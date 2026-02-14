@@ -1,0 +1,12 @@
+{
+  "name": "@zhilian-os/agent-schedule",
+  "version": "0.1.0",
+  "private": true,
+  "description": "智能排班Agent - 基于客流预测和员工技能的自动排班系统",
+  "main": "src/index.py",
+  "scripts": {
+    "test": "pytest tests/ -v",
+    "lint": "ruff check src/",
+    "format": "black src/ tests/"
+  }
+}
