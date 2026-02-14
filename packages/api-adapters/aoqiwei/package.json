@@ -1,0 +1,12 @@
+{
+  "name": "@zhilian-os/api-adapters-aoqiwei",
+  "version": "0.1.0",
+  "private": true,
+  "description": "奥琦韦微生活系统API适配器",
+  "main": "src/index.py",
+  "scripts": {
+    "test": "pytest tests/ -v",
+    "lint": "ruff check src/",
+    "format": "black src/ tests/"
+  }
+}
