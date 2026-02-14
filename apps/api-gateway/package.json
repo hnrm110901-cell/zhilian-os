@@ -1,0 +1,17 @@
+{
+  "name": "@zhilian-os/api-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "description": "智链OS API网关服务",
+  "main": "src/main.py",
+  "scripts": {
+    "dev": "uvicorn src.main:app --reload --host 0.0.0.0 --port 8000",
+    "start": "uvicorn src.main:app --host 0.0.0.0 --port 8000",
+    "test": "pytest tests/ -v",
+    "lint": "ruff check src/",
+    "format": "black src/ tests/",
+    "type-check": "mypy src/"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
