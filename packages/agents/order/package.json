@@ -1,0 +1,12 @@
+{
+  "name": "@zhilian-os/agent-order",
+  "version": "0.1.0",
+  "private": true,
+  "description": "订单协同Agent - 预定、排位、等位、点单、结账全流程管理",
+  "main": "src/index.py",
+  "scripts": {
+    "test": "pytest tests/ -v",
+    "lint": "ruff check src/",
+    "format": "black src/ tests/"
+  }
+}
