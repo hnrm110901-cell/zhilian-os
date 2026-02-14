@@ -1,0 +1,23 @@
+{
+  "name": "@zhilian-os/agent-inventory",
+  "version": "0.1.0",
+  "description": "智能库存预警Agent - Intelligent Inventory Alert Agent",
+  "main": "src/__init__.py",
+  "scripts": {
+    "test": "pytest tests/",
+    "test:watch": "pytest-watch tests/",
+    "lint": "ruff check src/ tests/",
+    "format": "black src/ tests/"
+  },
+  "keywords": [
+    "inventory",
+    "alert",
+    "prediction",
+    "expiration",
+    "ai-agent"
+  ],
+  "dependencies": {
+    "@zhilian-os/api-adapter-pinzhi": "workspace:*"
+  },
+  "devDependencies": {}
+}
