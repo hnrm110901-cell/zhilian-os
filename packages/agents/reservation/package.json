@@ -1,0 +1,23 @@
+{
+  "name": "@zhilian-os/agent-reservation",
+  "version": "0.1.0",
+  "description": "预定宴会Agent - Reservation & Banquet Agent",
+  "main": "src/__init__.py",
+  "scripts": {
+    "test": "pytest tests/",
+    "test:watch": "pytest-watch tests/",
+    "lint": "ruff check src/ tests/",
+    "format": "black src/ tests/"
+  },
+  "keywords": [
+    "reservation",
+    "banquet",
+    "booking",
+    "event-management",
+    "ai-agent"
+  ],
+  "dependencies": {
+    "@zhilian-os/agent-order": "workspace:*"
+  },
+  "devDependencies": {}
+}
