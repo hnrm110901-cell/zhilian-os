@@ -1,0 +1,28 @@
+# 智链OS - Python依赖包
+# Zhilian OS - Python Dependencies
+
+# 核心依赖 Core Dependencies
+structlog>=23.1.0          # 结构化日志
+aiohttp>=3.9.0             # 异步HTTP客户端
+python-dotenv>=1.0.0       # 环境变量管理
+
+# 测试依赖 Testing Dependencies
+pytest>=7.4.0              # 测试框架
+pytest-asyncio>=0.21.0     # 异步测试支持
+pytest-cov>=4.1.0          # 测试覆盖率
+pytest-mock>=3.11.0        # Mock支持
+
+# 代码质量 Code Quality
+ruff>=0.1.0                # 代码检查和格式化
+black>=23.0.0              # 代码格式化
+mypy>=1.5.0                # 类型检查
+
+# API相关 API Related
+fastapi>=0.104.0           # API框架
+uvicorn[standard]>=0.24.0  # ASGI服务器
+pydantic>=2.4.0            # 数据验证
+
+# 可选依赖 Optional Dependencies
+# langchain>=0.1.0         # LLM框架 (如需要)
+# langgraph>=0.0.1         # LLM图框架 (如需要)
+# openai>=1.0.0            # OpenAI API (如需要)
