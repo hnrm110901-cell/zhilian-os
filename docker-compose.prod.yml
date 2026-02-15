@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  # 前端服务
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile.prod
+    container_name: zhilian-web
+    restart: always
+    ports:
+      - "3000:80"
+    environment:
+      - NODE_ENV=production
+    networks:
+      - zhilian-network
+    depends_on:
+      - api-gateway
+
+  # API Gateway服务
+  api-gateway:
+    build:
+      context: ./apps/api-gateway
+      dockerfile: Dockerfile.prod
+    container_name: zhilian-api
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_ENV=production
+      - DEBUG=False
+    env_file:
+      - ./apps/api-gateway/.env.production
+    volumes:
+      - ./logs:/var/log/zhilian-os
+    networks:
+      - zhilian-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Nginx反向代理
+  nginx:
+    image: nginx:alpine
+    container_name: zhilian-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - ./logs/nginx:/var/log/nginx
+    networks:
+      - zhilian-network
+    depends_on:
+      - web
+      - api-gateway
+
+  # Redis (可选 - 用于缓存)
+  redis:
+    image: redis:7-alpine
+    container_name: zhilian-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - zhilian-network
+    command: redis-server --appendonly yes
+
+networks:
+  zhilian-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+    driver: local
