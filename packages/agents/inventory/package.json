@@ -17,7 +17,7 @@
     "ai-agent"
   ],
   "dependencies": {
-    "@zhilian-os/api-adapter-pinzhi": "workspace:*"
+    "@zhilian-os/api-adapters-pinzhi": "workspace:*"
   },
   "devDependencies": {}
 }

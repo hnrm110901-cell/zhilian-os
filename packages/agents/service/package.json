@@ -17,7 +17,7 @@
     "ai-agent"
   ],
   "dependencies": {
-    "@zhilian-os/api-adapter-aoqiwei": "workspace:*"
+    "@zhilian-os/api-adapters-aoqiwei": "workspace:*"
   },
   "devDependencies": {}
 }

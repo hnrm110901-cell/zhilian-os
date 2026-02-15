@@ -1,11 +1,18 @@
 """
 Agent API路由
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Dict, Any
+import structlog
 
+from ..services.agent_service import AgentService
+
+logger = structlog.get_logger()
 router = APIRouter()
+
+# 初始化Agent服务
+agent_service = AgentService()
 
 
 class AgentRequest(BaseModel):
@@ -26,64 +33,103 @@ class AgentResponse(BaseModel):
 @router.post("/schedule", response_model=AgentResponse)
 async def schedule_agent(request: AgentRequest):
     """智能排班Agent"""
-    # TODO: 实现排班Agent逻辑
-    return AgentResponse(
-        agent_type="schedule",
-        output_data={"message": "排班Agent开发中"},
-        execution_time=0.0,
-    )
+    try:
+        result = await agent_service.execute_agent("schedule", request.input_data)
+        return AgentResponse(
+            agent_type="schedule",
+            output_data=result,
+            execution_time=result.get("execution_time", 0.0),
+        )
+    except Exception as e:
+        logger.error("排班Agent执行失败", exc_info=e)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/order", response_model=AgentResponse)
 async def order_agent(request: AgentRequest):
     """订单协同Agent"""
-    # TODO: 实现订单Agent逻辑
-    return AgentResponse(
-        agent_type="order",
-        output_data={"message": "订单Agent开发中"},
-        execution_time=0.0,
-    )
+    try:
+        result = await agent_service.execute_agent("order", request.input_data)
+        return AgentResponse(
+            agent_type="order",
+            output_data=result,
+            execution_time=result.get("execution_time", 0.0),
+        )
+    except Exception as e:
+        logger.error("订单Agent执行失败", exc_info=e)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/inventory", response_model=AgentResponse)
 async def inventory_agent(request: AgentRequest):
     """库存预警Agent"""
-    # TODO: 实现库存Agent逻辑
-    return AgentResponse(
-        agent_type="inventory",
-        output_data={"message": "库存Agent开发中"},
-        execution_time=0.0,
-    )
+    try:
+        result = await agent_service.execute_agent("inventory", request.input_data)
+        return AgentResponse(
+            agent_type="inventory",
+            output_data=result,
+            execution_time=result.get("execution_time", 0.0),
+        )
+    except Exception as e:
+        logger.error("库存Agent执行失败", exc_info=e)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/service", response_model=AgentResponse)
 async def service_agent(request: AgentRequest):
     """服务质量Agent"""
-    # TODO: 实现服务Agent逻辑
-    return AgentResponse(
-        agent_type="service",
-        output_data={"message": "服务Agent开发中"},
-        execution_time=0.0,
-    )
+    try:
+        result = await agent_service.execute_agent("service", request.input_data)
+        return AgentResponse(
+            agent_type="service",
+            output_data=result,
+            execution_time=result.get("execution_time", 0.0),
+        )
+    except Exception as e:
+        logger.error("服务Agent执行失败", exc_info=e)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/training", response_model=AgentResponse)
 async def training_agent(request: AgentRequest):
     """培训辅导Agent"""
-    # TODO: 实现培训Agent逻辑
-    return AgentResponse(
-        agent_type="training",
-        output_data={"message": "培训Agent开发中"},
-        execution_time=0.0,
-    )
+    try:
+        result = await agent_service.execute_agent("training", request.input_data)
+        return AgentResponse(
+            agent_type="training",
+            output_data=result,
+            execution_time=result.get("execution_time", 0.0),
+        )
+    except Exception as e:
+        logger.error("培训Agent执行失败", exc_info=e)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/decision", response_model=AgentResponse)
 async def decision_agent(request: AgentRequest):
     """决策支持Agent"""
-    # TODO: 实现决策Agent逻辑
-    return AgentResponse(
-        agent_type="decision",
-        output_data={"message": "决策Agent开发中"},
-        execution_time=0.0,
-    )
+    try:
+        result = await agent_service.execute_agent("decision", request.input_data)
+        return AgentResponse(
+            agent_type="decision",
+            output_data=result,
+            execution_time=result.get("execution_time", 0.0),
+        )
+    except Exception as e:
+        logger.error("决策Agent执行失败", exc_info=e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/reservation", response_model=AgentResponse)
+async def reservation_agent(request: AgentRequest):
+    """预定宴会Agent"""
+    try:
+        result = await agent_service.execute_agent("reservation", request.input_data)
+        return AgentResponse(
+            agent_type="reservation",
+            output_data=result,
+            execution_time=result.get("execution_time", 0.0),
+        )
+    except Exception as e:
+        logger.error("预定Agent执行失败", exc_info=e)
+        raise HTTPException(status_code=500, detail=str(e))
