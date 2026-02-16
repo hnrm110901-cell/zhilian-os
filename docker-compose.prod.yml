@@ -9,7 +9,7 @@ services:
     container_name: zhilian-web
     restart: always
     ports:
-      - "3000:80"
+      - "3001:80"
     environment:
       - NODE_ENV=production
     networks:
@@ -67,7 +67,7 @@ services:
     container_name: zhilian-redis
     restart: always
     ports:
-      - "6379:6379"
+      - "6380:6379"
     volumes:
       - redis-data:/data
     networks:
