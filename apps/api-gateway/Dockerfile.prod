@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # 复制requirements
-COPY requirements.txt .
+COPY ./apps/api-gateway/requirements.txt .
 
 # 安装Python依赖
 RUN pip install --no-cache-dir --user -r requirements.txt
@@ -22,8 +22,9 @@ WORKDIR /app
 # 复制Python依赖
 COPY --from=builder /root/.local /root/.local
 
-# 复制应用代码
-COPY . .
+# 复制应用代码和packages
+COPY ./apps/api-gateway/src ./src
+COPY ./packages ./packages
 
 # 设置环境变量
 ENV PATH=/root/.local/bin:$PATH

@@ -20,8 +20,8 @@ services:
   # API Gateway服务
   api-gateway:
     build:
-      context: ./apps/api-gateway
-      dockerfile: Dockerfile.prod
+      context: .
+      dockerfile: ./apps/api-gateway/Dockerfile.prod
     container_name: zhilian-api
     restart: always
     ports:

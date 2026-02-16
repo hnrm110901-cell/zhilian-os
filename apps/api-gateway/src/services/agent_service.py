@@ -11,7 +11,7 @@ import sys
 logger = structlog.get_logger()
 
 # 添加agents包路径
-agents_path = Path(__file__).parent.parent.parent.parent.parent / "packages" / "agents"
+agents_path = Path(__file__).parent.parent.parent / "packages" / "agents"
 sys.path.insert(0, str(agents_path))
 
 
