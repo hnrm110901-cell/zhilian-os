@@ -184,17 +184,28 @@ class AgentService:
         self, agent: Any, input_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """执行订单Agent"""
-        action = input_data.get("action", "process")
+        action = input_data.get("action", "create")
 
-        if action == "process":
-            return await agent.process_order(
-                order_id=input_data.get("order_id"),
-                order_data=input_data.get("order_data", {}),
-            )
-        elif action == "optimize":
-            return await agent.optimize_order_flow(
+        if action == "create":
+            return await agent.create_order(
                 store_id=input_data.get("store_id"),
-                date=input_data.get("date"),
+                table_id=input_data.get("table_id"),
+                customer_id=input_data.get("customer_id"),
+            )
+        elif action == "reservation":
+            return await agent.create_reservation(
+                customer_name=input_data.get("customer_name"),
+                customer_phone=input_data.get("customer_phone"),
+                party_size=input_data.get("party_size"),
+                reservation_time=input_data.get("reservation_time"),
+                special_requests=input_data.get("special_requests"),
+            )
+        elif action == "queue":
+            return await agent.join_queue(
+                store_id=input_data.get("store_id"),
+                customer_name=input_data.get("customer_name"),
+                customer_phone=input_data.get("customer_phone"),
+                party_size=input_data.get("party_size"),
             )
         else:
             return {"success": False, "error": f"未知的操作: {action}"}
@@ -203,18 +214,51 @@ class AgentService:
         self, agent: Any, input_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """执行库存Agent"""
-        action = input_data.get("action", "check")
+        action = input_data.get("action", "monitor")
 
-        if action == "check":
-            return await agent.check_inventory(
-                store_id=input_data.get("store_id"),
-                items=input_data.get("items", []),
-            )
+        if action == "monitor":
+            category = input_data.get("category")
+            items = await agent.monitor_inventory(category=category)
+            # Items might be dicts or objects, handle both
+            items_list = []
+            for item in items:
+                if isinstance(item, dict):
+                    items_list.append(item)
+                else:
+                    items_list.append({
+                        "item_id": getattr(item, 'item_id', ''),
+                        "name": getattr(item, 'name', ''),
+                        "current_stock": getattr(item, 'current_stock', 0),
+                        "unit": getattr(item, 'unit', ''),
+                        "status": getattr(item, 'status', ''),
+                    })
+            return {
+                "success": True,
+                "items": items_list,
+            }
         elif action == "predict":
-            return await agent.predict_demand(
-                store_id=input_data.get("store_id"),
-                date=input_data.get("date"),
-            )
+            days = input_data.get("days", 7)
+            predictions = await agent.predict_consumption(days=days)
+            return {"success": True, "predictions": predictions}
+        elif action == "alerts":
+            alerts = await agent.generate_restock_alerts()
+            # Handle both dict and object returns
+            alerts_list = []
+            for alert in alerts:
+                if isinstance(alert, dict):
+                    alerts_list.append(alert)
+                else:
+                    alerts_list.append({
+                        "item_id": getattr(alert, 'item_id', ''),
+                        "item_name": getattr(alert, 'item_name', ''),
+                        "current_stock": getattr(alert, 'current_stock', 0),
+                        "recommended_quantity": getattr(alert, 'recommended_quantity', 0),
+                        "urgency": getattr(alert, 'urgency', ''),
+                    })
+            return {
+                "success": True,
+                "alerts": alerts_list,
+            }
         else:
             return {"success": False, "error": f"未知的操作: {action}"}
 
@@ -222,17 +266,29 @@ class AgentService:
         self, agent: Any, input_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """执行服务Agent"""
-        action = input_data.get("action", "analyze")
+        action = input_data.get("action", "monitor")
 
-        if action == "analyze":
-            return await agent.analyze_service_quality(
-                store_id=input_data.get("store_id"),
-                date=input_data.get("date"),
+        if action == "monitor":
+            metrics = await agent.monitor_service_quality(
+                start_date=input_data.get("start_date"),
+                end_date=input_data.get("end_date"),
             )
-        elif action == "alert":
-            return await agent.check_service_alerts(
-                store_id=input_data.get("store_id"),
+            return {
+                "success": True,
+                "metrics": metrics,
+            }
+        elif action == "feedback":
+            feedback_data = input_data.get("feedback_data", [])
+            result = await agent.analyze_feedback(
+                feedback_list=feedback_data,
             )
+            return {"success": True, "analysis": result}
+        elif action == "complaint":
+            result = await agent.handle_complaint(
+                complaint_id=input_data.get("complaint_id"),
+                complaint_data=input_data.get("complaint_data", {}),
+            )
+            return {"success": True, "result": result}
         else:
             return {"success": False, "error": f"未知的操作: {action}"}
 
@@ -240,18 +296,27 @@ class AgentService:
         self, agent: Any, input_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """执行培训Agent"""
-        action = input_data.get("action", "recommend")
+        action = input_data.get("action", "assess")
 
-        if action == "recommend":
-            return await agent.recommend_training(
-                employee_id=input_data.get("employee_id"),
-                performance_data=input_data.get("performance_data", {}),
+        if action == "assess":
+            needs = await agent.assess_training_needs(
+                staff_id=input_data.get("staff_id"),
+                position=input_data.get("position"),
             )
-        elif action == "generate":
-            return await agent.generate_training_plan(
-                store_id=input_data.get("store_id"),
-                training_type=input_data.get("training_type"),
+            return {
+                "success": True,
+                "needs": needs if isinstance(needs, list) else [needs],
+            }
+        elif action == "plan":
+            plan = await agent.generate_training_plan(
+                staff_id=input_data.get("staff_id"),
+                training_needs=input_data.get("training_needs"),
+                start_date=input_data.get("start_date"),
             )
+            return {
+                "success": True,
+                "plan": plan,
+            }
         else:
             return {"success": False, "error": f"未知的操作: {action}"}
 
@@ -259,18 +324,26 @@ class AgentService:
         self, agent: Any, input_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """执行决策Agent"""
-        action = input_data.get("action", "analyze")
+        action = input_data.get("action", "kpi")
 
-        if action == "analyze":
-            return await agent.analyze_business(
-                store_id=input_data.get("store_id"),
-                date_range=input_data.get("date_range", {}),
+        if action == "kpi":
+            kpis = await agent.analyze_kpis(
+                start_date=input_data.get("start_date"),
+                end_date=input_data.get("end_date"),
             )
+            return {
+                "success": True,
+                "kpis": kpis if isinstance(kpis, list) else [kpis],
+            }
+        elif action == "insights":
+            insights = await agent.generate_insights()
+            return {
+                "success": True,
+                "insights": insights if isinstance(insights, list) else [insights],
+            }
         elif action == "recommend":
-            return await agent.recommend_actions(
-                store_id=input_data.get("store_id"),
-                business_data=input_data.get("business_data", {}),
-            )
+            recommendations = await agent.generate_recommendations()
+            return {"success": True, "recommendations": recommendations}
         else:
             return {"success": False, "error": f"未知的操作: {action}"}
 
