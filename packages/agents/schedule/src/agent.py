@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 # Add core module to path
-core_path = Path(__file__).parent.parent.parent.parent / "apps" / "api-gateway" / "src" / "core"
+core_path = Path(__file__).parent.parent.parent.parent.parent / "src" / "core"
 sys.path.insert(0, str(core_path))
 
 from base_agent import BaseAgent, AgentResponse
