@@ -18,6 +18,14 @@ from enum import Enum
 from typing import TypedDict, List, Optional, Dict, Any
 from statistics import mean
 from collections import defaultdict
+import sys
+from pathlib import Path
+
+# Add core module to path
+core_path = Path(__file__).parent.parent.parent.parent / "apps" / "api-gateway" / "src" / "core"
+sys.path.insert(0, str(core_path))
+
+from base_agent import BaseAgent, AgentResponse
 
 logger = structlog.get_logger()
 
@@ -169,7 +177,7 @@ class SkillGap(TypedDict):
     priority: TrainingPriority  # 优先级
 
 
-class TrainingAgent:
+class TrainingAgent(BaseAgent):
     """
     智能培训Agent
 
@@ -194,6 +202,7 @@ class TrainingAgent:
             store_id: 门店ID
             training_config: 培训配置
         """
+        super().__init__()
         self.store_id = store_id
         self.training_config = training_config or {
             "min_passing_score": 70,  # 最低及格分数
@@ -205,6 +214,89 @@ class TrainingAgent:
             ]
         }
         self.logger = logger.bind(agent="training", store_id=store_id)
+
+    def get_supported_actions(self) -> List[str]:
+        """获取支持的操作列表"""
+        return [
+            "assess_training_needs", "generate_training_plan", "track_training_progress",
+            "evaluate_training_effectiveness", "analyze_skill_gaps",
+            "manage_certificates", "issue_certificate", "get_training_report"
+        ]
+
+    async def execute(self, action: str, params: Dict[str, Any]) -> AgentResponse:
+        """
+        执行Agent操作
+
+        Args:
+            action: 操作名称
+            params: 操作参数
+
+        Returns:
+            AgentResponse: 统一的响应格式
+        """
+        try:
+            if action == "assess_training_needs":
+                result = await self.assess_training_needs(
+                    staff_id=params.get("staff_id"),
+                    position=params.get("position")
+                )
+                return AgentResponse(success=True, data=result)
+            elif action == "generate_training_plan":
+                result = await self.generate_training_plan(
+                    staff_id=params["staff_id"],
+                    training_needs=params.get("training_needs"),
+                    start_date=params.get("start_date")
+                )
+                return AgentResponse(success=True, data=result)
+            elif action == "track_training_progress":
+                result = await self.track_training_progress(
+                    staff_id=params.get("staff_id"),
+                    plan_id=params.get("plan_id")
+                )
+                return AgentResponse(success=True, data=result)
+            elif action == "evaluate_training_effectiveness":
+                result = await self.evaluate_training_effectiveness(
+                    course_id=params.get("course_id"),
+                    start_date=params.get("start_date"),
+                    end_date=params.get("end_date")
+                )
+                return AgentResponse(success=True, data=result)
+            elif action == "analyze_skill_gaps":
+                result = await self.analyze_skill_gaps(
+                    staff_id=params["staff_id"]
+                )
+                return AgentResponse(success=True, data=result)
+            elif action == "manage_certificates":
+                result = await self.manage_certificates(
+                    staff_id=params.get("staff_id"),
+                    include_expired=params.get("include_expired", False)
+                )
+                return AgentResponse(success=True, data=result)
+            elif action == "issue_certificate":
+                result = await self.issue_certificate(
+                    staff_id=params["staff_id"],
+                    course_id=params["course_id"],
+                    record_id=params["record_id"]
+                )
+                return AgentResponse(success=True, data=result)
+            elif action == "get_training_report":
+                result = await self.get_training_report(
+                    start_date=params.get("start_date"),
+                    end_date=params.get("end_date")
+                )
+                return AgentResponse(success=True, data=result)
+            else:
+                return AgentResponse(
+                    success=False,
+                    data=None,
+                    error=f"Unsupported action: {action}"
+                )
+        except Exception as e:
+            return AgentResponse(
+                success=False,
+                data=None,
+                error=str(e)
+            )
 
     async def assess_training_needs(
         self,

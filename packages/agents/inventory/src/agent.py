@@ -15,6 +15,14 @@ from datetime import datetime, timedelta
 from enum import Enum
 from typing import TypedDict, List, Optional, Dict, Any
 from statistics import mean, stdev
+import sys
+from pathlib import Path
+
+# Add core module to path
+core_path = Path(__file__).parent.parent.parent.parent / "apps" / "api-gateway" / "src" / "core"
+sys.path.insert(0, str(core_path))
+
+from base_agent import BaseAgent, AgentResponse
 
 logger = structlog.get_logger()
 
@@ -105,7 +113,7 @@ class PredictionResult(TypedDict):
     days_until_stockout: Optional[int]  # 预计缺货天数
 
 
-class InventoryAgent:
+class InventoryAgent(BaseAgent):
     """
     智能库存预警Agent
 
@@ -131,6 +139,7 @@ class InventoryAgent:
             pinzhi_adapter: 品智收银适配器
             alert_thresholds: 预警阈值配置
         """
+        super().__init__()
         self.store_id = store_id
         self.pinzhi_adapter = pinzhi_adapter
         self.alert_thresholds = alert_thresholds or {
@@ -140,6 +149,72 @@ class InventoryAgent:
             "expiring_urgent_days": 3,  # 紧急过期天数
         }
         self.logger = logger.bind(agent="inventory", store_id=store_id)
+
+    def get_supported_actions(self) -> List[str]:
+        """获取支持的操作列表"""
+        return [
+            "monitor_inventory", "predict_consumption", "generate_restock_alerts",
+            "check_expiration", "optimize_stock_levels", "get_inventory_report"
+        ]
+
+    async def execute(self, action: str, params: Dict[str, Any]) -> AgentResponse:
+        """
+        执行Agent操作
+
+        Args:
+            action: 操作名称
+            params: 操作参数
+
+        Returns:
+            AgentResponse: 统一的响应格式
+        """
+        try:
+            if action == "monitor_inventory":
+                result = await self.monitor_inventory(
+                    category=params.get("category")
+                )
+                return AgentResponse(success=True, data=result)
+            elif action == "predict_consumption":
+                result = await self.predict_consumption(
+                    item_id=params["item_id"],
+                    history_days=params.get("history_days", 30),
+                    forecast_days=params.get("forecast_days", 7),
+                    method=params.get("method", PredictionMethod.WEIGHTED_AVERAGE)
+                )
+                return AgentResponse(success=True, data=result)
+            elif action == "generate_restock_alerts":
+                result = await self.generate_restock_alerts(
+                    category=params.get("category")
+                )
+                return AgentResponse(success=True, data=result)
+            elif action == "check_expiration":
+                result = await self.check_expiration(
+                    category=params.get("category")
+                )
+                return AgentResponse(success=True, data=result)
+            elif action == "optimize_stock_levels":
+                result = await self.optimize_stock_levels(
+                    item_id=params["item_id"],
+                    analysis_days=params.get("analysis_days", 90)
+                )
+                return AgentResponse(success=True, data=result)
+            elif action == "get_inventory_report":
+                result = await self.get_inventory_report(
+                    category=params.get("category")
+                )
+                return AgentResponse(success=True, data=result)
+            else:
+                return AgentResponse(
+                    success=False,
+                    data=None,
+                    error=f"Unsupported action: {action}"
+                )
+        except Exception as e:
+            return AgentResponse(
+                success=False,
+                data=None,
+                error=str(e)
+            )
 
     async def monitor_inventory(
         self,

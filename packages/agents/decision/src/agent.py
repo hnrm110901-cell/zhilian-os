@@ -18,6 +18,14 @@ from enum import Enum
 from typing import TypedDict, List, Optional, Dict, Any
 from statistics import mean, stdev
 from collections import defaultdict
+import sys
+from pathlib import Path
+
+# Add core module to path
+core_path = Path(__file__).parent.parent.parent.parent / "apps" / "api-gateway" / "src" / "core"
+sys.path.insert(0, str(core_path))
+
+from base_agent import BaseAgent, AgentResponse
 
 logger = structlog.get_logger()
 
@@ -130,7 +138,7 @@ class StrategicPlan(TypedDict):
     created_at: str  # 创建时间
 
 
-class DecisionAgent:
+class DecisionAgent(BaseAgent):
     """
     智能决策Agent
 
@@ -165,6 +173,7 @@ class DecisionAgent:
             training_agent: 培训Agent
             kpi_targets: KPI目标值
         """
+        super().__init__()
         self.store_id = store_id
         self.schedule_agent = schedule_agent
         self.order_agent = order_agent
@@ -179,6 +188,81 @@ class DecisionAgent:
             "inventory_turnover": 12,  # 库存周转率12次/年
         }
         self.logger = logger.bind(agent="decision", store_id=store_id)
+
+    def get_supported_actions(self) -> List[str]:
+        """获取支持的操作列表"""
+        return [
+            "analyze_kpis", "generate_insights", "generate_recommendations",
+            "forecast_trends", "optimize_resources", "create_strategic_plan",
+            "get_decision_report"
+        ]
+
+    async def execute(self, action: str, params: Dict[str, Any]) -> AgentResponse:
+        """
+        执行Agent操作
+
+        Args:
+            action: 操作名称
+            params: 操作参数
+
+        Returns:
+            AgentResponse: 统一的响应格式
+        """
+        try:
+            if action == "analyze_kpis":
+                result = await self.analyze_kpis(
+                    start_date=params.get("start_date"),
+                    end_date=params.get("end_date")
+                )
+                return AgentResponse(success=True, data=result)
+            elif action == "generate_insights":
+                result = await self.generate_insights(
+                    start_date=params.get("start_date"),
+                    end_date=params.get("end_date")
+                )
+                return AgentResponse(success=True, data=result)
+            elif action == "generate_recommendations":
+                result = await self.generate_recommendations(
+                    decision_type=params.get("decision_type"),
+                    start_date=params.get("start_date"),
+                    end_date=params.get("end_date")
+                )
+                return AgentResponse(success=True, data=result)
+            elif action == "forecast_trends":
+                result = await self.forecast_trends(
+                    metric_name=params["metric_name"],
+                    forecast_days=params.get("forecast_days", 30),
+                    historical_days=params.get("historical_days", 90)
+                )
+                return AgentResponse(success=True, data=result)
+            elif action == "optimize_resources":
+                result = await self.optimize_resources(
+                    resource_type=params["resource_type"]
+                )
+                return AgentResponse(success=True, data=result)
+            elif action == "create_strategic_plan":
+                result = await self.create_strategic_plan(
+                    time_horizon=params.get("time_horizon", "1年")
+                )
+                return AgentResponse(success=True, data=result)
+            elif action == "get_decision_report":
+                result = await self.get_decision_report(
+                    start_date=params.get("start_date"),
+                    end_date=params.get("end_date")
+                )
+                return AgentResponse(success=True, data=result)
+            else:
+                return AgentResponse(
+                    success=False,
+                    data=None,
+                    error=f"Unsupported action: {action}"
+                )
+        except Exception as e:
+            return AgentResponse(
+                success=False,
+                data=None,
+                error=str(e)
+            )
 
     async def analyze_kpis(
         self,

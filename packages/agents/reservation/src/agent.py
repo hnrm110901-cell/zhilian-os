@@ -16,6 +16,14 @@ from datetime import datetime, timedelta
 from enum import Enum
 from typing import TypedDict, List, Optional, Dict, Any
 from collections import defaultdict
+import sys
+from pathlib import Path
+
+# Add core module to path
+core_path = Path(__file__).parent.parent.parent.parent / "apps" / "api-gateway" / "src" / "core"
+sys.path.insert(0, str(core_path))
+
+from base_agent import BaseAgent, AgentResponse
 
 logger = structlog.get_logger()
 
@@ -155,7 +163,7 @@ class ReservationAnalytics(TypedDict):
     revenue_from_reservations: int  # 预定收入(分)
 
 
-class ReservationAgent:
+class ReservationAgent(BaseAgent):
     """
     预定宴会Agent
 
@@ -182,6 +190,7 @@ class ReservationAgent:
             order_agent: 订单Agent
             config: 配置参数
         """
+        super().__init__()
         self.store_id = store_id
         self.order_agent = order_agent
         self.config = config or {
@@ -193,6 +202,95 @@ class ReservationAgent:
             "reminder_hours": 2,  # 提醒提前时间(小时)
         }
         self.logger = logger.bind(agent="reservation", store_id=store_id)
+
+    def get_supported_actions(self) -> List[str]:
+        """获取支持的操作列表"""
+        return [
+            "create_reservation", "confirm_reservation", "cancel_reservation",
+            "create_banquet", "allocate_seating", "send_reminder",
+            "analyze_reservations"
+        ]
+
+    async def execute(self, action: str, params: Dict[str, Any]) -> AgentResponse:
+        """
+        执行Agent操作
+
+        Args:
+            action: 操作名称
+            params: 操作参数
+
+        Returns:
+            AgentResponse: 统一的响应格式
+        """
+        try:
+            if action == "create_reservation":
+                result = await self.create_reservation(
+                    customer_id=params["customer_id"],
+                    customer_name=params["customer_name"],
+                    customer_phone=params["customer_phone"],
+                    reservation_date=params["reservation_date"],
+                    reservation_time=params["reservation_time"],
+                    party_size=params["party_size"],
+                    reservation_type=params.get("reservation_type", ReservationType.REGULAR),
+                    special_requests=params.get("special_requests")
+                )
+                return AgentResponse(success=True, data=result)
+            elif action == "confirm_reservation":
+                result = await self.confirm_reservation(
+                    reservation_id=params["reservation_id"]
+                )
+                return AgentResponse(success=True, data=result)
+            elif action == "cancel_reservation":
+                result = await self.cancel_reservation(
+                    reservation_id=params["reservation_id"],
+                    reason=params.get("reason")
+                )
+                return AgentResponse(success=True, data=result)
+            elif action == "create_banquet":
+                result = await self.create_banquet(
+                    customer_id=params["customer_id"],
+                    customer_name=params["customer_name"],
+                    customer_phone=params["customer_phone"],
+                    banquet_type=params["banquet_type"],
+                    banquet_date=params["banquet_date"],
+                    banquet_time=params["banquet_time"],
+                    guest_count=params["guest_count"],
+                    table_count=params["table_count"],
+                    venue=params["venue"],
+                    menu_items=params["menu_items"],
+                    price_per_table=params["price_per_table"],
+                    special_requirements=params.get("special_requirements")
+                )
+                return AgentResponse(success=True, data=result)
+            elif action == "allocate_seating":
+                result = await self.allocate_seating(
+                    date=params["date"],
+                    time_slot=params["time_slot"]
+                )
+                return AgentResponse(success=True, data=result)
+            elif action == "send_reminder":
+                result = await self.send_reminder(
+                    reservation_id=params["reservation_id"]
+                )
+                return AgentResponse(success=True, data=result)
+            elif action == "analyze_reservations":
+                result = await self.analyze_reservations(
+                    start_date=params.get("start_date"),
+                    end_date=params.get("end_date")
+                )
+                return AgentResponse(success=True, data=result)
+            else:
+                return AgentResponse(
+                    success=False,
+                    data=None,
+                    error=f"Unsupported action: {action}"
+                )
+        except Exception as e:
+            return AgentResponse(
+                success=False,
+                data=None,
+                error=str(e)
+            )
 
     async def create_reservation(
         self,

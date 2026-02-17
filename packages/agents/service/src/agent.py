@@ -17,6 +17,14 @@ from enum import Enum
 from typing import TypedDict, List, Optional, Dict, Any
 from statistics import mean, stdev
 from collections import defaultdict
+import sys
+from pathlib import Path
+
+# Add core module to path
+core_path = Path(__file__).parent.parent.parent.parent / "apps" / "api-gateway" / "src" / "core"
+sys.path.insert(0, str(core_path))
+
+from base_agent import BaseAgent, AgentResponse
 
 logger = structlog.get_logger()
 
@@ -142,7 +150,7 @@ class ServiceImprovement(TypedDict):
     created_at: str  # 创建时间
 
 
-class ServiceAgent:
+class ServiceAgent(BaseAgent):
     """
     智能服务Agent
 
@@ -169,6 +177,7 @@ class ServiceAgent:
             aoqiwei_adapter: 奥琦韦会员系统适配器
             quality_thresholds: 质量阈值配置
         """
+        super().__init__()
         self.store_id = store_id
         self.aoqiwei_adapter = aoqiwei_adapter
         self.quality_thresholds = quality_thresholds or {
@@ -178,6 +187,82 @@ class ServiceAgent:
             "min_resolution_rate": 0.90,  # 最低解决率
         }
         self.logger = logger.bind(agent="service", store_id=store_id)
+
+    def get_supported_actions(self) -> List[str]:
+        """获取支持的操作列表"""
+        return [
+            "collect_feedback", "analyze_feedback", "handle_complaint",
+            "monitor_service_quality", "track_staff_performance",
+            "generate_improvements", "get_service_report"
+        ]
+
+    async def execute(self, action: str, params: Dict[str, Any]) -> AgentResponse:
+        """
+        执行Agent操作
+
+        Args:
+            action: 操作名称
+            params: 操作参数
+
+        Returns:
+            AgentResponse: 统一的响应格式
+        """
+        try:
+            if action == "collect_feedback":
+                result = await self.collect_feedback(
+                    start_date=params.get("start_date"),
+                    end_date=params.get("end_date"),
+                    feedback_type=params.get("feedback_type")
+                )
+                return AgentResponse(success=True, data=result)
+            elif action == "analyze_feedback":
+                result = await self.analyze_feedback(
+                    feedback=params["feedback"]
+                )
+                return AgentResponse(success=True, data=result)
+            elif action == "handle_complaint":
+                result = await self.handle_complaint(
+                    feedback=params["feedback"],
+                    assigned_to=params.get("assigned_to")
+                )
+                return AgentResponse(success=True, data=result)
+            elif action == "monitor_service_quality":
+                result = await self.monitor_service_quality(
+                    start_date=params.get("start_date"),
+                    end_date=params.get("end_date")
+                )
+                return AgentResponse(success=True, data=result)
+            elif action == "track_staff_performance":
+                result = await self.track_staff_performance(
+                    staff_id=params.get("staff_id"),
+                    start_date=params.get("start_date"),
+                    end_date=params.get("end_date")
+                )
+                return AgentResponse(success=True, data=result)
+            elif action == "generate_improvements":
+                result = await self.generate_improvements(
+                    start_date=params.get("start_date"),
+                    end_date=params.get("end_date")
+                )
+                return AgentResponse(success=True, data=result)
+            elif action == "get_service_report":
+                result = await self.get_service_report(
+                    start_date=params.get("start_date"),
+                    end_date=params.get("end_date")
+                )
+                return AgentResponse(success=True, data=result)
+            else:
+                return AgentResponse(
+                    success=False,
+                    data=None,
+                    error=f"Unsupported action: {action}"
+                )
+        except Exception as e:
+            return AgentResponse(
+                success=False,
+                data=None,
+                error=str(e)
+            )
 
     async def collect_feedback(
         self,
