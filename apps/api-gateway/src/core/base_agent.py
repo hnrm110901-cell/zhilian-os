@@ -37,14 +37,14 @@ class BaseAgent(ABC):
     所有Agent必须继承此类并实现抽象方法
     """
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
         """
         初始化Agent
 
         Args:
-            config: Agent配置字典
+            config: Agent配置字典（可选）
         """
-        self.config = config
+        self.config = config or {}
         self.status = AgentStatus.IDLE
         self.logger = None  # 子类可以设置logger
 
