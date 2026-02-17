@@ -6,6 +6,14 @@ from typing import Dict, Any, List, Optional, TypedDict
 from datetime import datetime, timedelta
 import structlog
 from enum import Enum
+import sys
+from pathlib import Path
+
+# Add core module to path
+core_path = Path(__file__).parent.parent.parent.parent / "apps" / "api-gateway" / "src" / "core"
+sys.path.insert(0, str(core_path))
+
+from base_agent import BaseAgent, AgentResponse
 
 logger = structlog.get_logger()
 
@@ -42,7 +50,7 @@ class ScheduleState(TypedDict):
     errors: List[str]
 
 
-class ScheduleAgent:
+class ScheduleAgent(BaseAgent):
     """智能排班Agent"""
 
     def __init__(self, config: Dict[str, Any]):
@@ -56,12 +64,67 @@ class ScheduleAgent:
                 - max_shift_hours: 最大班次时长
                 - max_weekly_hours: 每周最大工作时长
         """
+        super().__init__()
         self.config = config
         self.min_shift_hours = config.get("min_shift_hours", 4)
         self.max_shift_hours = config.get("max_shift_hours", 8)
         self.max_weekly_hours = config.get("max_weekly_hours", 40)
 
         logger.info("智能排班Agent初始化", config=config)
+
+    def get_supported_actions(self) -> List[str]:
+        """获取支持的操作列表"""
+        return ["run", "adjust_schedule", "get_schedule"]
+
+    async def execute(self, action: str, params: Dict[str, Any]) -> AgentResponse:
+        """
+        执行Agent操作
+
+        Args:
+            action: 操作名称
+            params: 操作参数
+
+        Returns:
+            AgentResponse: 统一的响应格式
+        """
+        if action == "run":
+            result = await self.run(
+                store_id=params["store_id"],
+                date=params["date"],
+                employees=params["employees"]
+            )
+            return AgentResponse(
+                success=result.get("success", True),
+                data=result,
+                error=result.get("error") if not result.get("success", True) else None
+            )
+        elif action == "adjust_schedule":
+            result = await self.adjust_schedule(
+                schedule_id=params["schedule_id"],
+                adjustments=params["adjustments"]
+            )
+            return AgentResponse(
+                success=result.get("success", True),
+                data=result,
+                error=result.get("error") if not result.get("success", True) else None
+            )
+        elif action == "get_schedule":
+            result = await self.get_schedule(
+                store_id=params["store_id"],
+                start_date=params["start_date"],
+                end_date=params["end_date"]
+            )
+            return AgentResponse(
+                success=result.get("success", True),
+                data=result,
+                error=result.get("error") if not result.get("success", True) else None
+            )
+        else:
+            return AgentResponse(
+                success=False,
+                data=None,
+                error=f"Unsupported action: {action}"
+            )
 
     async def analyze_traffic(self, state: ScheduleState) -> ScheduleState:
         """

@@ -7,6 +7,14 @@ from datetime import datetime, timedelta
 from enum import Enum
 import structlog
 import uuid
+import sys
+from pathlib import Path
+
+# Add core module to path
+core_path = Path(__file__).parent.parent.parent.parent / "apps" / "api-gateway" / "src" / "core"
+sys.path.insert(0, str(core_path))
+
+from base_agent import BaseAgent, AgentResponse
 
 logger = structlog.get_logger()
 
@@ -64,7 +72,7 @@ class OrderState(TypedDict):
     updated_at: str
 
 
-class OrderAgent:
+class OrderAgent(BaseAgent):
     """订单协同Agent"""
 
     def __init__(self, config: Dict[str, Any]):
@@ -74,11 +82,74 @@ class OrderAgent:
         Args:
             config: 配置字典
         """
+        super().__init__()
         self.config = config
         self.average_wait_time = config.get("average_wait_time", 30)  # 平均等位时间（分钟）
         self.average_dining_time = config.get("average_dining_time", 90)  # 平均用餐时间（分钟）
 
         logger.info("订单协同Agent初始化", config=config)
+
+    def get_supported_actions(self) -> List[str]:
+        """获取支持的操作列表"""
+        return [
+            "create_reservation", "join_queue", "get_queue_status",
+            "create_order", "add_dish", "recommend_dishes",
+            "calculate_bill", "process_payment", "get_order",
+            "update_order_status", "cancel_order"
+        ]
+
+    async def execute(self, action: str, params: Dict[str, Any]) -> AgentResponse:
+        """
+        执行Agent操作
+
+        Args:
+            action: 操作名称
+            params: 操作参数
+
+        Returns:
+            AgentResponse: 统一的响应格式
+        """
+        try:
+            if action == "create_reservation":
+                result = await self.create_reservation(**params)
+            elif action == "join_queue":
+                result = await self.join_queue(**params)
+            elif action == "get_queue_status":
+                result = await self.get_queue_status(**params)
+            elif action == "create_order":
+                result = await self.create_order(**params)
+            elif action == "add_dish":
+                result = await self.add_dish(**params)
+            elif action == "recommend_dishes":
+                result = await self.recommend_dishes(**params)
+            elif action == "calculate_bill":
+                result = await self.calculate_bill(**params)
+            elif action == "process_payment":
+                result = await self.process_payment(**params)
+            elif action == "get_order":
+                result = await self.get_order(**params)
+            elif action == "update_order_status":
+                result = await self.update_order_status(**params)
+            elif action == "cancel_order":
+                result = await self.cancel_order(**params)
+            else:
+                return AgentResponse(
+                    success=False,
+                    data=None,
+                    error=f"Unsupported action: {action}"
+                )
+
+            return AgentResponse(
+                success=result.get("success", True),
+                data=result,
+                error=result.get("error") if not result.get("success", True) else None
+            )
+        except Exception as e:
+            return AgentResponse(
+                success=False,
+                data=None,
+                error=str(e)
+            )
 
     # ==================== 预定管理 ====================
 
