@@ -29,12 +29,19 @@ services:
     environment:
       - APP_ENV=production
       - DEBUG=False
+      - DATABASE_URL=postgresql+asyncpg://zhilian:zhilian@postgres:5432/zhilian_os
+      - REDIS_URL=redis://redis:6379/0
     env_file:
       - ./apps/api-gateway/.env.production
     volumes:
       - ./logs:/var/log/zhilian-os
     networks:
       - zhilian-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
       interval: 30s
@@ -74,10 +81,33 @@ services:
       - zhilian-network
     command: redis-server --appendonly yes
 
+  # PostgreSQL数据库
+  postgres:
+    image: postgres:15-alpine
+    container_name: zhilian-postgres
+    restart: always
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=zhilian
+      - POSTGRES_PASSWORD=zhilian
+      - POSTGRES_DB=zhilian_os
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - zhilian-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zhilian"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 networks:
   zhilian-network:
     driver: bridge
 
 volumes:
   redis-data:
+    driver: local
+  postgres-data:
     driver: local

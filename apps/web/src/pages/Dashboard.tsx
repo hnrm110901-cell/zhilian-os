@@ -1,158 +1,169 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Col, Row, Statistic, Alert, Spin } from 'antd';
+import { Card, Col, Row, Statistic, Alert, Spin, Tag } from 'antd';
 import {
-  UserOutlined,
-  ShoppingOutlined,
   InboxOutlined,
   CheckCircleOutlined,
+  RiseOutlined,
+  DashboardOutlined,
 } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { apiClient } from '../services/api';
+import { decisionAgentService, type DecisionReport } from '../services/decisionAgent';
 
 const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [healthStatus, setHealthStatus] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [decisionReport, setDecisionReport] = useState<DecisionReport | null>(null);
 
   useEffect(() => {
-    checkHealth();
+    loadDashboardData();
   }, []);
 
-  const checkHealth = async () => {
+  const loadDashboardData = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.healthCheck();
-      setHealthStatus(response);
       setError(null);
+
+      // 并发加载健康检查和决策报告
+      const [health, report] = await Promise.all([
+        apiClient.healthCheck(),
+        decisionAgentService.getDecisionReport(),
+      ]);
+
+      setHealthStatus(health);
+      setDecisionReport(report);
     } catch (err: any) {
-      setError(err.message || '无法连接到后端服务');
+      console.error('Dashboard data loading error:', err);
+      setError(err.message || '无法加载数据');
     } finally {
       setLoading(false);
     }
   };
 
-  // 订单趋势图配置
-  const orderTrendOption = {
-    title: {
-      text: '近7天订单趋势',
-      left: 'center',
-    },
-    tooltip: {
-      trigger: 'axis',
-    },
-    xAxis: {
-      type: 'category',
-      data: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
-    },
-    yAxis: {
-      type: 'value',
-    },
-    series: [
-      {
-        name: '订单数',
-        data: [280, 310, 295, 340, 380, 420, 328],
-        type: 'line',
-        smooth: true,
-        itemStyle: {
-          color: '#1890ff',
-        },
-        areaStyle: {
-          color: {
-            type: 'linear',
-            x: 0,
-            y: 0,
-            x2: 0,
-            y2: 1,
-            colorStops: [
-              { offset: 0, color: 'rgba(24, 144, 255, 0.3)' },
-              { offset: 1, color: 'rgba(24, 144, 255, 0.05)' },
-            ],
-          },
-        },
-      },
-    ],
+  // 从决策报告中提取KPI数据用于图表
+  const getKPIChartData = () => {
+    if (!decisionReport) return null;
+
+    const kpis = decisionReport.kpi_summary.key_kpis;
+
+    // 营收类KPI趋势
+    const revenueKPIs = kpis.filter(k => k.category === 'revenue');
+
+    return {
+      categories: revenueKPIs.map(k => k.metric_name),
+      currentValues: revenueKPIs.map(k => k.current_value),
+      targetValues: revenueKPIs.map(k => k.target_value),
+      achievementRates: revenueKPIs.map(k => k.achievement_rate * 100),
+    };
   };
 
-  // Agent使用情况饼图
-  const agentUsageOption = {
-    title: {
-      text: 'Agent使用分布',
-      left: 'center',
-    },
-    tooltip: {
-      trigger: 'item',
-      formatter: '{a} <br/>{b}: {c} ({d}%)',
-    },
-    legend: {
-      orient: 'vertical',
-      left: 'left',
-      top: 'middle',
-    },
-    series: [
-      {
-        name: '调用次数',
-        type: 'pie',
-        radius: '50%',
-        data: [
-          { value: 235, name: '智能排班' },
-          { value: 189, name: '订单协同' },
-          { value: 156, name: '库存预警' },
-          { value: 142, name: '服务质量' },
-          { value: 98, name: '培训辅导' },
-          { value: 87, name: '决策支持' },
-          { value: 76, name: '预定宴会' },
-        ],
-        emphasis: {
+  // KPI达成率图表配置
+  const kpiAchievementOption = () => {
+    const chartData = getKPIChartData();
+    if (!chartData) return {};
+
+    return {
+      title: {
+        text: 'KPI达成率',
+        left: 'center',
+      },
+      tooltip: {
+        trigger: 'axis',
+        formatter: (params: any) => {
+          let result = params[0].name + '<br/>';
+          params.forEach((item: any) => {
+            result += `${item.marker}${item.seriesName}: ${item.value.toFixed(1)}%<br/>`;
+          });
+          return result;
+        },
+      },
+      legend: {
+        data: ['达成率', '目标线'],
+        bottom: 10,
+      },
+      xAxis: {
+        type: 'category',
+        data: chartData.categories,
+        axisLabel: {
+          interval: 0,
+          rotate: 30,
+        },
+      },
+      yAxis: {
+        type: 'value',
+        name: '达成率(%)',
+        max: 120,
+      },
+      series: [
+        {
+          name: '达成率',
+          data: chartData.achievementRates,
+          type: 'bar',
           itemStyle: {
-            shadowBlur: 10,
-            shadowOffsetX: 0,
-            shadowColor: 'rgba(0, 0, 0, 0.5)',
+            color: (params: any) => {
+              const value = params.value;
+              if (value >= 95) return '#52c41a';
+              if (value >= 85) return '#faad14';
+              return '#f5222d';
+            },
           },
         },
-      },
-    ],
+        {
+          name: '目标线',
+          data: chartData.categories.map(() => 100),
+          type: 'line',
+          itemStyle: {
+            color: '#1890ff',
+          },
+          lineStyle: {
+            type: 'dashed',
+          },
+        },
+      ],
+    };
   };
 
-  // 门店营业额柱状图
-  const revenueOption = {
-    title: {
-      text: '门店营业额TOP5',
-      left: 'center',
-    },
-    tooltip: {
-      trigger: 'axis',
-      axisPointer: {
-        type: 'shadow',
+  // KPI状态分布饼图
+  const kpiStatusOption = () => {
+    if (!decisionReport) return {};
+
+    const statusDist = decisionReport.kpi_summary.status_distribution;
+
+    return {
+      title: {
+        text: 'KPI状态分布',
+        left: 'center',
       },
-    },
-    xAxis: {
-      type: 'category',
-      data: ['朝阳店', '海淀店', '西城店', '东城店', '丰台店'],
-    },
-    yAxis: {
-      type: 'value',
-      name: '营业额(万元)',
-    },
-    series: [
-      {
-        name: '营业额',
-        data: [45.2, 38.6, 35.8, 32.4, 28.9],
-        type: 'bar',
-        itemStyle: {
-          color: {
-            type: 'linear',
-            x: 0,
-            y: 0,
-            x2: 0,
-            y2: 1,
-            colorStops: [
-              { offset: 0, color: '#52c41a' },
-              { offset: 1, color: '#95de64' },
-            ],
+      tooltip: {
+        trigger: 'item',
+        formatter: '{a} <br/>{b}: {c} ({d}%)',
+      },
+      legend: {
+        orient: 'vertical',
+        left: 'left',
+        top: 'middle',
+      },
+      series: [
+        {
+          name: 'KPI数量',
+          type: 'pie',
+          radius: '50%',
+          data: [
+            { value: statusDist.on_track || 0, name: '正常', itemStyle: { color: '#52c41a' } },
+            { value: statusDist.at_risk || 0, name: '风险', itemStyle: { color: '#faad14' } },
+            { value: statusDist.off_track || 0, name: '异常', itemStyle: { color: '#f5222d' } },
+          ],
+          emphasis: {
+            itemStyle: {
+              shadowBlur: 10,
+              shadowOffsetX: 0,
+              shadowColor: 'rgba(0, 0, 0, 0.5)',
+            },
           },
         },
-      },
-    ],
+      ],
+    };
   };
 
   if (loading) {
@@ -179,7 +190,7 @@ const Dashboard: React.FC = () => {
         />
       )}
 
-      {healthStatus && (
+      {healthStatus && !error && (
         <Alert
           message="系统状态"
           description={`后端服务运行正常 - ${healthStatus.status}`}
@@ -189,23 +200,48 @@ const Dashboard: React.FC = () => {
         />
       )}
 
+      {/* 健康分数卡片 */}
+      {decisionReport && (
+        <Card style={{ marginBottom: 16, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+          <Row align="middle">
+            <Col span={18}>
+              <div style={{ color: 'white' }}>
+                <h2 style={{ color: 'white', marginBottom: 8 }}>
+                  <DashboardOutlined /> 系统健康分数
+                </h2>
+                <p style={{ fontSize: 48, fontWeight: 'bold', margin: 0 }}>
+                  {decisionReport.overall_health_score.toFixed(1)}
+                </p>
+                <p style={{ opacity: 0.9, marginTop: 8 }}>
+                  {decisionReport.kpi_summary.total_kpis} 个KPI指标 |
+                  {' '}{decisionReport.action_required} 项需要关注
+                </p>
+              </div>
+            </Col>
+            <Col span={6} style={{ textAlign: 'right' }}>
+              <div style={{ color: 'white', fontSize: 14 }}>
+                <div style={{ marginBottom: 8 }}>
+                  <Tag color="success">{decisionReport.kpi_summary.status_distribution.on_track || 0} 正常</Tag>
+                </div>
+                <div style={{ marginBottom: 8 }}>
+                  <Tag color="warning">{decisionReport.kpi_summary.status_distribution.at_risk || 0} 风险</Tag>
+                </div>
+                <div>
+                  <Tag color="error">{decisionReport.kpi_summary.status_distribution.off_track || 0} 异常</Tag>
+                </div>
+              </div>
+            </Col>
+          </Row>
+        </Card>
+      )}
+
       <Row gutter={16}>
         <Col span={6}>
           <Card>
             <Statistic
-              title="活跃门店"
-              value={12}
-              prefix={<UserOutlined />}
-              valueStyle={{ color: '#3f8600' }}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title="今日订单"
-              value={328}
-              prefix={<ShoppingOutlined />}
+              title="KPI总数"
+              value={decisionReport?.kpi_summary.total_kpis || 0}
+              prefix={<DashboardOutlined />}
               valueStyle={{ color: '#1890ff' }}
             />
           </Card>
@@ -213,8 +249,19 @@ const Dashboard: React.FC = () => {
         <Col span={6}>
           <Card>
             <Statistic
-              title="库存预警"
-              value={5}
+              title="业务洞察"
+              value={decisionReport?.insights_summary.total_insights || 0}
+              suffix={`/ ${decisionReport?.insights_summary.high_impact || 0} 高影响`}
+              prefix={<RiseOutlined />}
+              valueStyle={{ color: '#faad14' }}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card>
+            <Statistic
+              title="待处理建议"
+              value={decisionReport?.action_required || 0}
               prefix={<InboxOutlined />}
               valueStyle={{ color: '#cf1322' }}
             />
@@ -223,11 +270,13 @@ const Dashboard: React.FC = () => {
         <Col span={6}>
           <Card>
             <Statistic
-              title="Agent运行"
-              value={7}
-              suffix="/ 7"
+              title="KPI达标率"
+              value={decisionReport ? (decisionReport.kpi_summary.on_track_rate * 100).toFixed(1) : 0}
+              suffix="%"
               prefix={<CheckCircleOutlined />}
-              valueStyle={{ color: '#52c41a' }}
+              valueStyle={{
+                color: decisionReport && decisionReport.kpi_summary.on_track_rate >= 0.8 ? '#52c41a' : '#faad14'
+              }}
             />
           </Card>
         </Col>
@@ -237,20 +286,42 @@ const Dashboard: React.FC = () => {
       <Row gutter={16} style={{ marginTop: 16 }}>
         <Col span={12}>
           <Card>
-            <ReactECharts option={orderTrendOption} style={{ height: 300 }} />
+            {decisionReport ? (
+              <ReactECharts option={kpiAchievementOption()} style={{ height: 300 }} />
+            ) : (
+              <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Spin />
+              </div>
+            )}
           </Card>
         </Col>
         <Col span={12}>
           <Card>
-            <ReactECharts option={agentUsageOption} style={{ height: 300 }} />
+            {decisionReport ? (
+              <ReactECharts option={kpiStatusOption()} style={{ height: 300 }} />
+            ) : (
+              <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Spin />
+              </div>
+            )}
           </Card>
         </Col>
       </Row>
 
       <Row gutter={16} style={{ marginTop: 16 }}>
         <Col span={12}>
-          <Card>
-            <ReactECharts option={revenueOption} style={{ height: 300 }} />
+          <Card title="关键业务洞察" bordered={false}>
+            {decisionReport?.insights_summary.key_insights.slice(0, 3).map((insight, index) => (
+              <div key={insight.insight_id} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: index < 2 ? '1px solid #f0f0f0' : 'none' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <strong>{insight.title}</strong>
+                  <Tag color={insight.impact_level === 'high' ? 'red' : insight.impact_level === 'medium' ? 'orange' : 'blue'}>
+                    {insight.impact_level === 'high' ? '高影响' : insight.impact_level === 'medium' ? '中影响' : '低影响'}
+                  </Tag>
+                </div>
+                <p style={{ color: '#666', fontSize: 13, margin: 0 }}>{insight.description}</p>
+              </div>
+            )) || <p style={{ color: '#999' }}>暂无洞察数据</p>}
           </Card>
         </Col>
         <Col span={12}>
@@ -259,12 +330,13 @@ const Dashboard: React.FC = () => {
             <p>• Agent数量: 7个</p>
             <p>• API状态: {healthStatus ? '正常' : '异常'}</p>
             <p>• 最后更新: {new Date().toLocaleString('zh-CN')}</p>
-            <p style={{ marginTop: 16, color: '#999' }}>
-              • 智能排班 - 基于客流预测的自动排班
-            </p>
-            <p style={{ color: '#999' }}>• 订单协同 - 全流程订单管理</p>
-            <p style={{ color: '#999' }}>• 库存预警 - 实时库存监控</p>
-            <p style={{ color: '#999' }}>• 服务质量 - 评价分析与监控</p>
+            {decisionReport && (
+              <>
+                <p style={{ marginTop: 16 }}>• 报告时间: {new Date(decisionReport.report_date).toLocaleString('zh-CN')}</p>
+                <p>• 门店ID: {decisionReport.store_id}</p>
+                <p>• 健康分数: {decisionReport.overall_health_score.toFixed(1)}/100</p>
+              </>
+            )}
           </Card>
         </Col>
       </Row>

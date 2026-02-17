@@ -43,11 +43,29 @@ async def startup_event():
     logger.info(f"环境: {settings.APP_ENV}")
     logger.info(f"调试模式: {settings.APP_DEBUG}")
 
+    # Initialize database
+    try:
+        from src.core.database import init_db
+        await init_db()
+        logger.info("数据库初始化成功")
+    except Exception as e:
+        logger.error("数据库初始化失败", error=str(e))
+        # Don't fail startup if database is not available
+        # This allows the API to run without database for testing
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """应用关闭事件"""
     logger.info("智链OS API Gateway 关闭中...")
+
+    # Close database connections
+    try:
+        from src.core.database import close_db
+        await close_db()
+        logger.info("数据库连接已关闭")
+    except Exception as e:
+        logger.error("关闭数据库连接失败", error=str(e))
 
 
 @app.exception_handler(Exception)
