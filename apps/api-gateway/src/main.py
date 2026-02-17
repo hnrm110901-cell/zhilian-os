@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 import structlog
 
 from src.core.config import settings
-from src.api import health, agents, auth, notifications, stores
+from src.api import health, agents, auth, notifications, stores, mobile, integrations
 
 # 配置结构化日志
 logger = structlog.get_logger()
@@ -37,6 +37,8 @@ app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(agents.router, prefix="/api/v1/agents", tags=["agents"])
 app.include_router(notifications.router, prefix="/api/v1", tags=["notifications"])
 app.include_router(stores.router, prefix="/api/v1", tags=["stores"])
+app.include_router(mobile.router, prefix="/api/v1", tags=["mobile"])
+app.include_router(integrations.router, prefix="/api/v1", tags=["integrations"])
 
 
 @app.on_event("startup")
