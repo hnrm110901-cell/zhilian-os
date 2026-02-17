@@ -1,12 +1,14 @@
 """
 Agent API路由
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Dict, Any
 import structlog
 
 from ..services.agent_service import AgentService
+from ..core.dependencies import get_current_active_user
+from ..models.user import User
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -31,8 +33,11 @@ class AgentResponse(BaseModel):
 
 
 @router.post("/schedule", response_model=AgentResponse)
-async def schedule_agent(request: AgentRequest):
-    """智能排班Agent"""
+async def schedule_agent(
+    request: AgentRequest,
+    current_user: User = Depends(get_current_active_user),
+):
+    """智能排班Agent (需要登录)"""
     try:
         result = await agent_service.execute_agent("schedule", request.input_data)
         return AgentResponse(
@@ -46,8 +51,11 @@ async def schedule_agent(request: AgentRequest):
 
 
 @router.post("/order", response_model=AgentResponse)
-async def order_agent(request: AgentRequest):
-    """订单协同Agent"""
+async def order_agent(
+    request: AgentRequest,
+    current_user: User = Depends(get_current_active_user),
+):
+    """订单协同Agent (需要登录)"""
     try:
         result = await agent_service.execute_agent("order", request.input_data)
         return AgentResponse(
@@ -61,8 +69,11 @@ async def order_agent(request: AgentRequest):
 
 
 @router.post("/inventory", response_model=AgentResponse)
-async def inventory_agent(request: AgentRequest):
-    """库存预警Agent"""
+async def inventory_agent(
+    request: AgentRequest,
+    current_user: User = Depends(get_current_active_user),
+):
+    """库存预警Agent (需要登录)"""
     try:
         result = await agent_service.execute_agent("inventory", request.input_data)
         return AgentResponse(
@@ -76,8 +87,11 @@ async def inventory_agent(request: AgentRequest):
 
 
 @router.post("/service", response_model=AgentResponse)
-async def service_agent(request: AgentRequest):
-    """服务质量Agent"""
+async def service_agent(
+    request: AgentRequest,
+    current_user: User = Depends(get_current_active_user),
+):
+    """服务质量Agent (需要登录)"""
     try:
         result = await agent_service.execute_agent("service", request.input_data)
         return AgentResponse(
@@ -91,8 +105,11 @@ async def service_agent(request: AgentRequest):
 
 
 @router.post("/training", response_model=AgentResponse)
-async def training_agent(request: AgentRequest):
-    """培训辅导Agent"""
+async def training_agent(
+    request: AgentRequest,
+    current_user: User = Depends(get_current_active_user),
+):
+    """培训辅导Agent (需要登录)"""
     try:
         result = await agent_service.execute_agent("training", request.input_data)
         return AgentResponse(
@@ -106,8 +123,11 @@ async def training_agent(request: AgentRequest):
 
 
 @router.post("/decision", response_model=AgentResponse)
-async def decision_agent(request: AgentRequest):
-    """决策支持Agent"""
+async def decision_agent(
+    request: AgentRequest,
+    current_user: User = Depends(get_current_active_user),
+):
+    """决策支持Agent (需要登录)"""
     try:
         result = await agent_service.execute_agent("decision", request.input_data)
         return AgentResponse(
@@ -121,8 +141,11 @@ async def decision_agent(request: AgentRequest):
 
 
 @router.post("/reservation", response_model=AgentResponse)
-async def reservation_agent(request: AgentRequest):
-    """预定宴会Agent"""
+async def reservation_agent(
+    request: AgentRequest,
+    current_user: User = Depends(get_current_active_user),
+):
+    """预定宴会Agent (需要登录)"""
     try:
         result = await agent_service.execute_agent("reservation", request.input_data)
         return AgentResponse(

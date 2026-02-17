@@ -10,10 +10,29 @@ from .base import Base, TimestampMixin
 
 
 class UserRole(str, enum.Enum):
-    """User roles"""
+    """User roles - 基于实际餐饮岗位"""
+    # 系统管理员
     ADMIN = "admin"
-    MANAGER = "manager"
-    STAFF = "staff"
+
+    # 管理层
+    STORE_MANAGER = "store_manager"  # 店长
+    ASSISTANT_MANAGER = "assistant_manager"  # 店长助理
+    FLOOR_MANAGER = "floor_manager"  # 楼面经理
+    CUSTOMER_MANAGER = "customer_manager"  # 客户经理
+
+    # 前厅运营
+    TEAM_LEADER = "team_leader"  # 领班
+    WAITER = "waiter"  # 服务员
+
+    # 后厨运营
+    HEAD_CHEF = "head_chef"  # 厨师长
+    STATION_MANAGER = "station_manager"  # 档口负责人
+    CHEF = "chef"  # 厨师
+
+    # 供应链与支持
+    WAREHOUSE_MANAGER = "warehouse_manager"  # 库管
+    FINANCE = "finance"  # 财务
+    PROCUREMENT = "procurement"  # 采购
 
 
 class User(Base, TimestampMixin):
@@ -26,7 +45,7 @@ class User(Base, TimestampMixin):
     email = Column(String(100), unique=True, nullable=False, index=True)
     hashed_password = Column(String(255), nullable=False)
     full_name = Column(String(100))
-    role = Column(Enum(UserRole), default=UserRole.STAFF, nullable=False)
+    role = Column(Enum(UserRole, values_callable=lambda x: [e.value for e in x]), default=UserRole.WAITER, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     store_id = Column(String(50), index=True)  # Associated store
 
