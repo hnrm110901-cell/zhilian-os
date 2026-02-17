@@ -392,6 +392,193 @@ async def supplier_webhook(
     return {"success": True, "message": "Webhook已接收"}
 
 
+# Reservation Integration Endpoints
+class ReservationSyncRequest(BaseModel):
+    """预订同步请求"""
+    reservation_id: str
+    external_id: Optional[str] = None
+    reservation_number: Optional[str] = None
+    customer_name: str
+    customer_phone: str
+    customer_count: int
+    reservation_date: str  # ISO format
+    reservation_time: str  # e.g., "18:00-20:00"
+    arrival_time: Optional[str] = None
+    table_type: Optional[str] = None
+    table_number: Optional[str] = None
+    area: Optional[str] = None
+    status: str = "pending"
+    special_requirements: Optional[str] = None
+    notes: Optional[str] = None
+    deposit_required: bool = False
+    deposit_amount: float = 0
+    deposit_paid: bool = False
+    source: str = "yiding"
+    channel: Optional[str] = None
+
+
+@router.post("/integrations/reservation/{system_id}/sync")
+async def sync_reservation(
+    system_id: str,
+    request: ReservationSyncRequest,
+    current_user: User = Depends(require_role(
+        UserRole.ADMIN,
+        UserRole.STORE_MANAGER,
+        UserRole.CUSTOMER_MANAGER,
+    )),
+    session: AsyncSession = Depends(get_db),
+):
+    """
+    同步预订数据
+    需要管理员、门店经理或客户经理权限
+    """
+    # 验证系统存在
+    system = await integration_service.get_system(session, system_id)
+    if not system:
+        raise HTTPException(status_code=404, detail="系统不存在")
+
+    if system.type != IntegrationType.RESERVATION:
+        raise HTTPException(status_code=400, detail="系统类型不匹配")
+
+    # 同步预订
+    reservation = await integration_service.sync_reservation(
+        session=session,
+        system_id=system_id,
+        store_id=current_user.store_id or system.store_id,
+        reservation_data=request.dict(),
+    )
+
+    return reservation.to_dict()
+
+
+@router.get("/integrations/reservation/list")
+async def get_reservations(
+    store_id: Optional[str] = None,
+    status: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    limit: int = 100,
+    current_user: User = Depends(get_current_active_user),
+    session: AsyncSession = Depends(get_db),
+):
+    """
+    获取预订列表
+    可按门店、状态、日期范围筛选
+    """
+    from datetime import datetime
+
+    date_from_dt = datetime.fromisoformat(date_from) if date_from else None
+    date_to_dt = datetime.fromisoformat(date_to) if date_to else None
+
+    reservations = await integration_service.get_reservations(
+        session=session,
+        store_id=store_id or current_user.store_id,
+        status=status,
+        date_from=date_from_dt,
+        date_to=date_to_dt,
+        limit=limit,
+    )
+
+    return [r.to_dict() for r in reservations]
+
+
+@router.put("/integrations/reservation/{reservation_id}/status")
+async def update_reservation_status(
+    reservation_id: str,
+    status: str,
+    arrival_time: Optional[str] = None,
+    table_number: Optional[str] = None,
+    current_user: User = Depends(require_role(
+        UserRole.ADMIN,
+        UserRole.STORE_MANAGER,
+        UserRole.FLOOR_MANAGER,
+    )),
+    session: AsyncSession = Depends(get_db),
+):
+    """
+    更新预订状态
+    需要管理员、门店经理或楼面经理权限
+    """
+    kwargs = {}
+    if arrival_time:
+        kwargs["arrival_time"] = arrival_time
+    if table_number:
+        kwargs["table_number"] = table_number
+
+    reservation = await integration_service.update_reservation_status(
+        session=session,
+        reservation_id=reservation_id,
+        status=status,
+        **kwargs,
+    )
+
+    if not reservation:
+        raise HTTPException(status_code=404, detail="预订不存在")
+
+    return reservation.to_dict()
+
+
+@router.post("/integrations/webhooks/reservation/{system_id}")
+async def reservation_webhook(
+    system_id: str,
+    payload: Dict[str, Any] = Body(...),
+    session: AsyncSession = Depends(get_db),
+):
+    """
+    预订系统Webhook接收端点
+    用于接收易订等预订系统推送的实时预订数据
+    """
+    logger.info("收到预订Webhook", system_id=system_id, payload=payload)
+
+    # 验证系统存在
+    system = await integration_service.get_system(session, system_id)
+    if not system:
+        raise HTTPException(status_code=404, detail="系统不存在")
+
+    # 处理webhook数据
+    # 易订系统推送格式示例:
+    # {
+    #   "event": "reservation.created" | "reservation.updated" | "reservation.cancelled",
+    #   "data": {
+    #     "reservation_id": "...",
+    #     "customer_name": "...",
+    #     ...
+    #   }
+    # }
+
+    event = payload.get("event")
+    data = payload.get("data", {})
+
+    if event in ["reservation.created", "reservation.updated"]:
+        # 同步预订数据
+        try:
+            reservation = await integration_service.sync_reservation(
+                session=session,
+                system_id=system_id,
+                store_id=system.store_id,
+                reservation_data=data,
+            )
+            logger.info("预订数据同步成功", reservation_id=data.get("reservation_id"))
+        except Exception as e:
+            logger.error("预订数据同步失败", error=str(e))
+            return {"success": False, "error": str(e)}
+
+    elif event == "reservation.cancelled":
+        # 更新预订状态为取消
+        try:
+            reservation = await integration_service.update_reservation_status(
+                session=session,
+                reservation_id=data.get("reservation_id"),
+                status="cancelled",
+            )
+            logger.info("预订取消成功", reservation_id=data.get("reservation_id"))
+        except Exception as e:
+            logger.error("预订取消失败", error=str(e))
+            return {"success": False, "error": str(e)}
+
+    return {"success": True, "message": "Webhook已接收并处理"}
+
+
 # Sync Log Endpoints
 @router.get("/integrations/sync-logs")
 async def get_sync_logs(

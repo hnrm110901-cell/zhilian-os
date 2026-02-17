@@ -16,6 +16,7 @@ from ..models.integration import (
     POSTransaction,
     SupplierOrder,
     MemberSync,
+    ReservationSync,
     IntegrationType,
     IntegrationStatus,
     SyncStatus,
@@ -394,6 +395,160 @@ class IntegrationService:
 
         logger.info("会员数据同步", member_id=member_data["member_id"])
         return member
+
+    # Reservation Sync Methods
+    async def sync_reservation(
+        self,
+        session: AsyncSession,
+        system_id: str,
+        store_id: str,
+        reservation_data: Dict[str, Any],
+    ) -> "ReservationSync":
+        """同步预订数据"""
+        from ..models.integration import ReservationSync
+
+        # 检查是否已存在
+        result = await session.execute(
+            select(ReservationSync).where(
+                and_(
+                    ReservationSync.system_id == system_id,
+                    ReservationSync.reservation_id == reservation_data["reservation_id"],
+                )
+            )
+        )
+        reservation = result.scalar_one_or_none()
+
+        if reservation:
+            # 更新现有记录
+            reservation.external_reservation_id = reservation_data.get("external_id")
+            reservation.reservation_number = reservation_data.get("reservation_number")
+            reservation.customer_name = reservation_data["customer_name"]
+            reservation.customer_phone = reservation_data["customer_phone"]
+            reservation.customer_count = reservation_data["customer_count"]
+            reservation.reservation_date = datetime.fromisoformat(reservation_data["reservation_date"])
+            reservation.reservation_time = reservation_data["reservation_time"]
+            reservation.table_type = reservation_data.get("table_type")
+            reservation.table_number = reservation_data.get("table_number")
+            reservation.area = reservation_data.get("area")
+            reservation.status = reservation_data.get("status", "pending")
+            reservation.special_requirements = reservation_data.get("special_requirements")
+            reservation.notes = reservation_data.get("notes")
+            reservation.deposit_required = reservation_data.get("deposit_required", False)
+            reservation.deposit_amount = reservation_data.get("deposit_amount", 0)
+            reservation.deposit_paid = reservation_data.get("deposit_paid", False)
+            reservation.source = reservation_data.get("source", "yiding")
+            reservation.channel = reservation_data.get("channel")
+            reservation.sync_status = SyncStatus.SUCCESS
+            reservation.synced_at = datetime.utcnow()
+            reservation.raw_data = reservation_data
+
+            if reservation_data.get("arrival_time"):
+                reservation.arrival_time = datetime.fromisoformat(reservation_data["arrival_time"])
+        else:
+            # 创建新记录
+            reservation = ReservationSync(
+                system_id=system_id,
+                store_id=store_id,
+                reservation_id=reservation_data["reservation_id"],
+                external_reservation_id=reservation_data.get("external_id"),
+                reservation_number=reservation_data.get("reservation_number"),
+                customer_name=reservation_data["customer_name"],
+                customer_phone=reservation_data["customer_phone"],
+                customer_count=reservation_data["customer_count"],
+                reservation_date=datetime.fromisoformat(reservation_data["reservation_date"]),
+                reservation_time=reservation_data["reservation_time"],
+                arrival_time=datetime.fromisoformat(reservation_data["arrival_time"])
+                    if reservation_data.get("arrival_time") else None,
+                table_type=reservation_data.get("table_type"),
+                table_number=reservation_data.get("table_number"),
+                area=reservation_data.get("area"),
+                status=reservation_data.get("status", "pending"),
+                special_requirements=reservation_data.get("special_requirements"),
+                notes=reservation_data.get("notes"),
+                deposit_required=reservation_data.get("deposit_required", False),
+                deposit_amount=reservation_data.get("deposit_amount", 0),
+                deposit_paid=reservation_data.get("deposit_paid", False),
+                source=reservation_data.get("source", "yiding"),
+                channel=reservation_data.get("channel"),
+                sync_status=SyncStatus.SUCCESS,
+                synced_at=datetime.utcnow(),
+                raw_data=reservation_data,
+            )
+            session.add(reservation)
+
+        await session.commit()
+        await session.refresh(reservation)
+
+        logger.info("预订数据同步", reservation_id=reservation_data["reservation_id"], store_id=store_id)
+        return reservation
+
+    async def get_reservations(
+        self,
+        session: AsyncSession,
+        store_id: Optional[str] = None,
+        status: Optional[str] = None,
+        date_from: Optional[datetime] = None,
+        date_to: Optional[datetime] = None,
+        limit: int = 100,
+    ) -> List["ReservationSync"]:
+        """获取预订列表"""
+        from ..models.integration import ReservationSync
+
+        query = select(ReservationSync)
+
+        conditions = []
+        if store_id:
+            conditions.append(ReservationSync.store_id == store_id)
+        if status:
+            conditions.append(ReservationSync.status == status)
+        if date_from:
+            conditions.append(ReservationSync.reservation_date >= date_from)
+        if date_to:
+            conditions.append(ReservationSync.reservation_date <= date_to)
+
+        if conditions:
+            query = query.where(and_(*conditions))
+
+        query = query.order_by(desc(ReservationSync.reservation_date)).limit(limit)
+
+        result = await session.execute(query)
+        return list(result.scalars().all())
+
+    async def update_reservation_status(
+        self,
+        session: AsyncSession,
+        reservation_id: str,
+        status: str,
+        **kwargs,
+    ) -> Optional["ReservationSync"]:
+        """更新预订状态"""
+        from ..models.integration import ReservationSync
+
+        result = await session.execute(
+            select(ReservationSync).where(ReservationSync.reservation_id == reservation_id)
+        )
+        reservation = result.scalar_one_or_none()
+
+        if not reservation:
+            return None
+
+        reservation.status = status
+
+        if status == "arrived" and kwargs.get("arrival_time"):
+            reservation.arrival_time = datetime.fromisoformat(kwargs["arrival_time"])
+
+        if status == "seated" and kwargs.get("table_number"):
+            reservation.table_number = kwargs["table_number"]
+
+        if status == "cancelled":
+            reservation.cancelled_at = datetime.utcnow()
+
+        reservation.updated_at = datetime.utcnow()
+        await session.commit()
+        await session.refresh(reservation)
+
+        logger.info("预订状态更新", reservation_id=reservation_id, status=status)
+        return reservation
 
     # Sync Log Methods
     async def create_sync_log(

@@ -20,6 +20,7 @@ class IntegrationType(str, enum.Enum):
     PAYMENT = "payment"  # 支付系统
     DELIVERY = "delivery"  # 配送系统
     ERP = "erp"  # ERP系统
+    RESERVATION = "reservation"  # 预订系统
 
 
 class IntegrationStatus(str, enum.Enum):
@@ -330,4 +331,96 @@ class MemberSync(Base):
             "sync_status": self.sync_status.value if self.sync_status else None,
             "last_activity": self.last_activity.isoformat() if self.last_activity else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class ReservationSync(Base):
+    """预订同步记录"""
+    __tablename__ = "reservation_syncs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    system_id = Column(UUID(as_uuid=True), nullable=False, comment="外部系统ID")
+    store_id = Column(String(50), nullable=False, comment="门店ID")
+
+    # 预订信息
+    reservation_id = Column(String(100), nullable=False, comment="预订ID")
+    external_reservation_id = Column(String(100), comment="外部系统预订ID")
+    reservation_number = Column(String(100), comment="预订号")
+
+    # 客户信息
+    customer_name = Column(String(100), nullable=False, comment="客户姓名")
+    customer_phone = Column(String(20), nullable=False, comment="客户电话")
+    customer_count = Column(Integer, nullable=False, comment="就餐人数")
+
+    # 预订时间
+    reservation_date = Column(DateTime, nullable=False, comment="预订日期")
+    reservation_time = Column(String(20), nullable=False, comment="预订时间段")
+    arrival_time = Column(DateTime, comment="实际到店时间")
+
+    # 桌台信息
+    table_type = Column(String(50), comment="桌台类型")
+    table_number = Column(String(20), comment="桌号")
+    area = Column(String(50), comment="区域")
+
+    # 预订状态
+    status = Column(String(50), nullable=False, comment="预订状态: pending/confirmed/arrived/seated/completed/cancelled/no_show")
+
+    # 特殊要求
+    special_requirements = Column(Text, comment="特殊要求")
+    notes = Column(Text, comment="备注")
+
+    # 预付信息
+    deposit_required = Column(Boolean, default=False, comment="是否需要预付")
+    deposit_amount = Column(Float, default=0, comment="预付金额")
+    deposit_paid = Column(Boolean, default=False, comment="是否已预付")
+
+    # 来源信息
+    source = Column(String(50), comment="预订来源: yiding/phone/wechat/app")
+    channel = Column(String(50), comment="渠道")
+
+    # 同步状态
+    sync_status = Column(
+        Enum(SyncStatus, values_callable=lambda x: [e.value for e in x]),
+        default=SyncStatus.PENDING,
+        comment="同步状态"
+    )
+    synced_at = Column(DateTime, comment="同步时间")
+
+    # 时间信息
+    created_at = Column(DateTime, default=datetime.utcnow, comment="创建时间")
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment="更新时间")
+    cancelled_at = Column(DateTime, comment="取消时间")
+
+    # 原始数据
+    raw_data = Column(JSON, comment="原始预订数据")
+
+    def to_dict(self):
+        """转换为字典"""
+        return {
+            "id": str(self.id),
+            "system_id": str(self.system_id),
+            "store_id": self.store_id,
+            "reservation_id": self.reservation_id,
+            "external_reservation_id": self.external_reservation_id,
+            "reservation_number": self.reservation_number,
+            "customer_name": self.customer_name,
+            "customer_phone": self.customer_phone,
+            "customer_count": self.customer_count,
+            "reservation_date": self.reservation_date.isoformat() if self.reservation_date else None,
+            "reservation_time": self.reservation_time,
+            "arrival_time": self.arrival_time.isoformat() if self.arrival_time else None,
+            "table_type": self.table_type,
+            "table_number": self.table_number,
+            "area": self.area,
+            "status": self.status,
+            "special_requirements": self.special_requirements,
+            "notes": self.notes,
+            "deposit_required": self.deposit_required,
+            "deposit_amount": self.deposit_amount,
+            "deposit_paid": self.deposit_paid,
+            "source": self.source,
+            "sync_status": self.sync_status.value if self.sync_status else None,
+            "synced_at": self.synced_at.isoformat() if self.synced_at else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

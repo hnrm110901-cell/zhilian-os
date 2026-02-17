@@ -24,7 +24,7 @@ async def migrate():
         # 创建枚举类型
         await conn.execute(text("""
             DO $$ BEGIN
-                CREATE TYPE integration_type AS ENUM ('pos', 'supplier', 'member', 'payment', 'delivery', 'erp');
+                CREATE TYPE integration_type AS ENUM ('pos', 'supplier', 'member', 'payment', 'delivery', 'erp', 'reservation');
             EXCEPTION
                 WHEN duplicate_object THEN null;
             END $$;
@@ -177,6 +177,43 @@ async def migrate():
         """))
         print("✓ 创建 member_syncs 表")
 
+        # 创建 reservation_syncs 表
+        await conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS reservation_syncs (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                system_id UUID NOT NULL,
+                store_id VARCHAR(50) NOT NULL,
+                reservation_id VARCHAR(100) NOT NULL,
+                external_reservation_id VARCHAR(100),
+                reservation_number VARCHAR(100),
+                customer_name VARCHAR(100) NOT NULL,
+                customer_phone VARCHAR(20) NOT NULL,
+                customer_count INTEGER NOT NULL,
+                reservation_date TIMESTAMP NOT NULL,
+                reservation_time VARCHAR(20) NOT NULL,
+                arrival_time TIMESTAMP,
+                table_type VARCHAR(50),
+                table_number VARCHAR(20),
+                area VARCHAR(50),
+                status VARCHAR(50) NOT NULL,
+                special_requirements TEXT,
+                notes TEXT,
+                deposit_required BOOLEAN DEFAULT false,
+                deposit_amount FLOAT DEFAULT 0,
+                deposit_paid BOOLEAN DEFAULT false,
+                source VARCHAR(50),
+                channel VARCHAR(50),
+                sync_status sync_status DEFAULT 'pending',
+                synced_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                cancelled_at TIMESTAMP,
+                raw_data JSONB,
+                UNIQUE(system_id, reservation_id)
+            );
+        """))
+        print("✓ 创建 reservation_syncs 表")
+
         # 创建索引
         await conn.execute(text("""
             CREATE INDEX IF NOT EXISTS idx_external_systems_type ON external_systems(type);
@@ -188,6 +225,10 @@ async def migrate():
             CREATE INDEX IF NOT EXISTS idx_supplier_orders_date ON supplier_orders(order_date);
             CREATE INDEX IF NOT EXISTS idx_member_syncs_system ON member_syncs(system_id);
             CREATE INDEX IF NOT EXISTS idx_member_syncs_phone ON member_syncs(phone);
+            CREATE INDEX IF NOT EXISTS idx_reservation_syncs_store ON reservation_syncs(store_id);
+            CREATE INDEX IF NOT EXISTS idx_reservation_syncs_date ON reservation_syncs(reservation_date);
+            CREATE INDEX IF NOT EXISTS idx_reservation_syncs_status ON reservation_syncs(status);
+            CREATE INDEX IF NOT EXISTS idx_reservation_syncs_phone ON reservation_syncs(customer_phone);
         """))
         print("✓ 创建索引")
 
