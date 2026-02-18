@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 import structlog
 
 from src.core.config import settings
-from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, pos
+from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, pos, members
 from src.middleware.monitoring import MonitoringMiddleware
 
 # 配置结构化日志
@@ -111,6 +111,10 @@ app = FastAPI(
             "name": "pos",
             "description": "POS系统 - 品智收银系统集成接口",
         },
+        {
+            "name": "members",
+            "description": "会员系统 - 奥琦韦会员管理接口",
+        },
     ],
 )
 
@@ -137,6 +141,7 @@ app.include_router(integrations.router, prefix="/api/v1", tags=["integrations"])
 app.include_router(monitoring.router, prefix="/api/v1", tags=["monitoring"])
 app.include_router(llm.router, prefix="/api/v1", tags=["llm"])
 app.include_router(pos.router, prefix="/api/v1/pos", tags=["pos"])
+app.include_router(members.router, prefix="/api/v1/members", tags=["members"])
 
 
 @app.on_event("startup")
@@ -161,6 +166,14 @@ async def startup_event():
 async def shutdown_event():
     """应用关闭事件"""
     logger.info("智链OS API Gateway 关闭中...")
+
+    # Close member service
+    try:
+        from src.services.member_service import member_service
+        await member_service.close()
+        logger.info("会员服务已关闭")
+    except Exception as e:
+        logger.error("关闭会员服务失败", error=str(e))
 
     # Close POS service
     try:

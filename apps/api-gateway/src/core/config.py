@@ -51,6 +51,8 @@ class Settings(BaseSettings):
     # 外部API配置 - 奥琦韦
     AOQIWEI_API_KEY: str = ""
     AOQIWEI_BASE_URL: str = "https://api.aoqiwei.com"
+    AOQIWEI_TIMEOUT: int = 30
+    AOQIWEI_RETRY_TIMES: int = 3
 
     # 外部API配置 - 品智
     PINZHI_TOKEN: str = ""
