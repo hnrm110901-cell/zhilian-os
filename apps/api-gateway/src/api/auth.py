@@ -63,6 +63,50 @@ class RefreshTokenRequest(BaseModel):
 async def login(request: LoginRequest):
     """
     用户登录
+
+    使用用户名和密码进行身份验证，成功后返回访问令牌和刷新令牌。
+
+    **认证要求**: 无需认证
+
+    **令牌说明**:
+    - `access_token`: 访问令牌，有效期30分钟，用于API请求认证
+    - `refresh_token`: 刷新令牌，有效期7天，用于获取新的访问令牌
+
+    **使用方法**:
+    1. 保存返回的两个令牌
+    2. 在后续API请求中使用访问令牌: `Authorization: Bearer <access_token>`
+    3. 访问令牌过期后，使用刷新令牌调用 `/auth/refresh` 获取新令牌
+
+    **示例请求**:
+    ```json
+    {
+        "username": "admin",
+        "password": "admin123"
+    }
+    ```
+
+    **示例响应**:
+    ```json
+    {
+        "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        "token_type": "bearer",
+        "expires_in": 1800,
+        "user": {
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "username": "admin",
+            "email": "admin@example.com",
+            "full_name": "系统管理员",
+            "role": "admin",
+            "store_id": "STORE_001",
+            "is_active": true
+        }
+    }
+    ```
+
+    **错误响应**:
+    - `401 Unauthorized`: 用户名或密码错误
+    - `403 Forbidden`: 用户已被禁用
     """
     user = await auth_service.authenticate_user(request.username, request.password)
 
@@ -86,6 +130,35 @@ async def login(request: LoginRequest):
 async def refresh_token(request: RefreshTokenRequest):
     """
     刷新访问令牌
+
+    使用刷新令牌获取新的访问令牌，无需重新登录。
+
+    **认证要求**: 无需认证（使用刷新令牌）
+
+    **使用场景**:
+    - 访问令牌过期（30分钟后）
+    - 前端自动刷新令牌机制
+    - 避免频繁要求用户重新登录
+
+    **示例请求**:
+    ```json
+    {
+        "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    }
+    ```
+
+    **示例响应**:
+    ```json
+    {
+        "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        "token_type": "bearer",
+        "expires_in": 1800
+    }
+    ```
+
+    **错误响应**:
+    - `401 Unauthorized`: 刷新令牌无效或已过期
+    - `401 Unauthorized`: 用户不存在或已被禁用
     """
     try:
         token_data = await auth_service.refresh_access_token(request.refresh_token)
@@ -139,6 +212,27 @@ async def register(
 async def get_current_user_info(current_user: User = Depends(get_current_active_user)):
     """
     获取当前登录用户信息
+
+    返回当前认证用户的详细信息。
+
+    **认证要求**: 需要有效的访问令牌
+
+    **示例响应**:
+    ```json
+    {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "username": "admin",
+        "email": "admin@example.com",
+        "full_name": "系统管理员",
+        "role": "admin",
+        "store_id": "STORE_001",
+        "is_active": true
+    }
+    ```
+
+    **错误响应**:
+    - `401 Unauthorized`: 未提供令牌或令牌无效
+    - `403 Forbidden`: 用户已被禁用
     """
     return UserResponse(
         id=str(current_user.id),
@@ -155,6 +249,37 @@ async def get_current_user_info(current_user: User = Depends(get_current_active_
 async def get_current_user_permissions(current_user: User = Depends(get_current_active_user)):
     """
     获取当前用户的权限列表
+
+    返回当前用户角色对应的所有权限。用于前端权限控制和UI元素显示。
+
+    **认证要求**: 需要有效的访问令牌
+
+    **权限类型**:
+    - `agent:*:read/write`: Agent操作权限
+    - `user:read/write/delete`: 用户管理权限
+    - `store:read/write/delete`: 门店管理权限
+    - `system:config/logs`: 系统配置权限
+
+    **示例响应**:
+    ```json
+    {
+        "role": "store_manager",
+        "permissions": [
+            "agent:schedule:read",
+            "agent:schedule:write",
+            "agent:order:read",
+            "agent:order:write",
+            "agent:inventory:read",
+            "agent:inventory:write",
+            "user:read",
+            "user:write",
+            "store:read"
+        ]
+    }
+    ```
+
+    **错误响应**:
+    - `401 Unauthorized`: 未提供令牌或令牌无效
     """
     permissions = get_user_permissions(current_user.role)
     return {

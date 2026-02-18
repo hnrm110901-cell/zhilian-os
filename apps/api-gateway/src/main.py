@@ -13,13 +13,92 @@ from src.api import health, agents, auth, notifications, stores, mobile, integra
 # 配置结构化日志
 logger = structlog.get_logger()
 
+# API文档描述
+API_DESCRIPTION = """
+## 智链OS (Zhilian Operating System)
+
+中餐连锁品牌门店运营智能体操作系统 - 基于多Agent协同的智能餐厅运营管理系统
+
+### 核心功能
+
+* **智能Agent系统**: 7个专业Agent实现从排班、订单、库存到决策的全流程智能化管理
+* **用户认证**: 基于JWT的安全认证系统，支持访问令牌和刷新令牌
+* **权限管理**: 细粒度的基于角色的访问控制(RBAC)，支持13种角色
+* **决策支持**: KPI分析、业务洞察生成、改进建议
+* **实时监控**: 系统健康检查、性能监控
+
+### 认证说明
+
+大部分API端点需要认证。使用以下步骤进行认证：
+
+1. 调用 `/api/v1/auth/login` 获取访问令牌
+2. 在后续请求的 `Authorization` 头中包含令牌: `Bearer <access_token>`
+3. 访问令牌有效期30分钟，过期后使用刷新令牌获取新的访问令牌
+
+### Agent系统
+
+系统包含7个智能Agent：
+
+* **ScheduleAgent**: 智能排班 - 基于AI的客流预测和自动排班
+* **OrderAgent**: 订单协同 - 预定管理、排队系统、智能点单推荐
+* **InventoryAgent**: 库存预警 - 实时监控、消耗预测、自动补货提醒
+* **ServiceAgent**: 服务质量 - 客户反馈收集、服务质量监控
+* **TrainingAgent**: 培训辅导 - 培训需求评估、计划生成、进度追踪
+* **DecisionAgent**: 决策支持 - KPI分析、业务洞察、改进建议
+* **ReservationAgent**: 预定宴会 - 预定管理、座位分配、宴会管理
+
+### 技术栈
+
+* **后端框架**: FastAPI (Python 3.9+)
+* **数据库**: PostgreSQL with SQLAlchemy ORM
+* **认证**: JWT (JSON Web Tokens)
+* **日志**: Structlog
+"""
+
 # 创建FastAPI应用
 app = FastAPI(
     title="智链OS API Gateway",
-    description="中餐连锁品牌门店运营智能体智链操作系统 API网关",
-    version="0.1.0",
+    description=API_DESCRIPTION,
+    version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    contact={
+        "name": "智链OS团队",
+        "email": "support@zhilian-os.com",
+    },
+    license_info={
+        "name": "MIT License",
+    },
+    openapi_tags=[
+        {
+            "name": "health",
+            "description": "系统健康检查和状态监控",
+        },
+        {
+            "name": "auth",
+            "description": "用户认证和授权 - 登录、注册、令牌管理、用户信息",
+        },
+        {
+            "name": "agents",
+            "description": "智能Agent系统 - 7个专业Agent的操作接口",
+        },
+        {
+            "name": "notifications",
+            "description": "通知管理 - 系统通知、消息推送",
+        },
+        {
+            "name": "stores",
+            "description": "门店管理 - 门店信息、配置管理",
+        },
+        {
+            "name": "mobile",
+            "description": "移动端API - 移动应用专用接口",
+        },
+        {
+            "name": "integrations",
+            "description": "外部系统集成 - 第三方系统对接接口",
+        },
+    ],
 )
 
 # 配置CORS

@@ -38,7 +38,56 @@ async def schedule_agent(
     request: AgentRequest,
     current_user: User = Depends(require_permission(Permission.AGENT_SCHEDULE_WRITE)),
 ):
-    """智能排班Agent (需要排班权限)"""
+    """
+    智能排班Agent
+
+    基于AI的客流预测和自动排班生成。
+
+    **认证要求**: 需要 `agent:schedule:write` 权限
+
+    **支持的操作**:
+    - `generate_schedule`: 生成排班计划
+    - `optimize_schedule`: 优化现有排班
+    - `analyze_staffing`: 分析人员需求
+
+    **示例请求**:
+    ```json
+    {
+        "agent_type": "schedule",
+        "input_data": {
+            "action": "generate_schedule",
+            "params": {
+                "store_id": "STORE_001",
+                "start_date": "2024-02-20",
+                "end_date": "2024-02-26",
+                "constraints": {
+                    "max_hours_per_week": 40,
+                    "min_rest_hours": 12
+                }
+            }
+        }
+    }
+    ```
+
+    **示例响应**:
+    ```json
+    {
+        "agent_type": "schedule",
+        "output_data": {
+            "schedule_id": "SCH_20240220_001",
+            "shifts": [...],
+            "coverage_rate": 0.95,
+            "recommendations": [...]
+        },
+        "execution_time": 0.234
+    }
+    ```
+
+    **错误响应**:
+    - `401 Unauthorized`: 未认证
+    - `403 Forbidden`: 权限不足
+    - `500 Internal Server Error`: Agent执行失败
+    """
     try:
         result = await agent_service.execute_agent("schedule", request.input_data)
         return AgentResponse(
@@ -128,7 +177,60 @@ async def decision_agent(
     request: AgentRequest,
     current_user: User = Depends(require_permission(Permission.AGENT_DECISION_READ)),
 ):
-    """决策支持Agent (需要决策权限)"""
+    """
+    决策支持Agent
+
+    提供KPI分析、业务洞察生成和改进建议。
+
+    **认证要求**: 需要 `agent:decision:read` 权限
+
+    **支持的操作**:
+    - `generate_report`: 生成决策报告
+    - `analyze_kpi`: 分析KPI指标
+    - `get_insights`: 获取业务洞察
+    - `get_recommendations`: 获取改进建议
+
+    **示例请求**:
+    ```json
+    {
+        "agent_type": "decision",
+        "input_data": {
+            "action": "generate_report",
+            "params": {
+                "store_id": "STORE_001",
+                "start_date": "2024-02-01",
+                "end_date": "2024-02-18",
+                "include_recommendations": true
+            }
+        }
+    }
+    ```
+
+    **示例响应**:
+    ```json
+    {
+        "agent_type": "decision",
+        "output_data": {
+            "report_id": "RPT_20240218_001",
+            "overall_health_score": 85.5,
+            "kpi_summary": {
+                "total_kpis": 12,
+                "on_track": 8,
+                "at_risk": 3,
+                "off_track": 1
+            },
+            "insights": [...],
+            "recommendations": [...]
+        },
+        "execution_time": 0.456
+    }
+    ```
+
+    **错误响应**:
+    - `401 Unauthorized`: 未认证
+    - `403 Forbidden`: 权限不足
+    - `500 Internal Server Error`: Agent执行失败
+    """
     try:
         result = await agent_service.execute_agent("decision", request.input_data)
         return AgentResponse(
