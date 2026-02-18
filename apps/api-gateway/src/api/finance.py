@@ -4,12 +4,14 @@
 from typing import Optional
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
 from src.core.auth import get_current_user, require_permission
 from src.services.finance_service import get_finance_service
+from src.services.report_export_service import report_export_service
 from src.models import User
 
 router = APIRouter()
@@ -138,3 +140,57 @@ async def get_financial_metrics(
     """获取财务指标"""
     service = get_finance_service(db)
     return await service.get_financial_metrics(store_id, start_date, end_date)
+
+
+@router.get("/reports/export")
+async def export_report(
+    report_type: str = Query(..., description="报表类型: income_statement, cash_flow, transactions"),
+    format: str = Query("csv", description="导出格式: csv"),
+    start_date: date = Query(...),
+    end_date: date = Query(...),
+    store_id: Optional[int] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    导出财务报表
+
+    支持的报表类型:
+    - income_statement: 损益表
+    - cash_flow: 现金流量表
+    - transactions: 交易明细
+
+    支持的格式:
+    - csv: CSV格式
+    """
+    try:
+        from datetime import datetime
+        start_datetime = datetime.combine(start_date, datetime.min.time())
+        end_datetime = datetime.combine(end_date, datetime.max.time())
+
+        if format == "csv":
+            content = await report_export_service.export_to_csv(
+                report_type=report_type,
+                start_date=start_datetime,
+                end_date=end_datetime,
+                store_id=store_id,
+                db=db
+            )
+
+            # 生成文件名
+            filename = f"{report_type}_{start_date}_{end_date}.csv"
+
+            return Response(
+                content=content,
+                media_type="text/csv",
+                headers={
+                    "Content-Disposition": f"attachment; filename={filename}"
+                }
+            )
+        else:
+            raise HTTPException(status_code=400, detail=f"不支持的导出格式: {format}")
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"导出失败: {str(e)}")

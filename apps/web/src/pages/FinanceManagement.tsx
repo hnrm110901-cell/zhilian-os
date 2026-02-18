@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Card, Col, Row, Table, Button, Modal, Form, Input, Select, InputNumber, DatePicker, Tag, Space, Tabs, Statistic } from 'antd';
+import { Card, Col, Row, Table, Button, Modal, Form, Input, Select, InputNumber, DatePicker, Tag, Space, Tabs, Statistic, message } from 'antd';
 import {
   DollarOutlined,
   PlusOutlined,
@@ -7,6 +7,7 @@ import {
   FallOutlined,
   FileTextOutlined,
   BarChartOutlined,
+  DownloadOutlined,
 } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { apiClient } from '../services/api';
@@ -153,6 +154,38 @@ const FinanceManagement: React.FC = () => {
       loadBudgetAnalysis();
     } catch (err: any) {
       handleApiError(err, '创建预算失败');
+    }
+  };
+
+  const handleExportReport = async (reportType: string) => {
+    try {
+      message.loading({ content: '正在导出报表...', key: 'export' });
+
+      const params = new URLSearchParams({
+        report_type: reportType,
+        format: 'csv',
+        start_date: dateRange[0].format('YYYY-MM-DD'),
+        end_date: dateRange[1].format('YYYY-MM-DD'),
+      });
+
+      const response = await apiClient.get(`/finance/reports/export?${params.toString()}`, {
+        responseType: 'blob',
+      });
+
+      // 创建下载链接
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${reportType}_${dateRange[0].format('YYYY-MM-DD')}_${dateRange[1].format('YYYY-MM-DD')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      message.success({ content: '报表导出成功', key: 'export' });
+    } catch (err: any) {
+      message.error({ content: '报表导出失败', key: 'export' });
+      handleApiError(err, '报表导出失败');
     }
   };
 
@@ -389,6 +422,15 @@ const FinanceManagement: React.FC = () => {
           </TabPane>
 
           <TabPane tab="损益表" key="income-statement">
+            <Space style={{ marginBottom: '16px' }}>
+              <Button
+                type="primary"
+                icon={<DownloadOutlined />}
+                onClick={() => handleExportReport('income_statement')}
+              >
+                导出损益表
+              </Button>
+            </Space>
             {incomeStatement && (
               <div>
                 <h3>收入</h3>
@@ -416,9 +458,37 @@ const FinanceManagement: React.FC = () => {
           </TabPane>
 
           <TabPane tab="现金流量" key="cash-flow">
+            <Space style={{ marginBottom: '16px' }}>
+              <Button
+                type="primary"
+                icon={<DownloadOutlined />}
+                onClick={() => handleExportReport('cash_flow')}
+              >
+                导出现金流量表
+              </Button>
+            </Space>
             {cashFlowChartOption && (
               <ReactECharts option={cashFlowChartOption} style={{ height: '400px' }} />
             )}
+          </TabPane>
+
+          <TabPane tab="交易明细" key="transactions-detail">
+            <Space style={{ marginBottom: '16px' }}>
+              <Button
+                type="primary"
+                icon={<DownloadOutlined />}
+                onClick={() => handleExportReport('transactions')}
+              >
+                导出交易明细
+              </Button>
+            </Space>
+            <Table
+              columns={transactionColumns}
+              dataSource={transactions}
+              rowKey="id"
+              loading={loading}
+              pagination={{ pageSize: 10 }}
+            />
           </TabPane>
 
           <TabPane tab="预算分析" key="budget">
