@@ -8,7 +8,8 @@ from fastapi.responses import JSONResponse
 import structlog
 
 from src.core.config import settings
-from src.api import health, agents, auth, notifications, stores, mobile, integrations
+from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring
+from src.middleware.monitoring import MonitoringMiddleware
 
 # 配置结构化日志
 logger = structlog.get_logger()
@@ -98,6 +99,10 @@ app = FastAPI(
             "name": "integrations",
             "description": "外部系统集成 - 第三方系统对接接口",
         },
+        {
+            "name": "monitoring",
+            "description": "系统监控 - 错误追踪、性能监控、日志查询",
+        },
     ],
 )
 
@@ -110,6 +115,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 添加监控中间件
+app.add_middleware(MonitoringMiddleware)
+
 # 注册路由
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
@@ -118,6 +126,7 @@ app.include_router(notifications.router, prefix="/api/v1", tags=["notifications"
 app.include_router(stores.router, prefix="/api/v1", tags=["stores"])
 app.include_router(mobile.router, prefix="/api/v1", tags=["mobile"])
 app.include_router(integrations.router, prefix="/api/v1", tags=["integrations"])
+app.include_router(monitoring.router, prefix="/api/v1", tags=["monitoring"])
 
 
 @app.on_event("startup")
@@ -155,12 +164,30 @@ async def shutdown_event():
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
     """全局异常处理"""
-    logger.error("未处理的异常", exc_info=exc)
+    from src.core.monitoring import error_monitor, ErrorSeverity, ErrorCategory
+
+    # 记录错误到监控系统
+    error_id = error_monitor.log_error(
+        message=str(exc),
+        severity=ErrorSeverity.ERROR,
+        category=ErrorCategory.SYSTEM,
+        exception=exc,
+        context={
+            "method": request.method,
+            "path": str(request.url),
+        },
+        request_id=getattr(request.state, "request_id", None),
+        endpoint=request.url.path,
+    )
+
+    logger.error("未处理的异常", error_id=error_id, exc_info=exc)
+
     return JSONResponse(
         status_code=500,
         content={
             "error": "Internal Server Error",
             "message": str(exc) if settings.APP_DEBUG else "服务器内部错误",
+            "error_id": error_id,
         },
     )
 
