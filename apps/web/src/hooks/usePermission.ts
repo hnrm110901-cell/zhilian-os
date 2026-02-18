@@ -3,21 +3,21 @@ import { hasPermission, hasAnyPermission, hasAllPermissions } from '../utils/per
 import type { Permission } from '../utils/permissions';
 
 export const usePermission = () => {
-  const { user } = useAuth();
+  const { user, permissions } = useAuth();
 
   const checkPermission = (permission: Permission): boolean => {
     if (!user) return false;
-    return hasPermission(user.role, permission);
+    return hasPermission(permissions, permission);
   };
 
-  const checkAnyPermission = (permissions: Permission[]): boolean => {
+  const checkAnyPermission = (requiredPermissions: Permission[]): boolean => {
     if (!user) return false;
-    return hasAnyPermission(user.role, permissions);
+    return hasAnyPermission(permissions, requiredPermissions);
   };
 
-  const checkAllPermissions = (permissions: Permission[]): boolean => {
+  const checkAllPermissions = (requiredPermissions: Permission[]): boolean => {
     if (!user) return false;
-    return hasAllPermissions(user.role, permissions);
+    return hasAllPermissions(permissions, requiredPermissions);
   };
 
   return {
@@ -25,7 +25,7 @@ export const usePermission = () => {
     checkAnyPermission,
     checkAllPermissions,
     isAdmin: user?.role === 'admin',
-    isManager: user?.role === 'manager',
-    isStaff: user?.role === 'staff',
+    isStoreManager: user?.role === 'store_manager',
+    isManager: user?.role === 'store_manager' || user?.role === 'assistant_manager' || user?.role === 'floor_manager',
   };
 };

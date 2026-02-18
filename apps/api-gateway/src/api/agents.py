@@ -7,7 +7,8 @@ from typing import Dict, Any
 import structlog
 
 from ..services.agent_service import AgentService
-from ..core.dependencies import get_current_active_user
+from ..core.dependencies import get_current_active_user, require_permission
+from ..core.permissions import Permission
 from ..models.user import User
 
 logger = structlog.get_logger()
@@ -35,9 +36,9 @@ class AgentResponse(BaseModel):
 @router.post("/schedule", response_model=AgentResponse)
 async def schedule_agent(
     request: AgentRequest,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_permission(Permission.AGENT_SCHEDULE_WRITE)),
 ):
-    """智能排班Agent (需要登录)"""
+    """智能排班Agent (需要排班权限)"""
     try:
         result = await agent_service.execute_agent("schedule", request.input_data)
         return AgentResponse(
@@ -53,9 +54,9 @@ async def schedule_agent(
 @router.post("/order", response_model=AgentResponse)
 async def order_agent(
     request: AgentRequest,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_permission(Permission.AGENT_ORDER_WRITE)),
 ):
-    """订单协同Agent (需要登录)"""
+    """订单协同Agent (需要订单权限)"""
     try:
         result = await agent_service.execute_agent("order", request.input_data)
         return AgentResponse(
@@ -71,9 +72,9 @@ async def order_agent(
 @router.post("/inventory", response_model=AgentResponse)
 async def inventory_agent(
     request: AgentRequest,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_permission(Permission.AGENT_INVENTORY_WRITE)),
 ):
-    """库存预警Agent (需要登录)"""
+    """库存预警Agent (需要库存权限)"""
     try:
         result = await agent_service.execute_agent("inventory", request.input_data)
         return AgentResponse(
@@ -89,9 +90,9 @@ async def inventory_agent(
 @router.post("/service", response_model=AgentResponse)
 async def service_agent(
     request: AgentRequest,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_permission(Permission.AGENT_SERVICE_WRITE)),
 ):
-    """服务质量Agent (需要登录)"""
+    """服务质量Agent (需要服务权限)"""
     try:
         result = await agent_service.execute_agent("service", request.input_data)
         return AgentResponse(
@@ -107,9 +108,9 @@ async def service_agent(
 @router.post("/training", response_model=AgentResponse)
 async def training_agent(
     request: AgentRequest,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_permission(Permission.AGENT_TRAINING_WRITE)),
 ):
-    """培训辅导Agent (需要登录)"""
+    """培训辅导Agent (需要培训权限)"""
     try:
         result = await agent_service.execute_agent("training", request.input_data)
         return AgentResponse(
@@ -125,9 +126,9 @@ async def training_agent(
 @router.post("/decision", response_model=AgentResponse)
 async def decision_agent(
     request: AgentRequest,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_permission(Permission.AGENT_DECISION_READ)),
 ):
-    """决策支持Agent (需要登录)"""
+    """决策支持Agent (需要决策权限)"""
     try:
         result = await agent_service.execute_agent("decision", request.input_data)
         return AgentResponse(
@@ -143,9 +144,9 @@ async def decision_agent(
 @router.post("/reservation", response_model=AgentResponse)
 async def reservation_agent(
     request: AgentRequest,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_permission(Permission.AGENT_RESERVATION_WRITE)),
 ):
-    """预定宴会Agent (需要登录)"""
+    """预定宴会Agent (需要预订权限)"""
     try:
         result = await agent_service.execute_agent("reservation", request.input_data)
         return AgentResponse(

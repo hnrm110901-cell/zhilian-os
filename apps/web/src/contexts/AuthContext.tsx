@@ -15,6 +15,7 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   refreshToken: string | null;
+  permissions: string[];
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (username: string, password: string) => Promise<boolean>;
@@ -22,6 +23,8 @@ interface AuthContextType {
   updateUser: (user: User) => void;
   checkAuth: () => Promise<void>;
   refreshAccessToken: () => Promise<boolean>;
+  hasPermission: (permission: string) => boolean;
+  hasAnyPermission: (permissions: string[]) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -30,12 +33,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
+  const [permissions, setPermissions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Check authentication on mount
   useEffect(() => {
     checkAuth();
   }, []);
+
+  const fetchPermissions = async (authToken: string) => {
+    try {
+      const response = await fetch('/api/v1/auth/me/permissions', {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setPermissions(data.permissions || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch permissions:', error);
+      setPermissions([]);
+    }
+  };
 
   const checkAuth = async () => {
     const storedToken = localStorage.getItem('token');
@@ -58,6 +80,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(userData);
         setToken(storedToken);
         setRefreshToken(storedRefreshToken);
+        await fetchPermissions(storedToken);
       } else if (response.status === 401 && storedRefreshToken) {
         // Token expired, try to refresh
         const refreshed = await refreshAccessToken();
@@ -157,6 +180,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('token', data.access_token);
       localStorage.setItem('refresh_token', data.refresh_token);
 
+      // Fetch user permissions
+      await fetchPermissions(data.access_token);
+
       message.success('登录成功');
       return true;
     } catch (error) {
@@ -170,6 +196,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     setToken(null);
     setRefreshToken(null);
+    setPermissions([]);
     localStorage.removeItem('token');
     localStorage.removeItem('refresh_token');
     message.success('已退出登录');
@@ -179,10 +206,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(updatedUser);
   };
 
+  const hasPermission = (permission: string): boolean => {
+    return permissions.includes(permission);
+  };
+
+  const hasAnyPermission = (requiredPermissions: string[]): boolean => {
+    return requiredPermissions.some(perm => permissions.includes(perm));
+  };
+
   const value: AuthContextType = {
     user,
     token,
     refreshToken,
+    permissions,
     isAuthenticated: !!user && !!token,
     isLoading,
     login,
@@ -190,6 +226,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     updateUser,
     checkAuth,
     refreshAccessToken,
+    hasPermission,
+    hasAnyPermission,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

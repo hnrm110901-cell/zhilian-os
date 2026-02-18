@@ -1,77 +1,66 @@
+// 权限类型定义 - 与后端保持一致
 export type Permission =
-  | 'view_dashboard'
-  | 'view_schedule'
-  | 'edit_schedule'
-  | 'view_orders'
-  | 'edit_orders'
-  | 'view_inventory'
-  | 'edit_inventory'
-  | 'view_service'
-  | 'edit_service'
-  | 'view_training'
-  | 'edit_training'
-  | 'view_decision'
-  | 'edit_decision'
-  | 'view_reservation'
-  | 'edit_reservation'
-  | 'manage_users'
-  | 'manage_roles';
+  // Agent访问权限
+  | 'agent:schedule:read'
+  | 'agent:schedule:write'
+  | 'agent:order:read'
+  | 'agent:order:write'
+  | 'agent:inventory:read'
+  | 'agent:inventory:write'
+  | 'agent:service:read'
+  | 'agent:service:write'
+  | 'agent:training:read'
+  | 'agent:training:write'
+  | 'agent:decision:read'
+  | 'agent:decision:write'
+  | 'agent:reservation:read'
+  | 'agent:reservation:write'
+  // 用户管理权限
+  | 'user:read'
+  | 'user:write'
+  | 'user:delete'
+  // 门店管理权限
+  | 'store:read'
+  | 'store:write'
+  | 'store:delete'
+  // 系统配置权限
+  | 'system:config'
+  | 'system:logs';
 
-export type Role = 'admin' | 'manager' | 'staff';
+// 角色类型定义 - 与后端保持一致
+export type Role =
+  | 'admin'
+  | 'store_manager'
+  | 'assistant_manager'
+  | 'floor_manager'
+  | 'customer_manager'
+  | 'team_leader'
+  | 'waiter'
+  | 'head_chef'
+  | 'station_manager'
+  | 'chef'
+  | 'warehouse_manager'
+  | 'finance'
+  | 'procurement';
 
-export const rolePermissions: Record<Role, Permission[]> = {
-  admin: [
-    'view_dashboard',
-    'view_schedule',
-    'edit_schedule',
-    'view_orders',
-    'edit_orders',
-    'view_inventory',
-    'edit_inventory',
-    'view_service',
-    'edit_service',
-    'view_training',
-    'edit_training',
-    'view_decision',
-    'edit_decision',
-    'view_reservation',
-    'edit_reservation',
-    'manage_users',
-    'manage_roles',
-  ],
-  manager: [
-    'view_dashboard',
-    'view_schedule',
-    'edit_schedule',
-    'view_orders',
-    'edit_orders',
-    'view_inventory',
-    'edit_inventory',
-    'view_service',
-    'edit_service',
-    'view_training',
-    'edit_training',
-    'view_reservation',
-    'edit_reservation',
-  ],
-  staff: [
-    'view_dashboard',
-    'view_schedule',
-    'view_orders',
-    'view_inventory',
-    'view_service',
-    'view_reservation',
-  ],
+/**
+ * 检查权限列表中是否包含指定权限
+ * 注意：前端权限检查基于从后端获取的权限列表
+ */
+export const hasPermission = (permissions: string[], permission: Permission): boolean => {
+  return permissions.includes(permission);
 };
 
-export const hasPermission = (role: Role, permission: Permission): boolean => {
-  return rolePermissions[role]?.includes(permission) || false;
+/**
+ * 检查是否拥有任意一个指定权限
+ */
+export const hasAnyPermission = (permissions: string[], requiredPermissions: Permission[]): boolean => {
+  return requiredPermissions.some(perm => permissions.includes(perm));
 };
 
-export const hasAnyPermission = (role: Role, permissions: Permission[]): boolean => {
-  return permissions.some(permission => hasPermission(role, permission));
-};
-
-export const hasAllPermissions = (role: Role, permissions: Permission[]): boolean => {
-  return permissions.every(permission => hasPermission(role, permission));
+/**
+ * 检查是否拥有所有指定权限
+ */
+export const hasAllPermissions = (permissions: string[], requiredPermissions: Permission[]): boolean => {
+  return requiredPermissions.every(perm => permissions.includes(perm));
 };

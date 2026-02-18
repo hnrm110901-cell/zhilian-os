@@ -3,11 +3,12 @@ Authentication API endpoints
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 
 from ..models.user import User, UserRole
 from ..services.auth_service import AuthService
 from ..core.dependencies import get_current_active_user, require_role
+from ..core.permissions import get_user_permissions
 
 router = APIRouter()
 auth_service = AuthService()
@@ -148,6 +149,18 @@ async def get_current_user_info(current_user: User = Depends(get_current_active_
         store_id=current_user.store_id,
         is_active=current_user.is_active,
     )
+
+
+@router.get("/me/permissions")
+async def get_current_user_permissions(current_user: User = Depends(get_current_active_user)):
+    """
+    获取当前用户的权限列表
+    """
+    permissions = get_user_permissions(current_user.role)
+    return {
+        "role": current_user.role.value,
+        "permissions": [perm.value for perm in permissions],
+    }
 
 
 @router.put("/me", response_model=UserResponse)
