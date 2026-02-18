@@ -2,7 +2,7 @@
 Mobile API endpoints
 移动端专用API接口 - 优化的数据结构和响应
 """
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime, timedelta
@@ -11,6 +11,8 @@ from ..models.user import User
 from ..core.dependencies import get_current_active_user
 from ..services.notification_service import notification_service
 from ..services.store_service import store_service
+from ..services.pos_service import pos_service
+from ..services.member_service import member_service
 import structlog
 
 logger = structlog.get_logger()
@@ -88,13 +90,29 @@ async def get_mobile_dashboard(
     # 根据角色生成快捷操作
     quick_actions = _get_quick_actions_by_role(current_user.role.value)
 
-    # 今日统计数据(占位符)
+    # 今日统计数据
+    today = datetime.now().strftime("%Y-%m-%d")
     today_stats = {
-        "date": datetime.now().strftime("%Y-%m-%d"),
-        "revenue": 0,  # TODO: 从订单表查询
-        "customers": 0,  # TODO: 从订单表查询
-        "orders": 0,  # TODO: 从订单表查询
+        "date": today,
+        "revenue": 0,
+        "customers": 0,
+        "orders": 0,
     }
+
+    # 获取今日订单数据
+    try:
+        orders_result = await pos_service.query_orders(
+            begin_date=today,
+            end_date=today,
+            page_index=1,
+            page_size=1000,
+        )
+        orders = orders_result.get("orders", [])
+        today_stats["orders"] = len(orders)
+        today_stats["revenue"] = sum(order.get("realPrice", 0) for order in orders)
+        today_stats["customers"] = sum(order.get("people", 0) for order in orders)
+    except Exception as e:
+        logger.warning("获取今日订单数据失败", error=str(e))
 
     dashboard = MobileDashboard(
         user=user_info,
@@ -305,3 +323,164 @@ async def submit_mobile_feedback(
         "success": True,
         "message": "感谢您的反馈",
     }
+
+
+@router.get("/mobile/orders/today")
+async def get_today_orders(
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    获取今日订单 - 移动端优化版
+    """
+    try:
+        today = datetime.now().strftime("%Y-%m-%d")
+        result = await pos_service.query_orders(
+            begin_date=today,
+            end_date=today,
+            page_index=1,
+            page_size=100,
+        )
+
+        orders = result.get("orders", [])
+
+        # 精简订单数据
+        simplified_orders = [
+            {
+                "id": order.get("billId"),
+                "order_no": order.get("billNo"),
+                "table_no": order.get("tableNo"),
+                "people": order.get("people"),
+                "amount": order.get("realPrice", 0) / 100,  # 转换为元
+                "status": order.get("billStatus"),
+                "time": order.get("payTime") or order.get("openTime"),
+            }
+            for order in orders[:20]  # 只返回最近20条
+        ]
+
+        return {
+            "date": today,
+            "total": len(orders),
+            "orders": simplified_orders,
+        }
+
+    except Exception as e:
+        logger.error("获取今日订单失败", error=str(e))
+        raise HTTPException(status_code=500, detail=f"获取今日订单失败: {str(e)}")
+
+
+@router.get("/mobile/member/info")
+async def get_member_info(
+    card_no: Optional[str] = Query(None, description="会员卡号"),
+    mobile: Optional[str] = Query(None, description="手机号"),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    查询会员信息 - 移动端快速查询
+    """
+    try:
+        member = await member_service.query_member(card_no=card_no, mobile=mobile)
+
+        # 精简会员数据
+        simplified_member = {
+            "card_no": member.get("cardNo"),
+            "name": member.get("name"),
+            "mobile": member.get("mobile"),
+            "level": member.get("level"),
+            "points": member.get("points"),
+            "balance": member.get("balance", 0) / 100,  # 转换为元
+        }
+
+        return simplified_member
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error("查询会员信息失败", error=str(e))
+        raise HTTPException(status_code=500, detail=f"查询会员信息失败: {str(e)}")
+
+
+@router.get("/mobile/menu/categories")
+async def get_menu_categories(
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    获取菜单类别 - 移动端点餐功能
+    """
+    try:
+        categories = await pos_service.get_dish_categories()
+
+        # 精简类别数据
+        simplified_categories = [
+            {
+                "id": cat.get("rcId"),
+                "name": cat.get("rcNAME"),
+                "parent_id": cat.get("fatherId"),
+            }
+            for cat in categories
+        ]
+
+        return {"categories": simplified_categories}
+
+    except Exception as e:
+        logger.error("获取菜单类别失败", error=str(e))
+        raise HTTPException(status_code=500, detail=f"获取菜单类别失败: {str(e)}")
+
+
+@router.get("/mobile/menu/dishes")
+async def get_menu_dishes(
+    category_id: Optional[int] = Query(None, description="类别ID"),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    获取菜品列表 - 移动端点餐功能
+    """
+    try:
+        dishes = await pos_service.get_dishes()
+
+        # 过滤和精简菜品数据
+        filtered_dishes = [
+            {
+                "id": dish.get("dishesId"),
+                "name": dish.get("dishesName"),
+                "price": dish.get("dishPrice"),
+                "category_id": dish.get("rcId"),
+                "unit": dish.get("unit"),
+                "is_recommend": dish.get("isRecommend") == 1,
+            }
+            for dish in dishes
+            if category_id is None or dish.get("rcId") == category_id
+        ]
+
+        return {"dishes": filtered_dishes}
+
+    except Exception as e:
+        logger.error("获取菜品列表失败", error=str(e))
+        raise HTTPException(status_code=500, detail=f"获取菜品列表失败: {str(e)}")
+
+
+@router.get("/mobile/tables")
+async def get_tables(
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    获取桌台列表 - 移动端桌台管理
+    """
+    try:
+        tables = await pos_service.get_tables()
+
+        # 精简桌台数据
+        simplified_tables = [
+            {
+                "id": table.get("tableId"),
+                "name": table.get("tableName"),
+                "area": table.get("blName"),
+            }
+            for table in tables
+        ]
+
+        return {"tables": simplified_tables}
+
+    except Exception as e:
+        logger.error("获取桌台列表失败", error=str(e))
+        raise HTTPException(status_code=500, detail=f"获取桌台列表失败: {str(e)}")
+
