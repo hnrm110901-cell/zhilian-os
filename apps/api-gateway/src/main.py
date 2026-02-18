@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 import structlog
 
 from src.core.config import settings
-from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, pos, members
+from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, pos, members, dashboard
 from src.middleware.monitoring import MonitoringMiddleware
 
 # 配置结构化日志
@@ -115,6 +115,10 @@ app = FastAPI(
             "name": "members",
             "description": "会员系统 - 奥琦韦会员管理接口",
         },
+        {
+            "name": "dashboard",
+            "description": "数据可视化 - 大屏数据接口",
+        },
     ],
 )
 
@@ -142,6 +146,7 @@ app.include_router(monitoring.router, prefix="/api/v1", tags=["monitoring"])
 app.include_router(llm.router, prefix="/api/v1", tags=["llm"])
 app.include_router(pos.router, prefix="/api/v1/pos", tags=["pos"])
 app.include_router(members.router, prefix="/api/v1/members", tags=["members"])
+app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["dashboard"])
 
 
 @app.on_event("startup")
