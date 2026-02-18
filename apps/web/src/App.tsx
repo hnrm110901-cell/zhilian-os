@@ -15,6 +15,7 @@ import DecisionPage from './pages/DecisionPage';
 import ReservationPage from './pages/ReservationPage';
 import UserManagementPage from './pages/UserManagementPage';
 import EnterpriseIntegrationPage from './pages/EnterpriseIntegrationPage';
+import MultiStoreManagement from './pages/MultiStoreManagement';
 import LoginPage from './pages/LoginPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 
@@ -51,6 +52,11 @@ const App: React.FC = () => {
               <Route path="enterprise" element={
                 <ProtectedRoute requiredRole="admin">
                   <EnterpriseIntegrationPage />
+                </ProtectedRoute>
+              } />
+              <Route path="multi-store" element={
+                <ProtectedRoute requiredRole="admin">
+                  <MultiStoreManagement />
                 </ProtectedRoute>
               } />
             </Route>

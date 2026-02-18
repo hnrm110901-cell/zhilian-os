@@ -10,6 +10,8 @@ from datetime import datetime, timedelta
 from ..models.store import Store, StoreStatus
 from ..models.user import User
 from ..core.database import get_db_session
+from ..services.pos_service import pos_service
+from ..services.member_service import member_service
 import structlog
 
 logger = structlog.get_logger()
@@ -201,8 +203,6 @@ class StoreService:
 
     async def get_store_stats(self, store_id: str) -> Dict:
         """获取门店统计信息"""
-        # TODO: 实现门店统计(营业额、客流量、员工数等)
-        # 这里需要查询订单、员工等表
         async with get_db_session() as session:
             store = await self.get_store(store_id)
             if not store:
@@ -215,19 +215,49 @@ class StoreService:
                 "status": store.status,
                 "area": store.area,
                 "seats": store.seats,
-                # TODO: 添加实际业务数据统计
-                "employee_count": 0,  # 从员工表查询
-                "today_revenue": 0,  # 从订单表查询
-                "today_customers": 0,  # 从订单表查询
-                "monthly_revenue": 0,  # 从订单表查询
+                "employee_count": 0,
+                "today_revenue": 0,
+                "today_customers": 0,
+                "today_orders": 0,
+                "monthly_revenue": 0,
                 "monthly_revenue_target": store.monthly_revenue_target,
             }
+
+            # 获取今日数据
+            try:
+                today = datetime.now().strftime("%Y-%m-%d")
+                orders_result = await pos_service.query_orders(
+                    begin_date=today,
+                    end_date=today,
+                    page_index=1,
+                    page_size=1000,
+                )
+                orders = orders_result.get("orders", [])
+                stats["today_orders"] = len(orders)
+                stats["today_revenue"] = sum(order.get("realPrice", 0) for order in orders)
+                stats["today_customers"] = sum(order.get("people", 0) for order in orders)
+            except Exception as e:
+                logger.warning("获取门店今日数据失败", store_id=store_id, error=str(e))
+
+            # 获取本月数据
+            try:
+                month_start = datetime.now().replace(day=1).strftime("%Y-%m-%d")
+                month_end = datetime.now().strftime("%Y-%m-%d")
+                month_orders_result = await pos_service.query_orders(
+                    begin_date=month_start,
+                    end_date=month_end,
+                    page_index=1,
+                    page_size=10000,
+                )
+                month_orders = month_orders_result.get("orders", [])
+                stats["monthly_revenue"] = sum(order.get("realPrice", 0) for order in month_orders)
+            except Exception as e:
+                logger.warning("获取门店本月数据失败", store_id=store_id, error=str(e))
 
             return stats
 
     async def compare_stores(self, store_ids: List[str], metrics: List[str]) -> Dict:
         """对比多个门店的数据"""
-        # TODO: 实现门店对比功能
         comparison = {
             "stores": [],
             "metrics": metrics,
@@ -243,13 +273,87 @@ class StoreService:
                     "region": store.region,
                 })
 
-                # TODO: 查询实际业务数据
+                # 获取门店统计数据
+                stats = await self.get_store_stats(store_id)
+
                 for metric in metrics:
                     if metric not in comparison["data"]:
                         comparison["data"][metric] = {}
-                    comparison["data"][metric][store_id] = 0  # 占位符
+
+                    # 映射指标到统计数据
+                    metric_value = 0
+                    if metric == "revenue":
+                        metric_value = stats.get("today_revenue", 0)
+                    elif metric == "customers":
+                        metric_value = stats.get("today_customers", 0)
+                    elif metric == "orders":
+                        metric_value = stats.get("today_orders", 0)
+                    elif metric == "monthly_revenue":
+                        metric_value = stats.get("monthly_revenue", 0)
+
+                    comparison["data"][metric][store_id] = metric_value
 
         return comparison
+
+    async def get_regional_summary(self) -> Dict:
+        """获取区域汇总数据"""
+        stores_by_region = await self.get_stores_by_region()
+
+        regional_summary = {}
+        for region, stores in stores_by_region.items():
+            regional_summary[region] = {
+                "store_count": len(stores),
+                "active_stores": sum(1 for s in stores if s.is_active),
+                "total_seats": sum(s.seats or 0 for s in stores),
+                "total_area": sum(s.area or 0 for s in stores),
+                "stores": [
+                    {
+                        "id": s.id,
+                        "name": s.name,
+                        "city": s.city,
+                        "status": s.status,
+                    }
+                    for s in stores
+                ],
+            }
+
+        return regional_summary
+
+    async def get_performance_ranking(self, metric: str = "revenue", limit: int = 10) -> List[Dict]:
+        """获取门店业绩排名"""
+        stores = await self.get_stores(is_active=True, limit=1000)
+
+        store_performance = []
+        for store in stores:
+            stats = await self.get_store_stats(store.id)
+
+            performance_value = 0
+            if metric == "revenue":
+                performance_value = stats.get("today_revenue", 0)
+            elif metric == "customers":
+                performance_value = stats.get("today_customers", 0)
+            elif metric == "orders":
+                performance_value = stats.get("today_orders", 0)
+            elif metric == "monthly_revenue":
+                performance_value = stats.get("monthly_revenue", 0)
+
+            store_performance.append({
+                "store_id": store.id,
+                "store_name": store.name,
+                "region": store.region,
+                "city": store.city,
+                "metric": metric,
+                "value": performance_value,
+            })
+
+        # 按业绩排序
+        store_performance.sort(key=lambda x: x["value"], reverse=True)
+
+        # 添加排名
+        for i, item in enumerate(store_performance[:limit]):
+            item["rank"] = i + 1
+
+        return store_performance[:limit]
 
 
 # 全局门店服务实例

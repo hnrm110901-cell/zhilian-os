@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 import structlog
 
 from src.core.config import settings
-from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, pos, members, dashboard
+from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, pos, members, dashboard, multi_store
 from src.middleware.monitoring import MonitoringMiddleware
 
 # 配置结构化日志
@@ -119,6 +119,10 @@ app = FastAPI(
             "name": "dashboard",
             "description": "数据可视化 - 大屏数据接口",
         },
+        {
+            "name": "multi_store",
+            "description": "多门店管理 - 门店对比、区域汇总、绩效排名",
+        },
     ],
 )
 
@@ -147,6 +151,7 @@ app.include_router(llm.router, prefix="/api/v1", tags=["llm"])
 app.include_router(pos.router, prefix="/api/v1/pos", tags=["pos"])
 app.include_router(members.router, prefix="/api/v1/members", tags=["members"])
 app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["dashboard"])
+app.include_router(multi_store.router, prefix="/api/v1/multi-store", tags=["multi_store"])
 
 
 @app.on_event("startup")
