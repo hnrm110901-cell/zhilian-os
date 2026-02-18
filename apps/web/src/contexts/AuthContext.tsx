@@ -14,12 +14,14 @@ interface User {
 interface AuthContextType {
   user: User | null;
   token: string | null;
+  refreshToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
   updateUser: (user: User) => void;
   checkAuth: () => Promise<void>;
+  refreshAccessToken: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -27,6 +29,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Check authentication on mount
@@ -36,6 +39,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const checkAuth = async () => {
     const storedToken = localStorage.getItem('token');
+    const storedRefreshToken = localStorage.getItem('refresh_token');
 
     if (!storedToken) {
       setIsLoading(false);
@@ -53,19 +57,78 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const userData = await response.json();
         setUser(userData);
         setToken(storedToken);
+        setRefreshToken(storedRefreshToken);
+      } else if (response.status === 401 && storedRefreshToken) {
+        // Token expired, try to refresh
+        const refreshed = await refreshAccessToken();
+        if (!refreshed) {
+          // Refresh failed, clear everything
+          localStorage.removeItem('token');
+          localStorage.removeItem('refresh_token');
+          setToken(null);
+          setRefreshToken(null);
+          setUser(null);
+        }
       } else {
         // Token is invalid, clear it
         localStorage.removeItem('token');
+        localStorage.removeItem('refresh_token');
         setToken(null);
+        setRefreshToken(null);
         setUser(null);
       }
     } catch (error) {
       console.error('Auth check error:', error);
       localStorage.removeItem('token');
+      localStorage.removeItem('refresh_token');
       setToken(null);
+      setRefreshToken(null);
       setUser(null);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const refreshAccessToken = async (): Promise<boolean> => {
+    const storedRefreshToken = localStorage.getItem('refresh_token');
+
+    if (!storedRefreshToken) {
+      return false;
+    }
+
+    try {
+      const response = await fetch('/api/v1/auth/refresh', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refresh_token: storedRefreshToken }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setToken(data.access_token);
+        localStorage.setItem('token', data.access_token);
+
+        // Re-fetch user data with new token
+        const userResponse = await fetch('/api/v1/auth/me', {
+          headers: {
+            'Authorization': `Bearer ${data.access_token}`,
+          },
+        });
+
+        if (userResponse.ok) {
+          const userData = await userResponse.json();
+          setUser(userData);
+        }
+
+        return true;
+      } else {
+        return false;
+      }
+    } catch (error) {
+      console.error('Token refresh error:', error);
+      return false;
     }
   };
 
@@ -87,10 +150,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const data = await response.json();
 
-      // Store token and user data
+      // Store both tokens and user data
       setToken(data.access_token);
+      setRefreshToken(data.refresh_token);
       setUser(data.user);
       localStorage.setItem('token', data.access_token);
+      localStorage.setItem('refresh_token', data.refresh_token);
 
       message.success('登录成功');
       return true;
@@ -104,7 +169,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     setUser(null);
     setToken(null);
+    setRefreshToken(null);
     localStorage.removeItem('token');
+    localStorage.removeItem('refresh_token');
     message.success('已退出登录');
   };
 
@@ -115,12 +182,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const value: AuthContextType = {
     user,
     token,
+    refreshToken,
     isAuthenticated: !!user && !!token,
     isLoading,
     login,
     logout,
     updateUser,
     checkAuth,
+    refreshAccessToken,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

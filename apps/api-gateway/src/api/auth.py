@@ -54,6 +54,10 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
 
 
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
+
 @router.post("/login")
 async def login(request: LoginRequest):
     """
@@ -73,8 +77,28 @@ async def login(request: LoginRequest):
             detail="用户已被禁用",
         )
 
-    token_data = await auth_service.create_access_token_for_user(user)
+    token_data = await auth_service.create_tokens_for_user(user)
     return token_data
+
+
+@router.post("/refresh")
+async def refresh_token(request: RefreshTokenRequest):
+    """
+    刷新访问令牌
+    """
+    try:
+        token_data = await auth_service.refresh_access_token(request.refresh_token)
+        return token_data
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="刷新令牌失败",
+        )
 
 
 @router.post("/register", response_model=UserResponse)

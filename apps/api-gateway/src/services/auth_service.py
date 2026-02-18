@@ -9,7 +9,15 @@ from sqlalchemy import select
 import uuid
 
 from ..models.user import User, UserRole
-from ..core.security import verify_password, get_password_hash, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
+from ..core.security import (
+    verify_password,
+    get_password_hash,
+    create_access_token,
+    create_refresh_token,
+    decode_refresh_token,
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    REFRESH_TOKEN_EXPIRE_DAYS,
+)
 from ..core.database import get_db_session
 
 
@@ -31,16 +39,30 @@ class AuthService:
 
             return user
 
-    async def create_access_token_for_user(self, user: User) -> dict:
-        """为用户创建访问令牌"""
+    async def create_tokens_for_user(self, user: User) -> dict:
+        """为用户创建访问令牌和刷新令牌"""
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        refresh_token_expires = timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+
+        token_data = {
+            "sub": str(user.id),
+            "username": user.username,
+            "role": user.role.value,
+        }
+
         access_token = create_access_token(
-            data={"sub": str(user.id), "username": user.username, "role": user.role.value},
+            data=token_data,
             expires_delta=access_token_expires,
+        )
+
+        refresh_token = create_refresh_token(
+            data=token_data,
+            expires_delta=refresh_token_expires,
         )
 
         return {
             "access_token": access_token,
+            "refresh_token": refresh_token,
             "token_type": "bearer",
             "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # seconds
             "user": {
@@ -50,8 +72,45 @@ class AuthService:
                 "full_name": user.full_name,
                 "role": user.role.value,
                 "store_id": user.store_id,
+                "is_active": user.is_active,
             },
         }
+
+    async def refresh_access_token(self, refresh_token: str) -> dict:
+        """使用刷新令牌获取新的访问令牌"""
+        # 验证刷新令牌
+        payload = decode_refresh_token(refresh_token)
+        user_id = payload.get("sub")
+
+        if not user_id:
+            raise ValueError("无效的刷新令牌")
+
+        # 获取用户信息
+        user = await self.get_user_by_id(user_id)
+        if not user or not user.is_active:
+            raise ValueError("用户不存在或已被禁用")
+
+        # 创建新的访问令牌
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={
+                "sub": str(user.id),
+                "username": user.username,
+                "role": user.role.value,
+            },
+            expires_delta=access_token_expires,
+        )
+
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        }
+
+    # Keep the old method for backward compatibility
+    async def create_access_token_for_user(self, user: User) -> dict:
+        """为用户创建访问令牌 (已弃用，使用create_tokens_for_user)"""
+        return await self.create_tokens_for_user(user)
 
     async def register_user(
         self,
