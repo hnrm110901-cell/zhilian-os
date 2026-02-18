@@ -20,6 +20,7 @@ import {
   ShopOutlined,
   ShoppingOutlined,
   MonitorOutlined,
+  DatabaseOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -176,6 +177,11 @@ const MainLayout: React.FC = () => {
         key: '/enterprise',
         icon: <ApiOutlined />,
         label: '企业集成',
+      },
+      {
+        key: '/backup',
+        icon: <DatabaseOutlined />,
+        label: '数据备份',
       }
     ] : []),
   ];

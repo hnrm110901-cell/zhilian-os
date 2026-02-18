@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 import structlog
 
 from src.core.config import settings
-from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, pos, members, dashboard, multi_store, supply_chain, finance
+from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, pos, members, dashboard, multi_store, supply_chain, finance, backup
 from src.middleware.monitoring import MonitoringMiddleware
 
 # 配置结构化日志
@@ -131,6 +131,10 @@ app = FastAPI(
             "name": "finance",
             "description": "财务管理 - 财务报表、预算管理、成本核算",
         },
+        {
+            "name": "backup",
+            "description": "数据备份 - 备份管理、恢复、验证",
+        },
     ],
 )
 
@@ -162,6 +166,7 @@ app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["dashboar
 app.include_router(multi_store.router, prefix="/api/v1/multi-store", tags=["multi_store"])
 app.include_router(supply_chain.router, prefix="/api/v1/supply-chain", tags=["supply_chain"])
 app.include_router(finance.router, prefix="/api/v1/finance", tags=["finance"])
+app.include_router(backup.router, prefix="/api/v1/backup", tags=["backup"])
 
 
 @app.on_event("startup")
@@ -181,11 +186,29 @@ async def startup_event():
         # Don't fail startup if database is not available
         # This allows the API to run without database for testing
 
+    # Start scheduler for automated tasks
+    try:
+        from src.services.scheduler import get_scheduler
+        scheduler = get_scheduler()
+        await scheduler.start()
+        logger.info("定时任务调度器启动成功")
+    except Exception as e:
+        logger.error("定时任务调度器启动失败", error=str(e))
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """应用关闭事件"""
     logger.info("智链OS API Gateway 关闭中...")
+
+    # Stop scheduler
+    try:
+        from src.services.scheduler import get_scheduler
+        scheduler = get_scheduler()
+        await scheduler.stop()
+        logger.info("定时任务调度器已停止")
+    except Exception as e:
+        logger.error("停止定时任务调度器失败", error=str(e))
 
     # Close member service
     try:

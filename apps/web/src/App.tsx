@@ -21,6 +21,7 @@ import DataVisualizationScreen from './pages/DataVisualizationScreen';
 import MonitoringPage from './pages/MonitoringPage';
 import MobileApp from './pages/MobileApp';
 import FinanceManagement from './pages/FinanceManagement';
+import BackupManagement from './pages/BackupManagement';
 import LoginPage from './pages/LoginPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 
@@ -87,6 +88,11 @@ const App: React.FC = () => {
               <Route path="finance" element={
                 <ProtectedRoute requiredRole="admin">
                   <FinanceManagement />
+                </ProtectedRoute>
+              } />
+              <Route path="backup" element={
+                <ProtectedRoute requiredRole="admin">
+                  <BackupManagement />
                 </ProtectedRoute>
               } />
             </Route>
