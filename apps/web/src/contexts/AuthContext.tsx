@@ -5,100 +5,95 @@ interface User {
   id: string;
   username: string;
   email: string;
-  role: 'admin' | 'manager' | 'staff';
-  avatar?: string;
+  full_name: string | null;
+  role: string;
+  store_id: string | null;
+  is_active: boolean;
 }
 
 interface AuthContextType {
   user: User | null;
+  token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
   updateUser: (user: User) => void;
+  checkAuth: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Check authentication on mount
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    const token = localStorage.getItem('token');
+    checkAuth();
+  }, []);
 
-    if (storedUser && token) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (error) {
-        console.error('Failed to parse stored user:', error);
-        localStorage.removeItem('user');
-        localStorage.removeItem('token');
-      }
+  const checkAuth = async () => {
+    const storedToken = localStorage.getItem('token');
+
+    if (!storedToken) {
+      setIsLoading(false);
+      return;
     }
 
-    setIsLoading(false);
-  }, []);
+    try {
+      const response = await fetch('/api/v1/auth/me', {
+        headers: {
+          'Authorization': `Bearer ${storedToken}`,
+        },
+      });
+
+      if (response.ok) {
+        const userData = await response.json();
+        setUser(userData);
+        setToken(storedToken);
+      } else {
+        // Token is invalid, clear it
+        localStorage.removeItem('token');
+        setToken(null);
+        setUser(null);
+      }
+    } catch (error) {
+      console.error('Auth check error:', error);
+      localStorage.removeItem('token');
+      setToken(null);
+      setUser(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const login = async (username: string, password: string): Promise<boolean> => {
     try {
-      // Mock authentication - replace with real API call
-      if (username === 'admin' && password === 'admin123') {
-        const mockUser: User = {
-          id: '1',
-          username: 'admin',
-          email: 'admin@zhilian.com',
-          role: 'admin',
-          avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=admin'
-        };
+      const response = await fetch('/api/v1/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password }),
+      });
 
-        const mockToken = 'mock-jwt-token-' + Date.now();
-
-        setUser(mockUser);
-        localStorage.setItem('user', JSON.stringify(mockUser));
-        localStorage.setItem('token', mockToken);
-
-        message.success('登录成功');
-        return true;
-      } else if (username === 'manager' && password === 'manager123') {
-        const mockUser: User = {
-          id: '2',
-          username: 'manager',
-          email: 'manager@zhilian.com',
-          role: 'manager',
-          avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=manager'
-        };
-
-        const mockToken = 'mock-jwt-token-' + Date.now();
-
-        setUser(mockUser);
-        localStorage.setItem('user', JSON.stringify(mockUser));
-        localStorage.setItem('token', mockToken);
-
-        message.success('登录成功');
-        return true;
-      } else if (username === 'staff' && password === 'staff123') {
-        const mockUser: User = {
-          id: '3',
-          username: 'staff',
-          email: 'staff@zhilian.com',
-          role: 'staff',
-          avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=staff'
-        };
-
-        const mockToken = 'mock-jwt-token-' + Date.now();
-
-        setUser(mockUser);
-        localStorage.setItem('user', JSON.stringify(mockUser));
-        localStorage.setItem('token', mockToken);
-
-        message.success('登录成功');
-        return true;
-      } else {
-        message.error('用户名或密码错误');
+      if (!response.ok) {
+        const error = await response.json();
+        message.error(error.detail || '登录失败');
         return false;
       }
+
+      const data = await response.json();
+
+      // Store token and user data
+      setToken(data.access_token);
+      setUser(data.user);
+      localStorage.setItem('token', data.access_token);
+
+      message.success('登录成功');
+      return true;
     } catch (error) {
       console.error('Login error:', error);
       message.error('登录失败，请稍后重试');
@@ -108,23 +103,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('user');
+    setToken(null);
     localStorage.removeItem('token');
     message.success('已退出登录');
   };
 
   const updateUser = (updatedUser: User) => {
     setUser(updatedUser);
-    localStorage.setItem('user', JSON.stringify(updatedUser));
   };
 
   const value: AuthContextType = {
     user,
-    isAuthenticated: !!user,
+    token,
+    isAuthenticated: !!user && !!token,
     isLoading,
     login,
     logout,
-    updateUser
+    updateUser,
+    checkAuth,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
