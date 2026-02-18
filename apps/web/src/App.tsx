@@ -23,6 +23,7 @@ import MobileApp from './pages/MobileApp';
 import FinanceManagement from './pages/FinanceManagement';
 import BackupManagement from './pages/BackupManagement';
 import AdvancedAnalytics from './pages/AdvancedAnalytics';
+import NotificationCenter from './pages/NotificationCenter';
 import LoginPage from './pages/LoginPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 
@@ -99,6 +100,11 @@ const App: React.FC = () => {
               <Route path="analytics" element={
                 <ProtectedRoute>
                   <AdvancedAnalytics />
+                </ProtectedRoute>
+              } />
+              <Route path="notifications" element={
+                <ProtectedRoute>
+                  <NotificationCenter />
                 </ProtectedRoute>
               } />
             </Route>

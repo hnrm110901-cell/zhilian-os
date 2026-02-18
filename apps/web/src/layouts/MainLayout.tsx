@@ -21,6 +21,8 @@ import {
   ShoppingOutlined,
   MonitorOutlined,
   DatabaseOutlined,
+  BellOutlined,
+  DollarOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -171,6 +173,11 @@ const MainLayout: React.FC = () => {
       key: '/mobile',
       icon: <MobileOutlined />,
       label: '移动端',
+    },
+    {
+      key: '/notifications',
+      icon: <BellOutlined />,
+      label: '通知中心',
     },
     ...(user?.role === 'admin' ? [
       {

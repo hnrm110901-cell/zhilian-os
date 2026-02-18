@@ -2,7 +2,7 @@
 Notification API endpoints
 通知相关的API接口
 """
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, Query
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, Query, HTTPException
 from typing import Optional, List
 from pydantic import BaseModel
 
@@ -11,6 +11,11 @@ from ..models.notification import NotificationType, NotificationPriority
 from ..core.dependencies import get_current_active_user
 from ..core.websocket import manager
 from ..services.notification_service import notification_service
+from ..services.multi_channel_notification import (
+    multi_channel_notification_service,
+    NotificationChannel,
+    NotificationTemplate
+)
 import structlog
 
 logger = structlog.get_logger()
@@ -218,4 +223,134 @@ async def get_notification_stats():
     return {
         "active_connections": manager.get_connection_count(),
         "active_users": len(manager.get_active_users()),
+    }
+
+
+# 多渠道通知API
+class MultiChannelNotificationRequest(BaseModel):
+    channels: List[str]  # email, sms, wechat, app_push
+    recipient: str
+    title: str
+    content: str
+    extra_data: Optional[dict] = None
+
+
+class TemplateNotificationRequest(BaseModel):
+    template_name: str
+    recipient: str
+    template_vars: dict
+
+
+@router.post("/notifications/multi-channel")
+async def send_multi_channel_notification(
+    request: MultiChannelNotificationRequest,
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    发送多渠道通知
+
+    支持的渠道:
+    - email: 邮件通知
+    - sms: 短信通知
+    - wechat: 微信通知
+    - app_push: App推送通知
+    """
+    try:
+        # 转换渠道字符串为枚举
+        channels = [NotificationChannel(ch) for ch in request.channels]
+
+        # 发送通知
+        results = await multi_channel_notification_service.send_notification(
+            channels=channels,
+            recipient=request.recipient,
+            title=request.title,
+            content=request.content,
+            extra_data=request.extra_data
+        )
+
+        # 转换结果为可序列化格式
+        serialized_results = {
+            channel.value: success
+            for channel, success in results.items()
+        }
+
+        return {
+            "success": True,
+            "message": "通知已发送",
+            "results": serialized_results
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"无效的通知渠道: {str(e)}")
+    except Exception as e:
+        logger.error("发送多渠道通知失败", error=str(e))
+        raise HTTPException(status_code=500, detail=f"发送失败: {str(e)}")
+
+
+@router.post("/notifications/template")
+async def send_template_notification(
+    request: TemplateNotificationRequest,
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    使用模板发送通知
+
+    可用模板:
+    - order_confirmed: 订单确认
+    - order_ready: 订单已完成
+    - inventory_low: 库存预警
+    - staff_schedule: 排班通知
+    - payment_success: 支付成功
+    - backup_completed: 数据备份完成
+    - backup_failed: 数据备份失败
+    - system_alert: 系统告警
+    """
+    try:
+        # 发送模板通知
+        results = await multi_channel_notification_service.send_template_notification(
+            template_name=request.template_name,
+            recipient=request.recipient,
+            **request.template_vars
+        )
+
+        if not results:
+            raise HTTPException(status_code=404, detail=f"模板不存在: {request.template_name}")
+
+        # 转换结果为可序列化格式
+        serialized_results = {
+            channel.value: success
+            for channel, success in results.items()
+        }
+
+        return {
+            "success": True,
+            "message": "模板通知已发送",
+            "template": request.template_name,
+            "results": serialized_results
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("发送模板通知失败", error=str(e))
+        raise HTTPException(status_code=500, detail=f"发送失败: {str(e)}")
+
+
+@router.get("/notifications/templates")
+async def get_notification_templates(
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    获取所有可用的通知模板
+    """
+    templates = {}
+    for name, template in NotificationTemplate.TEMPLATES.items():
+        templates[name] = {
+            "title": template["title"],
+            "content": template["content"],
+            "channels": [ch.value for ch in template["channels"]],
+            "priority": template["priority"],
+        }
+
+    return {
+        "templates": templates,
+        "count": len(templates)
     }
