@@ -12,6 +12,7 @@ from src.core.database import get_db
 from src.core.auth import get_current_user, require_permission
 from src.services.finance_service import get_finance_service
 from src.services.report_export_service import report_export_service
+from src.services.pdf_report_service import pdf_report_service
 from src.models import User
 
 router = APIRouter()
@@ -145,7 +146,7 @@ async def get_financial_metrics(
 @router.get("/reports/export")
 async def export_report(
     report_type: str = Query(..., description="报表类型: income_statement, cash_flow, transactions"),
-    format: str = Query("csv", description="导出格式: csv"),
+    format: str = Query("csv", description="导出格式: csv, pdf"),
     start_date: date = Query(...),
     end_date: date = Query(...),
     store_id: Optional[int] = Query(None),
@@ -162,6 +163,7 @@ async def export_report(
 
     支持的格式:
     - csv: CSV格式
+    - pdf: PDF格式
     """
     try:
         from datetime import datetime
@@ -187,6 +189,48 @@ async def export_report(
                     "Content-Disposition": f"attachment; filename={filename}"
                 }
             )
+        elif format == "pdf":
+            # 获取报表数据
+            service = get_finance_service(db)
+
+            if report_type == "income_statement":
+                data = await service.generate_income_statement(
+                    store_id=str(store_id) if store_id else "STORE001",
+                    start_date=start_date,
+                    end_date=end_date
+                )
+                content = pdf_report_service.generate_income_statement_pdf(
+                    data, start_datetime, end_datetime
+                )
+            elif report_type == "cash_flow":
+                data = await service.generate_cash_flow(
+                    store_id=str(store_id) if store_id else "STORE001",
+                    start_date=start_date,
+                    end_date=end_date
+                )
+                content = pdf_report_service.generate_cash_flow_pdf(
+                    data, start_datetime, end_datetime
+                )
+            else:
+                raise HTTPException(status_code=400, detail=f"PDF格式不支持报表类型: {report_type}")
+
+            # 生成文件名
+            filename = f"{report_type}_{start_date}_{end_date}.pdf"
+
+            return Response(
+                content=content,
+                media_type="application/pdf",
+                headers={
+                    "Content-Disposition": f"attachment; filename={filename}"
+                }
+            )
+        else:
+            raise HTTPException(status_code=400, detail=f"不支持的导出格式: {format}")
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"导出失败: {str(e)}")
         else:
             raise HTTPException(status_code=400, detail=f"不支持的导出格式: {format}")
 

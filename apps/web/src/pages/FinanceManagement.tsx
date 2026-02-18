@@ -8,6 +8,7 @@ import {
   FileTextOutlined,
   BarChartOutlined,
   DownloadOutlined,
+  FilePdfOutlined,
 } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { apiClient } from '../services/api';
@@ -157,13 +158,13 @@ const FinanceManagement: React.FC = () => {
     }
   };
 
-  const handleExportReport = async (reportType: string) => {
+  const handleExportReport = async (reportType: string, format: string = 'csv') => {
     try {
       message.loading({ content: '正在导出报表...', key: 'export' });
 
       const params = new URLSearchParams({
         report_type: reportType,
-        format: 'csv',
+        format: format,
         start_date: dateRange[0].format('YYYY-MM-DD'),
         end_date: dateRange[1].format('YYYY-MM-DD'),
       });
@@ -176,7 +177,8 @@ const FinanceManagement: React.FC = () => {
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `${reportType}_${dateRange[0].format('YYYY-MM-DD')}_${dateRange[1].format('YYYY-MM-DD')}.csv`);
+      const extension = format === 'pdf' ? 'pdf' : 'csv';
+      link.setAttribute('download', `${reportType}_${dateRange[0].format('YYYY-MM-DD')}_${dateRange[1].format('YYYY-MM-DD')}.${extension}`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -426,9 +428,15 @@ const FinanceManagement: React.FC = () => {
               <Button
                 type="primary"
                 icon={<DownloadOutlined />}
-                onClick={() => handleExportReport('income_statement')}
+                onClick={() => handleExportReport('income_statement', 'csv')}
               >
-                导出损益表
+                导出CSV
+              </Button>
+              <Button
+                icon={<FilePdfOutlined />}
+                onClick={() => handleExportReport('income_statement', 'pdf')}
+              >
+                导出PDF
               </Button>
             </Space>
             {incomeStatement && (
@@ -462,9 +470,15 @@ const FinanceManagement: React.FC = () => {
               <Button
                 type="primary"
                 icon={<DownloadOutlined />}
-                onClick={() => handleExportReport('cash_flow')}
+                onClick={() => handleExportReport('cash_flow', 'csv')}
               >
-                导出现金流量表
+                导出CSV
+              </Button>
+              <Button
+                icon={<FilePdfOutlined />}
+                onClick={() => handleExportReport('cash_flow', 'pdf')}
+              >
+                导出PDF
               </Button>
             </Space>
             {cashFlowChartOption && (
@@ -477,9 +491,9 @@ const FinanceManagement: React.FC = () => {
               <Button
                 type="primary"
                 icon={<DownloadOutlined />}
-                onClick={() => handleExportReport('transactions')}
+                onClick={() => handleExportReport('transactions', 'csv')}
               >
-                导出交易明细
+                导出CSV
               </Button>
             </Space>
             <Table
