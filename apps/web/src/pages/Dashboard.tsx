@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { Card, Col, Row, Statistic, Alert, Spin, Tag, Button, Switch, Space } from 'antd';
 import {
   InboxOutlined,
@@ -38,7 +38,7 @@ const Dashboard: React.FC = () => {
     };
   }, [autoRefresh, refreshInterval]);
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -58,15 +58,15 @@ const Dashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // 手动刷新
-  const handleManualRefresh = () => {
+  const handleManualRefresh = useCallback(() => {
     loadDashboardData();
-  };
+  }, [loadDashboardData]);
 
-  // 从决策报告中提取KPI数据用于图表
-  const getKPIChartData = () => {
+  // 从决策报告中提取KPI数据用于图表 - 使用 useMemo 缓存计算结果
+  const kpiChartData = useMemo(() => {
     if (!decisionReport) return null;
 
     const kpis = decisionReport.kpi_summary.key_kpis;
@@ -80,12 +80,11 @@ const Dashboard: React.FC = () => {
       targetValues: revenueKPIs.map(k => k.target_value),
       achievementRates: revenueKPIs.map(k => k.achievement_rate * 100),
     };
-  };
+  }, [decisionReport]);
 
-  // KPI达成率图表配置
-  const kpiAchievementOption = () => {
-    const chartData = getKPIChartData();
-    if (!chartData) return {};
+  // KPI达成率图表配置 - 使用 useMemo 缓存配置对象
+  const kpiAchievementOption = useMemo(() => {
+    if (!kpiChartData) return {};
 
     return {
       title: {
@@ -108,7 +107,7 @@ const Dashboard: React.FC = () => {
       },
       xAxis: {
         type: 'category',
-        data: chartData.categories,
+        data: kpiChartData.categories,
         axisLabel: {
           interval: 0,
           rotate: 30,
@@ -122,7 +121,7 @@ const Dashboard: React.FC = () => {
       series: [
         {
           name: '达成率',
-          data: chartData.achievementRates,
+          data: kpiChartData.achievementRates,
           type: 'bar',
           itemStyle: {
             color: (params: any) => {
@@ -135,7 +134,7 @@ const Dashboard: React.FC = () => {
         },
         {
           name: '目标线',
-          data: chartData.categories.map(() => 100),
+          data: kpiChartData.categories.map(() => 100),
           type: 'line',
           itemStyle: {
             color: '#1890ff',
@@ -146,10 +145,10 @@ const Dashboard: React.FC = () => {
         },
       ],
     };
-  };
+  }, [kpiChartData]);
 
-  // KPI状态分布饼图
-  const kpiStatusOption = () => {
+  // KPI状态分布饼图 - 使用 useMemo 缓存配置对象
+  const kpiStatusOption = useMemo(() => {
     if (!decisionReport) return {};
 
     const statusDist = decisionReport.kpi_summary.status_distribution;
@@ -188,7 +187,7 @@ const Dashboard: React.FC = () => {
         },
       ],
     };
-  };
+  }, [decisionReport]);
 
   if (loading) {
     return (
@@ -340,7 +339,7 @@ const Dashboard: React.FC = () => {
         <Col span={12}>
           <Card>
             {decisionReport ? (
-              <ReactECharts option={kpiAchievementOption()} style={{ height: 300 }} />
+              <ReactECharts option={kpiAchievementOption} style={{ height: 300 }} />
             ) : (
               <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Spin />
@@ -351,7 +350,7 @@ const Dashboard: React.FC = () => {
         <Col span={12}>
           <Card>
             {decisionReport ? (
-              <ReactECharts option={kpiStatusOption()} style={{ height: 300 }} />
+              <ReactECharts option={kpiStatusOption} style={{ height: 300 }} />
             ) : (
               <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Spin />
