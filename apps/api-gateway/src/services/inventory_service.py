@@ -126,13 +126,41 @@ class InventoryService:
             result = await session.execute(stmt)
             items = result.scalars().all()
 
+            # Optimize: Fetch all transaction data in a single query to avoid N+1
+            if items:
+                item_ids = [item.id for item in items]
+                thirty_days_ago = datetime.now() - timedelta(days=30)
+
+                trans_stmt = (
+                    select(InventoryTransaction)
+                    .where(
+                        and_(
+                            InventoryTransaction.item_id.in_(item_ids),
+                            InventoryTransaction.transaction_type == TransactionType.USAGE,
+                            InventoryTransaction.transaction_time >= thirty_days_ago
+                        )
+                    )
+                )
+                trans_result = await session.execute(trans_stmt)
+                all_transactions = trans_result.scalars().all()
+
+                # Group transactions by item_id for quick lookup
+                transactions_by_item = {}
+                for trans in all_transactions:
+                    if trans.item_id not in transactions_by_item:
+                        transactions_by_item[trans.item_id] = []
+                    transactions_by_item[trans.item_id].append(trans)
+
             alerts = []
             for item in items:
                 # 计算建议补货数量
                 recommended_quantity = self._calculate_restock_quantity(item)
 
-                # 预测缺货日期
-                estimated_stockout_date = await self._estimate_stockout_date(session, item)
+                # 预测缺货日期 - 使用预加载的交易数据
+                item_transactions = transactions_by_item.get(item.id, [])
+                estimated_stockout_date = self._estimate_stockout_date_from_transactions(
+                    item, item_transactions
+                )
 
                 alert = {
                     "alert_id": f"ALERT_{item.id}_{datetime.now().strftime('%Y%m%d%H%M%S')}",
@@ -425,7 +453,7 @@ class InventoryService:
         session,
         item: InventoryItem
     ) -> Optional[str]:
-        """预测缺货日期"""
+        """预测缺货日期 - 已弃用，使用 _estimate_stockout_date_from_transactions"""
         # 查询最近30天的消耗记录
         thirty_days_ago = datetime.now() - timedelta(days=30)
         stmt = (
@@ -441,10 +469,19 @@ class InventoryService:
         result = await session.execute(stmt)
         transactions = result.scalars().all()
 
+        return self._estimate_stockout_date_from_transactions(item, transactions)
+
+    def _estimate_stockout_date_from_transactions(
+        self,
+        item: InventoryItem,
+        transactions: List[InventoryTransaction]
+    ) -> Optional[str]:
+        """从交易记录预测缺货日期 - 优化版本，避免N+1查询"""
         if not transactions:
             return None
 
         # 计算平均每日消耗
+        thirty_days_ago = datetime.now() - timedelta(days=30)
         total_usage = sum(abs(trans.quantity) for trans in transactions)
         days = (datetime.now() - thirty_days_ago).days
         avg_daily_usage = total_usage / days if days > 0 else 0

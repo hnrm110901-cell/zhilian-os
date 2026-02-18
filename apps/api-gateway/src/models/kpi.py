@@ -1,7 +1,7 @@
 """
 KPI Models
 """
-from sqlalchemy import Column, String, Float, Date, ForeignKey, JSON
+from sqlalchemy import Column, String, Float, Date, ForeignKey, JSON, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import uuid
@@ -64,6 +64,12 @@ class KPIRecord(Base, TimestampMixin):
 
     # Relationships
     kpi = relationship("KPI", back_populates="records")
+
+    # Composite indexes for common query patterns
+    __table_args__ = (
+        Index('idx_kpi_record_kpi_store_date', 'kpi_id', 'store_id', 'record_date'),
+        Index('idx_kpi_record_store_date', 'store_id', 'record_date'),
+    )
 
     def __repr__(self):
         return f"<KPIRecord(kpi_id='{self.kpi_id}', date='{self.record_date}', value={self.value})>"

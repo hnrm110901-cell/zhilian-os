@@ -92,57 +92,78 @@ class DecisionService:
         start_date: date,
         end_date: date
     ) -> List[Dict[str, Any]]:
-        """Get KPI data from database"""
+        """Get KPI data from database - optimized to avoid N+1 queries"""
+        from sqlalchemy import func, case
+        from sqlalchemy.orm import aliased
+
         # Get all active KPIs
         kpi_defs = await KPIRepository.get_all_active(session)
+        if not kpi_defs:
+            return []
 
-        # Get latest records for each KPI
-        kpis = []
-        for kpi_def in kpi_defs:
-            # Get latest record
-            result = await session.execute(
-                select(KPIRecord)
-                .where(
-                    and_(
-                        KPIRecord.kpi_id == kpi_def.id,
-                        KPIRecord.store_id == self.store_id,
-                        KPIRecord.record_date <= end_date
-                    )
-                )
-                .order_by(desc(KPIRecord.record_date))
-                .limit(1)
+        kpi_ids = [kpi.id for kpi in kpi_defs]
+        kpi_dict = {kpi.id: kpi for kpi in kpi_defs}
+
+        # Use window function to get latest and previous records in a single query
+        # This eliminates the N+1 query problem
+        latest_subq = (
+            select(
+                KPIRecord.kpi_id,
+                KPIRecord.value.label('current_value'),
+                KPIRecord.target_value,
+                KPIRecord.achievement_rate,
+                KPIRecord.trend,
+                KPIRecord.status,
+                KPIRecord.record_date,
+                func.row_number().over(
+                    partition_by=KPIRecord.kpi_id,
+                    order_by=desc(KPIRecord.record_date)
+                ).label('rn')
             )
-            latest_record = result.scalar_one_or_none()
-
-            if latest_record:
-                # Get previous record for comparison
-                prev_result = await session.execute(
-                    select(KPIRecord)
-                    .where(
-                        and_(
-                            KPIRecord.kpi_id == kpi_def.id,
-                            KPIRecord.store_id == self.store_id,
-                            KPIRecord.record_date < latest_record.record_date
-                        )
-                    )
-                    .order_by(desc(KPIRecord.record_date))
-                    .limit(1)
+            .where(
+                and_(
+                    KPIRecord.kpi_id.in_(kpi_ids),
+                    KPIRecord.store_id == self.store_id,
+                    KPIRecord.record_date <= end_date
                 )
-                prev_record = prev_result.scalar_one_or_none()
+            )
+            .subquery()
+        )
 
-                kpi_data = {
-                    "metric_id": kpi_def.id,
-                    "metric_name": kpi_def.name,
-                    "category": kpi_def.category,
-                    "current_value": latest_record.value,
-                    "target_value": latest_record.target_value or kpi_def.target_value,
-                    "previous_value": prev_record.value if prev_record else latest_record.value,
-                    "unit": kpi_def.unit,
-                    "achievement_rate": latest_record.achievement_rate or 0,
-                    "trend": latest_record.trend or "stable",
-                    "status": latest_record.status or "on_track"
-                }
-                kpis.append(kpi_data)
+        # Get latest records (rn = 1)
+        latest_alias = aliased(latest_subq)
+        latest_query = select(latest_alias).where(latest_alias.c.rn == 1)
+        latest_result = await session.execute(latest_query)
+        latest_records = {row.kpi_id: row for row in latest_result}
+
+        # Get previous records (rn = 2)
+        prev_alias = aliased(latest_subq)
+        prev_query = select(prev_alias).where(prev_alias.c.rn == 2)
+        prev_result = await session.execute(prev_query)
+        prev_records = {row.kpi_id: row for row in prev_result}
+
+        # Build KPI data list
+        kpis = []
+        for kpi_id, latest_record in latest_records.items():
+            kpi_def = kpi_dict.get(kpi_id)
+            if not kpi_def:
+                continue
+
+            prev_record = prev_records.get(kpi_id)
+
+            kpi_data = {
+                "metric_id": kpi_def.id,
+                "metric_name": kpi_def.name,
+                "category": kpi_def.category,
+                "current_value": latest_record.current_value,
+                "target_value": latest_record.target_value or kpi_def.target_value,
+                "previous_value": prev_record.current_value if prev_record else latest_record.current_value,
+                "unit": kpi_def.unit,
+                "achievement_rate": latest_record.achievement_rate or 0,
+                "trend": latest_record.trend or "stable",
+                "status": latest_record.status or "on_track"
+            }
+            kpis.append(kpi_data)
 
         return kpis
 

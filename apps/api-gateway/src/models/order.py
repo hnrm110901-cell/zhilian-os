@@ -1,7 +1,7 @@
 """
 Order Models
 """
-from sqlalchemy import Column, String, Integer, ForeignKey, Enum, JSON, DateTime
+from sqlalchemy import Column, String, Integer, ForeignKey, Enum, JSON, DateTime, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import uuid
@@ -50,6 +50,13 @@ class Order(Base, TimestampMixin):
 
     # Relationships
     items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
+
+    # Composite indexes for common query patterns
+    __table_args__ = (
+        Index('idx_order_store_status', 'store_id', 'status'),
+        Index('idx_order_store_time', 'store_id', 'order_time'),
+        Index('idx_order_status_time', 'status', 'order_time'),
+    )
 
     def __repr__(self):
         return f"<Order(id='{self.id}', status='{self.status}', total={self.total_amount})>"
