@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Col, Row, Statistic, Alert, Spin, Tag } from 'antd';
+import { Card, Col, Row, Statistic, Alert, Spin, Tag, Button, Switch, Space } from 'antd';
 import {
   InboxOutlined,
   CheckCircleOutlined,
   RiseOutlined,
   DashboardOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { apiClient } from '../services/api';
@@ -15,10 +16,27 @@ const Dashboard: React.FC = () => {
   const [healthStatus, setHealthStatus] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [decisionReport, setDecisionReport] = useState<DecisionReport | null>(null);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [refreshInterval] = useState(30000); // 30秒
+  const [lastRefreshTime, setLastRefreshTime] = useState<Date>(new Date());
 
   useEffect(() => {
     loadDashboardData();
-  }, []);
+
+    // 设置自动刷新
+    let intervalId: number | undefined;
+    if (autoRefresh) {
+      intervalId = window.setInterval(() => {
+        loadDashboardData();
+      }, refreshInterval);
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [autoRefresh, refreshInterval]);
 
   const loadDashboardData = async () => {
     try {
@@ -33,12 +51,18 @@ const Dashboard: React.FC = () => {
 
       setHealthStatus(health);
       setDecisionReport(report);
+      setLastRefreshTime(new Date());
     } catch (err: any) {
       console.error('Dashboard data loading error:', err);
       setError(err.message || '无法加载数据');
     } finally {
       setLoading(false);
     }
+  };
+
+  // 手动刷新
+  const handleManualRefresh = () => {
+    loadDashboardData();
   };
 
   // 从决策报告中提取KPI数据用于图表
@@ -177,15 +201,44 @@ const Dashboard: React.FC = () => {
 
   return (
     <div>
-      <h1 style={{ marginBottom: 24 }}>控制台</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+        <h1 style={{ margin: 0 }}>控制台</h1>
+        <Space>
+          <span style={{ fontSize: 12, color: '#999' }}>
+            最后更新: {lastRefreshTime.toLocaleTimeString('zh-CN')}
+          </span>
+          <Button
+            icon={<ReloadOutlined spin={loading} />}
+            onClick={handleManualRefresh}
+            loading={loading}
+          >
+            刷新
+          </Button>
+          <span style={{ fontSize: 14 }}>自动刷新:</span>
+          <Switch
+            checked={autoRefresh}
+            onChange={setAutoRefresh}
+            checkedChildren="开"
+            unCheckedChildren="关"
+          />
+        </Space>
+      </div>
 
       {error && (
         <Alert
-          message="连接错误"
-          description={error}
+          message="数据加载失败"
+          description={
+            <div>
+              <p>{error}</p>
+              <Button size="small" onClick={handleManualRefresh}>
+                重试
+              </Button>
+            </div>
+          }
           type="error"
           showIcon
           closable
+          onClose={() => setError(null)}
           style={{ marginBottom: 24 }}
         />
       )}

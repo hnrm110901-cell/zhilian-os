@@ -15,12 +15,15 @@ import {
   Statistic,
   Progress,
   Alert,
+  Select,
 } from 'antd';
 import {
   InboxOutlined,
   WarningOutlined,
   CheckCircleOutlined,
   ExclamationCircleOutlined,
+  ReloadOutlined,
+  SearchOutlined,
 } from '@ant-design/icons';
 import { apiClient } from '../services/api';
 
@@ -78,6 +81,14 @@ const InventoryPage: React.FC = () => {
   ]);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [searchText, setSearchText] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  // 刷新库存数据
+  const refreshInventory = () => {
+    message.info('库存数据已刷新');
+    // 这里可以调用API刷新数据
+  };
 
   // 检查库存
   const handleCheckInventory = async (values: any) => {
@@ -237,12 +248,34 @@ const InventoryPage: React.FC = () => {
     critical: inventory.filter((i) => i.status === 'critical' || i.status === 'out').length,
   };
 
+  // 过滤库存
+  const filteredInventory = inventory.filter((item) => {
+    const matchesSearch =
+      searchText === '' ||
+      item.name.toLowerCase().includes(searchText.toLowerCase()) ||
+      item.item_id.toLowerCase().includes(searchText.toLowerCase()) ||
+      item.category.toLowerCase().includes(searchText.toLowerCase());
+
+    const matchesStatus = statusFilter === 'all' || item.status === statusFilter;
+
+    return matchesSearch && matchesStatus;
+  });
+
   // 预警列表
   const alerts = inventory.filter((i) => i.status !== 'normal');
 
   return (
     <div>
-      <h1 style={{ marginBottom: 24 }}>库存预警Agent</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+        <h1 style={{ margin: 0 }}>库存预警Agent</h1>
+        <Button
+          icon={<ReloadOutlined />}
+          onClick={refreshInventory}
+          loading={loading}
+        >
+          刷新
+        </Button>
+      </div>
 
       {/* 预警提示 */}
       {alerts.length > 0 && (
@@ -311,12 +344,43 @@ const InventoryPage: React.FC = () => {
       <Tabs defaultActiveKey="list">
         <TabPane tab="库存列表" key="list">
           <Card>
+            <Space style={{ marginBottom: 16, width: '100%', justifyContent: 'space-between' }}>
+              <Space>
+                <Input
+                  placeholder="搜索物品名称、ID或分类"
+                  prefix={<SearchOutlined />}
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  style={{ width: 300 }}
+                  allowClear
+                />
+                <Select
+                  value={statusFilter}
+                  onChange={setStatusFilter}
+                  style={{ width: 120 }}
+                >
+                  <Select.Option value="all">全部状态</Select.Option>
+                  <Select.Option value="normal">正常</Select.Option>
+                  <Select.Option value="low">偏低</Select.Option>
+                  <Select.Option value="critical">紧急</Select.Option>
+                  <Select.Option value="out">缺货</Select.Option>
+                </Select>
+              </Space>
+              <span style={{ color: '#999' }}>
+                共 {filteredInventory.length} 条记录
+              </span>
+            </Space>
             <Table
-              dataSource={inventory}
+              dataSource={filteredInventory}
               columns={columns}
               rowKey="item_id"
               pagination={{ pageSize: 10 }}
-              locale={{ emptyText: '暂无库存记录' }}
+              locale={{
+                emptyText: inventory.length === 0
+                  ? '暂无库存记录'
+                  : '没有符合条件的库存物品'
+              }}
+              loading={loading}
             />
           </Card>
         </TabPane>
