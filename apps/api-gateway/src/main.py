@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 import structlog
 
 from src.core.config import settings
-from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, pos, members, dashboard, multi_store, supply_chain, finance, backup, analytics, audit
+from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, pos, members, dashboard, multi_store, supply_chain, finance, backup, analytics, audit, data_import_export
 from src.middleware.monitoring import MonitoringMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
 from src.middleware.audit_log import AuditLogMiddleware
@@ -145,6 +145,10 @@ app = FastAPI(
             "name": "audit",
             "description": "审计日志 - 操作日志、用户活动、系统统计",
         },
+        {
+            "name": "data",
+            "description": "数据导入导出 - 批量导入、数据导出、模板下载",
+        },
     ],
 )
 
@@ -185,6 +189,7 @@ app.include_router(finance.router, prefix="/api/v1/finance", tags=["finance"])
 app.include_router(backup.router, prefix="/api/v1/backup", tags=["backup"])
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["analytics"])
 app.include_router(audit.router, prefix="/api/v1/audit", tags=["audit"])
+app.include_router(data_import_export.router, prefix="/api/v1/data", tags=["data"])
 
 
 @app.on_event("startup")

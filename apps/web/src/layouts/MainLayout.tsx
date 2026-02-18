@@ -24,6 +24,7 @@ import {
   BellOutlined,
   DollarOutlined,
   FileTextOutlined,
+  FileExcelOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -200,6 +201,11 @@ const MainLayout: React.FC = () => {
         key: '/audit',
         icon: <FileTextOutlined />,
         label: '审计日志',
+      },
+      {
+        key: '/data-import-export',
+        icon: <FileExcelOutlined />,
+        label: '数据导入导出',
       }
     ] : []),
   ];

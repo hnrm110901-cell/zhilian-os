@@ -25,6 +25,7 @@ import BackupManagement from './pages/BackupManagement';
 import AdvancedAnalytics from './pages/AdvancedAnalytics';
 import NotificationCenter from './pages/NotificationCenter';
 import AuditLogPage from './pages/AuditLogPage';
+import DataImportExportPage from './pages/DataImportExportPage';
 import LoginPage from './pages/LoginPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 
@@ -111,6 +112,11 @@ const App: React.FC = () => {
               <Route path="audit" element={
                 <ProtectedRoute requiredRole="admin">
                   <AuditLogPage />
+                </ProtectedRoute>
+              } />
+              <Route path="data-import-export" element={
+                <ProtectedRoute requiredRole="admin">
+                  <DataImportExportPage />
                 </ProtectedRoute>
               } />
             </Route>
