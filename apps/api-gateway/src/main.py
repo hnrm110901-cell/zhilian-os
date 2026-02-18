@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 import structlog
 
 from src.core.config import settings
-from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, pos, members, dashboard, multi_store, supply_chain, finance, backup
+from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, pos, members, dashboard, multi_store, supply_chain, finance, backup, analytics
 from src.middleware.monitoring import MonitoringMiddleware
 
 # 配置结构化日志
@@ -135,6 +135,10 @@ app = FastAPI(
             "name": "backup",
             "description": "数据备份 - 备份管理、恢复、验证",
         },
+        {
+            "name": "analytics",
+            "description": "高级分析 - 预测分析、异常检测、关联分析",
+        },
     ],
 )
 
@@ -167,6 +171,7 @@ app.include_router(multi_store.router, prefix="/api/v1/multi-store", tags=["mult
 app.include_router(supply_chain.router, prefix="/api/v1/supply-chain", tags=["supply_chain"])
 app.include_router(finance.router, prefix="/api/v1/finance", tags=["finance"])
 app.include_router(backup.router, prefix="/api/v1/backup", tags=["backup"])
+app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["analytics"])
 
 
 @app.on_event("startup")

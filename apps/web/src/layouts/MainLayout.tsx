@@ -156,6 +156,11 @@ const MainLayout: React.FC = () => {
           label: '数据大屏',
         },
         {
+          key: '/analytics',
+          icon: <BarChartOutlined />,
+          label: '高级分析',
+        },
+        {
           key: '/monitoring',
           icon: <MonitorOutlined />,
           label: '系统监控',
