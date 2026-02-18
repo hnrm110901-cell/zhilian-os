@@ -16,6 +16,7 @@ import ReservationPage from './pages/ReservationPage';
 import UserManagementPage from './pages/UserManagementPage';
 import EnterpriseIntegrationPage from './pages/EnterpriseIntegrationPage';
 import MultiStoreManagement from './pages/MultiStoreManagement';
+import SupplyChainManagement from './pages/SupplyChainManagement';
 import LoginPage from './pages/LoginPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 
@@ -57,6 +58,11 @@ const App: React.FC = () => {
               <Route path="multi-store" element={
                 <ProtectedRoute requiredRole="admin">
                   <MultiStoreManagement />
+                </ProtectedRoute>
+              } />
+              <Route path="supply-chain" element={
+                <ProtectedRoute requiredRole="admin">
+                  <SupplyChainManagement />
                 </ProtectedRoute>
               } />
             </Route>
