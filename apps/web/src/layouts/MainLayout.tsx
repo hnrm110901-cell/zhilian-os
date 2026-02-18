@@ -15,6 +15,11 @@ import {
   SettingOutlined,
   TeamOutlined,
   ApiOutlined,
+  LineChartOutlined,
+  MobileOutlined,
+  ShopOutlined,
+  ShoppingOutlined,
+  MonitorOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -76,39 +81,85 @@ const MainLayout: React.FC = () => {
       label: '控制台',
     },
     {
-      key: '/schedule',
-      icon: <ScheduleOutlined />,
-      label: '智能排班',
+      key: 'agents',
+      icon: <ApiOutlined />,
+      label: 'Agent系统',
+      children: [
+        {
+          key: '/schedule',
+          icon: <ScheduleOutlined />,
+          label: '智能排班',
+        },
+        {
+          key: '/order',
+          icon: <ShoppingCartOutlined />,
+          label: '订单协同',
+        },
+        {
+          key: '/inventory',
+          icon: <InboxOutlined />,
+          label: '库存预警',
+        },
+        {
+          key: '/service',
+          icon: <CustomerServiceOutlined />,
+          label: '服务质量',
+        },
+        {
+          key: '/training',
+          icon: <ReadOutlined />,
+          label: '培训辅导',
+        },
+        {
+          key: '/decision',
+          icon: <BarChartOutlined />,
+          label: '决策支持',
+        },
+        {
+          key: '/reservation',
+          icon: <CalendarOutlined />,
+          label: '预定宴会',
+        },
+      ],
     },
     {
-      key: '/order',
-      icon: <ShoppingCartOutlined />,
-      label: '订单协同',
+      key: 'business',
+      icon: <ShopOutlined />,
+      label: '业务管理',
+      children: [
+        {
+          key: '/multi-store',
+          icon: <ShopOutlined />,
+          label: '多门店管理',
+        },
+        {
+          key: '/supply-chain',
+          icon: <ShoppingOutlined />,
+          label: '供应链管理',
+        },
+      ],
     },
     {
-      key: '/inventory',
-      icon: <InboxOutlined />,
-      label: '库存预警',
+      key: 'analytics',
+      icon: <LineChartOutlined />,
+      label: '数据分析',
+      children: [
+        {
+          key: '/data-visualization',
+          icon: <LineChartOutlined />,
+          label: '数据大屏',
+        },
+        {
+          key: '/monitoring',
+          icon: <MonitorOutlined />,
+          label: '系统监控',
+        },
+      ],
     },
     {
-      key: '/service',
-      icon: <CustomerServiceOutlined />,
-      label: '服务质量',
-    },
-    {
-      key: '/training',
-      icon: <ReadOutlined />,
-      label: '培训辅导',
-    },
-    {
-      key: '/decision',
-      icon: <BarChartOutlined />,
-      label: '决策支持',
-    },
-    {
-      key: '/reservation',
-      icon: <CalendarOutlined />,
-      label: '预定宴会',
+      key: '/mobile',
+      icon: <MobileOutlined />,
+      label: '移动端',
     },
     ...(user?.role === 'admin' ? [
       {

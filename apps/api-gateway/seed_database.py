@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from src.core.database import get_db_session
 from src.models import (
     User, Store, Employee, Order, OrderItem, InventoryItem, InventoryTransaction,
-    Schedule, Shift, Reservation, KPI, KPIRecord
+    Schedule, Shift, Reservation, KPI, KPIRecord, Supplier, PurchaseOrder
 )
 from src.models.user import UserRole
 from src.models.order import OrderStatus
@@ -63,6 +63,7 @@ async def seed_stores():
             name="智链餐厅-朝阳店",
             address="北京市朝阳区建国路88号",
             phone="010-12345678",
+            region="华北",
             is_active=True,
             config={
                 "opening_hours": {
@@ -78,6 +79,52 @@ async def seed_stores():
                 "tables": 40,
             },
             monthly_revenue_target="1000000",  # 100万
+            cost_ratio_target="0.35",
+        ),
+        Store(
+            id="STORE002",
+            name="智链餐厅-海淀店",
+            address="北京市海淀区中关村大街1号",
+            phone="010-87654321",
+            region="华北",
+            is_active=True,
+            config={
+                "opening_hours": {
+                    "monday": "10:00-22:00",
+                    "tuesday": "10:00-22:00",
+                    "wednesday": "10:00-22:00",
+                    "thursday": "10:00-22:00",
+                    "friday": "10:00-23:00",
+                    "saturday": "09:00-23:00",
+                    "sunday": "09:00-22:00",
+                },
+                "capacity": 180,
+                "tables": 35,
+            },
+            monthly_revenue_target="900000",
+            cost_ratio_target="0.35",
+        ),
+        Store(
+            id="STORE003",
+            name="智链餐厅-浦东店",
+            address="上海市浦东新区陆家嘴环路1000号",
+            phone="021-12345678",
+            region="华东",
+            is_active=True,
+            config={
+                "opening_hours": {
+                    "monday": "10:00-22:00",
+                    "tuesday": "10:00-22:00",
+                    "wednesday": "10:00-22:00",
+                    "thursday": "10:00-22:00",
+                    "friday": "10:00-23:00",
+                    "saturday": "09:00-23:00",
+                    "sunday": "09:00-22:00",
+                },
+                "capacity": 220,
+                "tables": 45,
+            },
+            monthly_revenue_target="1200000",
             cost_ratio_target="0.35",
         ),
     ]
@@ -222,6 +269,98 @@ async def seed_kpis():
     return kpis
 
 
+async def seed_suppliers():
+    """Create sample suppliers"""
+    suppliers = [
+        Supplier(
+            name="新鲜蔬菜供应商",
+            code="SUP001",
+            category="food",
+            contact_person="王经理",
+            phone="010-88888888",
+            email="wang@vegetables.com",
+            address="北京市大兴区蔬菜批发市场A区101号",
+            status="active",
+            rating=4.5,
+            payment_terms="net30",
+            delivery_time=1,
+        ),
+        Supplier(
+            name="优质肉类供应商",
+            code="SUP002",
+            category="food",
+            contact_person="李经理",
+            phone="010-99999999",
+            email="li@meat.com",
+            address="北京市顺义区肉类批发市场B区202号",
+            status="active",
+            rating=4.8,
+            payment_terms="net30",
+            delivery_time=2,
+        ),
+        Supplier(
+            name="饮料批发商",
+            code="SUP003",
+            category="beverage",
+            contact_person="张经理",
+            phone="010-77777777",
+            email="zhang@beverage.com",
+            address="北京市朝阳区饮料批发中心C区303号",
+            status="active",
+            rating=4.3,
+            payment_terms="net60",
+            delivery_time=3,
+        ),
+    ]
+    return suppliers
+
+
+async def seed_purchase_orders():
+    """Create sample purchase orders"""
+    orders = [
+        PurchaseOrder(
+            order_number="PO-20240218-001",
+            supplier_id="SUP001",
+            store_id="STORE001",
+            status="completed",
+            total_amount=50000,  # 500元
+            items=[
+                {"name": "白菜", "quantity": 50, "unit": "kg", "price": 300},
+                {"name": "土豆", "quantity": 30, "unit": "kg", "price": 200},
+            ],
+            expected_delivery=datetime.now() - timedelta(days=5),
+            actual_delivery=datetime.now() - timedelta(days=5),
+            created_by="admin",
+        ),
+        PurchaseOrder(
+            order_number="PO-20240218-002",
+            supplier_id="SUP002",
+            store_id="STORE001",
+            status="shipped",
+            total_amount=120000,  # 1200元
+            items=[
+                {"name": "猪肉", "quantity": 20, "unit": "kg", "price": 6000},
+            ],
+            expected_delivery=datetime.now() + timedelta(days=1),
+            created_by="admin",
+        ),
+        PurchaseOrder(
+            order_number="PO-20240218-003",
+            supplier_id="SUP003",
+            store_id="STORE002",
+            status="pending",
+            total_amount=80000,  # 800元
+            items=[
+                {"name": "可乐", "quantity": 100, "unit": "瓶", "price": 500},
+                {"name": "雪碧", "quantity": 60, "unit": "瓶", "price": 300},
+            ],
+            expected_delivery=datetime.now() + timedelta(days=3),
+            created_by="manager",
+        ),
+    ]
+    return orders
+
+
 async def main():
     """Main seed function"""
     print("🌱 Starting database seeding...")
@@ -263,6 +402,20 @@ async def main():
             await session.flush()
             print(f"✓ Created {len(kpis)} KPIs")
 
+            # Seed suppliers
+            print("Creating suppliers...")
+            suppliers = await seed_suppliers()
+            session.add_all(suppliers)
+            await session.flush()
+            print(f"✓ Created {len(suppliers)} suppliers")
+
+            # Seed purchase orders
+            print("Creating purchase orders...")
+            purchase_orders = await seed_purchase_orders()
+            session.add_all(purchase_orders)
+            await session.flush()
+            print(f"✓ Created {len(purchase_orders)} purchase orders")
+
             # Create sample KPI records
             print("Creating KPI records...")
             today = date.today()
@@ -303,6 +456,8 @@ async def main():
             print(f"  - Inventory Items: {len(inventory_items)}")
             print(f"  - KPIs: {len(kpis)}")
             print(f"  - KPI Records: {len(kpi_records)}")
+            print(f"  - Suppliers: {len(suppliers)}")
+            print(f"  - Purchase Orders: {len(purchase_orders)}")
 
         except Exception as e:
             await session.rollback()

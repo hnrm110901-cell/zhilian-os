@@ -17,6 +17,9 @@ import UserManagementPage from './pages/UserManagementPage';
 import EnterpriseIntegrationPage from './pages/EnterpriseIntegrationPage';
 import MultiStoreManagement from './pages/MultiStoreManagement';
 import SupplyChainManagement from './pages/SupplyChainManagement';
+import DataVisualizationScreen from './pages/DataVisualizationScreen';
+import MonitoringPage from './pages/MonitoringPage';
+import MobileApp from './pages/MobileApp';
 import LoginPage from './pages/LoginPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 
@@ -63,6 +66,21 @@ const App: React.FC = () => {
               <Route path="supply-chain" element={
                 <ProtectedRoute requiredRole="admin">
                   <SupplyChainManagement />
+                </ProtectedRoute>
+              } />
+              <Route path="data-visualization" element={
+                <ProtectedRoute>
+                  <DataVisualizationScreen />
+                </ProtectedRoute>
+              } />
+              <Route path="monitoring" element={
+                <ProtectedRoute requiredRole="admin">
+                  <MonitoringPage />
+                </ProtectedRoute>
+              } />
+              <Route path="mobile" element={
+                <ProtectedRoute>
+                  <MobileApp />
                 </ProtectedRoute>
               } />
             </Route>
