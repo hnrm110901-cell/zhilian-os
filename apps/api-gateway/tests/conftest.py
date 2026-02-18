@@ -116,3 +116,27 @@ def sample_schedule_data():
             },
         ],
     }
+
+
+@pytest.fixture
+async def sample_user(test_db):
+    """创建示例用户"""
+    import uuid
+    from src.models.user import User, UserRole
+    from src.core.security import get_password_hash
+
+    user = User(
+        id=uuid.uuid4(),
+        username="testuser",
+        email="test@example.com",
+        hashed_password=get_password_hash("password123"),
+        full_name="Test User",
+        role=UserRole.STAFF,
+        is_active=True,
+    )
+
+    test_db.add(user)
+    await test_db.commit()
+    await test_db.refresh(user)
+
+    return user

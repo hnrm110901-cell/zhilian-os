@@ -9,7 +9,7 @@ from sqlalchemy import Column, String, DateTime, Enum, Text, Boolean, Integer, F
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 
-from ..core.database import Base
+from .base import Base
 
 
 class IntegrationType(str, enum.Enum):
