@@ -55,6 +55,8 @@ class Settings(BaseSettings):
     # 外部API配置 - 品智
     PINZHI_TOKEN: str = ""
     PINZHI_BASE_URL: str = ""
+    PINZHI_TIMEOUT: int = 30
+    PINZHI_RETRY_TIMES: int = 3
 
     # Celery配置
     CELERY_BROKER_URL: str

@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 import structlog
 
 from src.core.config import settings
-from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm
+from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, pos
 from src.middleware.monitoring import MonitoringMiddleware
 
 # 配置结构化日志
@@ -107,6 +107,10 @@ app = FastAPI(
             "name": "llm",
             "description": "LLM配置 - 大语言模型配置和测试",
         },
+        {
+            "name": "pos",
+            "description": "POS系统 - 品智收银系统集成接口",
+        },
     ],
 )
 
@@ -132,6 +136,7 @@ app.include_router(mobile.router, prefix="/api/v1", tags=["mobile"])
 app.include_router(integrations.router, prefix="/api/v1", tags=["integrations"])
 app.include_router(monitoring.router, prefix="/api/v1", tags=["monitoring"])
 app.include_router(llm.router, prefix="/api/v1", tags=["llm"])
+app.include_router(pos.router, prefix="/api/v1/pos", tags=["pos"])
 
 
 @app.on_event("startup")
@@ -156,6 +161,14 @@ async def startup_event():
 async def shutdown_event():
     """应用关闭事件"""
     logger.info("智链OS API Gateway 关闭中...")
+
+    # Close POS service
+    try:
+        from src.services.pos_service import pos_service
+        await pos_service.close()
+        logger.info("POS服务已关闭")
+    except Exception as e:
+        logger.error("关闭POS服务失败", error=str(e))
 
     # Close database connections
     try:
