@@ -11,6 +11,7 @@ from .schedule import Schedule, Shift
 from .reservation import Reservation
 from .kpi import KPI, KPIRecord
 from .supply_chain import Supplier, PurchaseOrder
+from .finance import FinancialTransaction, Budget, Invoice, FinancialReport
 
 __all__ = [
     "Base",
@@ -28,4 +29,8 @@ __all__ = [
     "KPIRecord",
     "Supplier",
     "PurchaseOrder",
+    "FinancialTransaction",
+    "Budget",
+    "Invoice",
+    "FinancialReport",
 ]

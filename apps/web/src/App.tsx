@@ -20,6 +20,7 @@ import SupplyChainManagement from './pages/SupplyChainManagement';
 import DataVisualizationScreen from './pages/DataVisualizationScreen';
 import MonitoringPage from './pages/MonitoringPage';
 import MobileApp from './pages/MobileApp';
+import FinanceManagement from './pages/FinanceManagement';
 import LoginPage from './pages/LoginPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 
@@ -81,6 +82,11 @@ const App: React.FC = () => {
               <Route path="mobile" element={
                 <ProtectedRoute>
                   <MobileApp />
+                </ProtectedRoute>
+              } />
+              <Route path="finance" element={
+                <ProtectedRoute requiredRole="admin">
+                  <FinanceManagement />
                 </ProtectedRoute>
               } />
             </Route>

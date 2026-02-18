@@ -137,6 +137,11 @@ const MainLayout: React.FC = () => {
           icon: <ShoppingOutlined />,
           label: '供应链管理',
         },
+        {
+          key: '/finance',
+          icon: <DollarOutlined />,
+          label: '财务管理',
+        },
       ],
     },
     {
