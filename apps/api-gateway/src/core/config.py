@@ -19,9 +19,21 @@ class Settings(BaseSettings):
     REDIS_URL: str
 
     # AI/LLM配置
-    OPENAI_API_KEY: str
+    LLM_PROVIDER: str = "openai"  # openai, anthropic, azure_openai
+    LLM_MODEL: str = "gpt-4-turbo-preview"
+    LLM_API_KEY: str = ""
+    LLM_BASE_URL: str = ""  # For Azure OpenAI or custom endpoints
+    LLM_TEMPERATURE: float = 0.7
+    LLM_MAX_TOKENS: int = 2000
+    LLM_ENABLED: bool = False  # 是否启用LLM（默认关闭，使用模拟数据）
+
+    # Legacy OpenAI config (for backward compatibility)
+    OPENAI_API_KEY: str = ""
     OPENAI_API_BASE: str = "https://api.openai.com/v1"
     MODEL_NAME: str = "gpt-4-turbo-preview"
+
+    # Anthropic config
+    ANTHROPIC_API_KEY: str = ""
 
     # 向量数据库配置
     QDRANT_URL: str = "http://localhost:6333"

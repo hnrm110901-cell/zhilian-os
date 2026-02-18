@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 import structlog
 
 from src.core.config import settings
-from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring
+from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm
 from src.middleware.monitoring import MonitoringMiddleware
 
 # 配置结构化日志
@@ -103,6 +103,10 @@ app = FastAPI(
             "name": "monitoring",
             "description": "系统监控 - 错误追踪、性能监控、日志查询",
         },
+        {
+            "name": "llm",
+            "description": "LLM配置 - 大语言模型配置和测试",
+        },
     ],
 )
 
@@ -127,6 +131,7 @@ app.include_router(stores.router, prefix="/api/v1", tags=["stores"])
 app.include_router(mobile.router, prefix="/api/v1", tags=["mobile"])
 app.include_router(integrations.router, prefix="/api/v1", tags=["integrations"])
 app.include_router(monitoring.router, prefix="/api/v1", tags=["monitoring"])
+app.include_router(llm.router, prefix="/api/v1", tags=["llm"])
 
 
 @app.on_event("startup")
