@@ -24,6 +24,7 @@ import FinanceManagement from './pages/FinanceManagement';
 import BackupManagement from './pages/BackupManagement';
 import AdvancedAnalytics from './pages/AdvancedAnalytics';
 import NotificationCenter from './pages/NotificationCenter';
+import AuditLogPage from './pages/AuditLogPage';
 import LoginPage from './pages/LoginPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 
@@ -105,6 +106,11 @@ const App: React.FC = () => {
               <Route path="notifications" element={
                 <ProtectedRoute>
                   <NotificationCenter />
+                </ProtectedRoute>
+              } />
+              <Route path="audit" element={
+                <ProtectedRoute requiredRole="admin">
+                  <AuditLogPage />
                 </ProtectedRoute>
               } />
             </Route>

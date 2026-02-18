@@ -23,6 +23,7 @@ import {
   DatabaseOutlined,
   BellOutlined,
   DollarOutlined,
+  FileTextOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -194,6 +195,11 @@ const MainLayout: React.FC = () => {
         key: '/backup',
         icon: <DatabaseOutlined />,
         label: '数据备份',
+      },
+      {
+        key: '/audit',
+        icon: <FileTextOutlined />,
+        label: '审计日志',
       }
     ] : []),
   ];

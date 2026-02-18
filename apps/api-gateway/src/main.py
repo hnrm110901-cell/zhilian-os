@@ -8,9 +8,10 @@ from fastapi.responses import JSONResponse
 import structlog
 
 from src.core.config import settings
-from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, pos, members, dashboard, multi_store, supply_chain, finance, backup, analytics
+from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, pos, members, dashboard, multi_store, supply_chain, finance, backup, analytics, audit
 from src.middleware.monitoring import MonitoringMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
+from src.middleware.audit_log import AuditLogMiddleware
 
 # 配置结构化日志
 logger = structlog.get_logger()
@@ -140,6 +141,10 @@ app = FastAPI(
             "name": "analytics",
             "description": "高级分析 - 预测分析、异常检测、关联分析",
         },
+        {
+            "name": "audit",
+            "description": "审计日志 - 操作日志、用户活动、系统统计",
+        },
     ],
 )
 
@@ -154,6 +159,9 @@ app.add_middleware(
 
 # 添加速率限制中间件
 app.add_middleware(RateLimitMiddleware)
+
+# 添加审计日志中间件
+app.add_middleware(AuditLogMiddleware)
 
 # 添加监控中间件
 app.add_middleware(MonitoringMiddleware)
@@ -176,6 +184,7 @@ app.include_router(supply_chain.router, prefix="/api/v1/supply-chain", tags=["su
 app.include_router(finance.router, prefix="/api/v1/finance", tags=["finance"])
 app.include_router(backup.router, prefix="/api/v1/backup", tags=["backup"])
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["analytics"])
+app.include_router(audit.router, prefix="/api/v1/audit", tags=["audit"])
 
 
 @app.on_event("startup")
