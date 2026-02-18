@@ -10,6 +10,7 @@ import structlog
 from src.core.config import settings
 from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, pos, members, dashboard, multi_store, supply_chain, finance, backup, analytics
 from src.middleware.monitoring import MonitoringMiddleware
+from src.middleware.rate_limit import RateLimitMiddleware
 
 # 配置结构化日志
 logger = structlog.get_logger()
@@ -150,6 +151,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 添加速率限制中间件
+app.add_middleware(RateLimitMiddleware)
 
 # 添加监控中间件
 app.add_middleware(MonitoringMiddleware)
