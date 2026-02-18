@@ -24,20 +24,9 @@ import {
   ReloadOutlined,
   SearchOutlined,
 } from '@ant-design/icons';
-import { apiClient } from '../services/api';
+import { orderDataService, type Order } from '../services/orderData';
 
 const { TabPane } = Tabs;
-
-interface Order {
-  order_id: string;
-  store_id: string;
-  table_number: string;
-  status: string;
-  items: any[];
-  total_amount: number;
-  created_at: string;
-  updated_at: string;
-}
 
 const OrderPage: React.FC = () => {
   const [form] = Form.useForm();
@@ -50,6 +39,8 @@ const OrderPage: React.FC = () => {
 
   // 初始加载订单数据
   useEffect(() => {
+    // 初始化示例数据（仅在首次加载时）
+    orderDataService.initializeSampleData();
     loadOrders();
   }, []);
 
@@ -57,12 +48,13 @@ const OrderPage: React.FC = () => {
   const loadOrders = async () => {
     try {
       setLoading(true);
-      // 这里可以调用API获取订单列表
+      // 从本地存储加载订单
+      const loadedOrders = orderDataService.getAll();
+      setOrders(loadedOrders);
+
+      // 未来可以替换为API调用:
       // const response = await apiClient.callAgent('order', { action: 'list' });
       // setOrders(response.output_data.orders || []);
-
-      // 暂时使用模拟数据
-      message.info('订单数据已加载');
     } catch (error: any) {
       message.error(error.message || '加载订单失败');
     } finally {
@@ -75,46 +67,36 @@ const OrderPage: React.FC = () => {
     try {
       setLoading(true);
 
-      const request = {
-        action: 'process',
-        order_id: values.order_id || `ORD_${Date.now()}`,
-        order_data: {
-          store_id: values.store_id,
-          table_number: values.table_number,
-          items: [
-            {
-              item_id: 'item_001',
-              name: values.dish_name,
-              quantity: values.quantity,
-              price: values.price,
-            },
-          ],
-        },
-      };
+      // 创建订单并保存到本地存储
+      orderDataService.create({
+        store_id: values.store_id,
+        table_number: values.table_number,
+        status: 'pending',
+        items: [
+          {
+            item_id: `item_${Date.now()}`,
+            name: values.dish_name,
+            quantity: values.quantity,
+            price: values.price,
+          },
+        ],
+        total_amount: values.price * values.quantity,
+      });
 
-      const response = await apiClient.callAgent('order', request);
+      message.success('订单创建成功');
+      form.resetFields();
 
-      if (response.output_data.success) {
-        message.success('订单处理成功');
-        form.resetFields();
+      // 刷新订单列表
+      loadOrders();
 
-        // 添加到订单列表
-        const newOrder: Order = {
-          order_id: request.order_id,
-          store_id: values.store_id,
-          table_number: values.table_number,
-          status: 'pending',
-          items: request.order_data.items,
-          total_amount: values.price * values.quantity,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-        setOrders([newOrder, ...orders]);
-      } else {
-        message.error(response.output_data.error || '订单处理失败');
-      }
+      // 未来可以调用API:
+      // const request = {
+      //   action: 'process',
+      //   order_data: { ... }
+      // };
+      // const response = await apiClient.callAgent('order', request);
     } catch (error: any) {
-      message.error(error.message || '订单处理失败');
+      message.error(error.message || '订单创建失败');
     } finally {
       setLoading(false);
     }
@@ -129,24 +111,27 @@ const OrderPage: React.FC = () => {
   // 更新订单状态
   const handleUpdateStatus = async (orderId: string, newStatus: string) => {
     try {
-      const request = {
-        action: 'update_status',
-        order_id: orderId,
-        status: newStatus,
-      };
+      // 更新本地存储中的订单状态
+      const updatedOrder = orderDataService.updateStatus(
+        orderId,
+        newStatus as Order['status']
+      );
 
-      const response = await apiClient.callAgent('order', request);
-
-      if (response.output_data.success) {
+      if (updatedOrder) {
         message.success('订单状态已更新');
-        setOrders(
-          orders.map((order) =>
-            order.order_id === orderId ? { ...order, status: newStatus } : order
-          )
-        );
+        // 刷新订单列表
+        loadOrders();
       } else {
-        message.error(response.output_data.error || '状态更新失败');
+        message.error('订单不存在');
       }
+
+      // 未来可以调用API:
+      // const request = {
+      //   action: 'update_status',
+      //   order_id: orderId,
+      //   status: newStatus,
+      // };
+      // const response = await apiClient.callAgent('order', request);
     } catch (error: any) {
       message.error(error.message || '状态更新失败');
     }

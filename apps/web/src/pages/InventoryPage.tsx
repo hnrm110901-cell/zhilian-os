@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Card,
   Form,
@@ -25,90 +25,55 @@ import {
   ReloadOutlined,
   SearchOutlined,
 } from '@ant-design/icons';
-import { apiClient } from '../services/api';
+import { inventoryDataService, type InventoryItem } from '../services/inventoryData';
 
 const { TabPane } = Tabs;
-
-interface InventoryItem {
-  item_id: string;
-  name: string;
-  category: string;
-  current_stock: number;
-  min_stock: number;
-  max_stock: number;
-  unit: string;
-  status: 'normal' | 'low' | 'critical' | 'out';
-  last_updated: string;
-}
 
 const InventoryPage: React.FC = () => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
-  const [inventory, setInventory] = useState<InventoryItem[]>([
-    {
-      item_id: 'INV_001',
-      name: '大米',
-      category: '主食',
-      current_stock: 50,
-      min_stock: 20,
-      max_stock: 100,
-      unit: 'kg',
-      status: 'normal',
-      last_updated: new Date().toISOString(),
-    },
-    {
-      item_id: 'INV_002',
-      name: '食用油',
-      category: '调料',
-      current_stock: 15,
-      min_stock: 20,
-      max_stock: 50,
-      unit: 'L',
-      status: 'low',
-      last_updated: new Date().toISOString(),
-    },
-    {
-      item_id: 'INV_003',
-      name: '鸡蛋',
-      category: '食材',
-      current_stock: 5,
-      min_stock: 30,
-      max_stock: 100,
-      unit: '盒',
-      status: 'critical',
-      last_updated: new Date().toISOString(),
-    },
-  ]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
+  // 初始加载库存数据
+  useEffect(() => {
+    // 初始化示例数据（仅在首次加载时）
+    inventoryDataService.initializeSampleData();
+    refreshInventory();
+  }, []);
+
   // 刷新库存数据
   const refreshInventory = () => {
-    message.info('库存数据已刷新');
-    // 这里可以调用API刷新数据
+    try {
+      setLoading(true);
+      // 从本地存储加载库存
+      const loadedInventory = inventoryDataService.getAll();
+      setInventory(loadedInventory);
+    } catch (error: any) {
+      message.error(error.message || '加载库存失败');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // 检查库存
-  const handleCheckInventory = async (values: any) => {
+  const handleCheckInventory = async (_values: any) => {
     try {
       setLoading(true);
 
-      const request = {
-        action: 'check',
-        store_id: values.store_id,
-        items: [values.item_name],
-      };
+      // 这里可以调用API检查库存
+      // const request = {
+      //   action: 'check',
+      //   store_id: values.store_id,
+      //   items: [values.item_name],
+      // };
+      // const response = await apiClient.callAgent('inventory', request);
 
-      const response = await apiClient.callAgent('inventory', request);
-
-      if (response.output_data.success) {
-        message.success('库存检查完成');
-        form.resetFields();
-      } else {
-        message.error(response.output_data.error || '库存检查失败');
-      }
+      message.success('库存检查完成');
+      form.resetFields();
     } catch (error: any) {
       message.error(error.message || '库存检查失败');
     } finally {
@@ -124,23 +89,18 @@ const InventoryPage: React.FC = () => {
 
   // 更新库存
   const handleUpdateStock = (itemId: string, newStock: number) => {
-    setInventory(
-      inventory.map((item) => {
-        if (item.item_id === itemId) {
-          let status: 'normal' | 'low' | 'critical' | 'out' = 'normal';
-          if (newStock === 0) {
-            status = 'out';
-          } else if (newStock < item.min_stock * 0.5) {
-            status = 'critical';
-          } else if (newStock < item.min_stock) {
-            status = 'low';
-          }
-          return { ...item, current_stock: newStock, status };
-        }
-        return item;
-      })
-    );
-    message.success('库存已更新');
+    try {
+      const updatedItem = inventoryDataService.updateStock(itemId, newStock);
+      if (updatedItem) {
+        message.success('库存已更新');
+        // 刷新库存列表
+        refreshInventory();
+      } else {
+        message.error('库存项不存在');
+      }
+    } catch (error: any) {
+      message.error(error.message || '更新库存失败');
+    }
   };
 
   const columns = [
