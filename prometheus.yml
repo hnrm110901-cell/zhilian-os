@@ -1,0 +1,60 @@
+# Prometheus配置文件
+# Prometheus Configuration
+
+global:
+  scrape_interval: 15s  # 默认抓取间隔
+  evaluation_interval: 15s  # 评估规则间隔
+  external_labels:
+    cluster: 'zhilian-os'
+    environment: 'development'
+
+# 告警管理器配置（可选）
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets:
+#           - alertmanager:9093
+
+# 规则文件（可选）
+# rule_files:
+#   - "alerts/*.yml"
+
+# 抓取配置
+scrape_configs:
+  # Prometheus自身监控
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+
+  # 智链OS API Gateway
+  - job_name: 'zhilian-api-gateway'
+    scrape_interval: 10s  # API Gateway更频繁的抓取
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['host.docker.internal:8000']  # 使用host.docker.internal访问宿主机
+        labels:
+          service: 'api-gateway'
+          app: 'zhilian-os'
+
+  # PostgreSQL Exporter（可选）
+  # - job_name: 'postgres'
+  #   static_configs:
+  #     - targets: ['postgres-exporter:9187']
+  #       labels:
+  #         service: 'postgres'
+
+  # Redis Exporter（可选）
+  # - job_name: 'redis'
+  #   static_configs:
+  #     - targets: ['redis-exporter:9121']
+  #       labels:
+  #         service: 'redis'
+
+  # Qdrant Metrics（如果支持）
+  # - job_name: 'qdrant'
+  #   static_configs:
+  #     - targets: ['qdrant:6333']
+  #       labels:
+  #         service: 'qdrant'

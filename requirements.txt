@@ -17,6 +17,9 @@ ruff>=0.1.0                # 代码检查和格式化
 black>=23.0.0              # 代码格式化
 mypy>=1.5.0                # 类型检查
 
+# 监控 Monitoring
+prometheus-client>=0.19.0  # Prometheus指标客户端
+
 # API相关 API Related
 fastapi>=0.104.0           # API框架
 uvicorn[standard]>=0.24.0  # ASGI服务器

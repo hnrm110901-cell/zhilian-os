@@ -4,8 +4,10 @@
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 import structlog
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST, CollectorRegistry
+import time
 
 from src.core.config import settings
 # 核心模块
@@ -192,6 +194,80 @@ app.add_middleware(AuditLogMiddleware)
 
 # 添加监控中间件
 app.add_middleware(MonitoringMiddleware)
+
+# ==================== Prometheus指标 ====================
+# 创建Prometheus指标
+REQUEST_COUNT = Counter(
+    'http_requests_total',
+    'Total HTTP requests',
+    ['method', 'endpoint', 'status']
+)
+
+REQUEST_DURATION = Histogram(
+    'http_request_duration_seconds',
+    'HTTP request duration in seconds',
+    ['method', 'endpoint']
+)
+
+ACTIVE_REQUESTS = Gauge(
+    'http_requests_active',
+    'Number of active HTTP requests'
+)
+
+# Prometheus metrics端点
+@app.get("/metrics", include_in_schema=False)
+async def metrics():
+    """
+    Prometheus metrics endpoint
+
+    Exposes application metrics in Prometheus format for scraping.
+    """
+    return Response(
+        content=generate_latest(),
+        media_type=CONTENT_TYPE_LATEST
+    )
+
+# Prometheus中间件
+@app.middleware("http")
+async def prometheus_middleware(request, call_next):
+    """
+    Prometheus metrics middleware
+
+    Records HTTP request metrics for Prometheus monitoring.
+    """
+    # 跳过metrics端点本身
+    if request.url.path == "/metrics":
+        return await call_next(request)
+
+    # 增加活跃请求计数
+    ACTIVE_REQUESTS.inc()
+
+    # 记录请求开始时间
+    start_time = time.time()
+
+    try:
+        # 处理请求
+        response = await call_next(request)
+
+        # 记录请求指标
+        REQUEST_COUNT.labels(
+            method=request.method,
+            endpoint=request.url.path,
+            status=response.status_code
+        ).inc()
+
+        # 记录请求时长
+        duration = time.time() - start_time
+        REQUEST_DURATION.labels(
+            method=request.method,
+            endpoint=request.url.path
+        ).observe(duration)
+
+        return response
+
+    finally:
+        # 减少活跃请求计数
+        ACTIVE_REQUESTS.dec()
 
 # 注册路由 - 核心模块
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
