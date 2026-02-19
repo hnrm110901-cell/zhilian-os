@@ -9,10 +9,15 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
-from src.core.auth import get_current_user, require_permission
+from src.core.dependencies import get_current_active_user, require_permission
 from src.services.finance_service import get_finance_service
 from src.services.report_export_service import report_export_service
-from src.services.pdf_report_service import pdf_report_service
+try:
+    from src.services.pdf_report_service import pdf_report_service
+    PDF_AVAILABLE = True
+except ImportError:
+    pdf_report_service = None
+    PDF_AVAILABLE = False
 from src.models import User
 
 router = APIRouter()
@@ -63,7 +68,7 @@ async def get_transactions(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
 ):
     """获取财务交易记录列表"""
     service = get_finance_service(db)
@@ -84,7 +89,7 @@ async def get_income_statement(
     start_date: date = Query(...),
     end_date: date = Query(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
 ):
     """获取损益表"""
     service = get_finance_service(db)
@@ -97,7 +102,7 @@ async def get_cash_flow(
     start_date: date = Query(...),
     end_date: date = Query(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
 ):
     """获取现金流量表"""
     service = get_finance_service(db)
@@ -123,7 +128,7 @@ async def get_budget_analysis(
     year: int = Query(...),
     month: int = Query(..., ge=1, le=12),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
 ):
     """获取预算分析"""
     service = get_finance_service(db)
@@ -136,7 +141,7 @@ async def get_financial_metrics(
     start_date: date = Query(...),
     end_date: date = Query(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
 ):
     """获取财务指标"""
     service = get_finance_service(db)
@@ -151,7 +156,7 @@ async def export_report(
     end_date: date = Query(...),
     store_id: Optional[int] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     导出财务报表
@@ -190,6 +195,13 @@ async def export_report(
                 }
             )
         elif format == "pdf":
+            # Check if PDF is available
+            if not PDF_AVAILABLE:
+                raise HTTPException(
+                    status_code=501,
+                    detail="PDF导出功能不可用，请安装reportlab库"
+                )
+
             # 获取报表数据
             service = get_finance_service(db)
 
@@ -224,13 +236,6 @@ async def export_report(
                     "Content-Disposition": f"attachment; filename={filename}"
                 }
             )
-        else:
-            raise HTTPException(status_code=400, detail=f"不支持的导出格式: {format}")
-
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"导出失败: {str(e)}")
         else:
             raise HTTPException(status_code=400, detail=f"不支持的导出格式: {format}")
 

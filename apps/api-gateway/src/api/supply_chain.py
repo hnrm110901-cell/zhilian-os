@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime
 
 from src.core.database import get_db
-from src.core.auth import get_current_user, require_permission
+from src.core.dependencies import get_current_active_user, require_permission
 from src.services.supply_chain_service import get_supply_chain_service
 from src.models import User
 
@@ -51,7 +51,7 @@ async def get_suppliers(
     status: Optional[str] = Query(None),
     category: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
 ):
     """获取供应商列表"""
     service = get_supply_chain_service(db)
@@ -74,7 +74,7 @@ async def get_supplier_performance(
     supplier_id: str,
     days: int = Query(30, ge=1, le=365),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
 ):
     """获取供应商绩效"""
     service = get_supply_chain_service(db)
@@ -88,7 +88,7 @@ async def get_purchase_orders(
     status: Optional[str] = Query(None),
     supplier_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
 ):
     """获取采购订单列表"""
     service = get_supply_chain_service(db)
@@ -126,7 +126,7 @@ async def update_order_status(
 async def get_replenishment_suggestions(
     store_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
 ):
     """获取补货建议"""
     service = get_supply_chain_service(db)

@@ -5,14 +5,12 @@ import {
   PlusOutlined,
   RiseOutlined,
   FallOutlined,
-  FileTextOutlined,
-  BarChartOutlined,
   DownloadOutlined,
   FilePdfOutlined,
 } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { apiClient } from '../services/api';
-import { showSuccess, showError, handleApiError } from '../utils/message';
+import { showSuccess, handleApiError } from '../utils/message';
 import dayjs from 'dayjs';
 
 const { TabPane } = Tabs;

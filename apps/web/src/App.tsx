@@ -37,6 +37,11 @@ const App: React.FC = () => {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/unauthorized" element={<UnauthorizedPage />} />
+            <Route path="/mobile" element={
+              <ProtectedRoute>
+                <MobileApp />
+              </ProtectedRoute>
+            } />
             <Route path="/" element={
               <ProtectedRoute>
                 <MainLayout />
@@ -82,11 +87,6 @@ const App: React.FC = () => {
               <Route path="monitoring" element={
                 <ProtectedRoute requiredRole="admin">
                   <MonitoringPage />
-                </ProtectedRoute>
-              } />
-              <Route path="mobile" element={
-                <ProtectedRoute>
-                  <MobileApp />
                 </ProtectedRoute>
               } />
               <Route path="finance" element={

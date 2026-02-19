@@ -1,17 +1,14 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Card, List, Button, Tag, Statistic, Row, Col, Tabs, Badge, Avatar, Space, Spin } from 'antd';
+import { Card, List, Button, Tag, Statistic, Row, Col, Badge, Avatar, Space, Spin } from 'antd';
 import {
   ShoppingOutlined,
   UserOutlined,
   BellOutlined,
   HomeOutlined,
-  MenuOutlined,
   DollarOutlined,
   TeamOutlined,
 } from '@ant-design/icons';
 import { apiClient } from '../services/api';
-
-const { TabPane } = Tabs;
 
 const MobileApp: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -32,7 +29,7 @@ const MobileApp: React.FC = () => {
   }, []);
 
   const loadTodayOrders = useCallback(async () => {
-    try:
+    try {
       const response = await apiClient.get('/mobile/orders/today');
       setTodayOrders(response.data);
     } catch (err: any) {

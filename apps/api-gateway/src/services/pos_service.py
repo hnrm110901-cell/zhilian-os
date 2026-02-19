@@ -12,7 +12,15 @@ import os
 packages_path = os.path.join(os.path.dirname(__file__), "../../../../packages")
 sys.path.insert(0, os.path.abspath(packages_path))
 
-from api_adapters.pinzhi.src.adapter import PinzhiAdapter
+try:
+    from api_adapters.pinzhi.src.adapter import PinzhiAdapter
+    PINZHI_AVAILABLE = True
+except ImportError:
+    logger = structlog.get_logger()
+    logger.warning("PinzhiAdapter not available, POS features will be limited")
+    PinzhiAdapter = None
+    PINZHI_AVAILABLE = False
+
 from ..core.config import settings
 
 logger = structlog.get_logger()
@@ -22,10 +30,12 @@ class POSService:
     """POS服务"""
 
     def __init__(self):
-        self._adapter: Optional[PinzhiAdapter] = None
+        self._adapter: Optional[Any] = None
 
-    def _get_adapter(self) -> PinzhiAdapter:
+    def _get_adapter(self) -> Any:
         """获取或创建POS适配器实例"""
+        if not PINZHI_AVAILABLE:
+            raise RuntimeError("PinzhiAdapter is not available")
         if self._adapter is None:
             config = {
                 "base_url": settings.PINZHI_BASE_URL,

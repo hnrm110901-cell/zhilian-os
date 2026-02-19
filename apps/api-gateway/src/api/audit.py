@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
-from src.core.auth import get_current_user, require_permission
+from src.core.dependencies import get_current_active_user, require_permission
 from src.services.audit_log_service import audit_log_service
 from src.models import User
 
@@ -150,7 +150,7 @@ async def cleanup_old_logs(
 
 @router.get("/logs/actions")
 async def get_available_actions(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     获取所有可用的操作类型
@@ -170,7 +170,7 @@ async def get_available_actions(
 
 @router.get("/logs/resource-types")
 async def get_available_resource_types(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     获取所有可用的资源类型

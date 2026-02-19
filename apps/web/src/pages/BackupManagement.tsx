@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Card, Table, Button, Modal, Space, Tag, Popconfirm, message as antdMessage } from 'antd';
+import { Card, Table, Button, Modal, Space, Tag, Popconfirm } from 'antd';
 import {
   DatabaseOutlined,
   PlusOutlined,

@@ -38,7 +38,7 @@ async def seed_users():
             email="manager@zhilian.com",
             hashed_password="$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYqVr/1jrPK",  # manager123
             full_name="门店经理",
-            role=UserRole.MANAGER,
+            role=UserRole.STORE_MANAGER,
             is_active=True,
             store_id="STORE001",
         ),
@@ -46,8 +46,8 @@ async def seed_users():
             username="staff",
             email="staff@zhilian.com",
             hashed_password="$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYqVr/1jrPK",  # staff123
-            full_name="员工",
-            role=UserRole.STAFF,
+            full_name="服务员",
+            role=UserRole.WAITER,
             is_active=True,
             store_id="STORE001",
         ),

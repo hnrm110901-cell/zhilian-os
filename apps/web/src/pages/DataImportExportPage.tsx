@@ -7,8 +7,6 @@ import {
   Space,
   Tabs,
   Alert,
-  Table,
-  Tag,
 } from 'antd';
 import {
   UploadOutlined,
@@ -53,7 +51,7 @@ const DataImportExportPage: React.FC = () => {
   };
 
   const handleExportInventory = async () => {
-    try:
+    try {
       message.loading({ content: '正在导出库存数据...', key: 'export' });
 
       const response = await apiClient.get('/data/export/inventory', {
@@ -99,7 +97,7 @@ const DataImportExportPage: React.FC = () => {
   };
 
   const handleDownloadInventoryTemplate = async () => {
-    try:
+    try {
       const response = await apiClient.get('/data/templates/inventory', {
         responseType: 'blob',
       });
@@ -131,7 +129,7 @@ const DataImportExportPage: React.FC = () => {
       return isCSV || Upload.LIST_IGNORE;
     },
     customRequest: async ({ file, onSuccess, onError }) => {
-      try:
+      try {
         setImporting(true);
         setImportResult(null);
 

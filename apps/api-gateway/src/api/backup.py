@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel, Field
 from typing import Optional
 
-from src.core.auth import get_current_user, require_permission
+from src.core.dependencies import get_current_active_user, require_permission
 from src.services.backup_service import get_backup_service
 from src.models import User
 

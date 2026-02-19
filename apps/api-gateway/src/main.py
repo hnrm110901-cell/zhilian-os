@@ -8,7 +8,14 @@ from fastapi.responses import JSONResponse
 import structlog
 
 from src.core.config import settings
-from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, pos, members, dashboard, multi_store, supply_chain, finance, backup, analytics, audit, data_import_export
+# 核心模块
+from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise
+# 逐步启用的模块
+from src.api import dashboard, analytics, audit, backup, multi_store, supply_chain, finance, data_import_export
+# 需要外部适配器的模块 (会在适配器不可用时返回错误)
+from src.api import members
+# POS模块暂时禁用 (文件为空)
+# from src.api import pos
 from src.middleware.monitoring import MonitoringMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
 from src.middleware.audit_log import AuditLogMiddleware
@@ -110,6 +117,10 @@ app = FastAPI(
             "description": "LLM配置 - 大语言模型配置和测试",
         },
         {
+            "name": "enterprise",
+            "description": "企业集成 - 企业微信、飞书消息推送和用户管理",
+        },
+        {
             "name": "pos",
             "description": "POS系统 - 品智收银系统集成接口",
         },
@@ -170,7 +181,7 @@ app.add_middleware(AuditLogMiddleware)
 # 添加监控中间件
 app.add_middleware(MonitoringMiddleware)
 
-# 注册路由
+# 注册路由 - 核心模块
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(agents.router, prefix="/api/v1/agents", tags=["agents"])
@@ -180,16 +191,21 @@ app.include_router(mobile.router, prefix="/api/v1", tags=["mobile"])
 app.include_router(integrations.router, prefix="/api/v1", tags=["integrations"])
 app.include_router(monitoring.router, prefix="/api/v1", tags=["monitoring"])
 app.include_router(llm.router, prefix="/api/v1", tags=["llm"])
-app.include_router(pos.router, prefix="/api/v1/pos", tags=["pos"])
-app.include_router(members.router, prefix="/api/v1/members", tags=["members"])
+app.include_router(enterprise.router, prefix="/api/v1/enterprise", tags=["enterprise"])
+
+# 逐步启用的模块
 app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["dashboard"])
+app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["analytics"])
+app.include_router(audit.router, prefix="/api/v1/audit", tags=["audit"])
+app.include_router(backup.router, prefix="/api/v1/backup", tags=["backup"])
 app.include_router(multi_store.router, prefix="/api/v1/multi-store", tags=["multi_store"])
 app.include_router(supply_chain.router, prefix="/api/v1/supply-chain", tags=["supply_chain"])
 app.include_router(finance.router, prefix="/api/v1/finance", tags=["finance"])
-app.include_router(backup.router, prefix="/api/v1/backup", tags=["backup"])
-app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["analytics"])
-app.include_router(audit.router, prefix="/api/v1/audit", tags=["audit"])
 app.include_router(data_import_export.router, prefix="/api/v1/data", tags=["data"])
+app.include_router(members.router, prefix="/api/v1/members", tags=["members"])
+
+# POS模块暂时禁用 (文件为空)
+# app.include_router(pos.router, prefix="/api/v1/pos", tags=["pos"])
 
 
 @app.on_event("startup")

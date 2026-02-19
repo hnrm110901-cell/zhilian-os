@@ -1,9 +1,19 @@
 """
 健康检查API
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from datetime import datetime
+import structlog
+
+from src.core.dependencies import get_current_active_user
+from src.services.wechat_service import wechat_service
+from src.services.feishu_service import feishu_service
+from src.services.aoqiwei_service import aoqiwei_service
+from src.services.pinzhi_service import pinzhi_service
+from src.models import User
+
+logger = structlog.get_logger()
 
 router = APIRouter()
 
@@ -103,3 +113,209 @@ async def liveness_check():
     - `health`: 综合健康状态检查
     """
     return {"status": "alive"}
+
+
+@router.get("/external-systems", summary="外部系统健康检查")
+async def external_systems_health(
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    检查所有外部系统的配置和连接状态
+
+    需要认证，返回所有外部系统的健康状态
+    """
+    logger.info("开始检查外部系统健康状态")
+
+    # 并发检查所有外部系统
+    wechat_status = {
+        "name": "企业微信",
+        "configured": wechat_service.is_configured(),
+        "status": "not_configured" if not wechat_service.is_configured() else "configured",
+    }
+
+    feishu_status = {
+        "name": "飞书",
+        "configured": feishu_service.is_configured(),
+        "status": "not_configured" if not feishu_service.is_configured() else "configured",
+    }
+
+    # 对于Aoqiwei和Pinzhi，执行实际的健康检查
+    aoqiwei_status = await aoqiwei_service.health_check()
+    aoqiwei_status["name"] = "奥琦韦会员系统"
+
+    pinzhi_status = await pinzhi_service.health_check()
+    pinzhi_status["name"] = "品智POS系统"
+
+    # 汇总结果
+    systems = {
+        "wechat": wechat_status,
+        "feishu": feishu_status,
+        "aoqiwei": aoqiwei_status,
+        "pinzhi": pinzhi_status,
+    }
+
+    # 计算总体状态
+    total_systems = len(systems)
+    configured_systems = sum(1 for s in systems.values() if s.get("configured", False))
+    healthy_systems = sum(
+        1 for s in systems.values()
+        if s.get("status") in ["healthy", "configured"]
+    )
+
+    overall_status = "healthy" if healthy_systems == total_systems else "degraded"
+    if configured_systems == 0:
+        overall_status = "not_configured"
+    elif healthy_systems == 0:
+        overall_status = "unhealthy"
+
+    return {
+        "overall_status": overall_status,
+        "timestamp": datetime.now().isoformat(),
+        "summary": {
+            "total": total_systems,
+            "configured": configured_systems,
+            "healthy": healthy_systems,
+        },
+        "systems": systems,
+    }
+
+
+@router.get("/wechat", summary="企业微信健康检查")
+async def wechat_health(
+    current_user: User = Depends(get_current_active_user),
+):
+    """检查企业微信配置状态"""
+    is_configured = wechat_service.is_configured()
+
+    return {
+        "name": "企业微信",
+        "configured": is_configured,
+        "status": "configured" if is_configured else "not_configured",
+        "message": "企业微信已配置" if is_configured else "企业微信未配置，请设置环境变量",
+        "timestamp": datetime.now().isoformat(),
+    }
+
+
+@router.get("/feishu", summary="飞书健康检查")
+async def feishu_health(
+    current_user: User = Depends(get_current_active_user),
+):
+    """检查飞书配置状态"""
+    is_configured = feishu_service.is_configured()
+
+    return {
+        "name": "飞书",
+        "configured": is_configured,
+        "status": "configured" if is_configured else "not_configured",
+        "message": "飞书已配置" if is_configured else "飞书未配置，请设置环境变量",
+        "timestamp": datetime.now().isoformat(),
+    }
+
+
+@router.get("/aoqiwei", summary="奥琦韦健康检查")
+async def aoqiwei_health(
+    current_user: User = Depends(get_current_active_user),
+):
+    """检查奥琦韦会员系统配置和连接状态"""
+    result = await aoqiwei_service.health_check()
+    result["name"] = "奥琦韦会员系统"
+    result["timestamp"] = datetime.now().isoformat()
+    return result
+
+
+@router.get("/pinzhi", summary="品智健康检查")
+async def pinzhi_health(
+    current_user: User = Depends(get_current_active_user),
+):
+    """检查品智POS系统配置和连接状态"""
+    result = await pinzhi_service.health_check()
+    result["name"] = "品智POS系统"
+    result["timestamp"] = datetime.now().isoformat()
+    return result
+
+
+@router.get("/config/validation", summary="配置验证")
+async def config_validation(
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    验证所有配置项
+
+    检查必需和可选配置项是否正确设置
+    """
+    from src.core.config import settings
+
+    # 必需配置
+    required_configs = {
+        "DATABASE_URL": bool(settings.DATABASE_URL),
+        "REDIS_URL": bool(settings.REDIS_URL),
+        "SECRET_KEY": bool(settings.SECRET_KEY),
+        "JWT_SECRET": bool(settings.JWT_SECRET),
+    }
+
+    # 可选配置 - 企业微信
+    wechat_configs = {
+        "WECHAT_CORP_ID": bool(settings.WECHAT_CORP_ID),
+        "WECHAT_CORP_SECRET": bool(settings.WECHAT_CORP_SECRET),
+        "WECHAT_AGENT_ID": bool(settings.WECHAT_AGENT_ID),
+    }
+
+    # 可选配置 - 飞书
+    feishu_configs = {
+        "FEISHU_APP_ID": bool(settings.FEISHU_APP_ID),
+        "FEISHU_APP_SECRET": bool(settings.FEISHU_APP_SECRET),
+    }
+
+    # 可选配置 - 奥琦韦
+    aoqiwei_configs = {
+        "AOQIWEI_API_KEY": bool(settings.AOQIWEI_API_KEY),
+        "AOQIWEI_BASE_URL": bool(settings.AOQIWEI_BASE_URL),
+    }
+
+    # 可选配置 - 品智
+    pinzhi_configs = {
+        "PINZHI_TOKEN": bool(settings.PINZHI_TOKEN),
+        "PINZHI_BASE_URL": bool(settings.PINZHI_BASE_URL),
+    }
+
+    # 计算完整性
+    wechat_complete = all(wechat_configs.values())
+    feishu_complete = all(feishu_configs.values())
+    aoqiwei_complete = all(aoqiwei_configs.values())
+    pinzhi_complete = all(pinzhi_configs.values())
+
+    return {
+        "required": {
+            "configs": required_configs,
+            "complete": all(required_configs.values()),
+        },
+        "optional": {
+            "wechat": {
+                "configs": wechat_configs,
+                "complete": wechat_complete,
+            },
+            "feishu": {
+                "configs": feishu_configs,
+                "complete": feishu_complete,
+            },
+            "aoqiwei": {
+                "configs": aoqiwei_configs,
+                "complete": aoqiwei_complete,
+            },
+            "pinzhi": {
+                "configs": pinzhi_configs,
+                "complete": pinzhi_complete,
+            },
+        },
+        "summary": {
+            "required_complete": all(required_configs.values()),
+            "optional_systems_configured": sum([
+                wechat_complete,
+                feishu_complete,
+                aoqiwei_complete,
+                pinzhi_complete,
+            ]),
+            "total_optional_systems": 4,
+        },
+        "timestamp": datetime.now().isoformat(),
+    }

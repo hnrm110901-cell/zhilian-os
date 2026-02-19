@@ -7,7 +7,7 @@ from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
-from src.core.auth import get_current_user, require_permission
+from src.core.dependencies import get_current_active_user, require_permission
 from src.services.data_import_export_service import data_import_export_service
 from src.models import User
 
@@ -133,7 +133,7 @@ async def import_inventory(
 
 @router.get("/templates/users")
 async def get_user_import_template(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     获取用户导入模板CSV
@@ -166,7 +166,7 @@ async def get_user_import_template(
 
 @router.get("/templates/inventory")
 async def get_inventory_import_template(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     获取库存导入模板CSV

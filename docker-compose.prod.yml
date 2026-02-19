@@ -31,6 +31,7 @@ services:
       - DEBUG=False
       - DATABASE_URL=postgresql+asyncpg://zhilian:zhilian@postgres:5432/zhilian_os
       - REDIS_URL=redis://redis:6379/0
+      - PYTHONPATH=/app:/app/packages
     env_file:
       - ./apps/api-gateway/.env.production
     volumes:

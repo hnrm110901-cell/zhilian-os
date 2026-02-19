@@ -23,7 +23,7 @@ import {
 } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { apiClient } from '../services/api';
-import { showSuccess, showError, handleApiError } from '../utils/message';
+import { showSuccess, handleApiError } from '../utils/message';
 import dayjs from 'dayjs';
 
 const { RangePicker } = DatePicker;
@@ -162,7 +162,7 @@ const AuditLogPage: React.FC = () => {
         <div>
           <div>{username || record.user_id}</div>
           {record.user_role && (
-            <Tag size="small" color="blue">
+            <Tag color="blue">
               {record.user_role}
             </Tag>
           )}
@@ -325,13 +325,19 @@ const AuditLogPage: React.FC = () => {
             {/* 过滤条件 */}
             <Space style={{ marginBottom: '16px' }} wrap>
               <RangePicker
-                value={[filters.start_date, filters.end_date]}
+                value={filters.start_date && filters.end_date ? [filters.start_date, filters.end_date] : null}
                 onChange={(dates) => {
                   if (dates) {
                     setFilters({
                       ...filters,
-                      start_date: dates[0],
-                      end_date: dates[1],
+                      start_date: dates[0] || dayjs().subtract(7, 'days'),
+                      end_date: dates[1] || dayjs(),
+                    });
+                  } else {
+                    setFilters({
+                      ...filters,
+                      start_date: dayjs().subtract(7, 'days'),
+                      end_date: dayjs(),
                     });
                   }
                 }}

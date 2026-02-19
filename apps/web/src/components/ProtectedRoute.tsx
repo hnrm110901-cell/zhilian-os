@@ -25,7 +25,9 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole 
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    // 保存当前路径，登录后重定向回来
+    const currentPath = window.location.pathname;
+    return <Navigate to={`/login?redirect=${encodeURIComponent(currentPath)}`} replace />;
   }
 
   if (requiredRole && user?.role !== requiredRole && user?.role !== 'admin') {

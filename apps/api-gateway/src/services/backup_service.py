@@ -328,3 +328,7 @@ backup_service = BackupService()
 def get_backup_service() -> BackupService:
     """获取备份服务实例"""
     return backup_service
+
+
+# 创建全局实例
+backup_service = BackupService()

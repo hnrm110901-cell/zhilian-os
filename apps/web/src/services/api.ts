@@ -77,6 +77,21 @@ class ApiClient {
     return this.request<T>({ ...config, method: 'POST', url, data });
   }
 
+  // PUT请求
+  async put<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
+    return this.request<T>({ ...config, method: 'PUT', url, data });
+  }
+
+  // PATCH请求
+  async patch<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
+    return this.request<T>({ ...config, method: 'PATCH', url, data });
+  }
+
+  // DELETE请求
+  async delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<T> {
+    return this.request<T>({ ...config, method: 'DELETE', url });
+  }
+
   // 调用Agent
   async callAgent(agentType: string, inputData: Record<string, any>): Promise<AgentResponse> {
     const request: AgentRequest = {

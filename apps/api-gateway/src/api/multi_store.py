@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 import structlog
 
 from ..services.store_service import store_service
-from ..core.auth import get_current_user, require_permissions
+from ..core.dependencies import get_current_active_user
 from ..models.user import User
 from ..models.store import StoreStatus
 
@@ -70,8 +70,7 @@ class CompareStoresRequest(BaseModel):
 @router.post("/create", summary="创建门店")
 async def create_store(
     request: CreateStoreRequest,
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permissions(["store:write"])),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     创建门店
@@ -100,8 +99,7 @@ async def get_stores(
     is_active: Optional[bool] = Query(None, description="是否激活"),
     limit: int = Query(100, ge=1, le=1000, description="每页数量"),
     offset: int = Query(0, ge=0, description="偏移量"),
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permissions(["store:read"])),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     获取门店列表
@@ -151,8 +149,7 @@ async def get_stores(
 @router.get("/{store_id}", summary="获取门店详情")
 async def get_store(
     store_id: str,
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permissions(["store:read"])),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     获取门店详情
@@ -197,8 +194,7 @@ async def get_store(
 async def update_store(
     store_id: str,
     request: UpdateStoreRequest,
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permissions(["store:write"])),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     更新门店信息
@@ -226,8 +222,7 @@ async def update_store(
 @router.delete("/{store_id}", summary="删除门店")
 async def delete_store(
     store_id: str,
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permissions(["store:delete"])),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     删除门店（软删除）
@@ -254,8 +249,7 @@ async def delete_store(
 @router.get("/{store_id}/stats", summary="获取门店统计")
 async def get_store_stats(
     store_id: str,
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permissions(["store:read"])),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     获取门店统计信息
@@ -279,8 +273,7 @@ async def get_store_stats(
 @router.post("/compare", summary="门店对比")
 async def compare_stores(
     request: CompareStoresRequest,
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permissions(["store:read"])),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     对比多个门店的数据
@@ -299,8 +292,7 @@ async def compare_stores(
 
 @router.get("/regional/summary", summary="获取区域汇总")
 async def get_regional_summary(
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permissions(["store:read"])),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     获取区域汇总数据
@@ -319,8 +311,7 @@ async def get_regional_summary(
 async def get_performance_ranking(
     metric: str = Query("revenue", description="排名指标"),
     limit: int = Query(10, ge=1, le=100, description="返回数量"),
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permissions(["store:read"])),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     获取门店业绩排名
@@ -339,8 +330,7 @@ async def get_performance_ranking(
 async def get_store_count(
     region: Optional[str] = Query(None, description="大区"),
     status: Optional[str] = Query(None, description="状态"),
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permissions(["store:read"])),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     获取门店数量

@@ -7,7 +7,7 @@ from typing import Optional
 import structlog
 
 from ..services.dashboard_service import dashboard_service
-from ..core.auth import get_current_user, require_permissions
+from ..core.dependencies import get_current_active_user
 from ..models.user import User
 
 logger = structlog.get_logger()
@@ -17,8 +17,7 @@ router = APIRouter()
 
 @router.get("/overview", summary="获取概览统计数据")
 async def get_overview_stats(
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permissions(["dashboard:read"])),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     获取概览统计数据
@@ -38,8 +37,7 @@ async def get_overview_stats(
 @router.get("/sales-trend", summary="获取销售趋势")
 async def get_sales_trend(
     days: int = Query(7, ge=1, le=30, description="天数"),
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permissions(["dashboard:read"])),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     获取销售趋势数据
@@ -56,8 +54,7 @@ async def get_sales_trend(
 
 @router.get("/category-sales", summary="获取菜品类别销售")
 async def get_category_sales(
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permissions(["dashboard:read"])),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     获取菜品类别销售数据
@@ -74,8 +71,7 @@ async def get_category_sales(
 
 @router.get("/payment-methods", summary="获取支付方式分布")
 async def get_payment_methods(
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permissions(["dashboard:read"])),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     获取支付方式分布数据
@@ -92,8 +88,7 @@ async def get_payment_methods(
 
 @router.get("/member-stats", summary="获取会员统计")
 async def get_member_stats(
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permissions(["dashboard:read"])),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     获取会员统计数据
@@ -110,8 +105,7 @@ async def get_member_stats(
 
 @router.get("/agent-performance", summary="获取Agent性能")
 async def get_agent_performance(
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permissions(["dashboard:read"])),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     获取Agent性能数据
@@ -128,8 +122,7 @@ async def get_agent_performance(
 
 @router.get("/realtime-metrics", summary="获取实时指标")
 async def get_realtime_metrics(
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permissions(["dashboard:read"])),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     获取实时指标数据

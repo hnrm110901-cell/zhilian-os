@@ -17,7 +17,7 @@ class ReportExportService:
     """报表导出服务"""
 
     def __init__(self):
-        self.finance_service = FinanceService()
+        pass
 
     async def export_to_csv(
         self,
@@ -41,13 +41,14 @@ class ReportExportService:
             CSV文件字节流
         """
         # 获取报表数据
+        finance_service = FinanceService(db)
         if report_type == "income_statement":
-            data = await self.finance_service.get_income_statement(
+            data = await finance_service.get_income_statement(
                 start_date, end_date, store_id, db
             )
             return self._generate_income_statement_csv(data, start_date, end_date)
         elif report_type == "cash_flow":
-            data = await self.finance_service.get_cash_flow_statement(
+            data = await finance_service.get_cash_flow_statement(
                 start_date, end_date, store_id, db
             )
             return self._generate_cash_flow_csv(data, start_date, end_date)

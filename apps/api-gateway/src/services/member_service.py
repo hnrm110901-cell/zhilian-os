@@ -12,7 +12,15 @@ import os
 packages_path = os.path.join(os.path.dirname(__file__), "../../../../packages")
 sys.path.insert(0, os.path.abspath(packages_path))
 
-from api_adapters.aoqiwei.src.adapter import AoqiweiAdapter
+try:
+    from api_adapters.aoqiwei.src.adapter import AoqiweiAdapter
+    AOQIWEI_AVAILABLE = True
+except ImportError:
+    logger = structlog.get_logger()
+    logger.warning("AoqiweiAdapter not available, member features will be limited")
+    AoqiweiAdapter = None
+    AOQIWEI_AVAILABLE = False
+
 from ..core.config import settings
 
 logger = structlog.get_logger()
@@ -22,10 +30,12 @@ class MemberService:
     """会员服务"""
 
     def __init__(self):
-        self._adapter: Optional[AoqiweiAdapter] = None
+        self._adapter: Optional[Any] = None
 
-    def _get_adapter(self) -> AoqiweiAdapter:
+    def _get_adapter(self) -> Any:
         """获取或创建会员适配器实例"""
+        if not AOQIWEI_AVAILABLE:
+            raise RuntimeError("AoqiweiAdapter is not available")
         if self._adapter is None:
             config = {
                 "base_url": settings.AOQIWEI_BASE_URL,

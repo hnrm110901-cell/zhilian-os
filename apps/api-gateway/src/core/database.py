@@ -10,6 +10,9 @@ from src.core.config import settings
 
 logger = structlog.get_logger()
 
+# Import Base for models
+from src.models.base import Base
+
 # Create async engine
 engine = create_async_engine(
     settings.DATABASE_URL,

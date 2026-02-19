@@ -9,7 +9,7 @@ from datetime import date
 import structlog
 
 from ..services.member_service import member_service
-from ..core.auth import get_current_user, require_permissions
+from ..core.dependencies import get_current_active_user
 from ..models.user import User
 
 logger = structlog.get_logger()
@@ -114,8 +114,7 @@ async def query_member(
     card_no: Optional[str] = Query(None, description="会员卡号"),
     mobile: Optional[str] = Query(None, description="手机号"),
     openid: Optional[str] = Query(None, description="微信openid"),
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permissions(["member:read"])),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     查询会员信息
@@ -139,8 +138,7 @@ async def query_member(
 @router.post("/add", summary="新增会员")
 async def add_member(
     request: AddMemberRequest,
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permissions(["member:write"])),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     新增会员
@@ -166,8 +164,7 @@ async def add_member(
 async def update_member(
     card_no: str,
     request: UpdateMemberRequest,
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permissions(["member:write"])),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     修改会员信息
@@ -186,8 +183,7 @@ async def update_member(
 @router.post("/trade/preview", summary="交易预览")
 async def trade_preview(
     request: TradePreviewRequest,
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permissions(["member:trade"])),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     交易预览（计算优惠）
@@ -211,8 +207,7 @@ async def trade_preview(
 @router.post("/trade/submit", summary="交易提交")
 async def trade_submit(
     request: TradeSubmitRequest,
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permissions(["member:trade"])),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     交易提交
@@ -242,8 +237,7 @@ async def trade_query(
     card_no: Optional[str] = Query(None, description="会员卡号"),
     start_date: Optional[str] = Query(None, description="开始日期 (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="结束日期 (YYYY-MM-DD)"),
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permissions(["member:read"])),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     查询交易记录
@@ -268,8 +262,7 @@ async def trade_query(
 async def trade_cancel(
     trade_id: str,
     reason: str = Query("", description="撤销原因"),
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permissions(["member:trade"])),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     交易撤销
@@ -287,8 +280,7 @@ async def trade_cancel(
 @router.post("/recharge/submit", summary="储值提交")
 async def recharge_submit(
     request: RechargeRequest,
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permissions(["member:recharge"])),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     储值提交
@@ -315,8 +307,7 @@ async def recharge_query(
     card_no: str = Query(..., description="会员卡号"),
     start_date: Optional[str] = Query(None, description="开始日期 (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="结束日期 (YYYY-MM-DD)"),
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permissions(["member:read"])),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     查询储值记录
@@ -335,8 +326,7 @@ async def recharge_query(
 async def coupon_list(
     card_no: str = Query(..., description="会员卡号"),
     store_id: Optional[str] = Query(None, description="门店ID"),
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permissions(["member:read"])),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     查询可用优惠券
@@ -354,8 +344,7 @@ async def coupon_list(
 @router.post("/coupon/use", summary="券码核销")
 async def coupon_use(
     request: CouponUseRequest,
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permissions(["member:coupon"])),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     券码核销
@@ -381,8 +370,7 @@ async def coupon_use(
     summary="测试会员系统连接",
 )
 async def test_connection(
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permissions(["system:config"])),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     测试会员系统连接

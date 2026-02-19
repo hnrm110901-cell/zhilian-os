@@ -588,3 +588,7 @@ class AgentService:
                 "error": str(e),
                 "execution_time": execution_time,
             }
+
+
+# 创建全局实例
+agent_service = AgentService()

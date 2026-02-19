@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { orderDataService, type Order } from './orderData';
+import { orderDataService } from './orderData';
 
 describe('OrderDataService', () => {
   beforeEach(() => {

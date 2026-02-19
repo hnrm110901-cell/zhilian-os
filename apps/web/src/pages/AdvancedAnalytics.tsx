@@ -402,7 +402,7 @@ const AdvancedAnalytics: React.FC = () => {
                   <Table
                     columns={associationColumns}
                     dataSource={associations.associations}
-                    rowKey={(record) => `${record.item1}-${record.item2}`}
+                    rowKey={(record: any) => `${record.item1}-${record.item2}`}
                     pagination={{ pageSize: 10 }}
                   />
                 </Card>

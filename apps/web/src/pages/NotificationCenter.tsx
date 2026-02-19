@@ -11,7 +11,6 @@ import {
   Space,
   Badge,
   Tabs,
-  message,
   Checkbox,
 } from 'antd';
 import {
@@ -21,11 +20,9 @@ import {
   MessageOutlined,
   WechatOutlined,
   MobileOutlined,
-  CheckCircleOutlined,
-  CloseCircleOutlined,
 } from '@ant-design/icons';
 import { apiClient } from '../services/api';
-import { showSuccess, showError, handleApiError } from '../utils/message';
+import { showSuccess, handleApiError } from '../utils/message';
 
 const { TabPane } = Tabs;
 const { TextArea } = Input;

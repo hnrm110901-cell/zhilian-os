@@ -1,9 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Card, Col, Row, Table, Statistic, Spin, Select, Button, Tag, Space } from 'antd';
+import { Card, Col, Row, Table, Statistic, Spin, Select, Tag, Space } from 'antd';
 import {
   ShopOutlined,
-  DollarOutlined,
-  TeamOutlined,
   RiseOutlined,
   FallOutlined,
 } from '@ant-design/icons';
