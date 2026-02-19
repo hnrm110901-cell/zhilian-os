@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 
 from ..services.neural_system import NeuralSystemOrchestrator
+from ..services.federated_learning_service import federated_learning_service
 from ..schemas.restaurant_standard_schema import (
     NeuralEventSchema,
     OrderSchema,
@@ -95,20 +96,19 @@ async def emit_event(request: EventEmissionRequest):
     3. Distributed to relevant subscribers
     """
     try:
-        event = NeuralEventSchema(
-            event_id=f"{request.event_type}_{request.store_id}_{datetime.now().timestamp()}",
+        await neural_system.emit_event(
             event_type=request.event_type,
-            store_id=request.store_id,
-            timestamp=datetime.now(),
+            event_source="api",
             data=request.data,
-            metadata=request.metadata or {}
+            store_id=request.store_id,
+            priority=0
         )
 
-        await neural_system.emit_event(event)
+        event_id = f"{request.event_type}_{request.store_id}_{datetime.now().timestamp()}"
 
         return EventEmissionResponse(
             success=True,
-            event_id=event.event_id,
+            event_id=event_id,
             message=f"Event {request.event_type} emitted successfully"
         )
     except Exception as e:
@@ -262,9 +262,9 @@ async def get_system_status():
 
         return SystemStatusResponse(
             status="operational",
-            total_events=len(neural_system.event_history),
-            total_stores=len(neural_system.fl_service.stores),
-            federated_learning_round=neural_system.fl_service.current_round,
+            total_events=len(neural_system.event_queue),
+            total_stores=len(federated_learning_service.participating_stores),
+            federated_learning_round=federated_learning_service.training_rounds,
             vector_db_collections=vector_db_stats,
             uptime_seconds=0.0  # Would calculate actual uptime
         )

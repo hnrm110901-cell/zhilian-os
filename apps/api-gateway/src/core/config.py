@@ -39,6 +39,16 @@ class Settings(BaseSettings):
     QDRANT_URL: str = "http://localhost:6333"
     QDRANT_API_KEY: str = ""
 
+    # 神经系统配置
+    EMBEDDING_MODEL: str = "paraphrase-multilingual-MiniLM-L12-v2"
+    EMBEDDING_DIMENSION: int = 384
+    NEURAL_SYSTEM_ENABLED: bool = True
+
+    # 联邦学习配置
+    FL_MIN_STORES: int = 3
+    FL_AGGREGATION_THRESHOLD: float = 0.8
+    FL_LEARNING_RATE: float = 0.01
+
     # 企业微信配置
     WECHAT_CORP_ID: str = ""
     WECHAT_CORP_SECRET: str = ""
