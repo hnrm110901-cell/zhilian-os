@@ -363,6 +363,48 @@ class VectorDatabaseService:
                f"来源 {event_data['event_source']}, " \
                f"数据: {data_text}"
 
+    async def search_orders(
+        self,
+        query: str,
+        store_id: str,
+        limit: int = 10
+    ) -> List[Dict[str, Any]]:
+        """搜索订单"""
+        return await self.semantic_search(
+            collection_name="orders",
+            query=query,
+            limit=limit,
+            filters={"store_id": store_id}
+        )
+
+    async def search_dishes(
+        self,
+        query: str,
+        store_id: str,
+        limit: int = 10
+    ) -> List[Dict[str, Any]]:
+        """搜索菜品"""
+        return await self.semantic_search(
+            collection_name="dishes",
+            query=query,
+            limit=limit,
+            filters={"store_id": store_id}
+        )
+
+    async def search_events(
+        self,
+        query: str,
+        store_id: str,
+        limit: int = 10
+    ) -> List[Dict[str, Any]]:
+        """搜索事件"""
+        return await self.semantic_search(
+            collection_name="events",
+            query=query,
+            limit=limit,
+            filters={"store_id": store_id}
+        )
+
 
 # 创建全局实例
 vector_db_service = VectorDatabaseService()
