@@ -21,8 +21,11 @@ langchain-openai==0.0.5
 langgraph==0.0.20
 llama-index==0.9.48
 
-# Vector Database
+# Vector Database & Embeddings
 qdrant-client==1.7.3
+sentence-transformers==2.3.1
+torch==2.1.2
+numpy==1.26.3
 
 # Task Queue
 celery==5.3.6

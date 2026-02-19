@@ -18,6 +18,30 @@
 6. **决策支持Agent** - 数据分析、经营洞察、预测优化
 7. **预定宴会Agent** - 预定管理、宴会管理、座位分配、提醒通知
 
+### 🧠 神经系统
+
+智链OS神经系统是餐饮门店的智能中枢，提供：
+
+- **五大核心维度**: 订单、菜品、人员、时间、金额的标准化Schema
+- **语义搜索**: 基于向量数据库的自然语言搜索能力
+- **联邦学习**: 跨门店知识共享，数据隔离架构保护隐私
+- **事件驱动**: 实时事件处理和智能协调
+
+详细文档：
+- [神经系统实现报告](./NEURAL_SYSTEM_IMPLEMENTATION.md)
+- [神经系统快速开始](./NEURAL_SYSTEM_QUICKSTART.md)
+
+### 🎤 语音交互
+
+支持Shokz骨传导耳机深度集成：
+
+- **OpenComm 2**: 前厅/收银语音交互
+- **OpenRun Pro 2**: 后厨语音交互
+- **智能路由**: 基于角色的语音命令路由
+- **多语言支持**: 中文、英文语音识别和合成
+
+详细文档：[Shokz集成报告](./SHOKZ_INTEGRATION_REPORT.md)
+
 ### 🏗️ 三层架构
 
 ```
@@ -129,6 +153,13 @@ cp .env.example .env
 ### 启动开发环境
 
 ```bash
+# 启动基础设施 (PostgreSQL, Redis, Qdrant)
+docker-compose up -d
+
+# 初始化神经系统
+cd apps/api-gateway
+python scripts/init_neural_system.py
+
 # 启动所有服务
 pnpm dev
 
