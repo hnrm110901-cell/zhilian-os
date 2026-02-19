@@ -222,24 +222,16 @@ async def participate_in_federated_learning(request: FederatedLearningParticipat
     while keeping raw data isolated at the store level.
     """
     try:
-        # In a real implementation, this would load the model from the path
-        # For now, we'll use a placeholder
-        local_model = {"weights": [], "bias": []}  # Placeholder
-
-        success = await neural_system.participate_in_federated_learning(
+        result = await neural_system.participate_in_federated_learning(
             store_id=request.store_id,
-            local_model=local_model,
-            training_samples=request.training_samples
+            model_type="demand_prediction"  # Default model type
         )
 
-        if success:
-            return FederatedLearningParticipationResponse(
-                success=True,
-                round_number=neural_system.fl_service.current_round,
-                message="Successfully participated in federated learning"
-            )
-        else:
-            raise HTTPException(status_code=500, detail="Failed to participate in federated learning")
+        return FederatedLearningParticipationResponse(
+            success=result.get("success", False),
+            round_number=result.get("round", 0),
+            message=result.get("message", "Participated in federated learning")
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Participation failed: {str(e)}")
 
