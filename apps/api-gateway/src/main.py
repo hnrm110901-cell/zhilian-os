@@ -9,7 +9,7 @@ import structlog
 
 from src.core.config import settings
 # 核心模块
-from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise
+from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice
 # 逐步启用的模块
 from src.api import dashboard, analytics, audit, backup, multi_store, supply_chain, finance, data_import_export
 # 需要外部适配器的模块 (会在适配器不可用时返回错误)
@@ -121,6 +121,10 @@ app = FastAPI(
             "description": "企业集成 - 企业微信、飞书消息推送和用户管理",
         },
         {
+            "name": "voice",
+            "description": "语音交互 - Shokz骨传导耳机集成、语音命令、语音通知",
+        },
+        {
             "name": "pos",
             "description": "POS系统 - 品智收银系统集成接口",
         },
@@ -192,6 +196,7 @@ app.include_router(integrations.router, prefix="/api/v1", tags=["integrations"])
 app.include_router(monitoring.router, prefix="/api/v1", tags=["monitoring"])
 app.include_router(llm.router, prefix="/api/v1", tags=["llm"])
 app.include_router(enterprise.router, prefix="/api/v1/enterprise", tags=["enterprise"])
+app.include_router(voice.router, prefix="/api/v1/voice", tags=["voice"])
 
 # 逐步启用的模块
 app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["dashboard"])
