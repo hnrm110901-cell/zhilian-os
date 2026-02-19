@@ -277,3 +277,124 @@ async def health_check():
         "timestamp": datetime.now().isoformat()
     }
 
+
+# ==================== Batch Indexing Endpoints ====================
+
+class BatchIndexOrdersRequest(BaseModel):
+    """Request to batch index orders"""
+    orders: List[Dict[str, Any]] = Field(..., description="List of orders to index", min_items=1, max_items=1000)
+
+
+class BatchIndexDishesRequest(BaseModel):
+    """Request to batch index dishes"""
+    dishes: List[Dict[str, Any]] = Field(..., description="List of dishes to index", min_items=1, max_items=1000)
+
+
+class BatchIndexEventsRequest(BaseModel):
+    """Request to batch index events"""
+    events: List[Dict[str, Any]] = Field(..., description="List of events to index", min_items=1, max_items=1000)
+
+
+class BatchIndexResponse(BaseModel):
+    """Response from batch indexing operation"""
+    success: bool = Field(..., description="Overall operation success")
+    total: int = Field(..., description="Total items submitted")
+    indexed: int = Field(..., description="Successfully indexed items")
+    failed: int = Field(..., description="Failed items")
+    errors: List[str] = Field(default_factory=list, description="Error messages (max 10)")
+    duration_seconds: float = Field(..., description="Operation duration in seconds")
+
+
+@router.post("/batch/index/orders", response_model=BatchIndexResponse)
+async def batch_index_orders(request: BatchIndexOrdersRequest):
+    """
+    Batch index multiple orders
+
+    Efficiently index multiple orders in a single operation.
+    Supports up to 1000 orders per request.
+
+    Returns statistics about the indexing operation including:
+    - Total items processed
+    - Successfully indexed count
+    - Failed count with error details
+    - Operation duration
+    """
+    try:
+        from ..services.vector_db_service_enhanced import vector_db_service_enhanced
+
+        # Ensure service is initialized
+        if not vector_db_service_enhanced._initialized:
+            await vector_db_service_enhanced.initialize()
+
+        # Perform batch indexing
+        result = await vector_db_service_enhanced.index_orders_batch(request.orders)
+
+        return BatchIndexResponse(
+            success=result["success"] >= result["total"] * 0.8,  # 80% success threshold
+            total=result["total"],
+            indexed=result["success"],
+            failed=result["failure"],
+            errors=result["errors"],
+            duration_seconds=result["duration_seconds"]
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Batch indexing failed: {str(e)}")
+
+
+@router.post("/batch/index/dishes", response_model=BatchIndexResponse)
+async def batch_index_dishes(request: BatchIndexDishesRequest):
+    """
+    Batch index multiple dishes
+
+    Efficiently index multiple dishes in a single operation.
+    Supports up to 1000 dishes per request.
+    """
+    try:
+        from ..services.vector_db_service_enhanced import vector_db_service_enhanced
+
+        if not vector_db_service_enhanced._initialized:
+            await vector_db_service_enhanced.initialize()
+
+        # Perform batch indexing for dishes
+        result = await vector_db_service_enhanced.index_dishes_batch(request.dishes)
+
+        return BatchIndexResponse(
+            success=result["success"] >= result["total"] * 0.8,
+            total=result["total"],
+            indexed=result["success"],
+            failed=result["failure"],
+            errors=result["errors"],
+            duration_seconds=result["duration_seconds"]
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Batch indexing failed: {str(e)}")
+
+
+@router.post("/batch/index/events", response_model=BatchIndexResponse)
+async def batch_index_events(request: BatchIndexEventsRequest):
+    """
+    Batch index multiple events
+
+    Efficiently index multiple events in a single operation.
+    Supports up to 1000 events per request.
+    """
+    try:
+        from ..services.vector_db_service_enhanced import vector_db_service_enhanced
+
+        if not vector_db_service_enhanced._initialized:
+            await vector_db_service_enhanced.initialize()
+
+        # Perform batch indexing for events
+        result = await vector_db_service_enhanced.index_events_batch(request.events)
+
+        return BatchIndexResponse(
+            success=result["success"] >= result["total"] * 0.8,
+            total=result["total"],
+            indexed=result["success"],
+            failed=result["failure"],
+            errors=result["errors"],
+            duration_seconds=result["duration_seconds"]
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Batch indexing failed: {str(e)}")
+

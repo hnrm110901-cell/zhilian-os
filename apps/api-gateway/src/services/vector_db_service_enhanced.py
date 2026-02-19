@@ -678,6 +678,186 @@ class VectorDatabaseServiceEnhanced:
             filters={"store_id": store_id}
         )
 
+    async def index_dishes_batch(self, dishes: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        批量索引菜品
+
+        Args:
+            dishes: 菜品列表
+
+        Returns:
+            批量索引结果统计
+        """
+        start_time = time.time()
+        success_count = 0
+        failure_count = 0
+        errors = []
+
+        try:
+            from qdrant_client.models import PointStruct
+
+            points = []
+            for dish_data in dishes:
+                try:
+                    # 验证必需字段
+                    required_fields = ["dish_id", "name", "category", "price", "is_available", "store_id"]
+                    if not all(field in dish_data for field in required_fields):
+                        failure_count += 1
+                        errors.append(f"菜品 {dish_data.get('dish_id', 'unknown')} 缺少必需字段")
+                        continue
+
+                    # 生成文本和嵌入
+                    text = self._dish_to_text(dish_data)
+                    embedding = self.generate_embedding(text)
+
+                    # 创建点
+                    point_id = int(hashlib.md5(dish_data["dish_id"].encode()).hexdigest()[:16], 16)
+                    point = PointStruct(
+                        id=point_id,
+                        vector=embedding,
+                        payload={
+                            "dish_id": dish_data["dish_id"],
+                            "name": dish_data["name"],
+                            "category": dish_data["category"],
+                            "price": float(dish_data["price"]),
+                            "is_available": dish_data["is_available"],
+                            "store_id": dish_data["store_id"],
+                            "text": text,
+                        },
+                    )
+                    points.append(point)
+                    success_count += 1
+
+                except Exception as e:
+                    failure_count += 1
+                    errors.append(f"菜品 {dish_data.get('dish_id', 'unknown')} 处理失败: {str(e)}")
+
+            # 批量插入
+            if points:
+                self.client.upsert(
+                    collection_name="dishes",
+                    points=points,
+                )
+
+            end_time = time.time()
+            duration = end_time - start_time
+
+            logger.info(
+                "批量菜品索引完成",
+                total=len(dishes),
+                success=success_count,
+                failure=failure_count,
+                duration_seconds=duration
+            )
+
+            return {
+                "total": len(dishes),
+                "success": success_count,
+                "failure": failure_count,
+                "errors": errors[:10],
+                "duration_seconds": duration,
+            }
+
+        except Exception as e:
+            logger.error("批量菜品索引失败", error=str(e))
+            return {
+                "total": len(dishes),
+                "success": 0,
+                "failure": len(dishes),
+                "errors": [str(e)],
+                "duration_seconds": time.time() - start_time,
+            }
+
+    async def index_events_batch(self, events: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        批量索引事件
+
+        Args:
+            events: 事件列表
+
+        Returns:
+            批量索引结果统计
+        """
+        start_time = time.time()
+        success_count = 0
+        failure_count = 0
+        errors = []
+
+        try:
+            from qdrant_client.models import PointStruct
+
+            points = []
+            for event_data in events:
+                try:
+                    # 验证必需字段
+                    required_fields = ["event_id", "event_type", "event_source", "timestamp", "store_id"]
+                    if not all(field in event_data for field in required_fields):
+                        failure_count += 1
+                        errors.append(f"事件 {event_data.get('event_id', 'unknown')} 缺少必需字段")
+                        continue
+
+                    # 生成文本和嵌入
+                    text = self._event_to_text(event_data)
+                    embedding = self.generate_embedding(text)
+
+                    # 创建点
+                    point_id = int(hashlib.md5(event_data["event_id"].encode()).hexdigest()[:16], 16)
+                    point = PointStruct(
+                        id=point_id,
+                        vector=embedding,
+                        payload={
+                            "event_id": event_data["event_id"],
+                            "event_type": event_data["event_type"],
+                            "event_source": event_data["event_source"],
+                            "timestamp": event_data["timestamp"].isoformat() if isinstance(event_data["timestamp"], datetime) else event_data["timestamp"],
+                            "store_id": event_data["store_id"],
+                            "priority": event_data.get("priority", 0),
+                            "text": text,
+                        },
+                    )
+                    points.append(point)
+                    success_count += 1
+
+                except Exception as e:
+                    failure_count += 1
+                    errors.append(f"事件 {event_data.get('event_id', 'unknown')} 处理失败: {str(e)}")
+
+            # 批量插入
+            if points:
+                self.client.upsert(
+                    collection_name="events",
+                    points=points,
+                )
+
+            end_time = time.time()
+            duration = end_time - start_time
+
+            logger.info(
+                "批量事件索引完成",
+                total=len(events),
+                success=success_count,
+                failure=failure_count,
+                duration_seconds=duration
+            )
+
+            return {
+                "total": len(events),
+                "success": success_count,
+                "failure": failure_count,
+                "errors": errors[:10],
+                "duration_seconds": duration,
+            }
+
+        except Exception as e:
+            logger.error("批量事件索引失败", error=str(e))
+            return {
+                "total": len(events),
+                "success": 0,
+                "failure": len(events),
+                "errors": [str(e)],
+                "duration_seconds": time.time() - start_time,
+            }
+
 
 # 创建全局实例
 vector_db_service_enhanced = VectorDatabaseServiceEnhanced()
