@@ -127,7 +127,7 @@ async def search_orders(request: SemanticSearchRequest):
         results = await neural_system.semantic_search_orders(
             query=request.query,
             store_id=request.store_id,
-            top_k=request.top_k
+            limit=request.top_k
         )
 
         search_results = [
@@ -160,7 +160,7 @@ async def search_dishes(request: SemanticSearchRequest):
         results = await neural_system.semantic_search_dishes(
             query=request.query,
             store_id=request.store_id,
-            top_k=request.top_k
+            limit=request.top_k
         )
 
         search_results = [
@@ -192,7 +192,7 @@ async def search_events(request: SemanticSearchRequest):
         results = await neural_system.semantic_search_events(
             query=request.query,
             store_id=request.store_id,
-            top_k=request.top_k
+            limit=request.top_k
         )
 
         search_results = [
