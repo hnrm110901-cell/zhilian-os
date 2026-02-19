@@ -195,6 +195,61 @@ const MobileApp: React.FC = () => {
     </div>
   );
 
+  const renderNotifications = () => (
+    <div>
+      <Card
+        title={`通知中心 (${dashboard?.notifications?.unread_count || 0}条未读)`}
+        extra={
+          <Button size="small" onClick={() => {
+            // TODO: Mark all as read
+            console.log('Mark all as read');
+          }}>
+            全部已读
+          </Button>
+        }
+      >
+        <List
+          dataSource={dashboard?.notifications?.latest_notifications || []}
+          renderItem={(item: any) => (
+            <List.Item
+              onClick={() => {
+                // TODO: Mark as read and navigate
+                console.log('Notification clicked:', item);
+              }}
+              style={{ cursor: 'pointer' }}
+            >
+              <List.Item.Meta
+                avatar={
+                  <Badge dot={!item.is_read}>
+                    <Avatar
+                      icon={<BellOutlined />}
+                      style={{
+                        backgroundColor: item.priority === 'high' ? '#ff4d4f' : '#1890ff',
+                      }}
+                    />
+                  </Badge>
+                }
+                title={item.title}
+                description={
+                  <Space direction="vertical" size={4}>
+                    <span>{item.message}</span>
+                    <Space>
+                      <Tag color={item.priority === 'high' ? 'red' : 'blue'}>{item.type}</Tag>
+                      <span style={{ fontSize: 12, color: '#999' }}>
+                        {new Date(item.created_at).toLocaleString('zh-CN')}
+                      </span>
+                    </Space>
+                  </Space>
+                }
+              />
+            </List.Item>
+          )}
+          locale={{ emptyText: '暂无通知' }}
+        />
+      </Card>
+    </div>
+  );
+
   const renderProfile = () => (
     <div>
       <Card title="个人信息" style={{ marginBottom: 16 }}>
@@ -268,6 +323,7 @@ const MobileApp: React.FC = () => {
       <div style={{ padding: 16 }}>
         {activeTab === 'home' && renderHome()}
         {activeTab === 'orders' && renderOrders()}
+        {activeTab === 'notifications' && renderNotifications()}
         {activeTab === 'profile' && renderProfile()}
       </div>
 
