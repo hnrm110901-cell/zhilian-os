@@ -1,0 +1,19 @@
+{
+  "name": "@zhilian-os/meituan-saas-adapter",
+  "version": "1.0.0",
+  "description": "美团餐饮SAAS平台API适配器",
+  "main": "src/__init__.py",
+  "scripts": {
+    "test": "pytest tests/ -v",
+    "test:coverage": "pytest tests/ -v --cov=src --cov-report=html"
+  },
+  "keywords": [
+    "meituan",
+    "saas",
+    "restaurant",
+    "delivery",
+    "api-adapter"
+  ],
+  "author": "Zhilian OS Team",
+  "license": "MIT"
+}

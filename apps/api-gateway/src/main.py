@@ -9,7 +9,7 @@ import structlog
 
 from src.core.config import settings
 # 核心模块
-from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural
+from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters
 # 逐步启用的模块
 from src.api import dashboard, analytics, audit, backup, multi_store, supply_chain, finance, data_import_export
 # 需要外部适配器的模块 (会在适配器不可用时返回错误)
@@ -129,6 +129,10 @@ app = FastAPI(
             "description": "神经系统 - 事件处理、语义搜索、联邦学习、系统状态",
         },
         {
+            "name": "adapters",
+            "description": "API适配器 - 第三方系统集成（天财商龙、美团SAAS、奥琦韦、品智）",
+        },
+        {
             "name": "pos",
             "description": "POS系统 - 品智收银系统集成接口",
         },
@@ -202,6 +206,7 @@ app.include_router(llm.router, prefix="/api/v1", tags=["llm"])
 app.include_router(enterprise.router, prefix="/api/v1/enterprise", tags=["enterprise"])
 app.include_router(voice.router, prefix="/api/v1/voice", tags=["voice"])
 app.include_router(neural.router, prefix="/api/v1/neural", tags=["neural"])
+app.include_router(adapters.router, tags=["adapters"])
 
 # 逐步启用的模块
 app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["dashboard"])
