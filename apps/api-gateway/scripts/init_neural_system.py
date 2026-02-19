@@ -2,7 +2,6 @@
 Neural System Initialization Script
 Initializes Qdrant collections for the neural system
 """
-import asyncio
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams
 import structlog
@@ -10,7 +9,7 @@ import structlog
 logger = structlog.get_logger()
 
 
-async def initialize_qdrant_collections():
+def initialize_qdrant_collections():
     """Initialize Qdrant collections for neural system"""
 
     # Configuration
@@ -70,11 +69,11 @@ async def initialize_qdrant_collections():
         return False
 
 
-async def main():
+def main():
     """Main function"""
     logger.info("Starting neural system initialization...")
 
-    success = await initialize_qdrant_collections()
+    success = initialize_qdrant_collections()
 
     if success:
         logger.info("✓ Neural system initialized successfully!")
@@ -85,4 +84,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
