@@ -10,36 +10,16 @@ class FeishuService {
   }
 
   /**
-   * Get tenant access token from Feishu API
+   * Get tenant access token - handled by backend
+   * Frontend doesn't need to manage tokens directly
    */
-  async getTenantAccessToken(): Promise<string> {
-    if (this.tenantAccessToken && Date.now() < this.tokenExpireTime) {
-      return this.tenantAccessToken;
-    }
-
-    try {
-      // Mock implementation - replace with real API call
-      // const response = await axios.post(
-      //   'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal',
-      //   {
-      //     app_id: this.config.appId,
-      //     app_secret: this.config.appSecret,
-      //   }
-      // );
-
-      // Mock token for development
-      this.tenantAccessToken = 'mock-feishu-tenant-token-' + Date.now();
-      this.tokenExpireTime = Date.now() + 7200 * 1000; // 2 hours
-
-      return this.tenantAccessToken;
-    } catch (error) {
-      console.error('Failed to get Feishu tenant access token:', error);
-      throw error;
-    }
+  private async getTenantAccessToken(): Promise<string> {
+    // Token management is handled by backend
+    return 'managed-by-backend';
   }
 
   /**
-   * Send message to users
+   * Send message to users via backend API
    */
   async sendMessage(payload: NotificationPayload): Promise<boolean> {
     if (!this.config.enabled) {
@@ -48,31 +28,27 @@ class FeishuService {
     }
 
     try {
-      await this.getTenantAccessToken();
+      const response = await fetch('/api/v1/enterprise/feishu/send-message', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({
+          content: payload.message.content,
+          receive_id: payload.userIds?.[0] || '',
+          receive_id_type: 'user_id',
+          message_type: this.mapMessageType(payload.message.type),
+        }),
+      });
 
-      const messageData = {
-        receive_id_type: 'user_id',
-        user_id: payload.userIds?.[0] || '',
-        msg_type: this.mapMessageType(payload.message.type),
-        content: JSON.stringify(this.formatMessage(payload.message)),
-      };
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to send message');
+      }
 
-      // Mock implementation - replace with real API call
-      // const response = await axios.post(
-      //   'https://open.feishu.cn/open-apis/im/v1/messages',
-      //   messageData,
-      //   {
-      //     headers: {
-      //       Authorization: `Bearer ${token}`,
-      //     },
-      //     params: {
-      //       receive_id_type: 'user_id',
-      //     },
-      //   }
-      // );
-
-      console.log('Feishu message sent (mock):', messageData);
-      return true;
+      const result = await response.json();
+      return result.success;
     } catch (error) {
       console.error('Failed to send Feishu message:', error);
       return false;
@@ -80,7 +56,7 @@ class FeishuService {
   }
 
   /**
-   * Send webhook notification
+   * Send webhook notification via backend API
    */
   async sendWebhook(message: MessageTemplate): Promise<boolean> {
     if (!this.config.webhookUrl) {
@@ -89,15 +65,24 @@ class FeishuService {
     }
 
     try {
-      const webhookData = {
-        msg_type: this.mapMessageType(message.type),
-        content: this.formatMessage(message),
-      };
+      const response = await fetch('/api/v1/enterprise/feishu/send-message', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({
+          content: message.content,
+          receive_id: '@all',
+          receive_id_type: 'user_id',
+          message_type: this.mapMessageType(message.type),
+        }),
+      });
 
-      // Mock implementation - replace with real API call
-      // await axios.post(this.config.webhookUrl, webhookData);
+      if (!response.ok) {
+        throw new Error('Failed to send webhook');
+      }
 
-      console.log('Feishu webhook sent (mock):', webhookData);
       return true;
     } catch (error) {
       console.error('Failed to send Feishu webhook:', error);
@@ -106,31 +91,22 @@ class FeishuService {
   }
 
   /**
-   * Get user list from Feishu
+   * Get user list from backend API
    */
   async getUserList(): Promise<any[]> {
     try {
-      await this.getTenantAccessToken();
+      const response = await fetch('/api/v1/enterprise/feishu/users?department_id=0', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
 
-      // Mock implementation - replace with real API call
-      // const response = await axios.get(
-      //   'https://open.feishu.cn/open-apis/contact/v3/users',
-      //   {
-      //     headers: {
-      //       Authorization: `Bearer ${token}`,
-      //     },
-      //     params: {
-      //       department_id: departmentId,
-      //       page_size: 50,
-      //     },
-      //   }
-      // );
+      if (!response.ok) {
+        throw new Error('Failed to get user list');
+      }
 
-      // Mock user list
-      return [
-        { user_id: 'user1', name: '张三', department_ids: ['dept1'] },
-        { user_id: 'user2', name: '李四', department_ids: ['dept1'] },
-      ];
+      const result = await response.json();
+      return result.data || [];
     } catch (error) {
       console.error('Failed to get Feishu user list:', error);
       return [];

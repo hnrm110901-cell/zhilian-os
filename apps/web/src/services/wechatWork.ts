@@ -10,38 +10,16 @@ class WeChatWorkService {
   }
 
   /**
-   * Get access token from WeChat Work API
+   * Get access token - handled by backend
+   * Frontend doesn't need to manage tokens directly
    */
-  async getAccessToken(): Promise<string> {
-    if (this.accessToken && Date.now() < this.tokenExpireTime) {
-      return this.accessToken;
-    }
-
-    try {
-      // Mock implementation - replace with real API call
-      // const response = await axios.get(
-      //   `https://qyapi.weixin.qq.com/cgi-bin/gettoken`,
-      //   {
-      //     params: {
-      //       corpid: this.config.corpId,
-      //       corpsecret: this.config.appSecret,
-      //     },
-      //   }
-      // );
-
-      // Mock token for development
-      this.accessToken = 'mock-wechat-access-token-' + Date.now();
-      this.tokenExpireTime = Date.now() + 7200 * 1000; // 2 hours
-
-      return this.accessToken;
-    } catch (error) {
-      console.error('Failed to get WeChat Work access token:', error);
-      throw error;
-    }
+  private async getAccessToken(): Promise<string> {
+    // Token management is handled by backend
+    return 'managed-by-backend';
   }
 
   /**
-   * Send message to users
+   * Send message to users via backend API
    */
   async sendMessage(payload: NotificationPayload): Promise<boolean> {
     if (!this.config.enabled) {
@@ -50,26 +28,28 @@ class WeChatWorkService {
     }
 
     try {
-      await this.getAccessToken();
+      const response = await fetch('/api/v1/enterprise/wechat/send-message', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({
+          content: payload.message.content,
+          touser: payload.userIds?.join('|'),
+          message_type: payload.message.type,
+          title: payload.message.title,
+          url: payload.message.url,
+        }),
+      });
 
-      const messageData = {
-        touser: payload.userIds?.join('|') || '@all',
-        msgtype: payload.message.type,
-        agentid: this.config.agentId,
-        [payload.message.type]: this.formatMessage(payload.message),
-      };
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to send message');
+      }
 
-      // Mock implementation - replace with real API call
-      // const response = await axios.post(
-      //   `https://qyapi.weixin.qq.com/cgi-bin/message/send`,
-      //   messageData,
-      //   {
-      //     params: { access_token: token },
-      //   }
-      // );
-
-      console.log('WeChat Work message sent (mock):', messageData);
-      return true;
+      const result = await response.json();
+      return result.success;
     } catch (error) {
       console.error('Failed to send WeChat Work message:', error);
       return false;
@@ -77,7 +57,7 @@ class WeChatWorkService {
   }
 
   /**
-   * Send webhook notification
+   * Send webhook notification via backend API
    */
   async sendWebhook(message: MessageTemplate): Promise<boolean> {
     if (!this.config.webhookUrl) {
@@ -86,15 +66,24 @@ class WeChatWorkService {
     }
 
     try {
-      const webhookData = {
-        msgtype: message.type,
-        [message.type]: this.formatMessage(message),
-      };
+      const response = await fetch('/api/v1/enterprise/wechat/send-message', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({
+          content: message.content,
+          message_type: message.type,
+          title: message.title,
+          url: message.url,
+        }),
+      });
 
-      // Mock implementation - replace with real API call
-      // await axios.post(this.config.webhookUrl, webhookData);
+      if (!response.ok) {
+        throw new Error('Failed to send webhook');
+      }
 
-      console.log('WeChat Work webhook sent (mock):', webhookData);
       return true;
     } catch (error) {
       console.error('Failed to send WeChat Work webhook:', error);
@@ -103,28 +92,22 @@ class WeChatWorkService {
   }
 
   /**
-   * Get user list from WeChat Work
+   * Get user list from backend API
    */
   async getUserList(): Promise<any[]> {
     try {
-      await this.getAccessToken();
+      const response = await fetch('/api/v1/enterprise/wechat/users?department_id=1', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
 
-      // Mock implementation - replace with real API call
-      // const response = await axios.get(
-      //   `https://qyapi.weixin.qq.com/cgi-bin/user/list`,
-      //   {
-      //     params: {
-      //       access_token: token,
-      //       department_id: departmentId || 1,
-      //     },
-      //   }
-      // );
+      if (!response.ok) {
+        throw new Error('Failed to get user list');
+      }
 
-      // Mock user list
-      return [
-        { userid: 'user1', name: '张三', department: [1] },
-        { userid: 'user2', name: '李四', department: [1] },
-      ];
+      const result = await response.json();
+      return result.data || [];
     } catch (error) {
       console.error('Failed to get WeChat Work user list:', error);
       return [];
