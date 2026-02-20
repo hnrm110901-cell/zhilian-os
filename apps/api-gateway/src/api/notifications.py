@@ -6,9 +6,9 @@ from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, Query, H
 from typing import Optional, List
 from pydantic import BaseModel
 
-from ..models.user import User
+from ..models.user import User, UserRole
 from ..models.notification import NotificationType, NotificationPriority
-from ..core.dependencies import get_current_active_user
+from ..core.dependencies import get_current_active_user, require_role
 from ..core.websocket import manager
 from ..services.notification_service import notification_service
 from ..services.multi_channel_notification import (
@@ -62,23 +62,52 @@ async def websocket_endpoint(
     """
     WebSocket连接端点
     客户端需要提供JWT token进行认证
+
+    使用方式:
+    ws://localhost:8000/api/v1/notifications/ws?token=<your_jwt_token>
     """
-    # TODO: 验证token并获取用户信息
-    # 这里简化处理,实际应该解析token获取用户信息
     from ..core.security import decode_access_token
+    from ..core.database import get_db_session
+    from sqlalchemy import select
 
     try:
+        # 验证token并获取用户信息
         payload = decode_access_token(token)
         user_id = payload.get("sub")
-        role = payload.get("role")
-        # store_id需要从数据库查询,这里暂时从payload获取
-        store_id = payload.get("store_id")
 
         if not user_id:
-            await websocket.close(code=1008, reason="Invalid token")
+            await websocket.close(code=1008, reason="Invalid token: missing user_id")
             return
 
-        await manager.connect(websocket, user_id, role, store_id)
+        # 从数据库获取完整的用户信息
+        async with get_db_session() as session:
+            stmt = select(User).where(User.id == user_id)
+            result = await session.execute(stmt)
+            user = result.scalar_one_or_none()
+
+            if not user:
+                await websocket.close(code=1008, reason="User not found")
+                return
+
+            if not user.is_active:
+                await websocket.close(code=1008, reason="User is inactive")
+                return
+
+        # 连接WebSocket
+        await manager.connect(
+            websocket,
+            user_id=str(user.id),
+            role=user.role.value,
+            store_id=user.store_id
+        )
+
+        logger.info(
+            "WebSocket连接已建立",
+            user_id=user.id,
+            username=user.username,
+            role=user.role.value,
+            store_id=user.store_id
+        )
 
         try:
             while True:
@@ -86,7 +115,7 @@ async def websocket_endpoint(
                 data = await websocket.receive_text()
                 logger.debug("收到WebSocket消息", user_id=user_id, data=data)
 
-                # 可以处理客户端发来的消息,比如心跳包
+                # 处理客户端发来的消息
                 if data == "ping":
                     await websocket.send_text("pong")
 
@@ -94,20 +123,37 @@ async def websocket_endpoint(
             manager.disconnect(websocket, user_id)
             logger.info("WebSocket连接断开", user_id=user_id)
 
+    except HTTPException as e:
+        logger.error("WebSocket认证失败", error=str(e.detail))
+        await websocket.close(code=1008, reason=str(e.detail))
     except Exception as e:
         logger.error("WebSocket连接错误", error=str(e))
-        await websocket.close(code=1011, reason=str(e))
+        await websocket.close(code=1011, reason="Internal server error")
 
 
 @router.post("/notifications", response_model=NotificationResponse)
 async def create_notification(
     request: CreateNotificationRequest,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.STORE_MANAGER, UserRole.ASSISTANT_MANAGER)),
 ):
     """
-    创建通知 (需要管理员或店长权限)
+    创建通知 (需要管理员、店长或店长助理权限)
+
+    权限要求:
+    - ADMIN: 可以创建任何通知
+    - STORE_MANAGER: 可以创建本门店的通知
+    - ASSISTANT_MANAGER: 可以创建本门店的通知
     """
-    # TODO: 添加权限检查,只有管理员和店长可以创建通知
+    # 如果不是管理员，确保只能为自己的门店创建通知
+    if current_user.role != UserRole.ADMIN:
+        if request.store_id and request.store_id != current_user.store_id:
+            raise HTTPException(
+                status_code=403,
+                detail="无权限为其他门店创建通知"
+            )
+        # 如果没有指定store_id，使用当前用户的store_id
+        if not request.store_id:
+            request.store_id = current_user.store_id
 
     notification = await notification_service.create_notification(
         title=request.title,
@@ -120,6 +166,14 @@ async def create_notification(
         extra_data=request.extra_data,
         source=request.source,
         send_realtime=True,
+    )
+
+    logger.info(
+        "通知已创建",
+        notification_id=notification.id,
+        creator_id=current_user.id,
+        creator_role=current_user.role.value,
+        target_store=request.store_id,
     )
 
     return NotificationResponse(**notification.to_dict())
