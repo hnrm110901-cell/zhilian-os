@@ -2,7 +2,7 @@
 Multi-Channel Notification Configuration
 多渠道通知配置管理
 """
-from pydantic import BaseSettings, EmailStr
+from pydantic_settings import BaseSettings
 from typing import Optional
 
 
@@ -10,7 +10,7 @@ class EmailConfig(BaseSettings):
     """邮件配置"""
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
-    SMTP_USER: EmailStr = "noreply@example.com"
+    SMTP_USER: str = "noreply@example.com"
     SMTP_PASSWORD: str = ""
     SMTP_FROM_NAME: str = "智链OS"
     SMTP_USE_TLS: bool = True
