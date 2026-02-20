@@ -49,6 +49,10 @@ class Permission(str, Enum):
     SYSTEM_CONFIG = "system:config"
     SYSTEM_LOGS = "system:logs"
 
+    # 审计日志权限
+    AUDIT_READ = "audit:read"
+    AUDIT_DELETE = "audit:delete"
+
 
 # 角色权限映射
 ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
@@ -75,6 +79,7 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
         Permission.USER_WRITE,
         Permission.STORE_READ,
         Permission.SYSTEM_LOGS,
+        Permission.AUDIT_READ,
     },
 
     # 店长助理 - 协助店长管理
@@ -176,6 +181,7 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
         Permission.AGENT_DECISION_READ,
         Permission.STORE_READ,
         Permission.SYSTEM_LOGS,
+        Permission.AUDIT_READ,
     },
 
     # 采购 - 采购和库存

@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
 from src.core.dependencies import get_current_active_user, require_permission
+from src.core.permissions import Permission
 from src.services.audit_log_service import audit_log_service
 from src.models import User
 
@@ -51,12 +52,12 @@ async def get_audit_logs(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_permission("audit:read")),
+    current_user: User = Depends(require_permission(Permission.AUDIT_READ)),
 ):
     """
     查询审计日志
 
-    需要audit:read权限
+    需要AUDIT_READ权限
     """
     # 转换日期为datetime
     start_datetime = datetime.combine(start_date, datetime.min.time()) if start_date else None
@@ -90,12 +91,12 @@ async def get_user_activity_stats(
     user_id: str,
     days: int = Query(30, ge=1, le=365),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_permission("audit:read")),
+    current_user: User = Depends(require_permission(Permission.AUDIT_READ)),
 ):
     """
     获取用户活动统计
 
-    需要audit:read权限
+    需要AUDIT_READ权限
     """
     stats = await audit_log_service.get_user_activity_stats(
         user_id=user_id,
@@ -110,12 +111,12 @@ async def get_user_activity_stats(
 async def get_system_activity_stats(
     days: int = Query(7, ge=1, le=90),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_permission("audit:read")),
+    current_user: User = Depends(require_permission(Permission.AUDIT_READ)),
 ):
     """
     获取系统活动统计
 
-    需要audit:read权限
+    需要AUDIT_READ权限
     """
     stats = await audit_log_service.get_system_activity_stats(
         days=days,
@@ -129,12 +130,12 @@ async def get_system_activity_stats(
 async def cleanup_old_logs(
     days: int = Query(90, ge=30, le=365, description="保留天数"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_permission("audit:delete")),
+    current_user: User = Depends(require_permission(Permission.AUDIT_DELETE)),
 ):
     """
     清理旧日志
 
-    需要audit:delete权限
+    需要AUDIT_DELETE权限
     """
     count = await audit_log_service.delete_old_logs(
         days=days,
