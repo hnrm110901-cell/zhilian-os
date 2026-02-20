@@ -5,14 +5,12 @@ import {
   UserOutlined,
   BellOutlined,
   HomeOutlined,
-  DollarOutlined,
   TeamOutlined,
   ReloadOutlined,
   LogoutOutlined,
 } from '@ant-design/icons';
 import { apiClient } from '../services/api';
 import { DataCard, LoadingSkeleton, EmptyState } from '../components';
-import { useTheme } from '../contexts/ThemeContext';
 
 const MobileApp: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -20,7 +18,6 @@ const MobileApp: React.FC = () => {
   const [todayOrders, setTodayOrders] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('home');
   const [refreshing, setRefreshing] = useState(false);
-  const { isDark } = useTheme();
 
   const loadDashboardData = useCallback(async () => {
     try {

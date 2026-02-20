@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Input, Select, Space, Button, DatePicker } from 'antd';
 import { SearchOutlined, ReloadOutlined } from '@ant-design/icons';
-import type { RangePickerProps } from 'antd/es/date-picker';
 
 const { RangePicker } = DatePicker;
 
