@@ -260,32 +260,114 @@ async def get_quick_stats(
         "store_id": current_user.store_id,
     }
 
+    today = datetime.now().strftime("%Y-%m-%d")
+
     # 根据角色返回不同的统计数据
-    if current_user.role.value == "store_manager":
-        stats.update({
-            "today_revenue": 0,  # TODO: 实际数据
-            "today_customers": 0,
-            "today_orders": 0,
-            "staff_on_duty": 0,
-        })
+    if current_user.role.value in ["store_manager", "admin", "assistant_manager"]:
+        # 店长/管理员/店长助理 - 查看门店整体数据
+        try:
+            orders_result = await pos_service.query_orders(
+                begin_date=today,
+                end_date=today,
+                page_index=1,
+                page_size=1000,
+            )
+            orders = orders_result.get("orders", [])
+
+            stats.update({
+                "today_revenue": sum(order.get("realPrice", 0) for order in orders),
+                "today_customers": sum(order.get("people", 0) for order in orders),
+                "today_orders": len(orders),
+                "staff_on_duty": 0,  # 需要从员工排班系统获取
+            })
+        except Exception as e:
+            logger.warning("获取店长统计数据失败", error=str(e))
+            stats.update({
+                "today_revenue": 0,
+                "today_customers": 0,
+                "today_orders": 0,
+                "staff_on_duty": 0,
+            })
+
     elif current_user.role.value == "waiter":
-        stats.update({
-            "my_orders_count": 0,  # TODO: 实际数据
-            "pending_orders": 0,
-            "completed_today": 0,
-        })
-    elif current_user.role.value == "chef":
-        stats.update({
-            "pending_orders": 0,  # TODO: 实际数据
-            "in_progress": 0,
-            "completed_today": 0,
-        })
+        # 服务员 - 查看个人订单数据
+        try:
+            orders_result = await pos_service.query_orders(
+                begin_date=today,
+                end_date=today,
+                page_index=1,
+                page_size=1000,
+            )
+            orders = orders_result.get("orders", [])
+
+            # 筛选当前用户的订单（假设订单中有waiter_id字段）
+            my_orders = [o for o in orders if o.get("waiter_id") == str(current_user.id)]
+            pending_orders = [o for o in my_orders if o.get("status") in ["pending", "preparing"]]
+            completed_orders = [o for o in my_orders if o.get("status") == "completed"]
+
+            stats.update({
+                "my_orders_count": len(my_orders),
+                "pending_orders": len(pending_orders),
+                "completed_today": len(completed_orders),
+            })
+        except Exception as e:
+            logger.warning("获取服务员统计数据失败", error=str(e))
+            stats.update({
+                "my_orders_count": 0,
+                "pending_orders": 0,
+                "completed_today": 0,
+            })
+
+    elif current_user.role.value in ["chef", "head_chef", "station_manager"]:
+        # 厨师 - 查看待制作订单
+        try:
+            orders_result = await pos_service.query_orders(
+                begin_date=today,
+                end_date=today,
+                page_index=1,
+                page_size=1000,
+            )
+            orders = orders_result.get("orders", [])
+
+            pending_orders = [o for o in orders if o.get("status") in ["pending", "confirmed"]]
+            in_progress_orders = [o for o in orders if o.get("status") == "preparing"]
+            completed_orders = [o for o in orders if o.get("status") == "completed"]
+
+            stats.update({
+                "pending_orders": len(pending_orders),
+                "in_progress": len(in_progress_orders),
+                "completed_today": len(completed_orders),
+            })
+        except Exception as e:
+            logger.warning("获取厨师统计数据失败", error=str(e))
+            stats.update({
+                "pending_orders": 0,
+                "in_progress": 0,
+                "completed_today": 0,
+            })
+
     elif current_user.role.value == "warehouse_manager":
-        stats.update({
-            "low_stock_items": 0,  # TODO: 实际数据
-            "pending_receive": 0,
-            "today_transactions": 0,
-        })
+        # 库管 - 查看库存数据
+        try:
+            from ..services.inventory_service import inventory_service
+
+            # 获取低库存商品数量
+            low_stock_items = await inventory_service.get_low_stock_items(
+                store_id=current_user.store_id
+            )
+
+            stats.update({
+                "low_stock_items": len(low_stock_items) if low_stock_items else 0,
+                "pending_receive": 0,  # 需要从采购系统获取
+                "today_transactions": 0,  # 需要从库存交易记录获取
+            })
+        except Exception as e:
+            logger.warning("获取库管统计数据失败", error=str(e))
+            stats.update({
+                "low_stock_items": 0,
+                "pending_receive": 0,
+                "today_transactions": 0,
+            })
 
     return stats
 
