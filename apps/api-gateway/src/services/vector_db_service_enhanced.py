@@ -9,6 +9,7 @@ Vector Database Service - Enhanced Version
 4. 支持批量操作
 5. 添加性能监控
 6. 兼容性增强
+7. 添加熔断器防止Silent Failure
 """
 from typing import List, Dict, Any, Optional
 import structlog
@@ -18,6 +19,8 @@ import json
 import asyncio
 from functools import wraps
 import time
+
+from ..core.circuit_breaker import CircuitBreaker, CircuitBreakerOpenError
 
 logger = structlog.get_logger()
 
@@ -66,7 +69,15 @@ class VectorDatabaseServiceEnhanced:
         self._initialized = False
         self._client_version = None
 
-        logger.info("VectorDatabaseServiceEnhanced初始化完成")
+        # 初始化熔断器（防止Silent Failure）
+        self.circuit_breaker = CircuitBreaker(
+            failure_threshold=5,  # 连续失败5次后熔断
+            success_threshold=2,  # 半开状态成功2次后恢复
+            timeout=60.0,  # 熔断60秒后尝试恢复
+            expected_exception=Exception,
+        )
+
+        logger.info("VectorDatabaseServiceEnhanced初始化完成（带熔断器）")
 
     @retry_on_failure(max_retries=3, delay=2.0)
     async def initialize(self):
@@ -233,7 +244,7 @@ class VectorDatabaseServiceEnhanced:
     @retry_on_failure(max_retries=2, delay=1.0)
     async def index_order(self, order_data: Dict[str, Any]) -> bool:
         """
-        索引订单到向量数据库（带重试）
+        索引订单到向量数据库（带重试和熔断器）
 
         Args:
             order_data: 订单数据
@@ -242,50 +253,70 @@ class VectorDatabaseServiceEnhanced:
             是否成功
         """
         try:
-            # 验证必需字段
-            required_fields = ["order_id", "order_number", "order_type", "total", "created_at", "store_id"]
-            for field in required_fields:
-                if field not in order_data:
-                    logger.error(f"订单数据缺少必需字段: {field}")
-                    return False
-
-            # 生成订单的文本表示
-            text = self._order_to_text(order_data)
-
-            # 生成嵌入向量
-            embedding = self.generate_embedding(text)
-
-            # 存储到Qdrant
-            from qdrant_client.models import PointStruct
-
-            # 生成唯一ID（使用order_id的哈希值转换为整数）
-            point_id = int(hashlib.md5(order_data["order_id"].encode()).hexdigest()[:16], 16)
-
-            point = PointStruct(
-                id=point_id,
-                vector=embedding,
-                payload={
-                    "order_id": order_data["order_id"],
-                    "order_number": order_data["order_number"],
-                    "order_type": order_data["order_type"],
-                    "total": float(order_data["total"]),
-                    "created_at": order_data["created_at"].isoformat() if isinstance(order_data["created_at"], datetime) else order_data["created_at"],
-                    "store_id": order_data["store_id"],
-                    "text": text,
-                },
+            # 使用熔断器保护Qdrant操作
+            return await self.circuit_breaker.call_async(
+                self._index_order_internal,
+                order_data
             )
-
-            self.client.upsert(
-                collection_name="orders",
-                points=[point],
+        except CircuitBreakerOpenError as e:
+            logger.warning(
+                "熔断器打开，订单索引降级",
+                order_id=order_data.get("order_id"),
+                error=str(e),
             )
-
-            logger.info("订单索引成功", order_id=order_data["order_id"])
-            return True
-
-        except KeyError as e:
-            logger.error(f"订单数据字段错误: {str(e)}")
+            # 降级策略：记录到日志，返回False但不抛出异常
             return False
+
+    async def _index_order_internal(self, order_data: Dict[str, Any]) -> bool:
+        """
+        内部订单索引方法（被熔断器保护）
+
+        Args:
+            order_data: 订单数据
+
+        Returns:
+            是否成功
+        """
+        # 验证必需字段
+        required_fields = ["order_id", "order_number", "order_type", "total", "created_at", "store_id"]
+        for field in required_fields:
+            if field not in order_data:
+                logger.error(f"订单数据缺少必需字段: {field}")
+                return False
+
+        # 生成订单的文本表示
+        text = self._order_to_text(order_data)
+
+        # 生成嵌入向量
+        embedding = self.generate_embedding(text)
+
+        # 存储到Qdrant
+        from qdrant_client.models import PointStruct
+
+        # 生成唯一ID（使用order_id的哈希值转换为整数）
+        point_id = int(hashlib.md5(order_data["order_id"].encode()).hexdigest()[:16], 16)
+
+        point = PointStruct(
+            id=point_id,
+            vector=embedding,
+            payload={
+                "order_id": order_data["order_id"],
+                "order_number": order_data["order_number"],
+                "order_type": order_data["order_type"],
+                "total": float(order_data["total"]),
+                "created_at": order_data["created_at"].isoformat() if isinstance(order_data["created_at"], datetime) else order_data["created_at"],
+                "store_id": order_data["store_id"],
+                "text": text,
+            },
+        )
+
+        self.client.upsert(
+            collection_name="orders",
+            points=[point],
+        )
+
+        logger.info("订单索引成功", order_id=order_data["order_id"])
+        return True
         except Exception as e:
             logger.error("订单索引失败", error=str(e))
             return False
@@ -382,7 +413,7 @@ class VectorDatabaseServiceEnhanced:
 
     async def health_check(self) -> Dict[str, Any]:
         """
-        健康检查
+        健康检查（包含熔断器状态）
 
         Returns:
             健康状态信息
@@ -393,12 +424,19 @@ class VectorDatabaseServiceEnhanced:
             "client_version": self._client_version,
             "embedding_model_loaded": self.embedding_model is not None,
             "collections": [],
+            "circuit_breaker": self.circuit_breaker.get_stats(),
             "error": None,
         }
 
         try:
             if not self._initialized:
                 health_status["status"] = "not_initialized"
+                return health_status
+
+            # 检查熔断器状态
+            if self.circuit_breaker.state.value == "open":
+                health_status["status"] = "circuit_breaker_open"
+                health_status["error"] = "熔断器已打开，服务暂时不可用"
                 return health_status
 
             # 检查Qdrant连接

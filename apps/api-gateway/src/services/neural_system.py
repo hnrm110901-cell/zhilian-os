@@ -18,6 +18,7 @@ from ..schemas.restaurant_standard_schema import (
     DishSchema,
     StaffSchema,
 )
+from ..core.celery_tasks import process_neural_event
 
 logger = structlog.get_logger()
 
@@ -35,10 +36,11 @@ class NeuralSystemOrchestrator:
 
     def __init__(self):
         """初始化神经系统编排器"""
-        self.event_queue: List[NeuralEventSchema] = []
+        # 移除内存事件队列，改用Celery任务队列
+        # self.event_queue: List[NeuralEventSchema] = []
         self.event_handlers: Dict[str, Any] = {}
 
-        logger.info("NeuralSystemOrchestrator初始化完成")
+        logger.info("NeuralSystemOrchestrator初始化完成（使用Celery任务队列）")
 
     async def initialize(self):
         """初始化神经系统"""
@@ -78,7 +80,7 @@ class NeuralSystemOrchestrator:
         priority: int = 0,
     ) -> Dict[str, Any]:
         """
-        发射神经系统事件
+        发射神经系统事件（使用Celery异步任务队列）
 
         Args:
             event_type: 事件类型
@@ -91,37 +93,35 @@ class NeuralSystemOrchestrator:
             处理结果
         """
         try:
-            # 创建事件
-            event = {
-                "event_id": str(uuid.uuid4()),
-                "event_type": event_type,
-                "event_source": event_source,
-                "timestamp": datetime.now(),
-                "store_id": store_id,
-                "data": data,
-                "priority": priority,
-                "processed": False,
-            }
+            # 生成事件ID
+            event_id = str(uuid.uuid4())
 
             logger.info(
-                "神经系统事件发射",
+                "神经系统事件发射（Celery）",
+                event_id=event_id,
                 event_type=event_type,
                 store_id=store_id,
             )
 
-            # 1. 向量化存储
-            await vector_db_service.index_event(event)
-
-            # 2. 触发事件处理器
-            result = await self._process_event(event)
-
-            # 3. 标记为已处理
-            event["processed"] = True
+            # 提交到Celery任务队列（异步处理）
+            task = process_neural_event.apply_async(
+                kwargs={
+                    "event_id": event_id,
+                    "event_type": event_type,
+                    "event_source": event_source,
+                    "store_id": store_id,
+                    "data": data,
+                    "priority": priority,
+                },
+                priority=priority,  # 设置任务优先级
+            )
 
             return {
                 "success": True,
-                "event_id": event["event_id"],
-                "processing_result": result,
+                "event_id": event_id,
+                "task_id": task.id,
+                "status": "queued",
+                "message": "事件已提交到Celery任务队列",
             }
 
         except Exception as e:

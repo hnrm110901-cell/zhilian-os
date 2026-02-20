@@ -13,14 +13,24 @@ logger = structlog.get_logger()
 # Import Base for models
 from src.models.base import Base
 
-# Create async engine
+# Create async engine with optimized connection pool
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=settings.APP_DEBUG,
+    # Use NullPool for testing to avoid connection issues
     poolclass=NullPool if settings.APP_ENV == "test" else None,
-    pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
+    # Connection pool settings (only apply when not using NullPool)
+    pool_size=20,  # Base pool size - increased for production load
+    max_overflow=40,  # Allow up to 60 total connections (20 + 40)
+    pool_timeout=30,  # Wait up to 30 seconds for a connection
+    pool_recycle=3600,  # Recycle connections after 1 hour to avoid stale connections
+    pool_pre_ping=True,  # Verify connections before using them
+    # Connection arguments for better reliability
+    connect_args={
+        "server_settings": {"application_name": "zhilian_os_api"},
+        "timeout": 10,  # Connection timeout
+        "command_timeout": 60,  # Query timeout
+    } if "postgresql" in settings.DATABASE_URL else {},
 )
 
 # Create session factory
@@ -84,3 +94,50 @@ async def close_db():
     """Close database connections"""
     await engine.dispose()
     logger.info("Database connections closed")
+
+
+async def get_pool_status():
+    """
+    Get database connection pool status for monitoring
+
+    Returns:
+        dict: Pool statistics including size, checked out connections, etc.
+    """
+    pool = engine.pool
+    return {
+        "pool_size": pool.size(),
+        "checked_out": pool.checkedout(),
+        "overflow": pool.overflow(),
+        "checked_in": pool.checkedin(),
+        "total_connections": pool.size() + pool.overflow(),
+    }
+
+
+async def health_check():
+    """
+    Check database health and connectivity
+
+    Returns:
+        dict: Health status with connection test result
+    """
+    try:
+        async with get_db_session() as session:
+            # Simple query to test connection
+            result = await session.execute("SELECT 1")
+            result.scalar()
+
+        pool_status = await get_pool_status()
+
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "pool": pool_status,
+        }
+    except Exception as e:
+        logger.error("Database health check failed", error=str(e))
+        return {
+            "status": "unhealthy",
+            "database": "disconnected",
+            "error": str(e),
+        }
+

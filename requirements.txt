@@ -26,6 +26,11 @@ fastapi>=0.104.0           # API框架
 uvicorn[standard]>=0.24.0  # ASGI服务器
 pydantic>=2.4.0            # 数据验证
 
+# 任务队列 Task Queue
+celery>=5.3.0              # 分布式任务队列
+redis>=5.0.0               # Redis客户端（Celery broker）
+kombu>=5.3.0               # Celery消息传输库
+
 # 向量数据库和AI模型 Vector Database and AI Models
 qdrant-client==1.8.2        # Qdrant向量数据库客户端 (使用gRPC协议)
 sentence-transformers>=2.3.1  # 文本嵌入模型
@@ -33,6 +38,7 @@ torch>=2.1.0               # PyTorch (sentence-transformers依赖)
 httpx>=0.25.0              # HTTP客户端 (用于REST API备选方案)
 
 # 可选依赖 Optional Dependencies
-# langchain>=0.1.0         # LLM框架 (如需要)
-# langgraph>=0.0.1         # LLM图框架 (如需要)
-# openai>=1.0.0            # OpenAI API (如需要)
+langchain>=0.1.0            # LLM框架
+langgraph>=0.0.1            # LLM图框架
+openai>=1.0.0               # OpenAI API（DeepSeek兼容）
+anthropic>=0.18.0           # Anthropic Claude API

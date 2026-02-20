@@ -1,0 +1,97 @@
+"""
+Celery配置和应用实例
+"""
+from celery import Celery
+from kombu import Exchange, Queue
+import structlog
+
+from .config import settings
+
+logger = structlog.get_logger()
+
+# 创建Celery应用实例
+celery_app = Celery(
+    "zhilian_os",
+    broker=settings.CELERY_BROKER_URL,
+    backend=settings.CELERY_RESULT_BACKEND,
+)
+
+# Celery配置
+celery_app.conf.update(
+    # 任务序列化
+    task_serializer="json",
+    accept_content=["json"],
+    result_serializer="json",
+    timezone="Asia/Shanghai",
+    enable_utc=True,
+
+    # 任务结果配置
+    result_expires=3600,  # 结果保留1小时
+    result_backend_transport_options={
+        "master_name": "mymaster",
+        "retry_on_timeout": True,
+    },
+
+    # 任务执行配置
+    task_acks_late=True,  # 任务完成后才确认
+    task_reject_on_worker_lost=True,  # Worker丢失时拒绝任务
+    task_track_started=True,  # 跟踪任务开始状态
+
+    # 重试配置
+    task_default_retry_delay=60,  # 默认重试延迟60秒
+    task_max_retries=3,  # 最大重试3次
+
+    # Worker配置
+    worker_prefetch_multiplier=4,  # 每个worker预取4个任务
+    worker_max_tasks_per_child=1000,  # 每个worker子进程最多执行1000个任务后重启
+
+    # 队列配置
+    task_queues=(
+        # 高优先级队列 - 实时事件处理
+        Queue(
+            "high_priority",
+            Exchange("high_priority"),
+            routing_key="high_priority",
+            queue_arguments={"x-max-priority": 10},
+        ),
+        # 默认队列 - 普通事件处理
+        Queue(
+            "default",
+            Exchange("default"),
+            routing_key="default",
+            queue_arguments={"x-max-priority": 5},
+        ),
+        # 低优先级队列 - 批量处理和ML训练
+        Queue(
+            "low_priority",
+            Exchange("low_priority"),
+            routing_key="low_priority",
+            queue_arguments={"x-max-priority": 1},
+        ),
+    ),
+
+    # 任务路由
+    task_routes={
+        "src.core.celery_tasks.process_neural_event": {
+            "queue": "high_priority",
+            "routing_key": "high_priority",
+        },
+        "src.core.celery_tasks.index_to_vector_db": {
+            "queue": "default",
+            "routing_key": "default",
+        },
+        "src.core.celery_tasks.train_federated_model": {
+            "queue": "low_priority",
+            "routing_key": "low_priority",
+        },
+    },
+)
+
+# 自动发现任务
+celery_app.autodiscover_tasks(["src.core"])
+
+logger.info(
+    "Celery应用初始化完成",
+    broker=settings.CELERY_BROKER_URL,
+    backend=settings.CELERY_RESULT_BACKEND,
+)

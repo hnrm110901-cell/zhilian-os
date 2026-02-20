@@ -1,26 +1,37 @@
 """
 API速率限制中间件
 防止API滥用，保护系统资源
+使用Redis存储，支持分布式部署
 """
 import time
 from typing import Dict, Optional
-from collections import defaultdict
 from datetime import datetime, timedelta
 import structlog
 from fastapi import Request, HTTPException, status
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
+import redis.asyncio as redis
+import json
 
 logger = structlog.get_logger()
 
 
-class RateLimiter:
-    """速率限制器"""
+class RedisRateLimiter:
+    """基于Redis的速率限制器"""
 
-    def __init__(self):
-        # 存储每个客户端的请求记录
-        # key: client_id, value: list of timestamps
-        self.requests: Dict[str, list] = defaultdict(list)
+    def __init__(self, redis_url: str = "redis://localhost:6379/0"):
+        """
+        初始化Redis速率限制器
+
+        Args:
+            redis_url: Redis连接URL
+        """
+        self.redis_client = redis.from_url(
+            redis_url,
+            encoding="utf-8",
+            decode_responses=True,
+            max_connections=50,
+        )
 
         # 速率限制配置
         self.limits = {
@@ -46,7 +57,9 @@ class RateLimiter:
         """获取客户端标识"""
         # 优先使用用户ID（如果已认证）
         if hasattr(request.state, "user") and request.state.user:
-            return f"user:{request.state.user.id}"
+            user_id = getattr(request.state.user, "id", None)
+            if user_id:
+                return f"user:{user_id}"
 
         # 否则使用IP地址
         forwarded = request.headers.get("X-Forwarded-For")
@@ -67,19 +80,22 @@ class RateLimiter:
         else:
             return self.limits["default"]
 
-    def _clean_old_requests(self, client_id: str, window: int):
-        """清理过期的请求记录"""
-        now = time.time()
-        cutoff = now - window
+    def _get_redis_key(self, client_id: str, path: str) -> str:
+        """生成Redis键"""
+        return f"rate_limit:{client_id}:{path}"
 
-        if client_id in self.requests:
-            self.requests[client_id] = [
-                ts for ts in self.requests[client_id]
-                if ts > cutoff
-            ]
+    async def is_allowed(self, request: Request) -> tuple[bool, Optional[Dict]]:
+        """
+        检查请求是否允许
 
-    def is_allowed(self, request: Request) -> tuple[bool, Optional[Dict]]:
-        """检查请求是否允许"""
+        使用Redis的INCR和EXPIRE命令实现滑动窗口限流
+
+        Args:
+            request: FastAPI请求对象
+
+        Returns:
+            (是否允许, 限流信息)
+        """
         client_id = self._get_client_id(request)
         path = request.url.path
         limit_config = self._get_limit_config(path)
@@ -87,38 +103,136 @@ class RateLimiter:
         max_requests = limit_config["requests"]
         window = limit_config["window"]
 
-        # 清理过期记录
-        self._clean_old_requests(client_id, window)
+        redis_key = self._get_redis_key(client_id, path)
 
-        # 检查当前请求数
-        current_requests = len(self.requests[client_id])
+        try:
+            # 使用Redis Pipeline提升性能
+            pipe = self.redis_client.pipeline()
 
-        if current_requests >= max_requests:
-            # 计算重试时间
-            oldest_request = min(self.requests[client_id])
-            retry_after = int(oldest_request + window - time.time())
+            # 获取当前计数
+            pipe.get(redis_key)
+            # 增加计数
+            pipe.incr(redis_key)
+            # 设置过期时间
+            pipe.expire(redis_key, window)
 
-            return False, {
+            results = await pipe.execute()
+            current_count = int(results[0]) if results[0] else 0
+            new_count = int(results[1])
+
+            if current_count >= max_requests:
+                # 获取TTL计算重试时间
+                ttl = await self.redis_client.ttl(redis_key)
+                retry_after = max(ttl, 1)
+
+                return False, {
+                    "client_id": client_id,
+                    "limit": max_requests,
+                    "window": window,
+                    "current": current_count,
+                    "retry_after": retry_after
+                }
+
+            return True, {
                 "client_id": client_id,
                 "limit": max_requests,
                 "window": window,
-                "current": current_requests,
-                "retry_after": max(retry_after, 1)
+                "remaining": max_requests - new_count
             }
 
-        # 记录新请求
-        self.requests[client_id].append(time.time())
+        except redis.RedisError as e:
+            logger.error("Redis rate limiter error", error=str(e))
+            # Redis故障时，允许请求通过（降级策略）
+            return True, {
+                "client_id": client_id,
+                "limit": max_requests,
+                "window": window,
+                "remaining": max_requests,
+                "fallback": True
+            }
 
-        return True, {
-            "client_id": client_id,
-            "limit": max_requests,
-            "window": window,
-            "remaining": max_requests - current_requests - 1
-        }
+    async def reset(self, client_id: str, path: str = "*"):
+        """
+        重置客户端的速率限制
+
+        Args:
+            client_id: 客户端ID
+            path: 路径（*表示所有路径）
+        """
+        try:
+            if path == "*":
+                # 删除该客户端的所有限流记录
+                pattern = f"rate_limit:{client_id}:*"
+                keys = []
+                async for key in self.redis_client.scan_iter(match=pattern):
+                    keys.append(key)
+
+                if keys:
+                    await self.redis_client.delete(*keys)
+            else:
+                redis_key = self._get_redis_key(client_id, path)
+                await self.redis_client.delete(redis_key)
+
+            logger.info("Rate limit reset", client_id=client_id, path=path)
+        except redis.RedisError as e:
+            logger.error("Failed to reset rate limit", error=str(e))
+
+    async def get_stats(self, client_id: str) -> Dict:
+        """
+        获取客户端的限流统计信息
+
+        Args:
+            client_id: 客户端ID
+
+        Returns:
+            统计信息字典
+        """
+        try:
+            pattern = f"rate_limit:{client_id}:*"
+            stats = {}
+
+            async for key in self.redis_client.scan_iter(match=pattern):
+                count = await self.redis_client.get(key)
+                ttl = await self.redis_client.ttl(key)
+                path = key.split(":", 2)[2]
+
+                stats[path] = {
+                    "count": int(count) if count else 0,
+                    "ttl": ttl
+                }
+
+            return stats
+        except redis.RedisError as e:
+            logger.error("Failed to get rate limit stats", error=str(e))
+            return {}
+
+    async def close(self):
+        """关闭Redis连接"""
+        await self.redis_client.close()
 
 
-# 全局速率限制器实例
-rate_limiter = RateLimiter()
+# 全局速率限制器实例（需要在应用启动时初始化）
+rate_limiter: Optional[RedisRateLimiter] = None
+
+
+def init_rate_limiter(redis_url: str = "redis://localhost:6379/0"):
+    """
+    初始化全局速率限制器
+
+    Args:
+        redis_url: Redis连接URL
+    """
+    global rate_limiter
+    rate_limiter = RedisRateLimiter(redis_url)
+    logger.info("Redis rate limiter initialized", redis_url=redis_url)
+
+
+async def close_rate_limiter():
+    """关闭速率限制器"""
+    global rate_limiter
+    if rate_limiter:
+        await rate_limiter.close()
+        logger.info("Redis rate limiter closed")
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -129,8 +243,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if request.url.path in ["/api/v1/health", "/docs", "/redoc", "/openapi.json"]:
             return await call_next(request)
 
+        # 如果速率限制器未初始化，跳过限流
+        if rate_limiter is None:
+            logger.warning("Rate limiter not initialized, skipping rate limit check")
+            return await call_next(request)
+
         # 检查速率限制
-        allowed, info = rate_limiter.is_allowed(request)
+        allowed, info = await rate_limiter.is_allowed(request)
 
         if not allowed:
             logger.warning(
@@ -168,6 +287,6 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         return response
 
 
-def get_rate_limiter() -> RateLimiter:
+def get_rate_limiter() -> RedisRateLimiter:
     """获取速率限制器实例"""
     return rate_limiter

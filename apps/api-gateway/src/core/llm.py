@@ -16,6 +16,7 @@ class LLMProvider(str, Enum):
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
     AZURE_OPENAI = "azure_openai"
+    DEEPSEEK = "deepseek"
 
 
 class LLMModel(str, Enum):
@@ -29,6 +30,10 @@ class LLMModel(str, Enum):
     CLAUDE_3_OPUS = "claude-3-opus-20240229"
     CLAUDE_3_SONNET = "claude-3-sonnet-20240229"
     CLAUDE_3_HAIKU = "claude-3-haiku-20240307"
+
+    # DeepSeek models
+    DEEPSEEK_CHAT = "deepseek-chat"
+    DEEPSEEK_CODER = "deepseek-coder"
 
 
 class BaseLLMClient(ABC):
@@ -299,6 +304,14 @@ class LLMFactory:
                 base_url=kwargs.get("base_url"),
                 **kwargs
             )
+        elif provider == LLMProvider.DEEPSEEK:
+            # DeepSeek使用OpenAI兼容API
+            return OpenAIClient(
+                api_key=api_key,
+                model=model or LLMModel.DEEPSEEK_CHAT.value,
+                base_url=kwargs.get("base_url", "https://api.deepseek.com"),
+                **kwargs
+            )
         else:
             raise ValueError(f"Unsupported LLM provider: {provider}")
 
@@ -321,11 +334,17 @@ def get_llm_client() -> BaseLLMClient:
         provider = os.getenv("LLM_PROVIDER", LLMProvider.OPENAI.value)
         model = os.getenv("LLM_MODEL")
         api_key = os.getenv("LLM_API_KEY")
+        base_url = os.getenv("LLM_BASE_URL")
+
+        kwargs = {}
+        if base_url:
+            kwargs["base_url"] = base_url
 
         _llm_client = LLMFactory.create_client(
             provider=LLMProvider(provider),
             api_key=api_key,
             model=model,
+            **kwargs
         )
 
         logger.info(

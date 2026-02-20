@@ -25,13 +25,13 @@ class Settings(BaseSettings):
     REDIS_URL: str
 
     # AI/LLM配置
-    LLM_PROVIDER: str = "openai"  # openai, anthropic, azure_openai
-    LLM_MODEL: str = "gpt-4-turbo-preview"
+    LLM_PROVIDER: str = "deepseek"  # openai, anthropic, azure_openai, deepseek
+    LLM_MODEL: str = "deepseek-chat"
     LLM_API_KEY: str = ""
-    LLM_BASE_URL: str = ""  # For Azure OpenAI or custom endpoints
+    LLM_BASE_URL: str = "https://api.deepseek.com"  # For Azure OpenAI, DeepSeek or custom endpoints
     LLM_TEMPERATURE: float = 0.7
     LLM_MAX_TOKENS: int = 2000
-    LLM_ENABLED: bool = False  # 是否启用LLM（默认关闭，使用模拟数据）
+    LLM_ENABLED: bool = True  # 是否启用LLM（默认启用DeepSeek）
 
     # Legacy OpenAI config (for backward compatibility)
     OPENAI_API_KEY: str = ""
