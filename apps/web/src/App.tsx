@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ConfigProvider } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { AuthProvider } from './contexts/AuthContext';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import { lightTheme, darkTheme } from './config/theme';
 import ProtectedRoute from './components/ProtectedRoute';
 import MainLayout from './layouts/MainLayout';
 import Dashboard from './pages/Dashboard';
@@ -29,9 +31,11 @@ import DataImportExportPage from './pages/DataImportExportPage';
 import LoginPage from './pages/LoginPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
+  const { isDark } = useTheme();
+
   return (
-    <ConfigProvider locale={zhCN}>
+    <ConfigProvider locale={zhCN} theme={isDark ? darkTheme : lightTheme}>
       <AuthProvider>
         <BrowserRouter>
           <Routes>
@@ -124,6 +128,14 @@ const App: React.FC = () => {
         </BrowserRouter>
       </AuthProvider>
     </ConfigProvider>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   );
 };
 

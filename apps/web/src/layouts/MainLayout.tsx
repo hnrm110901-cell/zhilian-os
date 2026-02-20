@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Layout, Menu, theme, Dropdown, Avatar, Space, Tag, Breadcrumb, Badge, Tooltip } from 'antd';
+import { Layout, Menu, theme, Dropdown, Avatar, Space, Tag, Breadcrumb, Badge, Tooltip, Button } from 'antd';
 import type { MenuProps } from 'antd';
 import {
   DashboardOutlined,
@@ -26,9 +26,12 @@ import {
   FileTextOutlined,
   FileExcelOutlined,
   HomeOutlined,
+  BulbOutlined,
+  BulbFilled,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 const { Header, Content, Sider } = Layout;
 
@@ -37,6 +40,7 @@ const MainLayout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
+  const { isDark, toggleTheme } = useTheme();
   const {
     token: { colorBgContainer, borderRadiusLG },
   } = theme.useToken();
@@ -327,6 +331,14 @@ const MainLayout: React.FC = () => {
             中餐连锁品牌门店运营智能体操作系统
           </div>
           <Space size="large">
+            <Tooltip title={isDark ? '切换到亮色模式' : '切换到暗色模式'}>
+              <Button
+                type="text"
+                icon={isDark ? <BulbFilled style={{ color: '#faad14' }} /> : <BulbOutlined />}
+                onClick={toggleTheme}
+                style={{ fontSize: 18 }}
+              />
+            </Tooltip>
             <Tooltip title="通知中心">
               <Badge count={5} size="small">
                 <BellOutlined
