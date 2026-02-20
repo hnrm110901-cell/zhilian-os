@@ -1,12 +1,18 @@
 """
 配置管理
 """
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
 
 
 class Settings(BaseSettings):
     """应用配置"""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore"
+    )
 
     # 应用配置
     APP_ENV: str = "development"
@@ -86,10 +92,6 @@ class Settings(BaseSettings):
 
     # CORS配置
     CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173"]
-
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
 
 
 # 创建全局配置实例
