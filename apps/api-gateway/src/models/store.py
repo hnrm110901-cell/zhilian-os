@@ -35,6 +35,10 @@ class Store(Base, TimestampMixin):
     phone = Column(String(20))
     email = Column(String(100))
 
+    # 地理位置
+    latitude = Column(Float)  # 纬度
+    longitude = Column(Float)  # 经度
+
     # 管理信息
     manager_id = Column(UUID(as_uuid=True))  # 店长ID
     region = Column(String(50))  # 所属区域(华东、华南等)
@@ -73,6 +77,8 @@ class Store(Base, TimestampMixin):
             "district": self.district,
             "phone": self.phone,
             "email": self.email,
+            "latitude": self.latitude,
+            "longitude": self.longitude,
             "manager_id": str(self.manager_id) if self.manager_id else None,
             "region": self.region,
             "status": self.status,

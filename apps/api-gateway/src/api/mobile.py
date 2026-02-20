@@ -13,6 +13,7 @@ from ..services.notification_service import notification_service
 from ..services.store_service import store_service
 from ..services.pos_service import pos_service
 from ..services.member_service import member_service
+from ..utils.geo import haversine_distance, format_distance
 import structlog
 
 logger = structlog.get_logger()
@@ -226,25 +227,62 @@ async def get_nearby_stores(
 ):
     """
     获取附近门店 - 移动端地理位置功能
-    TODO: 实现基于地理位置的门店搜索
+    基于用户当前位置,返回指定半径内的门店列表,按距离排序
     """
-    # 占位符实现
-    stores = await store_service.get_stores(limit=10)
+    try:
+        # 获取所有活跃门店
+        all_stores = await store_service.get_stores(limit=1000)
 
-    return {
-        "location": {"latitude": latitude, "longitude": longitude},
-        "radius": radius,
-        "stores": [
-            {
-                "id": store.id,
-                "name": store.name,
-                "address": store.address,
-                "phone": store.phone,
-                "distance": 0,  # TODO: 计算实际距离
-            }
-            for store in stores
-        ],
-    }
+        # 计算距离并过滤
+        nearby_stores = []
+        for store in all_stores:
+            # 跳过没有地理位置信息的门店
+            if store.latitude is None or store.longitude is None:
+                continue
+
+            # 计算距离
+            distance = haversine_distance(
+                latitude, longitude, store.latitude, store.longitude
+            )
+
+            # 只保留在半径内的门店
+            if distance <= radius:
+                nearby_stores.append({
+                    "id": store.id,
+                    "name": store.name,
+                    "address": store.address,
+                    "phone": store.phone,
+                    "latitude": store.latitude,
+                    "longitude": store.longitude,
+                    "distance": round(distance, 2),  # 距离(米)
+                    "distance_text": format_distance(distance),  # 格式化的距离文本
+                    "city": store.city,
+                    "district": store.district,
+                    "status": store.status,
+                })
+
+        # 按距离排序
+        nearby_stores.sort(key=lambda x: x["distance"])
+
+        logger.info(
+            "查询附近门店",
+            user_id=str(current_user.id),
+            latitude=latitude,
+            longitude=longitude,
+            radius=radius,
+            found_count=len(nearby_stores),
+        )
+
+        return {
+            "location": {"latitude": latitude, "longitude": longitude},
+            "radius": radius,
+            "count": len(nearby_stores),
+            "stores": nearby_stores,
+        }
+
+    except Exception as e:
+        logger.error("查询附近门店失败", error=str(e))
+        raise HTTPException(status_code=500, detail=f"查询附近门店失败: {str(e)}")
 
 
 @router.get("/mobile/quick-stats")
