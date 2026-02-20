@@ -8,7 +8,7 @@ import structlog
 
 from ..services.customer360_service import customer360_service
 from ..core.dependencies import get_current_user
-from ..schemas.user import User
+from ..models.user import User
 
 router = APIRouter(prefix="/api/v1/customer360", tags=["Customer360"])
 logger = structlog.get_logger()

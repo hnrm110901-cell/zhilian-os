@@ -8,7 +8,7 @@ import structlog
 
 from ..services.queue_service import queue_service, QueueStatus
 from ..core.dependencies import get_current_user
-from ..schemas.user import User
+from ..models.user import User
 
 router = APIRouter(prefix="/api/v1/queue", tags=["Queue"])
 logger = structlog.get_logger()

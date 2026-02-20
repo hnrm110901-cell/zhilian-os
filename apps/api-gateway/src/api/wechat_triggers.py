@@ -8,7 +8,7 @@ import structlog
 
 from ..services.wechat_trigger_service import wechat_trigger_service, send_wechat_push_task
 from ..core.dependencies import get_current_user
-from ..schemas.user import User
+from ..models.user import User
 
 router = APIRouter(prefix="/api/v1/wechat/triggers", tags=["WeChat Triggers"])
 logger = structlog.get_logger()

@@ -9,7 +9,7 @@ import structlog
 from ..services.meituan_queue_integration import meituan_queue_integration
 from ..services.meituan_queue_service import meituan_queue_service
 from ..core.dependencies import get_current_user
-from ..schemas.user import User
+from ..models.user import User
 
 router = APIRouter(prefix="/api/v1/meituan/queue", tags=["Meituan Queue"])
 logger = structlog.get_logger()
