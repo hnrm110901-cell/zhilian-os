@@ -7,7 +7,7 @@ from typing import Optional
 import structlog
 
 from ..services.customer360_service import customer360_service
-from ..middleware.auth import get_current_user
+from ..core.dependencies import get_current_user
 from ..schemas.user import User
 
 router = APIRouter(prefix="/api/v1/customer360", tags=["Customer360"])

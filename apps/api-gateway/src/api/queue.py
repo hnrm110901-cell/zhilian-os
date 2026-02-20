@@ -7,7 +7,7 @@ from typing import Optional
 import structlog
 
 from ..services.queue_service import queue_service, QueueStatus
-from ..middleware.auth import get_current_user
+from ..core.dependencies import get_current_user
 from ..schemas.user import User
 
 router = APIRouter(prefix="/api/v1/queue", tags=["Queue"])

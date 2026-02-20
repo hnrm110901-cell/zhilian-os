@@ -7,7 +7,7 @@ from typing import Optional, Dict, Any
 import structlog
 
 from ..services.wechat_trigger_service import wechat_trigger_service, send_wechat_push_task
-from ..middleware.auth import get_current_user
+from ..core.dependencies import get_current_user
 from ..schemas.user import User
 
 router = APIRouter(prefix="/api/v1/wechat/triggers", tags=["WeChat Triggers"])
