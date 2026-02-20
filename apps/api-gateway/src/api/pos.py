@@ -300,3 +300,43 @@ async def pos_health_check(
             "error": str(e),
             "timestamp": datetime.now().isoformat(),
         }
+
+
+
+@router.get("/queue/current")
+async def get_current_queue(
+    store_id: str = Query(..., description="门店ID"),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    获取当前排队情况（POS集成）
+
+    Args:
+        store_id: 门店ID
+
+    Returns:
+        当前排队列表和统计
+    """
+    from ..services.queue_service import queue_service, QueueStatus
+
+    try:
+        # 获取等待中的排队
+        queues = await queue_service.get_queue_list(
+            store_id=store_id,
+            status=QueueStatus.WAITING,
+            limit=50,
+        )
+
+        # 获取统计信息
+        stats = await queue_service.get_queue_stats(store_id=store_id)
+
+        return {
+            "success": True,
+            "data": {
+                "queues": queues,
+                "stats": stats,
+            },
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取排队情况失败: {str(e)}")
+
