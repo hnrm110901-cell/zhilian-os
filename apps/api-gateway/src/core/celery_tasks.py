@@ -103,13 +103,29 @@ async def process_neural_event(
         # 1. 向量化存储
         await vector_db_service.index_event(event)
 
-        # 2. 根据事件类型调用相应的处理任务
+        # 2. 触发企微推送（如果配置了触发规则）
+        from ..services.wechat_trigger_service import wechat_trigger_service
+        try:
+            await wechat_trigger_service.trigger_push(
+                event_type=event_type,
+                event_data=data,
+                store_id=store_id,
+            )
+        except Exception as e:
+            # 企微推送失败不影响主流程
+            logger.warning(
+                "企微推送触发失败",
+                event_type=event_type,
+                error=str(e),
+            )
+
+        # 3. 根据事件类型调用相应的处理任务
         if event_type.startswith("order."):
             await index_order_to_vector_db.delay(data)
         elif event_type.startswith("dish."):
             await index_dish_to_vector_db.delay(data)
 
-        # 3. 标记为已处理
+        # 4. 标记为已处理
         event["processed"] = True
 
         logger.info(
