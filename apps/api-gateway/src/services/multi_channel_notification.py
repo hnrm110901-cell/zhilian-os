@@ -273,32 +273,68 @@ class SMSNotificationHandler(NotificationChannelHandler):
     ) -> bool:
         """发送阿里云短信"""
         try:
-            # TODO: 实际集成阿里云SDK
-            # from aliyunsdkcore.client import AcsClient
-            # from aliyunsdkcore.request import CommonRequest
-            #
-            # client = AcsClient(
-            #     sms_config.ALIYUN_ACCESS_KEY_ID,
-            #     sms_config.ALIYUN_ACCESS_KEY_SECRET,
-            #     sms_config.ALIYUN_SMS_REGION
-            # )
-            #
-            # request = CommonRequest()
-            # request.set_domain('dysmsapi.aliyuncs.com')
-            # request.set_version('2017-05-25')
-            # request.set_action_name('SendSms')
-            # request.add_query_param('PhoneNumbers', phone)
-            # request.add_query_param('SignName', sms_config.ALIYUN_SMS_SIGN_NAME)
-            # request.add_query_param('TemplateCode', extra_data.get('template_code'))
-            # request.add_query_param('TemplateParam', json.dumps(extra_data.get('template_params', {})))
-            #
-            # response = client.do_action_with_exception(request)
-            # result = json.loads(response)
-            # return result.get('Code') == 'OK'
+            import json
+            import httpx
+            import hmac
+            import hashlib
+            import base64
+            from urllib.parse import quote
+            from datetime import datetime, timezone
+            import uuid as uuid_lib
 
-            logger.info("阿里云短信模拟发送", phone=phone, content=content[:50])
-            await asyncio.sleep(0.1)
-            return True
+            # 构建请求参数
+            params = {
+                'PhoneNumbers': phone,
+                'SignName': sms_config.ALIYUN_SMS_SIGN_NAME,
+                'TemplateCode': extra_data.get('template_code') if extra_data else sms_config.ALIYUN_SMS_TEMPLATE_CODE,
+                'TemplateParam': json.dumps(extra_data.get('template_params', {'content': content})),
+            }
+
+            # 公共参数
+            common_params = {
+                'AccessKeyId': sms_config.ALIYUN_ACCESS_KEY_ID,
+                'Action': 'SendSms',
+                'Format': 'JSON',
+                'RegionId': sms_config.ALIYUN_SMS_REGION or 'cn-hangzhou',
+                'SignatureMethod': 'HMAC-SHA1',
+                'SignatureNonce': str(uuid_lib.uuid4()),
+                'SignatureVersion': '1.0',
+                'Timestamp': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+                'Version': '2017-05-25',
+            }
+
+            # 合并参数
+            all_params = {**common_params, **params}
+
+            # 构建签名字符串
+            sorted_params = sorted(all_params.items())
+            canonicalized_query_string = '&'.join([f"{quote(k, safe='')}={quote(str(v), safe='')}" for k, v in sorted_params])
+            string_to_sign = f"GET&%2F&{quote(canonicalized_query_string, safe='')}"
+
+            # 计算签名
+            h = hmac.new(
+                (sms_config.ALIYUN_ACCESS_KEY_SECRET + '&').encode('utf-8'),
+                string_to_sign.encode('utf-8'),
+                hashlib.sha1
+            )
+            signature = base64.b64encode(h.digest()).decode('utf-8')
+            all_params['Signature'] = signature
+
+            # 发送请求
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"https://dysmsapi.aliyuncs.com/",
+                    params=all_params,
+                    timeout=30.0
+                )
+                result = response.json()
+
+                if result.get('Code') == 'OK':
+                    logger.info("阿里云短信发送成功", phone=phone, biz_id=result.get('BizId'))
+                    return True
+                else:
+                    logger.error("阿里云短信发送失败", phone=phone, code=result.get('Code'), message=result.get('Message'))
+                    return False
 
         except Exception as e:
             logger.error("阿里云短信发送失败", error=str(e))
@@ -312,29 +348,87 @@ class SMSNotificationHandler(NotificationChannelHandler):
     ) -> bool:
         """发送腾讯云短信"""
         try:
-            # TODO: 实际集成腾讯云SDK
-            # from tencentcloud.common import credential
-            # from tencentcloud.sms.v20210111 import sms_client, models
-            #
-            # cred = credential.Credential(
-            #     sms_config.TENCENT_SECRET_ID,
-            #     sms_config.TENCENT_SECRET_KEY
-            # )
-            # client = sms_client.SmsClient(cred, "ap-guangzhou")
-            #
-            # req = models.SendSmsRequest()
-            # req.SmsSdkAppId = sms_config.TENCENT_SMS_APP_ID
-            # req.SignName = sms_config.TENCENT_SMS_SIGN
-            # req.PhoneNumberSet = [phone]
-            # req.TemplateId = extra_data.get('template_id')
-            # req.TemplateParamSet = extra_data.get('template_params', [])
-            #
-            # resp = client.SendSms(req)
-            # return resp.SendStatusSet[0].Code == "Ok"
+            import json
+            import httpx
+            import hmac
+            import hashlib
+            from datetime import datetime
+            import time
 
-            logger.info("腾讯云短信模拟发送", phone=phone, content=content[:50])
-            await asyncio.sleep(0.1)
-            return True
+            # 腾讯云API参数
+            service = "sms"
+            host = "sms.tencentcloudapi.com"
+            endpoint = f"https://{host}"
+            region = sms_config.TENCENT_SMS_REGION or "ap-guangzhou"
+            action = "SendSms"
+            version = "2021-01-11"
+            timestamp = int(time.time())
+            date = datetime.utcfromtimestamp(timestamp).strftime("%Y-%m-%d")
+
+            # 请求体
+            payload = {
+                "PhoneNumberSet": [phone if phone.startswith('+') else f"+86{phone}"],
+                "SmsSdkAppId": sms_config.TENCENT_SMS_APP_ID,
+                "SignName": sms_config.TENCENT_SMS_SIGN,
+                "TemplateId": extra_data.get('template_id') if extra_data else sms_config.TENCENT_SMS_TEMPLATE_ID,
+                "TemplateParamSet": extra_data.get('template_params', [content]),
+            }
+            payload_str = json.dumps(payload)
+
+            # 构建规范请求串
+            http_request_method = "POST"
+            canonical_uri = "/"
+            canonical_querystring = ""
+            canonical_headers = f"content-type:application/json; charset=utf-8\nhost:{host}\nx-tc-action:{action.lower()}\n"
+            signed_headers = "content-type;host;x-tc-action"
+            hashed_request_payload = hashlib.sha256(payload_str.encode("utf-8")).hexdigest()
+            canonical_request = f"{http_request_method}\n{canonical_uri}\n{canonical_querystring}\n{canonical_headers}\n{signed_headers}\n{hashed_request_payload}"
+
+            # 构建待签名字符串
+            algorithm = "TC3-HMAC-SHA256"
+            credential_scope = f"{date}/{service}/tc3_request"
+            hashed_canonical_request = hashlib.sha256(canonical_request.encode("utf-8")).hexdigest()
+            string_to_sign = f"{algorithm}\n{timestamp}\n{credential_scope}\n{hashed_canonical_request}"
+
+            # 计算签名
+            def sign(key, msg):
+                return hmac.new(key, msg.encode("utf-8"), hashlib.sha256).digest()
+
+            secret_date = sign(("TC3" + sms_config.TENCENT_SECRET_KEY).encode("utf-8"), date)
+            secret_service = sign(secret_date, service)
+            secret_signing = sign(secret_service, "tc3_request")
+            signature = hmac.new(secret_signing, string_to_sign.encode("utf-8"), hashlib.sha256).hexdigest()
+
+            # 构建Authorization
+            authorization = f"{algorithm} Credential={sms_config.TENCENT_SECRET_ID}/{credential_scope}, SignedHeaders={signed_headers}, Signature={signature}"
+
+            # 发送请求
+            headers = {
+                "Authorization": authorization,
+                "Content-Type": "application/json; charset=utf-8",
+                "Host": host,
+                "X-TC-Action": action,
+                "X-TC-Timestamp": str(timestamp),
+                "X-TC-Version": version,
+                "X-TC-Region": region,
+            }
+
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    endpoint,
+                    headers=headers,
+                    data=payload_str,
+                    timeout=30.0
+                )
+                result = response.json()
+
+                if result.get('Response', {}).get('SendStatusSet', [{}])[0].get('Code') == 'Ok':
+                    logger.info("腾讯云短信发送成功", phone=phone, serial_no=result.get('Response', {}).get('SendStatusSet', [{}])[0].get('SerialNo'))
+                    return True
+                else:
+                    error = result.get('Response', {}).get('Error', {})
+                    logger.error("腾讯云短信发送失败", phone=phone, code=error.get('Code'), message=error.get('Message'))
+                    return False
 
         except Exception as e:
             logger.error("腾讯云短信发送失败", error=str(e))
