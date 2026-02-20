@@ -6,6 +6,9 @@ from typing import List, Set, Dict
 from enum import Enum
 
 from ..models.user import UserRole
+import structlog
+
+logger = structlog.get_logger()
 
 
 class Permission(str, Enum):
