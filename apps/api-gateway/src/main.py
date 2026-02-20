@@ -13,7 +13,7 @@ from src.core.config import settings
 # 核心模块
 from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters
 # 逐步启用的模块
-from src.api import dashboard, analytics, audit, backup, multi_store, supply_chain, finance, data_import_export
+from src.api import dashboard, analytics, audit, backup, multi_store, supply_chain, finance, data_import_export, customer360
 # 需要外部适配器的模块 (会在适配器不可用时返回错误)
 from src.api import members
 # POS模块暂时禁用 (文件为空)
@@ -294,6 +294,7 @@ app.include_router(supply_chain.router, prefix="/api/v1/supply-chain", tags=["su
 app.include_router(finance.router, prefix="/api/v1/finance", tags=["finance"])
 app.include_router(data_import_export.router, prefix="/api/v1/data", tags=["data"])
 app.include_router(members.router, prefix="/api/v1/members", tags=["members"])
+app.include_router(customer360.router, tags=["customer360"])
 
 # POS模块暂时禁用 (文件为空)
 # app.include_router(pos.router, prefix="/api/v1/pos", tags=["pos"])
