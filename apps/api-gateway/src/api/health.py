@@ -76,14 +76,55 @@ async def readiness_check():
     **示例响应**:
     ```json
     {
-        "status": "ready"
+        "status": "ready",
+        "checks": {
+            "database": "healthy",
+            "redis": "healthy"
+        }
     }
     ```
 
-    **注意**: 当前实现为简化版本，未检查数据库和Redis连接状态
+    **状态说明**:
+    - `ready`: 所有依赖服务正常
+    - `not_ready`: 至少一个依赖服务不可用
     """
-    # TODO: 检查数据库连接、Redis连接等
-    return {"status": "ready"}
+    from ..core.database import get_db_session
+    from sqlalchemy import text
+    import redis
+    from ..core.config import settings
+
+    checks = {}
+    all_healthy = True
+
+    # 检查数据库连接
+    try:
+        async with get_db_session() as session:
+            await session.execute(text("SELECT 1"))
+        checks["database"] = "healthy"
+        logger.debug("数据库连接检查通过")
+    except Exception as e:
+        checks["database"] = f"unhealthy: {str(e)}"
+        all_healthy = False
+        logger.error("数据库连接检查失败", error=str(e))
+
+    # 检查Redis连接
+    try:
+        redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
+        redis_client.ping()
+        checks["redis"] = "healthy"
+        logger.debug("Redis连接检查通过")
+    except Exception as e:
+        checks["redis"] = f"unhealthy: {str(e)}"
+        all_healthy = False
+        logger.error("Redis连接检查失败", error=str(e))
+
+    status = "ready" if all_healthy else "not_ready"
+
+    return {
+        "status": status,
+        "checks": checks,
+        "timestamp": datetime.now().isoformat()
+    }
 
 
 @router.get("/live")
