@@ -28,15 +28,19 @@ import {
   HomeOutlined,
   BulbOutlined,
   BulbFilled,
+  SearchOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { GlobalSearch } from '../components/GlobalSearch';
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 
 const { Header, Content, Sider } = Layout;
 
 const MainLayout: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
+  const [searchVisible, setSearchVisible] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
@@ -44,6 +48,35 @@ const MainLayout: React.FC = () => {
   const {
     token: { colorBgContainer, borderRadiusLG },
   } = theme.useToken();
+
+  // 全局快捷键
+  useKeyboardShortcuts([
+    {
+      key: 'k',
+      ctrl: true,
+      callback: () => setSearchVisible(true),
+      description: '打开搜索',
+    },
+    {
+      key: 't',
+      ctrl: true,
+      shift: true,
+      callback: toggleTheme,
+      description: '切换主题',
+    },
+    {
+      key: 'h',
+      ctrl: true,
+      callback: () => navigate('/'),
+      description: '返回首页',
+    },
+    {
+      key: 'n',
+      ctrl: true,
+      callback: () => navigate('/notifications'),
+      description: '打开通知',
+    },
+  ]);
 
   const roleMap: Record<string, { text: string; color: string }> = {
     admin: { text: '管理员', color: 'red' },
@@ -276,6 +309,7 @@ const MainLayout: React.FC = () => {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
+      <GlobalSearch visible={searchVisible} onClose={() => setSearchVisible(false)} />
       <Sider
         collapsible
         collapsed={collapsed}
@@ -331,6 +365,14 @@ const MainLayout: React.FC = () => {
             中餐连锁品牌门店运营智能体操作系统
           </div>
           <Space size="large">
+            <Tooltip title="搜索 (Ctrl+K)">
+              <Button
+                type="text"
+                icon={<SearchOutlined />}
+                onClick={() => setSearchVisible(true)}
+                style={{ fontSize: 18 }}
+              />
+            </Tooltip>
             <Tooltip title={isDark ? '切换到亮色模式' : '切换到暗色模式'}>
               <Button
                 type="text"

@@ -4,6 +4,7 @@ export { DataCard } from './DataCard';
 export { EmptyState } from './EmptyState';
 export { LoadingSkeleton } from './LoadingSkeleton';
 export { SearchBar } from './SearchBar';
+export { GlobalSearch } from './GlobalSearch';
 
 // 现有组件
 export { default as PermissionGuard } from './PermissionGuard';
