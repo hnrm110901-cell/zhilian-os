@@ -14,7 +14,7 @@ from ..models.order import Order
 from ..models.reservation import Reservation
 from ..models.integration import MemberSync, POSTransaction, ReservationSync
 from ..models.audit_log import AuditLog
-from ..core.database import get_session
+from ..core.database import get_db_session
 
 logger = structlog.get_logger()
 

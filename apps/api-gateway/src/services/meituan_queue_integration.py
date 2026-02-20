@@ -152,10 +152,10 @@ class MeituanQueueIntegration:
         Returns:
             队列位置（从1开始）
         """
-        from ..core.database import get_session
+        from ..core.database import get_db_session
         from sqlalchemy import select, and_, func
 
-        async with get_session() as session:
+        async with get_db_session() as session:
             # 计算前面有多少个等待的订单
             result = await session.execute(
                 select(func.count(Queue.queue_id))
@@ -278,10 +278,10 @@ class MeituanQueueIntegration:
 
     async def _calculate_queue_index_by_id(self, queue_id: str) -> int:
         """根据queue_id计算队列位置"""
-        from ..core.database import get_session
+        from ..core.database import get_db_session
         from sqlalchemy import select
 
-        async with get_session() as session:
+        async with get_db_session() as session:
             result = await session.execute(
                 select(Queue).where(Queue.queue_id == queue_id)
             )
