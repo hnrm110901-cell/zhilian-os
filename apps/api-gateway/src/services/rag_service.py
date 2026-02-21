@@ -12,7 +12,7 @@ import structlog
 from datetime import datetime
 
 from .vector_db_service import vector_db_service
-from ..core.llm import llm_factory
+from ..core.llm import get_llm_client
 
 logger = structlog.get_logger()
 
@@ -33,7 +33,7 @@ class RAGService:
             await self.vector_db.initialize()
 
             # 初始化LLM
-            self.llm = llm_factory.get_llm()
+            self.llm = get_llm_client()
 
             logger.info("RAG服务初始化成功")
         except Exception as e:

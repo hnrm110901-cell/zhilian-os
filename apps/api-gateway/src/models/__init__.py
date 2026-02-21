@@ -15,6 +15,20 @@ from .finance import FinancialTransaction, Budget, Invoice, FinancialReport
 from .task import Task, TaskStatus, TaskPriority
 from .daily_report import DailyReport
 from .reconciliation import ReconciliationRecord, ReconciliationStatus
+from .notification import Notification, NotificationType, NotificationPriority
+from .audit_log import AuditLog, AuditAction, ResourceType
+from .queue import Queue, QueueStatus
+from .integration import (
+    ExternalSystem,
+    SyncLog,
+    POSTransaction,
+    SupplierOrder,
+    MemberSync,
+    ReservationSync,
+    IntegrationType,
+    IntegrationStatus,
+    SyncStatus,
+)
 
 __all__ = [
     "Base",
@@ -42,4 +56,21 @@ __all__ = [
     "DailyReport",
     "ReconciliationRecord",
     "ReconciliationStatus",
+    "Notification",
+    "NotificationType",
+    "NotificationPriority",
+    "AuditLog",
+    "AuditAction",
+    "ResourceType",
+    "Queue",
+    "QueueStatus",
+    "ExternalSystem",
+    "SyncLog",
+    "POSTransaction",
+    "SupplierOrder",
+    "MemberSync",
+    "ReservationSync",
+    "IntegrationType",
+    "IntegrationStatus",
+    "SyncStatus",
 ]

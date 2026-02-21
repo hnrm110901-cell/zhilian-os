@@ -7,7 +7,7 @@ from sqlalchemy.sql import func
 from datetime import datetime
 import enum
 
-from ..core.database import Base
+from .base import Base
 
 
 class QueueStatus(str, enum.Enum):

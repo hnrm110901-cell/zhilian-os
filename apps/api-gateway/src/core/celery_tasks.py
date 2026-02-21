@@ -925,9 +925,6 @@ async def check_inventory_alert(
                                 "无可用接收人",
                                 store_id=str(store.id)
                             )
-                            store_id=str(store.id)
-                        )
-                        alerts_sent += 1
 
                 except Exception as e:
                     logger.error(

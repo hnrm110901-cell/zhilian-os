@@ -7,7 +7,7 @@ from sqlalchemy.sql import func
 from datetime import datetime
 import uuid
 
-from src.core.database import Base
+from .base import Base
 
 
 class AuditLog(Base):
