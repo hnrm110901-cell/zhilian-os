@@ -1,0 +1,17 @@
+[flake8]
+max-line-length = 127
+exclude = 
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    alembic/versions,
+    node_modules
+ignore = 
+    E203,
+    E501,
+    W503,
+    E402
+per-file-ignores =
+    __init__.py:F401
+max-complexity = 10
