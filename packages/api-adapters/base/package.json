@@ -1,0 +1,12 @@
+{
+  "name": "@zhilian-os/api-adapters-base",
+  "version": "0.1.0",
+  "private": true,
+  "description": "API适配器基础类",
+  "main": "src/index.py",
+  "scripts": {
+    "test": "pytest tests/ -v",
+    "lint": "ruff check src/",
+    "format": "black src/ tests/"
+  }
+}

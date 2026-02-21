@@ -1,0 +1,8 @@
+{
+  "dashboard": {
+    "title": "智链OS API监控概览",
+    "tags": ["api", "overview"],
+    "timezone": "browser",
+    "refresh": "30s"
+  }
+}

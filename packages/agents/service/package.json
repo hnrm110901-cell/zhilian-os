@@ -1,0 +1,23 @@
+{
+  "name": "@zhilian-os/agent-service",
+  "version": "0.1.0",
+  "description": "智能服务Agent - Intelligent Service Agent",
+  "main": "src/__init__.py",
+  "scripts": {
+    "test": "pytest tests/",
+    "test:watch": "pytest-watch tests/",
+    "lint": "ruff check src/ tests/",
+    "format": "black src/ tests/"
+  },
+  "keywords": [
+    "service",
+    "customer-feedback",
+    "quality-monitoring",
+    "complaint-handling",
+    "ai-agent"
+  ],
+  "dependencies": {
+    "@zhilian-os/api-adapters-aoqiwei": "workspace:*"
+  },
+  "devDependencies": {}
+}

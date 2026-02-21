@@ -1,0 +1,27 @@
+{
+  "name": "@zhilian-os/agent-decision",
+  "version": "0.1.0",
+  "description": "智能决策Agent - Intelligent Decision Agent",
+  "main": "src/__init__.py",
+  "scripts": {
+    "test": "pytest tests/",
+    "test:watch": "pytest-watch tests/",
+    "lint": "ruff check src/ tests/",
+    "format": "black src/ tests/"
+  },
+  "keywords": [
+    "decision-making",
+    "business-intelligence",
+    "analytics",
+    "forecasting",
+    "ai-agent"
+  ],
+  "dependencies": {
+    "@zhilian-os/agent-schedule": "workspace:*",
+    "@zhilian-os/agent-order": "workspace:*",
+    "@zhilian-os/agent-inventory": "workspace:*",
+    "@zhilian-os/agent-service": "workspace:*",
+    "@zhilian-os/agent-training": "workspace:*"
+  },
+  "devDependencies": {}
+}

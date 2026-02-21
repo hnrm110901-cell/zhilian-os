@@ -1,0 +1,24 @@
+{
+  "name": "@zhilian-os/yiding-adapter",
+  "version": "0.1.0",
+  "description": "YiDing reservation system adapter for Zhilian OS",
+  "main": "src/__init__.py",
+  "scripts": {
+    "test": "pytest tests/",
+    "test:watch": "pytest tests/ --watch",
+    "test:coverage": "pytest --cov=src --cov-report=html tests/",
+    "lint": "ruff check src/ tests/",
+    "format": "black src/ tests/",
+    "type-check": "mypy src/"
+  },
+  "keywords": [
+    "zhilian-os",
+    "adapter",
+    "yiding",
+    "reservation",
+    "restaurant"
+  ],
+  "author": "Zhilian OS Team",
+  "license": "MIT"
+}
+

@@ -1,0 +1,19 @@
+{
+  "name": "@zhilian-os/tiancai-shanglong-adapter",
+  "version": "1.0.0",
+  "description": "天财商龙餐饮管理系统API适配器",
+  "main": "src/__init__.py",
+  "scripts": {
+    "test": "pytest tests/ -v",
+    "test:coverage": "pytest tests/ -v --cov=src --cov-report=html"
+  },
+  "keywords": [
+    "tiancai",
+    "shanglong",
+    "restaurant",
+    "pos",
+    "api-adapter"
+  ],
+  "author": "Zhilian OS Team",
+  "license": "MIT"
+}

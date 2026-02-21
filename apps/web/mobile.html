@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>智链OS - 移动端</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .container {
+            max-width: 100%;
+            padding: 0;
+        }
+
+        /* 头部 */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .header .subtitle {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        /* 登录表单 */
+        .login-container {
+            padding: 20px;
+            max-width: 400px;
+            margin: 40px auto;
+        }
+
+        .login-card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #555;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        /* 仪表盘 */
+        .dashboard {
+            display: none;
+        }
+
+        .dashboard.active {
+            display: block;
+        }
+
+        .user-info {
+            background: white;
+            padding: 20px;
+            margin: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .user-info h2 {
+            font-size: 20px;
+            margin-bottom: 5px;
+        }
+
+        .user-info .role {
+            color: #667eea;
+            font-size: 14px;
+        }
+
+        /* 快捷操作 */
+        .quick-actions {
+            padding: 0 20px;
+            margin-bottom: 20px;
+        }
+
+        .quick-actions h3 {
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .actions-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+
+        .action-card {
+            background: white;
+            padding: 20px 10px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .action-card:active {
+            transform: scale(0.95);
+        }
+
+        .action-card .icon {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+
+        .action-card .label {
+            font-size: 14px;
+            color: #555;
+        }
+
+        /* 通知 */
+        .notifications {
+            padding: 0 20px;
+            margin-bottom: 20px;
+        }
+
+        .notifications h3 {
+            margin-bottom: 15px;
+            font-size: 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .badge {
+            background: #ff4757;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+
+        .notification-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .notification-item .title {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .notification-item .message {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .notification-item .time {
+            font-size: 12px;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        /* 统计卡片 */
+        .stats {
+            padding: 0 20px;
+            margin-bottom: 20px;
+        }
+
+        .stats h3 {
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .stat-card .value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .stat-card .label {
+            font-size: 14px;
+            color: #666;
+        }
+
+        /* 加载状态 */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .error {
+            background: #ff4757;
+            color: white;
+            padding: 15px;
+            margin: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <div class="header">
+            <h1>智链OS</h1>
+            <div class="subtitle">连锁餐饮智能管理系统</div>
+        </div>
+
+        <!-- 登录界面 -->
+        <div id="loginView" class="login-container">
+            <div class="login-card">
+                <h2 style="margin-bottom: 20px; text-align: center;">登录</h2>
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label>用户名</label>
+                        <input type="text" id="username" value="manager001" required>
+                    </div>
+                    <div class="form-group">
+                        <label>密码</label>
+                        <input type="password" id="password" value="manager123" required>
+                    </div>
+                    <button type="submit" class="btn">登录</button>
+                </form>
+                <div id="loginError" class="error" style="display: none; margin-top: 15px;"></div>
+            </div>
+        </div>
+
+        <!-- 仪表盘 -->
+        <div id="dashboardView" class="dashboard">
+            <div class="user-info">
+                <h2 id="userName">加载中...</h2>
+                <div class="role" id="userRole"></div>
+                <div style="margin-top: 10px; font-size: 14px; color: #999;" id="storeName"></div>
+            </div>
+
+            <div class="quick-actions">
+                <h3>快捷操作</h3>
+                <div class="actions-grid" id="quickActions"></div>
+            </div>
+
+            <div class="notifications">
+                <h3>
+                    通知
+                    <span class="badge" id="unreadBadge">0</span>
+                </h3>
+                <div id="notificationsList"></div>
+            </div>
+
+            <div class="stats">
+                <h3>今日数据</h3>
+                <div class="stats-grid" id="statsGrid"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api/v1';
+        let authToken = localStorage.getItem('authToken');
+
+        // 登录
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username, password})
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    authToken = data.access_token;
+                    localStorage.setItem('authToken', authToken);
+                    showDashboard();
+                } else {
+                    document.getElementById('loginError').textContent = data.detail || '登录失败';
+                    document.getElementById('loginError').style.display = 'block';
+                }
+            } catch (error) {
+                document.getElementById('loginError').textContent = '网络错误';
+                document.getElementById('loginError').style.display = 'block';
+            }
+        });
+
+        // 显示仪表盘
+        async function showDashboard() {
+            document.getElementById('loginView').style.display = 'none';
+            document.getElementById('dashboardView').classList.add('active');
+
+            try {
+                const response = await fetch(`${API_BASE}/mobile/dashboard`, {
+                    headers: {'Authorization': `Bearer ${authToken}`}
+                });
+
+                const data = await response.json();
+
+                // 用户信息
+                document.getElementById('userName').textContent = data.user.full_name;
+                document.getElementById('userRole').textContent = data.user.role;
+                document.getElementById('storeName').textContent = data.user.store_name || '';
+
+                // 快捷操作
+                const actionsHtml = data.quick_actions.map(action => `
+                    <div class="action-card">
+                        <div class="icon">${getIcon(action.icon)}</div>
+                        <div class="label">${action.label}</div>
+                    </div>
+                `).join('');
+                document.getElementById('quickActions').innerHTML = actionsHtml;
+
+                // 通知
+                document.getElementById('unreadBadge').textContent = data.notifications.unread_count;
+                const notificationsHtml = data.notifications.latest_notifications.map(notif => `
+                    <div class="notification-item">
+                        <div class="title">${notif.title}</div>
+                        <div class="message">${notif.message}</div>
+                        <div class="time">${formatTime(notif.created_at)}</div>
+                    </div>
+                `).join('');
+                document.getElementById('notificationsList').innerHTML = notificationsHtml || '<div style="text-align: center; color: #999; padding: 20px;">暂无通知</div>';
+
+                // 统计数据
+                const statsHtml = `
+                    <div class="stat-card">
+                        <div class="value">¥${data.today_stats.revenue}</div>
+                        <div class="label">今日营业额</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="value">${data.today_stats.customers}</div>
+                        <div class="label">今日客流</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="value">${data.today_stats.orders}</div>
+                        <div class="label">今日订单</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="value">-</div>
+                        <div class="label">在线员工</div>
+                    </div>
+                `;
+                document.getElementById('statsGrid').innerHTML = statsHtml;
+
+            } catch (error) {
+                console.error('加载仪表盘失败', error);
+            }
+        }
+
+        // 图标映射
+        function getIcon(iconName) {
+            const icons = {
+                'plus': '➕',
+                'list': '📋',
+                'bell': '🔔',
+                'chart': '📊',
+                'users': '👥',
+                'box': '📦',
+                'file': '📄',
+                'cooking': '👨‍🍳',
+                'book': '📖',
+                'download': '⬇️',
+                'alert': '⚠️',
+                'home': '🏠',
+                'user': '👤'
+            };
+            return icons[iconName] || '📱';
+        }
+
+        // 格式化时间
+        function formatTime(isoString) {
+            if (!isoString) return '';
+            const date = new Date(isoString);
+            const now = new Date();
+            const diff = now - date;
+            const minutes = Math.floor(diff / 60000);
+            if (minutes < 1) return '刚刚';
+            if (minutes < 60) return `${minutes}分钟前`;
+            const hours = Math.floor(minutes / 60);
+            if (hours < 24) return `${hours}小时前`;
+            return date.toLocaleDateString('zh-CN');
+        }
+
+        // 检查登录状态
+        if (authToken) {
+            showDashboard();
+        }
+    </script>
+</body>
+</html>

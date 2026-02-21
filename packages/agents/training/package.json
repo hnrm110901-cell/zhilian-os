@@ -1,0 +1,21 @@
+{
+  "name": "@zhilian-os/agent-training",
+  "version": "0.1.0",
+  "description": "智能培训Agent - Intelligent Training Agent",
+  "main": "src/__init__.py",
+  "scripts": {
+    "test": "pytest tests/",
+    "test:watch": "pytest-watch tests/",
+    "lint": "ruff check src/ tests/",
+    "format": "black src/ tests/"
+  },
+  "keywords": [
+    "training",
+    "skill-development",
+    "assessment",
+    "certification",
+    "ai-agent"
+  ],
+  "dependencies": {},
+  "devDependencies": {}
+}
