@@ -61,6 +61,8 @@ uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 启动后访问:
 - Swagger UI: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
+- 详细API文档: [API_DOCUMENTATION.md](API_DOCUMENTATION.md)
+- Postman集合: [postman_collection.json](postman_collection.json)
 
 ## API使用示例
 

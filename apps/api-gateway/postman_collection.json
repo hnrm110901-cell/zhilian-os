@@ -1,0 +1,362 @@
+{
+  "info": {
+    "name": "智链OS API Gateway",
+    "description": "智链OS API Gateway完整API集合",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "认证",
+      "item": [
+        {
+          "name": "登录",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"testuser\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "任务管理",
+      "item": [
+        {
+          "name": "创建任务",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"检查库存\",\n  \"content\": \"检查所有商品的库存情况，确保没有缺货\",\n  \"priority\": \"high\",\n  \"category\": \"库存管理\",\n  \"due_at\": \"2026-02-25T18:00:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks",
+              "host": ["{{base_url}}"],
+              "path": ["tasks"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "获取任务列表",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/tasks?status=pending&limit=20",
+              "host": ["{{base_url}}"],
+              "path": ["tasks"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "pending"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "获取任务详情",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/tasks/:task_id",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", ":task_id"],
+              "variable": [
+                {
+                  "key": "task_id",
+                  "value": "123e4567-e89b-12d3-a456-426614174000"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "更新任务状态",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"in_progress\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks/:task_id/status",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", ":task_id", "status"],
+              "variable": [
+                {
+                  "key": "task_id",
+                  "value": "123e4567-e89b-12d3-a456-426614174000"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "完成任务",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"result\": \"库存检查完成，所有商品库存正常\",\n  \"attachments\": \"[\\\"https://example.com/report.pdf\\\"]\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks/:task_id/complete",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", ":task_id", "complete"],
+              "variable": [
+                {
+                  "key": "task_id",
+                  "value": "123e4567-e89b-12d3-a456-426614174000"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "指派任务",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assignee_id\": \"550e8400-e29b-41d4-a716-446655440000\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks/:task_id/assign",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", ":task_id", "assign"],
+              "variable": [
+                {
+                  "key": "task_id",
+                  "value": "123e4567-e89b-12d3-a456-426614174000"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "删除任务",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/tasks/:task_id",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", ":task_id"],
+              "variable": [
+                {
+                  "key": "task_id",
+                  "value": "123e4567-e89b-12d3-a456-426614174000"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "对账管理",
+      "item": [
+        {
+          "name": "执行对账",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reconciliation_date\": \"2026-02-20\",\n  \"threshold\": 2.0\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/reconciliation/perform",
+              "host": ["{{base_url}}"],
+              "path": ["reconciliation", "perform"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "获取对账记录列表",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/reconciliation/records?status=mismatched&limit=20",
+              "host": ["{{base_url}}"],
+              "path": ["reconciliation", "records"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "mismatched"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "获取对账记录详情",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/reconciliation/records/:record_id",
+              "host": ["{{base_url}}"],
+              "path": ["reconciliation", "records", ":record_id"],
+              "variable": [
+                {
+                  "key": "record_id",
+                  "value": "789e4567-e89b-12d3-a456-426614174000"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "确认对账记录",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resolution\": \"差异已核实，为退款订单导致\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/reconciliation/records/:record_id/confirm",
+              "host": ["{{base_url}}"],
+              "path": ["reconciliation", "records", ":record_id", "confirm"],
+              "variable": [
+                {
+                  "key": "record_id",
+                  "value": "789e4567-e89b-12d3-a456-426614174000"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "健康检查",
+      "item": [
+        {
+          "name": "API健康检查",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8000/health",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["health"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "数据库健康检查",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8000/health/db",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["health", "db"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
