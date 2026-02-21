@@ -29,6 +29,7 @@ from .integration import (
     IntegrationStatus,
     SyncStatus,
 )
+from .decision_log import DecisionLog, DecisionType, DecisionStatus, DecisionOutcome
 
 __all__ = [
     "Base",
@@ -73,4 +74,8 @@ __all__ = [
     "IntegrationType",
     "IntegrationStatus",
     "SyncStatus",
+    "DecisionLog",
+    "DecisionType",
+    "DecisionStatus",
+    "DecisionOutcome",
 ]
