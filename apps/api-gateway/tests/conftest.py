@@ -3,6 +3,7 @@
 """
 import pytest
 import asyncio
+import os
 from typing import AsyncGenerator, Generator
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.pool import NullPool
@@ -10,8 +11,14 @@ from sqlalchemy.pool import NullPool
 from src.models import Base
 
 
-# 测试数据库URL
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+# 测试数据库URL - 优先使用PostgreSQL，回退到SQLite
+TEST_DATABASE_URL = os.getenv(
+    "TEST_DATABASE_URL",
+    "postgresql+asyncpg://postgres:postgres@localhost:5432/zhilian_test"
+)
+
+# 如果PostgreSQL不可用，使用SQLite
+USE_SQLITE_FALLBACK = os.getenv("USE_SQLITE_FALLBACK", "true").lower() == "true"
 
 
 @pytest.fixture(scope="session")
@@ -25,32 +32,41 @@ def event_loop() -> Generator:
 @pytest.fixture(scope="function")
 async def test_db() -> AsyncGenerator[AsyncSession, None]:
     """创建测试数据库会话"""
-    # 创建测试引擎
-    engine = create_async_engine(
-        TEST_DATABASE_URL,
-        poolclass=NullPool,
-        echo=False,
-    )
+    # 尝试连接PostgreSQL
+    try:
+        engine = create_async_engine(
+            TEST_DATABASE_URL,
+            poolclass=NullPool,
+            echo=False,
+        )
 
-    # 创建所有表
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        # 测试连接
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+            await conn.run_sync(Base.metadata.create_all)
 
-    # 创建会话
-    async_session = async_sessionmaker(
-        engine,
-        class_=AsyncSession,
-        expire_on_commit=False,
-    )
+        # 创建会话
+        async_session = async_sessionmaker(
+            engine,
+            class_=AsyncSession,
+            expire_on_commit=False,
+        )
 
-    async with async_session() as session:
-        yield session
+        async with async_session() as session:
+            yield session
 
-    # 清理
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+        # 清理
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
 
-    await engine.dispose()
+        await engine.dispose()
+
+    except Exception as e:
+        # PostgreSQL不可用，跳过需要数据库的测试
+        if USE_SQLITE_FALLBACK:
+            pytest.skip(f"PostgreSQL test database not available: {e}. Set TEST_DATABASE_URL environment variable or install PostgreSQL.")
+        else:
+            raise
 
 
 @pytest.fixture
