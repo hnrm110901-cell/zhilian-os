@@ -26,12 +26,9 @@ class RedisRateLimiter:
         Args:
             redis_url: Redis连接URL
         """
-        self.redis_client = redis.from_url(
-            redis_url,
-            encoding="utf-8",
-            decode_responses=True,
-            max_connections=50,
-        )
+        self.redis_client = None
+        self.redis_url = redis_url
+        self._initialized = False
 
         # 速率限制配置
         self.limits = {
@@ -43,6 +40,10 @@ class RedisRateLimiter:
                 "requests": 10,
                 "window": 60,
             },
+            "oauth": {
+                "requests": 5,
+                "window": 300,  # OAuth登录限制更严格
+            },
             "backup": {
                 "requests": 5,
                 "window": 300,  # 5分钟
@@ -52,6 +53,25 @@ class RedisRateLimiter:
                 "window": 60,
             },
         }
+
+    async def initialize(self):
+        """初始化Redis连接"""
+        if self._initialized:
+            return
+
+        try:
+            self.redis_client = await redis.from_url(
+                self.redis_url,
+                encoding="utf-8",
+                decode_responses=True,
+                max_connections=50,
+            )
+            await self.redis_client.ping()
+            self._initialized = True
+            logger.info("速率限制器Redis连接初始化成功")
+        except Exception as e:
+            logger.error("速率限制器Redis连接初始化失败", error=str(e))
+            raise
 
     def _get_client_id(self, request: Request) -> str:
         """获取客户端标识"""
@@ -71,8 +91,10 @@ class RedisRateLimiter:
 
     def _get_limit_config(self, path: str) -> Dict[str, int]:
         """根据路径获取限制配置"""
-        if "/auth/" in path:
+        if "/auth/login" in path or "/auth/register" in path:
             return self.limits["auth"]
+        elif "/auth/oauth/" in path:
+            return self.limits["oauth"]
         elif "/backup/" in path:
             return self.limits["backup"]
         elif "/analytics/" in path:
@@ -96,6 +118,10 @@ class RedisRateLimiter:
         Returns:
             (是否允许, 限流信息)
         """
+        # 确保Redis已初始化
+        if not self._initialized:
+            await self.initialize()
+
         client_id = self._get_client_id(request)
         path = request.url.path
         limit_config = self._get_limit_config(path)

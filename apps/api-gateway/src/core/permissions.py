@@ -35,6 +35,13 @@ class Permission(str, Enum):
     AGENT_RESERVATION_READ = "agent:reservation:read"
     AGENT_RESERVATION_WRITE = "agent:reservation:write"
 
+    # 语音设备权限（Shokz耳机）
+    VOICE_DEVICE_READ = "voice:device:read"
+    VOICE_DEVICE_WRITE = "voice:device:write"
+    VOICE_DEVICE_DELETE = "voice:device:delete"
+    VOICE_COMMAND = "voice:command"
+    VOICE_NOTIFICATION = "voice:notification"
+
     # 用户管理权限
     USER_READ = "user:read"
     USER_WRITE = "user:write"
@@ -75,6 +82,11 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
         Permission.AGENT_DECISION_WRITE,
         Permission.AGENT_RESERVATION_READ,
         Permission.AGENT_RESERVATION_WRITE,
+        Permission.VOICE_DEVICE_READ,
+        Permission.VOICE_DEVICE_WRITE,
+        Permission.VOICE_DEVICE_DELETE,
+        Permission.VOICE_COMMAND,
+        Permission.VOICE_NOTIFICATION,
         Permission.USER_READ,
         Permission.USER_WRITE,
         Permission.STORE_READ,
@@ -95,6 +107,10 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
         Permission.AGENT_DECISION_READ,
         Permission.AGENT_RESERVATION_READ,
         Permission.AGENT_RESERVATION_WRITE,
+        Permission.VOICE_DEVICE_READ,
+        Permission.VOICE_DEVICE_WRITE,
+        Permission.VOICE_COMMAND,
+        Permission.VOICE_NOTIFICATION,
         Permission.USER_READ,
         Permission.STORE_READ,
     },
@@ -109,6 +125,10 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
         Permission.AGENT_TRAINING_READ,
         Permission.AGENT_RESERVATION_READ,
         Permission.AGENT_RESERVATION_WRITE,
+        Permission.VOICE_DEVICE_READ,
+        Permission.VOICE_DEVICE_WRITE,
+        Permission.VOICE_COMMAND,
+        Permission.VOICE_NOTIFICATION,
         Permission.USER_READ,
     },
 
@@ -130,6 +150,8 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
         Permission.AGENT_SERVICE_READ,
         Permission.AGENT_RESERVATION_READ,
         Permission.AGENT_TRAINING_READ,
+        Permission.VOICE_DEVICE_READ,
+        Permission.VOICE_COMMAND,
     },
 
     # 服务员 - 基础服务操作
@@ -138,6 +160,8 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
         Permission.AGENT_ORDER_WRITE,
         Permission.AGENT_SERVICE_READ,
         Permission.AGENT_RESERVATION_READ,
+        Permission.VOICE_DEVICE_READ,
+        Permission.VOICE_COMMAND,
     },
 
     # 厨师长 - 后厨全面管理
@@ -149,6 +173,10 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
         Permission.AGENT_INVENTORY_WRITE,
         Permission.AGENT_TRAINING_READ,
         Permission.AGENT_DECISION_READ,
+        Permission.VOICE_DEVICE_READ,
+        Permission.VOICE_DEVICE_WRITE,
+        Permission.VOICE_COMMAND,
+        Permission.VOICE_NOTIFICATION,
         Permission.USER_READ,
     },
 
@@ -158,12 +186,16 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
         Permission.AGENT_ORDER_READ,
         Permission.AGENT_INVENTORY_READ,
         Permission.AGENT_TRAINING_READ,
+        Permission.VOICE_DEVICE_READ,
+        Permission.VOICE_COMMAND,
     },
 
     # 厨师 - 基础后厨操作
     UserRole.CHEF: {
         Permission.AGENT_ORDER_READ,
         Permission.AGENT_INVENTORY_READ,
+        Permission.VOICE_DEVICE_READ,
+        Permission.VOICE_COMMAND,
     },
 
     # 库管 - 库存管理

@@ -2,20 +2,9 @@ import type { FeishuConfig, MessageTemplate, NotificationPayload } from '../type
 
 class FeishuService {
   private config: FeishuConfig;
-  private tenantAccessToken: string | null = null;
-  private tokenExpireTime: number = 0;
 
   constructor(config: FeishuConfig) {
     this.config = config;
-  }
-
-  /**
-   * Get tenant access token - handled by backend
-   * Frontend doesn't need to manage tokens directly
-   */
-  private async getTenantAccessToken(): Promise<string> {
-    // Token management is handled by backend
-    return 'managed-by-backend';
   }
 
   /**
@@ -152,7 +141,9 @@ class FeishuService {
 
   /**
    * Format message based on type
+   * @private
    */
+  // @ts-ignore - Reserved for future use
   private formatMessage(message: MessageTemplate): any {
     switch (message.type) {
       case 'text':
@@ -189,7 +180,6 @@ class FeishuService {
    */
   updateConfig(config: Partial<FeishuConfig>): void {
     this.config = { ...this.config, ...config };
-    this.tenantAccessToken = null; // Reset token
   }
 
   /**

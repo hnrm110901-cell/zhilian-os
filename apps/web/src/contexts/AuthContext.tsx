@@ -25,6 +25,7 @@ interface AuthContextType {
   refreshAccessToken: () => Promise<boolean>;
   hasPermission: (permission: string) => boolean;
   hasAnyPermission: (permissions: string[]) => boolean;
+  setToken: (accessToken: string, refreshToken: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -214,6 +215,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return requiredPermissions.some(perm => permissions.includes(perm));
   };
 
+  const setTokens = async (accessToken: string, refreshToken: string): Promise<void> => {
+    // Store tokens
+    setToken(accessToken);
+    setRefreshToken(refreshToken);
+    localStorage.setItem('token', accessToken);
+    localStorage.setItem('refresh_token', refreshToken);
+
+    // Fetch user data
+    try {
+      const response = await fetch('/api/v1/auth/me', {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
+
+      if (response.ok) {
+        const userData = await response.json();
+        setUser(userData);
+        await fetchPermissions(accessToken);
+      }
+    } catch (error) {
+      console.error('Failed to fetch user data:', error);
+    }
+  };
+
   const value: AuthContextType = {
     user,
     token,
@@ -228,6 +254,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshAccessToken,
     hasPermission,
     hasAnyPermission,
+    setToken: setTokens,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

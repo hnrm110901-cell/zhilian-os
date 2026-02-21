@@ -470,26 +470,60 @@ class QueueService:
     async def _send_notification(self, queue: Queue):
         """发送通知给客户"""
         try:
-            # TODO: 集成短信或微信通知
-            # 这里可以调用企微推送服务
-            from ..services.wechat_trigger_service import wechat_trigger_service
+            # 使用多渠道通知服务
+            from ..services.multi_channel_notification import multi_channel_notification
 
-            await wechat_trigger_service.trigger_push(
-                event_type="queue.called",
-                event_data={
-                    "queue_number": queue.queue_number,
-                    "customer_name": queue.customer_name,
-                    "customer_phone": queue.customer_phone,
-                    "table_number": queue.table_number or "待分配",
-                },
-                store_id=queue.store_id,
-            )
+            # 构建通知消息
+            message = f"【智链OS】尊敬的{queue.customer_name}，您的排队号{queue.queue_number}已到，"
 
-            queue.notification_sent = True
-            queue.notification_method = "wechat"
+            if queue.table_number:
+                message += f"请前往{queue.table_number}号桌就座。"
+            else:
+                message += "请到前台等候安排座位。"
+
+            # 发送短信通知（如果有手机号）
+            if queue.customer_phone:
+                sms_result = await multi_channel_notification.send_sms(
+                    phone_number=queue.customer_phone,
+                    message=message,
+                    template_params={
+                        "customer_name": queue.customer_name,
+                        "queue_number": queue.queue_number,
+                        "table_number": queue.table_number or "待分配",
+                    }
+                )
+
+                if sms_result.get("success"):
+                    queue.notification_sent = True
+                    queue.notification_method = "sms"
+                    logger.info(
+                        "排队通知发送成功",
+                        queue_id=queue.id,
+                        phone=queue.customer_phone,
+                        method="sms"
+                    )
+
+            # 同时发送企业微信通知（如果配置了）
+            try:
+                from ..services.wechat_trigger_service import wechat_trigger_service
+
+                await wechat_trigger_service.trigger_push(
+                    event_type="queue.called",
+                    event_data={
+                        "queue_number": queue.queue_number,
+                        "customer_name": queue.customer_name,
+                        "customer_phone": queue.customer_phone,
+                        "table_number": queue.table_number or "待分配",
+                        "message": message,
+                    },
+                    store_id=queue.store_id,
+                )
+                logger.info("企业微信通知已触发", queue_id=queue.id)
+            except Exception as wechat_error:
+                logger.warning("企业微信通知失败", error=str(wechat_error))
 
         except Exception as e:
-            logger.warning("发送通知失败", error=str(e))
+            logger.warning("发送通知失败", error=str(e), queue_id=queue.id)
 
     async def _emit_queue_event(
         self,

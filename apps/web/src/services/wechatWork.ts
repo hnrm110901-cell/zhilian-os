@@ -2,20 +2,9 @@ import type { WeChatWorkConfig, MessageTemplate, NotificationPayload } from '../
 
 class WeChatWorkService {
   private config: WeChatWorkConfig;
-  private accessToken: string | null = null;
-  private tokenExpireTime: number = 0;
 
   constructor(config: WeChatWorkConfig) {
     this.config = config;
-  }
-
-  /**
-   * Get access token - handled by backend
-   * Frontend doesn't need to manage tokens directly
-   */
-  private async getAccessToken(): Promise<string> {
-    // Token management is handled by backend
-    return 'managed-by-backend';
   }
 
   /**
@@ -116,7 +105,9 @@ class WeChatWorkService {
 
   /**
    * Format message based on type
+   * @private
    */
+  // @ts-ignore - Reserved for future use
   private formatMessage(message: MessageTemplate): any {
     switch (message.type) {
       case 'text':
@@ -139,7 +130,6 @@ class WeChatWorkService {
    */
   updateConfig(config: Partial<WeChatWorkConfig>): void {
     this.config = { ...this.config, ...config };
-    this.accessToken = null; // Reset token
   }
 
   /**

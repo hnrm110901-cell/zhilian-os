@@ -42,6 +42,18 @@
 
 详细文档：[Shokz集成报告](./SHOKZ_INTEGRATION_REPORT.md)
 
+### 🔐 企业账号OAuth登录
+
+支持企业微信、飞书、钉钉OAuth登录：
+
+- **企业微信**: 企业员工一键登录
+- **飞书**: 飞书企业账号登录
+- **钉钉**: 钉钉企业账号登录
+- **自动创建账户**: 首次登录自动创建用户
+- **角色自动映射**: 根据职位/部门自动分配角色
+
+详细文档：[OAuth配置指南](./docs/OAUTH_SETUP.md)
+
 ### 🏗️ 三层架构
 
 ```
@@ -147,6 +159,10 @@ cp .env.example .env
 - `OPENAI_API_KEY`: OpenAI API密钥
 - `WECHAT_CORP_ID`: 企业微信CorpID
 - `WECHAT_CORP_SECRET`: 企业微信Secret
+- `FEISHU_APP_ID`: 飞书应用ID
+- `FEISHU_APP_SECRET`: 飞书应用密钥
+- `DINGTALK_APP_KEY`: 钉钉应用Key
+- `DINGTALK_APP_SECRET`: 钉钉应用密钥
 - `AOQIWEI_API_KEY`: 奥琦韦API密钥
 - `PINZHI_TOKEN`: 品智Token
 
@@ -248,8 +264,11 @@ kubectl get pods -n zhilian-os
 - [x] 服务质量Agent
 - [x] 培训辅导Agent
 - [x] 决策支持Agent
-- [ ] 管理后台开发
-- [ ] 企业微信/飞书集成
+- [x] 管理后台开发
+- [x] 企业微信/飞书集成
+- [x] OAuth登录（企业微信、飞书、钉钉）
+- [x] Shokz耳机权限配置
+- [x] 多渠道通知服务（短信、企业微信）
 
 ### Phase 3: 优化上线 (Week 9-12)
 - [ ] 性能优化

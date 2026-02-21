@@ -1,16 +1,86 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Form, Input, Button, Card, Space, Typography, Divider, message } from 'antd';
-import { UserOutlined, LockOutlined, LoginOutlined, RocketOutlined } from '@ant-design/icons';
+import { UserOutlined, LockOutlined, LoginOutlined, RocketOutlined, WechatOutlined } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import axios from 'axios';
 
 const { Title, Text } = Typography;
 
 const LoginPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, setToken } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
+  // Handle OAuth callback
+  useEffect(() => {
+    const code = searchParams.get('code');
+    const authCode = searchParams.get('auth_code');
+    const state = searchParams.get('state');
+    const provider = searchParams.get('provider');
+
+    if ((code || authCode) && provider) {
+      handleOAuthCallback(provider, code, authCode, state);
+    }
+  }, [searchParams]);
+
+  const handleOAuthCallback = async (
+    provider: string,
+    code: string | null,
+    authCode: string | null,
+    state: string | null
+  ) => {
+    setLoading(true);
+    try {
+      const endpoint = `/api/auth/oauth/${provider}/callback`;
+      const payload = provider === 'dingtalk'
+        ? { auth_code: authCode, state }
+        : { code, state };
+
+      const response = await axios.post(endpoint, payload);
+
+      if (response.data.access_token) {
+        setToken(response.data.access_token, response.data.refresh_token);
+        message.success('登录成功！');
+        const redirect = state || '/';
+        setTimeout(() => {
+          navigate(redirect);
+        }, 500);
+      }
+    } catch (error) {
+      message.error('OAuth登录失败，请重试');
+      // Clear URL parameters
+      navigate('/login', { replace: true });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOAuthLogin = (provider: string) => {
+    const state = searchParams.get('redirect') || '/';
+    const redirectUri = `${window.location.origin}/login?provider=${provider}`;
+
+    let authUrl = '';
+
+    if (provider === 'wechat-work') {
+      // 企业微信OAuth URL
+      const appId = import.meta.env.VITE_WECHAT_WORK_CORP_ID || 'YOUR_CORP_ID';
+      authUrl = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=snsapi_base&state=${state}#wechat_redirect`;
+    } else if (provider === 'feishu') {
+      // 飞书OAuth URL
+      const appId = import.meta.env.VITE_FEISHU_APP_ID || 'YOUR_APP_ID';
+      authUrl = `https://open.feishu.cn/open-apis/authen/v1/index?app_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
+    } else if (provider === 'dingtalk') {
+      // 钉钉OAuth URL
+      const appId = import.meta.env.VITE_DINGTALK_APP_KEY || 'YOUR_APP_KEY';
+      authUrl = `https://oapi.dingtalk.com/connect/oauth2/sns_authorize?appid=${appId}&response_type=code&scope=snsapi_login&state=${state}&redirect_uri=${encodeURIComponent(redirectUri)}`;
+    }
+
+    if (authUrl) {
+      window.location.href = authUrl;
+    }
+  };
 
   const onFinish = async (values: { username: string; password: string }) => {
     setLoading(true);
@@ -216,6 +286,62 @@ const LoginPage: React.FC = () => {
               <LoginOutlined style={{ color: 'white', fontSize: 20 }} />
             </Space>
           </Card>
+        </Space>
+
+        <Divider style={{ margin: '24px 0' }}>企业账号登录</Divider>
+
+        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+          <Button
+            size="large"
+            block
+            icon={<WechatOutlined />}
+            onClick={() => handleOAuthLogin('wechat-work')}
+            style={{
+              height: 48,
+              borderRadius: 8,
+              background: '#07c160',
+              color: 'white',
+              border: 'none',
+              fontSize: 16,
+              fontWeight: 500,
+            }}
+          >
+            企业微信登录
+          </Button>
+
+          <Button
+            size="large"
+            block
+            onClick={() => handleOAuthLogin('feishu')}
+            style={{
+              height: 48,
+              borderRadius: 8,
+              background: '#00b96b',
+              color: 'white',
+              border: 'none',
+              fontSize: 16,
+              fontWeight: 500,
+            }}
+          >
+            🪶 飞书登录
+          </Button>
+
+          <Button
+            size="large"
+            block
+            onClick={() => handleOAuthLogin('dingtalk')}
+            style={{
+              height: 48,
+              borderRadius: 8,
+              background: '#0089ff',
+              color: 'white',
+              border: 'none',
+              fontSize: 16,
+              fontWeight: 500,
+            }}
+          >
+            💼 钉钉登录
+          </Button>
         </Space>
 
         <style>{`

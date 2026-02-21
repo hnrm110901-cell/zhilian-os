@@ -7,11 +7,13 @@ from typing import Optional, List
 
 from ..models.user import User, UserRole
 from ..services.auth_service import AuthService
+from ..services.enterprise_oauth_service import EnterpriseOAuthService
 from ..core.dependencies import get_current_active_user, require_role
 from ..core.permissions import get_user_permissions
 
 router = APIRouter()
 auth_service = AuthService()
+oauth_service = EnterpriseOAuthService()
 
 
 # Request/Response models
@@ -319,6 +321,226 @@ async def update_current_user(
     )
 
 
+# OAuth endpoints
+class OAuthCallbackRequest(BaseModel):
+    code: Optional[str] = None
+    auth_code: Optional[str] = None
+    state: Optional[str] = None
+
+
+@router.post("/oauth/wechat-work/callback")
+async def wechat_work_oauth_callback(request: OAuthCallbackRequest):
+    """
+    企业微信OAuth回调
+
+    处理企业微信OAuth授权回调，自动创建或更新用户账户。
+
+    **认证要求**: 无需认证
+
+    **流程说明**:
+    1. 前端跳转到企业微信授权页面
+    2. 用户授权后，企业微信回调到前端
+    3. 前端将code和state发送到此接口
+    4. 后端获取用户信息并创建/更新账户
+    5. 返回JWT令牌供前端使用
+
+    **示例请求**:
+    ```json
+    {
+        "code": "xxx",
+        "state": "random_state"
+    }
+    ```
+
+    **示例响应**:
+    ```json
+    {
+        "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        "token_type": "bearer",
+        "expires_in": 1800,
+        "user": {
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "username": "zhangsan",
+            "email": "zhangsan@company.com",
+            "full_name": "张三",
+            "role": "staff",
+            "store_id": null,
+            "is_active": true
+        }
+    }
+    ```
+
+    **错误响应**:
+    - `400 Bad Request`: 缺少code参数
+    - `401 Unauthorized`: OAuth授权失败
+    """
+    if not request.code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="缺少code参数",
+        )
+
+    try:
+        token_data = await oauth_service.wechat_work_oauth_login(
+            code=request.code,
+            state=request.state,
+        )
+        return token_data
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"企业微信OAuth登录失败: {str(e)}",
+        )
+
+
+@router.post("/oauth/feishu/callback")
+async def feishu_oauth_callback(request: OAuthCallbackRequest):
+    """
+    飞书OAuth回调
+
+    处理飞书OAuth授权回调，自动创建或更新用户账户。
+
+    **认证要求**: 无需认证
+
+    **流程说明**:
+    1. 前端跳转到飞书授权页面
+    2. 用户授权后，飞书回调到前端
+    3. 前端将code和state发送到此接口
+    4. 后端获取用户信息并创建/更新账户
+    5. 返回JWT令牌供前端使用
+
+    **示例请求**:
+    ```json
+    {
+        "code": "xxx",
+        "state": "random_state"
+    }
+    ```
+
+    **示例响应**:
+    ```json
+    {
+        "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        "token_type": "bearer",
+        "expires_in": 1800,
+        "user": {
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "username": "lisi",
+            "email": "lisi@company.com",
+            "full_name": "李四",
+            "role": "staff",
+            "store_id": null,
+            "is_active": true
+        }
+    }
+    ```
+
+    **错误响应**:
+    - `400 Bad Request`: 缺少code参数
+    - `401 Unauthorized`: OAuth授权失败
+    """
+    if not request.code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="缺少code参数",
+        )
+
+    try:
+        token_data = await oauth_service.feishu_oauth_login(
+            code=request.code,
+            state=request.state,
+        )
+        return token_data
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"飞书OAuth登录失败: {str(e)}",
+        )
+
+
+@router.post("/oauth/dingtalk/callback")
+async def dingtalk_oauth_callback(request: OAuthCallbackRequest):
+    """
+    钉钉OAuth回调
+
+    处理钉钉OAuth授权回调，自动创建或更新用户账户。
+
+    **认证要求**: 无需认证
+
+    **流程说明**:
+    1. 前端跳转到钉钉授权页面
+    2. 用户授权后，钉钉回调到前端
+    3. 前端将auth_code和state发送到此接口
+    4. 后端获取用户信息并创建/更新账户
+    5. 返回JWT令牌供前端使用
+
+    **示例请求**:
+    ```json
+    {
+        "auth_code": "xxx",
+        "state": "random_state"
+    }
+    ```
+
+    **示例响应**:
+    ```json
+    {
+        "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        "token_type": "bearer",
+        "expires_in": 1800,
+        "user": {
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "username": "wangwu",
+            "email": "wangwu@company.com",
+            "full_name": "王五",
+            "role": "staff",
+            "store_id": null,
+            "is_active": true
+        }
+    }
+    ```
+
+    **错误响应**:
+    - `400 Bad Request`: 缺少auth_code参数
+    - `401 Unauthorized`: OAuth授权失败
+    """
+    if not request.auth_code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="缺少auth_code参数",
+        )
+
+    try:
+        token_data = await oauth_service.dingtalk_oauth_login(
+            auth_code=request.auth_code,
+            state=request.state,
+        )
+        return token_data
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"钉钉OAuth登录失败: {str(e)}",
+        )
+
+
 @router.post("/change-password")
 async def change_password(
     request: ChangePasswordRequest,
@@ -375,3 +597,223 @@ async def update_user(
         store_id=user.store_id,
         is_active=user.is_active,
     )
+
+
+# OAuth endpoints
+class OAuthCallbackRequest(BaseModel):
+    code: Optional[str] = None
+    auth_code: Optional[str] = None
+    state: Optional[str] = None
+
+
+@router.post("/oauth/wechat-work/callback")
+async def wechat_work_oauth_callback(request: OAuthCallbackRequest):
+    """
+    企业微信OAuth回调
+
+    处理企业微信OAuth授权回调，自动创建或更新用户账户。
+
+    **认证要求**: 无需认证
+
+    **流程说明**:
+    1. 前端跳转到企业微信授权页面
+    2. 用户授权后，企业微信回调到前端
+    3. 前端将code和state发送到此接口
+    4. 后端获取用户信息并创建/更新账户
+    5. 返回JWT令牌供前端使用
+
+    **示例请求**:
+    ```json
+    {
+        "code": "xxx",
+        "state": "random_state"
+    }
+    ```
+
+    **示例响应**:
+    ```json
+    {
+        "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        "token_type": "bearer",
+        "expires_in": 1800,
+        "user": {
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "username": "zhangsan",
+            "email": "zhangsan@company.com",
+            "full_name": "张三",
+            "role": "staff",
+            "store_id": null,
+            "is_active": true
+        }
+    }
+    ```
+
+    **错误响应**:
+    - `400 Bad Request`: 缺少code参数
+    - `401 Unauthorized`: OAuth授权失败
+    """
+    if not request.code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="缺少code参数",
+        )
+
+    try:
+        token_data = await oauth_service.wechat_work_oauth_login(
+            code=request.code,
+            state=request.state,
+        )
+        return token_data
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"企业微信OAuth登录失败: {str(e)}",
+        )
+
+
+@router.post("/oauth/feishu/callback")
+async def feishu_oauth_callback(request: OAuthCallbackRequest):
+    """
+    飞书OAuth回调
+
+    处理飞书OAuth授权回调，自动创建或更新用户账户。
+
+    **认证要求**: 无需认证
+
+    **流程说明**:
+    1. 前端跳转到飞书授权页面
+    2. 用户授权后，飞书回调到前端
+    3. 前端将code和state发送到此接口
+    4. 后端获取用户信息并创建/更新账户
+    5. 返回JWT令牌供前端使用
+
+    **示例请求**:
+    ```json
+    {
+        "code": "xxx",
+        "state": "random_state"
+    }
+    ```
+
+    **示例响应**:
+    ```json
+    {
+        "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        "token_type": "bearer",
+        "expires_in": 1800,
+        "user": {
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "username": "lisi",
+            "email": "lisi@company.com",
+            "full_name": "李四",
+            "role": "staff",
+            "store_id": null,
+            "is_active": true
+        }
+    }
+    ```
+
+    **错误响应**:
+    - `400 Bad Request`: 缺少code参数
+    - `401 Unauthorized`: OAuth授权失败
+    """
+    if not request.code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="缺少code参数",
+        )
+
+    try:
+        token_data = await oauth_service.feishu_oauth_login(
+            code=request.code,
+            state=request.state,
+        )
+        return token_data
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"飞书OAuth登录失败: {str(e)}",
+        )
+
+
+@router.post("/oauth/dingtalk/callback")
+async def dingtalk_oauth_callback(request: OAuthCallbackRequest):
+    """
+    钉钉OAuth回调
+
+    处理钉钉OAuth授权回调，自动创建或更新用户账户。
+
+    **认证要求**: 无需认证
+
+    **流程说明**:
+    1. 前端跳转到钉钉授权页面
+    2. 用户授权后，钉钉回调到前端
+    3. 前端将auth_code和state发送到此接口
+    4. 后端获取用户信息并创建/更新账户
+    5. 返回JWT令牌供前端使用
+
+    **示例请求**:
+    ```json
+    {
+        "auth_code": "xxx",
+        "state": "random_state"
+    }
+    ```
+
+    **示例响应**:
+    ```json
+    {
+        "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        "token_type": "bearer",
+        "expires_in": 1800,
+        "user": {
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "username": "wangwu",
+            "email": "wangwu@company.com",
+            "full_name": "王五",
+            "role": "staff",
+            "store_id": null,
+            "is_active": true
+        }
+    }
+    ```
+
+    **错误响应**:
+    - `400 Bad Request`: 缺少auth_code参数
+    - `401 Unauthorized`: OAuth授权失败
+    """
+    if not request.auth_code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="缺少auth_code参数",
+        )
+
+    try:
+        token_data = await oauth_service.dingtalk_oauth_login(
+            auth_code=request.auth_code,
+            state=request.state,
+        )
+        return token_data
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"钉钉OAuth登录失败: {str(e)}",
+        )
