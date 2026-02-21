@@ -377,3 +377,133 @@ async def broadcast_voice_notification(
     except Exception as e:
         logger.error("广播语音通知失败", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== 轻量级语音指令 (MVP) ====================
+
+
+from ..services.voice_command_service import voice_command_service
+from ..core.database import get_db
+from sqlalchemy.orm import Session
+
+
+class SimpleVoiceCommandRequest(BaseModel):
+    """简单语音指令请求"""
+    voice_text: str = Field(..., description="语音识别文本")
+    store_id: str = Field(..., description="门店ID")
+
+
+class MeituanQueueBroadcastRequest(BaseModel):
+    """美团排队播报请求"""
+    store_id: str = Field(..., description="门店ID")
+    queue_count: int = Field(..., description="排队数量")
+    estimated_wait_time: int = Field(..., description="预计等待时间（分钟）")
+
+
+class TimeoutOrderAlertRequest(BaseModel):
+    """超时订单告警请求"""
+    store_id: str = Field(..., description="门店ID")
+    table_number: str = Field(..., description="桌号")
+    wait_time: int = Field(..., description="等待时间（分钟）")
+
+
+@router.post("/command/simple", summary="处理简单语音指令 (MVP)")
+async def handle_simple_voice_command(
+    request: SimpleVoiceCommandRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    处理简单语音指令 (轻量级MVP)
+
+    支持5个高频指令:
+    - 当前排队
+    - 催单提醒
+    - 库存查询
+    - 今日营收
+    - 呼叫支援
+
+    本地意图识别，响应时间<500ms，无需云端LLM
+    """
+    try:
+        result = await voice_command_service.handle_command(
+            voice_text=request.voice_text,
+            store_id=request.store_id,
+            user_id=current_user.id,
+            db=db
+        )
+
+        logger.info(
+            "simple_voice_command_handled",
+            voice_text=request.voice_text,
+            store_id=request.store_id,
+            user_id=current_user.id,
+            success=result["success"]
+        )
+
+        return result
+
+    except Exception as e:
+        logger.error("handle_simple_voice_command_failed", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/broadcast/meituan-queue", summary="美团排队播报")
+async def broadcast_meituan_queue(
+    request: MeituanQueueBroadcastRequest,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    美团排队自动播报
+
+    每5分钟自动播报美团排队情况
+    """
+    try:
+        result = await voice_command_service.broadcast_meituan_queue_update(
+            store_id=request.store_id,
+            queue_count=request.queue_count,
+            estimated_wait_time=request.estimated_wait_time
+        )
+
+        logger.info(
+            "meituan_queue_broadcast",
+            store_id=request.store_id,
+            queue_count=request.queue_count
+        )
+
+        return result
+
+    except Exception as e:
+        logger.error("broadcast_meituan_queue_failed", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/alert/timeout-order", summary="超时订单告警")
+async def alert_timeout_order(
+    request: TimeoutOrderAlertRequest,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    超时订单告警
+
+    当订单等待时间超过阈值时自动告警
+    """
+    try:
+        result = await voice_command_service.alert_timeout_order(
+            store_id=request.store_id,
+            table_number=request.table_number,
+            wait_time=request.wait_time
+        )
+
+        logger.warning(
+            "timeout_order_alert",
+            store_id=request.store_id,
+            table_number=request.table_number,
+            wait_time=request.wait_time
+        )
+
+        return result
+
+    except Exception as e:
+        logger.error("alert_timeout_order_failed", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))

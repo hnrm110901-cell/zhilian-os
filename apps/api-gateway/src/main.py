@@ -11,7 +11,7 @@ import time
 
 from src.core.config import settings
 # 核心模块
-from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation
+from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation, approval
 # 逐步启用的模块
 from src.api import dashboard, analytics, audit, multi_store, finance, customer360, wechat_triggers, queue, meituan_queue
 # 需要外部适配器的模块 (会在适配器不可用时返回错误)
@@ -93,6 +93,10 @@ app = FastAPI(
         {
             "name": "agents",
             "description": "智能Agent系统 - 7个专业Agent的操作接口",
+        },
+        {
+            "name": "approval",
+            "description": "审批流管理 - Human-in-the-loop决策审批、信任度评分、决策统计",
         },
         {
             "name": "notifications",
@@ -269,6 +273,7 @@ async def prometheus_middleware(request, call_next):
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(agents.router, prefix="/api/v1/agents", tags=["agents"])
+app.include_router(approval.router, prefix="/api/v1", tags=["approval"])
 app.include_router(notifications.router, prefix="/api/v1", tags=["notifications"])
 app.include_router(stores.router, prefix="/api/v1", tags=["stores"])
 app.include_router(mobile.router, prefix="/api/v1", tags=["mobile"])
