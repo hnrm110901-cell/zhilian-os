@@ -97,6 +97,36 @@ celery_app.conf.update(
 
     # Celery Beat定时任务调度
     beat_schedule={
+        # 每15分钟检测营收异常
+        "detect-revenue-anomaly": {
+            "task": "src.core.celery_tasks.detect_revenue_anomaly",
+            "schedule": crontab(minute="*/15"),
+            "args": (),
+            "options": {
+                "queue": "default",
+                "priority": 7,
+            },
+        },
+        # 每天6AM生成昨日简报(RAG增强)
+        "generate-daily-report-rag": {
+            "task": "src.core.celery_tasks.generate_daily_report_with_rag",
+            "schedule": crontab(hour=6, minute=0),
+            "args": (),
+            "options": {
+                "queue": "default",
+                "priority": 6,
+            },
+        },
+        # 每天10AM检查库存预警(午高峰前)
+        "check-inventory-alert": {
+            "task": "src.core.celery_tasks.check_inventory_alert",
+            "schedule": crontab(hour=10, minute=0),
+            "args": (),
+            "options": {
+                "queue": "default",
+                "priority": 7,
+            },
+        },
         # 每日凌晨1点生成前一天的日报
         "generate-daily-reports": {
             "task": "src.core.celery_tasks.generate_and_send_daily_report",

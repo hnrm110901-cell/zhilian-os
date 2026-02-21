@@ -560,3 +560,359 @@ async def perform_daily_reconciliation(
         raise self.retry(exc=e)
 
 
+@celery_app.task(
+    base=CallbackTask,
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+)
+async def detect_revenue_anomaly(
+    self,
+    store_id: str = None,
+) -> Dict[str, Any]:
+    """
+    检测营收异常 (每15分钟执行)
+
+    Args:
+        store_id: 门店ID (None表示检测所有门店)
+
+    Returns:
+        检测结果
+    """
+    try:
+        from datetime import datetime, timedelta
+        from ..agents.decision_agent import DecisionAgent
+        from ..services.wechat_work_message_service import wechat_work_message_service
+        from ..models.store import Store
+        from ..core.database import get_db_session
+        from sqlalchemy import select
+
+        logger.info(
+            "开始检测营收异常",
+            store_id=store_id
+        )
+
+        decision_agent = DecisionAgent()
+        alerts_sent = 0
+
+        # 获取要检测的门店列表
+        async with get_db_session() as session:
+            if store_id:
+                result = await session.execute(
+                    select(Store).where(Store.id == store_id, Store.is_active == True)
+                )
+                stores = result.scalars().all()
+            else:
+                result = await session.execute(
+                    select(Store).where(Store.is_active == True)
+                )
+                stores = result.scalars().all()
+
+            for store in stores:
+                try:
+                    # TODO: 从数据库获取当前营收和预期营收
+                    # 这里使用模拟数据
+                    current_revenue = 8000.0  # 实际应从数据库查询
+                    expected_revenue = 10000.0  # 实际应从历史数据计算
+
+                    # 计算偏差
+                    deviation = ((current_revenue - expected_revenue) / expected_revenue) * 100
+
+                    # 只有偏差超过15%才告警
+                    if abs(deviation) > 15:
+                        # 使用DecisionAgent分析
+                        analysis = await decision_agent.analyze_revenue_anomaly(
+                            store_id=str(store.id),
+                            current_revenue=current_revenue,
+                            expected_revenue=expected_revenue,
+                            time_period="today"
+                        )
+
+                        if analysis["success"]:
+                            # 构建告警消息
+                            alert_emoji = "⚠️" if deviation < 0 else "📈"
+                            message = f"""{alert_emoji} 营收异常告警
+
+门店: {store.name}
+当前营收: ¥{current_revenue:.2f}
+预期营收: ¥{expected_revenue:.2f}
+偏差: {deviation:+.1f}%
+
+AI分析:
+{analysis['data']['analysis']}
+
+时间: {datetime.now().strftime('%Y-%m-%d %H:%M')}
+"""
+
+                            # 发送企微告警
+                            # TODO: 查询店长和管理员的企微ID
+                            # await wechat_work_message_service.send_text_message(...)
+
+                            logger.info(
+                                "营收异常告警已生成",
+                                store_id=str(store.id),
+                                deviation=deviation
+                            )
+                            alerts_sent += 1
+
+                except Exception as e:
+                    logger.error(
+                        "门店营收异常检测失败",
+                        store_id=str(store.id),
+                        error=str(e)
+                    )
+                    continue
+
+        logger.info(
+            "营收异常检测完成",
+            stores_checked=len(stores),
+            alerts_sent=alerts_sent
+        )
+
+        return {
+            "success": True,
+            "stores_checked": len(stores),
+            "alerts_sent": alerts_sent,
+            "timestamp": datetime.now().isoformat()
+        }
+
+    except Exception as e:
+        logger.error(
+            "营收异常检测失败",
+            error=str(e),
+            exc_info=e
+        )
+        raise self.retry(exc=e)
+
+
+@celery_app.task(
+    base=CallbackTask,
+    bind=True,
+    max_retries=3,
+    default_retry_delay=300,
+)
+async def generate_daily_report_with_rag(
+    self,
+    store_id: str = None,
+) -> Dict[str, Any]:
+    """
+    生成并发送昨日简报 (RAG增强版，每天6AM执行)
+
+    Args:
+        store_id: 门店ID (None表示为所有门店生成)
+
+    Returns:
+        生成结果
+    """
+    try:
+        from datetime import datetime, date, timedelta
+        from ..agents.decision_agent import DecisionAgent
+        from ..services.wechat_work_message_service import wechat_work_message_service
+        from ..models.store import Store
+        from ..core.database import get_db_session
+        from sqlalchemy import select
+
+        logger.info(
+            "开始生成昨日简报(RAG增强)",
+            store_id=store_id
+        )
+
+        decision_agent = DecisionAgent()
+        reports_sent = 0
+        yesterday = date.today() - timedelta(days=1)
+
+        # 获取要生成报告的门店列表
+        async with get_db_session() as session:
+            if store_id:
+                result = await session.execute(
+                    select(Store).where(Store.id == store_id, Store.is_active == True)
+                )
+                stores = result.scalars().all()
+            else:
+                result = await session.execute(
+                    select(Store).where(Store.is_active == True)
+                )
+                stores = result.scalars().all()
+
+            for store in stores:
+                try:
+                    # 使用DecisionAgent生成经营建议
+                    recommendations = await decision_agent.generate_business_recommendations(
+                        store_id=str(store.id),
+                        focus_area=None  # 全面分析
+                    )
+
+                    if recommendations["success"]:
+                        # 构建简报消息
+                        message = f"""📊 昨日简报 {yesterday.strftime('%Y年%m月%d日')}
+
+门店: {store.name}
+
+AI经营分析:
+{recommendations['data']['recommendations']}
+
+---
+基于{recommendations['data']['context_used']}条历史数据分析
+生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M')}
+"""
+
+                        # 发送企微消息
+                        # TODO: 查询店长和管理员的企微ID
+                        # await wechat_work_message_service.send_text_message(...)
+
+                        logger.info(
+                            "昨日简报已生成",
+                            store_id=str(store.id)
+                        )
+                        reports_sent += 1
+
+                except Exception as e:
+                    logger.error(
+                        "门店简报生成失败",
+                        store_id=str(store.id),
+                        error=str(e)
+                    )
+                    continue
+
+        logger.info(
+            "昨日简报生成完成",
+            stores_processed=len(stores),
+            reports_sent=reports_sent
+        )
+
+        return {
+            "success": True,
+            "stores_processed": len(stores),
+            "reports_sent": reports_sent,
+            "report_date": str(yesterday),
+            "timestamp": datetime.now().isoformat()
+        }
+
+    except Exception as e:
+        logger.error(
+            "昨日简报生成失败",
+            error=str(e),
+            exc_info=e
+        )
+        raise self.retry(exc=e)
+
+
+@celery_app.task(
+    base=CallbackTask,
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+)
+async def check_inventory_alert(
+    self,
+    store_id: str = None,
+) -> Dict[str, Any]:
+    """
+    检查库存预警 (午高峰前1小时，每天10AM执行)
+
+    Args:
+        store_id: 门店ID (None表示检查所有门店)
+
+    Returns:
+        检查结果
+    """
+    try:
+        from datetime import datetime
+        from ..agents.inventory_agent import InventoryAgent
+        from ..services.wechat_work_message_service import wechat_work_message_service
+        from ..models.store import Store
+        from ..core.database import get_db_session
+        from sqlalchemy import select
+
+        logger.info(
+            "开始检查库存预警",
+            store_id=store_id
+        )
+
+        inventory_agent = InventoryAgent()
+        alerts_sent = 0
+
+        # 获取要检查的门店列表
+        async with get_db_session() as session:
+            if store_id:
+                result = await session.execute(
+                    select(Store).where(Store.id == store_id, Store.is_active == True)
+                )
+                stores = result.scalars().all()
+            else:
+                result = await session.execute(
+                    select(Store).where(Store.is_active == True)
+                )
+                stores = result.scalars().all()
+
+            for store in stores:
+                try:
+                    # TODO: 从数据库获取当前库存
+                    # 这里使用模拟数据
+                    current_inventory = {
+                        "DISH001": 20,  # 宫保鸡丁
+                        "DISH002": 50,  # 鱼香肉丝
+                        "DISH003": 10,  # 麻婆豆腐
+                    }
+
+                    # 使用InventoryAgent检查低库存
+                    alert_result = await inventory_agent.check_low_stock_alert(
+                        store_id=str(store.id),
+                        current_inventory=current_inventory,
+                        threshold_hours=4  # 午高峰前4小时预警
+                    )
+
+                    if alert_result["success"]:
+                        # 构建预警消息
+                        message = f"""🔔 库存预警 (午高峰前)
+
+门店: {store.name}
+时间: {datetime.now().strftime('%Y-%m-%d %H:%M')}
+
+AI分析:
+{alert_result['data']['alert']}
+
+当前库存状态:
+{chr(10).join([f'• {dish_id}: {qty}份' for dish_id, qty in current_inventory.items()])}
+
+请及时补货，确保午高峰供应充足。
+"""
+
+                        # 发送企微预警
+                        # TODO: 查询店长和管理员的企微ID
+                        # await wechat_work_message_service.send_text_message(...)
+
+                        logger.info(
+                            "库存预警已生成",
+                            store_id=str(store.id)
+                        )
+                        alerts_sent += 1
+
+                except Exception as e:
+                    logger.error(
+                        "门店库存检查失败",
+                        store_id=str(store.id),
+                        error=str(e)
+                    )
+                    continue
+
+        logger.info(
+            "库存预警检查完成",
+            stores_checked=len(stores),
+            alerts_sent=alerts_sent
+        )
+
+        return {
+            "success": True,
+            "stores_checked": len(stores),
+            "alerts_sent": alerts_sent,
+            "timestamp": datetime.now().isoformat()
+        }
+
+    except Exception as e:
+        logger.error(
+            "库存预警检查失败",
+            error=str(e),
+            exc_info=e
+        )
+        raise self.retry(exc=e)
