@@ -11,7 +11,7 @@ import time
 
 from src.core.config import settings
 # 核心模块
-from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation, approval, edge_node, decision_validator
+from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation, approval, edge_node, decision_validator, federated_learning, recommendations, agent_collaboration
 # 逐步启用的模块
 from src.api import dashboard, analytics, audit, multi_store, finance, customer360, wechat_triggers, queue, meituan_queue
 # 需要外部适配器的模块 (会在适配器不可用时返回错误)
@@ -182,6 +182,18 @@ app = FastAPI(
             "name": "decision_validator",
             "description": "决策验证 - AI决策双重验证、规则引擎、异常检测",
         },
+        {
+            "name": "federated_learning",
+            "description": "联邦学习 - 多门店模型训练、隐私保护、模型聚合",
+        },
+        {
+            "name": "recommendations",
+            "description": "智能推荐 - 个性化菜品推荐、动态定价、精准营销",
+        },
+        {
+            "name": "agent_collaboration",
+            "description": "Agent协同 - 跨Agent决策协调、冲突解决、全局优化",
+        },
     ],
 )
 
@@ -310,6 +322,11 @@ app.include_router(meituan_queue.router, tags=["meituan_queue"])
 # Phase 3: 稳定性加固期 (Stability Reinforcement Period)
 app.include_router(edge_node.router, tags=["edge_node"])
 app.include_router(decision_validator.router, tags=["decision_validator"])
+
+# Phase 4: 智能优化期 (Intelligence Optimization Period)
+app.include_router(federated_learning.router, tags=["federated_learning"])
+app.include_router(recommendations.router, tags=["recommendations"])
+app.include_router(agent_collaboration.router, tags=["agent_collaboration"])
 
 # POS模块暂时禁用 (文件为空)
 # app.include_router(pos.router, prefix="/api/v1/pos", tags=["pos"])
