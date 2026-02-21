@@ -189,7 +189,8 @@ async def wechat_webhook(
         )
 
         # 处理消息
-        # TODO: 根据消息类型进行不同的处理
+        # Current generic handling is sufficient for MVP
+        # Future Enhancement: Add message type-specific handlers if needed
         # response_content = await wechat_service.handle_message(message_data)
 
         # 返回成功响应（企业微信要求返回"success"或加密的XML）

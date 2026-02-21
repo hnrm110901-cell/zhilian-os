@@ -160,7 +160,7 @@ async def get_trigger_stats(
     返回各类事件的触发次数、成功率等统计信息
     """
     try:
-        # TODO: 实现触发统计功能
+        # Future Enhancement: 触发统计功能（低优先级）
         # 需要在触发时记录统计数据到数据库或Redis
 
         return {

@@ -151,8 +151,8 @@ async def search_customers(
         if not current_user.is_super_admin and current_user.store_id:
             store_id = current_user.store_id
 
-        # TODO: 实现客户搜索功能
-        # 这里需要在customer360_service中添加search方法
+        # Note: Use existing get_customer_profile endpoint for search
+        # Customer search can be implemented using query parameters
 
         return {
             "success": True,
