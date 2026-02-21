@@ -363,10 +363,31 @@ async def pos_webhook(
     if not system:
         raise HTTPException(status_code=404, detail="系统不存在")
 
-    # 处理webhook数据
-    # TODO: 根据payload类型进行不同处理
+    # 处理webhook数据 - 根据payload类型进行不同处理
+    event_type = payload.get("event_type") or payload.get("type")
 
-    return {"success": True, "message": "Webhook已接收"}
+    if event_type == "order.created":
+        # 处理订单创建事件
+        logger.info("处理订单创建事件", order_id=payload.get("order_id"))
+        # 可以触发Neural System事件
+        from ..services.neural_system import neural_system
+        await neural_system.emit_event(
+            event_type="order.created",
+            event_source=f"pos_system_{system_id}",
+            data=payload,
+            store_id=payload.get("store_id", "default")
+        )
+    elif event_type == "order.updated":
+        # 处理订单更新事件
+        logger.info("处理订单更新事件", order_id=payload.get("order_id"))
+    elif event_type == "inventory.low":
+        # 处理库存预警事件
+        logger.info("处理库存预警事件", item=payload.get("item_name"))
+    else:
+        # 通用处理
+        logger.info("处理通用Webhook事件", event_type=event_type)
+
+    return {"success": True, "message": "Webhook已接收并处理", "event_type": event_type}
 
 
 @router.post("/integrations/webhooks/supplier/{system_id}")
@@ -386,10 +407,45 @@ async def supplier_webhook(
     if not system:
         raise HTTPException(status_code=404, detail="系统不存在")
 
-    # 处理webhook数据
-    # TODO: 更新订单状态
+    # 处理webhook数据 - 更新订单状态
+    order_id = payload.get("order_id") or payload.get("external_order_id")
+    status = payload.get("status")
 
-    return {"success": True, "message": "Webhook已接收"}
+    if order_id and status:
+        logger.info(
+            "更新订单状态",
+            order_id=order_id,
+            status=status,
+            system_id=system_id
+        )
+
+        # 触发订单状态更新事件
+        from ..services.neural_system import neural_system
+        await neural_system.emit_event(
+            event_type="order.status_updated",
+            event_source=f"supplier_system_{system_id}",
+            data={
+                "order_id": order_id,
+                "status": status,
+                "updated_at": payload.get("updated_at"),
+                "delivery_time": payload.get("delivery_time"),
+                "tracking_number": payload.get("tracking_number"),
+            },
+            store_id=payload.get("store_id", "default")
+        )
+
+        return {
+            "success": True,
+            "message": "订单状态已更新",
+            "order_id": order_id,
+            "status": status
+        }
+    else:
+        logger.warning("Webhook数据缺少必要字段", payload=payload)
+        return {
+            "success": False,
+            "message": "缺少order_id或status字段"
+        }
 
 
 # Reservation Integration Endpoints

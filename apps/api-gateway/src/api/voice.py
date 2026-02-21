@@ -9,7 +9,8 @@ from pydantic import BaseModel, Field
 from typing import Optional, List
 import structlog
 
-from src.core.dependencies import get_current_active_user
+from src.core.dependencies import get_current_active_user, require_permission
+from src.core.permissions import Permission
 from src.services.shokz_service import shokz_service, DeviceType, DeviceRole
 from src.services.voice_orchestrator import voice_orchestrator
 from src.models import User
@@ -49,10 +50,12 @@ class VoiceNotificationRequest(BaseModel):
 @router.post("/devices/register", summary="注册Shokz设备")
 async def register_device(
     request: RegisterDeviceRequest,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_permission(Permission.VOICE_DEVICE_WRITE)),
 ):
     """
     注册Shokz骨传导耳机设备
+
+    **权限要求**: voice:device:write
 
     支持的设备类型:
     - opencomm_2: OpenComm 2（前厅/收银）
@@ -95,9 +98,13 @@ async def register_device(
 @router.post("/devices/{device_id}/connect", summary="连接Shokz设备")
 async def connect_device(
     device_id: str,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_permission(Permission.VOICE_DEVICE_WRITE)),
 ):
-    """连接Shokz设备"""
+    """
+    连接Shokz设备
+
+    **权限要求**: voice:device:write
+    """
     try:
         result = await shokz_service.connect_device(device_id)
 
@@ -118,9 +125,13 @@ async def connect_device(
 @router.post("/devices/{device_id}/disconnect", summary="断开Shokz设备")
 async def disconnect_device(
     device_id: str,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_permission(Permission.VOICE_DEVICE_WRITE)),
 ):
-    """断开Shokz设备"""
+    """
+    断开Shokz设备
+
+    **权限要求**: voice:device:write
+    """
     try:
         result = await shokz_service.disconnect_device(device_id)
 
@@ -141,9 +152,13 @@ async def disconnect_device(
 @router.get("/devices/{device_id}", summary="获取设备信息")
 async def get_device_info(
     device_id: str,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_permission(Permission.VOICE_DEVICE_READ)),
 ):
-    """获取Shokz设备详细信息"""
+    """
+    获取Shokz设备详细信息
+
+    **权限要求**: voice:device:read
+    """
     device_info = shokz_service.get_device_info(device_id)
 
     if not device_info:
@@ -159,10 +174,12 @@ async def get_device_info(
 async def list_devices(
     role: Optional[str] = None,
     connected_only: bool = False,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_permission(Permission.VOICE_DEVICE_READ)),
 ):
     """
     列出Shokz设备
+
+    **权限要求**: voice:device:read
 
     可选参数:
     - role: 按角色筛选（front_of_house, cashier, kitchen）
@@ -194,10 +211,12 @@ async def list_devices(
 @router.post("/voice/command", summary="处理语音命令")
 async def process_voice_command(
     request: VoiceCommandRequest,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_permission(Permission.VOICE_COMMAND)),
 ):
     """
     启动语音会话并处理命令
+
+    **权限要求**: voice:command
 
     流程:
     1. 从Shokz设备录音
@@ -231,10 +250,12 @@ async def process_voice_command(
 async def process_voice_command_upload(
     device_id: str,
     audio_file: UploadFile = File(...),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_permission(Permission.VOICE_COMMAND)),
 ):
     """
     上传音频文件处理语音命令
+
+    **权限要求**: voice:command
 
     用于测试和调试，不需要实际的Shokz设备
     """
@@ -265,10 +286,12 @@ async def process_voice_command_upload(
 @router.post("/voice/notification", summary="发送语音通知")
 async def send_voice_notification(
     request: VoiceNotificationRequest,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_permission(Permission.VOICE_NOTIFICATION)),
 ):
     """
     发送语音通知到Shokz设备
+
+    **权限要求**: voice:notification
 
     优先级:
     - normal: 普通通知（正常语速）
