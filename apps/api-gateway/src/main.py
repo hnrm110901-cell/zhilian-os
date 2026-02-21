@@ -13,7 +13,7 @@ from src.core.config import settings
 # 核心模块
 from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation
 # 逐步启用的模块
-from src.api import dashboard, analytics, audit, backup, multi_store, supply_chain, finance, data_import_export, customer360, wechat_triggers, queue, meituan_queue
+from src.api import dashboard, analytics, audit, multi_store, finance, customer360, wechat_triggers, queue, meituan_queue
 # 需要外部适配器的模块 (会在适配器不可用时返回错误)
 from src.api import members
 # POS模块暂时禁用 (文件为空)
@@ -159,16 +159,8 @@ app = FastAPI(
             "description": "多门店管理 - 门店对比、区域汇总、绩效排名",
         },
         {
-            "name": "supply_chain",
-            "description": "供应链管理 - 供应商管理、采购订单、补货建议",
-        },
-        {
             "name": "finance",
             "description": "财务管理 - 财务报表、预算管理、成本核算",
-        },
-        {
-            "name": "backup",
-            "description": "数据备份 - 备份管理、恢复、验证",
         },
         {
             "name": "analytics",
@@ -177,10 +169,6 @@ app = FastAPI(
         {
             "name": "audit",
             "description": "审计日志 - 操作日志、用户活动、系统统计",
-        },
-        {
-            "name": "data",
-            "description": "数据导入导出 - 批量导入、数据导出、模板下载",
         },
     ],
 )
@@ -298,11 +286,8 @@ app.include_router(reconciliation.router, prefix="/api/v1", tags=["reconciliatio
 app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["dashboard"])
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["analytics"])
 app.include_router(audit.router, prefix="/api/v1/audit", tags=["audit"])
-app.include_router(backup.router, prefix="/api/v1/backup", tags=["backup"])
 app.include_router(multi_store.router, prefix="/api/v1/multi-store", tags=["multi_store"])
-app.include_router(supply_chain.router, prefix="/api/v1/supply-chain", tags=["supply_chain"])
 app.include_router(finance.router, prefix="/api/v1/finance", tags=["finance"])
-app.include_router(data_import_export.router, prefix="/api/v1/data", tags=["data"])
 app.include_router(members.router, prefix="/api/v1/members", tags=["members"])
 app.include_router(customer360.router, tags=["customer360"])
 app.include_router(wechat_triggers.router, tags=["wechat_triggers"])

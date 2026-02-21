@@ -8,7 +8,6 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 
 from ..services.neural_system import NeuralSystemOrchestrator
-from ..services.federated_learning_service import federated_learning_service
 from ..schemas.restaurant_standard_schema import (
     NeuralEventSchema,
     OrderSchema,
@@ -255,8 +254,8 @@ async def get_system_status():
         return SystemStatusResponse(
             status="operational",
             total_events=len(neural_system.event_queue),
-            total_stores=len(federated_learning_service.participating_stores),
-            federated_learning_round=federated_learning_service.training_rounds,
+            total_stores=0,  # Removed federated learning
+            federated_learning_round=0,  # Removed federated learning
             vector_db_collections=vector_db_stats,
             uptime_seconds=0.0  # Would calculate actual uptime
         )

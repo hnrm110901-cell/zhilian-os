@@ -258,65 +258,6 @@ async def index_dish_to_vector_db(
 @celery_app.task(
     base=CallbackTask,
     bind=True,
-    max_retries=2,
-    default_retry_delay=300,  # 5分钟
-)
-async def train_federated_model(
-    self,
-    store_id: str,
-    model_type: str = "demand_forecast",
-) -> Dict[str, Any]:
-    """
-    训练联邦学习模型（低优先级任务）
-
-    Args:
-        store_id: 门店ID
-        model_type: 模型类型
-
-    Returns:
-        训练结果
-    """
-    try:
-        from ..services.federated_learning_service import federated_learning_service
-
-        logger.info(
-            "开始联邦学习模型训练",
-            store_id=store_id,
-            model_type=model_type,
-        )
-
-        # 参与联邦学习
-        result = await federated_learning_service.participate_in_training(
-            store_id=store_id,
-            model_type=model_type,
-        )
-
-        logger.info(
-            "联邦学习模型训练完成",
-            store_id=store_id,
-            model_type=model_type,
-        )
-
-        return {
-            "success": True,
-            "store_id": store_id,
-            "model_type": model_type,
-            "result": result,
-        }
-
-    except Exception as e:
-        logger.error(
-            "联邦学习模型训练失败",
-            store_id=store_id,
-            error=str(e),
-            exc_info=e,
-        )
-        raise self.retry(exc=e)
-
-
-@celery_app.task(
-    base=CallbackTask,
-    bind=True,
 )
 async def batch_index_orders(
     self,

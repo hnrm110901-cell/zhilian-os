@@ -11,7 +11,6 @@ from datetime import datetime
 import uuid
 
 from .vector_db_service import vector_db_service
-from .federated_learning_service import federated_learning_service, data_isolation_manager
 from ..schemas.restaurant_standard_schema import (
     NeuralEventSchema,
     OrderSchema,
@@ -364,39 +363,15 @@ class NeuralSystemOrchestrator:
             参与结果
         """
         try:
-            # 1. 注册门店
-            await federated_learning_service.register_store(store_id)
-
-            # 2. 下载全局模型
-            global_model = await federated_learning_service.get_global_model(store_id)
-
-            # 3. 本地训练（使用本地数据，数据不离开本地）
-            # TODO: 实际的本地训练逻辑
-
-            # 4. 上传模型更新（只上传参数，不上传数据）
-            model_update = {
-                "version": global_model["version"],
-                "parameters": global_model["parameters"],  # 训练后的参数
-            }
-
-            training_metrics = {
-                "samples": 1000,  # 训练样本数
-                "loss": 0.15,
-                "accuracy": 0.85,
-            }
-
-            await federated_learning_service.upload_local_update(
-                store_id=store_id,
-                model_update=model_update,
-                training_metrics=training_metrics,
-            )
-
-            logger.info("门店参与联邦学习成功", store_id=store_id)
+            # Federated learning removed - not supported for 3-5 stores
+            # See architecture review: no statistical significance with small data
+            logger.info("联邦学习已移除（数据量不支撑）", store_id=store_id)
 
             return {
-                "success": True,
+                "success": False,
                 "store_id": store_id,
                 "model_type": model_type,
+                "message": "Federated learning removed - insufficient data volume"
             }
 
         except Exception as e:
@@ -413,8 +388,8 @@ class NeuralSystemOrchestrator:
         Returns:
             系统状态
         """
-        # 获取联邦学习状态
-        fl_status = await federated_learning_service.get_training_status()
+        # Federated learning removed
+        fl_status = {"status": "removed", "reason": "insufficient data volume"}
 
         return {
             "neural_system": "operational",
