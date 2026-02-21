@@ -5,14 +5,8 @@ Agent服务 - Agent Service
 import time
 import structlog
 from typing import Dict, Any, Optional
-from pathlib import Path
-import sys
 
 logger = structlog.get_logger()
-
-# 添加agents包路径
-agents_path = Path(__file__).parent.parent.parent / "packages" / "agents"
-sys.path.insert(0, str(agents_path))
 
 
 class AgentService:
@@ -31,23 +25,13 @@ class AgentService:
         任何Agent初始化失败都会抛出RuntimeError终止服务启动。
         这遵循"宁可不启动，不能带着死亡的引擎起飞"的原则。
         """
-        # 默认配置
-        default_config = {
-            "llm_config": {
-                "model": "gpt-4",
-                "temperature": 0.7,
-            }
-        }
-        default_store_id = "STORE001"
-
         # 定义必需的Agent列表
-        required_agents = []
         failed_agents = []
 
         # 初始化排班Agent
         try:
-            from schedule.src.agent import ScheduleAgent
-            self._agents["schedule"] = ScheduleAgent(default_config)
+            from ..agents.schedule_agent import ScheduleAgent
+            self._agents["schedule"] = ScheduleAgent()
             logger.info("ScheduleAgent初始化成功")
         except Exception as e:
             logger.error("ScheduleAgent初始化失败", exc_info=e)
@@ -55,8 +39,8 @@ class AgentService:
 
         # 初始化订单Agent
         try:
-            from order.src.agent import OrderAgent
-            self._agents["order"] = OrderAgent(default_config)
+            from ..agents.order_agent import OrderAgent
+            self._agents["order"] = OrderAgent()
             logger.info("OrderAgent初始化成功")
         except Exception as e:
             logger.error("OrderAgent初始化失败", exc_info=e)
@@ -64,71 +48,30 @@ class AgentService:
 
         # 初始化库存Agent
         try:
-            from inventory.src.agent import InventoryAgent
-            self._agents["inventory"] = InventoryAgent(
-                store_id=default_store_id,
-                pinzhi_adapter=None,
-                alert_thresholds=None
-            )
+            from ..agents.inventory_agent import InventoryAgent
+            self._agents["inventory"] = InventoryAgent()
             logger.info("InventoryAgent初始化成功")
         except Exception as e:
             logger.error("InventoryAgent初始化失败", exc_info=e)
             failed_agents.append(("inventory", str(e)))
 
-        # 初始化服务Agent
-        try:
-            from service.src.agent import ServiceAgent
-            self._agents["service"] = ServiceAgent(
-                store_id=default_store_id,
-                aoqiwei_adapter=None,
-                quality_thresholds=None
-            )
-            logger.info("ServiceAgent初始化成功")
-        except Exception as e:
-            logger.error("ServiceAgent初始化失败", exc_info=e)
-            failed_agents.append(("service", str(e)))
-
-        # 初始化培训Agent
-        try:
-            from training.src.agent import TrainingAgent
-            self._agents["training"] = TrainingAgent(
-                store_id=default_store_id,
-                training_config=None
-            )
-            logger.info("TrainingAgent初始化成功")
-        except Exception as e:
-            logger.error("TrainingAgent初始化失败", exc_info=e)
-            failed_agents.append(("training", str(e)))
-
         # 初始化决策Agent
         try:
-            from decision.src.agent import DecisionAgent
-            self._agents["decision"] = DecisionAgent(
-                store_id=default_store_id,
-                schedule_agent=None,
-                order_agent=None,
-                inventory_agent=None,
-                service_agent=None,
-                training_agent=None,
-                kpi_targets=None
-            )
+            from ..agents.decision_agent import DecisionAgent
+            self._agents["decision"] = DecisionAgent()
             logger.info("DecisionAgent初始化成功")
         except Exception as e:
             logger.error("DecisionAgent初始化失败", exc_info=e)
             failed_agents.append(("decision", str(e)))
 
-        # 初始化预定Agent
+        # 初始化KPIAgent
         try:
-            from reservation.src.agent import ReservationAgent
-            self._agents["reservation"] = ReservationAgent(
-                store_id=default_store_id,
-                order_agent=None,
-                config=None
-            )
-            logger.info("ReservationAgent初始化成功")
+            from ..agents.kpi_agent import KPIAgent
+            self._agents["kpi"] = KPIAgent()
+            logger.info("KPIAgent初始化成功")
         except Exception as e:
-            logger.error("ReservationAgent初始化失败", exc_info=e)
-            failed_agents.append(("reservation", str(e)))
+            logger.error("KPIAgent初始化失败", exc_info=e)
+            failed_agents.append(("kpi", str(e)))
 
         # 验证所有Agent是否成功初始化
         if failed_agents:
