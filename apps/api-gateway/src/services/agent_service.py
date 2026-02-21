@@ -25,7 +25,12 @@ class AgentService:
         logger.info("AgentService初始化完成")
 
     def _initialize_agents(self):
-        """初始化所有Agent"""
+        """
+        初始化所有Agent
+
+        任何Agent初始化失败都会抛出RuntimeError终止服务启动。
+        这遵循"宁可不启动，不能带着死亡的引擎起飞"的原则。
+        """
         # 默认配置
         default_config = {
             "llm_config": {
@@ -35,24 +40,30 @@ class AgentService:
         }
         default_store_id = "STORE001"
 
+        # 定义必需的Agent列表
+        required_agents = []
+        failed_agents = []
+
+        # 初始化排班Agent
         try:
-            # 初始化排班Agent
             from schedule.src.agent import ScheduleAgent
             self._agents["schedule"] = ScheduleAgent(default_config)
             logger.info("ScheduleAgent初始化成功")
         except Exception as e:
             logger.error("ScheduleAgent初始化失败", exc_info=e)
+            failed_agents.append(("schedule", str(e)))
 
+        # 初始化订单Agent
         try:
-            # 初始化订单Agent
             from order.src.agent import OrderAgent
             self._agents["order"] = OrderAgent(default_config)
             logger.info("OrderAgent初始化成功")
         except Exception as e:
             logger.error("OrderAgent初始化失败", exc_info=e)
+            failed_agents.append(("order", str(e)))
 
+        # 初始化库存Agent
         try:
-            # 初始化库存Agent
             from inventory.src.agent import InventoryAgent
             self._agents["inventory"] = InventoryAgent(
                 store_id=default_store_id,
@@ -62,9 +73,10 @@ class AgentService:
             logger.info("InventoryAgent初始化成功")
         except Exception as e:
             logger.error("InventoryAgent初始化失败", exc_info=e)
+            failed_agents.append(("inventory", str(e)))
 
+        # 初始化服务Agent
         try:
-            # 初始化服务Agent
             from service.src.agent import ServiceAgent
             self._agents["service"] = ServiceAgent(
                 store_id=default_store_id,
@@ -74,9 +86,10 @@ class AgentService:
             logger.info("ServiceAgent初始化成功")
         except Exception as e:
             logger.error("ServiceAgent初始化失败", exc_info=e)
+            failed_agents.append(("service", str(e)))
 
+        # 初始化培训Agent
         try:
-            # 初始化培训Agent
             from training.src.agent import TrainingAgent
             self._agents["training"] = TrainingAgent(
                 store_id=default_store_id,
@@ -85,9 +98,10 @@ class AgentService:
             logger.info("TrainingAgent初始化成功")
         except Exception as e:
             logger.error("TrainingAgent初始化失败", exc_info=e)
+            failed_agents.append(("training", str(e)))
 
+        # 初始化决策Agent
         try:
-            # 初始化决策Agent
             from decision.src.agent import DecisionAgent
             self._agents["decision"] = DecisionAgent(
                 store_id=default_store_id,
@@ -101,9 +115,10 @@ class AgentService:
             logger.info("DecisionAgent初始化成功")
         except Exception as e:
             logger.error("DecisionAgent初始化失败", exc_info=e)
+            failed_agents.append(("decision", str(e)))
 
+        # 初始化预定Agent
         try:
-            # 初始化预定Agent
             from reservation.src.agent import ReservationAgent
             self._agents["reservation"] = ReservationAgent(
                 store_id=default_store_id,
@@ -113,6 +128,37 @@ class AgentService:
             logger.info("ReservationAgent初始化成功")
         except Exception as e:
             logger.error("ReservationAgent初始化失败", exc_info=e)
+            failed_agents.append(("reservation", str(e)))
+
+        # 验证所有Agent是否成功初始化
+        if failed_agents:
+            error_msg = "Agent初始化失败，服务无法启动:\n"
+            for agent_name, error in failed_agents:
+                error_msg += f"  - {agent_name}: {error}\n"
+            logger.critical(error_msg)
+            raise RuntimeError(error_msg)
+
+        logger.info(f"所有Agent初始化成功，共{len(self._agents)}个Agent")
+
+    def get_agents_status(self) -> Dict[str, Any]:
+        """
+        获取所有Agent的状态
+
+        Returns:
+            Dict包含每个Agent的状态信息
+        """
+        status = {
+            "total_agents": len(self._agents),
+            "agents": {}
+        }
+
+        for agent_name, agent in self._agents.items():
+            status["agents"][agent_name] = {
+                "initialized": True,
+                "type": type(agent).__name__
+            }
+
+        return status
 
     async def execute_agent(
         self, agent_type: str, input_data: Dict[str, Any]
