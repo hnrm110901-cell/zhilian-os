@@ -39,7 +39,7 @@ class Customer360Service:
         Returns:
             客户360画像数据
         """
-        async with get_session() as session:
+        async with get_db_session() as session:
             try:
                 logger.info(
                     "获取客户360画像",

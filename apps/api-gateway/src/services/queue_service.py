@@ -39,7 +39,7 @@ class QueueService:
         Returns:
             排队信息
         """
-        async with get_session() as session:
+        async with get_db_session() as session:
             try:
                 # 生成排队号码（当天的序号）
                 queue_number = await self._generate_queue_number(session, store_id)
@@ -180,7 +180,7 @@ class QueueService:
         Returns:
             被叫号的排队信息
         """
-        async with get_session() as session:
+        async with get_db_session() as session:
             try:
                 # 获取下一个等待的客户
                 result = await session.execute(
@@ -254,7 +254,7 @@ class QueueService:
         Returns:
             更新后的排队信息
         """
-        async with get_session() as session:
+        async with get_db_session() as session:
             try:
                 result = await session.execute(
                     select(Queue).where(Queue.queue_id == queue_id)
@@ -321,7 +321,7 @@ class QueueService:
         Returns:
             取消结果
         """
-        async with get_session() as session:
+        async with get_db_session() as session:
             try:
                 result = await session.execute(
                     select(Queue).where(Queue.queue_id == queue_id)
@@ -385,7 +385,7 @@ class QueueService:
         Returns:
             排队列表
         """
-        async with get_session() as session:
+        async with get_db_session() as session:
             try:
                 query = select(Queue).where(Queue.store_id == store_id)
 
@@ -416,7 +416,7 @@ class QueueService:
         Returns:
             统计信息
         """
-        async with get_session() as session:
+        async with get_db_session() as session:
             try:
                 # 当前等待人数
                 waiting_result = await session.execute(
