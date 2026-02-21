@@ -1,0 +1,137 @@
+version: '3.8'
+
+services:
+  # PostgreSQL数据库
+  db:
+    image: postgres:13-alpine
+    container_name: zhilian-db
+    environment:
+      POSTGRES_USER: zhilian
+      POSTGRES_PASSWORD: zhilian
+      POSTGRES_DB: zhilian_os
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zhilian"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - zhilian-network
+
+  # Redis缓存
+  redis:
+    image: redis:6-alpine
+    container_name: zhilian-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - zhilian-network
+
+  # Qdrant向量数据库
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: zhilian-qdrant
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - zhilian-network
+
+  # API服务
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zhilian-api
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - DATABASE_URL=postgresql+asyncpg://zhilian:zhilian@db:5432/zhilian_os
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - QDRANT_URL=http://qdrant:6333
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - zhilian-network
+    restart: unless-stopped
+
+  # Celery Worker
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zhilian-worker
+    command: celery -A src.core.celery_app worker --loglevel=info --concurrency=4
+    environment:
+      - APP_ENV=production
+      - DATABASE_URL=postgresql+asyncpg://zhilian:zhilian@db:5432/zhilian_os
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+    depends_on:
+      - db
+      - redis
+      - api
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - zhilian-network
+    restart: unless-stopped
+
+  # Celery Beat
+  beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zhilian-beat
+    command: celery -A src.core.celery_app beat --loglevel=info
+    environment:
+      - APP_ENV=production
+      - DATABASE_URL=postgresql+asyncpg://zhilian:zhilian@db:5432/zhilian_os
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+    depends_on:
+      - db
+      - redis
+      - api
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - zhilian-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  qdrant_data:
+
+networks:
+  zhilian-network:
+    driver: bridge
