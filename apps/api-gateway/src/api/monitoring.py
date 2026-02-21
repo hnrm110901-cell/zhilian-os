@@ -10,6 +10,8 @@ from ..core.monitoring import error_monitor, ErrorSeverity, ErrorCategory
 from ..core.dependencies import get_current_active_user, require_permission
 from ..core.permissions import Permission
 from ..models.user import User
+from ..services.agent_monitor_service import agent_monitor_service
+from ..services.scheduler_monitor_service import scheduler_monitor_service
 
 router = APIRouter()
 
@@ -220,4 +222,133 @@ async def clear_old_errors(
         "hours": hours,
         "remaining_errors": len(error_monitor.error_records),
         "remaining_metrics": len(error_monitor.performance_metrics),
+    }
+
+
+# ==================== Agent监控端点 ====================
+
+@router.get("/monitoring/agents/metrics")
+async def get_agent_metrics(
+    agent_type: Optional[str] = Query(None, description="Agent类型"),
+    time_range: str = Query("1h", description="时间范围 (1h/6h/24h)"),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    获取Agent性能指标
+
+    返回Agent的调用次数、成功率、响应时间等指标
+    """
+    result = await agent_monitor_service.get_agent_metrics(agent_type, time_range)
+    return result
+
+
+@router.get("/monitoring/agents/quality/{agent_type}")
+async def analyze_agent_quality(
+    agent_type: str,
+    time_range: str = Query("24h", description="时间范围"),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    分析Agent决策质量
+
+    返回质量评分、等级和改进建议
+    """
+    result = await agent_monitor_service.analyze_decision_quality(agent_type, time_range)
+    return result
+
+
+@router.get("/monitoring/agents/realtime")
+async def get_agent_realtime_stats(
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    获取Agent实时统计
+
+    返回最近1小时和5分钟的实时数据
+    """
+    result = await agent_monitor_service.get_realtime_stats()
+    return result
+
+
+# ==================== 调度任务监控端点 ====================
+
+@router.get("/monitoring/scheduler/metrics")
+async def get_scheduler_metrics(
+    task_name: Optional[str] = Query(None, description="任务名称"),
+    time_range: str = Query("1h", description="时间范围 (1h/6h/24h)"),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    获取调度任务指标
+
+    返回任务执行次数、成功率、执行时间等指标
+    """
+    result = await scheduler_monitor_service.get_task_metrics(task_name, time_range)
+    return result
+
+
+@router.get("/monitoring/scheduler/health")
+async def check_scheduler_health(
+    task_name: Optional[str] = Query(None, description="任务名称"),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    检查调度任务健康状态
+
+    返回任务健康状态和告警信息
+    """
+    result = await scheduler_monitor_service.check_task_health(task_name)
+    return result
+
+
+@router.get("/monitoring/scheduler/queue")
+async def get_queue_stats(
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    获取队列统计
+
+    返回队列积压、活跃任务等信息
+    """
+    result = await scheduler_monitor_service.get_queue_stats()
+    return result
+
+
+# ==================== 监控大盘 ====================
+
+@router.get("/monitoring/dashboard")
+async def get_monitoring_dashboard(
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    获取监控大盘数据
+
+    返回完整的监控概览，包括Agent和调度任务的所有指标
+    """
+    # Agent指标
+    agent_metrics = await agent_monitor_service.get_agent_metrics(time_range="1h")
+    agent_realtime = await agent_monitor_service.get_realtime_stats()
+
+    # 调度任务指标
+    scheduler_metrics = await scheduler_monitor_service.get_task_metrics(time_range="1h")
+    scheduler_health = await scheduler_monitor_service.check_task_health()
+    queue_stats = await scheduler_monitor_service.get_queue_stats()
+
+    # 错误监控
+    error_summary = error_monitor.get_error_summary(time_window_minutes=60)
+
+    return {
+        "success": True,
+        "dashboard": {
+            "agents": {
+                "metrics": agent_metrics.get("metrics", {}),
+                "realtime": agent_realtime.get("stats", {})
+            },
+            "scheduler": {
+                "metrics": scheduler_metrics.get("metrics", {}),
+                "health": scheduler_health.get("health", {}),
+                "queue": queue_stats.get("stats", {})
+            },
+            "errors": error_summary
+        }
     }
