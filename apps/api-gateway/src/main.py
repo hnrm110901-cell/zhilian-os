@@ -12,6 +12,7 @@ import time
 from src.core.config import settings
 # 核心模块
 from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation, approval, edge_node, decision_validator, federated_learning, recommendations, agent_collaboration
+from src.api.phase5_apis import platform_router, industry_router, supply_chain_router, i18n_router
 # 逐步启用的模块
 from src.api import dashboard, analytics, audit, multi_store, finance, customer360, wechat_triggers, queue, meituan_queue
 # 需要外部适配器的模块 (会在适配器不可用时返回错误)
@@ -194,6 +195,22 @@ app = FastAPI(
             "name": "agent_collaboration",
             "description": "Agent协同 - 跨Agent决策协调、冲突解决、全局优化",
         },
+        {
+            "name": "open_platform",
+            "description": "开放平台 - 第三方开发者接入、插件市场、收入分成",
+        },
+        {
+            "name": "industry_solutions",
+            "description": "行业解决方案 - 火锅/烧烤/快餐等行业模板、最佳实践",
+        },
+        {
+            "name": "supply_chain",
+            "description": "供应链整合 - 供应商直连、自动询价比价、供应链金融",
+        },
+        {
+            "name": "internationalization",
+            "description": "国际化 - 多语言支持、多币种支持、本地化运营",
+        },
     ],
 )
 
@@ -327,6 +344,12 @@ app.include_router(decision_validator.router, tags=["decision_validator"])
 app.include_router(federated_learning.router, tags=["federated_learning"])
 app.include_router(recommendations.router, tags=["recommendations"])
 app.include_router(agent_collaboration.router, tags=["agent_collaboration"])
+
+# Phase 5: 生态扩展期 (Ecosystem Expansion Period)
+app.include_router(platform_router, tags=["open_platform"])
+app.include_router(industry_router, tags=["industry_solutions"])
+app.include_router(supply_chain_router, tags=["supply_chain"])
+app.include_router(i18n_router, tags=["internationalization"])
 
 # POS模块暂时禁用 (文件为空)
 # app.include_router(pos.router, prefix="/api/v1/pos", tags=["pos"])
