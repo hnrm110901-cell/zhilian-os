@@ -156,6 +156,77 @@ async def liveness_check():
     return {"status": "alive"}
 
 
+@router.get("/agents", summary="Agent系统健康检查")
+async def agents_health():
+    """
+    检查所有Agent的状态
+
+    验证所有AI Agent是否成功初始化并可用。
+    这是Week 1架构重构的关键端点，用于防止静默失败。
+
+    **认证要求**: 无需认证
+
+    **使用场景**:
+    - 服务启动后验证所有Agent已加载
+    - 监控系统检查Agent可用性
+    - 故障排查时确认Agent状态
+
+    **示例响应**:
+    ```json
+    {
+        "status": "healthy",
+        "total_agents": 7,
+        "agents": {
+            "schedule": {"initialized": true, "type": "ScheduleAgent"},
+            "order": {"initialized": true, "type": "OrderAgent"},
+            ...
+        },
+        "timestamp": "2026-02-21T18:00:00.000Z"
+    }
+    ```
+
+    **状态说明**:
+    - `healthy`: 所有Agent正常初始化
+    - `degraded`: 部分Agent不可用
+    - `unhealthy`: 无Agent可用或服务未启动
+    """
+    try:
+        from src.services.agent_service import AgentService
+
+        # 获取AgentService实例
+        # 注意: 如果AgentService初始化失败，这里会抛出异常
+        agent_service = AgentService()
+
+        # 获取所有Agent状态
+        agents_status = agent_service.get_agents_status()
+
+        # 判断整体健康状态
+        total_agents = agents_status.get("total_agents", 0)
+        if total_agents == 0:
+            status = "unhealthy"
+        elif total_agents >= 7:  # 期望有7个Agent
+            status = "healthy"
+        else:
+            status = "degraded"
+
+        return {
+            "status": status,
+            "total_agents": total_agents,
+            "agents": agents_status.get("agents", {}),
+            "timestamp": datetime.now().isoformat()
+        }
+
+    except Exception as e:
+        logger.error("Agent健康检查失败", error=str(e))
+        return {
+            "status": "unhealthy",
+            "total_agents": 0,
+            "agents": {},
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
+
+
 @router.get("/external-systems", summary="外部系统健康检查")
 async def external_systems_health(
     current_user: User = Depends(get_current_active_user),
