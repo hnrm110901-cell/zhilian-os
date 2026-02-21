@@ -412,3 +412,137 @@ async def batch_index_dishes(
     except Exception as e:
         logger.error("批量索引菜品失败", error=str(e), exc_info=e)
         raise self.retry(exc=e)
+
+
+@celery_app.task(
+    base=CallbackTask,
+    bind=True,
+    max_retries=3,
+    default_retry_delay=300,  # 5分钟
+)
+async def generate_and_send_daily_report(
+    self,
+    store_id: str,
+    report_date: str = None,
+) -> Dict[str, Any]:
+    """
+    生成并发送营业日报
+
+    Args:
+        store_id: 门店ID
+        report_date: 报告日期（YYYY-MM-DD格式，默认为昨天）
+
+    Returns:
+        生成和发送结果
+    """
+    try:
+        from datetime import date, datetime
+        from ..services.daily_report_service import daily_report_service
+        from ..services.wechat_work_message_service import wechat_work_message_service
+        from ..models.user import User, UserRole
+        from ..core.database import get_db_session
+        from sqlalchemy import select
+
+        logger.info(
+            "开始生成营业日报",
+            store_id=store_id,
+            report_date=report_date
+        )
+
+        # 解析日期
+        if report_date:
+            target_date = datetime.strptime(report_date, "%Y-%m-%d").date()
+        else:
+            from datetime import timedelta
+            target_date = date.today() - timedelta(days=1)
+
+        # 1. 生成日报
+        report = await daily_report_service.generate_daily_report(
+            store_id=store_id,
+            report_date=target_date
+        )
+
+        # 2. 构建推送消息
+        revenue_yuan = report.total_revenue / 100
+        message = f"""【营业日报】{target_date.strftime('%Y年%m月%d日')}
+
+{report.summary}
+
+📊 详细数据：
+• 订单数：{report.order_count}笔
+• 客流量：{report.customer_count}人
+• 客单价：¥{report.avg_order_value / 100:.2f}
+
+📈 运营指标：
+• 任务完成率：{report.task_completion_rate:.1f}%
+• 库存预警：{report.inventory_alert_count}个
+"""
+
+        # 添加亮点
+        if report.highlights:
+            message += "\n✨ 今日亮点：\n"
+            for highlight in report.highlights:
+                message += f"• {highlight}\n"
+
+        # 添加预警
+        if report.alerts:
+            message += "\n⚠️ 需要关注：\n"
+            for alert in report.alerts:
+                message += f"• {alert}\n"
+
+        # 3. 查询店长和老板，发送推送
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(User).where(
+                    User.store_id == store_id,
+                    User.is_active == True,
+                    User.role.in_([UserRole.STORE_MANAGER, UserRole.ADMIN]),
+                    User.wechat_user_id.isnot(None)
+                )
+            )
+            managers = result.scalars().all()
+
+            sent_count = 0
+            for manager in managers:
+                try:
+                    result = await wechat_work_message_service.send_text_message(
+                        user_id=manager.wechat_user_id,
+                        content=message
+                    )
+                    if result.get("success"):
+                        sent_count += 1
+                except Exception as e:
+                    logger.error(
+                        "发送日报失败",
+                        user_id=str(manager.id),
+                        error=str(e)
+                    )
+
+        # 4. 标记为已发送
+        if sent_count > 0:
+            await daily_report_service.mark_as_sent(report.id)
+
+        logger.info(
+            "营业日报生成并发送完成",
+            store_id=store_id,
+            report_date=str(target_date),
+            sent_count=sent_count
+        )
+
+        return {
+            "success": True,
+            "store_id": store_id,
+            "report_date": str(target_date),
+            "report_id": str(report.id),
+            "sent_count": sent_count
+        }
+
+    except Exception as e:
+        logger.error(
+            "生成营业日报失败",
+            store_id=store_id,
+            error=str(e),
+            exc_info=e
+        )
+        raise self.retry(exc=e)
+

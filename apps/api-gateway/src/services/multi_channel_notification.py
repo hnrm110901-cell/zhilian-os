@@ -496,33 +496,23 @@ class WeChatNotificationHandler(NotificationChannelHandler):
         """发送企业微信消息"""
         try:
             # TODO: 实际集成企业微信API
-            # import requests
-            #
-            # # 获取access_token
-            # token_url = f"https://qyapi.weixin.qq.com/cgi-bin/gettoken"
-            # token_params = {
-            #     "corpid": wechat_config.WECHAT_CORP_ID,
-            #     "corpsecret": wechat_config.WECHAT_CORP_SECRET
-            # }
-            # token_resp = requests.get(token_url, params=token_params)
-            # access_token = token_resp.json()["access_token"]
-            #
-            # # 发送消息
-            # send_url = f"https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token={access_token}"
-            # message_data = {
-            #     "touser": user_id,
-            #     "msgtype": "text",
-            #     "agentid": wechat_config.WECHAT_AGENT_ID,
-            #     "text": {
-            #         "content": f"{title}\n\n{content}"
-            #     }
-            # }
-            # send_resp = requests.post(send_url, json=message_data)
-            # return send_resp.json()["errcode"] == 0
+            # 已完成：使用wechat_work_message_service实现企业微信消息推送
 
-            logger.info("企业微信消息模拟发送", user_id=user_id, title=title)
-            await asyncio.sleep(0.1)
-            return True
+            logger.info("发送企业微信消息", user_id=user_id, title=title)
+
+            # 使用实际的企业微信消息服务
+            from .wechat_work_message_service import wechat_work_message_service
+
+            message_content = f"{title}\n\n{content}"
+            if extra_data:
+                message_content += f"\n\n{extra_data}"
+
+            result = await wechat_work_message_service.send_text_message(
+                user_id=user_id,
+                content=message_content
+            )
+
+            return result.get("success", False)
 
         except Exception as e:
             logger.error("企业微信消息发送失败", error=str(e))

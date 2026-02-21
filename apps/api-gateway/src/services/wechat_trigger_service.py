@@ -7,9 +7,12 @@ WeChat Push Trigger Service
 from typing import Dict, Any, Optional
 import structlog
 from datetime import datetime
+from sqlalchemy import select
 
 from ..services.wechat_service import WeChatService
 from ..core.celery_tasks import celery_app
+from ..core.database import get_db_session
+from ..models.user import User, UserRole
 
 logger = structlog.get_logger()
 
@@ -137,6 +140,22 @@ class WeChatTriggerService:
                 "target": "manager",
                 "message_template": "【服务质量】\n问题类型：{issue_type}\n描述：{description}\n客户：{customer_name}\n请及时处理！",
             },
+
+            # 任务相关触发
+            "task.created": {
+                "enabled": True,
+                "template": "新任务分配",
+                "priority": "high",
+                "target": "assignee",  # 直接推送给指派人
+                "message_template": "【新任务】\n任务：{title}\n内容：{content}\n优先级：{priority}\n截止时间：{due_at}\n请及时处理！",
+            },
+            "task.completed": {
+                "enabled": True,
+                "template": "任务完成通知",
+                "priority": "normal",
+                "target": "creator",  # 推送给创建人
+                "message_template": "【任务完成】\n任务：{title}\n完成人：{assignee_name}\n完成时间：{completed_at}",
+            },
         }
 
     async def should_trigger(
@@ -206,6 +225,7 @@ class WeChatTriggerService:
             target_users = await self._get_target_users(
                 rule["target"],
                 store_id,
+                event_data  # 传递事件数据，用于处理特殊目标（如assignee、creator）
             )
 
             # 发送企微消息
@@ -275,35 +295,124 @@ class WeChatTriggerService:
         self,
         target_role: str,
         store_id: Optional[str] = None,
+        event_data: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         获取推送目标用户
 
         Args:
-            target_role: 目标角色
+            target_role: 目标角色或特殊标识（assignee、creator等）
             store_id: 门店ID
+            event_data: 事件数据（用于获取特定用户ID）
 
         Returns:
             用户ID列表（用|分隔）
         """
-        # TODO: 从数据库查询对应角色的用户
-        # 这里需要根据实际的用户-角色映射来实现
+        # 处理特殊目标：直接指定用户ID
+        if target_role in ["assignee", "creator"] and event_data:
+            user_id_key = f"{target_role}_id"
+            user_id = event_data.get(user_id_key)
 
-        # 角色到企微用户ID的映射（示例）
-        role_user_mapping = {
-            "kitchen_staff": "KitchenStaff",  # 后厨人员
-            "manager": "Manager",  # 店长
-            "front_desk": "FrontDesk",  # 前台
-            "service_staff": "ServiceStaff",  # 服务员
-            "member_manager": "MemberManager",  # 会员管理员
-            "cashier": "Cashier",  # 收银员
-            "inventory_manager": "InventoryManager",  # 库存管理员
-            "tech_support": "TechSupport",  # 技术支持
+            if user_id:
+                try:
+                    # 查询用户的企微ID
+                    async with get_db_session() as session:
+                        result = await session.execute(
+                            select(User).where(
+                                User.id == uuid.UUID(user_id),
+                                User.is_active == True,
+                                User.wechat_user_id.isnot(None)
+                            )
+                        )
+                        user = result.scalar_one_or_none()
+
+                        if user and user.wechat_user_id:
+                            return user.wechat_user_id
+
+                except Exception as e:
+                    logger.error(
+                        "查询特定用户企微ID失败",
+                        user_id=user_id,
+                        error=str(e)
+                    )
+
+        # 映射触发规则中的角色名称到UserRole枚举
+        role_mapping = {
+            "kitchen_staff": [UserRole.HEAD_CHEF, UserRole.CHEF, UserRole.STATION_MANAGER],
+            "manager": [UserRole.STORE_MANAGER, UserRole.ASSISTANT_MANAGER],
+            "front_desk": [UserRole.TEAM_LEADER, UserRole.WAITER],
+            "service_staff": [UserRole.WAITER, UserRole.TEAM_LEADER],
+            "member_manager": [UserRole.CUSTOMER_MANAGER],
+            "cashier": [UserRole.WAITER],  # 收银员通常由服务员兼任
+            "inventory_manager": [UserRole.WAREHOUSE_MANAGER],
+            "tech_support": [UserRole.ADMIN],
         }
 
-        # 如果有store_id，可以查询该门店的对应角色用户
-        # 这里简化处理，返回角色对应的用户组
-        return role_user_mapping.get(target_role, "@all")
+        # 获取对应的UserRole枚举列表
+        user_roles = role_mapping.get(target_role, [])
+
+        if not user_roles:
+            logger.warning(
+                "未找到对应的用户角色映射",
+                target_role=target_role
+            )
+            return "@all"
+
+        try:
+            async with get_db_session() as session:
+                # 构建查询条件
+                query = select(User).where(
+                    User.is_active == True,
+                    User.role.in_(user_roles),
+                    User.wechat_user_id.isnot(None)
+                )
+
+                # 如果指定了门店，添加门店过滤
+                if store_id:
+                    query = query.where(User.store_id == store_id)
+
+                # 执行查询
+                result = await session.execute(query)
+                users = result.scalars().all()
+
+                # 提取企微用户ID
+                wechat_user_ids = [
+                    user.wechat_user_id
+                    for user in users
+                    if user.wechat_user_id
+                ]
+
+                if not wechat_user_ids:
+                    logger.warning(
+                        "未找到符合条件的用户",
+                        target_role=target_role,
+                        store_id=store_id,
+                        user_roles=[role.value for role in user_roles]
+                    )
+                    return "@all"
+
+                # 用|分隔多个用户ID
+                user_id_str = "|".join(wechat_user_ids)
+
+                logger.info(
+                    "成功获取推送目标用户",
+                    target_role=target_role,
+                    store_id=store_id,
+                    user_count=len(wechat_user_ids)
+                )
+
+                return user_id_str
+
+        except Exception as e:
+            logger.error(
+                "查询推送目标用户失败",
+                target_role=target_role,
+                store_id=store_id,
+                error=str(e),
+                exc_info=e
+            )
+            # 出错时返回@all，确保消息能发送
+            return "@all"
 
 
 # Celery异步任务：处理企微推送

@@ -2,19 +2,30 @@
 企业微信和飞书集成API
 Enterprise WeChat and Feishu Integration API
 """
-from fastapi import APIRouter, Depends, HTTPException, Request, Body
+from fastapi import APIRouter, Depends, HTTPException, Request, Body, Query
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 import structlog
 
 from src.core.dependencies import get_current_active_user
+from src.core.config import settings
 from src.services.wechat_service import wechat_service
 from src.services.feishu_service import feishu_service
 from src.models import User
+from src.utils.wechat_crypto import WeChatCrypto
 
 logger = structlog.get_logger()
 
 router = APIRouter()
+
+# 初始化企业微信加解密工具
+wechat_crypto = None
+if settings.WECHAT_TOKEN and settings.WECHAT_ENCODING_AES_KEY and settings.WECHAT_CORP_ID:
+    wechat_crypto = WeChatCrypto(
+        token=settings.WECHAT_TOKEN,
+        encoding_aes_key=settings.WECHAT_ENCODING_AES_KEY,
+        corp_id=settings.WECHAT_CORP_ID
+    )
 
 
 # ==================== Request/Response Models ====================
@@ -100,30 +111,94 @@ async def send_wechat_message(
 
 
 @router.post("/wechat/webhook", summary="企业微信消息回调")
-async def wechat_webhook(request: Request):
+@router.get("/wechat/webhook", summary="企业微信URL验证")
+async def wechat_webhook(
+    request: Request,
+    msg_signature: str = Query(..., description="消息签名"),
+    timestamp: str = Query(..., description="时间戳"),
+    nonce: str = Query(..., description="随机字符串"),
+    echostr: Optional[str] = Query(None, description="验证URL时的加密字符串")
+):
     """
     企业微信消息回调接口
 
     接收企业微信推送的消息和事件
+    支持GET请求用于URL验证，POST请求用于接收消息
     """
     try:
-        # 获取请求数据
+        # 检查是否配置了加解密工具
+        if not wechat_crypto:
+            logger.error("企业微信回调配置未完成")
+            raise HTTPException(
+                status_code=503,
+                detail="企业微信回调配置未完成，请配置WECHAT_TOKEN和WECHAT_ENCODING_AES_KEY"
+            )
+
+        # GET请求：URL验证
+        if request.method == "GET":
+            if not echostr:
+                raise HTTPException(status_code=400, detail="缺少echostr参数")
+
+            # 验证签名
+            if not wechat_crypto.verify_signature(msg_signature, timestamp, nonce, echostr):
+                logger.error("企业微信URL验证签名失败")
+                raise HTTPException(status_code=403, detail="签名验证失败")
+
+            # 解密echostr
+            decrypted_echo, error = wechat_crypto.decrypt_message(echostr)
+            if error:
+                logger.error("解密echostr失败", error=error)
+                raise HTTPException(status_code=500, detail=f"解密失败: {error}")
+
+            logger.info("企业微信URL验证成功")
+            return decrypted_echo
+
+        # POST请求：接收消息
         data = await request.body()
 
-        # TODO: 验证签名
-        # 企业微信会对消息进行加密，需要解密后处理
+        # 解析XML消息
+        xml_message = wechat_crypto.parse_xml_message(data)
+        if not xml_message:
+            raise HTTPException(status_code=400, detail="XML解析失败")
 
-        # 解析XML数据
-        # message_data = parse_wechat_xml(data)
+        # 获取加密的消息内容
+        encrypt_msg = xml_message.get("Encrypt")
+        if not encrypt_msg:
+            raise HTTPException(status_code=400, detail="缺少加密消息")
+
+        # 验证签名
+        if not wechat_crypto.verify_signature(msg_signature, timestamp, nonce, encrypt_msg):
+            logger.error("企业微信消息签名验证失败")
+            raise HTTPException(status_code=403, detail="签名验证失败")
+
+        # 解密消息
+        decrypted_msg, error = wechat_crypto.decrypt_message(encrypt_msg)
+        if error:
+            logger.error("消息解密失败", error=error)
+            raise HTTPException(status_code=500, detail=f"解密失败: {error}")
+
+        # 解析解密后的XML消息
+        message_data = wechat_crypto.parse_xml_message(decrypted_msg.encode())
+        if not message_data:
+            raise HTTPException(status_code=400, detail="消息解析失败")
+
+        logger.info(
+            "收到企业微信消息",
+            msg_type=message_data.get("MsgType"),
+            from_user=message_data.get("FromUserName")
+        )
 
         # 处理消息
-        # response = await wechat_service.handle_message(message_data)
+        # TODO: 根据消息类型进行不同的处理
+        # response_content = await wechat_service.handle_message(message_data)
 
-        # 返回响应（需要加密）
-        return {"success": True}
+        # 返回成功响应（企业微信要求返回"success"或加密的XML）
+        return "success"
 
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error("处理企业微信回调失败", error=str(e))
+        logger.error("处理企业微信回调失败", error=str(e), exc_info=e)
         raise HTTPException(status_code=500, detail=str(e))
 
 

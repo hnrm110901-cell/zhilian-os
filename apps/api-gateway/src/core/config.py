@@ -59,10 +59,44 @@ class Settings(BaseSettings):
     WECHAT_CORP_ID: str = ""
     WECHAT_CORP_SECRET: str = ""
     WECHAT_AGENT_ID: str = ""
+    WECHAT_TOKEN: str = ""  # 企业微信回调Token
+    WECHAT_ENCODING_AES_KEY: str = ""  # 企业微信回调EncodingAESKey
 
     # 飞书配置
     FEISHU_APP_ID: str = ""
     FEISHU_APP_SECRET: str = ""
+
+    # 钉钉配置
+    DINGTALK_APP_KEY: str = ""
+    DINGTALK_APP_SECRET: str = ""
+
+    # OAuth配置
+    OAUTH_REDIRECT_URI: str = "http://localhost:5173/login"
+
+    # 短信服务配置
+    # 阿里云短信
+    ALIYUN_ACCESS_KEY_ID: str = ""
+    ALIYUN_ACCESS_KEY_SECRET: str = ""
+    ALIYUN_SMS_SIGN_NAME: str = ""
+    ALIYUN_SMS_TEMPLATE_CODE: str = ""
+
+    # 腾讯云短信
+    TENCENT_SECRET_ID: str = ""
+    TENCENT_SECRET_KEY: str = ""
+    TENCENT_SMS_APP_ID: str = ""
+    TENCENT_SMS_SIGN_NAME: str = ""
+    TENCENT_SMS_TEMPLATE_ID: str = ""
+
+    # 语音服务配置
+    # 百度语音
+    BAIDU_APP_ID: str = ""
+    BAIDU_API_KEY: str = ""
+    BAIDU_SECRET_KEY: str = ""
+
+    # 讯飞语音
+    XUNFEI_APP_ID: str = ""
+    XUNFEI_API_KEY: str = ""
+    XUNFEI_API_SECRET: str = ""
 
     # 美团等位配置
     MEITUAN_DEVELOPER_ID: str = ""  # 美团开发者ID
