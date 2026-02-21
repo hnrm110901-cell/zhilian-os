@@ -11,7 +11,7 @@ import time
 
 from src.core.config import settings
 # 核心模块
-from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation, approval
+from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation, approval, edge_node, decision_validator
 # 逐步启用的模块
 from src.api import dashboard, analytics, audit, multi_store, finance, customer360, wechat_triggers, queue, meituan_queue
 # 需要外部适配器的模块 (会在适配器不可用时返回错误)
@@ -174,6 +174,14 @@ app = FastAPI(
             "name": "audit",
             "description": "审计日志 - 操作日志、用户活动、系统统计",
         },
+        {
+            "name": "edge_node",
+            "description": "边缘节点 - 边缘计算、离线模式、网络状态管理",
+        },
+        {
+            "name": "decision_validator",
+            "description": "决策验证 - AI决策双重验证、规则引擎、异常检测",
+        },
     ],
 )
 
@@ -298,6 +306,10 @@ app.include_router(customer360.router, tags=["customer360"])
 app.include_router(wechat_triggers.router, tags=["wechat_triggers"])
 app.include_router(queue.router, tags=["queue"])
 app.include_router(meituan_queue.router, tags=["meituan_queue"])
+
+# Phase 3: 稳定性加固期 (Stability Reinforcement Period)
+app.include_router(edge_node.router, tags=["edge_node"])
+app.include_router(decision_validator.router, tags=["decision_validator"])
 
 # POS模块暂时禁用 (文件为空)
 # app.include_router(pos.router, prefix="/api/v1/pos", tags=["pos"])
