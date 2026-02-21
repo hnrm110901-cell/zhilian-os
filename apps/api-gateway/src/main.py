@@ -11,7 +11,7 @@ import time
 
 from src.core.config import settings
 # 核心模块
-from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks
+from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation
 # 逐步启用的模块
 from src.api import dashboard, analytics, audit, backup, multi_store, supply_chain, finance, data_import_export, customer360, wechat_triggers, queue, meituan_queue
 # 需要外部适配器的模块 (会在适配器不可用时返回错误)
@@ -137,6 +137,10 @@ app = FastAPI(
         {
             "name": "tasks",
             "description": "任务管理 - 任务创建、指派、完成、查询",
+        },
+        {
+            "name": "reconciliation",
+            "description": "对账管理 - POS对账、差异预警、对账确认",
         },
         {
             "name": "pos",
@@ -288,6 +292,7 @@ app.include_router(voice.router, prefix="/api/v1/voice", tags=["voice"])
 app.include_router(neural.router, prefix="/api/v1/neural", tags=["neural"])
 app.include_router(adapters.router, tags=["adapters"])
 app.include_router(tasks.router, prefix="/api/v1", tags=["tasks"])
+app.include_router(reconciliation.router, prefix="/api/v1", tags=["reconciliation"])
 
 # 逐步启用的模块
 app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["dashboard"])

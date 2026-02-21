@@ -14,6 +14,7 @@ from .supply_chain import Supplier, PurchaseOrder
 from .finance import FinancialTransaction, Budget, Invoice, FinancialReport
 from .task import Task, TaskStatus, TaskPriority
 from .daily_report import DailyReport
+from .reconciliation import ReconciliationRecord, ReconciliationStatus
 
 __all__ = [
     "Base",
@@ -39,4 +40,6 @@ __all__ = [
     "TaskStatus",
     "TaskPriority",
     "DailyReport",
+    "ReconciliationRecord",
+    "ReconciliationStatus",
 ]

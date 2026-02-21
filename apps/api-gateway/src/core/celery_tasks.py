@@ -546,3 +546,76 @@ async def generate_and_send_daily_report(
         )
         raise self.retry(exc=e)
 
+
+@celery_app.task(
+    base=CallbackTask,
+    bind=True,
+    max_retries=3,
+    default_retry_delay=300,  # 5分钟
+)
+async def perform_daily_reconciliation(
+    self,
+    store_id: str,
+    reconciliation_date: str = None,
+) -> Dict[str, Any]:
+    """
+    执行每日对账
+
+    Args:
+        store_id: 门店ID
+        reconciliation_date: 对账日期（YYYY-MM-DD格式，默认为昨天）
+
+    Returns:
+        对账结果
+    """
+    try:
+        from datetime import date, datetime
+        from ..services.reconcile_service import reconcile_service
+
+        logger.info(
+            "开始执行每日对账",
+            store_id=store_id,
+            reconciliation_date=reconciliation_date
+        )
+
+        # 解析日期
+        if reconciliation_date:
+            target_date = datetime.strptime(reconciliation_date, "%Y-%m-%d").date()
+        else:
+            from datetime import timedelta
+            target_date = date.today() - timedelta(days=1)
+
+        # 执行对账
+        record = await reconcile_service.perform_reconciliation(
+            store_id=store_id,
+            reconciliation_date=target_date
+        )
+
+        logger.info(
+            "每日对账完成",
+            store_id=store_id,
+            reconciliation_date=str(target_date),
+            status=record.status.value,
+            diff_ratio=record.diff_ratio
+        )
+
+        return {
+            "success": True,
+            "store_id": store_id,
+            "reconciliation_date": str(target_date),
+            "record_id": str(record.id),
+            "status": record.status.value,
+            "diff_ratio": record.diff_ratio,
+            "alert_sent": record.alert_sent
+        }
+
+    except Exception as e:
+        logger.error(
+            "执行每日对账失败",
+            store_id=store_id,
+            error=str(e),
+            exc_info=e
+        )
+        raise self.retry(exc=e)
+
+

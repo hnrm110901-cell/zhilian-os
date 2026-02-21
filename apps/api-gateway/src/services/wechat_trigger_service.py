@@ -156,6 +156,15 @@ class WeChatTriggerService:
                 "target": "creator",  # 推送给创建人
                 "message_template": "【任务完成】\n任务：{title}\n完成人：{assignee_name}\n完成时间：{completed_at}",
             },
+
+            # 对账相关触发
+            "reconcile.anomaly": {
+                "enabled": True,
+                "template": "对账异常预警",
+                "priority": "urgent",
+                "target": "manager",  # 推送给店长
+                "message_template": "【对账异常】{reconciliation_date}\n⚠️ 发现账目差异\n\nPOS金额：¥{pos_amount:.2f}\n实际金额：¥{actual_amount:.2f}\n差异金额：¥{diff_amount:.2f}\n差异比例：{diff_ratio:.2f}%\n\n请及时核查处理！",
+            },
         }
 
     async def should_trigger(
