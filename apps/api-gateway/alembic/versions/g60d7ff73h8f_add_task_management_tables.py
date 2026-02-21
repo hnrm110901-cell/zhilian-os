@@ -19,6 +19,23 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    # Create enum types if they don't exist using raw SQL
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE taskstatus AS ENUM ('pending', 'in_progress', 'completed', 'cancelled', 'overdue');
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
+    """)
+
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE taskpriority AS ENUM ('low', 'normal', 'high', 'urgent');
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
+    """)
+
     # Create tasks table
     op.create_table(
         'tasks',
@@ -26,8 +43,8 @@ def upgrade() -> None:
         sa.Column('title', sa.String(length=200), nullable=False),
         sa.Column('content', sa.Text(), nullable=True),
         sa.Column('category', sa.String(length=50), nullable=True),
-        sa.Column('status', sa.Enum('pending', 'in_progress', 'completed', 'cancelled', 'overdue', name='taskstatus'), nullable=False),
-        sa.Column('priority', sa.Enum('low', 'normal', 'high', 'urgent', name='taskpriority'), nullable=False),
+        sa.Column('status', postgresql.ENUM('pending', 'in_progress', 'completed', 'cancelled', 'overdue', name='taskstatus', create_type=False), nullable=False),
+        sa.Column('priority', postgresql.ENUM('low', 'normal', 'high', 'urgent', name='taskpriority', create_type=False), nullable=False),
         sa.Column('store_id', sa.String(length=50), nullable=False),
         sa.Column('creator_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('assignee_id', postgresql.UUID(as_uuid=True), nullable=True),

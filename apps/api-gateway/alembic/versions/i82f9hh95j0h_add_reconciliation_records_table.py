@@ -19,6 +19,15 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    # Create enum type if it doesn't exist using raw SQL
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE reconciliationstatus AS ENUM ('pending', 'matched', 'mismatched', 'confirmed', 'investigating');
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
+    """)
+
     # Create reconciliation_records table
     op.create_table(
         'reconciliation_records',
@@ -35,7 +44,7 @@ def upgrade() -> None:
         sa.Column('diff_ratio', sa.Float(), nullable=True),
         sa.Column('diff_order_count', sa.Integer(), nullable=True),
         sa.Column('diff_transaction_count', sa.Integer(), nullable=True),
-        sa.Column('status', sa.Enum('pending', 'matched', 'mismatched', 'confirmed', 'investigating', name='reconciliationstatus'), nullable=False),
+        sa.Column('status', postgresql.ENUM('pending', 'matched', 'mismatched', 'confirmed', 'investigating', name='reconciliationstatus', create_type=False), nullable=False),
         sa.Column('discrepancies', sa.JSON(), nullable=True),
         sa.Column('notes', sa.Text(), nullable=True),
         sa.Column('confirmed_by', postgresql.UUID(as_uuid=True), nullable=True),
