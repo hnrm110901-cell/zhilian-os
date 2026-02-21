@@ -582,8 +582,9 @@ async def detect_revenue_anomaly(
     try:
         from datetime import datetime, timedelta
         from ..agents.decision_agent import DecisionAgent
-        from ..services.wechat_work_message_service import wechat_work_message_service
+        from ..services.wechat_alert_service import wechat_alert_service
         from ..models.store import Store
+        from ..models.user import User, UserRole
         from ..core.database import get_db_session
         from sqlalchemy import select
 
@@ -629,31 +630,43 @@ async def detect_revenue_anomaly(
                         )
 
                         if analysis["success"]:
-                            # 构建告警消息
-                            alert_emoji = "⚠️" if deviation < 0 else "📈"
-                            message = f"""{alert_emoji} 营收异常告警
-
-门店: {store.name}
-当前营收: ¥{current_revenue:.2f}
-预期营收: ¥{expected_revenue:.2f}
-偏差: {deviation:+.1f}%
-
-AI分析:
-{analysis['data']['analysis']}
-
-时间: {datetime.now().strftime('%Y-%m-%d %H:%M')}
-"""
-
-                            # 发送企微告警
-                            # TODO: 查询店长和管理员的企微ID
-                            # await wechat_work_message_service.send_text_message(...)
-
-                            logger.info(
-                                "营收异常告警已生成",
-                                store_id=str(store.id),
-                                deviation=deviation
+                            # 查询店长和管理员的企微ID
+                            user_result = await session.execute(
+                                select(User).where(
+                                    User.store_id == store.id,
+                                    User.is_active == True,
+                                    User.role.in_([UserRole.STORE_MANAGER, UserRole.ADMIN]),
+                                    User.wechat_user_id.isnot(None)
+                                )
                             )
-                            alerts_sent += 1
+                            managers = user_result.scalars().all()
+                            recipient_ids = [m.wechat_user_id for m in managers]
+
+                            if recipient_ids:
+                                # 使用WeChatAlertService发送告警
+                                alert_result = await wechat_alert_service.send_revenue_alert(
+                                    store_id=str(store.id),
+                                    store_name=store.name,
+                                    current_revenue=current_revenue,
+                                    expected_revenue=expected_revenue,
+                                    deviation=deviation,
+                                    analysis=analysis['data']['analysis'],
+                                    recipient_ids=recipient_ids
+                                )
+
+                                if alert_result.get("success"):
+                                    alerts_sent += alert_result.get("sent_count", 0)
+                                    logger.info(
+                                        "营收异常告警已发送",
+                                        store_id=str(store.id),
+                                        deviation=deviation,
+                                        sent_count=alert_result.get("sent_count")
+                                    )
+                            else:
+                                logger.warning(
+                                    "无可用接收人",
+                                    store_id=str(store.id)
+                                )
 
                 except Exception as e:
                     logger.error(
@@ -819,8 +832,9 @@ async def check_inventory_alert(
     try:
         from datetime import datetime
         from ..agents.inventory_agent import InventoryAgent
-        from ..services.wechat_work_message_service import wechat_work_message_service
+        from ..services.wechat_alert_service import wechat_alert_service
         from ..models.store import Store
+        from ..models.user import User, UserRole
         from ..core.database import get_db_session
         from sqlalchemy import select
 
@@ -863,27 +877,54 @@ async def check_inventory_alert(
                     )
 
                     if alert_result["success"]:
-                        # 构建预警消息
-                        message = f"""🔔 库存预警 (午高峰前)
+                        # 构建预警项目列表
+                        alert_items = [
+                            {
+                                "dish_name": "宫保鸡丁",
+                                "quantity": 20,
+                                "risk": "high" if 20 < 30 else "medium"
+                            },
+                            {
+                                "dish_name": "麻婆豆腐",
+                                "quantity": 10,
+                                "risk": "high"
+                            }
+                        ]
 
-门店: {store.name}
-时间: {datetime.now().strftime('%Y-%m-%d %H:%M')}
+                        # 查询店长和管理员的企微ID
+                        user_result = await session.execute(
+                            select(User).where(
+                                User.store_id == store.id,
+                                User.is_active == True,
+                                User.role.in_([UserRole.STORE_MANAGER, UserRole.ADMIN]),
+                                User.wechat_user_id.isnot(None)
+                            )
+                        )
+                        managers = user_result.scalars().all()
+                        recipient_ids = [m.wechat_user_id for m in managers]
 
-AI分析:
-{alert_result['data']['alert']}
+                        if recipient_ids:
+                            # 使用WeChatAlertService发送预警
+                            send_result = await wechat_alert_service.send_inventory_alert(
+                                store_id=str(store.id),
+                                store_name=store.name,
+                                alert_items=alert_items,
+                                analysis=alert_result['data']['alert'],
+                                recipient_ids=recipient_ids
+                            )
 
-当前库存状态:
-{chr(10).join([f'• {dish_id}: {qty}份' for dish_id, qty in current_inventory.items()])}
-
-请及时补货，确保午高峰供应充足。
-"""
-
-                        # 发送企微预警
-                        # TODO: 查询店长和管理员的企微ID
-                        # await wechat_work_message_service.send_text_message(...)
-
-                        logger.info(
-                            "库存预警已生成",
+                            if send_result.get("success"):
+                                alerts_sent += send_result.get("sent_count", 0)
+                                logger.info(
+                                    "库存预警已发送",
+                                    store_id=str(store.id),
+                                    sent_count=send_result.get("sent_count")
+                                )
+                        else:
+                            logger.warning(
+                                "无可用接收人",
+                                store_id=str(store.id)
+                            )
                             store_id=str(store.id)
                         )
                         alerts_sent += 1
