@@ -2,6 +2,7 @@
 Celery配置和应用实例
 """
 from celery import Celery
+from celery.schedules import crontab
 from kombu import Exchange, Queue
 import structlog
 
@@ -83,6 +84,38 @@ celery_app.conf.update(
         "src.core.celery_tasks.train_federated_model": {
             "queue": "low_priority",
             "routing_key": "low_priority",
+        },
+        "src.core.celery_tasks.generate_and_send_daily_report": {
+            "queue": "default",
+            "routing_key": "default",
+        },
+        "src.core.celery_tasks.perform_daily_reconciliation": {
+            "queue": "default",
+            "routing_key": "default",
+        },
+    },
+
+    # Celery Beat定时任务调度
+    beat_schedule={
+        # 每日凌晨1点生成前一天的日报
+        "generate-daily-reports": {
+            "task": "src.core.celery_tasks.generate_and_send_daily_report",
+            "schedule": crontab(hour=1, minute=0),
+            "args": (),  # 将为所有门店生成报告
+            "options": {
+                "queue": "default",
+                "priority": 5,
+            },
+        },
+        # 每日凌晨2点执行POS对账
+        "perform-daily-reconciliation": {
+            "task": "src.core.celery_tasks.perform_daily_reconciliation",
+            "schedule": crontab(hour=2, minute=0),
+            "args": (),  # 将为所有门店执行对账
+            "options": {
+                "queue": "default",
+                "priority": 5,
+            },
         },
     },
 )

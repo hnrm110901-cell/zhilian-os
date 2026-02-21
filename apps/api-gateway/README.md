@@ -1,14 +1,24 @@
 # 智链OS API Gateway
 
-智链OS的API网关服务，提供统一的HTTP API接口访问所有智能体。
+智链OS的API网关服务，提供统一的HTTP API接口访问所有智能体和业务功能。
 
 ## 功能特性
 
+### 核心功能
 - 统一的Agent调用接口
 - 自动错误处理和日志记录
 - 执行时间统计
 - CORS支持
 - API文档自动生成
+
+### MVP功能 (已完成)
+- **任务管理系统**: 创建、分配、跟踪任务，支持优先级和状态管理
+- **营业日报**: 自动生成每日营业报告，通过企业微信推送
+- **POS对账系统**: 自动对比POS数据与实际订单，异常告警
+- **企业微信集成**: 消息推送、用户查询、Webhook签名验证
+- **多渠道通知**: 支持企业微信、飞书、短信、语音等多种通知方式
+- **OAuth登录**: 支持企业微信、飞书、钉钉等企业OAuth登录
+- **Redis缓存**: 提升系统性能和响应速度
 
 ## 已集成的Agent
 
@@ -128,11 +138,39 @@ curl -X POST "http://localhost:8000/api/v1/agents/reservation" \\
 ## 测试
 
 ```bash
-# 运行集成测试
-python tests/test_agent_integration.py
-
 # 运行所有测试
 pytest tests/
+
+# 运行特定测试文件
+pytest tests/test_task_service.py
+
+# 查看测试覆盖率
+pytest --cov=src --cov-report=html
+
+# 运行集成测试
+python tests/test_agent_integration.py
+```
+
+详细测试说明请查看 [tests/README.md](tests/README.md)
+
+## 部署
+
+详细部署指南请查看 [DEPLOYMENT.md](DEPLOYMENT.md)
+
+快速启动:
+
+```bash
+# 1. 运行数据库迁移
+python3 -m alembic upgrade head
+
+# 2. 启动API服务
+uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+
+# 3. 启动Celery Worker
+celery -A src.core.celery_app worker --loglevel=info
+
+# 4. 启动Celery Beat (定时任务)
+./scripts/start_celery_beat.sh
 ```
 
 ## 项目结构
