@@ -11,7 +11,7 @@ import time
 
 from src.core.config import settings
 # 核心模块
-from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation, approval, edge_node, decision_validator, federated_learning, recommendations, agent_collaboration
+from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation, approval, edge_node, decision_validator, federated_learning, recommendations, agent_collaboration, embedding
 from src.api.phase5_apis import platform_router, industry_router, supply_chain_router, i18n_router
 # 逐步启用的模块
 from src.api import dashboard, analytics, audit, multi_store, finance, customer360, wechat_triggers, queue, meituan_queue
@@ -211,6 +211,10 @@ app = FastAPI(
             "name": "internationalization",
             "description": "国际化 - 多语言支持、多币种支持、本地化运营",
         },
+        {
+            "name": "embedding",
+            "description": "嵌入模型 - 语义理解、相似度计算、智能推荐",
+        },
     ],
 )
 
@@ -350,6 +354,9 @@ app.include_router(platform_router, tags=["open_platform"])
 app.include_router(industry_router, tags=["industry_solutions"])
 app.include_router(supply_chain_router, tags=["supply_chain"])
 app.include_router(i18n_router, tags=["internationalization"])
+
+# Embedding Model (嵌入模型)
+app.include_router(embedding.router, tags=["embedding"])
 
 # POS模块暂时禁用 (文件为空)
 # app.include_router(pos.router, prefix="/api/v1/pos", tags=["pos"])
