@@ -216,21 +216,47 @@ class DashboardService:
 
     async def get_payment_methods(self) -> Dict[str, Any]:
         """
-        获取支付方式分布
-
-        Returns:
-            支付方式分布数据
+        获取支付方式分布（从 order_metadata 统计，fallback 到 POS 分类列表）
         """
         try:
-            pay_types = await pos_service.get_pay_types()
+            async with get_db_session() as session:
+                result = await session.execute(
+                    select(Order.order_metadata, func.count(Order.id).label("cnt"))
+                    .where(
+                        Order.status == OrderStatus.COMPLETED,
+                        Order.order_metadata.isnot(None),
+                    )
+                    .group_by(Order.order_metadata)
+                    .limit(200)
+                )
+                rows = result.all()
 
-            # 模拟支付方式分布（实际应该从订单中统计）
-            payment_distribution = []
-            for pay_type in pay_types:
-                payment_distribution.append({
-                    "name": pay_type.get("name", "未知"),
-                    "value": 0,  # 实际应该统计使用次数
-                })
+            # 从 order_metadata JSON 中提取 payment_method
+            payment_counts: Dict[str, int] = {}
+            for row in rows:
+                meta = row.order_metadata or {}
+                pay = meta.get("payment_method") or meta.get("pay_type") or meta.get("payType")
+                if pay:
+                    payment_counts[pay] = payment_counts.get(pay, 0) + row.cnt
+
+            if payment_counts:
+                payment_distribution = [
+                    {"name": name, "value": count}
+                    for name, count in sorted(payment_counts.items(), key=lambda x: -x[1])
+                ]
+            else:
+                # fallback：从 POS 获取分类列表，value 为 0
+                try:
+                    pay_types = await pos_service.get_pay_types()
+                    payment_distribution = [
+                        {"name": p.get("name", "未知"), "value": 0} for p in pay_types
+                    ]
+                except Exception:
+                    payment_distribution = [
+                        {"name": "微信支付", "value": 0},
+                        {"name": "支付宝", "value": 0},
+                        {"name": "现金", "value": 0},
+                    ]
 
             return {"payment_methods": payment_distribution}
 

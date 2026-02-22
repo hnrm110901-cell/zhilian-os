@@ -207,10 +207,47 @@ class MarketingAgentService:
         self,
         customer_id: str
     ) -> List[float]:
-        """向量化口味偏好"""
-        # 使用嵌入模型将口味偏好向量化
-        # TODO: 调用embedding_model_service
-        return [0.8, 0.2, 0.6, 0.9, 0.3]  # 示例向量
+        """向量化口味偏好（基于历史订单菜品类别统计）"""
+        # 5维特征向量：[辣度偏好, 素食偏好, 海鲜偏好, 肉类偏好, 甜品偏好]
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(OrderItem.item_name, func.sum(OrderItem.quantity).label("qty"))
+                .join(Order, OrderItem.order_id == Order.id)
+                .where(
+                    Order.customer_phone == customer_id,
+                    Order.status == OrderStatus.COMPLETED,
+                )
+                .group_by(OrderItem.item_name)
+                .order_by(func.sum(OrderItem.quantity).desc())
+                .limit(20)
+            )
+            items = result.all()
+
+        if not items:
+            return [0.5, 0.2, 0.3, 0.6, 0.2]
+
+        total_qty = sum(r.qty for r in items)
+        keywords = {
+            "spicy": ["辣", "麻", "椒", "火锅"],
+            "veg": ["素", "蔬菜", "豆腐", "菌"],
+            "seafood": ["鱼", "虾", "蟹", "海鲜", "贝"],
+            "meat": ["肉", "牛", "猪", "鸡", "鸭", "羊"],
+            "sweet": ["甜", "糕", "饮", "奶", "果"],
+        }
+        scores = {k: 0.0 for k in keywords}
+        for row in items:
+            weight = row.qty / total_qty
+            for key, kws in keywords.items():
+                if any(kw in row.item_name for kw in kws):
+                    scores[key] += weight
+
+        return [
+            min(1.0, scores["spicy"] * 2),
+            min(1.0, scores["veg"] * 2),
+            min(1.0, scores["seafood"] * 2),
+            min(1.0, scores["meat"] * 2),
+            min(1.0, scores["sweet"] * 2),
+        ]
 
     async def _calculate_customer_value(self, customer_id: str) -> float:
         """计算顾客价值（RFM模型）"""

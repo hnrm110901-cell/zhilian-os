@@ -517,20 +517,38 @@ class ZhilianOpenAPI:
         """
         logger.info(f"Generating coupon strategy for {scenario}")
 
-        # TODO: 调用营销服务
+        from src.core.database import get_db_session
+        from src.models.order import Order, OrderStatus
+        from sqlalchemy import select, func
+
+        # 根据目标客群查询历史消费均值，生成合适的优惠券策略
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(
+                    func.avg(Order.final_amount).label("avg_amount"),
+                    func.count(Order.id).label("order_count"),
+                ).where(Order.status == OrderStatus.COMPLETED)
+            )
+            row = result.one()
+            avg_amount_fen = int(row.avg_amount or 10000)  # 分
+
+        avg_yuan = avg_amount_fen / 100
+        # 满减门槛 = 均值的80%，优惠 = 门槛的20%
+        threshold = round(avg_yuan * 0.8 / 10) * 10
+        amount = round(threshold * 0.2 / 5) * 5
+
         strategy = {
             "coupon_type": "满减券",
-            "amount": 20.0,
-            "threshold": 100.0,
-            "valid_days": 7,
-            "expected_conversion": 0.25
+            "scenario": scenario,
+            "target_segment": target_segment,
+            "amount": max(5.0, float(amount)),
+            "threshold": max(20.0, float(threshold)),
+            "valid_days": 7 if scenario != "birthday" else 30,
+            "expected_conversion": 0.25,
+            "basis": f"基于历史均单价 ¥{avg_yuan:.0f} 计算",
         }
 
-        return APIResponse(
-            code=200,
-            message="优惠券策略生成成功",
-            data=strategy
-        )
+        return APIResponse(code=200, message="优惠券策略生成成功", data=strategy)
 
     async def trigger_marketing_campaign(
         self,
@@ -590,22 +608,32 @@ class ZhilianOpenAPI:
         """
         logger.info(f"Querying SOP for scenario: {scenario}")
 
-        # TODO: 调用SOP服务
-        sop = {
-            "title": "顾客投诉菜品口味不佳的应对话术",
-            "steps": [
-                "立即道歉，表达理解",
-                "询问具体问题",
-                "提供解决方案",
-                "记录反馈"
-            ]
-        }
+        from src.services.sop_knowledge_base_service import sop_knowledge_base, QueryContext
 
-        return APIResponse(
-            code=200,
-            message="SOP查询成功",
-            data=sop
+        ctx = QueryContext(
+            user_role=context.get("user_role", "store_manager") if context else "store_manager",
+            user_experience_years=context.get("experience_years", 1) if context else 1,
+            current_situation=scenario,
+            urgency=context.get("urgency", "medium") if context else "medium",
+            store_type=context.get("store_type", "正餐") if context else "正餐",
         )
+        recommendations = await sop_knowledge_base.query_best_practice(scenario, ctx)
+
+        if recommendations:
+            top = recommendations[0]
+            sop = {
+                "sop_id": top.sop_id,
+                "title": top.title,
+                "relevance_score": top.relevance_score,
+                "confidence": top.confidence,
+                "summary": top.summary,
+                "key_steps": top.key_steps,
+                "estimated_time_minutes": top.estimated_time_minutes,
+            }
+        else:
+            sop = {"title": f"场景「{scenario}」暂无匹配SOP", "key_steps": [], "confidence": 0.0}
+
+        return APIResponse(code=200, message="SOP查询成功", data=sop)
 
     async def get_federated_model(
         self,
