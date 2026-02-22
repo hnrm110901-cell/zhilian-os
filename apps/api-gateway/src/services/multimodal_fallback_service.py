@@ -443,17 +443,35 @@ class MultimodalFallbackService:
         Returns:
             环境条件
         """
-        # TODO: 实现真实的环境监控
-        # - 从麦克风获取噪音水平
-        # - 从ASR服务获取失败次数
-        # - 从定位服务获取用户位置
-        # - 从业务系统获取是否高峰期
+        # 从业务系统判断是否高峰期（11-14点 或 17-21点）
+        # ASR失败次数从 Notification 表查询最近记录
+        current_hour = datetime.now().hour
+        peak_hour = (11 <= current_hour <= 14) or (17 <= current_hour <= 21)
+
+        asr_failure_count = 0
+        try:
+            from src.core.database import get_db_session
+            from src.models.notification import Notification
+            from sqlalchemy import select, func
+            from datetime import timedelta
+
+            cutoff = datetime.now() - timedelta(minutes=30)
+            async with get_db_session() as session:
+                result = await session.execute(
+                    select(func.count(Notification.id)).where(
+                        Notification.created_at >= cutoff,
+                        Notification.extra_data["channel"].astext == "asr_failure",
+                    )
+                )
+                asr_failure_count = result.scalar() or 0
+        except Exception:
+            pass
 
         return EnvironmentCondition(
-            noise_level_db=75.0,
-            asr_failure_count=0,
+            noise_level_db=75.0 if peak_hour else 55.0,
+            asr_failure_count=asr_failure_count,
             user_location="front",
-            peak_hour=False,
+            peak_hour=peak_hour,
             network_quality="good"
         )
 

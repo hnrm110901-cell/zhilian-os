@@ -133,11 +133,53 @@ class ZhilianOpenAPI:
         """
         logger.info(f"Syncing {len(orders)} orders")
 
-        # TODO: 实现实际的API调用
+        from src.core.database import get_db_session
+        from src.models.order import Order, OrderStatus
+        from sqlalchemy import select
+
+        valid_statuses = {s.value for s in OrderStatus}
+        synced, errors = 0, []
+
+        async with get_db_session() as session:
+            for order in orders:
+                try:
+                    result = await session.execute(
+                        select(Order).where(Order.id == order.order_id)
+                    )
+                    existing = result.scalar_one_or_none()
+                    status = OrderStatus(order.status) if order.status in valid_statuses else OrderStatus.COMPLETED
+
+                    if existing:
+                        existing.status = status
+                        existing.total_amount = int(order.total_amount * 100)
+                        existing.discount_amount = int(order.discount_amount * 100)
+                        existing.final_amount = int(order.actual_amount * 100)
+                    else:
+                        session.add(Order(
+                            id=order.order_id,
+                            store_id=order.store_id,
+                            table_number=order.table_number,
+                            status=status,
+                            total_amount=int(order.total_amount * 100),
+                            discount_amount=int(order.discount_amount * 100),
+                            final_amount=int(order.actual_amount * 100),
+                            order_time=order.order_time,
+                            order_metadata={
+                                "payment_method": order.payment_method,
+                                "customer_id": order.customer_id,
+                                "order_type": order.order_type,
+                                "items": order.items,
+                            },
+                        ))
+                    synced += 1
+                except Exception as e:
+                    errors.append({"order_id": order.order_id, "error": str(e)})
+            await session.commit()
+
         return APIResponse(
             code=200,
             message="订单同步成功",
-            data={"synced_count": len(orders)}
+            data={"synced_count": synced, "errors": errors}
         )
 
     async def sync_dishes(

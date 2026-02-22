@@ -321,9 +321,7 @@ class HumanInTheLoopService:
         """
         logger.info("发送审批通知", request_id=request.request_id)
 
-        # TODO: 调用企业微信API发送消息
-        message = f"""
-【智链OS - 需要您的审批】
+        message = f"""【智链OS - 需要您的审批】
 
 操作类型: {request.operation_type}
 风险等级: {request.risk_level}
@@ -334,10 +332,17 @@ AI推理: {request.reasoning}
 预期影响:
 {request.expected_impact}
 
-请在{request.expires_at.strftime('%Y-%m-%d %H:%M')}前完成审批
-        """
+请在{request.expires_at.strftime('%Y-%m-%d %H:%M')}前完成审批"""
 
-        logger.info("审批通知已发送", message=message)
+        try:
+            from src.services.wechat_work_message_service import WeChatWorkMessageService
+            wechat_service = WeChatWorkMessageService()
+            target = request.approver_id or "@all"
+            await wechat_service.send_text_message(target, message)
+            logger.info("审批通知已发送", request_id=request.request_id, target=target)
+        except Exception as e:
+            logger.error("审批通知发送失败，降级为日志记录", request_id=request.request_id, error=str(e))
+            logger.info("审批通知内容", message=message)
 
     async def approve_request(
         self,
