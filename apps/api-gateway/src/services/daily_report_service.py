@@ -4,7 +4,7 @@ Daily Report Service
 """
 from typing import Dict, Any, Optional, List
 from datetime import datetime, date, timedelta
-from sqlalchemy import select, and_, func
+from sqlalchemy import select, and_, func, or_
 import structlog
 import uuid
 
@@ -295,8 +295,25 @@ class DailyReportService:
                 (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0.0
             )
 
-            # 3. 服务问题数（暂时返回0，后续可以从反馈系统获取）
-            service_issue_count = 0
+            # 3. 服务问题数（从Notification表查询高优先级或错误类型通知）
+            from src.models.notification import Notification, NotificationPriority, NotificationType
+            notif_result = await session.execute(
+                select(func.count(Notification.id)).where(
+                    and_(
+                        Notification.store_id == store_id,
+                        Notification.created_at >= start_datetime,
+                        Notification.created_at <= end_datetime,
+                        or_(
+                            Notification.type == NotificationType.ERROR,
+                            Notification.priority.in_([
+                                NotificationPriority.HIGH,
+                                NotificationPriority.URGENT
+                            ])
+                        )
+                    )
+                )
+            )
+            service_issue_count = notif_result.scalar() or 0
 
             return {
                 "inventory_alert_count": inventory_alert_count,
