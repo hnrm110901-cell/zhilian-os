@@ -297,7 +297,30 @@ class KMSService:
 
         logger.info(f"KMS Audit: {json.dumps(audit_entry)}")
 
-        # TODO: 写入专门的审计日志系统
+        # 写入审计日志表（异步，不阻塞主流程）
+        try:
+            import asyncio
+            from src.models.audit_log import AuditLog
+
+            async def _save():
+                from src.core.database import get_db_session
+                async with get_db_session() as session:
+                    log = AuditLog(
+                        action=f"kms_{operation}",
+                        resource_type="encryption_key",
+                        resource_id=key_id,
+                        user_id="system",
+                        description=f"KMS操作: {operation}",
+                        changes=metadata or {},
+                    )
+                    session.add(log)
+                    await session.commit()
+
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.ensure_future(_save())
+        except Exception as e:
+            logger.warning(f"KMS审计日志写入失败: {e}")
 
     def get_key_metadata(self, key_id: str) -> Optional[Dict]:
         """

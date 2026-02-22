@@ -12,8 +12,7 @@ from ..services.pos_service import pos_service
 from ..services.member_service import member_service
 from ..services.agent_service import agent_service
 from ..core.database import get_db_session
-from ..models.order import Order, OrderItem, OrderStatus
-from ..models.dish import Dish, DishCategory
+from ..models.order import Order, OrderItem, OrderStatusfrom ..models.dish import Dish, DishCategory
 
 logger = structlog.get_logger()
 
@@ -300,21 +299,45 @@ class DashboardService:
 
     async def get_agent_performance(self) -> Dict[str, Any]:
         """
-        获取Agent性能数据
-
-        Returns:
-            Agent性能数据
+        获取Agent性能数据（从 DecisionLog 统计）
         """
         try:
-            agents = [
-                {"name": "排班Agent", "tasks": 0, "success_rate": 0.0},
-                {"name": "订单Agent", "tasks": 0, "success_rate": 0.0},
-                {"name": "库存Agent", "tasks": 0, "success_rate": 0.0},
-                {"name": "服务Agent", "tasks": 0, "success_rate": 0.0},
-                {"name": "培训Agent", "tasks": 0, "success_rate": 0.0},
-                {"name": "决策Agent", "tasks": 0, "success_rate": 0.0},
-                {"name": "预定Agent", "tasks": 0, "success_rate": 0.0},
-            ]
+            from ..models.decision_log import DecisionLog, DecisionStatus
+
+            agent_map = {
+                "schedule": "排班Agent",
+                "order": "订单Agent",
+                "inventory": "库存Agent",
+                "service": "服务Agent",
+                "training": "培训Agent",
+                "human_in_the_loop": "决策Agent",
+                "reservation": "预定Agent",
+            }
+
+            async with get_db_session() as session:
+                result = await session.execute(
+                    select(
+                        DecisionLog.agent_type,
+                        func.count(DecisionLog.id).label("total"),
+                        func.count(DecisionLog.id).filter(
+                            DecisionLog.decision_status == DecisionStatus.EXECUTED
+                        ).label("executed"),
+                    ).group_by(DecisionLog.agent_type)
+                )
+                rows = result.all()
+
+            db_agents = {
+                row.agent_type: {
+                    "tasks": row.total,
+                    "success_rate": round(row.executed / row.total, 2) if row.total > 0 else 0.0,
+                }
+                for row in rows
+            }
+
+            agents = []
+            for key, display_name in agent_map.items():
+                data = db_agents.get(key, {"tasks": 0, "success_rate": 0.0})
+                agents.append({"name": display_name, **data})
 
             return {"agents": agents}
 
@@ -324,19 +347,54 @@ class DashboardService:
 
     async def get_realtime_metrics(self) -> Dict[str, Any]:
         """
-        获取实时指标
-
-        Returns:
-            实时指标数据
+        获取实时指标（从 Order 和 Queue 表查询）
         """
         try:
+            from ..models.queue import Queue, QueueStatus
+
+            active_statuses = [
+                OrderStatus.PENDING, OrderStatus.CONFIRMED,
+                OrderStatus.PREPARING, OrderStatus.READY,
+            ]
+
+            async with get_db_session() as session:
+                # 当前进行中订单
+                orders_result = await session.execute(
+                    select(func.count(Order.id)).where(Order.status.in_(active_statuses))
+                )
+                current_orders = orders_result.scalar() or 0
+
+                # 厨房待制作
+                kitchen_result = await session.execute(
+                    select(func.count(Order.id)).where(
+                        Order.status.in_([OrderStatus.CONFIRMED, OrderStatus.PREPARING])
+                    )
+                )
+                kitchen_queue = kitchen_result.scalar() or 0
+
+                # 当前排队人数
+                queue_result = await session.execute(
+                    select(func.sum(Queue.party_size)).where(Queue.status == QueueStatus.WAITING)
+                )
+                current_customers = queue_result.scalar() or 0
+
+                # 平均等待时间（排队数 × 15分钟/桌）
+                queue_count_result = await session.execute(
+                    select(func.count(Queue.queue_id)).where(Queue.status == QueueStatus.WAITING)
+                )
+                queue_count = queue_count_result.scalar() or 0
+                average_wait_time = queue_count * 15
+
+                # 桌台占用率（用进行中订单数 / 50 估算）
+                table_occupancy_rate = min(1.0, round(current_orders / 50, 2))
+
             return {
                 "timestamp": datetime.now().isoformat(),
-                "current_orders": 0,  # 当前进行中的订单
-                "current_customers": 0,  # 当前在店顾客
-                "table_occupancy_rate": 0.0,  # 桌台占用率
-                "average_wait_time": 0,  # 平均等待时间（分钟）
-                "kitchen_queue": 0,  # 厨房待制作订单
+                "current_orders": current_orders,
+                "current_customers": current_customers,
+                "table_occupancy_rate": table_occupancy_rate,
+                "average_wait_time": average_wait_time,
+                "kitchen_queue": kitchen_queue,
             }
 
         except Exception as e:

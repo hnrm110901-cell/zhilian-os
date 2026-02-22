@@ -461,15 +461,57 @@ class MultimodalFallbackService:
         self,
         time_range_hours: int = 24
     ) -> Dict[str, Any]:
-        """获取投递统计"""
-        # TODO: 实现统计功能
-        return {
-            "total_messages": 0,
-            "by_channel": {},
-            "by_priority": {},
-            "success_rate": 0.0,
-            "average_response_time_ms": 0
-        }
+        """获取投递统计（从 Notification 表聚合）"""
+        import asyncio
+        from datetime import timedelta
+
+        async def _query():
+            from src.core.database import get_db_session
+            from src.models.notification import Notification
+            from sqlalchemy import select, func
+
+            cutoff = datetime.now() - timedelta(hours=time_range_hours)
+            async with get_db_session() as session:
+                total_result = await session.execute(
+                    select(func.count(Notification.id)).where(Notification.created_at >= cutoff)
+                )
+                total = total_result.scalar() or 0
+
+                by_type_result = await session.execute(
+                    select(Notification.type, func.count(Notification.id).label("cnt"))
+                    .where(Notification.created_at >= cutoff)
+                    .group_by(Notification.type)
+                )
+                by_priority_result = await session.execute(
+                    select(Notification.priority, func.count(Notification.id).label("cnt"))
+                    .where(Notification.created_at >= cutoff)
+                    .group_by(Notification.priority)
+                )
+                read_result = await session.execute(
+                    select(func.count(Notification.id)).where(
+                        Notification.created_at >= cutoff,
+                        Notification.is_read == True,
+                    )
+                )
+                read_count = read_result.scalar() or 0
+
+            return {
+                "total_messages": total,
+                "by_channel": {row.type: row.cnt for row in by_type_result.all()},
+                "by_priority": {row.priority: row.cnt for row in by_priority_result.all()},
+                "success_rate": round(read_count / total, 2) if total > 0 else 0.0,
+                "average_response_time_ms": 0,
+            }
+
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                future = asyncio.ensure_future(_query())
+                return {"total_messages": 0, "by_channel": {}, "by_priority": {}, "success_rate": 0.0, "average_response_time_ms": 0}
+            return loop.run_until_complete(_query())
+        except Exception as e:
+            logger.warning(f"获取投递统计失败: {e}")
+            return {"total_messages": 0, "by_channel": {}, "by_priority": {}, "success_rate": 0.0, "average_response_time_ms": 0}
 
 
 # 全局实例

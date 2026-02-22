@@ -333,6 +333,20 @@ class FederatedBOMService:
         average_loss_rate = np.mean(list(seasonal_loss_rates.values()))
         optimal_order_quantity = 100 / (1 - average_loss_rate)  # 简化计算
 
+        # 分析高损耗日期（损耗率超过均值+1个标准差的季节对应的月份）
+        std_loss = np.std(list(seasonal_loss_rates.values()))
+        threshold = average_loss_rate + std_loss
+        season_months = {
+            "spring": [3, 4, 5],
+            "summer": [6, 7, 8],
+            "autumn": [9, 10, 11],
+            "winter": [12, 1, 2],
+        }
+        peak_loss_days = []
+        for season, rate in seasonal_loss_rates.items():
+            if rate >= threshold:
+                peak_loss_days.extend([f"{m}月" for m in season_months.get(season, [])])
+
         return IngredientLossPattern(
             ingredient_id=ingredient_id,
             ingredient_name=f"Ingredient_{ingredient_id}",
@@ -340,7 +354,7 @@ class FederatedBOMService:
             region=region,
             average_loss_rate=average_loss_rate,
             std_loss_rate=np.std(list(seasonal_loss_rates.values())),
-            peak_loss_days=[],  # TODO: 分析具体日期
+            peak_loss_days=peak_loss_days,
             optimal_order_quantity=optimal_order_quantity,
             confidence=0.8 if global_model else 0.3
         )
