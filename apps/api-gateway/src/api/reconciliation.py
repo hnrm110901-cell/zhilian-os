@@ -162,9 +162,20 @@ async def get_reconciliation_record(
         except ValueError:
             raise HTTPException(status_code=400, detail="无效的record_id格式")
 
-        # 这里简化处理，实际应该通过service获取
-        # 暂时返回错误，提示需要实现
-        raise HTTPException(status_code=501, detail="功能开发中")
+        from src.core.database import get_db_session
+        from src.models.reconciliation import ReconciliationRecord
+        from sqlalchemy import select
+
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(ReconciliationRecord).where(ReconciliationRecord.id == record_uuid)
+            )
+            record = result.scalar_one_or_none()
+
+        if not record:
+            raise HTTPException(status_code=404, detail="对账记录不存在")
+
+        return {"success": True, "data": record.to_dict()}
 
     except HTTPException:
         raise

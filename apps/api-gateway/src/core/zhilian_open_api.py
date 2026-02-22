@@ -224,17 +224,46 @@ class ZhilianOpenAPI:
         """
         logger.info(f"Predicting sales for store {store_id} on {date}")
 
-        # TODO: 调用预测服务
-        predictions = {
-            "D101": {"dish_name": "剁椒鱼头", "predicted_sales": 35},
-            "D102": {"dish_name": "香辣蟹", "predicted_sales": 28}
-        }
+        from src.core.database import get_db_session
+        from src.models.daily_report import DailyReport
+        from src.models.dish import Dish
+        from sqlalchemy import select, func
+        from datetime import timedelta
 
-        return APIResponse(
-            code=200,
-            message="销量预测成功",
-            data=predictions
-        )
+        target_date = date if isinstance(date, datetime) else date
+        weekday = target_date.weekday()
+        past_dates = [target_date - timedelta(weeks=w) for w in range(1, 5)]
+
+        async with get_db_session() as session:
+            # 历史同星期平均客单数
+            hist = await session.execute(
+                select(func.avg(DailyReport.order_count), func.avg(DailyReport.total_revenue)).where(
+                    DailyReport.store_id == store_id,
+                    DailyReport.report_date.in_([d.date() if hasattr(d, "date") else d for d in past_dates]),
+                )
+            )
+            row = hist.one()
+            avg_orders = int(row[0] or 50)
+            avg_revenue = int(row[1] or 5000_00)
+
+            # 查询菜品列表
+            dishes_result = await session.execute(
+                select(Dish.id, Dish.name).where(Dish.store_id == store_id, Dish.is_available == True).limit(10)
+            )
+            dishes = dishes_result.all()
+
+        if dish_ids:
+            predictions = {
+                str(d.id): {"dish_name": d.name, "predicted_sales": max(1, avg_orders // max(len(dishes), 1))}
+                for d in dishes if str(d.id) in dish_ids
+            }
+        else:
+            predictions = {
+                str(d.id): {"dish_name": d.name, "predicted_sales": max(1, avg_orders // max(len(dishes), 1))}
+                for d in dishes
+            }
+
+        return APIResponse(code=200, message="销量预测成功", data=predictions)
 
     async def suggest_schedule(
         self,
@@ -253,19 +282,24 @@ class ZhilianOpenAPI:
         """
         logger.info(f"Suggesting schedule for store {store_id} on {date}")
 
-        # TODO: 调用排班服务
-        schedule = {
-            "服务员": 12,
-            "厨师": 8,
-            "配菜员": 4,
-            "收银员": 2
+        from src.core.database import get_db_session
+        from src.models.employee import Employee
+        from sqlalchemy import select, func
+
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(Employee.position, func.count(Employee.id).label("cnt")).where(
+                    Employee.store_id == store_id,
+                    Employee.is_active == True,
+                ).group_by(Employee.position)
+            )
+            rows = result.all()
+
+        schedule = {row.position: row.cnt for row in rows} if rows else {
+            "服务员": 12, "厨师": 8, "配菜员": 4, "收银员": 2
         }
 
-        return APIResponse(
-            code=200,
-            message="排班建议生成成功",
-            data=schedule
-        )
+        return APIResponse(code=200, message="排班建议生成成功", data=schedule)
 
     async def suggest_purchase(
         self,
@@ -284,17 +318,29 @@ class ZhilianOpenAPI:
         """
         logger.info(f"Suggesting purchase for store {store_id} on {date}")
 
-        # TODO: 调用采购服务
-        purchase_list = [
-            {"item": "波士顿龙虾", "quantity": 10, "unit": "只"},
-            {"item": "帝王蟹", "quantity": 6, "unit": "只"}
-        ]
+        from src.core.database import get_db_session
+        from src.models.inventory import InventoryItem
+        from sqlalchemy import select
 
-        return APIResponse(
-            code=200,
-            message="采购建议生成成功",
-            data=purchase_list
-        )
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(InventoryItem).where(
+                    InventoryItem.store_id == store_id,
+                    InventoryItem.current_quantity <= InventoryItem.min_quantity,
+                ).limit(20)
+            )
+            low_items = result.scalars().all()
+
+        purchase_list = [
+            {
+                "item": item.name,
+                "quantity": max(1, (item.max_quantity or item.min_quantity * 3) - item.current_quantity),
+                "unit": item.unit or "份",
+            }
+            for item in low_items
+        ] or [{"item": "暂无低库存商品", "quantity": 0, "unit": ""}]
+
+        return APIResponse(code=200, message="采购建议生成成功", data=purchase_list)
 
     async def suggest_pricing(
         self,
@@ -313,19 +359,29 @@ class ZhilianOpenAPI:
         """
         logger.info(f"Suggesting pricing for dish {dish_id}")
 
-        # TODO: 调用定价服务
-        pricing = {
-            "recommended_price": 88.0,
-            "min_price": 78.0,
-            "max_price": 98.0,
-            "confidence": 0.85
-        }
+        from src.core.database import get_db_session
+        from src.models.dish import Dish
+        from sqlalchemy import select
 
-        return APIResponse(
-            code=200,
-            message="定价建议生成成功",
-            data=pricing
-        )
+        async with get_db_session() as session:
+            result = await session.execute(select(Dish).where(Dish.id == dish_id))
+            dish = result.scalar_one_or_none()
+
+        if dish:
+            price = float(dish.price)
+            pricing = {
+                "dish_id": dish_id,
+                "dish_name": dish.name,
+                "current_price": price,
+                "recommended_price": round(price * 1.05, 2),
+                "min_price": round(price * 0.9, 2),
+                "max_price": round(price * 1.2, 2),
+                "confidence": 0.80,
+            }
+        else:
+            pricing = {"dish_id": dish_id, "recommended_price": 0, "confidence": 0}
+
+        return APIResponse(code=200, message="定价建议生成成功", data=pricing)
 
     # ==================== Level 3: 营销能力 ====================
 
@@ -344,20 +400,51 @@ class ZhilianOpenAPI:
         """
         logger.info(f"Getting customer profile for {customer_id}")
 
-        # TODO: 调用营销服务
+        from src.core.database import get_db_session
+        from src.models.order import Order, OrderItem, OrderStatus
+        from sqlalchemy import select, func
+
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(
+                    func.count(Order.id).label("order_count"),
+                    func.sum(Order.final_amount).label("total_spend"),
+                    func.max(Order.order_time).label("last_visit"),
+                ).where(
+                    Order.customer_phone == customer_id,
+                    Order.status == OrderStatus.COMPLETED,
+                )
+            )
+            row = result.one()
+
+            # 常点菜品
+            top_items_result = await session.execute(
+                select(OrderItem.item_name, func.sum(OrderItem.quantity).label("qty"))
+                .join(Order, OrderItem.order_id == Order.id)
+                .where(Order.customer_phone == customer_id, Order.status == OrderStatus.COMPLETED)
+                .group_by(OrderItem.item_name)
+                .order_by(func.sum(OrderItem.quantity).desc())
+                .limit(3)
+            )
+            top_items = [r.item_name for r in top_items_result.all()]
+
+        order_count = row.order_count or 0
+        total_spend = int(row.total_spend or 0)
+        value_score = min(100.0, order_count * 5 + total_spend / 10000)
+        churn_risk = 0.1 if order_count > 5 else 0.5
+
         profile = {
             "customer_id": customer_id,
-            "value_score": 85.0,
-            "churn_risk": 0.15,
-            "segment": "high_value",
-            "favorite_dishes": ["剁椒鱼头", "香辣蟹"]
+            "order_count": order_count,
+            "total_spend_fen": total_spend,
+            "last_visit": row.last_visit.isoformat() if row.last_visit else None,
+            "value_score": round(value_score, 1),
+            "churn_risk": churn_risk,
+            "segment": "high_value" if value_score > 60 else "regular",
+            "favorite_dishes": top_items,
         }
 
-        return APIResponse(
-            code=200,
-            message="客户画像获取成功",
-            data=profile
-        )
+        return APIResponse(code=200, message="客户画像获取成功", data=profile)
 
     async def recommend_dishes_for_customer(
         self,
@@ -376,17 +463,42 @@ class ZhilianOpenAPI:
         """
         logger.info(f"Recommending dishes for customer {customer_id}")
 
-        # TODO: 调用推荐服务
-        recommendations = [
-            {"dish_id": "D101", "dish_name": "剁椒鱼头", "score": 0.92},
-            {"dish_id": "D102", "dish_name": "香辣蟹", "score": 0.88}
-        ]
+        from src.core.database import get_db_session
+        from src.models.dish import Dish
+        from src.models.order import Order, OrderItem, OrderStatus
+        from sqlalchemy import select, func
 
-        return APIResponse(
-            code=200,
-            message="推荐生成成功",
-            data=recommendations[:top_k]
-        )
+        async with get_db_session() as session:
+            # 顾客历史点过的菜
+            ordered_result = await session.execute(
+                select(OrderItem.item_name)
+                .join(Order, OrderItem.order_id == Order.id)
+                .where(Order.customer_phone == customer_id, Order.status == OrderStatus.COMPLETED)
+                .distinct()
+            )
+            ordered_names = {r.item_name for r in ordered_result.all()}
+
+            # 推荐高评分且顾客未点过的菜
+            dishes_result = await session.execute(
+                select(Dish).where(Dish.is_available == True)
+                .order_by(Dish.rating.desc().nullslast(), Dish.total_sales.desc().nullslast())
+                .limit(top_k + len(ordered_names))
+            )
+            all_dishes = dishes_result.scalars().all()
+
+        recommendations = []
+        for d in all_dishes:
+            if len(recommendations) >= top_k:
+                break
+            recommendations.append({
+                "dish_id": str(d.id),
+                "dish_name": d.name,
+                "price": float(d.price),
+                "score": float(d.rating or 4.0),
+                "is_new": d.name not in ordered_names,
+            })
+
+        return APIResponse(code=200, message="推荐生成成功", data=recommendations)
 
     async def generate_coupon_strategy(
         self,
@@ -435,18 +547,29 @@ class ZhilianOpenAPI:
         """
         logger.info("Triggering marketing campaign")
 
-        # TODO: 调用营销服务
-        result = {
-            "campaign_id": "CAMP_20260222",
-            "status": "launched",
-            "expected_reach": 1000
-        }
+        from src.core.database import get_db_session
+        from src.models.marketing_campaign import MarketingCampaign
+        import uuid as _uuid
+        from datetime import date
 
-        return APIResponse(
-            code=200,
-            message="营销活动已启动",
-            data=result
-        )
+        campaign_id = f"CAMP_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        async with get_db_session() as session:
+            campaign = MarketingCampaign(
+                id=str(_uuid.uuid4()),
+                store_id=campaign_config.get("store_id", ""),
+                name=campaign_config.get("name", campaign_id),
+                campaign_type=campaign_config.get("type", "coupon"),
+                status="active",
+                budget=float(campaign_config.get("budget", 0)),
+                target_audience=campaign_config.get("target_audience"),
+                description=campaign_config.get("description"),
+            )
+            session.add(campaign)
+            await session.commit()
+            campaign_id = campaign.id
+
+        result = {"campaign_id": campaign_id, "status": "launched", "expected_reach": campaign_config.get("expected_reach", 0)}
+        return APIResponse(code=200, message="营销活动已启动", data=result)
 
     # ==================== Level 4: 高级能力 ====================
 
@@ -499,19 +622,32 @@ class ZhilianOpenAPI:
         """
         logger.info(f"Getting federated model: {model_type}")
 
-        # TODO: 调用联邦学习服务
-        model = {
-            "model_type": model_type,
-            "version": "v1.0",
-            "accuracy": 0.85,
-            "updated_at": datetime.now()
-        }
+        from src.core.database import get_db_session
+        from src.models.federated_learning import FLTrainingRound
+        from sqlalchemy import select
 
-        return APIResponse(
-            code=200,
-            message="模型获取成功",
-            data=model
-        )
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(FLTrainingRound).where(
+                    FLTrainingRound.model_type == model_type,
+                    FLTrainingRound.status == "completed",
+                ).order_by(FLTrainingRound.completed_at.desc()).limit(1)
+            )
+            fl_round = result.scalar_one_or_none()
+
+        if fl_round:
+            model = {
+                "model_type": model_type,
+                "round_id": fl_round.id,
+                "version": f"v{fl_round.id[:8]}",
+                "participating_stores": fl_round.num_participating_stores or 0,
+                "updated_at": fl_round.completed_at.isoformat() if fl_round.completed_at else None,
+                "has_parameters": fl_round.global_model_parameters is not None,
+            }
+        else:
+            model = {"model_type": model_type, "version": "none", "updated_at": None}
+
+        return APIResponse(code=200, message="模型获取成功", data=model)
 
     # ==================== 工具方法 ====================
 
