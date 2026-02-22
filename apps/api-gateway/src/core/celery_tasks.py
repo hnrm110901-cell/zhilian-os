@@ -580,13 +580,14 @@ async def detect_revenue_anomaly(
         检测结果
     """
     try:
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, date
         from ..agents.decision_agent import DecisionAgent
         from ..services.wechat_alert_service import wechat_alert_service
         from ..models.store import Store
         from ..models.user import User, UserRole
+        from ..models.order import Order, OrderStatus
         from ..core.database import get_db_session
-        from sqlalchemy import select
+        from sqlalchemy import select, func
 
         logger.info(
             "开始检测营收异常",
@@ -611,10 +612,45 @@ async def detect_revenue_anomaly(
 
             for store in stores:
                 try:
-                    # TODO: 从数据库获取当前营收和预期营收
-                    # 这里使用模拟数据
-                    current_revenue = 8000.0  # 实际应从数据库查询
-                    expected_revenue = 10000.0  # 实际应从历史数据计算
+                    now = datetime.now()
+                    today_start = datetime.combine(date.today(), datetime.min.time())
+
+                    # 当前营收：今天到目前为止已完成/已上菜的订单
+                    rev_result = await session.execute(
+                        select(func.coalesce(func.sum(Order.final_amount), 0)).where(
+                            Order.store_id == store.id,
+                            Order.order_time >= today_start,
+                            Order.order_time <= now,
+                            Order.status.in_([OrderStatus.COMPLETED, OrderStatus.SERVED])
+                        )
+                    )
+                    current_revenue = float(rev_result.scalar() or 0) / 100
+
+                    # 预期营收：过去4周同星期同时段的平均值
+                    current_elapsed = timedelta(hours=now.hour, minutes=now.minute)
+                    expected_samples = []
+                    for weeks_ago in range(1, 5):
+                        past_date = date.today() - timedelta(weeks=weeks_ago)
+                        past_start = datetime.combine(past_date, datetime.min.time())
+                        past_end = past_start + current_elapsed
+                        past_rev = await session.execute(
+                            select(func.coalesce(func.sum(Order.final_amount), 0)).where(
+                                Order.store_id == store.id,
+                                Order.order_time >= past_start,
+                                Order.order_time <= past_end,
+                                Order.status.in_([OrderStatus.COMPLETED, OrderStatus.SERVED])
+                            )
+                        )
+                        val = float(past_rev.scalar() or 0) / 100
+                        if val > 0:
+                            expected_samples.append(val)
+
+                    if not expected_samples:
+                        # 无历史数据，跳过本门店
+                        logger.debug("无历史营收数据，跳过", store_id=str(store.id))
+                        continue
+
+                    expected_revenue = sum(expected_samples) / len(expected_samples)
 
                     # 计算偏差
                     deviation = ((current_revenue - expected_revenue) / expected_revenue) * 100
@@ -769,15 +805,39 @@ AI经营分析:
 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M')}
 """
 
-                        # 发送企微消息
-                        # TODO: 查询店长和管理员的企微ID
-                        # await wechat_work_message_service.send_text_message(...)
+                        # 查询店长和管理员的企微ID并发送
+                        from ..models.user import User, UserRole
+                        user_result = await session.execute(
+                            select(User).where(
+                                User.store_id == store.id,
+                                User.is_active == True,
+                                User.role.in_([UserRole.STORE_MANAGER, UserRole.ADMIN]),
+                                User.wechat_user_id.isnot(None)
+                            )
+                        )
+                        managers = user_result.scalars().all()
+                        sent_count = 0
+                        for manager in managers:
+                            try:
+                                send_result = await wechat_work_message_service.send_text_message(
+                                    user_id=manager.wechat_user_id,
+                                    content=message
+                                )
+                                if send_result.get("success"):
+                                    sent_count += 1
+                            except Exception as send_err:
+                                logger.error(
+                                    "发送简报失败",
+                                    user_id=str(manager.id),
+                                    error=str(send_err)
+                                )
 
                         logger.info(
-                            "昨日简报已生成",
-                            store_id=str(store.id)
+                            "昨日简报已生成并发送",
+                            store_id=str(store.id),
+                            sent_count=sent_count
                         )
-                        reports_sent += 1
+                        reports_sent += sent_count
 
                 except Exception as e:
                     logger.error(
@@ -835,6 +895,7 @@ async def check_inventory_alert(
         from ..services.wechat_alert_service import wechat_alert_service
         from ..models.store import Store
         from ..models.user import User, UserRole
+        from ..models.inventory import InventoryItem, InventoryStatus
         from ..core.database import get_db_session
         from sqlalchemy import select
 
@@ -861,12 +922,26 @@ async def check_inventory_alert(
 
             for store in stores:
                 try:
-                    # TODO: 从数据库获取当前库存
-                    # 这里使用模拟数据
+                    # 从数据库查询低库存/缺货库存项
+                    inv_result = await session.execute(
+                        select(InventoryItem).where(
+                            InventoryItem.store_id == store.id,
+                            InventoryItem.status.in_([
+                                InventoryStatus.LOW,
+                                InventoryStatus.CRITICAL,
+                                InventoryStatus.OUT_OF_STOCK,
+                            ])
+                        )
+                    )
+                    low_stock_items = inv_result.scalars().all()
+
+                    if not low_stock_items:
+                        logger.debug("无库存预警项", store_id=str(store.id))
+                        continue
+
+                    # 构建 InventoryAgent 所需的 current_inventory 字典
                     current_inventory = {
-                        "DISH001": 20,  # 宫保鸡丁
-                        "DISH002": 50,  # 鱼香肉丝
-                        "DISH003": 10,  # 麻婆豆腐
+                        item.id: item.current_quantity for item in low_stock_items
                     }
 
                     # 使用InventoryAgent检查低库存
@@ -877,18 +952,18 @@ async def check_inventory_alert(
                     )
 
                     if alert_result["success"]:
-                        # 构建预警项目列表
+                        # 构建预警项目列表（来自真实数据）
                         alert_items = [
                             {
-                                "dish_name": "宫保鸡丁",
-                                "quantity": 20,
-                                "risk": "high" if 20 < 30 else "medium"
-                            },
-                            {
-                                "dish_name": "麻婆豆腐",
-                                "quantity": 10,
-                                "risk": "high"
+                                "dish_name": item.name,
+                                "quantity": item.current_quantity,
+                                "unit": item.unit or "",
+                                "min_quantity": item.min_quantity,
+                                "risk": "high" if item.status in (
+                                    InventoryStatus.CRITICAL, InventoryStatus.OUT_OF_STOCK
+                                ) else "medium",
                             }
+                            for item in low_stock_items
                         ]
 
                         # 查询店长和管理员的企微ID
