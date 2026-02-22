@@ -418,8 +418,36 @@ AI推理: {request.reasoning}
         """
         logger.info("获取待审批请求", store_id=store_id)
 
-        # TODO: 从数据库查询
-        return []
+        from src.core.database import get_db_session
+        from src.models.decision_log import DecisionLog, DecisionStatus
+        from sqlalchemy import select
+
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(DecisionLog).where(
+                    DecisionLog.store_id == store_id,
+                    DecisionLog.decision_status == DecisionStatus.PENDING,
+                ).order_by(DecisionLog.created_at.desc()).limit(20)
+            )
+            logs = result.scalars().all()
+
+        requests = []
+        for log in logs:
+            request = ApprovalRequest(
+                request_id=log.id,
+                decision_id=log.id,
+                risk_level=RiskLevel.HIGH,
+                action_type=log.decision_type.value if log.decision_type else "unknown",
+                action_description=str(log.ai_suggestion) if log.ai_suggestion else "",
+                expected_impact={},
+                approval_comment=None,
+                created_at=log.created_at,
+                approved_at=None,
+                expires_at=log.created_at + timedelta(hours=24) if log.created_at else datetime.now(),
+            )
+            requests.append(request)
+
+        return requests
 
     async def get_approval_statistics(
         self,
@@ -432,15 +460,75 @@ AI推理: {request.reasoning}
         """
         logger.info("获取审批统计", store_id=store_id)
 
-        # TODO: 从数据库统计
+        from src.core.database import get_db_session
+        from src.models.decision_log import DecisionLog, DecisionStatus
+        from sqlalchemy import select, func
+
+        async with get_db_session() as session:
+            total_result = await session.execute(
+                select(func.count(DecisionLog.id)).where(DecisionLog.store_id == store_id)
+            )
+            total_decisions = int(total_result.scalar() or 0)
+
+            auto_result = await session.execute(
+                select(func.count(DecisionLog.id)).where(
+                    DecisionLog.store_id == store_id,
+                    DecisionLog.decision_status == DecisionStatus.EXECUTED,
+                    DecisionLog.manager_id == None,
+                )
+            )
+            auto_executed = int(auto_result.scalar() or 0)
+
+            approval_result = await session.execute(
+                select(func.count(DecisionLog.id)).where(
+                    DecisionLog.store_id == store_id,
+                    DecisionLog.decision_status.in_([
+                        DecisionStatus.APPROVED, DecisionStatus.REJECTED, DecisionStatus.MODIFIED
+                    ])
+                )
+            )
+            approval_required = int(approval_result.scalar() or 0)
+
+            approved_result = await session.execute(
+                select(func.count(DecisionLog.id)).where(
+                    DecisionLog.store_id == store_id,
+                    DecisionLog.decision_status == DecisionStatus.APPROVED,
+                )
+            )
+            approved_count = int(approved_result.scalar() or 0)
+
+            time_result = await session.execute(
+                select(
+                    func.avg(
+                        func.extract("epoch", DecisionLog.approved_at) -
+                        func.extract("epoch", DecisionLog.created_at)
+                    )
+                ).where(
+                    DecisionLog.store_id == store_id,
+                    DecisionLog.approved_at != None,
+                )
+            )
+            avg_seconds = float(time_result.scalar() or 0)
+
+            trust_result = await session.execute(
+                select(func.avg(DecisionLog.trust_score)).where(
+                    DecisionLog.store_id == store_id,
+                    DecisionLog.trust_score != None,
+                )
+            )
+            avg_trust = float(trust_result.scalar() or 85.0)
+
+        approval_rate = round(approved_count / approval_required, 2) if approval_required > 0 else 0.0
+        current_trust_phase = await self.get_store_trust_phase(store_id)
+
         stats = {
-            "total_decisions": 1000,
-            "auto_executed": 850,
-            "approval_required": 150,
-            "approval_rate": 0.90,  # 90%的审批请求被批准
-            "avg_approval_time_hours": 2.5,
-            "trust_score": 0.85,  # 信任评分（0-1）
-            "current_trust_phase": TrustPhase.ASSISTANCE
+            "total_decisions": total_decisions,
+            "auto_executed": auto_executed,
+            "approval_required": approval_required,
+            "approval_rate": approval_rate,
+            "avg_approval_time_hours": round(avg_seconds / 3600, 1),
+            "trust_score": round(avg_trust / 100.0, 2),
+            "current_trust_phase": current_trust_phase,
         }
 
         return stats
