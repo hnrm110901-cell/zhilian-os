@@ -337,43 +337,46 @@ class SchedulerMonitorService:
 
     async def get_queue_stats(self) -> Dict[str, Any]:
         """
-        获取队列统计 (模拟)
+        获取队列统计（从 Celery 实时查询）
 
         Returns:
             队列统计数据
         """
         try:
-            # 实际应该从Celery获取队列信息
-            # 这里返回模拟数据
+            from src.core.celery_app import celery_app
+            import asyncio
+
+            loop = asyncio.get_event_loop()
+
+            def _inspect():
+                insp = celery_app.control.inspect(timeout=2.0)
+                active = insp.active() or {}
+                reserved = insp.reserved() or {}
+                worker_stats = insp.stats() or {}
+                return active, reserved, worker_stats
+
+            active, reserved, worker_stats = await loop.run_in_executor(None, _inspect)
+
+            active_count = sum(len(tasks) for tasks in active.values())
+            reserved_count = sum(len(tasks) for tasks in reserved.values())
+            worker_count = len(worker_stats)
+
             stats = {
                 "queues": {
-                    "high_priority": {
-                        "pending": 0,
-                        "active": 0,
-                        "completed_last_hour": 0
-                    },
                     "default": {
-                        "pending": 0,
-                        "active": 0,
-                        "completed_last_hour": 0
-                    },
-                    "low_priority": {
-                        "pending": 0,
-                        "active": 0,
-                        "completed_last_hour": 0
+                        "pending": reserved_count,
+                        "active": active_count,
+                        "completed_last_hour": 0,
                     }
                 },
                 "workers": {
-                    "active": 1,
-                    "total": 1
+                    "active": worker_count,
+                    "total": worker_count,
                 },
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
-            return {
-                "success": True,
-                "stats": stats
-            }
+            return {"success": True, "stats": stats}
 
         except Exception as e:
             logger.error(
