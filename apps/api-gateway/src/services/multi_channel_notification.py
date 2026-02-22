@@ -527,38 +527,43 @@ class WeChatNotificationHandler(NotificationChannelHandler):
     ) -> bool:
         """发送微信公众号模板消息"""
         try:
-            # Future Enhancement: WeChat Official Account integration (non-essential)
-            # Enterprise WeChat is sufficient for MVP
-            # import requests
-            #
-            # # 获取access_token
-            # token_url = "https://api.weixin.qq.com/cgi-bin/token"
-            # token_params = {
-            #     "grant_type": "client_credential",
-            #     "appid": wechat_config.WECHAT_APP_ID,
-            #     "secret": wechat_config.WECHAT_APP_SECRET
-            # }
-            # token_resp = requests.get(token_url, params=token_params)
-            # access_token = token_resp.json()["access_token"]
-            #
-            # # 发送模板消息
-            # send_url = f"https://api.weixin.qq.com/cgi-bin/message/template/send?access_token={access_token}"
-            # template_data = {
-            #     "touser": openid,
-            #     "template_id": extra_data.get("template_id"),
-            #     "url": extra_data.get("url", ""),
-            #     "data": {
-            #         "first": {"value": title},
-            #         "keyword1": {"value": content},
-            #         "remark": {"value": "感谢使用智链OS"}
-            #     }
-            # }
-            # send_resp = requests.post(send_url, json=template_data)
-            # return send_resp.json()["errcode"] == 0
+            import httpx
 
-            logger.info("微信公众号消息模拟发送", openid=openid, title=title)
-            await asyncio.sleep(0.1)
-            return True
+            # 获取 access_token
+            token_url = "https://api.weixin.qq.com/cgi-bin/token"
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                token_resp = await client.get(token_url, params={
+                    "grant_type": "client_credential",
+                    "appid": wechat_config.WECHAT_APP_ID,
+                    "secret": wechat_config.WECHAT_APP_SECRET,
+                })
+                token_data = token_resp.json()
+                access_token = token_data.get("access_token")
+                if not access_token:
+                    logger.error("微信公众号获取token失败", error=token_data.get("errmsg"))
+                    return False
+
+                # 发送模板消息
+                send_url = f"https://api.weixin.qq.com/cgi-bin/message/template/send?access_token={access_token}"
+                template_data = {
+                    "touser": openid,
+                    "template_id": extra_data.get("template_id") if extra_data else "",
+                    "url": extra_data.get("url", "") if extra_data else "",
+                    "data": {
+                        "first": {"value": title, "color": "#173177"},
+                        "keyword1": {"value": content, "color": "#173177"},
+                        "remark": {"value": "感谢使用智链OS", "color": "#173177"},
+                    },
+                }
+                send_resp = await client.post(send_url, json=template_data)
+                result = send_resp.json()
+
+            if result.get("errcode") == 0:
+                logger.info("微信公众号消息发送成功", openid=openid, title=title)
+                return True
+            else:
+                logger.error("微信公众号消息发送失败", errcode=result.get("errcode"), errmsg=result.get("errmsg"))
+                return False
 
         except Exception as e:
             logger.error("微信公众号消息发送失败", error=str(e))
