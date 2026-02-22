@@ -8,6 +8,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from typing import Optional, List
 import structlog
 
+from src.core.tenant_context import TenantContext
+
 logger = structlog.get_logger()
 
 
@@ -43,6 +45,12 @@ class StoreAccessMiddleware(BaseHTTPMiddleware):
             # 从请求中提取store_id
             store_id = await self._extract_store_id(request)
 
+            # 如果没有提取到store_id，尝试从用户信息获取
+            if not store_id:
+                user = getattr(request.state, "user", None)
+                if user:
+                    store_id = user.get("store_id")
+
             if store_id:
                 # 验证用户是否有权访问该门店
                 if not await self._validate_store_access(request, store_id):
@@ -62,12 +70,22 @@ class StoreAccessMiddleware(BaseHTTPMiddleware):
                         },
                     )
 
+                # 设置租户上下文
+                TenantContext.set_current_tenant(store_id)
+                logger.debug("Tenant context set in middleware", store_id=store_id)
+
             # 继续处理请求
             response = await call_next(request)
+
+            # 清除租户上下文
+            TenantContext.clear_current_tenant()
+
             return response
 
         except Exception as e:
             logger.error("Store access middleware error", error=str(e))
+            # 确保清除租户上下文
+            TenantContext.clear_current_tenant()
             # 出错时允许请求继续，避免阻塞正常流程
             return await call_next(request)
 

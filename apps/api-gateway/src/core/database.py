@@ -7,6 +7,8 @@ from contextlib import asynccontextmanager
 import structlog
 
 from src.core.config import settings
+from src.core.tenant_context import TenantContext
+from src.core.tenant_filter import enable_tenant_filter
 
 logger = structlog.get_logger()
 
@@ -59,9 +61,12 @@ AsyncSessionLocal = async_sessionmaker(
 
 
 @asynccontextmanager
-async def get_db_session():
+async def get_db_session(enable_tenant_isolation: bool = True):
     """
-    Async context manager for database sessions
+    Async context manager for database sessions with tenant isolation
+
+    Args:
+        enable_tenant_isolation: 是否启用租户隔离（默认True）
 
     Usage:
         async with get_db_session() as session:
@@ -69,6 +74,18 @@ async def get_db_session():
     """
     async with AsyncSessionLocal() as session:
         try:
+            # 启用租户过滤器
+            if enable_tenant_isolation:
+                tenant_id = TenantContext.get_current_tenant()
+                if tenant_id:
+                    enable_tenant_filter(session)
+                    logger.debug("Tenant isolation enabled", tenant_id=tenant_id)
+                else:
+                    logger.warning(
+                        "Tenant isolation requested but no tenant context set. "
+                        "Session will not be filtered."
+                    )
+
             yield session
             await session.commit()
         except Exception as e:
@@ -79,9 +96,12 @@ async def get_db_session():
             await session.close()
 
 
-async def get_db():
+async def get_db(enable_tenant_isolation: bool = True):
     """
-    Dependency for FastAPI endpoints
+    Dependency for FastAPI endpoints with tenant isolation
+
+    Args:
+        enable_tenant_isolation: 是否启用租户隔离（默认True）
 
     Usage:
         @app.get("/items")
@@ -90,6 +110,13 @@ async def get_db():
     """
     async with AsyncSessionLocal() as session:
         try:
+            # 启用租户过滤器
+            if enable_tenant_isolation:
+                tenant_id = TenantContext.get_current_tenant()
+                if tenant_id:
+                    enable_tenant_filter(session)
+                    logger.debug("Tenant isolation enabled for endpoint", tenant_id=tenant_id)
+
             yield session
         finally:
             await session.close()
