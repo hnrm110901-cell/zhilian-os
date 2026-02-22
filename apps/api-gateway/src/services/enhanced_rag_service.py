@@ -160,9 +160,13 @@ class EnhancedRAGService:
         Returns:
             查询结果
         """
-        # TODO: 实现实际的RAG查询逻辑
-        # 1. 向量检索客户的历史数据
-        # 2. 使用LLM生成回答
+        # 根据query_type从数据库检索相关数据作为上下文
+        from src.core.database import get_db_session
+        from src.models.order import Order, OrderStatus
+        from src.models.daily_report import DailyReport
+        from src.models.inventory import InventoryItem
+        from sqlalchemy import select, func
+        from datetime import date, timedelta
 
         logger.info(
             "Querying with customer data",
@@ -171,12 +175,74 @@ class EnhancedRAGService:
             data_source="customer_data",
         )
 
+        retrieved_docs = []
+        answer_data = {}
+
+        async with get_db_session() as session:
+            if query_type in ("revenue", "sales", "营收", "销售"):
+                # 查询最近30天营收数据
+                cutoff = date.today() - timedelta(days=30)
+                result = await session.execute(
+                    select(
+                        func.sum(DailyReport.total_revenue).label("total"),
+                        func.avg(DailyReport.total_revenue).label("avg_daily"),
+                        func.sum(DailyReport.customer_count).label("customers"),
+                        func.count(DailyReport.id).label("days"),
+                    ).where(
+                        DailyReport.store_id == self.store_id,
+                        DailyReport.report_date >= cutoff,
+                    )
+                )
+                row = result.one()
+                answer_data = {
+                    "period": "最近30天",
+                    "total_revenue_fen": row.total or 0,
+                    "avg_daily_revenue_fen": int(row.avg_daily or 0),
+                    "total_customers": row.customers or 0,
+                    "data_days": row.days or 0,
+                }
+                retrieved_docs = [{"type": "daily_report", "days": row.days or 0}]
+
+            elif query_type in ("inventory", "库存"):
+                result = await session.execute(
+                    select(
+                        func.count(InventoryItem.id).label("total"),
+                        func.count(InventoryItem.id).filter(
+                            InventoryItem.current_quantity <= InventoryItem.min_quantity
+                        ).label("low_stock"),
+                    ).where(InventoryItem.store_id == self.store_id)
+                )
+                row = result.one()
+                answer_data = {
+                    "total_items": row.total or 0,
+                    "low_stock_items": row.low_stock or 0,
+                }
+                retrieved_docs = [{"type": "inventory", "items": row.total or 0}]
+
+            else:
+                # 通用：查询最近订单统计
+                result = await session.execute(
+                    select(
+                        func.count(Order.id).label("count"),
+                        func.sum(Order.total_amount).label("revenue"),
+                    ).where(
+                        Order.store_id == self.store_id,
+                        Order.status == OrderStatus.COMPLETED,
+                    )
+                )
+                row = result.one()
+                answer_data = {
+                    "total_orders": row.count or 0,
+                    "total_revenue_fen": int(row.revenue or 0),
+                }
+                retrieved_docs = [{"type": "orders", "count": row.count or 0}]
+
         return {
-            "answer": "基于您的历史数据生成的回答（待实现）",
+            "answer": answer_data,
             "data_source": "customer_data",
             "confidence": "high",
             "data_sufficiency": data_sufficiency,
-            "retrieved_documents": [],  # 检索到的相关文档
+            "retrieved_documents": retrieved_docs,
             "note": "此建议基于您门店的实际运营数据，具有较高的准确性。",
         }
 

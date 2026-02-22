@@ -539,18 +539,44 @@ class MarketingAgentService:
         Returns:
             效果分析
         """
-        # TODO: 从数据库查询活动数据
+        # 从数据库查询活动数据
+        from src.models.marketing_campaign import MarketingCampaign
 
-        performance = {
-            "campaign_id": campaign_id,
-            "reach": 1000,              # 触达人数
-            "conversion": 250,          # 转化人数
-            "conversion_rate": 0.25,    # 转化率
-            "revenue": 62500.0,         # 带来营收
-            "cost": 5000.0,             # 成本
-            "roi": 12.5,                # ROI
-            "avg_order_amount": 250.0   # 平均客单价
-        }
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(MarketingCampaign).where(MarketingCampaign.id == campaign_id)
+            )
+            campaign = result.scalar_one_or_none()
+
+        if campaign:
+            reach = campaign.reach_count or 0
+            conversion = campaign.conversion_count or 0
+            revenue = campaign.revenue_generated or 0.0
+            cost = campaign.actual_cost or campaign.budget or 0.0
+            conversion_rate = conversion / reach if reach > 0 else 0.0
+            roi = (revenue - cost) / cost if cost > 0 else 0.0
+            avg_order = revenue / conversion if conversion > 0 else 0.0
+            performance = {
+                "campaign_id": campaign_id,
+                "reach": reach,
+                "conversion": conversion,
+                "conversion_rate": round(conversion_rate, 4),
+                "revenue": revenue,
+                "cost": cost,
+                "roi": round(roi, 2),
+                "avg_order_amount": round(avg_order, 2),
+            }
+        else:
+            performance = {
+                "campaign_id": campaign_id,
+                "reach": 0,
+                "conversion": 0,
+                "conversion_rate": 0.0,
+                "revenue": 0.0,
+                "cost": 0.0,
+                "roi": 0.0,
+                "avg_order_amount": 0.0,
+            }
 
         return performance
 

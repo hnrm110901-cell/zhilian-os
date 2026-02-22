@@ -293,9 +293,11 @@ class RaaSPricingService:
 
         async with get_db_session() as session:
             result = await session.execute(
-                select(Store.created_at).where(Store.id == store_id)
+                select(Store.created_at, Store.config).where(Store.id == store_id)
             )
-            created_at = result.scalar_one_or_none()
+            row = result.one_or_none()
+            created_at = row[0] if row else None
+            store_config = row[1] if row else {}
 
         start_date = created_at if created_at else current_date - timedelta(days=120)
 
@@ -303,8 +305,13 @@ class RaaSPricingService:
         if (current_date - start_date).days <= self.FREE_TRIAL_DAYS:
             return PricingTier.FREE_TRIAL
 
-        # 试用期结束后，根据门店选择返回对应层级
-        # TODO: 从数据库查询门店选择的层级
+        # 从门店配置中读取选择的层级
+        tier_str = (store_config or {}).get("pricing_tier")
+        if tier_str:
+            try:
+                return PricingTier(tier_str)
+            except ValueError:
+                pass
         return PricingTier.COST_SAVING
 
     async def generate_monthly_bill(
