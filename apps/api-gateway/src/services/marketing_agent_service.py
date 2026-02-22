@@ -17,11 +17,15 @@ Marketing Agent Service
 """
 
 from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from pydantic import BaseModel
 from enum import Enum
 import numpy as np
 import logging
+from sqlalchemy import select, func
+from src.core.database import get_db_session
+from src.models.order import Order, OrderStatus
+from src.models.dish import Dish
 
 logger = logging.getLogger(__name__)
 
@@ -123,14 +127,22 @@ class MarketingAgentService:
 
     async def _get_customer_basic_info(self, customer_id: str) -> Dict:
         """获取顾客基础信息"""
-        # TODO: 从数据库查询
+        # customer_id 为手机号
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(Order.customer_name, Order.customer_phone).where(
+                    Order.customer_phone == customer_id
+                ).limit(1)
+            )
+            row = result.one_or_none()
+
         return {
-            "name": "张三",
-            "phone": "138****1234",
-            "gender": "male",
-            "age": 32,
-            "register_date": "2024-01-15",
-            "member_level": "gold"
+            "name": row[0] if row else "未知",
+            "phone": customer_id,
+            "gender": "unknown",
+            "age": None,
+            "register_date": None,
+            "member_level": "regular",
         }
 
     async def _analyze_consumption_behavior(
@@ -138,16 +150,57 @@ class MarketingAgentService:
         customer_id: str
     ) -> Dict:
         """分析消费行为"""
-        # TODO: 从订单数据分析
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(
+                    func.count(Order.id),
+                    func.coalesce(func.sum(Order.final_amount), 0),
+                    func.max(Order.order_time),
+                ).where(
+                    Order.customer_phone == customer_id,
+                    Order.status.in_([OrderStatus.COMPLETED, OrderStatus.SERVED]),
+                )
+            )
+            row = result.one()
+
+            # 推断偏好时段（按小时统计）
+            hour_result = await session.execute(
+                select(func.extract("hour", Order.order_time)).where(
+                    Order.customer_phone == customer_id,
+                    Order.status.in_([OrderStatus.COMPLETED, OrderStatus.SERVED]),
+                )
+            )
+            hours = [int(h[0]) for h in hour_result.all() if h[0] is not None]
+
+        total_orders = int(row[0] or 0)
+        total_amount = float(row[1] or 0) / 100.0
+        last_order_time = row[2]
+
+        avg_order_amount = round(total_amount / total_orders, 1) if total_orders > 0 else 0.0
+        last_order_date = last_order_time.strftime("%Y-%m-%d") if last_order_time else None
+        days_since_last = (datetime.now() - last_order_time).days if last_order_time else 999
+
+        # 推断偏好时段
+        if hours:
+            avg_hour = sum(hours) / len(hours)
+            if avg_hour < 10:
+                preferred_time = "早餐"
+            elif avg_hour < 14:
+                preferred_time = "午餐"
+            else:
+                preferred_time = "晚餐"
+        else:
+            preferred_time = "晚餐"
+
         return {
-            "total_orders": 25,
-            "total_amount": 5800.0,
-            "avg_order_amount": 232.0,
-            "last_order_date": "2026-02-15",
-            "days_since_last_order": 7,
-            "favorite_dishes": ["剁椒鱼头", "香辣蟹", "干锅虾"],
-            "preferred_time": "晚餐",
-            "preferred_day": "周末"
+            "total_orders": total_orders,
+            "total_amount": total_amount,
+            "avg_order_amount": avg_order_amount,
+            "last_order_date": last_order_date,
+            "days_since_last_order": days_since_last,
+            "favorite_dishes": [],
+            "preferred_time": preferred_time,
+            "preferred_day": "周末",
         }
 
     async def _vectorize_taste_preference(
@@ -362,28 +415,29 @@ class MarketingAgentService:
         # 1. 获取顾客口味向量
         taste_vector = await self._vectorize_taste_preference(customer_id)
 
-        # 2. 获取所有菜品
-        # TODO: 从数据库查询
+        # 2. 从数据库查询门店可售菜品（按评分+销量排序）
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(Dish).where(
+                    Dish.store_id == tenant_id,
+                    Dish.is_available == True,
+                ).order_by(
+                    Dish.rating.desc(),
+                    Dish.total_sales.desc(),
+                ).limit(top_k * 3)
+            )
+            dishes = result.scalars().all()
 
-        # 3. 计算相似度
-        # TODO: 使用嵌入模型计算
-
-        # 4. 排序并返回Top K
+        # 3. 返回 Top K（无嵌入模型时按评分排序）
         recommendations = [
             {
-                "dish_id": "D101",
-                "dish_name": "剁椒鱼头",
-                "price": 88.0,
-                "similarity": 0.92,
-                "reason": "基于您的口味偏好推荐"
-            },
-            {
-                "dish_id": "D102",
-                "dish_name": "香辣蟹",
-                "price": 128.0,
-                "similarity": 0.88,
-                "reason": "喜欢剁椒鱼头的顾客也喜欢这道菜"
+                "dish_id": str(d.id),
+                "dish_name": d.name,
+                "price": float(d.price) / 100.0 if d.price else 0.0,
+                "similarity": round(float(d.rating or 4.0) / 5.0, 2),
+                "reason": "门店热门推荐" if d.is_recommended else "基于评分推荐",
             }
+            for d in dishes
         ]
 
         return recommendations[:top_k]
