@@ -309,10 +309,14 @@ class Customer360Service:
             query = select(POSTransaction).order_by(desc(POSTransaction.transaction_time))
 
             # POS交易主要通过手机号关联
-            if identifier_type in ["phone", "member_id"]:
-                # 假设customer_info字段存储JSON，包含phone或member_id
-                # 这里需要根据实际数据结构调整
-                pass
+            if identifier_type == "phone":
+                query = query.where(
+                    POSTransaction.customer_info["phone"].astext == identifier
+                )
+            elif identifier_type == "member_id":
+                query = query.where(
+                    POSTransaction.customer_info["member_id"].astext == identifier
+                )
 
             if store_id:
                 query = query.where(POSTransaction.store_id == store_id)
@@ -352,8 +356,11 @@ class Customer360Service:
             # 审计日志可能通过user_id或resource_id关联
             query = select(AuditLog).order_by(desc(AuditLog.timestamp)).limit(100)
 
-            # 这里需要根据实际情况调整查询条件
-            # 可能需要通过user_id或其他字段关联
+            if identifier_type == "user_id":
+                query = query.where(AuditLog.user_id == identifier)
+            elif identifier_type in ["phone", "member_id"]:
+                # 通过 resource_id 关联（resource_id 可能存储手机号或会员ID）
+                query = query.where(AuditLog.resource_id == identifier)
 
             result = await session.execute(query)
             logs = result.scalars().all()

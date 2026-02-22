@@ -154,9 +154,19 @@ class QueueService:
         )
         waiting_count = result.scalar() or 0
 
-        # 简单估算：每组客人平均等待15分钟
-        # 实际应该基于历史数据和当前餐厅状态
-        base_wait_time = 15
+        # 基于历史实际等待时间计算均值，fallback 15 分钟
+        from datetime import timedelta
+        hist_result = await session.execute(
+            select(func.avg(Queue.actual_wait_time)).where(
+                and_(
+                    Queue.store_id == store_id,
+                    Queue.actual_wait_time.isnot(None),
+                    Queue.created_at >= (datetime.utcnow() - timedelta(days=7)),
+                )
+            )
+        )
+        avg_wait = hist_result.scalar()
+        base_wait_time = int(avg_wait) if avg_wait else 15
         estimated_time = waiting_count * base_wait_time
 
         # 根据人数调整（大桌等待时间可能更长）

@@ -261,19 +261,41 @@ async def get_reconciliation_summary(
     返回最近N天的对账情况汇总
     """
     try:
-        # 简化实现，返回基本统计
-        # 实际应该从数据库聚合统计
+        from src.core.database import get_db_session
+        from src.models.reconciliation import ReconciliationRecord, ReconciliationStatus
+        from sqlalchemy import select, func, case
+        from datetime import timedelta
+
+        cutoff = date.today() - timedelta(days=days)
+        async with get_db_session() as session:
+            row = (await session.execute(
+                select(
+                    func.count(ReconciliationRecord.id).label("total"),
+                    func.sum(case(
+                        (ReconciliationRecord.status == ReconciliationStatus.MATCHED, 1), else_=0
+                    )).label("matched"),
+                    func.sum(case(
+                        (ReconciliationRecord.status == ReconciliationStatus.MISMATCHED, 1), else_=0
+                    )).label("mismatched"),
+                    func.sum(case(
+                        (ReconciliationRecord.status == ReconciliationStatus.PENDING, 1), else_=0
+                    )).label("pending"),
+                    func.coalesce(func.sum(ReconciliationRecord.diff_amount), 0).label("total_diff"),
+                    func.coalesce(func.avg(ReconciliationRecord.diff_ratio), 0.0).label("avg_diff_ratio"),
+                ).where(ReconciliationRecord.reconciliation_date >= cutoff)
+            )).one()
+
         return {
             "success": True,
             "data": {
-                "total_records": 0,
-                "matched_count": 0,
-                "mismatched_count": 0,
-                "pending_count": 0,
-                "total_diff_amount": 0,
-                "avg_diff_ratio": 0.0
+                "total_records": row.total or 0,
+                "matched_count": int(row.matched or 0),
+                "mismatched_count": int(row.mismatched or 0),
+                "pending_count": int(row.pending or 0),
+                "total_diff_amount": int(row.total_diff or 0),
+                "avg_diff_ratio": round(float(row.avg_diff_ratio or 0.0), 4),
             },
-            "message": "功能开发中"
+            "message": "success",
         }
 
     except Exception as e:

@@ -357,8 +357,13 @@ class VoiceCommandService:
                 raise ValueError(f"Store not found: {store_id}")
 
             # 发送支援请求到企微群
-            # 这里应该调用企微API发送消息
-            # 简化实现：记录支援请求
+            try:
+                from .wechat_work_message_service import WeChatWorkMessageService
+                wechat = WeChatWorkMessageService()
+                msg = f"【支援请求】\n门店：{store.name}\n请求人：{user_id}\n时间：{datetime.utcnow().strftime('%H:%M:%S')}\n请附近同事尽快赶来支援"
+                await wechat.send_text_message("@all", msg)
+            except Exception as we:
+                logger.warning("企微支援通知发送失败", error=str(we))
 
             support_request = {
                 "id": str(uuid.uuid4()),
