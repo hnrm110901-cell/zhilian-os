@@ -167,9 +167,53 @@ class BenchmarkService(BaseService):
             "labor_cost_ratio": labor_cost_ratio,
             "food_cost_ratio": food_cost_ratio,
             "profit_margin": profit_margin,
-            "customer_satisfaction": 4.0,
+            "customer_satisfaction": await self._get_customer_satisfaction(store_id, start_date, end_date),
             "days": days,
         }
+
+    async def _get_customer_satisfaction(
+        self,
+        store_id: str,
+        start_date: date,
+        end_date: date
+    ) -> float:
+        """基于投诉通知率估算客户满意度（1-5分）"""
+        try:
+            from src.models.notification import Notification, NotificationType
+            from sqlalchemy import and_
+            start_dt = datetime.combine(start_date, datetime.min.time())
+            end_dt = datetime.combine(end_date, datetime.max.time())
+            async with get_db_session() as session:
+                total_result = await session.execute(
+                    select(func.count(Notification.id)).where(
+                        and_(
+                            Notification.store_id == store_id,
+                            Notification.created_at >= start_dt,
+                            Notification.created_at <= end_dt,
+                        )
+                    )
+                )
+                complaint_result = await session.execute(
+                    select(func.count(Notification.id)).where(
+                        and_(
+                            Notification.store_id == store_id,
+                            Notification.created_at >= start_dt,
+                            Notification.created_at <= end_dt,
+                            Notification.type == NotificationType.ERROR,
+                        )
+                    )
+                )
+            total = total_result.scalar() or 0
+            complaints = complaint_result.scalar() or 0
+            if total == 0:
+                return 4.0
+            complaint_rate = complaints / total
+            # 投诉率 0% → 5.0分，10%+ → 3.0分
+            score = 5.0 - complaint_rate * 20
+            return round(max(1.0, min(5.0, score)), 1)
+        except Exception as e:
+            logger.warning("客户满意度计算失败", error=str(e))
+            return 4.0
 
     async def _get_benchmark_stores(self, store_id: str) -> List[str]:
         """

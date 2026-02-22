@@ -168,8 +168,14 @@ class VoiceCommandService:
             if waiting_queues == 0:
                 voice_response = "当前没有排队，可以直接接待顾客"
             else:
-                # 计算预计等待时间
-                avg_wait_time = waiting_queues * 15  # 假设每桌15分钟
+                # 从历史数据计算每桌平均等待时间
+                from sqlalchemy import func as sa_func
+                avg_actual = db.query(sa_func.avg(Queue.actual_wait_time)).filter(
+                    Queue.store_id == store_id,
+                    Queue.actual_wait_time.isnot(None)
+                ).scalar()
+                avg_wait_per_table = int(avg_actual) if avg_actual else 15
+                avg_wait_time = waiting_queues * avg_wait_per_table
                 voice_response = f"当前有{waiting_queues}桌排队，预计等待{avg_wait_time}分钟"
 
             return {

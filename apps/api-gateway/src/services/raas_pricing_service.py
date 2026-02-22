@@ -205,6 +205,91 @@ class RaaSPricingService:
         current_inventory_turnover = 15.0
         current_repeat_rate = 32.0
 
+        try:
+            from sqlalchemy import and_
+            from src.models.inventory import InventoryItem
+            from src.models.store import Store
+            from src.models.order import Order
+
+            async with get_db_session() as session:
+                # 食材损耗率：低库存物品占比 × 10（估算损耗百分比）
+                inv_result = await session.execute(
+                    select(
+                        func.count(InventoryItem.id).label("total"),
+                        func.sum(func.case(
+                            (InventoryItem.quantity <= InventoryItem.min_quantity, 1), else_=0
+                        )).label("low_stock")
+                    ).where(InventoryItem.store_id == store_id)
+                )
+                inv_row = inv_result.first()
+                if inv_row and inv_row.total:
+                    current_food_waste_rate = round(
+                        (inv_row.low_stock or 0) / inv_row.total * 10, 1
+                    )
+
+                # 人工成本 & 能源成本：从 Store 配置读取
+                store_result = await session.execute(
+                    select(Store).where(Store.id == store_id)
+                )
+                store = store_result.scalar_one_or_none()
+                if store:
+                    monthly_rev = store.monthly_revenue_target or 0
+                    labor_ratio = float(store.labor_cost_ratio_target or 28.0) / 100
+                    if monthly_rev:
+                        current_labor_cost = monthly_rev * labor_ratio / 30 * days_in_period
+                    current_energy_cost = float(
+                        (store.config or {}).get("monthly_energy_cost", 7500.0)
+                    )
+
+                # 库存周转率：期间订单数 / 库存品类数 × 月化系数
+                order_count_result = await session.execute(
+                    select(func.count(Order.id)).where(
+                        and_(
+                            Order.store_id == store_id,
+                            Order.created_at >= current_period_start,
+                            Order.created_at <= current_period_end,
+                            Order.status != "cancelled",
+                        )
+                    )
+                )
+                order_count = order_count_result.scalar() or 0
+                total_items = inv_row.total if inv_row and inv_row.total else 1
+                current_inventory_turnover = round(
+                    order_count / max(days_in_period, 1) * 30 / max(total_items, 1), 1
+                )
+                current_inventory_turnover = max(current_inventory_turnover, 1.0)
+
+                # 复购率：有多次订单的手机号 / 总手机号
+                phone_counts_sq = (
+                    select(
+                        Order.customer_phone,
+                        func.count(Order.id).label("cnt")
+                    ).where(
+                        and_(
+                            Order.store_id == store_id,
+                            Order.created_at >= current_period_start,
+                            Order.created_at <= current_period_end,
+                            Order.customer_phone.isnot(None),
+                        )
+                    ).group_by(Order.customer_phone)
+                    .subquery()
+                )
+                repeat_result = await session.execute(
+                    select(
+                        func.count(phone_counts_sq.c.customer_phone).label("total"),
+                        func.sum(func.case(
+                            (phone_counts_sq.c.cnt > 1, 1), else_=0
+                        )).label("repeat")
+                    )
+                )
+                repeat_row = repeat_result.first()
+                if repeat_row and repeat_row.total:
+                    current_repeat_rate = round(
+                        (repeat_row.repeat or 0) / repeat_row.total * 100, 1
+                    )
+        except Exception as _e:
+            logger.warning("效果指标DB查询失败，使用默认值", error=str(_e))
+
         # 计算成本节省
         days_in_period = (current_period_end - current_period_start).days
         months_in_period = days_in_period / 30.0
