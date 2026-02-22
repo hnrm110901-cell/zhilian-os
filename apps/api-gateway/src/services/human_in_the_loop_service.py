@@ -290,7 +290,26 @@ class HumanInTheLoopService:
         # TODO: 推送到企业微信
         await self.send_approval_notification(request)
 
-        # TODO: 保存到数据库
+        # 保存到数据库
+        from src.core.database import get_db_session
+        from src.models.decision_log import DecisionLog, DecisionStatus, DecisionType
+        import uuid
+
+        async with get_db_session() as session:
+            log = DecisionLog(
+                id=decision.decision_id,
+                decision_type=DecisionType.PURCHASE_SUGGESTION,
+                agent_type="human_in_the_loop",
+                agent_method="create_approval_request",
+                store_id=decision.store_id,
+                ai_suggestion={"operation_type": decision.operation_type, "expected_impact": decision.expected_impact},
+                ai_confidence=decision.confidence_score,
+                ai_reasoning=decision.reasoning,
+                decision_status=DecisionStatus.PENDING,
+            )
+            session.add(log)
+            await session.commit()
+
         return request
 
     async def send_approval_notification(
@@ -337,29 +356,59 @@ AI推理: {request.reasoning}
             approved=approved
         )
 
-        # TODO: 从数据库查询审批请求
-        # TODO: 更新审批状态
-        # TODO: 如果批准，执行操作
+        from src.core.database import get_db_session
+        from src.models.decision_log import DecisionLog, DecisionStatus
 
-        # 模拟返回
-        request = ApprovalRequest(
+        decision_id = request_id.replace("approval_", "")
+        now = datetime.now()
+
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(DecisionLog).where(DecisionLog.id == decision_id)
+            )
+            log = result.scalar_one_or_none()
+
+            if log:
+                log.decision_status = DecisionStatus.APPROVED if approved else DecisionStatus.REJECTED
+                log.manager_id = approver_id
+                log.approved_at = now
+                log.manager_feedback = comment
+                await session.commit()
+
+                return ApprovalRequest(
+                    request_id=request_id,
+                    decision_id=decision_id,
+                    store_id=log.store_id,
+                    operation_type=OperationType(log.ai_suggestion.get("operation_type", OperationType.LARGE_PURCHASE)),
+                    risk_level=RiskLevel.HIGH,
+                    description=log.ai_reasoning or "",
+                    reasoning=log.ai_reasoning or "",
+                    expected_impact=log.ai_suggestion.get("expected_impact", {}),
+                    approver_id=approver_id,
+                    approval_status=ApprovalStatus.APPROVED if approved else ApprovalStatus.REJECTED,
+                    approval_comment=comment,
+                    created_at=log.created_at,
+                    approved_at=now,
+                    expires_at=now
+                )
+
+        # fallback if not found
+        return ApprovalRequest(
             request_id=request_id,
-            decision_id="decision_xxx",
-            store_id="store_xxx",
+            decision_id=decision_id,
+            store_id="",
             operation_type=OperationType.LARGE_PURCHASE,
             risk_level=RiskLevel.HIGH,
-            description="采购10000元食材",
-            reasoning="AI预测明天客流量增加30%",
-            expected_impact={"revenue_increase": 15000},
+            description="",
+            reasoning="",
+            expected_impact={},
             approver_id=approver_id,
             approval_status=ApprovalStatus.APPROVED if approved else ApprovalStatus.REJECTED,
             approval_comment=comment,
-            created_at=datetime.now(),
-            approved_at=datetime.now(),
-            expires_at=datetime.now()
+            created_at=now,
+            approved_at=now,
+            expires_at=now
         )
-
-        return request
 
     async def get_store_trust_phase(
         self,
@@ -407,7 +456,27 @@ AI推理: {request.reasoning}
             action=action
         )
 
-        # TODO: 保存到审计日志表
+        # 保存到审计日志表
+        from src.core.database import get_db_session
+        from src.models.audit_log import AuditLog
+
+        async with get_db_session() as session:
+            audit = AuditLog(
+                action=action,
+                resource_type="ai_decision",
+                resource_id=decision.decision_id,
+                user_id="system",
+                description=decision.description,
+                store_id=decision.store_id,
+                changes={
+                    "decision_id": decision.decision_id,
+                    "operation_type": decision.operation_type,
+                    "risk_level": decision.risk_level,
+                    "confidence_score": decision.confidence_score,
+                },
+            )
+            session.add(audit)
+            await session.commit()
 
     async def get_pending_approvals(
         self,

@@ -321,8 +321,24 @@ class EnhancedForecastService(BaseService):
         # 获取基准客流
         day_type = "周末" if target_date.weekday() in [5, 6] else "工作日"
 
-        # TODO: 从数据库获取历史客流数据
-        # 这里使用行业基线数据作为示例
+        # 从数据库获取历史客流数据（过去8周同星期）
+        from src.core.database import get_db_session
+        from src.models.daily_report import DailyReport
+        from sqlalchemy import select, func
+
+        historical_traffic = None
+        async with get_db_session() as session:
+            dates = [target_date - timedelta(weeks=w) for w in range(1, 9)]
+            result = await session.execute(
+                select(func.avg(DailyReport.customer_count)).where(
+                    DailyReport.store_id == self.store_id,
+                    DailyReport.report_date.in_(dates),
+                    DailyReport.customer_count > 0,
+                )
+            )
+            avg_traffic = result.scalar()
+            if avg_traffic and avg_traffic > 0:
+                historical_traffic = float(avg_traffic)
         from src.services.baseline_data_service import IndustryBaselineData
 
         baseline = IndustryBaselineData.get_traffic_baseline(
@@ -331,10 +347,12 @@ class EnhancedForecastService(BaseService):
             meal_period
         )
 
-        if not baseline:
+        if historical_traffic:
+            base_traffic = historical_traffic
+        elif baseline:
+            base_traffic = baseline["平均客流"]
+        else:
             return {"error": "No baseline data available"}
-
-        base_traffic = baseline["平均客流"]
 
         # 计算影响因子
         factors = self._calculate_impact_factors(target_date, weather_forecast, None)
