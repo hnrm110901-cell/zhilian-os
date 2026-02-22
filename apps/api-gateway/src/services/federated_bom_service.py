@@ -273,13 +273,29 @@ class FederatedBOMService:
 
         # 构造特征向量
         season_code = {"spring": 0, "summer": 1, "autumn": 2, "winter": 3}
+
+        # 查询实际采购量
+        purchase_quantity = 100  # fallback
+        try:
+            from src.core.database import get_db_session
+            from src.models.inventory import InventoryItem
+            from sqlalchemy import select
+            async with get_db_session() as session:
+                result = await session.execute(
+                    select(InventoryItem.current_quantity).where(InventoryItem.id == ingredient_id)
+                )
+                qty = result.scalar_one_or_none()
+                if qty is not None:
+                    purchase_quantity = float(qty)
+        except Exception:
+            pass
         features = np.array([
             season_code.get(season, 0),
             temperature,
             humidity,
             storage_days,
             0,  # is_holiday
-            100,  # purchase_quantity (假设)
+            purchase_quantity,  # 从库存记录获取实际采购量
         ])
 
         # 使用全局模型预测

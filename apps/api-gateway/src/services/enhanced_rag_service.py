@@ -323,11 +323,25 @@ class EnhancedRAGService:
 
         progress["overall_progress"] = total_progress / len(self.DATA_SUFFICIENCY_THRESHOLDS)
 
-        # 估算达到充足所需天数
+        # 估算达到充足所需天数：基于实际数据量和天数计算日增长率
         if progress["overall_progress"] < 100:
-            # 简单估算：假设每天增长1%
-            progress["estimated_days_to_sufficient"] = int(
-                (100 - progress["overall_progress"]) / 1
+            # 从 sufficiency 中获取实际数据量和天数
+            current_orders = sufficiency.get("current_data", {}).get("orders", 0)
+            current_days = sufficiency.get("current_data", {}).get("days", 0)
+            # 日均订单增长率
+            daily_order_rate = (current_orders / current_days) if current_days > 0 else 1.0
+            # 估算最慢维度的剩余天数
+            max_days_needed = 0
+            for dim in progress["dimensions"]:
+                if dim["status"] == "insufficient":
+                    remaining = dim["required"] - dim["current"]
+                    if dim["name"] == "orders" and daily_order_rate > 0:
+                        days_needed = int(remaining / daily_order_rate)
+                    else:
+                        days_needed = int(remaining / max(daily_order_rate, 1))
+                    max_days_needed = max(max_days_needed, days_needed)
+            progress["estimated_days_to_sufficient"] = max_days_needed if max_days_needed > 0 else int(
+                (100 - progress["overall_progress"]) / max(daily_order_rate, 1)
             )
 
         logger.info(
