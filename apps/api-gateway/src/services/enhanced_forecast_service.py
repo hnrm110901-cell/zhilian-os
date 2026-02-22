@@ -1,0 +1,329 @@
+"""
+增强的销售预测服务
+集成节假日、天气、商圈活动等多维度特征
+"""
+from datetime import date, datetime, timedelta
+from typing import Dict, List, Optional, Any
+import structlog
+import numpy as np
+
+from src.services.forecast_features import ChineseHolidays, WeatherImpact, BusinessDistrictEvents
+from src.services.base_service import BaseService
+
+logger = structlog.get_logger()
+
+
+class EnhancedForecastService(BaseService):
+    """
+    增强的销售预测服务
+    """
+
+    def __init__(self, store_id: Optional[str] = None, restaurant_type: str = "正餐"):
+        super().__init__(store_id)
+        self.restaurant_type = restaurant_type
+
+    async def forecast_sales(
+        self,
+        target_date: date,
+        weather_forecast: Optional[Dict[str, Any]] = None,
+        events: Optional[List[Dict[str, Any]]] = None,
+    ) -> Dict[str, Any]:
+        """
+        预测指定日期的销售额
+
+        Args:
+            target_date: 目标日期
+            weather_forecast: 天气预报 {"temperature": 25, "weather": "晴天"}
+            events: 商圈活动列表 [{"type": "大型展会", "impact": 1.8}]
+
+        Returns:
+            预测结果
+        """
+        store_id = self.require_store_id()
+
+        # 1. 获取历史基准数据
+        historical_baseline = await self._get_historical_baseline(target_date)
+
+        # 2. 计算各维度影响因子
+        factors = self._calculate_impact_factors(
+            target_date,
+            weather_forecast,
+            events
+        )
+
+        # 3. 综合预测
+        base_sales = historical_baseline["average_sales"]
+        predicted_sales = base_sales
+
+        # 应用各维度影响因子
+        for factor_name, factor_value in factors.items():
+            predicted_sales *= factor_value
+
+        # 4. 计算置信区间
+        std_dev = historical_baseline["std_dev"]
+        confidence_interval = {
+            "lower": max(0, predicted_sales - 1.96 * std_dev),  # 95%置信区间下限
+            "upper": predicted_sales + 1.96 * std_dev,  # 95%置信区间上限
+        }
+
+        # 5. 生成预测说明
+        explanation = self._generate_explanation(factors, historical_baseline)
+
+        result = {
+            "target_date": target_date.isoformat(),
+            "predicted_sales": round(predicted_sales, 2),
+            "confidence_interval": confidence_interval,
+            "baseline_sales": round(base_sales, 2),
+            "impact_factors": factors,
+            "explanation": explanation,
+            "model_version": "enhanced_v1.0",
+            "confidence_level": self._calculate_confidence_level(historical_baseline),
+        }
+
+        logger.info(
+            "Sales forecast generated",
+            store_id=store_id,
+            target_date=target_date.isoformat(),
+            predicted_sales=predicted_sales,
+        )
+
+        return result
+
+    def _calculate_impact_factors(
+        self,
+        target_date: date,
+        weather_forecast: Optional[Dict[str, Any]],
+        events: Optional[List[Dict[str, Any]]],
+    ) -> Dict[str, float]:
+        """
+        计算各维度影响因子
+
+        Returns:
+            影响因子字典
+        """
+        factors = {}
+
+        # 1. 星期因子
+        weekday = target_date.weekday()
+        if weekday in [5, 6]:  # 周末
+            factors["weekend_factor"] = 1.4
+        else:
+            factors["weekday_factor"] = 1.0
+
+        # 2. 节假日因子
+        holiday_impact = ChineseHolidays.get_holiday_impact_score(target_date)
+        if holiday_impact > 1.0:
+            factors["holiday_factor"] = holiday_impact
+
+        # 3. 节假日时期因子（节前、节中、节后）
+        holiday_period = ChineseHolidays.get_holiday_period(target_date)
+        if holiday_period == "节前":
+            factors["pre_holiday_factor"] = 1.2
+        elif holiday_period == "节后":
+            factors["post_holiday_factor"] = 0.9
+
+        # 4. 天气因子
+        if weather_forecast:
+            temperature = weather_forecast.get("temperature")
+            weather_type = weather_forecast.get("weather")
+
+            if temperature is not None:
+                temp_impact = WeatherImpact.get_temperature_impact(
+                    temperature,
+                    self.restaurant_type
+                )
+                if temp_impact != 1.0:
+                    factors["temperature_factor"] = temp_impact
+
+            if weather_type:
+                weather_impact = WeatherImpact.get_weather_impact(weather_type)
+                if weather_impact != 1.0:
+                    factors["weather_factor"] = weather_impact
+
+        # 5. 商圈活动因子
+        if events:
+            event_impact = 1.0
+            for event in events:
+                event_type = event.get("type")
+                if event_type:
+                    event_impact *= BusinessDistrictEvents.get_event_impact(event_type)
+
+            if event_impact != 1.0:
+                factors["event_factor"] = event_impact
+
+        # 6. 月份季节因子
+        month = target_date.month
+        if month in [1, 2]:  # 冬季，火锅旺季
+            if self.restaurant_type == "火锅":
+                factors["season_factor"] = 1.3
+        elif month in [7, 8]:  # 夏季，火锅淡季
+            if self.restaurant_type == "火锅":
+                factors["season_factor"] = 0.8
+
+        return factors
+
+    async def _get_historical_baseline(self, target_date: date) -> Dict[str, float]:
+        """
+        获取历史基准数据
+
+        Args:
+            target_date: 目标日期
+
+        Returns:
+            历史基准数据
+        """
+        # TODO: 实现实际的数据库查询
+        # 这里应该查询过去同类型日期（同星期、同月份）的历史销售数据
+
+        # 模拟数据
+        weekday = target_date.weekday()
+        is_weekend = weekday in [5, 6]
+
+        if self.restaurant_type == "火锅":
+            base_sales = 68000 if is_weekend else 42000
+            std_dev = 11000 if is_weekend else 7000
+        elif self.restaurant_type == "快餐":
+            base_sales = 25000 if is_weekend else 18000
+            std_dev = 4500 if is_weekend else 3500
+        else:  # 正餐
+            base_sales = 55000 if is_weekend else 35000
+            std_dev = 9000 if is_weekend else 6000
+
+        return {
+            "average_sales": base_sales,
+            "std_dev": std_dev,
+            "sample_count": 20,  # 历史样本数量
+        }
+
+    def _generate_explanation(
+        self,
+        factors: Dict[str, float],
+        historical_baseline: Dict[str, float]
+    ) -> str:
+        """
+        生成预测说明
+
+        Args:
+            factors: 影响因子
+            historical_baseline: 历史基准
+
+        Returns:
+            预测说明文本
+        """
+        explanations = []
+
+        base_sales = historical_baseline["average_sales"]
+        explanations.append(f"基于历史同类型日期的平均销售额{base_sales:.0f}元")
+
+        # 解释各个因子
+        if "weekend_factor" in factors:
+            explanations.append("周末客流增加40%")
+
+        if "holiday_factor" in factors:
+            impact = factors["holiday_factor"]
+            if impact >= 2.0:
+                explanations.append(f"法定节假日，预计客流增加{(impact-1)*100:.0f}%")
+
+        if "pre_holiday_factor" in factors:
+            explanations.append("节前消费高峰，预计增加20%")
+
+        if "post_holiday_factor" in factors:
+            explanations.append("节后消费回落，预计减少10%")
+
+        if "temperature_factor" in factors:
+            impact = factors["temperature_factor"]
+            if impact > 1.0:
+                explanations.append(f"低温天气利好{self.restaurant_type}，增加{(impact-1)*100:.0f}%")
+            elif impact < 1.0:
+                explanations.append(f"极端天气影响客流，减少{(1-impact)*100:.0f}%")
+
+        if "weather_factor" in factors:
+            impact = factors["weather_factor"]
+            if impact < 1.0:
+                explanations.append(f"恶劣天气影响，预计减少{(1-impact)*100:.0f}%")
+
+        if "event_factor" in factors:
+            impact = factors["event_factor"]
+            if impact > 1.0:
+                explanations.append(f"商圈活动带动，预计增加{(impact-1)*100:.0f}%")
+            elif impact < 1.0:
+                explanations.append(f"周边不利因素，预计减少{(1-impact)*100:.0f}%")
+
+        if "season_factor" in factors:
+            impact = factors["season_factor"]
+            if impact > 1.0:
+                explanations.append(f"旺季效应，预计增加{(impact-1)*100:.0f}%")
+            elif impact < 1.0:
+                explanations.append(f"淡季影响，预计减少{(1-impact)*100:.0f}%")
+
+        return "；".join(explanations) + "。"
+
+    def _calculate_confidence_level(self, historical_baseline: Dict[str, float]) -> str:
+        """
+        计算预测置信度等级
+
+        Args:
+            historical_baseline: 历史基准数据
+
+        Returns:
+            置信度等级：high/medium/low
+        """
+        sample_count = historical_baseline.get("sample_count", 0)
+
+        if sample_count >= 30:
+            return "high"
+        elif sample_count >= 10:
+            return "medium"
+        else:
+            return "low"
+
+    async def forecast_traffic(
+        self,
+        target_date: date,
+        meal_period: str,
+        weather_forecast: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        预测客流量
+
+        Args:
+            target_date: 目标日期
+            meal_period: 用餐时段（早餐/午餐/晚餐）
+            weather_forecast: 天气预报
+
+        Returns:
+            客流预测结果
+        """
+        # 获取基准客流
+        day_type = "周末" if target_date.weekday() in [5, 6] else "工作日"
+
+        # TODO: 从数据库获取历史客流数据
+        # 这里使用行业基线数据作为示例
+        from src.services.baseline_data_service import IndustryBaselineData
+
+        baseline = IndustryBaselineData.get_traffic_baseline(
+            self.restaurant_type,
+            day_type,
+            meal_period
+        )
+
+        if not baseline:
+            return {"error": "No baseline data available"}
+
+        base_traffic = baseline["平均客流"]
+
+        # 计算影响因子
+        factors = self._calculate_impact_factors(target_date, weather_forecast, None)
+
+        # 应用因子
+        predicted_traffic = base_traffic
+        for factor_value in factors.values():
+            predicted_traffic *= factor_value
+
+        return {
+            "target_date": target_date.isoformat(),
+            "meal_period": meal_period,
+            "predicted_traffic": round(predicted_traffic),
+            "baseline_traffic": base_traffic,
+            "impact_factors": factors,
+        }
