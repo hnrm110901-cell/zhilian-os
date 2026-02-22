@@ -487,7 +487,12 @@ class MarketingAgentService:
         # 通过企微发送
         message = f"🎂 生日快乐！送您{coupon['amount']}元生日券，满{coupon['threshold']}可用"
 
-        # TODO: 调用enterprise_service发送
+        try:
+            from src.services.wechat_work_message_service import WeChatWorkMessageService
+            wechat = WeChatWorkMessageService()
+            await wechat.send_text_message(customer_id, message)
+        except Exception as e:
+            logger.warning(f"企微发送生日券失败: {e}")
         logger.info(f"Sent birthday coupon to {customer_id}")
 
     async def _send_winback_offer(
@@ -506,7 +511,12 @@ class MarketingAgentService:
 
         message = f"好久不见！特别为您准备了{coupon['amount']}元优惠券，期待您的光临"
 
-        # TODO: 调用enterprise_service发送
+        try:
+            from src.services.wechat_work_message_service import WeChatWorkMessageService
+            wechat = WeChatWorkMessageService()
+            await wechat.send_text_message(customer_id, message)
+        except Exception as e:
+            logger.warning(f"企微发送挽回券失败: {e}")
         logger.info(f"Sent winback offer to {customer_id}")
 
     async def _send_repurchase_reminder(
@@ -521,7 +531,12 @@ class MarketingAgentService:
 
         message = f"您喜欢的{favorite_dishes[0]}又上新了，欢迎品尝！"
 
-        # TODO: 调用enterprise_service发送
+        try:
+            from src.services.wechat_work_message_service import WeChatWorkMessageService
+            wechat = WeChatWorkMessageService()
+            await wechat.send_text_message(customer_id, message)
+        except Exception as e:
+            logger.warning(f"企微发送复购提醒失败: {e}")
         logger.info(f"Sent repurchase reminder to {customer_id}")
 
     # ==================== 营销效果分析 ====================

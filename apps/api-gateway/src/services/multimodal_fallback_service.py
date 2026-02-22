@@ -352,36 +352,63 @@ class MultimodalFallbackService:
             return False
 
     async def _deliver_via_smartwatch(self, message: Message) -> bool:
-        """通过智能手表投递"""
+        """通过智能手表投递（保存到通知队列，由手表端轮询）"""
         try:
-            # 调用智能手表服务
-            # TODO: 实现智能手表推送
-            logger.info(f"Smartwatch delivery: {message.content}")
-            await asyncio.sleep(0.1)  # 模拟投递延迟
+            from src.core.database import get_db_session
+            from src.models.notification import Notification, NotificationType, NotificationPriority
+            async with get_db_session() as session:
+                notif = Notification(
+                    title="手表通知",
+                    message=message.content,
+                    type=NotificationType.INFO,
+                    priority=NotificationPriority.HIGH,
+                    extra_data={"channel": "smartwatch", "target_user": message.target_user},
+                )
+                session.add(notif)
+                await session.commit()
+            logger.info(f"Smartwatch delivery queued: {message.content}")
             return True
         except Exception as e:
             logger.error(f"Smartwatch delivery failed: {e}")
             return False
 
     async def _deliver_via_pos_popup(self, message: Message) -> bool:
-        """通过POS弹窗投递"""
+        """通过POS弹窗投递（保存到通知队列，由POS端轮询）"""
         try:
-            # 调用POS服务
-            # TODO: 实现POS弹窗
-            logger.info(f"POS popup delivery: {message.content}")
-            await asyncio.sleep(0.1)  # 模拟投递延迟
+            from src.core.database import get_db_session
+            from src.models.notification import Notification, NotificationType, NotificationPriority
+            async with get_db_session() as session:
+                notif = Notification(
+                    title="POS弹窗通知",
+                    message=message.content,
+                    type=NotificationType.ALERT,
+                    priority=NotificationPriority.URGENT,
+                    extra_data={"channel": "pos_popup", "target_user": message.target_user},
+                )
+                session.add(notif)
+                await session.commit()
+            logger.info(f"POS popup delivery queued: {message.content}")
             return True
         except Exception as e:
             logger.error(f"POS popup delivery failed: {e}")
             return False
 
     async def _deliver_via_kds_screen(self, message: Message) -> bool:
-        """通过KDS大屏投递"""
+        """通过KDS大屏投递（保存到通知队列，由KDS端轮询）"""
         try:
-            # 调用KDS服务
-            # TODO: 实现KDS大屏推送
-            logger.info(f"KDS screen delivery: {message.content}")
-            await asyncio.sleep(0.1)  # 模拟投递延迟
+            from src.core.database import get_db_session
+            from src.models.notification import Notification, NotificationType, NotificationPriority
+            async with get_db_session() as session:
+                notif = Notification(
+                    title="KDS大屏通知",
+                    message=message.content,
+                    type=NotificationType.INFO,
+                    priority=NotificationPriority.HIGH,
+                    extra_data={"channel": "kds_screen", "target_user": message.target_user},
+                )
+                session.add(notif)
+                await session.commit()
+            logger.info(f"KDS screen delivery queued: {message.content}")
             return True
         except Exception as e:
             logger.error(f"KDS screen delivery failed: {e}")
