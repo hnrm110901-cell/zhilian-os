@@ -172,27 +172,51 @@ class EnhancedForecastService(BaseService):
         Returns:
             历史基准数据
         """
-        # TODO: 实现实际的数据库查询
-        # 这里应该查询过去同类型日期（同星期、同月份）的历史销售数据
+        from sqlalchemy import select
+        from src.core.database import get_db_session
+        from src.models.daily_report import DailyReport
 
-        # 模拟数据
+        store_id = self.store_id
         weekday = target_date.weekday()
-        is_weekend = weekday in [5, 6]
+        samples = []
 
+        if store_id:
+            async with get_db_session() as session:
+                for weeks_ago in range(1, 9):
+                    past_date = target_date - timedelta(weeks=weeks_ago)
+                    result = await session.execute(
+                        select(DailyReport.total_revenue).where(
+                            DailyReport.store_id == store_id,
+                            DailyReport.report_date == past_date,
+                        )
+                    )
+                    row = result.scalar_one_or_none()
+                    if row is not None:
+                        samples.append(float(row) / 100.0)
+
+        if len(samples) >= 3:
+            return {
+                "average_sales": float(np.mean(samples)),
+                "std_dev": float(np.std(samples)),
+                "sample_count": len(samples),
+            }
+
+        # Fallback to industry baseline
+        is_weekend = weekday in [5, 6]
         if self.restaurant_type == "火锅":
             base_sales = 68000 if is_weekend else 42000
             std_dev = 11000 if is_weekend else 7000
         elif self.restaurant_type == "快餐":
             base_sales = 25000 if is_weekend else 18000
             std_dev = 4500 if is_weekend else 3500
-        else:  # 正餐
+        else:
             base_sales = 55000 if is_weekend else 35000
             std_dev = 9000 if is_weekend else 6000
 
         return {
             "average_sales": base_sales,
             "std_dev": std_dev,
-            "sample_count": 20,  # 历史样本数量
+            "sample_count": 0,
         }
 
     def _generate_explanation(
