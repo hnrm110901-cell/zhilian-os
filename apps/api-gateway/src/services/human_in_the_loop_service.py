@@ -10,11 +10,12 @@ Human-in-the-Loop服务 (增强版)
 - Level 3: 人工审批（高风险）
 - Level 4: 禁止AI操作（极高风险）
 """
-from datetime import datetime
+from datetime import datetime, date
 from typing import Dict, List, Optional
 from enum import Enum
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 import structlog
 
 logger = structlog.get_logger()
@@ -371,9 +372,19 @@ AI推理: {request.reasoning}
         - 辅助期（3-6个月）: AI执行低风险操作，高风险需审批
         - 自主期（6个月+）: AI自主执行大部分操作，仅极高风险需审批
         """
-        # TODO: 从数据库查询门店的使用时长
-        # 这里使用模拟数据
-        days_since_onboarding = 120  # 假设使用了120天
+        from src.core.database import get_db_session
+        from src.models.store import Store
+
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(Store.created_at).where(Store.id == store_id)
+            )
+            created_at = result.scalar_one_or_none()
+
+        if created_at:
+            days_since_onboarding = (date.today() - created_at.date()).days
+        else:
+            days_since_onboarding = 0
 
         if days_since_onboarding < 90:
             return TrustPhase.OBSERVATION

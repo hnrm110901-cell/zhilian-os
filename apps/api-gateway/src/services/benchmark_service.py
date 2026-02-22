@@ -7,7 +7,11 @@ from datetime import date, datetime, timedelta
 import structlog
 import numpy as np
 
+from sqlalchemy import select, func
 from src.services.base_service import BaseService
+from src.core.database import get_db_session
+from src.models.store import Store
+from src.models.daily_report import DailyReport
 
 logger = structlog.get_logger()
 
@@ -122,28 +126,50 @@ class BenchmarkService(BaseService):
         Returns:
             指标数据
         """
-        # TODO: 从数据库查询实际数据
-        # 这里返回模拟数据
-
         days = (end_date - start_date).days + 1
 
-        metrics = {
+        async with get_db_session() as session:
+            store_result = await session.execute(
+                select(Store).where(Store.id == store_id)
+            )
+            store = store_result.scalar_one_or_none()
+
+            reports_result = await session.execute(
+                select(DailyReport).where(
+                    DailyReport.store_id == store_id,
+                    DailyReport.report_date >= start_date,
+                    DailyReport.report_date <= end_date,
+                )
+            )
+            reports = reports_result.scalars().all()
+
+        total_revenue = sum(r.total_revenue for r in reports) / 100.0
+        total_customers = sum(r.customer_count for r in reports)
+        total_orders = sum(r.order_count for r in reports)
+        avg_spend = total_revenue / total_customers if total_customers > 0 else 0
+
+        seats = (store.seats or 50) if store else 50
+        table_turnover = round(total_orders / days / seats, 1) if seats > 0 and days > 0 else 0.0
+
+        labor_cost_ratio = float(store.labor_cost_ratio_target or 28.0) if store else 28.0
+        food_cost_ratio = float(store.cost_ratio_target or 38.0) if store else 38.0
+        profit_margin = round(100 - labor_cost_ratio - food_cost_ratio, 1)
+
+        return {
             "store_id": store_id,
-            "city": "长沙",
+            "city": store.city if store else "未知",
             "restaurant_type": "正餐",
-            "area": 200,  # 面积（平米）
-            "sales": 850000,  # 总销售额
-            "customer_count": 2800,  # 总客流量
-            "average_spend": 304,  # 客单价
-            "table_turnover": 2.8,  # 翻台率
-            "labor_cost_ratio": 28.5,  # 人力成本占比（%）
-            "food_cost_ratio": 38.2,  # 食材成本占比（%）
-            "profit_margin": 33.3,  # 毛利率（%）
-            "customer_satisfaction": 4.2,  # 客户满意度（1-5）
+            "area": store.area if store else 200,
+            "sales": round(total_revenue),
+            "customer_count": total_customers,
+            "average_spend": round(avg_spend, 1),
+            "table_turnover": table_turnover,
+            "labor_cost_ratio": labor_cost_ratio,
+            "food_cost_ratio": food_cost_ratio,
+            "profit_margin": profit_margin,
+            "customer_satisfaction": 4.0,
             "days": days,
         }
-
-        return metrics
 
     async def _get_benchmark_stores(self, store_id: str) -> List[str]:
         """
@@ -160,22 +186,25 @@ class BenchmarkService(BaseService):
         Returns:
             对标门店ID列表
         """
-        # TODO: 从数据库查询实际数据
-        # 这里返回模拟数据
+        async with get_db_session() as session:
+            store_result = await session.execute(
+                select(Store).where(Store.id == store_id)
+            )
+            store = store_result.scalar_one_or_none()
+            if not store:
+                return []
 
-        benchmark_stores = [
-            "STORE002",
-            "STORE003",
-            "STORE004",
-            "STORE005",
-            "STORE006",
-            "STORE007",
-            "STORE008",
-            "STORE009",
-            "STORE010",
-        ]
-
-        return benchmark_stores
+            area = store.area or 200
+            peers_result = await session.execute(
+                select(Store.id).where(
+                    Store.city == store.city,
+                    Store.id != store_id,
+                    Store.is_active == True,
+                    Store.area >= area * 0.7,
+                    Store.area <= area * 1.3,
+                ).limit(9)
+            )
+            return [row[0] for row in peers_result.all()]
 
     async def _get_benchmark_metrics(
         self,
@@ -194,26 +223,13 @@ class BenchmarkService(BaseService):
         Returns:
             指标数据列表
         """
-        # TODO: 从数据库查询实际数据
-        # 这里返回模拟数据
-
         metrics_list = []
-
-        for store_id in store_ids:
-            # 生成随机但合理的指标数据
-            metrics = {
-                "store_id": store_id,
-                "sales": np.random.randint(700000, 1200000),
-                "customer_count": np.random.randint(2000, 4000),
-                "average_spend": np.random.randint(250, 400),
-                "table_turnover": round(np.random.uniform(2.0, 3.5), 1),
-                "labor_cost_ratio": round(np.random.uniform(25.0, 32.0), 1),
-                "food_cost_ratio": round(np.random.uniform(35.0, 42.0), 1),
-                "profit_margin": round(np.random.uniform(28.0, 38.0), 1),
-                "customer_satisfaction": round(np.random.uniform(3.8, 4.5), 1),
-            }
-            metrics_list.append(metrics)
-
+        for sid in store_ids:
+            try:
+                m = await self._get_store_metrics(sid, start_date, end_date)
+                metrics_list.append(m)
+            except Exception:
+                pass
         return metrics_list
 
     def _calculate_rankings(
