@@ -3,13 +3,17 @@ Dashboard Service
 数据可视化大屏服务层
 """
 from typing import Dict, Any, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
 
 from ..services.pos_service import pos_service
 from ..services.member_service import member_service
 from ..services.agent_service import agent_service
+from ..core.database import get_db_session
+from ..models.order import Order, OrderItem, OrderStatus
+from ..models.dish import Dish, DishCategory
 
 logger = structlog.get_logger()
 
@@ -172,15 +176,38 @@ class DashboardService:
             菜品类别销售数据
         """
         try:
-            categories = await pos_service.get_dish_categories()
+            # 从订单明细统计各分类销售额
+            async with get_db_session() as session:
+                result = await session.execute(
+                    select(
+                        DishCategory.name.label("category_name"),
+                        func.sum(OrderItem.subtotal).label("total_sales"),
+                    )
+                    .join(Dish, OrderItem.item_id == func.cast(Dish.id, OrderItem.item_id.type))
+                    .join(DishCategory, Dish.category_id == DishCategory.id)
+                    .join(Order, OrderItem.order_id == Order.id)
+                    .where(Order.status == OrderStatus.COMPLETED)
+                    .group_by(DishCategory.name)
+                    .order_by(func.sum(OrderItem.subtotal).desc())
+                    .limit(5)
+                )
+                rows = result.all()
 
-            # 模拟销售数据（实际应该从订单明细中统计）
-            category_sales = []
-            for category in categories[:5]:  # 取前5个类别
-                category_sales.append({
-                    "name": category.get("rcNAME", "未知"),
-                    "value": 0,  # 实际应该统计销售额
-                })
+            if rows:
+                category_sales = [
+                    {"name": row.category_name, "value": int(row.total_sales or 0)}
+                    for row in rows
+                ]
+            else:
+                # fallback：从POS获取分类列表，销售额为0
+                try:
+                    categories = await pos_service.get_dish_categories()
+                    category_sales = [
+                        {"name": c.get("rcNAME", "未知"), "value": 0}
+                        for c in categories[:5]
+                    ]
+                except Exception:
+                    category_sales = []
 
             return {"categories": category_sales}
 
@@ -220,16 +247,45 @@ class DashboardService:
             会员统计数据
         """
         try:
-            # 模拟会员数据（实际应该从会员系统获取）
+            today = date.today()
+            thirty_days_ago = today - timedelta(days=30)
+
+            async with get_db_session() as session:
+                # 总会员数（有手机号的唯一顾客）
+                total_result = await session.execute(
+                    select(func.count(func.distinct(Order.customer_phone))).where(
+                        Order.customer_phone.isnot(None),
+                        Order.customer_phone != "",
+                    )
+                )
+                total_members = total_result.scalar() or 0
+
+                # 今日新顾客（今天首次下单）
+                new_today_result = await session.execute(
+                    select(func.count(func.distinct(Order.customer_phone))).where(
+                        Order.customer_phone.isnot(None),
+                        func.date(Order.order_time) == today,
+                    )
+                )
+                new_members_today = new_today_result.scalar() or 0
+
+                # 近30天活跃顾客
+                active_result = await session.execute(
+                    select(func.count(func.distinct(Order.customer_phone))).where(
+                        Order.customer_phone.isnot(None),
+                        Order.customer_phone != "",
+                        func.date(Order.order_time) >= thirty_days_ago,
+                    )
+                )
+                active_members = active_result.scalar() or 0
+
             return {
-                "total_members": 0,
-                "new_members_today": 0,
-                "active_members": 0,
+                "total_members": total_members,
+                "new_members_today": new_members_today,
+                "active_members": active_members,
                 "member_levels": [
-                    {"level": "普通会员", "count": 0},
-                    {"level": "银卡会员", "count": 0},
-                    {"level": "金卡会员", "count": 0},
-                    {"level": "钻石会员", "count": 0},
+                    {"level": "普通会员", "count": max(0, total_members - active_members)},
+                    {"level": "活跃会员", "count": active_members},
                 ],
             }
 

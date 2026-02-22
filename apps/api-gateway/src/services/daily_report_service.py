@@ -318,12 +318,55 @@ class DailyReportService:
         store_id: str,
         report_date: date
     ) -> Dict[str, Any]:
-        """聚合详细数据"""
-        # 简化实现，返回空数据
-        # 实际应该从订单明细中统计热销菜品、高峰时段等
+        """聚合详细数据：热销菜品、高峰时段"""
+        from src.models.order import OrderItem, OrderStatus
+        from sqlalchemy import extract
+
+        # 热销菜品 Top5
+        top_dishes_result = await session.execute(
+            select(
+                OrderItem.item_name,
+                func.sum(OrderItem.quantity).label("qty"),
+                func.sum(OrderItem.subtotal).label("revenue"),
+            )
+            .join(Order, OrderItem.order_id == Order.id)
+            .where(
+                Order.store_id == store_id,
+                func.date(Order.order_time) == report_date,
+                Order.status == OrderStatus.COMPLETED,
+            )
+            .group_by(OrderItem.item_name)
+            .order_by(func.sum(OrderItem.quantity).desc())
+            .limit(5)
+        )
+        top_dishes = [
+            {"name": row.item_name, "quantity": int(row.qty), "revenue": int(row.revenue)}
+            for row in top_dishes_result.all()
+        ]
+
+        # 高峰时段（按小时统计订单数）
+        peak_hours_result = await session.execute(
+            select(
+                extract("hour", Order.order_time).label("hour"),
+                func.count(Order.id).label("order_count"),
+            )
+            .where(
+                Order.store_id == store_id,
+                func.date(Order.order_time) == report_date,
+                Order.status == OrderStatus.COMPLETED,
+            )
+            .group_by(extract("hour", Order.order_time))
+            .order_by(func.count(Order.id).desc())
+            .limit(3)
+        )
+        peak_hours = [
+            {"hour": int(row.hour), "order_count": int(row.order_count)}
+            for row in peak_hours_result.all()
+        ]
+
         return {
-            "top_dishes": [],
-            "peak_hours": [],
+            "top_dishes": top_dishes,
+            "peak_hours": peak_hours,
             "payment_methods": {}
         }
 
