@@ -2,14 +2,15 @@
 定时任务调度器
 用于执行业务驱动的定时任务
 
-根据架构评审：调度器应该驱动业务价值
-- 每15分钟营收异常检测
-- 每天6AM生成昨日简报
-- 午高峰前1小时库存预警
+调度计划：
+- 每15分钟  → detect_revenue_anomaly（营收异常检测）
+- 每天22:30 → generate_and_send_daily_report（营业日报）
+- 每天10:00 → check_inventory_alert（库存预警）
+- 每天03:00 → perform_daily_reconciliation（POS对账）
 """
 import asyncio
-from datetime import datetime, time
-from typing import Optional
+from datetime import datetime, date
+from typing import Optional, Dict
 import structlog
 
 logger = structlog.get_logger()
@@ -21,6 +22,12 @@ class TaskScheduler:
     def __init__(self):
         self.running = False
         self.task: Optional[asyncio.Task] = None
+        self._last_run: Dict[str, Optional[datetime]] = {
+            "revenue_anomaly": None,
+            "daily_report": None,
+            "inventory_alert": None,
+            "reconciliation": None,
+        }
 
     async def start(self):
         """启动调度器"""
@@ -52,23 +59,51 @@ class TaskScheduler:
         while self.running:
             try:
                 now = datetime.now()
-                current_time = now.time()
+                today = now.date()
 
-                # TODO Week 2: 实现业务驱动的调度任务
-                # 1. 每15分钟营收异常检测 → 企微告警
-                # 2. 每天6AM生成昨日简报 → 推送
-                # 3. 午高峰前1小时库存预警
+                # 每15分钟：营收异常检测
+                last = self._last_run["revenue_anomaly"]
+                if last is None or (now - last).total_seconds() >= 900:
+                    from src.core.celery_tasks import detect_revenue_anomaly
+                    detect_revenue_anomaly.delay()
+                    self._last_run["revenue_anomaly"] = now
+                    logger.info("scheduler_triggered", task="detect_revenue_anomaly")
 
-                logger.debug("scheduler_tick", time=current_time)
+                # 每天22:30：营业日报
+                last = self._last_run["daily_report"]
+                if (now.hour == 22 and now.minute == 30 and
+                        (last is None or last.date() < today)):
+                    from src.core.celery_tasks import generate_and_send_daily_report
+                    generate_and_send_daily_report.delay()
+                    self._last_run["daily_report"] = now
+                    logger.info("scheduler_triggered", task="generate_and_send_daily_report")
 
-                # 等待1分钟后再检查
+                # 每天10:00：库存预警
+                last = self._last_run["inventory_alert"]
+                if (now.hour == 10 and now.minute == 0 and
+                        (last is None or last.date() < today)):
+                    from src.core.celery_tasks import check_inventory_alert
+                    check_inventory_alert.delay()
+                    self._last_run["inventory_alert"] = now
+                    logger.info("scheduler_triggered", task="check_inventory_alert")
+
+                # 每天03:00：POS对账
+                last = self._last_run["reconciliation"]
+                if (now.hour == 3 and now.minute == 0 and
+                        (last is None or last.date() < today)):
+                    from src.core.celery_tasks import perform_daily_reconciliation
+                    perform_daily_reconciliation.delay()
+                    self._last_run["reconciliation"] = now
+                    logger.info("scheduler_triggered", task="perform_daily_reconciliation")
+
+                logger.debug("scheduler_tick", time=now.time())
                 await asyncio.sleep(60)
 
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 logger.error("scheduler_error", error=str(e))
-                await asyncio.sleep(60)  # 出错后等待1分钟
+                await asyncio.sleep(60)
 
 
 # 全局调度器实例

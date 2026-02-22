@@ -189,13 +189,45 @@ class ReconcileService:
         """
         获取POS数据
 
-        注意：这里暂时从Order表获取，实际应该从POS适配器获取
+        优先从POS适配器获取真实数据，失败时回退到Order表
         """
+        business_date = reconciliation_date.strftime("%Y-%m-%d")
+
+        # 尝试从真实POS系统获取数据
+        try:
+            from src.services.pos_service import pos_service
+            summary = await pos_service.query_order_summary(
+                ognid=store_id,
+                business_date=business_date
+            )
+            if summary:
+                total_amount = int(float(summary.get("totalAmount", 0)) * 100)
+                order_count = int(summary.get("orderCount", 0))
+                transaction_count = int(summary.get("transactionCount", order_count))
+                logger.info(
+                    "从POS系统获取对账数据",
+                    store_id=store_id,
+                    business_date=business_date,
+                    total_amount=total_amount,
+                    order_count=order_count
+                )
+                return {
+                    "total_amount": total_amount,
+                    "order_count": order_count,
+                    "transaction_count": transaction_count,
+                }
+        except Exception as e:
+            logger.warning(
+                "POS系统获取数据失败，回退到Order表",
+                store_id=store_id,
+                error=str(e)
+            )
+
+        # 回退：从Order表获取数据
         try:
             start_datetime = datetime.combine(reconciliation_date, datetime.min.time())
             end_datetime = datetime.combine(reconciliation_date, datetime.max.time())
 
-            # 查询当天的订单数据
             result = await session.execute(
                 select(
                     func.count(Order.id).label("order_count"),
@@ -211,14 +243,13 @@ class ReconcileService:
             )
 
             row = result.first()
-
             order_count = row.order_count or 0
             total_amount = int(row.total_amount or 0)
 
             return {
                 "total_amount": total_amount,
                 "order_count": order_count,
-                "transaction_count": order_count  # 简化处理，实际应该统计支付交易数
+                "transaction_count": order_count
             }
 
         except Exception as e:

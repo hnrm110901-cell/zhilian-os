@@ -127,20 +127,20 @@ celery_app.conf.update(
                 "priority": 7,
             },
         },
-        # 每日凌晨1点生成前一天的日报
+        # 每日22:30生成当日营业日报
         "generate-daily-reports": {
             "task": "src.core.celery_tasks.generate_and_send_daily_report",
-            "schedule": crontab(hour=1, minute=0),
+            "schedule": crontab(hour=22, minute=30),
             "args": (),  # 将为所有门店生成报告
             "options": {
                 "queue": "default",
                 "priority": 5,
             },
         },
-        # 每日凌晨2点执行POS对账
+        # 每日凌晨3点执行POS对账
         "perform-daily-reconciliation": {
             "task": "src.core.celery_tasks.perform_daily_reconciliation",
-            "schedule": crontab(hour=2, minute=0),
+            "schedule": crontab(hour=3, minute=0),
             "args": (),  # 将为所有门店执行对账
             "options": {
                 "queue": "default",
