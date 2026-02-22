@@ -119,3 +119,90 @@ def upgrade() -> None:
     )
     op.create_index('idx_order_items_order_id', 'order_items', ['order_id'])
     op.create_index('idx_order_items_store_id', 'order_items', ['store_id'])
+
+    # 6. 创建inventory_items表（库存项表）
+    op.create_table(
+        'inventory_items',
+        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
+        sa.Column('store_id', sa.String(50), sa.ForeignKey('stores.id'), nullable=False),
+        sa.Column('name', sa.String(100), nullable=False),
+        sa.Column('category', sa.String(50)),
+        sa.Column('unit', sa.String(20)),
+        sa.Column('unit_price', sa.Numeric(10, 2)),
+        sa.Column('current_quantity', sa.Numeric(10, 2), default=0),
+        sa.Column('min_quantity', sa.Numeric(10, 2)),
+        sa.Column('max_quantity', sa.Numeric(10, 2)),
+        sa.Column('status', sa.String(20), default='normal'),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
+    )
+    op.create_index('idx_inventory_items_store_id', 'inventory_items', ['store_id'])
+    op.create_index('idx_inventory_items_category', 'inventory_items', ['category'])
+
+    # 7. 创建inventory_transactions表（库存交易表）
+    op.create_table(
+        'inventory_transactions',
+        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
+        sa.Column('store_id', sa.String(50), sa.ForeignKey('stores.id'), nullable=False),
+        sa.Column('item_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('inventory_items.id'), nullable=False),
+        sa.Column('transaction_type', sa.String(20), nullable=False),
+        sa.Column('quantity', sa.Numeric(10, 2), nullable=False),
+        sa.Column('unit_price', sa.Numeric(10, 2)),
+        sa.Column('total_amount', sa.Numeric(10, 2)),
+        sa.Column('transaction_time', sa.DateTime(timezone=True), nullable=False),
+        sa.Column('notes', sa.Text),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
+    )
+    op.create_index('idx_inventory_trans_store_id', 'inventory_transactions', ['store_id'])
+    op.create_index('idx_inventory_trans_item_id', 'inventory_transactions', ['item_id'])
+
+    # 8. 创建schedules表（排班表）
+    op.create_table(
+        'schedules',
+        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
+        sa.Column('store_id', sa.String(50), sa.ForeignKey('stores.id'), nullable=False),
+        sa.Column('employee_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('employees.id'), nullable=False),
+        sa.Column('date', sa.Date, nullable=False),
+        sa.Column('shift_type', sa.String(20)),
+        sa.Column('start_time', sa.Time),
+        sa.Column('end_time', sa.Time),
+        sa.Column('status', sa.String(20), default='scheduled'),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
+    )
+    op.create_index('idx_schedules_store_id', 'schedules', ['store_id'])
+    op.create_index('idx_schedules_employee_id', 'schedules', ['employee_id'])
+    op.create_index('idx_schedules_date', 'schedules', ['date'])
+
+    # 9. 创建shifts表（班次表）
+    op.create_table(
+        'shifts',
+        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
+        sa.Column('store_id', sa.String(50), sa.ForeignKey('stores.id'), nullable=False),
+        sa.Column('name', sa.String(50), nullable=False),
+        sa.Column('start_time', sa.Time, nullable=False),
+        sa.Column('end_time', sa.Time, nullable=False),
+        sa.Column('is_active', sa.Boolean, default=True),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
+    )
+    op.create_index('idx_shifts_store_id', 'shifts', ['store_id'])
+
+    # 10. 创建reservations表（预订表）
+    op.create_table(
+        'reservations',
+        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
+        sa.Column('store_id', sa.String(50), sa.ForeignKey('stores.id'), nullable=False),
+        sa.Column('customer_name', sa.String(100), nullable=False),
+        sa.Column('customer_phone', sa.String(20), nullable=False),
+        sa.Column('reservation_date', sa.Date, nullable=False),
+        sa.Column('reservation_time', sa.Time, nullable=False),
+        sa.Column('party_size', sa.Integer, nullable=False),
+        sa.Column('table_number', sa.String(20)),
+        sa.Column('status', sa.String(20), default='pending'),
+        sa.Column('notes', sa.Text),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
+    )
+    op.create_index('idx_reservations_store_id', 'reservations', ['store_id'])
+    op.create_index('idx_reservations_date', 'reservations', ['reservation_date'])
+    op.create_index('idx_reservations_store_date', 'reservations', ['store_id', 'reservation_date'])
