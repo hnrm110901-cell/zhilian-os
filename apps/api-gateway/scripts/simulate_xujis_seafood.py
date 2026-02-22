@@ -549,7 +549,7 @@ class XujisSeafoodSimulation:
         print("模拟测试结束")
         print("=" * 60)
 
-    async def run_simulation(self):
+    async def run_simulation(self, auto_run: bool = True):
         """运行完整模拟"""
         print("\n")
         print("╔" + "=" * 58 + "╗")
@@ -559,8 +559,12 @@ class XujisSeafoodSimulation:
         # 初始化数据
         await self.initialize_data()
 
-        # 等待用户确认
-        input("\n按回车键开始模拟业务流程...")
+        # 等待用户确认（可选）
+        if not auto_run:
+            input("\n按回车键开始模拟业务流程...")
+        else:
+            print("\n🚀 自动开始模拟业务流程...")
+            await asyncio.sleep(1)
 
         # 模拟各个场景
         await self.simulate_morning_routine()
@@ -576,8 +580,13 @@ class XujisSeafoodSimulation:
 
 async def main():
     """主函数"""
+    import sys
+
+    # 检查是否有命令行参数
+    auto_run = "--auto" in sys.argv or len(sys.argv) == 1  # 默认自动运行
+
     simulation = XujisSeafoodSimulation()
-    await simulation.run_simulation()
+    await simulation.run_simulation(auto_run=auto_run)
 
 
 if __name__ == "__main__":
