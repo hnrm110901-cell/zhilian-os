@@ -11,7 +11,7 @@ import time
 
 from src.core.config import settings
 # 核心模块
-from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation, approval, edge_node, decision_validator, federated_learning, recommendations, agent_collaboration, embedding
+from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation, approval, edge_node, decision_validator, federated_learning, recommendations, agent_collaboration, embedding, raas, model_marketplace, human_in_the_loop
 from src.api.phase5_apis import platform_router, industry_router, supply_chain_router, i18n_router
 # 逐步启用的模块
 from src.api import dashboard, analytics, audit, multi_store, finance, customer360, wechat_triggers, queue, meituan_queue
@@ -30,27 +30,30 @@ logger = structlog.get_logger()
 API_DESCRIPTION = """
 ## 智链OS (Zhilian Operating System)
 
-中餐连锁品牌门店运营智能体操作系统 - 基于多Agent协同的智能餐厅运营管理系统
+### 产品定位: AI数字总经理 (RaaS - Result as a Service)
+
+**不卖软件，卖结果** - 年薪只要几万块的数字总经理
+
+智链OS是一个AI Native的餐饮RaaS系统，定位为"AI数字总经理"，拥有行业Top10%管理经验，24小时不休息，永不离职，持续学习进化。
+
+### 核心价值主张
+
+* **帮你省钱**: 每月砍掉一个人工成本，省下1000块钱的烂菜叶
+* **帮你赚钱**: 提升客流量、客单价、复购率，增加营收15-25%
+* **一周见效**: 不是三年后的愿景，是一周内看到的效果
+* **按效果付费**: 省下成本的20%，增加营收的15%作为服务费
+
+### 商业模式
+
+* **基础版（免费）**: 3个月免费试用，建立信任
+* **效果版**: 按省下的成本分成20%（食材损耗、人工成本、能源成本）
+* **增长版**: 按增加的营收分成15%（客流增加、客单价提升、复购率提升）
+* **模型版**: 购买行业最佳实践模型（¥9,999-29,999/年）
 
 ### 核心功能
 
-* **智能Agent系统**: 7个专业Agent实现从排班、订单、库存到决策的全流程智能化管理
-* **用户认证**: 基于JWT的安全认证系统，支持访问令牌和刷新令牌
-* **权限管理**: 细粒度的基于角色的访问控制(RBAC)，支持13种角色
-* **决策支持**: KPI分析、业务洞察生成、改进建议
-* **实时监控**: 系统健康检查、性能监控
-
-### 认证说明
-
-大部分API端点需要认证。使用以下步骤进行认证：
-
-1. 调用 `/api/v1/auth/login` 获取访问令牌
-2. 在后续请求的 `Authorization` 头中包含令牌: `Bearer <access_token>`
-3. 访问令牌有效期30分钟，过期后使用刷新令牌获取新的访问令牌
-
-### Agent系统
-
-系统包含7个智能Agent：
+#### 1. 智能Agent系统
+7个专业Agent实现从排班、订单、库存到决策的全流程智能化管理
 
 * **ScheduleAgent**: 智能排班 - 基于AI的客流预测和自动排班
 * **OrderAgent**: 订单协同 - 预定管理、排队系统、智能点单推荐
@@ -60,11 +63,54 @@ API_DESCRIPTION = """
 * **DecisionAgent**: 决策支持 - KPI分析、业务洞察、改进建议
 * **ReservationAgent**: 预定宴会 - 预定管理、座位分配、宴会管理
 
+#### 2. 前厅破冰：听觉革命（Voice-First）
+"智链耳机" - 解放双手的管理革命
+
+* 外卖爆单催单：语音通知优先处理
+* VIP到店识别：个性化服务推荐
+* 异常实时预警：及时处理客诉
+
+#### 3. 后厨破冰：控损为王（BOM）
+"智链控损" - 每月省下一个员工工资
+
+* 精准预测：AI预测食材需求，减少5%废损
+* 实时监控：库存异常自动预警
+* 智能采购：自动生成采购单，避免过度采购
+
+#### 4. 模型交易市场
+打造产业级突触网络，售卖行业最佳实践
+
+* **Level 1**: 基础服务（免费） - 使用自己门店数据训练的模型
+* **Level 2**: 行业模型（¥9,999/年） - 全国1000家门店联邦训练的通用模型
+* **Level 3**: 定制模型（¥29,999/年） - 针对特定品类的专属模型
+* **Level 4**: 数据贡献分成 - 门店贡献数据获得模型销售收益分成
+
+#### 5. Human-in-the-Loop安全防线
+"机器不可信"安全防线 - 高危操作分级审批
+
+* **Level 1**: 自动执行（低风险）
+* **Level 2**: 自动执行+事后审计（中风险）
+* **Level 3**: 人工审批（高风险）
+* **Level 4**: 禁止AI操作（极高风险）
+
+### 网络效应飞轮
+
+更多门店接入 → 更多数据训练 → AI模型更聪明 → 效果更好 → 更多门店愿意接入
+
+### 认证说明
+
+大部分API端点需要认证。使用以下步骤进行认证：
+
+1. 调用 `/api/v1/auth/login` 获取访问令牌
+2. 在后续请求的 `Authorization` 头中包含令牌: `Bearer <access_token>`
+3. 访问令牌有效期30分钟，过期后使用刷新令牌获取新的访问令牌
+
 ### 技术栈
 
 * **后端框架**: FastAPI (Python 3.9+)
 * **数据库**: PostgreSQL with SQLAlchemy ORM
 * **认证**: JWT (JSON Web Tokens)
+* **AI能力**: 联邦学习、神经符号双规、多模态交互
 * **日志**: Structlog
 """
 
@@ -215,6 +261,18 @@ app = FastAPI(
             "name": "embedding",
             "description": "嵌入模型 - 语义理解、相似度计算、智能推荐",
         },
+        {
+            "name": "raas",
+            "description": "RaaS定价 - 按效果付费、基线指标、效果指标、月度账单",
+        },
+        {
+            "name": "model_marketplace",
+            "description": "模型交易市场 - 行业模型购买、数据贡献分成、网络效应",
+        },
+        {
+            "name": "human_in_the_loop",
+            "description": "人机协同审批 - 风险分级、信任阶段、审批流程、决策统计",
+        },
     ],
 )
 
@@ -357,6 +415,15 @@ app.include_router(i18n_router, tags=["internationalization"])
 
 # Embedding Model (嵌入模型)
 app.include_router(embedding.router, tags=["embedding"])
+
+# RaaS (Result-as-a-Service)
+app.include_router(raas.router, tags=["raas"])
+
+# Model Marketplace (模型交易市场)
+app.include_router(model_marketplace.router, tags=["model_marketplace"])
+
+# Human-in-the-Loop (人机协同审批)
+app.include_router(human_in_the_loop.router, tags=["human_in_the_loop"])
 
 # POS模块暂时禁用 (文件为空)
 # app.include_router(pos.router, prefix="/api/v1/pos", tags=["pos"])
