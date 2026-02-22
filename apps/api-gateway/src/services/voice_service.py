@@ -147,9 +147,41 @@ class VoiceService:
         sample_rate: int,
     ) -> str:
         """Azure语音识别"""
-        # TODO: 实现Azure Speech Services集成
-        # import azure.cognitiveservices.speech as speechsdk
-        return "模拟识别结果"
+        try:
+            import httpx
+            from ..core.config import settings
+
+            if not settings.AZURE_SPEECH_KEY:
+                logger.warning("Azure Speech Key未配置，返回模拟结果")
+                return "模拟识别结果"
+
+            region = settings.AZURE_SPEECH_REGION
+            url = (
+                f"https://{region}.stt.speech.microsoft.com"
+                f"/speech/recognition/conversation/cognitiveservices/v1"
+                f"?language={language}&format=simple"
+            )
+            headers = {
+                "Ocp-Apim-Subscription-Key": settings.AZURE_SPEECH_KEY,
+                "Content-Type": f"audio/wav; codecs=audio/pcm; samplerate={sample_rate}",
+                "Accept": "application/json",
+            }
+
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(url, content=audio_data, headers=headers)
+                result = response.json()
+
+            if result.get("RecognitionStatus") == "Success":
+                text = result.get("DisplayText", "")
+                logger.info("Azure语音识别成功", text=text)
+                return text
+            else:
+                logger.error("Azure语音识别失败", status=result.get("RecognitionStatus"))
+                return "识别失败"
+
+        except Exception as e:
+            logger.error("Azure语音识别异常", error=str(e))
+            return "识别失败"
 
     async def _azure_tts(
         self,
@@ -159,8 +191,59 @@ class VoiceService:
         speed: float,
     ) -> bytes:
         """Azure语音合成"""
-        # TODO: 实现Azure Speech Services集成
-        return b""
+        try:
+            import httpx
+            from ..core.config import settings
+
+            if not settings.AZURE_SPEECH_KEY:
+                logger.warning("Azure Speech Key未配置，返回空音频")
+                return b""
+
+            region = settings.AZURE_SPEECH_REGION
+
+            # 获取访问令牌
+            token_url = f"https://{region}.api.cognitive.microsoft.com/sts/v1.0/issueToken"
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                token_resp = await client.post(
+                    token_url,
+                    headers={"Ocp-Apim-Subscription-Key": settings.AZURE_SPEECH_KEY},
+                )
+                access_token = token_resp.text
+
+            # 语音名称映射（中文）
+            voice_name = "zh-CN-XiaoxiaoNeural" if voice == "female" else "zh-CN-YunxiNeural"
+            rate_pct = int((speed - 1.0) * 100)
+            rate_str = f"+{rate_pct}%" if rate_pct >= 0 else f"{rate_pct}%"
+
+            ssml = (
+                f'<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="{language}">'
+                f'<voice name="{voice_name}">'
+                f'<prosody rate="{rate_str}">{text}</prosody>'
+                f"</voice></speak>"
+            )
+
+            tts_url = f"https://{region}.tts.speech.microsoft.com/cognitiveservices/v1"
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                tts_resp = await client.post(
+                    tts_url,
+                    content=ssml.encode("utf-8"),
+                    headers={
+                        "Authorization": f"Bearer {access_token}",
+                        "Content-Type": "application/ssml+xml",
+                        "X-Microsoft-OutputFormat": "riff-16khz-16bit-mono-pcm",
+                    },
+                )
+
+            if tts_resp.status_code == 200:
+                logger.info("Azure语音合成成功", audio_size=len(tts_resp.content))
+                return tts_resp.content
+            else:
+                logger.error("Azure语音合成失败", status=tts_resp.status_code)
+                return b""
+
+        except Exception as e:
+            logger.error("Azure语音合成异常", error=str(e))
+            return b""
 
     async def _baidu_stt(
         self,

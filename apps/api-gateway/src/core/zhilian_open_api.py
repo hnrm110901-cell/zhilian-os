@@ -722,13 +722,38 @@ class ZhilianOpenAPI:
     # ==================== 工具方法 ====================
 
     def _authenticate(self) -> bool:
-        """API认证"""
-        # TODO: 实现认证逻辑
+        """API认证 - 验证 api_key 格式和 api_secret 非空"""
+        if not self.api_key or not self.api_secret:
+            logger.warning("API认证失败：api_key 或 api_secret 为空")
+            return False
+        # api_key 格式：zl_开头，长度32+
+        if not self.api_key.startswith("zl_") or len(self.api_key) < 16:
+            logger.warning("API认证失败：api_key 格式无效", api_key=self.api_key[:8])
+            return False
         return True
 
     def _rate_limit_check(self) -> bool:
-        """限流检查"""
-        # TODO: 实现限流逻辑
+        """限流检查 - 每个 api_key 每分钟最多 60 次"""
+        import time
+        now = time.time()
+        window = 60  # 秒
+        limit = 60   # 次
+
+        if not hasattr(self, "_rate_counters"):
+            self._rate_counters: dict = {}
+
+        key = self.api_key
+        if key not in self._rate_counters:
+            self._rate_counters[key] = []
+
+        # 清理过期记录
+        self._rate_counters[key] = [t for t in self._rate_counters[key] if now - t < window]
+
+        if len(self._rate_counters[key]) >= limit:
+            logger.warning("限流触发", api_key=key[:8], count=len(self._rate_counters[key]))
+            return False
+
+        self._rate_counters[key].append(now)
         return True
 
 

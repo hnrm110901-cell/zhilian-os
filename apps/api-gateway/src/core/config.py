@@ -98,6 +98,10 @@ class Settings(BaseSettings):
     XUNFEI_API_KEY: str = ""
     XUNFEI_API_SECRET: str = ""
 
+    # Azure 语音服务
+    AZURE_SPEECH_KEY: str = ""
+    AZURE_SPEECH_REGION: str = "eastasia"
+
     # 美团等位配置
     MEITUAN_DEVELOPER_ID: str = ""  # 美团开发者ID
     MEITUAN_SIGN_KEY: str = ""  # 美团签名密钥
