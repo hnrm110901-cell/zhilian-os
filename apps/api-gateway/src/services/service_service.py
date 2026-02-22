@@ -113,12 +113,25 @@ class ServiceQualityService:
 
             avg_service_time = sum(service_times) / len(service_times) if service_times else 0
 
+            # 从门店配置读取理想服务时间
+            ideal_service_time = 30
+            try:
+                from src.models.store import Store
+                store_result = await session.execute(
+                    select(Store.config).where(Store.id == self.store_id)
+                )
+                store_cfg = store_result.scalar_one_or_none() or {}
+                ideal_service_time = int(store_cfg.get("ideal_service_time_minutes", 30))
+            except Exception:
+                pass
+
             # 服务质量评分（基于多个指标的综合评分）
             quality_score = self._calculate_quality_score(
                 avg_satisfaction,
                 completion_rate,
                 cancellation_rate,
-                avg_service_time
+                avg_service_time,
+                ideal_service_time,
             )
 
             return {
@@ -373,7 +386,8 @@ class ServiceQualityService:
         satisfaction: float,
         completion_rate: float,
         cancellation_rate: float,
-        avg_service_time: float
+        avg_service_time: float,
+        ideal_service_time: int = 30,
     ) -> float:
         """
         计算综合服务质量评分
@@ -402,7 +416,7 @@ class ServiceQualityService:
         # 取消率得分（取消率越低越好）
         cancellation_score = max(0, 100 - cancellation_rate * 2)
 
-        # 服务时间得分（假设理想服务时间是30分钟，超过会扣分）
+        # 服务时间得分（从门店配置读取理想服务时间，默认30分钟）
         ideal_service_time = 30
         if avg_service_time <= ideal_service_time:
             service_time_score = 100

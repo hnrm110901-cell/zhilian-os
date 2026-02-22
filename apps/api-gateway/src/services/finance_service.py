@@ -138,10 +138,23 @@ class FinanceService:
             expenses[category] = amount
             total_expenses += amount
 
-        # 计算利润
+        # 计算利润（含税费）
         gross_profit = total_revenue - expenses.get("food_cost", 0)
         operating_profit = total_revenue - total_expenses
-        net_profit = operating_profit  # 简化版，实际应考虑税费等
+        # 从门店配置读取税率，默认 6%（餐饮业增值税小规模纳税人）
+        tax_rate = 0.06
+        try:
+            from src.core.database import get_db_session
+            from src.models.store import Store
+            from sqlalchemy import select
+            async with get_db_session() as session:
+                result = await session.execute(select(Store.config).where(Store.id == store_id))
+                cfg = result.scalar_one_or_none() or {}
+                tax_rate = float(cfg.get("tax_rate", 0.06))
+        except Exception:
+            pass
+        tax_amount = int(operating_profit * tax_rate) if operating_profit > 0 else 0
+        net_profit = operating_profit - tax_amount
 
         # 计算比率
         gross_margin = (gross_profit / total_revenue * 100) if total_revenue > 0 else 0

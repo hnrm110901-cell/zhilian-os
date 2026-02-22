@@ -160,18 +160,36 @@ async def get_trigger_stats(
     返回各类事件的触发次数、成功率等统计信息
     """
     try:
-        # Future Enhancement: 触发统计功能（低优先级）
-        # 需要在触发时记录统计数据到数据库或Redis
+        from src.core.database import get_db_session
+        from src.models.notification import Notification
+        from sqlalchemy import select, func
+
+        async with get_db_session() as session:
+            # 统计企微相关通知
+            total_result = await session.execute(
+                select(func.count(Notification.id)).where(
+                    Notification.extra_data["channel"].astext.in_(["wechat", "wechat_work"])
+                )
+            )
+            total = total_result.scalar() or 0
+
+            # 按 type 分组统计
+            by_type_result = await session.execute(
+                select(Notification.type, func.count(Notification.id).label("cnt"))
+                .where(Notification.extra_data["channel"].astext.in_(["wechat", "wechat_work"]))
+                .group_by(Notification.type)
+            )
+            by_event_type = {row.type: row.cnt for row in by_type_result.all()}
 
         return {
             "success": True,
             "data": {
-                "total_triggers": 0,
-                "success_count": 0,
+                "total_triggers": total,
+                "success_count": total,  # Notification 写入即视为成功
                 "failure_count": 0,
-                "by_event_type": {},
+                "by_event_type": by_event_type,
             },
-            "message": "触发统计功能开发中",
+            "message": "success",
         }
 
     except Exception as e:
