@@ -77,37 +77,59 @@ class EnhancedRAGService:
         Returns:
             数据充足性评估结果
         """
-        # TODO: 实现实际的数据库查询逻辑
-        # 这里需要根据query_type查询相关数据的数量
+        from sqlalchemy import select, func
+        from src.core.database import get_db_session
+        from src.models.order import Order
+        from src.models.daily_report import DailyReport
+        from src.models.inventory import InventoryItem
+        from src.models.reservation import Reservation
 
-        # 模拟数据充足性检查
+        async with get_db_session() as session:
+            orders_result = await session.execute(
+                select(func.count(Order.id)).where(Order.store_id == self.store_id)
+            )
+            days_result = await session.execute(
+                select(func.count(func.distinct(DailyReport.report_date))).where(
+                    DailyReport.store_id == self.store_id
+                )
+            )
+            inventory_result = await session.execute(
+                select(func.count(InventoryItem.id)).where(
+                    InventoryItem.store_id == self.store_id
+                )
+            )
+            reservation_result = await session.execute(
+                select(func.count(Reservation.id)).where(
+                    Reservation.store_id == self.store_id
+                )
+            )
+
+        data_counts = {
+            "orders": int(orders_result.scalar() or 0),
+            "days": int(days_result.scalar() or 0),
+            "inventory_records": int(inventory_result.scalar() or 0),
+            "reservations": int(reservation_result.scalar() or 0),
+        }
+
+        missing_data = [
+            {
+                "dimension": key,
+                "current": data_counts.get(key, 0),
+                "required": threshold,
+                "gap": threshold - data_counts.get(key, 0),
+            }
+            for key, threshold in self.DATA_SUFFICIENCY_THRESHOLDS.items()
+            if data_counts.get(key, 0) < threshold
+        ]
+
         sufficiency = {
             "query_type": query_type,
             "store_id": self.store_id,
-            "data_counts": {
-                "orders": 0,
-                "days_of_data": 0,
-                "inventory_records": 0,
-                "reservations": 0,
-            },
+            "data_counts": data_counts,
             "thresholds": self.DATA_SUFFICIENCY_THRESHOLDS,
-            "is_sufficient": False,
-            "missing_data": [],
+            "is_sufficient": len(missing_data) == 0,
+            "missing_data": missing_data,
         }
-
-        # 检查每个维度的数据是否充足
-        for key, threshold in self.DATA_SUFFICIENCY_THRESHOLDS.items():
-            count = sufficiency["data_counts"].get(key, 0)
-            if count < threshold:
-                sufficiency["missing_data"].append({
-                    "dimension": key,
-                    "current": count,
-                    "required": threshold,
-                    "gap": threshold - count,
-                })
-
-        # 如果有任何维度数据不足，则判定为不充足
-        sufficiency["is_sufficient"] = len(sufficiency["missing_data"]) == 0
 
         logger.info(
             "Data sufficiency checked",
