@@ -4,6 +4,7 @@ Voice Interaction Service
 
 支持语音命令识别、语音合成、与Agent系统集成
 """
+import os
 from typing import Dict, Any, Optional
 import structlog
 from enum import Enum
@@ -197,7 +198,7 @@ class VoiceService:
 
             # 获取访问令牌
             token_url = f"https://{region}.api.cognitive.microsoft.com/sts/v1.0/issueToken"
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=float(os.getenv("VOICE_TOKEN_TIMEOUT", "10.0"))) as client:
                 token_resp = await client.post(
                     token_url,
                     headers={"Ocp-Apim-Subscription-Key": settings.AZURE_SPEECH_KEY},

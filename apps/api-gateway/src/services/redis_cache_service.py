@@ -4,6 +4,7 @@ Redis Cache Service
 
 提供统一的缓存接口，支持多种数据类型和过期策略
 """
+import os
 import redis.asyncio as redis
 import json
 import structlog
@@ -31,7 +32,7 @@ class RedisCacheService:
                 settings.REDIS_URL,
                 encoding="utf-8",
                 decode_responses=True,
-                max_connections=50
+                max_connections=int(os.getenv("REDIS_MAX_CONNECTIONS", "50"))
             )
             # 测试连接
             await self._redis.ping()

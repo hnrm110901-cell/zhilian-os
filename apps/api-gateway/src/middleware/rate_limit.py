@@ -65,7 +65,7 @@ class RedisRateLimiter:
                 self.redis_url,
                 encoding="utf-8",
                 decode_responses=True,
-                max_connections=50,
+                max_connections=int(os.getenv("REDIS_MAX_CONNECTIONS", "50")),
             )
             await self.redis_client.ping()
             self._initialized = True
