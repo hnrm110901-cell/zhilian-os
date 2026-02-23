@@ -19,6 +19,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 from enum import Enum
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -736,8 +737,8 @@ class ZhilianOpenAPI:
         """限流检查 - 每个 api_key 每分钟最多 60 次"""
         import time
         now = time.time()
-        window = 60  # 秒
-        limit = 60   # 次
+        window = int(os.getenv("OPEN_API_RATE_LIMIT_WINDOW", "60"))    # 秒
+        limit = int(os.getenv("OPEN_API_RATE_LIMIT_REQUESTS", "60"))   # 次
 
         if not hasattr(self, "_rate_counters"):
             self._rate_counters: dict = {}
