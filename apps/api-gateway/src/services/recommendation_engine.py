@@ -332,21 +332,38 @@ class IntelligentRecommendationEngine:
         - A/B test results
         """
         # Simplified implementation
-        return {
-            "store_id": store_id,
-            "period": {
-                "start": start_date.isoformat(),
-                "end": end_date.isoformat()
-            },
-            "metrics": {
-                "recommendation_acceptance_rate": 0.35,  # 35%
-                "average_order_value_increase": 0.18,  # 18% increase
-                "customer_satisfaction_score": 4.5,  # out of 5
-                "revenue_impact": 15000.0,  # RMB
-                "recommendations_shown": 1000,
-                "recommendations_accepted": 350
+        if not self.db:
+            return {
+                "store_id": store_id,
+                "period": {"start": start_date.isoformat(), "end": end_date.isoformat()},
+                "metrics": {},
             }
-        }
+        try:
+            from ..models.order import Order, OrderItem
+            total_orders = (
+                self.db.query(Order)
+                .filter(
+                    Order.store_id == store_id,
+                    Order.order_time >= start_date,
+                    Order.order_time <= end_date,
+                    Order.status == "completed",
+                )
+                .count()
+            )
+            return {
+                "store_id": store_id,
+                "period": {"start": start_date.isoformat(), "end": end_date.isoformat()},
+                "metrics": {
+                    "total_orders": total_orders,
+                    "recommendations_shown": total_orders,
+                },
+            }
+        except Exception:
+            return {
+                "store_id": store_id,
+                "period": {"start": start_date.isoformat(), "end": end_date.isoformat()},
+                "metrics": {},
+            }
 
     # Helper methods for recommendation logic
 
@@ -388,47 +405,100 @@ class IntelligentRecommendationEngine:
     def _get_available_dishes(self, store_id: str) -> List[Dict[str, Any]]:
         """Get available dishes for store"""
         # Simplified: query from database
-        return [
-            {
-                "dish_id": "dish_001",
-                "name": "宫保鸡丁",
-                "price": 38.0,
-                "profit_margin": 0.6,
-                "category": "川菜",
-                "tags": ["辣", "鸡肉", "热菜"]
-            },
-            {
-                "dish_id": "dish_002",
-                "name": "麻婆豆腐",
-                "price": 28.0,
-                "profit_margin": 0.7,
-                "category": "川菜",
-                "tags": ["辣", "豆腐", "热菜"]
-            }
-        ]
+        if not self.db:
+            return []
+        try:
+            from ..models.dish import Dish
+            dishes = (
+                self.db.query(Dish)
+                .filter(Dish.store_id == store_id, Dish.is_available == True)
+                .all()
+            )
+            return [
+                {
+                    "dish_id": str(d.id),
+                    "name": d.name,
+                    "price": float(d.price) if d.price else 0.0,
+                    "profit_margin": float(d.profit_margin) / 100 if d.profit_margin else 0.0,
+                    "category": str(d.category_id) if d.category_id else "",
+                    "tags": d.tags or [],
+                }
+                for d in dishes
+            ]
+        except Exception:
+            return []
 
     def _recently_ordered(self, customer_id: str, dish_id: str) -> bool:
         """Check if customer ordered this dish recently"""
-        # Simplified: check last 7 days
-        return False
+        if not self.db:
+            return False
+        try:
+            from ..models.order import Order, OrderItem
+            cutoff = datetime.now() - timedelta(days=7)
+            result = (
+                self.db.query(OrderItem)
+                .join(Order, Order.id == OrderItem.order_id)
+                .filter(
+                    Order.customer_phone == customer_id,
+                    Order.order_time >= cutoff,
+                    OrderItem.item_id == dish_id,
+                )
+                .first()
+            )
+            return result is not None
+        except Exception:
+            return False
 
     def _collaborative_filtering_score(
         self,
         customer_id: str,
         dish_id: str
     ) -> float:
-        """Calculate collaborative filtering score"""
-        # Simplified: use user-dish matrix
-        return 0.7
+        """Calculate collaborative filtering score based on order co-occurrence"""
+        if not self.db:
+            return 0.5
+        try:
+            from ..models.order import Order, OrderItem
+            # Count how many completed orders for this store include this dish
+            dish_orders = (
+                self.db.query(OrderItem)
+                .join(Order, Order.id == OrderItem.order_id)
+                .filter(OrderItem.item_id == dish_id, Order.status == "completed")
+                .count()
+            )
+            total_orders = (
+                self.db.query(Order)
+                .filter(Order.status == "completed")
+                .count()
+            )
+            if total_orders == 0:
+                return 0.5
+            # Popularity-based CF score, capped at 0.95
+            return min(0.95, 0.3 + (dish_orders / total_orders) * 2)
+        except Exception:
+            return 0.5
 
     def _content_based_score(
         self,
         customer_history: List[Dict[str, Any]],
         dish: Dict[str, Any]
     ) -> float:
-        """Calculate content-based filtering score"""
-        # Simplified: match dish attributes with customer preferences
-        return 0.8
+        """Calculate content-based filtering score via tag overlap"""
+        if not customer_history:
+            return 0.5
+        dish_tags = set(dish.get("tags") or [])
+        if not dish_tags:
+            return 0.5
+        # Collect tags from customer's past orders
+        history_tags: Dict[str, int] = {}
+        for item in customer_history:
+            for tag in (item.get("tags") or []):
+                history_tags[tag] = history_tags.get(tag, 0) + 1
+        if not history_tags:
+            return 0.5
+        overlap = sum(history_tags.get(t, 0) for t in dish_tags)
+        max_possible = sum(history_tags.values())
+        return min(0.95, 0.4 + (overlap / max_possible) * 0.55) if max_possible else 0.5
 
     def _context_score(
         self,
@@ -498,13 +568,20 @@ class IntelligentRecommendationEngine:
         dish_id: str
     ) -> Dict[str, Any]:
         """Get dish data"""
-        # Simplified
-        return {
-            "dish_id": dish_id,
-            "price": 38.0,
-            "cost": 15.0,
-            "profit_margin": 0.6
-        }
+        if self.db:
+            try:
+                from ..models.dish import Dish
+                dish = self.db.query(Dish).filter(Dish.id == dish_id).first()
+                if dish:
+                    return {
+                        "dish_id": str(dish.id),
+                        "price": float(dish.price) if dish.price else 0.0,
+                        "cost": float(dish.cost) if dish.cost else 0.0,
+                        "profit_margin": float(dish.profit_margin) / 100 if dish.profit_margin else 0.0,
+                    }
+            except Exception:
+                pass
+        return {"dish_id": dish_id, "price": 0.0, "cost": 0.0, "profit_margin": 0.0}
 
     def _determine_pricing_strategy(
         self,

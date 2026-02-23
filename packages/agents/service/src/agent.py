@@ -188,6 +188,19 @@ class ServiceAgent(BaseAgent):
             "min_resolution_rate": float(os.getenv("SERVICE_MIN_RESOLUTION_RATE", "0.90")),
         }
         self.logger = logger.bind(agent="service", store_id=store_id)
+        self._db_engine = None
+
+    def _get_db_engine(self):
+        """获取数据库引擎（延迟初始化）"""
+        if self._db_engine is None:
+            db_url = os.getenv("DATABASE_URL")
+            if db_url:
+                try:
+                    from sqlalchemy import create_engine
+                    self._db_engine = create_engine(db_url, pool_pre_ping=True)
+                except Exception:
+                    pass
+        return self._db_engine
 
     def get_supported_actions(self) -> List[str]:
         """获取支持的操作列表"""
@@ -579,15 +592,34 @@ class ServiceAgent(BaseAgent):
         priority = complaint["priority"]
         category = complaint["category"]
 
-        # 根据优先级和分类分配
         if priority == ComplaintPriority.URGENT:
-            return "MANAGER_001"  # 店长
+            target_position = "manager"
         elif category == ServiceCategory.FOOD_QUALITY:
-            return "CHEF_MANAGER_001"  # 厨师长
+            target_position = "chef"
         elif category == ServiceCategory.SERVICE_ATTITUDE:
-            return "SERVICE_MANAGER_001"  # 服务经理
+            target_position = "manager"
         else:
-            return "CUSTOMER_SERVICE_001"  # 客服专员
+            target_position = "cashier"
+
+        engine = self._get_db_engine()
+        if engine:
+            try:
+                from sqlalchemy import text
+                with engine.connect() as conn:
+                    row = conn.execute(text("""
+                        SELECT id FROM employees
+                        WHERE store_id = :store_id
+                          AND position = :position
+                          AND is_active = true
+                        LIMIT 1
+                    """), {"store_id": self.store_id, "position": target_position}).fetchone()
+                if row:
+                    return row[0]
+            except Exception:
+                pass
+
+        fallback = {"manager": "MANAGER_001", "chef": "CHEF_MANAGER_001", "cashier": "CUSTOMER_SERVICE_001"}
+        return fallback.get(target_position, "CUSTOMER_SERVICE_001")
 
     async def monitor_service_quality(
         self,

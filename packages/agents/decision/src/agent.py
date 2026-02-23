@@ -189,7 +189,6 @@ class DecisionAgent(BaseAgent):
             "inventory_turnover": int(os.getenv("DECISION_KPI_INVENTORY_TURNOVER_TARGET", "12")),
         }
         self._db_engine = None
-        }
         self.logger = logger.bind(agent="decision", store_id=store_id)
 
     def get_supported_actions(self) -> List[str]:
