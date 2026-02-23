@@ -226,26 +226,12 @@ class PinzhiAdapter:
         params = self._add_sign(params)
         logger.info("查询菜品信息", updatetime=updatetime)
 
-        # TODO: 实际调用API
-        # response = await self.request("POST", "/pinzhi/querydishes.do", data=params)
-        # return response.get("data", [])
-
-        # 临时返回模拟数据
-        return [
-            {
-                "dishesId": 1001,
-                "dishesCode": "D001",
-                "dishesName": "宫保鸡丁",
-                "dishPrice": 48.00,
-                "rcId": 1,
-                "status": 0,
-                "unit": "份",
-                "isMaterial": 0,
-                "isPractice": 0,
-                "isRecommend": 1,
-                "channel": "1,2,3",
-            }
-        ]
+        try:
+            response = await self._request("POST", "/pinzhi/querydishes.do", data=params)
+            return response.get("data", [])
+        except Exception as e:
+            logger.warning("查询菜品失败", error=str(e))
+            return []
 
     async def get_practice(self) -> List[Dict[str, Any]]:
         """
@@ -257,11 +243,12 @@ class PinzhiAdapter:
         params = self._add_sign({})
         logger.info("查询做法配料")
 
-        # TODO: 实际调用API
-        # response = await self.request("POST", "/pinzhi/queryPractice.do", data=params)
-        # return response.get("data", [])
-
-        return []
+        try:
+            response = await self._request("POST", "/pinzhi/queryPractice.do", data=params)
+            return response.get("data", [])
+        except Exception as e:
+            logger.warning("查询做法配料失败", error=str(e))
+            return []
 
     async def get_tables(self) -> List[Dict[str, Any]]:
         """
@@ -273,27 +260,12 @@ class PinzhiAdapter:
         params = self._add_sign({})
         logger.info("查询桌台信息")
 
-        # TODO: 实际调用API
-        # response = await self.request("GET", "/pinzhi/queryTable.do", params=params)
-        # return response.get("res", [])
-
-        # 临时返回模拟数据
-        return [
-            {
-                "tabelNo": "0001",
-                "tableId": 45460,
-                "blId": 395,
-                "tableName": "0001",
-                "blName": "一楼营业区",
-            },
-            {
-                "tabelNo": "0002",
-                "tableId": 45471,
-                "blId": 395,
-                "tableName": "0002",
-                "blName": "一楼营业区",
-            },
-        ]
+        try:
+            response = await self._request("GET", "/pinzhi/queryTable.do", params=params)
+            return response.get("res", [])
+        except Exception as e:
+            logger.warning("查询桌台失败", error=str(e))
+            return []
 
     async def get_employees(self) -> List[Dict[str, Any]]:
         """
@@ -305,27 +277,12 @@ class PinzhiAdapter:
         params = self._add_sign({})
         logger.info("查询员工信息")
 
-        # TODO: 实际调用API
-        # response = await self.request("GET", "/pinzhi/employe.do", params=params)
-        # return response.get("data", [])
-
-        # 临时返回模拟数据
-        return [
-            {
-                "epId": 255,
-                "epNo": "E001",
-                "epcardNo": "18708181320",
-                "epName": "张三",
-                "epEnName": "Zhang San",
-                "epTel": "18532127729",
-                "epMail": "",
-                "epQQ": "",
-                "status": 0,
-                "epSex": 1,
-                "pgId": 113,
-                "pgName": "收银员",
-            }
-        ]
+        try:
+            response = await self._request("GET", "/pinzhi/employe.do", params=params)
+            return response.get("data", [])
+        except Exception as e:
+            logger.warning("查询员工失败", error=str(e))
+            return []
 
     # ==================== 业务数据接口 ====================
 
@@ -420,16 +377,12 @@ class PinzhiAdapter:
         params = self._add_sign(params)
         logger.info("查询收入数据", ognid=ognid, business_date=business_date)
 
-        # TODO: 实际调用API
-        # response = await self.request("GET", "/pinzhi/queryOrderSummary.do", params=params)
-        # return response.get("res", {})
-
-        return {
-            "ognId": int(ognid),
-            "businesDate": business_date,
-            "rcIdList": [],
-            "cdIdList": [],
-        }
+        try:
+            response = await self._request("GET", "/pinzhi/queryOrderSummary.do", params=params)
+            return response.get("res", {})
+        except Exception as e:
+            logger.warning("查询收入数据失败", error=str(e))
+            return {}
 
     async def query_store_summary_list(
         self, business_date: str
@@ -447,11 +400,12 @@ class PinzhiAdapter:
         params = self._add_sign(params)
         logger.info("查询门店营业数据", business_date=business_date)
 
-        # TODO: 实际调用API
-        # response = await self.request("GET", "/pinzhi/queryStoreSummaryList.do", params=params)
-        # return response.get("data", [])
-
-        return []
+        try:
+            response = await self._request("GET", "/pinzhi/queryStoreSummaryList.do", params=params)
+            return response.get("data", [])
+        except Exception as e:
+            logger.warning("查询门店营业数据失败", error=str(e))
+            return []
 
     async def query_cooking_detail(self, business_date: str) -> List[Dict[str, Any]]:
         """
@@ -467,11 +421,12 @@ class PinzhiAdapter:
         params = self._add_sign(params)
         logger.info("查询出品明细", business_date=business_date)
 
-        # TODO: 实际调用API
-        # response = await self.request("GET", "/pinzhi/queryCookingDetail.do", params=params)
-        # return response.get("data", [])
-
-        return []
+        try:
+            response = await self._request("GET", "/pinzhi/queryCookingDetail.do", params=params)
+            return response.get("data", [])
+        except Exception as e:
+            logger.warning("查询出品明细失败", error=str(e))
+            return []
 
     async def get_payment_customer(
         self,
@@ -497,11 +452,12 @@ class PinzhiAdapter:
         params = self._add_sign(params)
         logger.info("查询挂账客户", begin_date=begin_date, end_date=end_date)
 
-        # TODO: 实际调用API
-        # response = await self.request("GET", "/pinzhi/paymentCustomer.do", params=params)
-        # return response.get("data", [])
-
-        return []
+        try:
+            response = await self._request("GET", "/pinzhi/paymentCustomer.do", params=params)
+            return response.get("data", [])
+        except Exception as e:
+            logger.warning("查询挂账客户失败", error=str(e))
+            return []
 
     async def get_pay_types(self) -> List[Dict[str, Any]]:
         """
@@ -513,17 +469,12 @@ class PinzhiAdapter:
         params = self._add_sign({})
         logger.info("查询支付方式")
 
-        # TODO: 实际调用API
-        # response = await self.request("GET", "/pinzhi/payType.do", params=params)
-        # return response.get("data", [])
-
-        # 临时返回模拟数据
-        return [
-            {"id": 1, "name": "现金", "category": 1},
-            {"id": 2, "name": "会员卡", "category": 2},
-            {"id": 3, "name": "微信支付", "category": 3},
-            {"id": 4, "name": "支付宝", "category": 3},
-        ]
+        try:
+            response = await self._request("GET", "/pinzhi/payType.do", params=params)
+            return response.get("data", [])
+        except Exception as e:
+            logger.warning("查询支付方式失败", error=str(e))
+            return []
 
     async def download_bill_data(
         self, ognid: str, pay_date: str, pay_type: int
@@ -545,11 +496,12 @@ class PinzhiAdapter:
             "下载对账单", ognid=ognid, pay_date=pay_date, pay_type=pay_type
         )
 
-        # TODO: 实际调用API
-        # response = await self.request("GET", "/pinzhi/downloadBillData.do", params=params)
-        # return response.get("data", "")
-
-        return ""
+        try:
+            response = await self._request("GET", "/pinzhi/downloadBillData.do", params=params)
+            return response.get("data", "")
+        except Exception as e:
+            logger.warning("下载对账单失败", error=str(e))
+            return ""
 
     async def close(self):
         """关闭适配器，释放资源"""
