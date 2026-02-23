@@ -46,14 +46,8 @@ class FederatedLearningService(BaseService):
 
     def __init__(self, store_id: Optional[str] = None):
         super().__init__(store_id)
-        self.min_stores = 3  # 最少参与门店数（可被config覆盖）
-        self.aggregation_threshold = 0.8  # 聚合阈值（可被config覆盖）
-        # 尝试从环境变量读取
-        import os
-        if os.getenv("FL_MIN_STORES"):
-            self.min_stores = int(os.getenv("FL_MIN_STORES"))
-        if os.getenv("FL_AGGREGATION_THRESHOLD"):
-            self.aggregation_threshold = float(os.getenv("FL_AGGREGATION_THRESHOLD"))
+        self.min_stores = int(os.getenv("FL_MIN_STORES", "3"))
+        self.aggregation_threshold = float(os.getenv("FL_AGGREGATION_THRESHOLD", "0.8"))
 
     async def create_training_round(
         self,
