@@ -122,9 +122,9 @@ class EnhancedForecastService(BaseService):
         # 3. 节假日时期因子（节前、节中、节后）
         holiday_period = ChineseHolidays.get_holiday_period(target_date)
         if holiday_period == "节前":
-            factors["pre_holiday_factor"] = 1.2
+            factors["pre_holiday_factor"] = float(os.getenv("FORECAST_PRE_HOLIDAY_FACTOR", "1.2"))
         elif holiday_period == "节后":
-            factors["post_holiday_factor"] = 0.9
+            factors["post_holiday_factor"] = float(os.getenv("FORECAST_POST_HOLIDAY_FACTOR", "0.9"))
 
         # 4. 天气因子
         if weather_forecast:
@@ -275,7 +275,7 @@ class EnhancedForecastService(BaseService):
 
         if "holiday_factor" in factors:
             impact = factors["holiday_factor"]
-            if impact >= 2.0:
+            if impact >= float(os.getenv("FORECAST_HOLIDAY_IMPACT_THRESHOLD", "2.0")):
                 explanations.append(f"法定节假日，预计客流增加{(impact-1)*100:.0f}%")
 
         if "pre_holiday_factor" in factors:
@@ -324,9 +324,9 @@ class EnhancedForecastService(BaseService):
         """
         sample_count = historical_baseline.get("sample_count", 0)
 
-        if sample_count >= 30:
+        if sample_count >= int(os.getenv("FORECAST_HIGH_CONFIDENCE_SAMPLES", "30")):
             return "high"
-        elif sample_count >= 10:
+        elif sample_count >= int(os.getenv("FORECAST_MED_CONFIDENCE_SAMPLES", "10")):
             return "medium"
         else:
             return "low"

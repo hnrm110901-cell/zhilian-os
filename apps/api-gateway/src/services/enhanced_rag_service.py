@@ -182,7 +182,7 @@ class EnhancedRAGService:
         async with get_db_session() as session:
             if query_type in ("revenue", "sales", "营收", "销售"):
                 # 查询最近30天营收数据
-                cutoff = date.today() - timedelta(days=30)
+                cutoff = date.today() - timedelta(days=int(os.getenv("RAG_DATA_DAYS", "30")))
                 result = await session.execute(
                     select(
                         func.sum(DailyReport.total_revenue).label("total"),

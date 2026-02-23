@@ -256,7 +256,7 @@ class SchedulerMonitorService:
                 consecutive_failures = health["consecutive_failures"]
 
                 # 判断健康状态
-                if consecutive_failures >= 3:
+                if consecutive_failures >= int(os.getenv("SCHEDULER_CRITICAL_FAILURES", "3")):
                     status = "critical"
                     message = f"连续失败{consecutive_failures}次"
                 elif consecutive_failures > 0:

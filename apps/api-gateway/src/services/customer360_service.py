@@ -197,7 +197,7 @@ class Customer360Service:
                 query = query.where(Order.store_id == store_id)
 
             # 限制最近100笔订单
-            query = query.limit(100)
+            query = query.limit(int(os.getenv("CUSTOMER360_ORDER_LIMIT", "100")))
 
             result = await session.execute(query)
             orders = result.scalars().all()
@@ -242,7 +242,7 @@ class Customer360Service:
             if store_id:
                 query = query.where(Reservation.store_id == store_id)
 
-            query = query.limit(50)
+            query = query.limit(int(os.getenv("CUSTOMER360_RESERVATION_LIMIT", "50")))
 
             result = await session.execute(query)
             reservations = result.scalars().all()
@@ -271,7 +271,7 @@ class Customer360Service:
             if store_id:
                 sync_query = sync_query.where(ReservationSync.store_id == store_id)
 
-            sync_query = sync_query.limit(50)
+            sync_query = sync_query.limit(int(os.getenv("CUSTOMER360_RESERVATION_LIMIT", "50")))
 
             sync_result = await session.execute(sync_query)
             sync_reservations = sync_result.scalars().all()
@@ -322,7 +322,7 @@ class Customer360Service:
             if store_id:
                 query = query.where(POSTransaction.store_id == store_id)
 
-            query = query.limit(100)
+            query = query.limit(int(os.getenv("CUSTOMER360_ORDER_LIMIT", "100")))
 
             result = await session.execute(query)
             transactions = result.scalars().all()
@@ -355,7 +355,7 @@ class Customer360Service:
         """获取活动日志"""
         try:
             # 审计日志可能通过user_id或resource_id关联
-            query = select(AuditLog).order_by(desc(AuditLog.timestamp)).limit(100)
+            query = select(AuditLog).order_by(desc(AuditLog.timestamp)).limit(int(os.getenv("CUSTOMER360_ORDER_LIMIT", "100")))
 
             if identifier_type == "user_id":
                 query = query.where(AuditLog.user_id == identifier)

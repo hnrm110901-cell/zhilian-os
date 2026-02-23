@@ -189,7 +189,7 @@ class DashboardService:
                     .where(Order.status == OrderStatus.COMPLETED)
                     .group_by(DishCategory.name)
                     .order_by(func.sum(OrderItem.subtotal).desc())
-                    .limit(5)
+                    .limit(int(os.getenv("DASHBOARD_CATEGORY_RANK_LIMIT", "5")))
                 )
                 rows = result.all()
 
@@ -228,7 +228,7 @@ class DashboardService:
                         Order.order_metadata.isnot(None),
                     )
                     .group_by(Order.order_metadata)
-                    .limit(200)
+                    .limit(int(os.getenv("DASHBOARD_PAYMENT_QUERY_LIMIT", "200")))
                 )
                 rows = result.all()
 
@@ -274,7 +274,7 @@ class DashboardService:
         """
         try:
             today = date.today()
-            thirty_days_ago = today - timedelta(days=30)
+            thirty_days_ago = today - timedelta(days=int(os.getenv("DASHBOARD_MEMBER_STATS_DAYS", "30")))
 
             async with get_db_session() as session:
                 # 总会员数（有手机号的唯一顾客）

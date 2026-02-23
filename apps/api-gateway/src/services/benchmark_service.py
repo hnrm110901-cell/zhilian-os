@@ -250,7 +250,7 @@ class BenchmarkService(BaseService):
                     Store.is_active == True,
                     Store.area >= area * _area_low,
                     Store.area <= area * _area_high,
-                ).limit(9)
+                ).limit(int(os.getenv("BENCHMARK_PEER_STORES_LIMIT", "9")))
             )
             return [row[0] for row in peers_result.all()]
 

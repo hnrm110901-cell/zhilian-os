@@ -2,6 +2,7 @@
 审计日志服务
 记录和查询系统操作日志
 """
+import os
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -316,7 +317,7 @@ class AuditLogService:
                 func.count(AuditLog.id).label('count')
             ).where(
                 AuditLog.created_at >= start_date
-            ).group_by(AuditLog.action).order_by(desc('count')).limit(10)
+            ).group_by(AuditLog.action).order_by(desc('count')).limit(int(os.getenv("AUDIT_TOP_OPS_LIMIT", "10")))
 
             action_stats_result = await session.execute(action_stats_stmt)
             top_actions = [{"action": row[0], "count": row[1]} for row in action_stats_result]

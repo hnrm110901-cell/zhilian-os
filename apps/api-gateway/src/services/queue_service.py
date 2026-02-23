@@ -162,7 +162,7 @@ class QueueService:
                 and_(
                     Queue.store_id == store_id,
                     Queue.actual_wait_time.isnot(None),
-                    Queue.created_at >= (datetime.utcnow() - timedelta(days=7)),
+                    Queue.created_at >= (datetime.utcnow() - timedelta(days=int(os.getenv("QUEUE_HISTORY_DAYS", "7")))),
                 )
             )
         )

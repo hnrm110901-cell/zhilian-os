@@ -288,7 +288,7 @@ class AnalyticsService:
                 "confidence_2_to_1": round(confidence_2_to_1, 3),
                 "lift": round(lift, 2),
                 "count": count,
-                "strength": "strong" if lift > 1.5 else "moderate" if lift > 1.0 else "weak"
+                "strength": "strong" if lift > float(os.getenv("ANALYTICS_LIFT_STRONG", "1.5")) else "moderate" if lift > float(os.getenv("ANALYTICS_LIFT_MODERATE", "1.0")) else "weak"
             })
 
         # 按提升度排序

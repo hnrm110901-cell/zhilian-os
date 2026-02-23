@@ -276,7 +276,7 @@ class FederatedBOMService:
         season_code = {"spring": 0, "summer": 1, "autumn": 2, "winter": 3}
 
         # 查询实际采购量
-        purchase_quantity = 100  # fallback
+        purchase_quantity = int(os.getenv("BOM_DEFAULT_PURCHASE_QUANTITY", "100"))  # fallback
         try:
             from src.core.database import get_db_session
             from src.models.inventory import InventoryItem

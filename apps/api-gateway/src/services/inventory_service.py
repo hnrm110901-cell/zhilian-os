@@ -457,7 +457,7 @@ class InventoryService:
     ) -> Optional[str]:
         """预测缺货日期 - 已弃用，使用 _estimate_stockout_date_from_transactions"""
         # 查询最近30天的消耗记录
-        thirty_days_ago = datetime.now() - timedelta(days=30)
+        thirty_days_ago = datetime.now() - timedelta(days=int(os.getenv("INVENTORY_HISTORY_DAYS", "30")))
         stmt = (
             select(InventoryTransaction)
             .where(
@@ -483,7 +483,7 @@ class InventoryService:
             return None
 
         # 计算平均每日消耗
-        thirty_days_ago = datetime.now() - timedelta(days=30)
+        thirty_days_ago = datetime.now() - timedelta(days=int(os.getenv("INVENTORY_HISTORY_DAYS", "30")))
         total_usage = sum(abs(trans.quantity) for trans in transactions)
         days = (datetime.now() - thirty_days_ago).days
         avg_daily_usage = total_usage / days if days > 0 else 0

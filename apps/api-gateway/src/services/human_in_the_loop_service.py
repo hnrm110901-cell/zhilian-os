@@ -502,7 +502,7 @@ AI推理: {request.reasoning}
                 select(DecisionLog).where(
                     DecisionLog.store_id == store_id,
                     DecisionLog.decision_status == DecisionStatus.PENDING,
-                ).order_by(DecisionLog.created_at.desc()).limit(20)
+                ).order_by(DecisionLog.created_at.desc()).limit(int(os.getenv("HITL_PENDING_LIMIT", "20")))
             )
             logs = result.scalars().all()
 

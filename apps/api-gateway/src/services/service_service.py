@@ -54,7 +54,7 @@ class ServiceQualityService:
                 end_dt = datetime.fromisoformat(end_date)
 
             if not start_date:
-                start_dt = end_dt - timedelta(days=7)
+                start_dt = end_dt - timedelta(days=int(os.getenv("SERVICE_STATS_DAYS_SHORT", "7")))
             else:
                 start_dt = datetime.fromisoformat(start_date)
 
@@ -182,7 +182,7 @@ class ServiceQualityService:
                 end_dt = datetime.fromisoformat(end_date)
 
             if not start_date:
-                start_dt = end_dt - timedelta(days=30)
+                start_dt = end_dt - timedelta(days=int(os.getenv("SERVICE_STATS_DAYS", "30")))
             else:
                 start_dt = datetime.fromisoformat(start_date)
 
@@ -474,7 +474,7 @@ class ServiceQualityService:
             })
 
         cancellation_rate = quality_metrics["service_metrics"]["cancellation_rate"]
-        if cancellation_rate > 5:
+        if cancellation_rate > float(os.getenv("SERVICE_CANCEL_RATE_THRESHOLD", "5")):
             improvements.append({
                 "category": "order_cancellation",
                 "priority": "medium",
@@ -483,7 +483,7 @@ class ServiceQualityService:
             })
 
         avg_service_time = quality_metrics["service_metrics"]["average_service_time_minutes"]
-        if avg_service_time > 45:
+        if avg_service_time > float(os.getenv("SERVICE_TIME_THRESHOLD_MINUTES", "45")):
             improvements.append({
                 "category": "service_efficiency",
                 "priority": "medium",

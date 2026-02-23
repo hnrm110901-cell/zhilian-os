@@ -1,6 +1,7 @@
 """
 门店对标分析API端点
 """
+import os
 from fastapi import APIRouter, Depends, Query
 from typing import List, Optional
 from pydantic import BaseModel
@@ -122,7 +123,7 @@ async def get_benchmark_summary(
 
     # 默认查询最近30天
     end_date = date.today()
-    start_date = end_date - timedelta(days=30)
+    start_date = end_date - timedelta(days=int(os.getenv("BENCHMARK_DEFAULT_DAYS", "30")))
 
     service = BenchmarkService()
     report = await service.get_benchmark_report(
