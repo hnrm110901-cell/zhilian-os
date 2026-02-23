@@ -6,6 +6,7 @@ import os
 from typing import Dict, Any, Optional, List
 import structlog
 from datetime import datetime
+import asyncio
 import httpx
 from .signature import generate_sign
 
@@ -91,6 +92,7 @@ class PinzhiAdapter:
                 )
                 if attempt == self.retry_times - 1:
                     raise Exception(f"HTTP请求失败: {e.response.status_code}")
+                await asyncio.sleep(0.5 * (2 ** attempt))
 
             except Exception as e:
                 logger.error(
@@ -101,6 +103,7 @@ class PinzhiAdapter:
                 )
                 if attempt == self.retry_times - 1:
                     raise
+                await asyncio.sleep(0.5 * (2 ** attempt))
 
         raise Exception("请求失败，已达到最大重试次数")
 
