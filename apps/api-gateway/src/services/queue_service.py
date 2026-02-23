@@ -6,6 +6,7 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from sqlalchemy import select, and_, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
+import os
 import structlog
 import uuid
 
@@ -166,14 +167,14 @@ class QueueService:
             )
         )
         avg_wait = hist_result.scalar()
-        base_wait_time = int(avg_wait) if avg_wait else 15
+        base_wait_time = int(avg_wait) if avg_wait else int(os.getenv("QUEUE_DEFAULT_WAIT_MINUTES", "15"))
         estimated_time = waiting_count * base_wait_time
 
         # 根据人数调整（大桌等待时间可能更长）
-        if party_size >= 6:
-            estimated_time = int(estimated_time * 1.3)
+        if party_size >= int(os.getenv("QUEUE_LARGE_PARTY_SIZE", "6")):
+            estimated_time = int(estimated_time * float(os.getenv("QUEUE_LARGE_PARTY_MULTIPLIER", "1.3")))
 
-        return max(10, estimated_time)  # 最少10分钟
+        return max(int(os.getenv("QUEUE_MIN_WAIT_MINUTES", "10")), estimated_time)  # 最少N分钟
 
     async def call_next(
         self,

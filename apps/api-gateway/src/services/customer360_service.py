@@ -476,8 +476,8 @@ class Customer360Service:
             if last_order_time:
                 days_since_last_order = (datetime.now() - datetime.fromisoformat(last_order_time)).days
                 recency_score = max(0, 100 - days_since_last_order)  # 越近越高
-                frequency_score = min(100, order_frequency * 10)  # 频率越高越好
-                monetary_score = min(100, total_spent / 100)  # 金额越高越好
+                frequency_score = min(100, order_frequency * float(os.getenv("RFM360_FREQUENCY_MULTIPLIER", "10")))  # 频率越高越好
+                monetary_score = min(100, total_spent / float(os.getenv("RFM360_MONETARY_DIVISOR", "100")))  # 金额越高越好
                 rfm_score = (recency_score + frequency_score + monetary_score) / 3
 
             return {

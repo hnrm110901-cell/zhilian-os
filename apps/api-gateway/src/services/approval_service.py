@@ -6,6 +6,7 @@
 import uuid
 from datetime import datetime
 from typing import Dict, List, Optional, Any
+import os
 import structlog
 from sqlalchemy.orm import Session
 
@@ -505,20 +506,20 @@ class ApprovalService:
 
         # 决策采纳情况得分
         if decision_log.decision_status == DecisionStatus.APPROVED:
-            score += 40  # 完全采纳
+            score += float(os.getenv("APPROVAL_SCORE_ADOPTED", "40"))    # 完全采纳
         elif decision_log.decision_status == DecisionStatus.MODIFIED:
-            score += 20  # 部分采纳
+            score += float(os.getenv("APPROVAL_SCORE_MODIFIED", "20"))   # 部分采纳
         elif decision_log.decision_status == DecisionStatus.REJECTED:
             score += 0  # 未采纳
 
         # 结果偏差得分
         if decision_log.result_deviation is not None:
-            if decision_log.result_deviation < 10:
-                score += 30  # 偏差<10%
-            elif decision_log.result_deviation < 20:
-                score += 20  # 偏差<20%
-            elif decision_log.result_deviation < 30:
-                score += 10  # 偏差<30%
+            if decision_log.result_deviation < float(os.getenv("APPROVAL_DEVIATION_LOW", "10")):
+                score += float(os.getenv("APPROVAL_SCORE_DEV_LOW", "30"))    # 偏差<10%
+            elif decision_log.result_deviation < float(os.getenv("APPROVAL_DEVIATION_MID", "20")):
+                score += float(os.getenv("APPROVAL_SCORE_DEV_MID", "20"))    # 偏差<20%
+            elif decision_log.result_deviation < float(os.getenv("APPROVAL_DEVIATION_HIGH", "30")):
+                score += float(os.getenv("APPROVAL_SCORE_DEV_HIGH", "10"))   # 偏差<30%
             else:
                 score += 0  # 偏差≥30%
 

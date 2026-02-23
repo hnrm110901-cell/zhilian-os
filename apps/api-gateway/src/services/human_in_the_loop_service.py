@@ -441,9 +441,9 @@ AI推理: {request.reasoning}
         else:
             days_since_onboarding = 0
 
-        if days_since_onboarding < 90:
+        if days_since_onboarding < int(os.getenv("HITL_OBSERVATION_DAYS", "90")):
             return TrustPhase.OBSERVATION
-        elif days_since_onboarding < 180:
+        elif days_since_onboarding < int(os.getenv("HITL_ASSISTANCE_DAYS", "180")):
             return TrustPhase.ASSISTANCE
         else:
             return TrustPhase.AUTONOMOUS

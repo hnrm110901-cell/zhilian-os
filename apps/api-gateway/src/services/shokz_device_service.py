@@ -20,6 +20,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 from enum import Enum
 from pydantic import BaseModel
+import os
 import structlog
 
 logger = structlog.get_logger()
@@ -254,7 +255,7 @@ class ShokzDeviceService:
         device.updated_at = datetime.now()
 
         # 低电量预警
-        if battery_level < 20:
+        if battery_level < int(os.getenv("SHOKZ_LOW_BATTERY_THRESHOLD", "20")):
             device.status = DeviceStatus.LOW_BATTERY
             logger.warning(
                 "Shokz设备电量低",

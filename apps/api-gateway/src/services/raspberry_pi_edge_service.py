@@ -21,6 +21,7 @@ from enum import Enum
 from pydantic import BaseModel
 import structlog
 import asyncio
+import os
 
 logger = structlog.get_logger()
 
@@ -187,11 +188,11 @@ class RaspberryPiEdgeService:
         node.updated_at = datetime.now()
 
         # 健康检查
-        if temperature > 80:
+        if temperature > float(os.getenv("EDGE_TEMP_ALERT_THRESHOLD", "80")):
             logger.warning("边缘节点温度过高", node_id=node_id, temperature=temperature)
             node.status = EdgeNodeStatus.ERROR
 
-        if cpu_usage > 90 or memory_usage > 90:
+        if cpu_usage > float(os.getenv("EDGE_CPU_ALERT_THRESHOLD", "90")) or memory_usage > float(os.getenv("EDGE_MEMORY_ALERT_THRESHOLD", "90")):
             logger.warning("边缘节点资源紧张", node_id=node_id, cpu=cpu_usage, memory=memory_usage)
 
         return node

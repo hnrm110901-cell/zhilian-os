@@ -5,6 +5,7 @@ Agent决策监控服务
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from collections import defaultdict
+import os
 import structlog
 
 logger = structlog.get_logger()
@@ -242,23 +243,23 @@ class AgentMonitorService:
 
             # 成功率权重: 40%
             success_rate = metrics.get("success_rate", 0)
-            quality_score += (success_rate / 100) * 40
+            quality_score += (success_rate / 100) * float(os.getenv("AGENT_SCORE_SUCCESS_WEIGHT", "40"))
 
             # 响应时间权重: 30% (目标<1000ms)
             avg_time = metrics.get("avg_execution_time_ms", 0)
             time_score = max(0, 100 - (avg_time / 10))  # 每10ms扣1分
-            quality_score += (time_score / 100) * 30
+            quality_score += (time_score / 100) * float(os.getenv("AGENT_SCORE_TIME_WEIGHT", "30"))
 
             # RAG使用率权重: 30% (目标>80%)
             rag_rate = metrics.get("rag_usage_rate", 0)
-            quality_score += (rag_rate / 100) * 30
+            quality_score += (rag_rate / 100) * float(os.getenv("AGENT_SCORE_RAG_WEIGHT", "30"))
 
             # 质量等级
-            if quality_score >= 90:
+            if quality_score >= float(os.getenv("AGENT_QUALITY_EXCELLENT", "90")):
                 quality_level = "优秀"
-            elif quality_score >= 75:
+            elif quality_score >= float(os.getenv("AGENT_QUALITY_GOOD", "75")):
                 quality_level = "良好"
-            elif quality_score >= 60:
+            elif quality_score >= float(os.getenv("AGENT_QUALITY_PASS", "60")):
                 quality_level = "及格"
             else:
                 quality_level = "待改进"
