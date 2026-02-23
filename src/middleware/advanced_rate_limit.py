@@ -10,6 +10,7 @@ Provides sophisticated rate limiting with multiple strategies:
 - Redis-backed distributed rate limiting
 """
 
+import os
 from fastapi import Request, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 from typing import Dict, Optional, Callable
@@ -52,8 +53,8 @@ class RateLimiter:
     def __init__(
         self,
         redis_client: Optional[redis.Redis] = None,
-        default_limit: int = 100,
-        default_window: int = 60,
+        default_limit: int = int(os.getenv("RATE_LIMIT_DEFAULT_REQUESTS", "100")),
+        default_window: int = int(os.getenv("RATE_LIMIT_DEFAULT_WINDOW", "60")),
         enable_redis: bool = True
     ):
         self.redis_client = redis_client
@@ -80,7 +81,7 @@ class RateLimiter:
         """Initialize default rate limits for different endpoints"""
         # Public endpoints - stricter limits
         self.endpoint_limits["/api/v1/auth/login"] = RateLimitRule(
-            requests=5,
+            requests=int(os.getenv("RATE_LIMIT_LOGIN_REQUESTS", "5")),
             window=60,
             scope="ip"
         )
@@ -349,7 +350,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self,
         app,
         redis_client: Optional[redis.Redis] = None,
-        default_limit: int = 100,
+        default_limit: int = int(os.getenv("RATE_LIMIT_DEFAULT_REQUESTS", "100")),
         default_window: int = 60
     ):
         super().__init__(app)

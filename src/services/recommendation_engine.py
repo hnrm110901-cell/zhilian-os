@@ -6,6 +6,7 @@ Phase 4: 智能优化期 (Intelligence Optimization Period)
 Provides personalized recommendations, dynamic pricing, and precision marketing
 """
 
+import os
 from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timedelta
 from enum import Enum
@@ -651,9 +652,9 @@ class IntelligentRecommendationEngine:
         discount_rate: float
     ) -> float:
         """Estimate campaign conversion rate"""
-        base_rate = 0.05  # 5% base conversion
-        discount_boost = discount_rate * 0.5  # Discount effect
-        return min(base_rate + discount_boost, 0.25)
+        base_rate = float(os.getenv("RECOMMEND_BASE_CONVERSION_RATE", "0.05"))  # base conversion
+        discount_boost = discount_rate * float(os.getenv("RECOMMEND_DISCOUNT_BOOST_FACTOR", "0.5"))  # Discount effect
+        return min(base_rate + discount_boost, float(os.getenv("RECOMMEND_MAX_CONVERSION_RATE", "0.25")))
 
     def _estimate_campaign_revenue(
         self,

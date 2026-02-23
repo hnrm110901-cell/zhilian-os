@@ -383,7 +383,7 @@ class SupplyChainIntegration:
         options = []
 
         # Option 1: Early payment discount
-        early_payment_discount = 0.02  # 2% discount
+        early_payment_discount = float(os.getenv("SUPPLY_CHAIN_EARLY_PAYMENT_DISCOUNT", "0.02"))  # early payment discount
         early_payment_amount = order.total_amount * (1 - early_payment_discount)
         options.append({
             "type": "early_payment_discount",
@@ -403,7 +403,7 @@ class SupplyChainIntegration:
         })
 
         # Option 3: Extended payment terms (with interest)
-        extended_interest = 0.05  # 5% interest
+        extended_interest = float(os.getenv("SUPPLY_CHAIN_EXTENDED_INTEREST", "0.05"))  # extended interest
         extended_amount = order.total_amount * (1 + extended_interest)
         options.append({
             "type": "extended_terms",
