@@ -73,7 +73,7 @@ class AgentMonitorService:
             self.decisions.append(decision_record)
 
             # 清理旧数据 (保留最近24小时)
-            cutoff_time = datetime.now() - timedelta(hours=24)
+            cutoff_time = datetime.now() - timedelta(hours=int(os.getenv("AGENT_MONITOR_RETENTION_HOURS", "24")))
             self.decisions = [
                 d for d in self.decisions
                 if d["timestamp"] > cutoff_time
@@ -315,14 +315,14 @@ class AgentMonitorService:
         """
         try:
             # 最近1小时的数据
-            one_hour_ago = datetime.now() - timedelta(hours=1)
+            one_hour_ago = datetime.now() - timedelta(hours=int(os.getenv("AGENT_STATS_WINDOW_HOURS", "1")))
             recent_decisions = [
                 d for d in self.decisions
                 if d["timestamp"] > one_hour_ago
             ]
 
             # 最近5分钟的数据
-            five_min_ago = datetime.now() - timedelta(minutes=5)
+            five_min_ago = datetime.now() - timedelta(minutes=int(os.getenv("AGENT_STATS_RECENT_MINUTES", "5")))
             very_recent_decisions = [
                 d for d in self.decisions
                 if d["timestamp"] > five_min_ago

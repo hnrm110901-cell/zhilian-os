@@ -155,8 +155,8 @@ async def process_neural_event(
 @celery_app.task(
     base=CallbackTask,
     bind=True,
-    max_retries=3,
-    default_retry_delay=30,
+    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
+    default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY_SHORT", "30")),
 )
 async def index_to_vector_db(
     self,
@@ -217,7 +217,7 @@ async def index_to_vector_db(
 @celery_app.task(
     base=CallbackTask,
     bind=True,
-    max_retries=3,
+    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
 )
 async def index_order_to_vector_db(
     self,
@@ -238,7 +238,7 @@ async def index_order_to_vector_db(
 @celery_app.task(
     base=CallbackTask,
     bind=True,
-    max_retries=3,
+    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
 )
 async def index_dish_to_vector_db(
     self,
@@ -359,8 +359,8 @@ async def batch_index_dishes(
 @celery_app.task(
     base=CallbackTask,
     bind=True,
-    max_retries=3,
-    default_retry_delay=300,  # 5分钟
+    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
+    default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY_LONG", "300")),  # 5分钟
 )
 async def generate_and_send_daily_report(
     self,
@@ -492,8 +492,8 @@ async def generate_and_send_daily_report(
 @celery_app.task(
     base=CallbackTask,
     bind=True,
-    max_retries=3,
-    default_retry_delay=300,  # 5分钟
+    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
+    default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY_LONG", "300")),  # 5分钟
 )
 async def perform_daily_reconciliation(
     self,
@@ -564,8 +564,8 @@ async def perform_daily_reconciliation(
 @celery_app.task(
     base=CallbackTask,
     bind=True,
-    max_retries=3,
-    default_retry_delay=60,
+    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
+    default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY", "60")),
 )
 async def detect_revenue_anomaly(
     self,
@@ -738,8 +738,8 @@ async def detect_revenue_anomaly(
 @celery_app.task(
     base=CallbackTask,
     bind=True,
-    max_retries=3,
-    default_retry_delay=300,
+    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
+    default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY_LONG", "300")),
 )
 async def generate_daily_report_with_rag(
     self,
@@ -874,8 +874,8 @@ AI经营分析:
 @celery_app.task(
     base=CallbackTask,
     bind=True,
-    max_retries=3,
-    default_retry_delay=60,
+    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
+    default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY", "60")),
 )
 async def check_inventory_alert(
     self,

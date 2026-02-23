@@ -518,7 +518,7 @@ AI推理: {request.reasoning}
                 approval_comment=None,
                 created_at=log.created_at,
                 approved_at=None,
-                expires_at=log.created_at + timedelta(hours=24) if log.created_at else datetime.now(),
+                expires_at=log.created_at + timedelta(hours=int(os.getenv("HITL_LOG_EXPIRE_HOURS", "24"))) if log.created_at else datetime.now(),
             )
             requests.append(request)
 
