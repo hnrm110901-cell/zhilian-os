@@ -439,15 +439,15 @@ class SOPKnowledgeBaseService:
         confidence += (sop.rating / 5.0) * 0.2
 
         # 使用次数加权
-        if sop.usage_count > 1000:
+        if sop.usage_count > int(os.getenv("SOP_HIGH_USAGE_THRESHOLD", "1000")):
             confidence += 0.1
 
         return min(confidence, 1.0)
 
     def _generate_summary(self, sop: SOPDocument) -> str:
         """生成摘要"""
-        # 简化版：取前100个字符
-        return sop.content[:100] + "..."
+        _summary_len = int(os.getenv("SOP_SUMMARY_LENGTH", "100"))
+        return sop.content[:_summary_len] + "..."
 
     def _extract_key_steps(self, sop: SOPDocument) -> List[str]:
         """提取关键步骤"""

@@ -280,8 +280,9 @@ class VoiceInteractionOrchestrator:
         text = ' '.join(text.split())
 
         # 限制长度（语音播报不宜过长）
-        if len(text) > 200:
-            text = text[:200] + "..."
+        _max_len = int(os.getenv("VOICE_MAX_TEXT_LENGTH", "200"))
+        if len(text) > _max_len:
+            text = text[:_max_len] + "..."
 
         return text
 

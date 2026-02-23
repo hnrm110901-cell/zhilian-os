@@ -534,16 +534,18 @@ class Customer360Service:
             tags.append(customer_value["customer_tier"])
 
         # 消费习惯标签
-        if customer_value.get("order_frequency_per_month", 0) > 4:
+        _freq_high = float(os.getenv("CUSTOMER_FREQ_HIGH_THRESHOLD", "4"))
+        _freq_mid = float(os.getenv("CUSTOMER_FREQ_MID_THRESHOLD", "2"))
+        if customer_value.get("order_frequency_per_month", 0) > _freq_high:
             tags.append("高频消费")
-        elif customer_value.get("order_frequency_per_month", 0) > 2:
+        elif customer_value.get("order_frequency_per_month", 0) > _freq_mid:
             tags.append("中频消费")
 
-        if customer_value.get("avg_order_value", 0) > 200:
+        if customer_value.get("avg_order_value", 0) > float(os.getenv("CUSTOMER_HIGH_VALUE_THRESHOLD", "200")):
             tags.append("高客单价")
 
         # 预订习惯标签
-        if len(reservations) > 5:
+        if len(reservations) > int(os.getenv("CUSTOMER_REGULAR_RESERVATION_COUNT", "5")):
             tags.append("预订常客")
 
         # 活跃度标签

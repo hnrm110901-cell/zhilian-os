@@ -47,7 +47,7 @@ class YiDingAdapter:
         self.config = config
         self.client = YiDingClient(config)
         self.mapper = YiDingMapper()
-        self.cache = YiDingCache(ttl=config.get("cache_ttl", 300))
+        self.cache = YiDingCache(ttl=config.get("cache_ttl", int(os.getenv("YIDING_CACHE_TTL", "300"))))
 
         self.logger = logger.bind(adapter="yiding")
 
