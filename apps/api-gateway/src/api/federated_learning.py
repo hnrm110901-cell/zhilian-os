@@ -52,7 +52,6 @@ async def create_training_round(
 
     需要管理员权限
     """
-    # TODO: 检查用户权限
     if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
 

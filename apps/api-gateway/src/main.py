@@ -11,7 +11,7 @@ import time
 
 from src.core.config import settings
 # 核心模块
-from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation, approval, edge_node, decision_validator, federated_learning, recommendations, agent_collaboration, embedding, raas, model_marketplace, human_in_the_loop, hardware_integration
+from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation, approval, edge_node, decision_validator, federated_learning, recommendations, agent_collaboration, embedding, raas, model_marketplace, human_in_the_loop, hardware_integration, pos
 from src.api.phase5_apis import platform_router, industry_router, supply_chain_router, i18n_router
 # 逐步启用的模块
 from src.api import dashboard, analytics, audit, multi_store, finance, customer360, wechat_triggers, queue, meituan_queue
@@ -432,8 +432,8 @@ app.include_router(human_in_the_loop.router, tags=["human_in_the_loop"])
 # Hardware Integration (硬件集成 - 树莓派5 + Shokz)
 app.include_router(hardware_integration.router, tags=["hardware_integration"])
 
-# POS模块暂时禁用 (文件为空)
-# app.include_router(pos.router, prefix="/api/v1/pos", tags=["pos"])
+# POS模块
+app.include_router(pos.router, prefix="/api/v1/pos", tags=["pos"])
 
 
 @app.on_event("startup")
