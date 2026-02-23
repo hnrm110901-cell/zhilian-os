@@ -17,6 +17,7 @@ from datetime import datetime
 import hashlib
 import json
 import asyncio
+import os
 from functools import wraps
 import time
 
@@ -149,11 +150,12 @@ class VectorDatabaseServiceEnhanced:
                 pass
 
             # 加载模型（可能需要下载）
+            model_name = os.getenv("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2")
             self.embedding_model = SentenceTransformer(
-                'paraphrase-multilingual-MiniLM-L12-v2',
+                model_name,
                 device='cpu'  # 使用CPU，避免GPU依赖
             )
-            logger.info("嵌入模型加载成功")
+            logger.info("嵌入模型加载成功", model=model_name)
 
         except Exception as e:
             logger.warning(f"嵌入模型加载失败，将使用模拟嵌入: {str(e)}")
@@ -236,7 +238,7 @@ class VectorDatabaseServiceEnhanced:
             return self._generate_mock_embedding(text)
 
     def _generate_mock_embedding(self, text: str) -> List[float]:
-        """生成模拟嵌入向量（用于测试）"""
+        """生成确定性哈希向量（嵌入模型不可用时的fallback，语义无意义）"""
         import random
         random.seed(hashlib.md5(text.encode()).hexdigest())
         return [random.random() for _ in range(384)]
