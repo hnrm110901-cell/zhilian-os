@@ -3,8 +3,14 @@ Shokz骨传导耳机集成服务
 Shokz Bone Conduction Headset Integration Service
 
 支持OpenComm 2（前厅/收银）和OpenRun Pro 2（后厨）深度对接
+蓝牙连接：bleak（BLE管理）
+音频流：PulseAudio/BlueZ（系统级A2DP/HFP）
 """
 from typing import Dict, Any, Optional, List
+import asyncio
+import subprocess
+import tempfile
+import os
 import structlog
 from enum import Enum
 
@@ -43,6 +49,7 @@ class ShokzDevice:
         self.is_connected = False
         self.battery_level = 100
         self.last_activity = None
+        self._ble_client = None  # bleak.BleakClient 实例（运行时注入）
 
 
 class ShokzService:
@@ -125,8 +132,18 @@ class ShokzService:
         device = self.devices[device_id]
 
         try:
-            # TODO: 实际的蓝牙连接逻辑
-            # 这里需要集成蓝牙库（如pybluez或bleak）
+            # 使用 bleak 建立 BLE 连接（管理连接状态、电量等）
+            # 音频流由系统 BlueZ/PulseAudio 通过 A2DP/HFP profile 处理
+            try:
+                from bleak import BleakClient
+                client = BleakClient(device.bluetooth_address)
+                await client.connect()
+                device._ble_client = client
+            except ImportError:
+                # bleak 未安装时（非 Linux/树莓派环境），仅标记连接状态
+                logger.warning("bleak 未安装，跳过 BLE 连接", device_id=device_id)
+            except Exception as ble_err:
+                logger.warning("BLE 连接失败，设备可能通过经典蓝牙连接", error=str(ble_err))
 
             device.is_connected = True
 
@@ -164,7 +181,13 @@ class ShokzService:
         device = self.devices[device_id]
 
         try:
-            # TODO: 实际的蓝牙断开逻辑
+            # 断开 BLE 连接
+            if device._ble_client is not None:
+                try:
+                    await device._ble_client.disconnect()
+                except Exception:
+                    pass
+                device._ble_client = None
 
             device.is_connected = False
 
@@ -215,14 +238,33 @@ class ShokzService:
             }
 
         try:
-            # TODO: 实际的音频发送逻辑
-            # 通过蓝牙A2DP协议发送音频
+            # 通过 PulseAudio 将音频数据发送到蓝牙 A2DP sink
+            # 先将音频数据写入临时文件，再用 paplay 播放到蓝牙设备
+            bt_addr_clean = device.bluetooth_address.replace(":", "_")
+            sink_name = f"bluez_sink.{bt_addr_clean}.a2dp_sink"
 
-            logger.info(
-                "音频发送成功",
-                device_id=device_id,
-                audio_size=len(audio_data),
-            )
+            with tempfile.NamedTemporaryFile(suffix=".raw", delete=False) as tmp:
+                tmp.write(audio_data)
+                tmp_path = tmp.name
+
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    "paplay",
+                    "--device", sink_name,
+                    "--format=s16le",
+                    "--rate=44100",
+                    "--channels=2",
+                    tmp_path,
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                _, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+                if proc.returncode != 0:
+                    raise RuntimeError(f"paplay 失败: {stderr.decode()[:200]}")
+            finally:
+                os.unlink(tmp_path)
+
+            logger.info("音频发送成功", device_id=device_id, audio_size=len(audio_data))
 
             return {
                 "success": True,
@@ -267,16 +309,35 @@ class ShokzService:
             }
 
         try:
-            # TODO: 实际的音频接收逻辑
-            # 通过蓝牙HFP/HSP协议接收音频
+            # 通过 PulseAudio 从蓝牙 HFP/HSP source 录音
+            bt_addr_clean = device.bluetooth_address.replace(":", "_")
+            source_name = f"bluez_source.{bt_addr_clean}.handsfree_head_unit"
+            sample_rate = int(os.getenv("SHOKZ_AUDIO_SAMPLE_RATE", "16000"))
+            channels = int(os.getenv("SHOKZ_AUDIO_CHANNELS", "1"))
 
-            audio_data = b""  # 实际接收的音频数据
+            with tempfile.NamedTemporaryFile(suffix=".raw", delete=False) as tmp:
+                tmp_path = tmp.name
 
-            logger.info(
-                "音频接收成功",
-                device_id=device_id,
-                duration=duration_seconds,
-            )
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    "parec",
+                    "--device", source_name,
+                    "--format=s16le",
+                    f"--rate={sample_rate}",
+                    f"--channels={channels}",
+                    "--latency-msec=100",
+                    tmp_path,
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                await asyncio.wait_for(proc.communicate(), timeout=duration_seconds + 2)
+                with open(tmp_path, "rb") as f:
+                    audio_data = f.read()
+            finally:
+                os.unlink(tmp_path)
+
+            logger.info("音频接收成功", device_id=device_id, duration=duration_seconds,
+                        bytes_received=len(audio_data))
 
             return {
                 "success": True,
@@ -284,7 +345,7 @@ class ShokzService:
                 "audio_data": audio_data,
                 "duration": duration_seconds,
                 "format": "pcm",
-                "sample_rate": 16000,
+                "sample_rate": sample_rate,
             }
 
         except Exception as e:
