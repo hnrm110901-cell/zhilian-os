@@ -161,7 +161,7 @@ class VoiceService:
                 "Accept": "application/json",
             }
 
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))) as client:
                 response = await client.post(url, content=audio_data, headers=headers)
                 result = response.json()
 
@@ -217,7 +217,7 @@ class VoiceService:
             )
 
             tts_url = f"https://{region}.tts.speech.microsoft.com/cognitiveservices/v1"
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))) as client:
                 tts_resp = await client.post(
                     tts_url,
                     content=ssml.encode("utf-8"),
@@ -262,7 +262,7 @@ class VoiceService:
 
             async with httpx.AsyncClient() as client:
                 # 获取token
-                token_response = await client.post(token_url, params=token_params, timeout=30.0)
+                token_response = await client.post(token_url, params=token_params, timeout=float(os.getenv("HTTP_TIMEOUT", "30.0")))
                 token_data = token_response.json()
                 access_token = token_data.get("access_token")
 
@@ -289,7 +289,7 @@ class VoiceService:
                     asr_url,
                     json=asr_data,
                     headers={"Content-Type": "application/json"},
-                    timeout=30.0
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
                 )
                 result = asr_response.json()
 
@@ -328,7 +328,7 @@ class VoiceService:
 
             async with httpx.AsyncClient() as client:
                 # 获取token
-                token_response = await client.post(token_url, params=token_params, timeout=30.0)
+                token_response = await client.post(token_url, params=token_params, timeout=float(os.getenv("HTTP_TIMEOUT", "30.0")))
                 token_data = token_response.json()
                 access_token = token_data.get("access_token")
 
@@ -360,7 +360,7 @@ class VoiceService:
                 tts_response = await client.post(
                     tts_url,
                     data=tts_params,
-                    timeout=30.0
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
                 )
 
                 # 检查是否返回音频数据

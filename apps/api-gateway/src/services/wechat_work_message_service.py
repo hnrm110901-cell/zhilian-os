@@ -35,7 +35,7 @@ class WeChatWorkMessageService:
                     "corpid": settings.WECHAT_CORP_ID,
                     "corpsecret": settings.WECHAT_CORP_SECRET,
                 },
-                timeout=30.0
+                timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
             )
             data = response.json()
 
@@ -90,7 +90,7 @@ class WeChatWorkMessageService:
                 response = await client.post(
                     send_url,
                     json=message_data,
-                    timeout=30.0
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
                 )
                 result = response.json()
 
@@ -157,7 +157,7 @@ class WeChatWorkMessageService:
                 response = await client.post(
                     send_url,
                     json=message_data,
-                    timeout=30.0
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
                 )
                 result = response.json()
 
@@ -222,7 +222,7 @@ class WeChatWorkMessageService:
                 response = await client.post(
                     send_url,
                     json=message_data,
-                    timeout=30.0
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
                 )
                 result = response.json()
 

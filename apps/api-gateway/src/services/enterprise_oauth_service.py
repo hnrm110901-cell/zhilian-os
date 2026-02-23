@@ -45,7 +45,7 @@ class EnterpriseOAuthService:
                         "corpid": settings.WECHAT_CORP_ID,
                         "corpsecret": settings.WECHAT_CORP_SECRET,
                     },
-                    timeout=30.0
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
                 )
                 token_data = token_response.json()
 
@@ -62,7 +62,7 @@ class EnterpriseOAuthService:
                         "access_token": access_token,
                         "code": code,
                     },
-                    timeout=30.0
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
                 )
                 userinfo_data = userinfo_response.json()
 
@@ -79,7 +79,7 @@ class EnterpriseOAuthService:
                         "access_token": access_token,
                         "userid": userid,
                     },
-                    timeout=30.0
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
                 )
                 user_detail = user_detail_response.json()
 
@@ -153,7 +153,7 @@ class EnterpriseOAuthService:
                         "app_id": settings.FEISHU_APP_ID,
                         "app_secret": settings.FEISHU_APP_SECRET,
                     },
-                    timeout=30.0
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
                 )
                 token_data = token_response.json()
 
@@ -168,7 +168,7 @@ class EnterpriseOAuthService:
                     user_token_url,
                     json={"grant_type": "authorization_code", "code": code},
                     headers={"Authorization": f"Bearer {app_access_token}"},
-                    timeout=30.0
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
                 )
                 user_token_data = user_token_response.json()
 
@@ -182,7 +182,7 @@ class EnterpriseOAuthService:
                 userinfo_response = await client.get(
                     userinfo_url,
                     headers={"Authorization": f"Bearer {user_access_token}"},
-                    timeout=30.0
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
                 )
                 userinfo_data = userinfo_response.json()
 
@@ -256,7 +256,7 @@ class EnterpriseOAuthService:
                         "appkey": settings.DINGTALK_APP_KEY,
                         "appsecret": settings.DINGTALK_APP_SECRET,
                     },
-                    timeout=30.0
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
                 )
                 token_data = token_response.json()
 
@@ -271,7 +271,7 @@ class EnterpriseOAuthService:
                     userinfo_url,
                     params={"access_token": access_token},
                     json={"code": auth_code},
-                    timeout=30.0
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
                 )
                 userinfo_data = userinfo_response.json()
 
@@ -286,7 +286,7 @@ class EnterpriseOAuthService:
                     user_detail_url,
                     params={"access_token": access_token},
                     json={"userid": userid},
-                    timeout=30.0
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
                 )
                 user_detail = user_detail_response.json()
 
