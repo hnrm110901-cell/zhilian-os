@@ -348,7 +348,7 @@ class FederatedBOMService:
 
         # 计算最优订货量
         average_loss_rate = np.mean(list(seasonal_loss_rates.values()))
-        optimal_order_quantity = 100 / (1 - average_loss_rate)  # 简化计算
+        optimal_order_quantity = float(os.getenv("BOM_OPTIMAL_ORDER_BASE", "100")) / (1 - average_loss_rate)  # 简化计算
 
         # 分析高损耗日期（损耗率超过均值+1个标准差的季节对应的月份）
         std_loss = np.std(list(seasonal_loss_rates.values()))

@@ -234,14 +234,14 @@ class EnhancedForecastService(BaseService):
         # Fallback to industry baseline
         is_weekend = weekday in [5, 6]
         if self.restaurant_type == "火锅":
-            base_sales = 68000 if is_weekend else 42000
-            std_dev = 11000 if is_weekend else 7000
+            base_sales = int(os.getenv("FORECAST_HOTPOT_WEEKEND_SALES", "68000")) if is_weekend else int(os.getenv("FORECAST_HOTPOT_WEEKDAY_SALES", "42000"))
+            std_dev = int(os.getenv("FORECAST_HOTPOT_WEEKEND_STD", "11000")) if is_weekend else int(os.getenv("FORECAST_HOTPOT_WEEKDAY_STD", "7000"))
         elif self.restaurant_type == "快餐":
-            base_sales = 25000 if is_weekend else 18000
-            std_dev = 4500 if is_weekend else 3500
+            base_sales = int(os.getenv("FORECAST_FASTFOOD_WEEKEND_SALES", "25000")) if is_weekend else int(os.getenv("FORECAST_FASTFOOD_WEEKDAY_SALES", "18000"))
+            std_dev = int(os.getenv("FORECAST_FASTFOOD_WEEKEND_STD", "4500")) if is_weekend else int(os.getenv("FORECAST_FASTFOOD_WEEKDAY_STD", "3500"))
         else:
-            base_sales = 55000 if is_weekend else 35000
-            std_dev = 9000 if is_weekend else 6000
+            base_sales = int(os.getenv("FORECAST_RESTAURANT_WEEKEND_SALES", "55000")) if is_weekend else int(os.getenv("FORECAST_RESTAURANT_WEEKDAY_SALES", "35000"))
+            std_dev = int(os.getenv("FORECAST_RESTAURANT_WEEKEND_STD", "9000")) if is_weekend else int(os.getenv("FORECAST_RESTAURANT_WEEKDAY_STD", "6000"))
 
         return {
             "average_sales": base_sales,

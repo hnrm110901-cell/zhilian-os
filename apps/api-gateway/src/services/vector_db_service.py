@@ -125,7 +125,7 @@ class VectorDatabaseService:
             # 嵌入模型不可用时，使用确定性哈希向量（语义无意义，仅保证服务不崩溃）
             import random
             random.seed(hashlib.md5(text.encode()).hexdigest())
-            return [random.random() for _ in range(384)]
+            return [random.random() for _ in range(int(os.getenv("VECTOR_EMBEDDING_DIM", "384")))]
 
     async def index_order(self, order_data: Dict[str, Any]) -> bool:
         """

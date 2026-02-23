@@ -483,7 +483,7 @@ class ZhilianOpenAPI:
             "last_visit": row.last_visit.isoformat() if row.last_visit else None,
             "value_score": round(value_score, 1),
             "churn_risk": churn_risk,
-            "segment": "high_value" if value_score > 60 else "regular",
+            "segment": "high_value" if value_score > float(os.getenv("OPENAPI_HIGH_VALUE_SCORE_THRESHOLD", "60")) else "regular",
             "favorite_dishes": top_items,
         }
 

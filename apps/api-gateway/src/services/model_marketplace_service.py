@@ -215,7 +215,7 @@ class ModelMarketplaceService:
 
         base_revenue_share = float(os.getenv("MARKETPLACE_BASE_REVENUE_SHARE", "100.0"))
         quality_multiplier = quality_score / 100.0
-        data_volume_multiplier = min(data_points / 10000, 10.0)
+        data_volume_multiplier = min(data_points / int(os.getenv("MARKETPLACE_DATA_VOLUME_BASE", "10000")), float(os.getenv("MARKETPLACE_DATA_VOLUME_MAX_MULTIPLIER", "10.0")))
         revenue_share = base_revenue_share * quality_multiplier * data_volume_multiplier
 
         async with get_db_session() as session:

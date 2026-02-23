@@ -247,7 +247,7 @@ class AgentMonitorService:
 
             # 响应时间权重: 30% (目标<1000ms)
             avg_time = metrics.get("avg_execution_time_ms", 0)
-            time_score = max(0, 100 - (avg_time / 10))  # 每10ms扣1分
+            time_score = max(0, 100 - (avg_time / float(os.getenv("AGENT_SCORE_TIME_DEDUCT_PER_MS", "10"))))  # 每10ms扣1分
             quality_score += (time_score / 100) * float(os.getenv("AGENT_SCORE_TIME_WEIGHT", "30"))
 
             # RAG使用率权重: 30% (目标>80%)

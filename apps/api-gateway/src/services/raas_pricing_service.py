@@ -239,7 +239,7 @@ class RaaSPricingService:
                     if monthly_rev:
                         current_labor_cost = monthly_rev * labor_ratio / 30 * days_in_period
                     current_energy_cost = float(
-                        (store.config or {}).get("monthly_energy_cost", 7500.0)
+                        (store.config or {}).get("monthly_energy_cost", float(os.getenv("RAAS_DEFAULT_ENERGY_COST", "7500.0")))
                     )
 
                 # 库存周转率：期间订单数 / 库存品类数 × 月化系数
