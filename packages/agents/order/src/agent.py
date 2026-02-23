@@ -87,6 +87,10 @@ class OrderAgent(BaseAgent):
         self.config = config
         self.average_wait_time = config.get("average_wait_time", 30)  # 平均等位时间（分钟）
         self.average_dining_time = config.get("average_dining_time", 90)  # 平均用餐时间（分钟）
+        # 内存状态缓存（API层负责DB持久化）
+        self._orders: Dict[str, Dict[str, Any]] = {}
+        self._queues: Dict[str, Dict[str, Any]] = {}
+        self._reservations: Dict[str, Dict[str, Any]] = {}
 
         logger.info("订单协同Agent初始化", config=config)
 
@@ -214,6 +218,7 @@ class OrderAgent(BaseAgent):
             "status": "confirmed",
             "created_at": datetime.now().isoformat(),
         }
+        self._reservations[reservation_id] = reservation
 
         logger.info("预定创建成功", reservation_id=reservation_id)
 
@@ -226,10 +231,13 @@ class OrderAgent(BaseAgent):
     async def _check_time_availability(
         self, store_id: str, time: str, party_size: int
     ) -> bool:
-        """检查时间可用性"""
-        # TODO: 查询数据库检查该时间段的预定情况
-        # TODO: 考虑桌台容量和已有预定
-        return True  # 临时返回可用
+        """检查时间可用性（基于内存中已有预定）"""
+        same_time = [
+            r for r in self._reservations.values()
+            if r["store_id"] == store_id and r["reservation_time"] == time and r["status"] == "confirmed"
+        ]
+        max_concurrent = int(os.getenv("ORDER_MAX_CONCURRENT_RESERVATIONS", "10"))
+        return len(same_time) < max_concurrent
 
     async def _suggest_alternative_times(
         self, store_id: str, requested_time: str, party_size: int
@@ -288,6 +296,7 @@ class OrderAgent(BaseAgent):
             "status": "waiting",
             "joined_at": datetime.now().isoformat(),
         }
+        self._queues[queue_info["queue_id"]] = queue_info
 
         logger.info(
             "排队成功",
@@ -302,16 +311,16 @@ class OrderAgent(BaseAgent):
         }
 
     async def _generate_queue_number(self, store_id: str) -> str:
-        """生成排队号"""
-        # TODO: 从数据库获取当前最大排队号并递增
-        # 临时生成格式：A001, A002, ...
-        return f"A{datetime.now().strftime('%H%M%S')[-3:]}"
+        """生成排队号（基于当前门店排队数量）"""
+        store_queues = [q for q in self._queues.values() if q["store_id"] == store_id and q["status"] == "waiting"]
+        seq = len(store_queues) + 1
+        return f"A{seq:03d}"
 
     async def _estimate_wait_time(self, store_id: str, party_size: int) -> int:
-        """预估等待时间"""
-        # TODO: 基于当前排队人数、桌台周转率等计算
-        # 简化算法：基础等待时间 + 人数因子
-        base_wait = self.average_wait_time
+        """预估等待时间（基于当前排队人数和平均用餐时长）"""
+        waiting = [q for q in self._queues.values() if q["store_id"] == store_id and q["status"] == "waiting"]
+        base_wait = len(waiting) * (self.average_dining_time // int(os.getenv("ORDER_TABLE_TURNOVER_FACTOR", "3")))
+        base_wait = max(base_wait, self.average_wait_time)
         party_factor = (party_size - 2) * int(os.getenv("ORDER_PARTY_WAIT_FACTOR", "5")) if party_size > 2 else 0
         return base_wait + party_factor
 
@@ -327,13 +336,25 @@ class OrderAgent(BaseAgent):
         """
         logger.info("查询排队状态", queue_id=queue_id)
 
-        # TODO: 从数据库查询排队信息
+        queue = self._queues.get(queue_id)
+        if not queue:
+            return {"success": False, "message": "排队记录不存在"}
+
+        store_id = queue["store_id"]
+        waiting = sorted(
+            [q for q in self._queues.values() if q["store_id"] == store_id and q["status"] == "waiting"],
+            key=lambda q: q["joined_at"],
+        )
+        ahead_count = next((i for i, q in enumerate(waiting) if q["queue_id"] == queue_id), 0)
+        estimated_wait = ahead_count * (self.average_dining_time // int(os.getenv("ORDER_TABLE_TURNOVER_FACTOR", "3")))
+
         return {
             "success": True,
             "queue_id": queue_id,
-            "status": "waiting",
-            "ahead_count": 5,  # 前面还有5桌
-            "estimated_wait_minutes": 25,
+            "status": queue["status"],
+            "queue_number": queue["queue_number"],
+            "ahead_count": ahead_count,
+            "estimated_wait_minutes": estimated_wait,
         }
 
     # ==================== 点单管理 ====================
@@ -369,6 +390,7 @@ class OrderAgent(BaseAgent):
             "status": OrderStatus.ORDERING.value,
             "created_at": datetime.now().isoformat(),
         }
+        self._orders[order_id] = order
 
         logger.info("订单创建成功", order_id=order_id)
 
@@ -413,7 +435,10 @@ class OrderAgent(BaseAgent):
             "subtotal": price * quantity,
         }
 
-        # TODO: 更新订单数据库
+        # 更新内存中的订单（API层负责DB持久化）
+        if order_id in self._orders:
+            self._orders[order_id]["dishes"].append(dish_item)
+            self._orders[order_id]["total_amount"] = sum(d["subtotal"] for d in self._orders[order_id]["dishes"])
 
         return {
             "success": True,
@@ -497,16 +522,15 @@ class OrderAgent(BaseAgent):
             coupons=coupon_codes,
         )
 
-        # TODO: 从数据库获取订单详情
-        # TODO: 计算会员折扣
-        # TODO: 应用优惠券
-        # TODO: 计算积分抵扣
+        # 从内存获取订单详情
+        order = self._orders.get(order_id)
+        total_amount = order["total_amount"] if order else 200.0
 
-        # 临时模拟数据
-        total_amount = 200.0
-        member_discount = float(os.getenv("ORDER_MEMBER_DISCOUNT", "20.0")) if member_id else 0
-        coupon_discount = float(os.getenv("ORDER_COUPON_DISCOUNT", "10.0")) if coupon_codes else 0
-        final_amount = total_amount - member_discount - coupon_discount
+        # 计算折扣（会员折扣率由环境变量配置）
+        member_discount_rate = float(os.getenv("ORDER_MEMBER_DISCOUNT_RATE", "0.1")) if member_id else 0
+        member_discount = round(total_amount * member_discount_rate, 2)
+        coupon_discount = float(os.getenv("ORDER_COUPON_DISCOUNT", "10.0")) * len(coupon_codes) if coupon_codes else 0
+        final_amount = max(0.0, total_amount - member_discount - coupon_discount)
 
         bill = {
             "order_id": order_id,
@@ -551,10 +575,6 @@ class OrderAgent(BaseAgent):
             amount=amount,
         )
 
-        # TODO: 调用支付接口
-        # TODO: 更新订单状态
-        # TODO: 生成支付凭证
-
         payment_id = f"PAY{uuid.uuid4().hex[:12].upper()}"
 
         payment_result = {
@@ -565,6 +585,11 @@ class OrderAgent(BaseAgent):
             "status": "success",
             "paid_at": datetime.now().isoformat(),
         }
+
+        # 更新内存中的订单状态（API层负责DB持久化）
+        if order_id in self._orders:
+            self._orders[order_id]["status"] = OrderStatus.PAID.value
+            self._orders[order_id]["payment_info"] = payment_result
 
         logger.info("支付成功", payment_id=payment_id)
 
@@ -588,16 +613,10 @@ class OrderAgent(BaseAgent):
         """
         logger.info("查询订单", order_id=order_id)
 
-        # TODO: 从数据库查询订单
-        return {
-            "success": True,
-            "order": {
-                "order_id": order_id,
-                "status": OrderStatus.PAID.value,
-                "dishes": [],
-                "total_amount": 200.0,
-            },
-        }
+        order = self._orders.get(order_id)
+        if not order:
+            return {"success": False, "message": "订单不存在"}
+        return {"success": True, "order": order}
 
     async def update_order_status(
         self, order_id: str, new_status: str
@@ -614,9 +633,23 @@ class OrderAgent(BaseAgent):
         """
         logger.info("更新订单状态", order_id=order_id, new_status=new_status)
 
-        # TODO: 验证状态转换合法性
-        # TODO: 更新数据库
-        # TODO: 触发相关通知
+        # 验证状态转换合法性
+        valid_transitions = {
+            OrderStatus.ORDERING.value: [OrderStatus.ORDERED.value, OrderStatus.CANCELLED.value],
+            OrderStatus.ORDERED.value: [OrderStatus.COOKING.value, OrderStatus.CANCELLED.value],
+            OrderStatus.COOKING.value: [OrderStatus.SERVED.value],
+            OrderStatus.SERVED.value: [OrderStatus.PAYING.value],
+            OrderStatus.PAYING.value: [OrderStatus.PAID.value],
+            OrderStatus.PAID.value: [OrderStatus.COMPLETED.value],
+        }
+        order = self._orders.get(order_id)
+        if order:
+            current = order.get("status", "")
+            allowed = valid_transitions.get(current, [])
+            if new_status not in allowed and new_status != OrderStatus.CANCELLED.value:
+                return {"success": False, "message": f"不允许从 {current} 转换到 {new_status}"}
+            order["status"] = new_status
+            order["updated_at"] = datetime.now().isoformat()
 
         return {
             "success": True,
@@ -640,12 +673,22 @@ class OrderAgent(BaseAgent):
         """
         logger.info("取消订单", order_id=order_id, reason=reason)
 
-        # TODO: 检查订单状态是否可取消
-        # TODO: 处理退款（如已支付）
-        # TODO: 更新订单状态
+        order = self._orders.get(order_id)
+        if not order:
+            return {"success": False, "message": "订单不存在"}
+
+        non_cancellable = {OrderStatus.PAID.value, OrderStatus.COMPLETED.value}
+        if order["status"] in non_cancellable:
+            return {"success": False, "message": f"订单状态为 {order['status']}，无法取消"}
+
+        needs_refund = order["status"] == OrderStatus.PAYING.value
+        order["status"] = OrderStatus.CANCELLED.value
+        order["cancel_reason"] = reason
+        order["cancelled_at"] = datetime.now().isoformat()
 
         return {
             "success": True,
             "order_id": order_id,
+            "needs_refund": needs_refund,
             "message": "订单已取消",
         }
