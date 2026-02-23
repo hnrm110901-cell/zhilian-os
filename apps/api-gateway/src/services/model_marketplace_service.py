@@ -8,6 +8,7 @@
 - Level 3: 定制模型（¥29,999/年） - 针对特定品类的专属模型
 - Level 4: 数据贡献分成 - 门店贡献数据获得模型销售收益分成
 """
+import os
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from enum import Enum
@@ -90,12 +91,12 @@ class DataContribution(BaseModel):
 class ModelMarketplaceService:
     """模型交易市场服务"""
 
-    # 模型定价
-    INDUSTRY_MODEL_PRICE = 9999.0  # 行业模型年费
-    CUSTOM_MODEL_PRICE = 29999.0  # 定制模型年费
+    # 模型定价（支持环境变量覆盖）
+    INDUSTRY_MODEL_PRICE = float(os.getenv("MARKETPLACE_INDUSTRY_PRICE", "9999.0"))
+    CUSTOM_MODEL_PRICE = float(os.getenv("MARKETPLACE_CUSTOM_PRICE", "29999.0"))
 
-    # 数据贡献分成比例
-    DATA_CONTRIBUTION_SHARE = 0.30  # 数据贡献者获得模型销售收入的30%
+    # 数据贡献分成比例（支持环境变量覆盖）
+    DATA_CONTRIBUTION_SHARE = float(os.getenv("MARKETPLACE_DATA_CONTRIBUTION_SHARE", "0.30"))
 
     def __init__(self, db: Session):
         self.db = db
@@ -212,7 +213,7 @@ class ModelMarketplaceService:
             quality_score=quality_score
         )
 
-        base_revenue_share = 100.0
+        base_revenue_share = float(os.getenv("MARKETPLACE_BASE_REVENUE_SHARE", "100.0"))
         quality_multiplier = quality_score / 100.0
         data_volume_multiplier = min(data_points / 10000, 10.0)
         revenue_share = base_revenue_share * quality_multiplier * data_volume_multiplier

@@ -7,6 +7,7 @@ RaaS定价服务 (Result-as-a-Service Pricing Service)
 - 效果版: 省下成本的20%作为服务费
 - 增长版: 增加营收的15%作为分成
 """
+import os
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from enum import Enum
@@ -83,12 +84,12 @@ class BaselineMetrics(BaseModel):
 class RaaSPricingService:
     """RaaS定价服务"""
 
-    # 分成比例
-    COST_SAVING_COMMISSION = 0.20  # 成本节省分成20%
-    REVENUE_GROWTH_COMMISSION = 0.15  # 营收增长分成15%
+    # 分成比例（支持环境变量覆盖）
+    COST_SAVING_COMMISSION = float(os.getenv("RAAS_COST_SAVING_COMMISSION", "0.20"))
+    REVENUE_GROWTH_COMMISSION = float(os.getenv("RAAS_REVENUE_GROWTH_COMMISSION", "0.15"))
 
-    # 免费试用期
-    FREE_TRIAL_DAYS = 90  # 3个月免费试用
+    # 免费试用期（支持环境变量覆盖）
+    FREE_TRIAL_DAYS = int(os.getenv("RAAS_FREE_TRIAL_DAYS", "90"))
 
     def __init__(self, db: Session):
         self.db = db

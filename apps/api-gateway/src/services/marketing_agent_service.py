@@ -22,6 +22,7 @@ from pydantic import BaseModel
 from enum import Enum
 import numpy as np
 import logging
+import os
 from sqlalchemy import select, func
 from src.core.database import get_db_session
 from src.models.order import Order, OrderStatus
@@ -271,14 +272,17 @@ class MarketingAgentService:
         """预测流失风险"""
         consumption = await self._analyze_consumption_behavior(customer_id)
 
-        # 简化的流失风险模型
+        # 简化的流失风险模型（天数阈值支持环境变量覆盖）
         days_since_last = consumption["days_since_last_order"]
+        _low_days = int(os.getenv("CHURN_LOW_RISK_DAYS", "7"))
+        _mid_days = int(os.getenv("CHURN_MID_RISK_DAYS", "30"))
+        _high_days = int(os.getenv("CHURN_HIGH_RISK_DAYS", "60"))
 
-        if days_since_last < 7:
+        if days_since_last < _low_days:
             risk = 0.1  # 低风险
-        elif days_since_last < 30:
+        elif days_since_last < _mid_days:
             risk = 0.3  # 中风险
-        elif days_since_last < 60:
+        elif days_since_last < _high_days:
             risk = 0.6  # 高风险
         else:
             risk = 0.9  # 极高风险
