@@ -4,6 +4,7 @@ RAG增强服务 - 集成行业基线数据
 """
 from typing import Dict, List, Optional, Any
 import structlog
+import os
 
 from src.services.baseline_data_service import BaselineDataService
 
@@ -16,12 +17,12 @@ class EnhancedRAGService:
     自动判断数据充足性，在数据不足时使用行业基线
     """
 
-    # 数据充足性阈值
+    # 数据充足性阈值（支持环境变量覆盖）
     DATA_SUFFICIENCY_THRESHOLDS = {
-        "orders": 100,  # 至少100个订单
-        "days": 30,  # 至少30天数据
-        "inventory_records": 50,  # 至少50条库存记录
-        "reservations": 30,  # 至少30个预订记录
+        "orders": int(os.getenv("RAG_MIN_ORDERS", "100")),
+        "days": int(os.getenv("RAG_MIN_DAYS", "30")),
+        "inventory_records": int(os.getenv("RAG_MIN_INVENTORY_RECORDS", "50")),
+        "reservations": int(os.getenv("RAG_MIN_RESERVATIONS", "30")),
     }
 
     def __init__(self, store_id: str, restaurant_type: str = "正餐"):
