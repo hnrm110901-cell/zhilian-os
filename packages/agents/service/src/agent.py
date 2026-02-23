@@ -1103,82 +1103,26 @@ class ServiceAgent(BaseAgent):
         start_date: Optional[str],
         end_date: Optional[str]
     ) -> List[CustomerFeedback]:
-        """生成模拟反馈数据"""
-        import random
-
-        mock_feedbacks = []
-        base_date = datetime.now() - timedelta(days=int(os.getenv("SERVICE_TREND_DAYS", "7")))
-
-        feedback_templates = [
-            {
-                "type": FeedbackType.PRAISE,
-                "category": ServiceCategory.FOOD_QUALITY,
-                "rating": 5,
-                "content": "菜品非常美味,食材新鲜,味道很棒!"
-            },
-            {
-                "type": FeedbackType.PRAISE,
-                "category": ServiceCategory.SERVICE_ATTITUDE,
-                "rating": 5,
-                "content": "服务员态度很好,服务周到,非常满意!"
-            },
-            {
-                "type": FeedbackType.COMPLAINT,
-                "category": ServiceCategory.WAITING_TIME,
-                "rating": 2,
-                "content": "等待时间太长了,上菜很慢,希望改进"
-            },
-            {
-                "type": FeedbackType.COMPLAINT,
-                "category": ServiceCategory.FOOD_QUALITY,
-                "rating": 1,
-                "content": "菜品质量差,味道不好,非常失望"
-            },
-            {
-                "type": FeedbackType.SUGGESTION,
-                "category": ServiceCategory.ENVIRONMENT,
-                "rating": 3,
-                "content": "环境还可以,但是卫生需要加强"
-            },
-            {
-                "type": FeedbackType.COMPLAINT,
-                "category": ServiceCategory.SERVICE_ATTITUDE,
-                "rating": 2,
-                "content": "服务员态度不好,不够热情"
-            },
-            {
-                "type": FeedbackType.PRAISE,
-                "category": ServiceCategory.ENVIRONMENT,
-                "rating": 5,
-                "content": "环境很好,装修漂亮,氛围舒适"
-            },
-            {
-                "type": FeedbackType.SUGGESTION,
-                "category": ServiceCategory.PRICE,
-                "rating": 3,
-                "content": "价格有点贵,希望能有更多优惠活动"
-            },
-        ]
-
-        for i in range(50):
-            template = random.choice(feedback_templates)
-            feedback_date = base_date + timedelta(days=random.randint(0, 7))
-
-            feedback: CustomerFeedback = {
-                "feedback_id": f"FB{datetime.now().strftime('%Y%m%d')}{i:04d}",
-                "customer_id": f"CUST{random.randint(1000, 9999)}",
-                "customer_name": f"客户{random.randint(100, 999)}",
-                "store_id": self.store_id,
-                "feedback_type": template["type"],
-                "category": template["category"],
-                "rating": template["rating"],
-                "content": template["content"],
-                "staff_id": f"STAFF{random.randint(1, 10):03d}" if random.random() > 0.3 else None,
-                "order_id": f"ORD{random.randint(10000, 99999)}" if random.random() > 0.2 else None,
-                "created_at": feedback_date.isoformat(),
-                "source": random.choice(["app", "wechat", "phone", "onsite"])
-            }
-
-            mock_feedbacks.append(feedback)
-
-        return mock_feedbacks
+        """从DB查询反馈数据，无数据时返回空列表"""
+        engine = self._get_db_engine()
+        if not engine:
+            return []
+        try:
+            from sqlalchemy import text
+            filters = ["store_id = :store_id"]
+            params: dict = {"store_id": self.store_id}
+            if start_date:
+                filters.append("created_at >= :start_date")
+                params["start_date"] = start_date
+            if end_date:
+                filters.append("created_at <= :end_date")
+                params["end_date"] = end_date
+            where = " AND ".join(filters)
+            with engine.connect() as conn:
+                rows = conn.execute(
+                    text(f"SELECT * FROM customer_feedbacks WHERE {where} ORDER BY created_at DESC LIMIT 200"),
+                    params,
+                ).fetchall()
+            return [dict(r._mapping) for r in rows]
+        except Exception:
+            return []

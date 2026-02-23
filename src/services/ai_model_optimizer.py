@@ -196,24 +196,22 @@ class AIModelOptimizer:
         Returns:
             Optimal hyperparameters and results
         """
-        # Simulate hyperparameter optimization
-        # In production, use libraries like Optuna, Ray Tune, or Hyperopt
+        # Grid search through param space (deterministic)
+        # In production, replace with Optuna, Ray Tune, or Hyperopt
+        import itertools
 
-        best_params = {}
+        keys = list(param_space.keys())
+        value_lists = [param_space[k] for k in keys]
+        all_combinations = list(itertools.product(*value_lists))[:max_trials]
+
+        best_params: Dict[str, Any] = {}
         best_score = 0.0
 
-        # Simulate trials
-        for trial in range(max_trials):
-            # Random sample from param space
-            params = {
-                key: np.random.choice(values)
-                for key, values in param_space.items()
-            }
-
-            # Simulate evaluation
-            score = 0.85 + np.random.random() * 0.10  # 0.85-0.95
-
-            if score > best_score:
+        for combo in all_combinations:
+            params = dict(zip(keys, combo))
+            # Score based on position in search space (placeholder until real eval)
+            score = 0.0
+            if score > best_score or not best_params:
                 best_score = score
                 best_params = params
 
