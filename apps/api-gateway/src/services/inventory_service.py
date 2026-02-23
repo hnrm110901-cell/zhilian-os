@@ -3,6 +3,7 @@ Inventory Service - 库存管理数据库服务
 处理库存的数据库操作
 """
 import structlog
+import os
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from sqlalchemy import select, func, and_, or_, desc
@@ -27,8 +28,8 @@ class InventoryService:
         """
         self.store_id = store_id
         self.alert_thresholds = {
-            "low_stock_ratio": 0.3,
-            "critical_stock_ratio": 0.1,
+            "low_stock_ratio": float(os.getenv("INVENTORY_LOW_STOCK_RATIO", "0.3")),
+            "critical_stock_ratio": float(os.getenv("INVENTORY_CRITICAL_STOCK_RATIO", "0.1")),
         }
         logger.info("InventoryService初始化", store_id=store_id)
 
@@ -445,8 +446,9 @@ class InventoryService:
         if item.max_quantity:
             return item.max_quantity - item.current_quantity
         else:
-            # 如果没有设置最大库存，建议补到安全库存的2倍
-            return item.min_quantity * 2 - item.current_quantity
+            # 如果没有设置最大库存，建议补到安全库存的N倍（支持环境变量覆盖）
+            restock_multiplier = float(os.getenv("INVENTORY_RESTOCK_MULTIPLIER", "2"))
+            return item.min_quantity * restock_multiplier - item.current_quantity
 
     async def _estimate_stockout_date(
         self,

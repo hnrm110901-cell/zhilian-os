@@ -6,6 +6,7 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime, date, timedelta
 from sqlalchemy import select, and_, func, or_
 import structlog
+import os
 import uuid
 
 from src.core.database import get_db_session
@@ -401,31 +402,36 @@ class DailyReportService:
         return summary
 
     def _generate_highlights(self, report: DailyReport) -> List[str]:
-        """生成亮点数据"""
+        """生成亮点数据（阈值支持环境变量覆盖）"""
         highlights = []
+        _rev_up = float(os.getenv("REPORT_HIGHLIGHT_REVENUE_UP", "10"))
+        _task_good = float(os.getenv("REPORT_HIGHLIGHT_TASK_RATE", "90"))
+        _order_milestone = int(os.getenv("REPORT_HIGHLIGHT_ORDER_COUNT", "100"))
 
-        if report.revenue_change_rate > 10:
+        if report.revenue_change_rate > _rev_up:
             highlights.append(f"营收大幅增长{report.revenue_change_rate:.1f}%")
 
-        if report.task_completion_rate >= 90:
+        if report.task_completion_rate >= _task_good:
             highlights.append(f"任务完成率达{report.task_completion_rate:.1f}%")
 
-        if report.order_count > 100:
+        if report.order_count > _order_milestone:
             highlights.append(f"订单量突破{report.order_count}笔")
 
         return highlights
 
     def _generate_alerts(self, report: DailyReport) -> List[str]:
-        """生成预警信息"""
+        """生成预警信息（阈值支持环境变量覆盖）"""
         alerts = []
+        _rev_down = float(os.getenv("REPORT_ALERT_REVENUE_DOWN", "10"))
+        _task_warn = float(os.getenv("REPORT_ALERT_TASK_RATE", "70"))
 
-        if report.revenue_change_rate < -10:
+        if report.revenue_change_rate < -_rev_down:
             alerts.append(f"营收下降{abs(report.revenue_change_rate):.1f}%，需关注")
 
         if report.inventory_alert_count > 0:
             alerts.append(f"{report.inventory_alert_count}个商品库存不足")
 
-        if report.task_completion_rate < 70:
+        if report.task_completion_rate < _task_warn:
             alerts.append(f"任务完成率仅{report.task_completion_rate:.1f}%")
 
         return alerts
