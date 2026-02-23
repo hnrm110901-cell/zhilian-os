@@ -6,6 +6,7 @@ from typing import Dict, List, Optional, Any
 from datetime import date, datetime, timedelta
 import structlog
 import numpy as np
+import os
 
 from sqlalchemy import select, func
 from src.services.base_service import BaseService
@@ -337,22 +338,18 @@ class BenchmarkService(BaseService):
         return rankings
 
     def _get_performance_level(self, percentile: float) -> str:
-        """
-        根据分位数判断表现水平
-
-        Args:
-            percentile: 分位数（0-100）
-
-        Returns:
-            表现水平
-        """
-        if percentile >= 90:
+        """根据分位数判断表现水平（阈值支持环境变量覆盖）"""
+        _excellent = float(os.getenv("BENCHMARK_EXCELLENT_PERCENTILE", "90"))
+        _good = float(os.getenv("BENCHMARK_GOOD_PERCENTILE", "75"))
+        _mid = float(os.getenv("BENCHMARK_MID_PERCENTILE", "50"))
+        _low = float(os.getenv("BENCHMARK_LOW_PERCENTILE", "25"))
+        if percentile >= _excellent:
             return "优秀"
-        elif percentile >= 75:
+        elif percentile >= _good:
             return "良好"
-        elif percentile >= 50:
+        elif percentile >= _mid:
             return "中等"
-        elif percentile >= 25:
+        elif percentile >= _low:
             return "待提升"
         else:
             return "需改进"
@@ -375,8 +372,10 @@ class BenchmarkService(BaseService):
 
         for dimension, data in rankings.items():
             percentile = data["percentile"]
+            _strength_threshold = float(os.getenv("BENCHMARK_STRENGTH_PERCENTILE", "75"))
+            _weakness_threshold = float(os.getenv("BENCHMARK_WEAKNESS_PERCENTILE", "50"))
 
-            if percentile >= 75:
+            if percentile >= _strength_threshold:
                 # 优势：排名前25%
                 strengths.append({
                     "dimension": dimension,
@@ -385,7 +384,7 @@ class BenchmarkService(BaseService):
                     "level": data["level"],
                     "vs_mean": data["vs_mean"],
                 })
-            elif percentile < 50:
+            elif percentile < _weakness_threshold:
                 # 劣势：排名后50%
                 weaknesses.append({
                     "dimension": dimension,

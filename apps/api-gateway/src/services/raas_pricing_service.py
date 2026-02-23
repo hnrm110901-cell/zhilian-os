@@ -308,7 +308,8 @@ class RaaSPricingService:
 
         # 库存成本节省（周转率提升意味着库存成本降低）
         inventory_improvement = (current_inventory_turnover - baseline.avg_inventory_turnover) / baseline.avg_inventory_turnover
-        inventory_cost_saved = max(0, baseline.avg_daily_revenue * 0.3 * inventory_improvement * days_in_period)
+        _inventory_cost_ratio = float(os.getenv("RAAS_INVENTORY_COST_RATIO", "0.3"))
+        inventory_cost_saved = max(0, baseline.avg_daily_revenue * _inventory_cost_ratio * inventory_improvement * days_in_period)
 
         total_cost_saved = food_waste_saved + labor_cost_saved + energy_cost_saved + inventory_cost_saved
 
