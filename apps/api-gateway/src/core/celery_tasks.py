@@ -48,11 +48,11 @@ class CallbackTask(Task):
 @celery_app.task(
     base=CallbackTask,
     bind=True,
-    max_retries=3,
-    default_retry_delay=60,
+    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
+    default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY", "60")),
     autoretry_for=(Exception,),
     retry_backoff=True,
-    retry_backoff_max=600,
+    retry_backoff_max=int(os.getenv("CELERY_RETRY_BACKOFF_MAX", "600")),
     retry_jitter=True,
 )
 async def process_neural_event(

@@ -3,6 +3,7 @@ KPIAgent - 绩效评估Agent (RAG增强)
 """
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
+import os
 import structlog
 
 from .llm_agent import LLMEnhancedAgent
@@ -78,7 +79,7 @@ class KPIAgent(LLMEnhancedAgent):
                 query=query,
                 store_id=store_id,
                 collection="events",
-                top_k=15
+                top_k=int(os.getenv("RAG_KPI_TOP_K", "12"))
             )
 
             return self.format_response(
@@ -174,7 +175,7 @@ class KPIAgent(LLMEnhancedAgent):
                 query=query,
                 store_id=store_id,
                 collection="events",
-                top_k=12
+                top_k=int(os.getenv("RAG_KPI_TOP_K", "12"))
             )
 
             return self.format_response(
@@ -250,7 +251,7 @@ class KPIAgent(LLMEnhancedAgent):
                 query=query,
                 store_id=store_id,
                 collection="events",
-                top_k=10
+                top_k=int(os.getenv("RAG_KPI_TOP_K", "12"))
             )
 
             return self.format_response(
@@ -324,7 +325,7 @@ class KPIAgent(LLMEnhancedAgent):
                 query=query,
                 store_id=store_id,
                 collection="events",
-                top_k=15
+                top_k=int(os.getenv("RAG_KPI_TOP_K", "12"))
             )
 
             return self.format_response(

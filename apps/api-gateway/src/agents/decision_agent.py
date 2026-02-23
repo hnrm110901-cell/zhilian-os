@@ -2,6 +2,7 @@
 DecisionAgent - 决策分析Agent (RAG增强)
 """
 from typing import Dict, Any, Optional
+import os
 import structlog
 
 from .llm_agent import LLMEnhancedAgent
@@ -77,7 +78,7 @@ class DecisionAgent(LLMEnhancedAgent):
                 query=query,
                 store_id=store_id,
                 collection="events",
-                top_k=5
+                top_k=int(os.getenv("RAG_DECISION_TOP_K", "8"))
             )
 
             return self.format_response(
@@ -152,7 +153,7 @@ class DecisionAgent(LLMEnhancedAgent):
                 query=query,
                 store_id=store_id,
                 collection="orders",
-                top_k=10
+                top_k=int(os.getenv("RAG_DECISION_TOP_K", "8"))
             )
 
             return self.format_response(
@@ -219,7 +220,7 @@ class DecisionAgent(LLMEnhancedAgent):
                 query=query,
                 store_id=store_id,
                 collection="events",
-                top_k=8
+                top_k=int(os.getenv("RAG_DECISION_TOP_K", "8"))
             )
 
             return self.format_response(
