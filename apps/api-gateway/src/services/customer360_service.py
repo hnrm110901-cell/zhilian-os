@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import select, and_, or_, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
+import os
 
 from ..models.order import Order
 from ..models.reservation import Reservation
@@ -496,14 +497,18 @@ class Customer360Service:
             return {}
 
     def _get_customer_tier(self, rfm_score: float) -> str:
-        """根据RFM评分获取客户等级"""
-        if rfm_score >= 80:
+        """根据RFM评分获取客户等级（阈值支持环境变量覆盖）"""
+        _vip = float(os.getenv("RFM_VIP_THRESHOLD", "80"))
+        _high = float(os.getenv("RFM_HIGH_THRESHOLD", "60"))
+        _mid = float(os.getenv("RFM_MID_THRESHOLD", "40"))
+        _low = float(os.getenv("RFM_LOW_THRESHOLD", "20"))
+        if rfm_score >= _vip:
             return "VIP"
-        elif rfm_score >= 60:
+        elif rfm_score >= _high:
             return "高价值"
-        elif rfm_score >= 40:
+        elif rfm_score >= _mid:
             return "中价值"
-        elif rfm_score >= 20:
+        elif rfm_score >= _low:
             return "低价值"
         else:
             return "流失风险"

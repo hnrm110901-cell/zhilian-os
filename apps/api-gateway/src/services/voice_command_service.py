@@ -156,8 +156,6 @@ class VoiceCommandService:
     async def _handle_queue_status(self, store_id: str, db: Session) -> Dict[str, Any]:
         """处理排队状态查询"""
         try:
-            # 查询当前排队数据（从Queue表或美团API）
-            # 这里使用模拟数据，实际应从数据库或API获取
             from ..models.queue import Queue, QueueStatus
 
             waiting_queues = db.query(Queue).filter(
