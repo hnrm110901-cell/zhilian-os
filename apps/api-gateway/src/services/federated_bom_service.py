@@ -158,11 +158,11 @@ class FederatedBOMService:
             for record in historical_data
         ])
 
-        # 简化的梯度下降
+        # 简化的梯度下降（超参数支持环境变量覆盖）
         n_features = features.shape[1]
         weights = np.random.randn(n_features) * 0.01
-        learning_rate = 0.01
-        epochs = 10
+        learning_rate = float(os.getenv("BOM_LEARNING_RATE", "0.01"))
+        epochs = int(os.getenv("BOM_TRAIN_EPOCHS", "10"))
 
         for epoch in range(epochs):
             # 前向传播
