@@ -348,8 +348,8 @@ class MarketingAgentService:
                 threshold=float(cfg.get("coupon_traffic_decline_threshold", 100.0)),
                 valid_days=int(cfg.get("coupon_traffic_decline_days", 7)),
                 target_segment=CustomerSegment.AT_RISK,
-                expected_conversion=0.25,
-                expected_roi=3.5
+                expected_conversion=float(cfg.get("coupon_traffic_decline_conversion", 0.25)),
+                expected_roi=float(cfg.get("coupon_traffic_decline_roi", 3.5))
             )
 
         elif scenario == "new_product_launch":
@@ -359,8 +359,8 @@ class MarketingAgentService:
                 threshold=None,
                 valid_days=int(cfg.get("coupon_new_product_days", 14)),
                 target_segment=CustomerSegment.HIGH_VALUE,
-                expected_conversion=0.35,
-                expected_roi=4.2
+                expected_conversion=float(cfg.get("coupon_new_product_conversion", 0.35)),
+                expected_roi=float(cfg.get("coupon_new_product_roi", 4.2))
             )
 
         elif scenario == "member_day":
@@ -370,8 +370,8 @@ class MarketingAgentService:
                 threshold=float(cfg.get("coupon_member_day_threshold", 50.0)),
                 valid_days=1,
                 target_segment=CustomerSegment.POTENTIAL,
-                expected_conversion=0.40,
-                expected_roi=5.0
+                expected_conversion=float(cfg.get("coupon_member_day_conversion", 0.40)),
+                expected_roi=float(cfg.get("coupon_member_day_roi", 5.0))
             )
 
         else:
@@ -381,8 +381,8 @@ class MarketingAgentService:
                 threshold=float(cfg.get("coupon_default_threshold", 50.0)),
                 valid_days=int(cfg.get("coupon_default_days", 7)),
                 target_segment=CustomerSegment.NEW,
-                expected_conversion=0.20,
-                expected_roi=2.8
+                expected_conversion=float(cfg.get("coupon_default_conversion", 0.20)),
+                expected_roi=float(cfg.get("coupon_default_roi", 2.8))
             )
 
     async def create_marketing_campaign(
