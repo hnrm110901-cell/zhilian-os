@@ -168,7 +168,7 @@ class FederatedLearningService(BaseService):
         # 应用差分隐私
         noisy_parameters = self._apply_differential_privacy(
             model_parameters,
-            epsilon=1.0,
+            epsilon=float(os.getenv("FL_PRIVACY_EPSILON", "1.0")),
         )
 
         # 验证模型参数

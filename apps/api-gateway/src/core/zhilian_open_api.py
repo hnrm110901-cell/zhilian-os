@@ -286,8 +286,8 @@ class ZhilianOpenAPI:
                 )
             )
             row = hist.one()
-            avg_orders = int(row[0] or 50)
-            avg_revenue = int(row[1] or 5000_00)
+            avg_orders = int(row[0] or int(os.getenv("OPENAPI_DEFAULT_AVG_ORDERS", "50")))
+            avg_revenue = int(row[1] or int(os.getenv("OPENAPI_DEFAULT_AVG_REVENUE", "500000")))
 
             # 查询菜品列表
             dishes_result = await session.execute(
@@ -416,10 +416,10 @@ class ZhilianOpenAPI:
                 "dish_id": dish_id,
                 "dish_name": dish.name,
                 "current_price": price,
-                "recommended_price": round(price * 1.05, 2),
-                "min_price": round(price * 0.9, 2),
-                "max_price": round(price * 1.2, 2),
-                "confidence": 0.80,
+                "recommended_price": round(price * float(os.getenv("PRICING_RECOMMEND_RATIO", "1.05")), 2),
+                "min_price": round(price * float(os.getenv("PRICING_MIN_RATIO", "0.9")), 2),
+                "max_price": round(price * float(os.getenv("PRICING_MAX_RATIO", "1.2")), 2),
+                "confidence": float(os.getenv("PRICING_CONFIDENCE", "0.80")),
             }
         else:
             pricing = {"dish_id": dish_id, "recommended_price": 0, "confidence": 0}
@@ -573,12 +573,12 @@ class ZhilianOpenAPI:
                 ).where(Order.status == OrderStatus.COMPLETED)
             )
             row = result.one()
-            avg_amount_fen = int(row.avg_amount or 10000)  # 分
+            avg_amount_fen = int(row.avg_amount or int(os.getenv("COUPON_DEFAULT_AVG_AMOUNT", "10000")))  # 分
 
         avg_yuan = avg_amount_fen / 100
         # 满减门槛 = 均值的80%，优惠 = 门槛的20%
-        threshold = round(avg_yuan * 0.8 / 10) * 10
-        amount = round(threshold * 0.2 / 5) * 5
+        threshold = round(avg_yuan * float(os.getenv("COUPON_THRESHOLD_RATIO", "0.8")) / 10) * 10
+        amount = round(threshold * float(os.getenv("COUPON_DISCOUNT_RATIO", "0.2")) / 5) * 5
 
         strategy = {
             "coupon_type": "满减券",

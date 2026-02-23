@@ -492,8 +492,8 @@ class VoiceService:
                 "auf": "audio/L16;rate=16000",  # 音频采样率
                 "vcn": voice_map.get(voice, "xiaoyan"),  # 发音人
                 "speed": int(speed * 50),  # 语速(0-100)
-                "volume": 50,  # 音量(0-100)
-                "pitch": 50,  # 音调(0-100)
+                "volume": int(os.getenv("VOICE_TTS_VOLUME", "50")),  # 音量(0-100)
+                "pitch": int(os.getenv("VOICE_TTS_PITCH", "50")),  # 音调(0-100)
                 "tte": "UTF8",  # 文本编码
             }
 

@@ -97,7 +97,7 @@ class EnhancedForecastService(BaseService):
         target_date: date,
         weather_forecast: Optional[Dict[str, Any]],
         events: Optional[List[Dict[str, Any]]],
-        weekend_factor: float = 1.4,
+        weekend_factor: float = float(os.getenv("FORECAST_WEEKEND_FACTOR", "1.4")),
     ) -> Dict[str, float]:
         """
         计算各维度影响因子

@@ -207,9 +207,9 @@ class CircuitBreakerOpenError(Exception):
 
 
 def circuit_breaker(
-    failure_threshold: int = 5,
-    success_threshold: int = 2,
-    timeout: float = 60.0,
+    failure_threshold: int = int(os.getenv("CB_FAILURE_THRESHOLD", "5")),
+    success_threshold: int = int(os.getenv("CB_SUCCESS_THRESHOLD", "2")),
+    timeout: float = float(os.getenv("CB_TIMEOUT", "60.0")),
     expected_exception: type = Exception,
     fallback: Callable = None,
 ):
