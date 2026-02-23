@@ -6,6 +6,7 @@ from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional, Any
 import structlog
 import numpy as np
+import os
 
 from src.services.forecast_features import ChineseHolidays, WeatherImpact, BusinessDistrictEvents
 from src.services.base_service import BaseService
@@ -181,7 +182,7 @@ class EnhancedForecastService(BaseService):
                 )
                 rows = result.all()
             if not rows:
-                return 1.4
+                return float(os.getenv("FORECAST_DEFAULT_WEEKEND_FACTOR", "1.4"))
             weekend_revs = [float(r.total_revenue) for r in rows if r.report_date.weekday() in [5, 6]]
             weekday_revs = [float(r.total_revenue) for r in rows if r.report_date.weekday() not in [5, 6]]
             if weekend_revs and weekday_revs:
@@ -189,7 +190,7 @@ class EnhancedForecastService(BaseService):
                 return round(max(1.0, min(2.5, factor)), 2)
         except Exception as e:
             logger.warning("周末系数计算失败，使用默认值", error=str(e))
-        return 1.4
+        return float(os.getenv("FORECAST_DEFAULT_WEEKEND_FACTOR", "1.4"))
 
     async def _get_historical_baseline(self, target_date: date) -> Dict[str, float]:
         """
