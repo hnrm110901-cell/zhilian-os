@@ -114,28 +114,30 @@ class AIModelOptimizer:
         Returns:
             Fine-tuning results
         """
-        # Simulate fine-tuning (in production, use actual ML framework)
+        # Use registered model metrics as baseline; zeros if model not yet tracked
+        # In production, replace with actual ML framework (PyTorch, TF, etc.)
+        model_info = self.models.get(model_id, {})
         original_metrics = ModelMetrics(
-            accuracy=0.85,
-            precision=0.83,
-            recall=0.87,
-            f1_score=0.85,
-            latency_ms=50.0,
-            throughput_qps=100.0,
-            model_size_mb=500.0,
-            memory_usage_mb=1000.0
+            accuracy=model_info.get("accuracy", 0.0),
+            precision=model_info.get("precision", 0.0),
+            recall=model_info.get("recall", 0.0),
+            f1_score=model_info.get("f1_score", 0.0),
+            latency_ms=model_info.get("latency_ms", 0.0),
+            throughput_qps=model_info.get("throughput_qps", 0.0),
+            model_size_mb=model_info.get("model_size_mb", 0.0),
+            memory_usage_mb=model_info.get("memory_usage_mb", 0.0),
         )
 
-        # Simulate improvement after fine-tuning
+        # Post-fine-tune metrics: same as original until real training runs
         optimized_metrics = ModelMetrics(
-            accuracy=0.92,
-            precision=0.90,
-            recall=0.94,
-            f1_score=0.92,
-            latency_ms=50.0,  # Same latency
-            throughput_qps=100.0,  # Same throughput
-            model_size_mb=500.0,  # Same size
-            memory_usage_mb=1000.0  # Same memory
+            accuracy=original_metrics.accuracy,
+            precision=original_metrics.precision,
+            recall=original_metrics.recall,
+            f1_score=original_metrics.f1_score,
+            latency_ms=original_metrics.latency_ms,
+            throughput_qps=original_metrics.throughput_qps,
+            model_size_mb=original_metrics.model_size_mb,
+            memory_usage_mb=original_metrics.memory_usage_mb,
         )
 
         # Calculate improvements
