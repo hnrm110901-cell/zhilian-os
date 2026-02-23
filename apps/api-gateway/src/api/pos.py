@@ -325,7 +325,7 @@ async def get_current_queue(
         queues = await queue_service.get_queue_list(
             store_id=store_id,
             status=QueueStatus.WAITING,
-            limit=50,
+            limit=int(os.getenv("POS_QUEUE_LIST_LIMIT", "50")),
         )
 
         # 获取统计信息

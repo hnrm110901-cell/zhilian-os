@@ -2,6 +2,7 @@
 美团等位集成API
 Meituan Queue Integration API
 """
+import os
 from fastapi import APIRouter, Depends, HTTPException, Body, Request
 from typing import Optional, Dict, Any
 import structlog
@@ -186,7 +187,7 @@ async def sync_waiting_info(
         queues = await queue_service.get_queue_list(
             store_id=store_id,
             status=QueueStatus.WAITING,
-            limit=100,
+            limit=int(os.getenv("MEITUAN_QUEUE_LIST_LIMIT", "100")),
         )
 
         # 构建订单等位列表

@@ -4,6 +4,7 @@ Voice Interaction API
 
 提供Shokz设备管理和语音交互接口
 """
+import os
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel, Field
 from typing import Optional, List
@@ -266,7 +267,7 @@ async def process_voice_command_upload(
         result = await voice_orchestrator.process_voice_command(
             device_id=device_id,
             audio_data=audio_data,
-            sample_rate=16000,
+            sample_rate=int(os.getenv("VOICE_SAMPLE_RATE", "16000")),
         )
 
         if not result["success"]:

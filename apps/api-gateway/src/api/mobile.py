@@ -2,6 +2,7 @@
 Mobile API endpoints
 移动端专用API接口 - 优化的数据结构和响应
 """
+import os
 from fastapi import APIRouter, Depends, Query, HTTPException
 from typing import List, Optional
 from pydantic import BaseModel
@@ -80,7 +81,7 @@ async def get_mobile_dashboard(
         user_id=str(current_user.id),
         role=current_user.role.value,
         store_id=current_user.store_id,
-        limit=3,
+        limit=int(os.getenv("MOBILE_DASHBOARD_NOTIF_LIMIT", "3")),
     )
 
     notifications_summary = MobileNotificationSummary(
@@ -106,7 +107,7 @@ async def get_mobile_dashboard(
             begin_date=today,
             end_date=today,
             page_index=1,
-            page_size=1000,
+            page_size=int(os.getenv("MOBILE_PAGE_SIZE", "1000")),
         )
         orders = orders_result.get("orders", [])
         today_stats["orders"] = len(orders)
@@ -175,7 +176,7 @@ async def get_notifications_summary(
         role=current_user.role.value,
         store_id=current_user.store_id,
         is_read=False,
-        limit=10,
+        limit=int(os.getenv("MOBILE_NOTIF_LIST_LIMIT", "10")),
     )
 
     # 精简通知数据
@@ -222,7 +223,7 @@ async def batch_mark_notifications_read(
 async def get_nearby_stores(
     latitude: float = Query(..., description="纬度"),
     longitude: float = Query(..., description="经度"),
-    radius: int = Query(5000, description="搜索半径(米)"),
+    radius: int = Query(int(os.getenv("MOBILE_STORE_SEARCH_RADIUS", "5000")), description="搜索半径(米)"),
     current_user: User = Depends(get_current_active_user),
 ):
     """
@@ -231,7 +232,7 @@ async def get_nearby_stores(
     """
     try:
         # 获取所有活跃门店
-        all_stores = await store_service.get_stores(limit=1000)
+        all_stores = await store_service.get_stores(limit=int(os.getenv("MOBILE_STORE_QUERY_LIMIT", "1000")))
 
         # 计算距离并过滤
         nearby_stores = []
@@ -308,7 +309,7 @@ async def get_quick_stats(
                 begin_date=today,
                 end_date=today,
                 page_index=1,
-                page_size=1000,
+                page_size=int(os.getenv("MOBILE_PAGE_SIZE", "1000")),
             )
             orders = orders_result.get("orders", [])
 
@@ -334,7 +335,7 @@ async def get_quick_stats(
                 begin_date=today,
                 end_date=today,
                 page_index=1,
-                page_size=1000,
+                page_size=int(os.getenv("MOBILE_PAGE_SIZE", "1000")),
             )
             orders = orders_result.get("orders", [])
 
@@ -363,7 +364,7 @@ async def get_quick_stats(
                 begin_date=today,
                 end_date=today,
                 page_index=1,
-                page_size=1000,
+                page_size=int(os.getenv("MOBILE_PAGE_SIZE", "1000")),
             )
             orders = orders_result.get("orders", [])
 
