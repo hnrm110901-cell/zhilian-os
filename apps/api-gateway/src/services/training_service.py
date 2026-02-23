@@ -3,6 +3,7 @@ Training Service - 培训管理数据库服务
 处理培训的数据库操作
 """
 import structlog
+import os
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from sqlalchemy import select, func, and_, or_
@@ -263,7 +264,7 @@ class TrainingService:
                 end_dt = datetime.fromisoformat(end_date)
 
             if not start_date:
-                start_dt = end_dt - timedelta(days=30)
+                start_dt = end_dt - timedelta(days=int(os.getenv("TRAINING_STATS_DAYS", "30")))
             else:
                 start_dt = datetime.fromisoformat(start_date)
 
@@ -442,14 +443,16 @@ class TrainingService:
         recommendations = []
 
         pass_rate = statistics.get("pass_rate", 0)
-        if pass_rate < 80:
+        _pass_rate_warn = float(os.getenv("TRAINING_PASS_RATE_WARN", "80"))
+        if pass_rate < _pass_rate_warn:
             recommendations.append(f"培训通过率为{pass_rate}%，建议加强培训质量和考核标准")
 
         if len(training_needs) > 0:
             recommendations.append(f"有{len(training_needs)}个培训需求待满足，建议制定培训计划")
 
         avg_score = statistics.get("average_score", 0)
-        if avg_score < 75:
+        _avg_score_warn = float(os.getenv("TRAINING_AVG_SCORE_WARN", "75"))
+        if avg_score < _avg_score_warn:
             recommendations.append(f"平均培训分数为{avg_score}，建议提供更多培训资源和辅导")
 
         return recommendations
