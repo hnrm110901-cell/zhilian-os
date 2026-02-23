@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 import structlog
 import uuid
+import os
 import sys
 from pathlib import Path
 
@@ -311,7 +312,7 @@ class OrderAgent(BaseAgent):
         # TODO: 基于当前排队人数、桌台周转率等计算
         # 简化算法：基础等待时间 + 人数因子
         base_wait = self.average_wait_time
-        party_factor = (party_size - 2) * 5 if party_size > 2 else 0
+        party_factor = (party_size - 2) * int(os.getenv("ORDER_PARTY_WAIT_FACTOR", "5")) if party_size > 2 else 0
         return base_wait + party_factor
 
     async def get_queue_status(self, queue_id: str) -> Dict[str, Any]:
@@ -503,8 +504,8 @@ class OrderAgent(BaseAgent):
 
         # 临时模拟数据
         total_amount = 200.0
-        member_discount = 20.0 if member_id else 0
-        coupon_discount = 10.0 if coupon_codes else 0
+        member_discount = float(os.getenv("ORDER_MEMBER_DISCOUNT", "20.0")) if member_id else 0
+        coupon_discount = float(os.getenv("ORDER_COUPON_DISCOUNT", "10.0")) if coupon_codes else 0
         final_amount = total_amount - member_discount - coupon_discount
 
         bill = {

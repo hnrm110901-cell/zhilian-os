@@ -623,7 +623,7 @@ class ServiceAgent(BaseAgent):
             average_rating = mean(ratings)
 
             # 满意度(评分>=4的比例)
-            satisfied_count = sum(1 for r in ratings if r >= 4)
+            satisfied_count = sum(1 for r in ratings if r >= int(os.getenv("SERVICE_SATISFIED_RATING_MIN", "4")))
             satisfaction_rate = satisfied_count / total_feedbacks
 
             # 投诉率
@@ -881,7 +881,7 @@ class ServiceAgent(BaseAgent):
 
             # 基于分类统计生成改进建议
             for category, count in metrics["category_breakdown"].items():
-                if count >= 5:  # 至少5条反馈才生成建议
+                if count >= int(os.getenv("SERVICE_MIN_FEEDBACK_COUNT", "5")):  # 至少5条反馈才生成建议
                     # 分析该分类的负面反馈
                     category_feedbacks = [
                         f for f in feedbacks

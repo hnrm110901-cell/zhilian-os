@@ -89,7 +89,7 @@ class VoiceService:
         text: str,
         language: str = "zh-CN",
         voice: str = "female",
-        speed: float = 1.0,
+        speed: float = float(os.getenv("VOICE_TTS_SPEED", "1.0")),
     ) -> Dict[str, Any]:
         """
         文字转语音 (TTS)
