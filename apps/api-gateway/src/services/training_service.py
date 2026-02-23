@@ -23,8 +23,8 @@ class TrainingService:
     def __init__(self, store_id: str = "STORE001"):
         self.store_id = store_id
         self.training_config = {
-            "min_passing_score": 70,
-            "certificate_validity_months": 12
+            "min_passing_score": int(os.getenv("TRAINING_MIN_PASSING_SCORE", "70")),
+            "certificate_validity_months": int(os.getenv("TRAINING_CERT_VALIDITY_MONTHS", "12"))
         }
         logger.info("TrainingService初始化", store_id=store_id)
 
@@ -38,18 +38,18 @@ class TrainingService:
                 if store and store.config:
                     cfg = store.config
                     return {
-                        "min_passing_score": int(cfg.get("training_min_passing_score", 70)),
-                        "certificate_validity_months": int(cfg.get("training_certificate_validity_months", 12)),
-                        "warning_threshold": float(cfg.get("training_warning_threshold", 60.0)),
-                        "critical_threshold": float(cfg.get("training_critical_threshold", 50.0)),
+                        "min_passing_score": int(cfg.get("training_min_passing_score", os.getenv("TRAINING_MIN_PASSING_SCORE", "70"))),
+                        "certificate_validity_months": int(cfg.get("training_certificate_validity_months", os.getenv("TRAINING_CERT_VALIDITY_MONTHS", "12"))),
+                        "warning_threshold": float(cfg.get("training_warning_threshold", os.getenv("TRAINING_WARNING_THRESHOLD", "60.0"))),
+                        "critical_threshold": float(cfg.get("training_critical_threshold", os.getenv("TRAINING_CRITICAL_THRESHOLD", "50.0"))),
                     }
         except Exception as e:
             logger.warning("读取培训配置失败，使用默认值", error=str(e))
         return {
-            "min_passing_score": 70,
-            "certificate_validity_months": 12,
-            "warning_threshold": 60.0,
-            "critical_threshold": 50.0,
+            "min_passing_score": int(os.getenv("TRAINING_MIN_PASSING_SCORE", "70")),
+            "certificate_validity_months": int(os.getenv("TRAINING_CERT_VALIDITY_MONTHS", "12")),
+            "warning_threshold": float(os.getenv("TRAINING_WARNING_THRESHOLD", "60.0")),
+            "critical_threshold": float(os.getenv("TRAINING_CRITICAL_THRESHOLD", "50.0")),
         }
 
     async def assess_training_needs(
