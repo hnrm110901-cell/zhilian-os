@@ -331,7 +331,7 @@ class FederatedLearningService:
 
         for update in updates:
             # Check minimum sample count
-            if update.sample_count < 100:
+            if update.sample_count < int(os.getenv("FL_MIN_SAMPLE_COUNT", "100")):
                 continue
 
             # Check metrics validity
