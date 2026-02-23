@@ -80,7 +80,7 @@ class VectorDatabaseServiceEnhanced:
 
         logger.info("VectorDatabaseServiceEnhanced初始化完成（带熔断器）")
 
-    @retry_on_failure(max_retries=3, delay=2.0)
+    @retry_on_failure(max_retries=int(os.getenv("VECTOR_DB_RETRY_MAX", "3")), delay=float(os.getenv("VECTOR_DB_RETRY_DELAY_LONG", "2.0")))
     async def initialize(self):
         """初始化Qdrant客户端和嵌入模型（带重试）"""
         if self._initialized:
@@ -243,7 +243,7 @@ class VectorDatabaseServiceEnhanced:
         random.seed(hashlib.md5(text.encode()).hexdigest())
         return [random.random() for _ in range(384)]
 
-    @retry_on_failure(max_retries=2, delay=1.0)
+    @retry_on_failure(max_retries=int(os.getenv("VECTOR_DB_RETRY_MAX_SHORT", "2")), delay=float(os.getenv("VECTOR_DB_RETRY_DELAY", "1.0")))
     async def index_order(self, order_data: Dict[str, Any]) -> bool:
         """
         索引订单到向量数据库（带重试和熔断器）
@@ -459,7 +459,7 @@ class VectorDatabaseServiceEnhanced:
 
         return health_status
 
-    @retry_on_failure(max_retries=2, delay=1.0)
+    @retry_on_failure(max_retries=int(os.getenv("VECTOR_DB_RETRY_MAX_SHORT", "2")), delay=float(os.getenv("VECTOR_DB_RETRY_DELAY", "1.0")))
     async def index_dish(self, dish_data: Dict[str, Any]) -> bool:
         """
         索引菜品到向量数据库（带重试）
@@ -518,7 +518,7 @@ class VectorDatabaseServiceEnhanced:
             logger.error("菜品索引失败", error=str(e))
             return False
 
-    @retry_on_failure(max_retries=2, delay=1.0)
+    @retry_on_failure(max_retries=int(os.getenv("VECTOR_DB_RETRY_MAX_SHORT", "2")), delay=float(os.getenv("VECTOR_DB_RETRY_DELAY", "1.0")))
     async def index_event(self, event_data: Dict[str, Any]) -> bool:
         """
         索引神经系统事件到向量数据库（带重试）
@@ -577,7 +577,7 @@ class VectorDatabaseServiceEnhanced:
             logger.error("事件索引失败", error=str(e))
             return False
 
-    @retry_on_failure(max_retries=2, delay=1.0)
+    @retry_on_failure(max_retries=int(os.getenv("VECTOR_DB_RETRY_MAX_SHORT", "2")), delay=float(os.getenv("VECTOR_DB_RETRY_DELAY", "1.0")))
     async def semantic_search(
         self,
         collection_name: str,
