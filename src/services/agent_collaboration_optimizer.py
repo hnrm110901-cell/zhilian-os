@@ -12,6 +12,7 @@ from enum import Enum
 from dataclasses import dataclass
 from sqlalchemy.orm import Session
 import numpy as np
+import os
 
 
 class AgentType(Enum):
@@ -370,7 +371,7 @@ class AgentCollaborationOptimizer:
                 involved_agents=[decision1.agent_type, decision2.agent_type],
                 involved_decisions=[decision1.decision_id, decision2.decision_id],
                 description=f"Resource conflict between {decision1.agent_type.value} and {decision2.agent_type.value}",
-                severity=0.7,
+                severity=float(os.getenv("AGENT_CONFLICT_RESOURCE_SEVERITY", "0.7")),
                 detected_at=datetime.utcnow()
             )
 
@@ -387,7 +388,7 @@ class AgentCollaborationOptimizer:
                 involved_agents=[decision1.agent_type, decision2.agent_type],
                 involved_decisions=[decision1.decision_id, decision2.decision_id],
                 description=f"Constraint conflict between {decision1.agent_type.value} and {decision2.agent_type.value}",
-                severity=0.5,
+                severity=float(os.getenv("AGENT_CONFLICT_CONSTRAINT_SEVERITY", "0.5")),
                 detected_at=datetime.utcnow()
             )
 

@@ -6,6 +6,7 @@ Phase 4: 智能优化期 (Intelligence Optimization Period)
 """
 
 from fastapi import APIRouter, HTTPException, Depends
+import os
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
@@ -46,7 +47,7 @@ class SubmitUpdateRequest(BaseModel):
 class AggregateRequest(BaseModel):
     """Aggregate updates request"""
     model_type: ModelTypeEnum
-    min_participants: int = 3
+    min_participants: int = int(os.getenv("FL_MIN_PARTICIPANTS", "3"))
 
 
 class DownloadModelRequest(BaseModel):
