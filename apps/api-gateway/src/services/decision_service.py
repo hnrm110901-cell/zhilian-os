@@ -199,7 +199,7 @@ class DecisionService:
                     "title": f"{kpi['metric_name']}未达标",
                     "description": f"{kpi['metric_name']}当前为{kpi['current_value']:.2f}{kpi['unit']}，目标为{kpi['target_value']:.2f}{kpi['unit']}，达成率仅{kpi['achievement_rate']:.1%}",
                     "category": kpi["category"],
-                    "impact_level": "high" if kpi["achievement_rate"] < 0.80 else "medium",
+                    "impact_level": "high" if kpi["achievement_rate"] < float(os.getenv("DECISION_HIGH_IMPACT_THRESHOLD", "0.80")) else "medium",
                     "data_points": [
                         {"label": "当前值", "value": kpi["current_value"]},
                         {"label": "目标值", "value": kpi["target_value"]},

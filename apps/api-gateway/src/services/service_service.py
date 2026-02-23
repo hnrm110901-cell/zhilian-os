@@ -282,9 +282,9 @@ class ServiceQualityService:
                         category="customer",
                         description=f"Service quality metric: {metric_name}",
                         unit=kwargs.get("unit", "score"),
-                        target_value=kwargs.get("target_value", 90.0),
-                        warning_threshold=kwargs.get("warning_threshold", 80.0),
-                        critical_threshold=kwargs.get("critical_threshold", 70.0),
+                        target_value=kwargs.get("target_value", float(os.getenv("SERVICE_KPI_DEFAULT_TARGET", "90.0"))),
+                        warning_threshold=kwargs.get("warning_threshold", float(os.getenv("SERVICE_KPI_DEFAULT_WARNING", "80.0"))),
+                        critical_threshold=kwargs.get("critical_threshold", float(os.getenv("SERVICE_KPI_DEFAULT_CRITICAL", "70.0"))),
                         calculation_method="average",
                         is_active="true"
                     )

@@ -182,10 +182,10 @@ class ServiceAgent(BaseAgent):
         self.store_id = store_id
         self.aoqiwei_adapter = aoqiwei_adapter
         self.quality_thresholds = quality_thresholds or {
-            "min_satisfaction_rate": 0.85,  # 最低满意度
-            "max_complaint_rate": 0.05,  # 最高投诉率
-            "max_response_time": 30,  # 最长响应时间(分钟)
-            "min_resolution_rate": 0.90,  # 最低解决率
+            "min_satisfaction_rate": float(os.getenv("SERVICE_MIN_SATISFACTION_RATE", "0.85")),
+            "max_complaint_rate": float(os.getenv("SERVICE_MAX_COMPLAINT_RATE", "0.05")),
+            "max_response_time": int(os.getenv("SERVICE_MAX_RESPONSE_TIME_MINUTES", "30")),
+            "min_resolution_rate": float(os.getenv("SERVICE_MIN_RESOLUTION_RATE", "0.90")),
         }
         self.logger = logger.bind(agent="service", store_id=store_id)
 
@@ -693,9 +693,9 @@ class ServiceAgent(BaseAgent):
 
         # 判断趋势
         diff = second_avg - first_avg
-        if diff > 0.3:
+        if diff > float(os.getenv("SERVICE_TREND_IMPROVING_THRESHOLD", "0.3")):
             return "improving"
-        elif diff < -0.3:
+        elif diff < -float(os.getenv("SERVICE_TREND_DECLINING_THRESHOLD", "0.3")):
             return "declining"
         else:
             return "stable"

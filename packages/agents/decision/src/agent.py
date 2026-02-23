@@ -182,11 +182,11 @@ class DecisionAgent(BaseAgent):
         self.service_agent = service_agent
         self.training_agent = training_agent
         self.kpi_targets = kpi_targets or {
-            "revenue_growth": 0.15,  # 营收增长15%
-            "cost_ratio": 0.35,  # 成本率35%
-            "customer_satisfaction": 0.90,  # 客户满意度90%
-            "staff_efficiency": 0.85,  # 员工效率85%
-            "inventory_turnover": 12,  # 库存周转率12次/年
+            "revenue_growth": float(os.getenv("DECISION_KPI_REVENUE_GROWTH_TARGET", "0.15")),
+            "cost_ratio": float(os.getenv("DECISION_KPI_COST_RATIO_TARGET", "0.35")),
+            "customer_satisfaction": float(os.getenv("DECISION_KPI_CUSTOMER_SATISFACTION_TARGET", "0.90")),
+            "staff_efficiency": float(os.getenv("DECISION_KPI_STAFF_EFFICIENCY_TARGET", "0.85")),
+            "inventory_turnover": int(os.getenv("DECISION_KPI_INVENTORY_TURNOVER_TARGET", "12")),
         }
         self.logger = logger.bind(agent="decision", store_id=store_id)
 
@@ -587,7 +587,7 @@ class DecisionAgent(BaseAgent):
             "title": f"{kpi['metric_name']}未达标",
             "description": f"{kpi['metric_name']}当前为{kpi['current_value']:.2f}{kpi['unit']},目标为{kpi['target_value']:.2f}{kpi['unit']},达成率仅{kpi['achievement_rate']:.1%}",
             "category": kpi["category"],
-            "impact_level": "high" if kpi["achievement_rate"] < 0.80 else "medium",
+            "impact_level": "high" if kpi["achievement_rate"] < float(os.getenv("DECISION_KPI_HIGH_IMPACT_THRESHOLD", "0.80")) else "medium",
             "data_points": [
                 {"label": "当前值", "value": kpi["current_value"]},
                 {"label": "目标值", "value": kpi["target_value"]},

@@ -101,7 +101,7 @@ celery_app.conf.update(
         # 每15分钟检测营收异常
         "detect-revenue-anomaly": {
             "task": "src.core.celery_tasks.detect_revenue_anomaly",
-            "schedule": crontab(minute="*/15"),
+            "schedule": crontab(minute=f"*/{os.getenv('CELERY_ANOMALY_DETECT_INTERVAL', '15')}"),
             "args": (),
             "options": {
                 "queue": "default",
@@ -111,7 +111,7 @@ celery_app.conf.update(
         # 每天6AM生成昨日简报(RAG增强)
         "generate-daily-report-rag": {
             "task": "src.core.celery_tasks.generate_daily_report_with_rag",
-            "schedule": crontab(hour=6, minute=0),
+            "schedule": crontab(hour=int(os.getenv("CELERY_RAG_REPORT_HOUR", "6")), minute=int(os.getenv("CELERY_RAG_REPORT_MINUTE", "0"))),
             "args": (),
             "options": {
                 "queue": "default",
@@ -121,7 +121,7 @@ celery_app.conf.update(
         # 每天10AM检查库存预警(午高峰前)
         "check-inventory-alert": {
             "task": "src.core.celery_tasks.check_inventory_alert",
-            "schedule": crontab(hour=10, minute=0),
+            "schedule": crontab(hour=int(os.getenv("CELERY_INVENTORY_CHECK_HOUR", "10")), minute=int(os.getenv("CELERY_INVENTORY_CHECK_MINUTE", "0"))),
             "args": (),
             "options": {
                 "queue": "default",
@@ -131,7 +131,7 @@ celery_app.conf.update(
         # 每日22:30生成当日营业日报
         "generate-daily-reports": {
             "task": "src.core.celery_tasks.generate_and_send_daily_report",
-            "schedule": crontab(hour=22, minute=30),
+            "schedule": crontab(hour=int(os.getenv("CELERY_BUSINESS_REPORT_HOUR", "22")), minute=int(os.getenv("CELERY_BUSINESS_REPORT_MINUTE", "30"))),
             "args": (),  # 将为所有门店生成报告
             "options": {
                 "queue": "default",
@@ -141,7 +141,7 @@ celery_app.conf.update(
         # 每日凌晨3点执行POS对账
         "perform-daily-reconciliation": {
             "task": "src.core.celery_tasks.perform_daily_reconciliation",
-            "schedule": crontab(hour=3, minute=0),
+            "schedule": crontab(hour=int(os.getenv("CELERY_RECONCILIATION_HOUR", "3")), minute=int(os.getenv("CELERY_RECONCILIATION_MINUTE", "0"))),
             "args": (),  # 将为所有门店执行对账
             "options": {
                 "queue": "default",

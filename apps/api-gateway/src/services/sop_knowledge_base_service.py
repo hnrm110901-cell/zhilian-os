@@ -433,10 +433,10 @@ class SOPKnowledgeBaseService:
 
         # 来源门店加权
         if sop.source_store:
-            confidence += 0.2
+            confidence += float(os.getenv("SOP_SOURCE_STORE_CONFIDENCE_BOOST", "0.2"))
 
         # 评分加权
-        confidence += (sop.rating / 5.0) * 0.2
+        confidence += (sop.rating / 5.0) * float(os.getenv("SOP_RATING_CONFIDENCE_WEIGHT", "0.2"))
 
         # 使用次数加权
         if sop.usage_count > int(os.getenv("SOP_HIGH_USAGE_THRESHOLD", "1000")):

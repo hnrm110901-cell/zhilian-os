@@ -696,8 +696,11 @@ class TrainingAgent(BaseAgent):
         average_score: float
     ) -> str:
         """计算培训效果评级"""
-        # 综合评分 = 完成率*30% + 通过率*40% + 平均分/100*30%
-        score = (completion_rate * 0.3 + pass_rate * 0.4 + (average_score / 100) * 0.3) * 100
+        # 综合评分 = 完成率*权重 + 通过率*权重 + 平均分/100*权重
+        _w_completion = float(os.getenv("TRAINING_COMPLETION_WEIGHT", "0.3"))
+        _w_pass = float(os.getenv("TRAINING_PASS_WEIGHT", "0.4"))
+        _w_score = float(os.getenv("TRAINING_SCORE_WEIGHT", "0.3"))
+        score = (completion_rate * _w_completion + pass_rate * _w_pass + (average_score / 100) * _w_score) * 100
 
         if score >= float(os.getenv("TRAINING_SCORE_EXCELLENT", "90")):
             return "excellent"

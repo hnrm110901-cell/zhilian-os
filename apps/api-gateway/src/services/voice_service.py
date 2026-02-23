@@ -74,7 +74,7 @@ class VoiceService:
                 "success": True,
                 "text": text,
                 "language": language,
-                "confidence": 0.95,
+                "confidence": float(os.getenv("VOICE_RECOGNITION_DEFAULT_CONFIDENCE", "0.95")),
             }
 
         except Exception as e:
