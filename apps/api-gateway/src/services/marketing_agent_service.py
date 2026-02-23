@@ -259,12 +259,18 @@ class MarketingAgentService:
         consumption = await self._analyze_consumption_behavior(customer_id)
 
         # 简化的RFM评分
-        r_score = 100 - min(consumption["days_since_last_order"] * 2, 100)
-        f_score = min(consumption["total_orders"] * 4, 100)
-        m_score = min(consumption["total_amount"] / 100, 100)
+        _r_mult = float(os.getenv("RFM_RECENCY_MULTIPLIER", "2"))
+        _f_mult = float(os.getenv("RFM_FREQUENCY_MULTIPLIER", "4"))
+        _m_div = float(os.getenv("RFM_MONETARY_DIVISOR", "100"))
+        r_score = 100 - min(consumption["days_since_last_order"] * _r_mult, 100)
+        f_score = min(consumption["total_orders"] * _f_mult, 100)
+        m_score = min(consumption["total_amount"] / _m_div, 100)
 
         # 加权平均
-        value_score = (r_score * 0.3 + f_score * 0.3 + m_score * 0.4)
+        _r_weight = float(os.getenv("RFM_RECENCY_WEIGHT", "0.3"))
+        _f_weight = float(os.getenv("RFM_FREQUENCY_WEIGHT", "0.3"))
+        _m_weight = float(os.getenv("RFM_MONETARY_WEIGHT", "0.4"))
+        value_score = (r_score * _r_weight + f_score * _f_weight + m_score * _m_weight)
 
         return value_score
 
@@ -368,7 +374,7 @@ class MarketingAgentService:
                 coupon_type="折扣券",
                 amount=float(cfg.get("coupon_member_day_discount", 0.88)),
                 threshold=float(cfg.get("coupon_member_day_threshold", 50.0)),
-                valid_days=1,
+                valid_days=int(cfg.get("coupon_member_day_valid_days", os.getenv("MARKETING_MEMBER_DAY_VALID_DAYS", "1"))),
                 target_segment=CustomerSegment.POTENTIAL,
                 expected_conversion=float(cfg.get("coupon_member_day_conversion", 0.40)),
                 expected_roi=float(cfg.get("coupon_member_day_roi", 5.0))

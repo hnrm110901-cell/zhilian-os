@@ -5,6 +5,7 @@
 from typing import List, Dict, Any, Optional
 from datetime import datetime, date, timedelta
 from calendar import monthrange
+import os
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func, extract
@@ -142,7 +143,7 @@ class FinanceService:
         gross_profit = total_revenue - expenses.get("food_cost", 0)
         operating_profit = total_revenue - total_expenses
         # 从门店配置读取税率，默认 6%（餐饮业增值税小规模纳税人）
-        tax_rate = 0.06
+        tax_rate = float(os.getenv("FINANCE_DEFAULT_TAX_RATE", "0.06"))
         try:
             from src.core.database import get_db_session
             from src.models.store import Store
@@ -150,7 +151,7 @@ class FinanceService:
             async with get_db_session() as session:
                 result = await session.execute(select(Store.config).where(Store.id == store_id))
                 cfg = result.scalar_one_or_none() or {}
-                tax_rate = float(cfg.get("tax_rate", 0.06))
+                tax_rate = float(cfg.get("tax_rate", os.getenv("FINANCE_DEFAULT_TAX_RATE", "0.06")))
         except Exception:
             pass
         tax_amount = int(operating_profit * tax_rate) if operating_profit > 0 else 0

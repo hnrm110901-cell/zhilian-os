@@ -405,10 +405,10 @@ class ServiceQualityService:
             质量评分 (0-100)
         """
         # 权重分配
-        satisfaction_weight = 0.4
-        completion_weight = 0.3
-        cancellation_weight = 0.2
-        service_time_weight = 0.1
+        satisfaction_weight = float(os.getenv("SERVICE_SCORE_SATISFACTION_WEIGHT", "0.4"))
+        completion_weight = float(os.getenv("SERVICE_SCORE_COMPLETION_WEIGHT", "0.3"))
+        cancellation_weight = float(os.getenv("SERVICE_SCORE_CANCELLATION_WEIGHT", "0.2"))
+        service_time_weight = float(os.getenv("SERVICE_SCORE_TIME_WEIGHT", "0.1"))
 
         # 标准化满意度（假设满意度已经是0-100的分数）
         satisfaction_score = satisfaction
@@ -420,7 +420,7 @@ class ServiceQualityService:
         cancellation_score = max(0, 100 - cancellation_rate * 2)
 
         # 服务时间得分（从门店配置读取理想服务时间，默认30分钟）
-        ideal_service_time = 30
+        ideal_service_time = int(os.getenv("SERVICE_IDEAL_TIME_MINUTES", "30"))
         if avg_service_time <= ideal_service_time:
             service_time_score = 100
         else:

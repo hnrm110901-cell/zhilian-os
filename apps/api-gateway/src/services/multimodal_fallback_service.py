@@ -22,6 +22,7 @@ from datetime import datetime
 from pydantic import BaseModel
 import asyncio
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -85,9 +86,9 @@ class MultimodalFallbackService:
     """多模态优雅降级服务"""
 
     def __init__(self):
-        self.asr_failure_threshold = 2      # ASR失败阈值
-        self.noise_threshold_db = 85.0      # 噪音阈值
-        self.response_timeout_ms = 3000     # 响应超时（毫秒）
+        self.asr_failure_threshold = int(os.getenv("MULTIMODAL_ASR_FAILURE_THRESHOLD", "2"))      # ASR失败阈值
+        self.noise_threshold_db = float(os.getenv("MULTIMODAL_NOISE_THRESHOLD_DB", "85.0"))        # 噪音阈值
+        self.response_timeout_ms = int(os.getenv("MULTIMODAL_RESPONSE_TIMEOUT_MS", "3000"))        # 响应超时（毫秒）
 
     async def deliver_message(
         self,

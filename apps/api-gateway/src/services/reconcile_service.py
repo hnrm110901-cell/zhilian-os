@@ -7,6 +7,7 @@ from datetime import datetime, date, timedelta
 from sqlalchemy import select, and_, func
 import structlog
 import uuid
+import os
 
 from src.core.database import get_db_session
 from src.models.reconciliation import ReconciliationRecord, ReconciliationStatus
@@ -21,7 +22,7 @@ class ReconcileService:
     """对账服务"""
 
     # 默认差异阈值（百分比）
-    DEFAULT_THRESHOLD = 2.0
+    DEFAULT_THRESHOLD = float(os.getenv("RECONCILE_DEFAULT_THRESHOLD", "2.0"))
 
     async def perform_reconciliation(
         self,
@@ -105,7 +106,8 @@ class ReconcileService:
                     record.diff_ratio = 0.0
 
                 # 4. 确定状态
-                if abs(record.diff_ratio) <= 0.1:  # 差异小于0.1%视为匹配
+                _match_threshold = float(os.getenv("RECONCILE_MATCH_THRESHOLD", "0.1"))
+                if abs(record.diff_ratio) <= _match_threshold:  # 差异小于阈值视为匹配
                     record.status = ReconciliationStatus.MATCHED
                 elif abs(record.diff_ratio) > threshold:
                     record.status = ReconciliationStatus.MISMATCHED
