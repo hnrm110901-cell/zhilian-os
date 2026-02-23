@@ -613,9 +613,23 @@ class OpenAPIPlatform:
         webhook_url: str,
         payload: Dict[str, Any]
     ):
-        """Trigger webhook (simplified)"""
-        # In production, use async HTTP client
-        pass
+        """Trigger webhook via HTTP POST"""
+        import json
+        import urllib.request
+        import urllib.error
+        try:
+            data = json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(
+                webhook_url,
+                data=data,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            timeout = int(os.getenv("WEBHOOK_TIMEOUT_SECONDS", "5"))
+            with urllib.request.urlopen(req, timeout=timeout):
+                pass
+        except urllib.error.URLError:
+            pass  # Non-blocking: webhook failure must not break the caller
 
     def log_api_usage(
         self,

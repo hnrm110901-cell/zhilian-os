@@ -356,35 +356,80 @@ class IntelligentRecommendationEngine:
         store_id: str
     ) -> List[Dict[str, Any]]:
         """Get customer order history"""
-        # Simplified: query from database
-        return []
+        if not self.db:
+            return []
+        try:
+            from ..models.order import Order, OrderItem
+            orders = (
+                self.db.query(Order)
+                .filter(
+                    Order.store_id == store_id,
+                    Order.customer_phone == customer_id,
+                    Order.status == "completed",
+                )
+                .order_by(Order.order_time.desc())
+                .limit(20)
+                .all()
+            )
+            history = []
+            for order in orders:
+                for item in order.items:
+                    history.append({
+                        "order_id": order.id,
+                        "dish_id": item.item_id,
+                        "dish_name": item.item_name,
+                        "quantity": item.quantity,
+                        "order_time": order.order_time.isoformat() if order.order_time else None,
+                    })
+            return history
+        except Exception:
+            return []
 
     def _get_available_dishes(self, store_id: str) -> List[Dict[str, Any]]:
         """Get available dishes for store"""
-        # Simplified: query from database
-        return [
-            {
-                "dish_id": "dish_001",
-                "name": "宫保鸡丁",
-                "price": 38.0,
-                "profit_margin": 0.6,
-                "category": "川菜",
-                "tags": ["辣", "鸡肉", "热菜"]
-            },
-            {
-                "dish_id": "dish_002",
-                "name": "麻婆豆腐",
-                "price": 28.0,
-                "profit_margin": 0.7,
-                "category": "川菜",
-                "tags": ["辣", "豆腐", "热菜"]
-            }
-        ]
+        if not self.db:
+            return []
+        try:
+            from ..models.dish import Dish
+            dishes = (
+                self.db.query(Dish)
+                .filter(Dish.store_id == store_id, Dish.is_available == True)
+                .all()
+            )
+            return [
+                {
+                    "dish_id": str(d.id),
+                    "name": d.name,
+                    "price": float(d.price) if d.price else 0.0,
+                    "profit_margin": float(d.profit_margin) / 100 if d.profit_margin else 0.0,
+                    "category": str(d.category_id) if d.category_id else "",
+                    "tags": d.tags or [],
+                }
+                for d in dishes
+            ]
+        except Exception:
+            return []
 
     def _recently_ordered(self, customer_id: str, dish_id: str) -> bool:
         """Check if customer ordered this dish recently"""
-        # Simplified: check last 7 days
-        return False
+        if not self.db:
+            return False
+        try:
+            from ..models.order import Order, OrderItem
+            cutoff = datetime.now() - timedelta(days=7)
+            result = (
+                self.db.query(OrderItem)
+                .join(Order, Order.id == OrderItem.order_id)
+                .filter(
+                    Order.customer_phone == customer_id,
+                    Order.order_time >= cutoff,
+                    OrderItem.item_id == dish_id,
+                )
+                .first()
+            )
+            return result is not None
+        except Exception:
+            return False
 
     def _collaborative_filtering_score(
         self,
