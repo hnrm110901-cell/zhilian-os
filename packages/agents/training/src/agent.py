@@ -215,6 +215,19 @@ class TrainingAgent(BaseAgent):
             ]
         }
         self.logger = logger.bind(agent="training", store_id=store_id)
+        self._db_engine = None
+
+    def _get_db_engine(self):
+        """获取数据库引擎（懒加载）"""
+        if self._db_engine is None:
+            db_url = os.getenv("DATABASE_URL")
+            if db_url:
+                try:
+                    from sqlalchemy import create_engine
+                    self._db_engine = create_engine(db_url, pool_pre_ping=True)
+                except Exception:
+                    pass
+        return self._db_engine
 
     def get_supported_actions(self) -> List[str]:
         """获取支持的操作列表"""
@@ -1109,19 +1122,52 @@ class TrainingAgent(BaseAgent):
 
     async def _get_staff_performance(self, staff_id: str) -> Dict[str, Any]:
         """获取员工表现"""
+        engine = self._get_db_engine()
+        if engine:
+            try:
+                from sqlalchemy import text
+                with engine.connect() as conn:
+                    row = conn.execute(text(
+                        "SELECT performance_score FROM employees WHERE id=:id AND store_id=:s"
+                    ), {"id": staff_id, "s": self.store_id}).fetchone()
+                if row and row[0]:
+                    score = float(row[0])
+                    return {
+                        "staff_id": staff_id,
+                        "service_score": int(score),
+                        "customer_rating": round(score / 20, 1),  # 100分制→5分制
+                    }
+            except Exception as e:
+                self.logger.warning("get_staff_performance_db_failed", error=str(e))
         import random
         return {
             "staff_id": staff_id,
             "service_score": random.randint(60, 95),
-            "customer_rating": random.uniform(3.5, 5.0)
+            "customer_rating": random.uniform(3.5, 5.0),
         }
 
-    async def _get_staff_skills(self, staff_id: str) -> Dict[str, SkillLevel]:
+    async def _get_staff_skills(self, staff_id: str) -> Dict[str, "SkillLevel"]:
         """获取员工技能"""
+        engine = self._get_db_engine()
+        if engine:
+            try:
+                from sqlalchemy import text
+                with engine.connect() as conn:
+                    row = conn.execute(text(
+                        "SELECT skills FROM employees WHERE id=:id AND store_id=:s"
+                    ), {"id": staff_id, "s": self.store_id}).fetchone()
+                if row and row[0]:
+                    skill_list = row[0] if isinstance(row[0], list) else []
+                    result = {}
+                    for skill in skill_list:
+                        result[skill] = SkillLevel.INTERMEDIATE
+                    if result:
+                        return result
+            except Exception as e:
+                self.logger.warning("get_staff_skills_db_failed", error=str(e))
         import random
         skills = ["服务礼仪", "客户沟通", "菜品知识", "食品安全", "菜品制作"]
         levels = [SkillLevel.BEGINNER, SkillLevel.INTERMEDIATE, SkillLevel.ADVANCED]
-
         return {skill: random.choice(levels) for skill in skills[:3]}
 
     async def _get_courses_info(self, course_ids: List[str]) -> List[TrainingCourse]:

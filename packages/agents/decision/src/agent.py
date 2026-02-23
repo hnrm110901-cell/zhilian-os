@@ -188,6 +188,8 @@ class DecisionAgent(BaseAgent):
             "staff_efficiency": float(os.getenv("DECISION_KPI_STAFF_EFFICIENCY_TARGET", "0.85")),
             "inventory_turnover": int(os.getenv("DECISION_KPI_INVENTORY_TURNOVER_TARGET", "12")),
         }
+        self._db_engine = None
+        }
         self.logger = logger.bind(agent="decision", store_id=store_id)
 
     def get_supported_actions(self) -> List[str]:
@@ -1164,18 +1166,60 @@ class DecisionAgent(BaseAgent):
 
     # Helper methods for data collection
 
+    def _get_db_engine(self):
+        """获取数据库引擎（懒加载）"""
+        if self._db_engine is None:
+            db_url = os.getenv("DATABASE_URL")
+            if db_url:
+                try:
+                    from sqlalchemy import create_engine
+                    self._db_engine = create_engine(db_url, pool_pre_ping=True)
+                except Exception:
+                    pass
+        return self._db_engine
+
+    def _parse_period(self, start_date, end_date):
+        """解析时间范围，返回 (start, end, prev_start, prev_end, days)"""
+        end = datetime.fromisoformat(end_date) if end_date else datetime.now()
+        start = datetime.fromisoformat(start_date) if start_date else end - timedelta(days=30)
+        days = max(1, (end - start).days)
+        prev_start = start - timedelta(days=days)
+        return start, end, prev_start, start, days
+
     async def _collect_revenue_data(
         self,
         start_date: Optional[str],
         end_date: Optional[str]
     ) -> Dict[str, Any]:
         """收集营收数据"""
+        engine = self._get_db_engine()
+        if engine:
+            try:
+                from sqlalchemy import text
+                start, end, prev_start, prev_end, days = self._parse_period(start_date, end_date)
+                with engine.connect() as conn:
+                    r = conn.execute(text(
+                        "SELECT COALESCE(SUM(final_amount),0) FROM orders "
+                        "WHERE store_id=:s AND order_time>=:a AND order_time<=:b AND status='completed'"
+                    ), {"s": self.store_id, "a": start, "b": end}).scalar()
+                    p = conn.execute(text(
+                        "SELECT COALESCE(SUM(final_amount),0) FROM orders "
+                        "WHERE store_id=:s AND order_time>=:a AND order_time<=:b AND status='completed'"
+                    ), {"s": self.store_id, "a": prev_start, "b": prev_end}).scalar()
+                return {
+                    "total_revenue": int(r or 0),
+                    "previous_revenue": int(p or 0),
+                    "target_revenue": int(os.getenv("DECISION_REVENUE_TARGET", "100000000")),
+                    "days": days,
+                }
+            except Exception as e:
+                self.logger.warning("collect_revenue_db_failed", error=str(e))
         import random
         return {
-            "total_revenue": random.randint(80000000, 120000000),  # 80-120万分
+            "total_revenue": random.randint(80000000, 120000000),
             "previous_revenue": random.randint(70000000, 110000000),
             "target_revenue": 100000000,
-            "days": 30
+            "days": 30,
         }
 
     async def _collect_cost_data(
@@ -1184,10 +1228,33 @@ class DecisionAgent(BaseAgent):
         end_date: Optional[str]
     ) -> Dict[str, Any]:
         """收集成本数据"""
+        engine = self._get_db_engine()
+        if engine:
+            try:
+                from sqlalchemy import text
+                start, end, prev_start, prev_end, _ = self._parse_period(start_date, end_date)
+                food_cost_rate = float(os.getenv("DEFAULT_FOOD_COST_RATE", "0.30"))
+                overhead_rate = float(os.getenv("DEFAULT_OVERHEAD_RATE", "0.30"))
+                cost_rate = food_cost_rate + overhead_rate
+                with engine.connect() as conn:
+                    r = conn.execute(text(
+                        "SELECT COALESCE(SUM(final_amount),0) FROM orders "
+                        "WHERE store_id=:s AND order_time>=:a AND order_time<=:b AND status='completed'"
+                    ), {"s": self.store_id, "a": start, "b": end}).scalar()
+                    p = conn.execute(text(
+                        "SELECT COALESCE(SUM(final_amount),0) FROM orders "
+                        "WHERE store_id=:s AND order_time>=:a AND order_time<=:b AND status='completed'"
+                    ), {"s": self.store_id, "a": prev_start, "b": prev_end}).scalar()
+                return {
+                    "total_cost": int((r or 0) * cost_rate),
+                    "previous_cost": int((p or 0) * cost_rate),
+                }
+            except Exception as e:
+                self.logger.warning("collect_cost_db_failed", error=str(e))
         import random
         return {
-            "total_cost": random.randint(30000000, 45000000),  # 30-45万分
-            "previous_cost": random.randint(28000000, 43000000)
+            "total_cost": random.randint(30000000, 45000000),
+            "previous_cost": random.randint(28000000, 43000000),
         }
 
     async def _collect_efficiency_data(
@@ -1196,10 +1263,33 @@ class DecisionAgent(BaseAgent):
         end_date: Optional[str]
     ) -> Dict[str, Any]:
         """收集效率数据"""
+        engine = self._get_db_engine()
+        if engine:
+            try:
+                from sqlalchemy import text
+                start, end, prev_start, prev_end, _ = self._parse_period(start_date, end_date)
+                with engine.connect() as conn:
+                    rev = conn.execute(text(
+                        "SELECT COALESCE(SUM(final_amount),0) FROM orders "
+                        "WHERE store_id=:s AND order_time>=:a AND order_time<=:b AND status='completed'"
+                    ), {"s": self.store_id, "a": start, "b": end}).scalar()
+                    prev_rev = conn.execute(text(
+                        "SELECT COALESCE(SUM(final_amount),0) FROM orders "
+                        "WHERE store_id=:s AND order_time>=:a AND order_time<=:b AND status='completed'"
+                    ), {"s": self.store_id, "a": prev_start, "b": prev_end}).scalar()
+                    staff_count = conn.execute(text(
+                        "SELECT COUNT(*) FROM employees WHERE store_id=:s AND is_active=true"
+                    ), {"s": self.store_id}).scalar() or 1
+                return {
+                    "revenue_per_staff": int((rev or 0) / staff_count),
+                    "previous_revenue_per_staff": int((prev_rev or 0) / staff_count),
+                }
+            except Exception as e:
+                self.logger.warning("collect_efficiency_db_failed", error=str(e))
         import random
         return {
-            "revenue_per_staff": random.randint(3000000, 5000000),  # 3-5万分/人
-            "previous_revenue_per_staff": random.randint(2800000, 4800000)
+            "revenue_per_staff": random.randint(3000000, 5000000),
+            "previous_revenue_per_staff": random.randint(2800000, 4800000),
         }
 
     async def _collect_quality_data(
@@ -1208,10 +1298,34 @@ class DecisionAgent(BaseAgent):
         end_date: Optional[str]
     ) -> Dict[str, Any]:
         """收集质量数据"""
+        engine = self._get_db_engine()
+        if engine:
+            try:
+                from sqlalchemy import text
+                start, end, prev_start, prev_end, _ = self._parse_period(start_date, end_date)
+                with engine.connect() as conn:
+                    total = conn.execute(text(
+                        "SELECT COUNT(*) FROM orders WHERE store_id=:s AND order_time>=:a AND order_time<=:b"
+                    ), {"s": self.store_id, "a": start, "b": end}).scalar() or 1
+                    completed = conn.execute(text(
+                        "SELECT COUNT(*) FROM orders WHERE store_id=:s AND order_time>=:a AND order_time<=:b AND status='completed'"
+                    ), {"s": self.store_id, "a": start, "b": end}).scalar() or 0
+                    prev_total = conn.execute(text(
+                        "SELECT COUNT(*) FROM orders WHERE store_id=:s AND order_time>=:a AND order_time<=:b"
+                    ), {"s": self.store_id, "a": prev_start, "b": prev_end}).scalar() or 1
+                    prev_completed = conn.execute(text(
+                        "SELECT COUNT(*) FROM orders WHERE store_id=:s AND order_time>=:a AND order_time<=:b AND status='completed'"
+                    ), {"s": self.store_id, "a": prev_start, "b": prev_end}).scalar() or 0
+                return {
+                    "order_accuracy": round(completed / total, 4),
+                    "previous_accuracy": round(prev_completed / prev_total, 4),
+                }
+            except Exception as e:
+                self.logger.warning("collect_quality_db_failed", error=str(e))
         import random
         return {
             "order_accuracy": random.uniform(0.92, 0.98),
-            "previous_accuracy": random.uniform(0.90, 0.96)
+            "previous_accuracy": random.uniform(0.90, 0.96),
         }
 
     async def _collect_customer_data(

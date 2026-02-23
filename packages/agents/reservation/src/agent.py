@@ -203,6 +203,19 @@ class ReservationAgent(BaseAgent):
             "reminder_hours": int(os.getenv("RESERVATION_REMINDER_HOURS", "2")),  # 提醒提前时间(小时)
         }
         self.logger = logger.bind(agent="reservation", store_id=store_id)
+        self._db_engine = None
+
+    def _get_db_engine(self):
+        """获取数据库引擎（懒加载）"""
+        if self._db_engine is None:
+            db_url = os.getenv("DATABASE_URL")
+            if db_url:
+                try:
+                    from sqlalchemy import create_engine
+                    self._db_engine = create_engine(db_url, pool_pre_ping=True)
+                except Exception:
+                    pass
+        return self._db_engine
 
     def get_supported_actions(self) -> List[str]:
         """获取支持的操作列表"""
@@ -994,17 +1007,59 @@ class ReservationAgent(BaseAgent):
         end_date: Optional[str]
     ) -> List[Reservation]:
         """获取时段内的预定"""
+        engine = self._get_db_engine()
+        if engine:
+            try:
+                from sqlalchemy import text
+                start = start_date or (datetime.now() - timedelta(days=30)).date().isoformat()
+                end = end_date or datetime.now().date().isoformat()
+                with engine.connect() as conn:
+                    rows = conn.execute(text(
+                        "SELECT id, customer_name, customer_phone, store_id, "
+                        "reservation_type, reservation_date, reservation_time, "
+                        "party_size, table_number, status, special_requests, "
+                        "estimated_budget, created_at, updated_at "
+                        "FROM reservations "
+                        "WHERE store_id=:s AND reservation_date>=:a AND reservation_date<=:b "
+                        "ORDER BY reservation_date DESC LIMIT 200"
+                    ), {"s": self.store_id, "a": start, "b": end}).fetchall()
+                reservations = []
+                for row in rows:
+                    reservations.append({
+                        "reservation_id": row[0],
+                        "customer_id": row[2],  # use phone as customer_id
+                        "customer_name": row[1],
+                        "customer_phone": row[2],
+                        "store_id": row[3],
+                        "reservation_type": row[4],
+                        "reservation_date": str(row[5]),
+                        "reservation_time": str(row[6]),
+                        "party_size": row[7],
+                        "table_type": None,
+                        "table_number": row[8],
+                        "special_requests": row[10],
+                        "status": row[9],
+                        "deposit_amount": int((row[11] or 0) * 0.3),
+                        "estimated_amount": row[11] or 0,
+                        "created_at": str(row[12]),
+                        "updated_at": str(row[13]),
+                        "confirmed_at": None,
+                        "seated_at": None,
+                        "completed_at": None,
+                    })
+                return reservations
+            except Exception as e:
+                self.logger.warning("get_reservations_by_period_db_failed", error=str(e))
         import random
-        # 生成模拟数据
+        # 生成模拟数据（fallback）
         reservations = []
         for i in range(50):
             status_choices = [
                 ReservationStatus.CONFIRMED,
                 ReservationStatus.COMPLETED,
                 ReservationStatus.CANCELLED,
-                ReservationStatus.NO_SHOW
+                ReservationStatus.NO_SHOW,
             ]
-
             reservation: Reservation = {
                 "reservation_id": f"RES{i:04d}",
                 "customer_id": f"CUST{random.randint(1, 100):03d}",
@@ -1025,8 +1080,7 @@ class ReservationAgent(BaseAgent):
                 "updated_at": datetime.now().isoformat(),
                 "confirmed_at": datetime.now().isoformat() if random.random() > 0.3 else None,
                 "seated_at": None,
-                "completed_at": None
+                "completed_at": None,
             }
             reservations.append(reservation)
-
         return reservations
