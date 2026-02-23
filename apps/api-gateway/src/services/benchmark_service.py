@@ -149,18 +149,18 @@ class BenchmarkService(BaseService):
         total_orders = sum(r.order_count for r in reports)
         avg_spend = total_revenue / total_customers if total_customers > 0 else 0
 
-        seats = (store.seats or 50) if store else 50
+        seats = (store.seats or int(os.getenv("BENCHMARK_DEFAULT_SEATS", "50"))) if store else int(os.getenv("BENCHMARK_DEFAULT_SEATS", "50"))
         table_turnover = round(total_orders / days / seats, 1) if seats > 0 and days > 0 else 0.0
 
-        labor_cost_ratio = float(store.labor_cost_ratio_target or 28.0) if store else 28.0
-        food_cost_ratio = float(store.cost_ratio_target or 38.0) if store else 38.0
+        labor_cost_ratio = float(store.labor_cost_ratio_target or float(os.getenv("BENCHMARK_DEFAULT_LABOR_RATIO", "28.0"))) if store else float(os.getenv("BENCHMARK_DEFAULT_LABOR_RATIO", "28.0"))
+        food_cost_ratio = float(store.cost_ratio_target or float(os.getenv("BENCHMARK_DEFAULT_FOOD_RATIO", "38.0"))) if store else float(os.getenv("BENCHMARK_DEFAULT_FOOD_RATIO", "38.0"))
         profit_margin = round(100 - labor_cost_ratio - food_cost_ratio, 1)
 
         return {
             "store_id": store_id,
             "city": store.city if store else "未知",
             "restaurant_type": "正餐",
-            "area": store.area if store else 200,
+            "area": store.area if store else int(os.getenv("BENCHMARK_DEFAULT_AREA", "200")),
             "sales": round(total_revenue),
             "customer_count": total_customers,
             "average_spend": round(avg_spend, 1),

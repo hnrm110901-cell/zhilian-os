@@ -225,7 +225,7 @@ class RaaSPricingService:
                 inv_row = inv_result.first()
                 if inv_row and inv_row.total:
                     current_food_waste_rate = round(
-                        (inv_row.low_stock or 0) / inv_row.total * 10, 1
+                        (inv_row.low_stock or 0) / inv_row.total * float(os.getenv("RAAS_WASTE_RATE_MULTIPLIER", "10")), 1
                     )
 
                 # 人工成本 & 能源成本：从 Store 配置读取
@@ -235,9 +235,9 @@ class RaaSPricingService:
                 store = store_result.scalar_one_or_none()
                 if store:
                     monthly_rev = store.monthly_revenue_target or 0
-                    labor_ratio = float(store.labor_cost_ratio_target or 28.0) / 100
+                    labor_ratio = float(store.labor_cost_ratio_target or float(os.getenv("BENCHMARK_DEFAULT_LABOR_RATIO", "28.0"))) / 100
                     if monthly_rev:
-                        current_labor_cost = monthly_rev * labor_ratio / 30 * days_in_period
+                        current_labor_cost = monthly_rev * labor_ratio / int(os.getenv("RAAS_DAYS_PER_MONTH", "30")) * days_in_period
                     current_energy_cost = float(
                         (store.config or {}).get("monthly_energy_cost", float(os.getenv("RAAS_DEFAULT_ENERGY_COST", "7500.0")))
                     )
@@ -256,7 +256,7 @@ class RaaSPricingService:
                 order_count = order_count_result.scalar() or 0
                 total_items = inv_row.total if inv_row and inv_row.total else 1
                 current_inventory_turnover = round(
-                    order_count / max(days_in_period, 1) * 30 / max(total_items, 1), 1
+                    order_count / max(days_in_period, 1) * int(os.getenv("RAAS_DAYS_PER_MONTH", "30")) / max(total_items, 1), 1
                 )
                 current_inventory_turnover = max(current_inventory_turnover, 1.0)
 

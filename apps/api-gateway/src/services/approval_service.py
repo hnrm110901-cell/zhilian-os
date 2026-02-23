@@ -502,7 +502,7 @@ class ApprovalService:
 
         # AI置信度得分
         if decision_log.ai_confidence:
-            score += decision_log.ai_confidence * 30
+            score += decision_log.ai_confidence * float(os.getenv("APPROVAL_AI_CONFIDENCE_WEIGHT", "30"))
 
         # 决策采纳情况得分
         if decision_log.decision_status == DecisionStatus.APPROVED:
