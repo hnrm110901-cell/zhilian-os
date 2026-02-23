@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from sqlalchemy.pool import NullPool
 from contextlib import asynccontextmanager
 import structlog
+import os
 
 from src.core.config import settings
 from src.core.tenant_context import TenantContext
@@ -36,17 +37,16 @@ else:
     engine = create_async_engine(
         settings.DATABASE_URL,
         echo=settings.APP_DEBUG,
-        # Connection pool settings for production load
-        pool_size=20,  # Base pool size
-        max_overflow=40,  # Allow up to 60 total connections (20 + 40)
-        pool_timeout=30,  # Wait up to 30 seconds for a connection
-        pool_recycle=3600,  # Recycle connections after 1 hour to avoid stale connections
-        pool_pre_ping=True,  # Verify connections before using them
-        # Connection arguments for better reliability
+        # Connection pool settings for production load（支持环境变量覆盖）
+        pool_size=int(os.getenv("DB_POOL_SIZE", "20")),
+        max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "40")),
+        pool_timeout=int(os.getenv("DB_POOL_TIMEOUT", "30")),
+        pool_recycle=int(os.getenv("DB_POOL_RECYCLE", "3600")),
+        pool_pre_ping=True,
         connect_args={
             "server_settings": {"application_name": "zhilian_os_api"},
-            "timeout": 10,  # Connection timeout
-            "command_timeout": 60,  # Query timeout
+            "timeout": int(os.getenv("DB_CONNECT_TIMEOUT", "10")),
+            "command_timeout": int(os.getenv("DB_COMMAND_TIMEOUT", "60")),
         } if "postgresql" in settings.DATABASE_URL else {},
     )
 
