@@ -104,9 +104,9 @@ class VectorDatabaseServiceEnhanced:
             # 创建客户端（使用gRPC协议以避免HTTP 503错误）
             self.client = QdrantClient(
                 host=self.qdrant_url.replace('http://', '').replace('https://', '').split(':')[0],
-                port=6334,  # gRPC端口
+                port=int(os.getenv("QDRANT_GRPC_PORT", "6334")),  # gRPC端口
                 prefer_grpc=True,
-                timeout=30,
+                timeout=int(os.getenv("QDRANT_TIMEOUT", "30")),
             )
 
             # 测试连接

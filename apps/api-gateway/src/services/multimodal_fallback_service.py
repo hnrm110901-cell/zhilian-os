@@ -456,7 +456,7 @@ class MultimodalFallbackService:
             from sqlalchemy import select, func
             from datetime import timedelta
 
-            cutoff = datetime.now() - timedelta(minutes=30)
+            cutoff = datetime.now() - timedelta(minutes=int(os.getenv("MULTIMODAL_STATS_WINDOW_MINUTES", "30")))
             async with get_db_session() as session:
                 result = await session.execute(
                     select(func.count(Notification.id)).where(
@@ -469,7 +469,7 @@ class MultimodalFallbackService:
             pass
 
         return EnvironmentCondition(
-            noise_level_db=75.0 if peak_hour else 55.0,
+            noise_level_db=float(os.getenv("MULTIMODAL_NOISE_PEAK_DB", "75.0")) if peak_hour else float(os.getenv("MULTIMODAL_NOISE_NORMAL_DB", "55.0")),
             asr_failure_count=asr_failure_count,
             user_location="front",
             peak_hour=peak_hour,

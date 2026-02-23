@@ -386,7 +386,7 @@ class RaaSPricingService:
             created_at = row[0] if row else None
             store_config = row[1] if row else {}
 
-        start_date = created_at if created_at else current_date - timedelta(days=120)
+        start_date = created_at if created_at else current_date - timedelta(days=int(os.getenv("RAAS_DEFAULT_HISTORY_DAYS", "120")))
 
         # 如果在免费试用期内
         if (current_date - start_date).days <= self.FREE_TRIAL_DAYS:
@@ -434,7 +434,7 @@ class RaaSPricingService:
             }
 
         # 获取基线指标
-        baseline_start = period_start - timedelta(days=90)
+        baseline_start = period_start - timedelta(days=int(os.getenv("RAAS_BASELINE_DAYS", "90")))
         baseline_end = period_start - timedelta(days=1)
         baseline = await self.calculate_baseline(store_id, baseline_start, baseline_end)
 

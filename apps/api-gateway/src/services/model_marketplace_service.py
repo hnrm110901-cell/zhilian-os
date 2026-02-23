@@ -172,7 +172,7 @@ class ModelMarketplaceService:
                 store_id=store_id,
                 model_id=model_id,
                 purchase_date=datetime.now(),
-                expiry_date=datetime.now() + timedelta(days=365),
+                expiry_date=datetime.now() + timedelta(days=int(os.getenv("MODEL_LICENSE_EXPIRY_DAYS", "365"))),
                 price_paid=price_paid,
                 status="active",
             )
@@ -185,7 +185,7 @@ class ModelMarketplaceService:
             store_id=store_id,
             model_id=model_id,
             purchase_date=datetime.now(),
-            expiry_date=datetime.now() + timedelta(days=365),
+            expiry_date=datetime.now() + timedelta(days=int(os.getenv("MODEL_LICENSE_EXPIRY_DAYS", "365"))),
             price_paid=price_paid,
             status="active",
         )
