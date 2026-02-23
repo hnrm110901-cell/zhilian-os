@@ -147,10 +147,10 @@ class IntelligentRecommendationEngine:
 
             # Weighted combination
             final_score = (
-                0.3 * cf_score +
-                0.3 * cb_score +
-                0.2 * context_score +
-                0.2 * business_score
+                float(os.getenv("RECOMMEND_CF_WEIGHT", "0.3")) * cf_score +
+                float(os.getenv("RECOMMEND_CB_WEIGHT", "0.3")) * cb_score +
+                float(os.getenv("RECOMMEND_CONTEXT_WEIGHT", "0.2")) * context_score +
+                float(os.getenv("RECOMMEND_BUSINESS_WEIGHT", "0.2")) * business_score
             )
 
             # Generate reason
@@ -455,13 +455,13 @@ class IntelligentRecommendationEngine:
         """Generate human-readable recommendation reason"""
         reasons = []
 
-        if cf_score > 0.7:
+        if cf_score > float(os.getenv("RECOMMEND_SCORE_THRESHOLD", "0.7")):
             reasons.append("相似顾客喜欢")
-        if cb_score > 0.7:
+        if cb_score > float(os.getenv("RECOMMEND_SCORE_THRESHOLD", "0.7")):
             reasons.append("符合您的口味偏好")
-        if context_score > 0.7:
+        if context_score > float(os.getenv("RECOMMEND_SCORE_THRESHOLD", "0.7")):
             reasons.append("适合当前场景")
-        if business_score > 0.7:
+        if business_score > float(os.getenv("RECOMMEND_SCORE_THRESHOLD", "0.7")):
             reasons.append("店长推荐")
 
         return "、".join(reasons) if reasons else "为您精选"
@@ -511,7 +511,7 @@ class IntelligentRecommendationEngine:
         """Calculate peak hour pricing"""
         current_price = dish["price"]
         # Increase price by 10-15% during peak hours
-        return current_price * 1.12
+        return current_price * float(os.getenv("PRICING_PEAK_RATIO", "1.12"))
 
     def _off_peak_pricing(
         self,
@@ -532,7 +532,7 @@ class IntelligentRecommendationEngine:
         current_price = dish["price"]
         demand_level = context.get("demand_level", 0.5)
         # Adjust based on demand
-        return current_price * (0.9 + 0.2 * demand_level)
+        return current_price * (float(os.getenv("PRICING_DEMAND_BASE", "0.9")) + float(os.getenv("PRICING_DEMAND_FACTOR", "0.2")) * demand_level)
 
     def _inventory_based_pricing(
         self,
@@ -543,8 +543,8 @@ class IntelligentRecommendationEngine:
         current_price = dish["price"]
         inventory_level = context.get("inventory_level", 0.5)
         # Lower price to clear inventory
-        if inventory_level > 0.8:
-            return current_price * 0.8
+        if inventory_level > float(os.getenv("PRICING_INVENTORY_CLEAR_THRESHOLD", "0.8")):
+            return current_price * float(os.getenv("PRICING_INVENTORY_CLEAR_RATIO", "0.8"))
         return current_price
 
     def _competitor_based_pricing(

@@ -240,7 +240,7 @@ class SupplyChainIntegration:
         quote_id = f"quote_{supplier_id}_{material_id}_{datetime.utcnow().timestamp()}"
 
         # Simulate pricing (base price with random variation)
-        base_price = 10.0
+        base_price = float(os.getenv("SUPPLY_CHAIN_MOCK_BASE_PRICE", "10.0"))
         unit_price = base_price * (0.9 + random.random() * 0.2)  # ±10% variation
         total_price = unit_price * quantity
 

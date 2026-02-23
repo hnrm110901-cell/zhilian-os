@@ -11,6 +11,7 @@ Provides comprehensive AI model optimization capabilities:
 - Auto-scaling
 """
 
+import os
 from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime
 from enum import Enum
@@ -223,7 +224,7 @@ class AIModelOptimizer:
             "max_trials": max_trials,
             "best_params": best_params,
             "best_score": best_score,
-            "improvement_pct": (best_score - 0.85) / 0.85 * 100
+            "improvement_pct": (best_score - float(os.getenv("MODEL_BASELINE_SCORE", "0.85"))) / float(os.getenv("MODEL_BASELINE_SCORE", "0.85")) * 100
         }
 
     def compress_model(
@@ -262,8 +263,8 @@ class AIModelOptimizer:
 
         if compression_method == "quantization":
             # INT8 quantization typically reduces size by 4x
-            size_reduction = 0.75
-            accuracy_loss = 0.01  # 1% accuracy loss
+            size_reduction = float(os.getenv("MODEL_QUANTIZATION_SIZE_REDUCTION", "0.75"))
+            accuracy_loss = float(os.getenv("MODEL_QUANTIZATION_ACCURACY_LOSS", "0.01"))  # accuracy loss
 
             optimized_metrics = ModelMetrics(
                 accuracy=original_metrics.accuracy - accuracy_loss,
@@ -294,8 +295,8 @@ class AIModelOptimizer:
 
         else:  # distillation
             # Distillation can reduce size significantly with minimal accuracy loss
-            size_reduction = 0.8
-            accuracy_loss = 0.02  # 2% accuracy loss
+            size_reduction = float(os.getenv("MODEL_DISTILLATION_SIZE_REDUCTION", "0.8"))
+            accuracy_loss = float(os.getenv("MODEL_DISTILLATION_ACCURACY_LOSS", "0.02"))  # accuracy loss
 
             optimized_metrics = ModelMetrics(
                 accuracy=original_metrics.accuracy - accuracy_loss,
