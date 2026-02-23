@@ -3,6 +3,7 @@ Service Quality Service - 服务质量数据库服务
 处理服务质量监控的数据库操作
 """
 import structlog
+import os
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from sqlalchemy import select, func, and_, or_
@@ -365,7 +366,7 @@ class ServiceQualityService:
         }
 
     def _calculate_trend(self, values: List[float]) -> str:
-        """计算趋势"""
+        """计算趋势（阈值支持环境变量覆盖）"""
         if len(values) < 2:
             return "stable"
 
@@ -374,9 +375,11 @@ class ServiceQualityService:
         first_half_avg = sum(values[:mid]) / mid if mid > 0 else 0
         second_half_avg = sum(values[mid:]) / (len(values) - mid) if len(values) > mid else 0
 
-        if second_half_avg > first_half_avg * 1.05:
+        _up = float(os.getenv("TREND_IMPROVING_THRESHOLD", "1.05"))
+        _down = float(os.getenv("TREND_DECLINING_THRESHOLD", "0.95"))
+        if second_half_avg > first_half_avg * _up:
             return "improving"
-        elif second_half_avg < first_half_avg * 0.95:
+        elif second_half_avg < first_half_avg * _down:
             return "declining"
         else:
             return "stable"
@@ -434,12 +437,15 @@ class ServiceQualityService:
         return total_score
 
     def _get_quality_status(self, score: float) -> str:
-        """获取质量状态"""
-        if score >= 90:
+        """获取质量状态（阈值支持环境变量覆盖）"""
+        _excellent = float(os.getenv("SERVICE_QUALITY_EXCELLENT", "90"))
+        _good = float(os.getenv("SERVICE_QUALITY_GOOD", "80"))
+        _fair = float(os.getenv("SERVICE_QUALITY_FAIR", "70"))
+        if score >= _excellent:
             return "excellent"
-        elif score >= 80:
+        elif score >= _good:
             return "good"
-        elif score >= 70:
+        elif score >= _fair:
             return "fair"
         else:
             return "needs_improvement"
