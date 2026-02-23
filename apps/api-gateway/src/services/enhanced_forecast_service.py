@@ -172,7 +172,7 @@ class EnhancedForecastService(BaseService):
             from sqlalchemy import select, func as sa_func
             from src.core.database import get_db_session
             from src.models.daily_report import DailyReport
-            cutoff = date.today() - timedelta(days=30)
+            cutoff = date.today() - timedelta(days=int(os.getenv("FORECAST_HISTORY_DAYS", "30")))
             async with get_db_session() as session:
                 result = await session.execute(
                     select(DailyReport.report_date, DailyReport.total_revenue).where(

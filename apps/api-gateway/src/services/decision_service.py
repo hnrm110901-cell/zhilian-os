@@ -8,6 +8,7 @@ from sqlalchemy import select, and_, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from collections import defaultdict
 from statistics import mean
+import os
 
 from src.core.database import get_db_session
 from src.models import KPI, KPIRecord, Store
@@ -43,7 +44,7 @@ class DecisionService:
                 end_dt = date.fromisoformat(end_date.split('T')[0])
 
             if not start_date:
-                start_dt = end_dt - timedelta(days=30)
+                start_dt = end_dt - timedelta(days=int(os.getenv("DECISION_DEFAULT_DAYS", "30")))
             else:
                 start_dt = date.fromisoformat(start_date.split('T')[0])
 

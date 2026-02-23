@@ -26,9 +26,9 @@ class AnalyticsService:
         self, store_id: str, days_ahead: int = 7
     ) -> Dict[str, Any]:
         """销售预测 - 基于历史数据预测未来销售"""
-        # 获取过去30天的销售数据
+        # 获取过去N天的销售数据
         end_date = date.today()
-        start_date = end_date - timedelta(days=30)
+        start_date = end_date - timedelta(days=int(os.getenv("ANALYTICS_HISTORY_DAYS", "30")))
 
         query = select(
             func.date(FinancialTransaction.transaction_date).label("date"),
@@ -220,9 +220,9 @@ class AnalyticsService:
         self, store_id: str, min_support: float = 0.1
     ) -> Dict[str, Any]:
         """关联分析 - 分析菜品之间的关联关系"""
-        # 获取最近30天的订单数据
+        # 获取最近N天的订单数据
         end_date = date.today()
-        start_date = end_date - timedelta(days=30)
+        start_date = end_date - timedelta(days=int(os.getenv("ANALYTICS_HISTORY_DAYS", "30")))
 
         # 查询订单及其商品
         query = select(Order).where(

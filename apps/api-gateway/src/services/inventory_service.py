@@ -130,7 +130,7 @@ class InventoryService:
             # Optimize: Fetch all transaction data in a single query to avoid N+1
             if items:
                 item_ids = [item.id for item in items]
-                thirty_days_ago = datetime.now() - timedelta(days=30)
+                thirty_days_ago = datetime.now() - timedelta(days=int(os.getenv("INVENTORY_HISTORY_DAYS", "30")))
 
                 trans_stmt = (
                     select(InventoryTransaction)
