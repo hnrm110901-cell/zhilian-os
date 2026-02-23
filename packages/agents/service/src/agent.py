@@ -1075,7 +1075,7 @@ class ServiceAgent(BaseAgent):
         import random
 
         mock_feedbacks = []
-        base_date = datetime.now() - timedelta(days=7)
+        base_date = datetime.now() - timedelta(days=int(os.getenv("SERVICE_TREND_DAYS", "7")))
 
         feedback_templates = [
             {

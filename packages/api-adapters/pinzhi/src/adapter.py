@@ -2,6 +2,7 @@
 品智收银系统API适配器
 提供门店管理、菜品管理、订单查询、营业数据等功能
 """
+import os
 from typing import Dict, Any, Optional, List
 import structlog
 from datetime import datetime
@@ -334,7 +335,7 @@ class PinzhiAdapter:
         begin_date: Optional[str] = None,
         end_date: Optional[str] = None,
         page_index: int = 1,
-        page_size: int = 20,
+        page_size: int = int(os.getenv("PINZHI_PAGE_SIZE", "20")),
     ) -> List[Dict[str, Any]]:
         """
         按日期查询订单数据（V2）

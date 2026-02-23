@@ -2,6 +2,7 @@
 API适配器基础类
 提供统一的接口规范和通用功能
 """
+import os
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 import httpx
@@ -48,8 +49,8 @@ class BaseAdapter(ABC):
         pass
 
     @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=2, max=10),
+        stop=stop_after_attempt(int(os.getenv("ADAPTER_RETRY_ATTEMPTS", "3"))),
+        wait=wait_exponential(multiplier=int(os.getenv("ADAPTER_RETRY_MULTIPLIER", "1")), min=int(os.getenv("ADAPTER_RETRY_MIN", "2")), max=int(os.getenv("ADAPTER_RETRY_MAX", "10"))),
     )
     async def request(
         self,
