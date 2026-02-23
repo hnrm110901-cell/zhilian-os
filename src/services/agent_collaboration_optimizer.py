@@ -303,6 +303,29 @@ class AgentCollaborationOptimizer:
         - Benefit realization
         """
         # Simplified implementation
+        # Count decisions submitted and approved from resolution history
+        submitted = sum(
+            1 for r in self.resolutions
+            if any(
+                d.agent_type == agent_type
+                for d in self._get_decisions_by_ids(r.approved_decisions + r.rejected_decisions)
+            )
+        )
+        approved = sum(
+            1 for r in self.resolutions
+            if any(
+                d.agent_type == agent_type
+                for d in self._get_decisions_by_ids(r.approved_decisions)
+            )
+        )
+        conflicts_involved = sum(
+            1 for c in self.conflicts
+            if any(
+                d.agent_type == agent_type
+                for d in self._get_decisions_by_ids(c.involved_decisions)
+            )
+        )
+        total = max(submitted, 1)
         return {
             "agent_type": agent_type.value,
             "period": {
@@ -310,13 +333,16 @@ class AgentCollaborationOptimizer:
                 "end": end_date.isoformat()
             },
             "metrics": {
-                "decisions_submitted": 100,
-                "decisions_approved": 85,
-                "approval_rate": 0.85,
-                "conflicts_involved": 15,
-                "conflict_rate": 0.15,
-                "avg_benefit_realization": 0.92,
-                "resource_utilization": 0.78
+                "decisions_submitted": submitted,
+                "decisions_approved": approved,
+                "approval_rate": round(approved / total, 4),
+                "conflicts_involved": conflicts_involved,
+                "conflict_rate": round(conflicts_involved / total, 4),
+                "avg_benefit_realization": round(
+                    sum(r.modifications.get("benefit_realization", 0.9) for r in self.resolutions) / max(len(self.resolutions), 1),
+                    4
+                ),
+                "resource_utilization": self._calculate_efficiency(),
             }
         }
 
@@ -416,7 +442,11 @@ class AgentCollaborationOptimizer:
         decision2: AgentDecision
     ) -> bool:
         """Check if constraints conflict"""
-        # Simplified: check if constraints are incompatible
+        # Constraints conflict if they share a key with incompatible values
+        for key, val1 in decision1.constraints.items():
+            val2 = decision2.constraints.get(key)
+            if val2 is not None and val1 != val2:
+                return True
         return False
 
     def _resolve_all_conflicts(self) -> List[Resolution]:

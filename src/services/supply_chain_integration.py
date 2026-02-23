@@ -234,14 +234,21 @@ class SupplyChainIntegration:
         quantity: float,
         required_date: datetime
     ) -> PurchaseQuote:
-        """Simulate quote from supplier"""
-        import random
-
+        """Generate quote based on supplier config"""
         quote_id = f"quote_{supplier_id}_{material_id}_{datetime.utcnow().timestamp()}"
 
-        # Simulate pricing (base price with random variation)
-        base_price = float(os.getenv("SUPPLY_CHAIN_MOCK_BASE_PRICE", "10.0"))
-        unit_price = base_price * (0.9 + random.random() * 0.2)  # ±10% variation
+        supplier = self.suppliers.get(supplier_id)
+        base_price = float(os.getenv(
+            f"SUPPLY_PRICE_{material_id.upper()}",
+            os.getenv("SUPPLY_CHAIN_MOCK_BASE_PRICE", "10.0")
+        ))
+        if supplier:
+            # Higher-rated suppliers carry a quality premium (rating 0-5 → factor 0.9-1.1)
+            rating_factor = 0.9 + (supplier.rating / 5.0) * 0.2
+            unit_price = base_price * rating_factor
+        else:
+            unit_price = base_price
+
         total_price = unit_price * quantity
 
         quote = PurchaseQuote(

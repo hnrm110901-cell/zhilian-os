@@ -1139,12 +1139,7 @@ class TrainingAgent(BaseAgent):
                     }
             except Exception as e:
                 self.logger.warning("get_staff_performance_db_failed", error=str(e))
-        import random
-        return {
-            "staff_id": staff_id,
-            "service_score": random.randint(60, 95),
-            "customer_rating": random.uniform(3.5, 5.0),
-        }
+        return {"staff_id": staff_id, "service_score": 0, "customer_rating": 0.0}
 
     async def _get_staff_skills(self, staff_id: str) -> Dict[str, "SkillLevel"]:
         """获取员工技能"""
@@ -1165,10 +1160,7 @@ class TrainingAgent(BaseAgent):
                         return result
             except Exception as e:
                 self.logger.warning("get_staff_skills_db_failed", error=str(e))
-        import random
-        skills = ["服务礼仪", "客户沟通", "菜品知识", "食品安全", "菜品制作"]
-        levels = [SkillLevel.BEGINNER, SkillLevel.INTERMEDIATE, SkillLevel.ADVANCED]
-        return {skill: random.choice(levels) for skill in skills[:3]}
+        return {}
 
     async def _get_courses_info(self, course_ids: List[str]) -> List[TrainingCourse]:
         """获取课程信息"""

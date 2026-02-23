@@ -984,7 +984,39 @@ class ReservationAgent(BaseAgent):
         time_slot: str
     ) -> List[Reservation]:
         """获取指定时段的预定"""
-        # 模拟数据
+        engine = self._get_db_engine()
+        if engine:
+            try:
+                from sqlalchemy import text
+                with engine.connect() as conn:
+                    rows = conn.execute(text("""
+                        SELECT id, customer_name, customer_phone, store_id,
+                               reservation_type, reservation_date, reservation_time,
+                               party_size, table_number, status, special_requests,
+                               estimated_budget, created_at, updated_at
+                        FROM reservations
+                        WHERE store_id = :s
+                          AND reservation_date = :d
+                          AND reservation_time = :t
+                        ORDER BY created_at DESC
+                    """), {"s": self.store_id, "d": date, "t": time_slot}).fetchall()
+                return [
+                    {
+                        "reservation_id": r[0], "customer_id": r[2],
+                        "customer_name": r[1], "customer_phone": r[2],
+                        "store_id": r[3], "reservation_type": r[4],
+                        "reservation_date": str(r[5]), "reservation_time": str(r[6]),
+                        "party_size": r[7], "table_type": None, "table_number": r[8],
+                        "special_requests": r[10], "status": r[9],
+                        "deposit_amount": 0, "estimated_amount": int(r[11] or 0),
+                        "created_at": r[12].isoformat() if r[12] else None,
+                        "updated_at": r[13].isoformat() if r[13] else None,
+                        "confirmed_at": None, "seated_at": None, "completed_at": None,
+                    }
+                    for r in rows
+                ]
+            except Exception as e:
+                self.logger.warning("get_reservations_by_time_db_failed", error=str(e))
         return []
 
     async def _get_available_tables(
@@ -993,7 +1025,35 @@ class ReservationAgent(BaseAgent):
         time_slot: str
     ) -> List[Dict[str, Any]]:
         """获取可用桌位"""
-        # 模拟数据
+        engine = self._get_db_engine()
+        if engine:
+            try:
+                from sqlalchemy import text
+                with engine.connect() as conn:
+                    # Get all tables for this store
+                    all_tables = conn.execute(text("""
+                        SELECT table_number, table_type, capacity
+                        FROM tables
+                        WHERE store_id = :s AND is_active = true
+                    """), {"s": self.store_id}).fetchall()
+                    # Get reserved table numbers for this slot
+                    reserved = conn.execute(text("""
+                        SELECT table_number FROM reservations
+                        WHERE store_id = :s
+                          AND reservation_date = :d
+                          AND reservation_time = :t
+                          AND status IN ('confirmed', 'seated')
+                    """), {"s": self.store_id, "d": date, "t": time_slot}).fetchall()
+                reserved_nums = {r[0] for r in reserved}
+                available = [
+                    {"table_number": t[0], "table_type": t[1], "capacity": t[2]}
+                    for t in all_tables if t[0] not in reserved_nums
+                ]
+                if available:
+                    return available
+            except Exception as e:
+                self.logger.warning("get_available_tables_db_failed", error=str(e))
+        # Fallback: default table layout
         return [
             {"table_number": "S001", "table_type": "small", "capacity": 2},
             {"table_number": "M001", "table_type": "medium", "capacity": 4},
@@ -1050,37 +1110,4 @@ class ReservationAgent(BaseAgent):
                 return reservations
             except Exception as e:
                 self.logger.warning("get_reservations_by_period_db_failed", error=str(e))
-        import random
-        # 生成模拟数据（fallback）
-        reservations = []
-        for i in range(50):
-            status_choices = [
-                ReservationStatus.CONFIRMED,
-                ReservationStatus.COMPLETED,
-                ReservationStatus.CANCELLED,
-                ReservationStatus.NO_SHOW,
-            ]
-            reservation: Reservation = {
-                "reservation_id": f"RES{i:04d}",
-                "customer_id": f"CUST{random.randint(1, 100):03d}",
-                "customer_name": f"客户{i}",
-                "customer_phone": f"138{random.randint(10000000, 99999999)}",
-                "store_id": self.store_id,
-                "reservation_type": random.choice(list(ReservationType)),
-                "reservation_date": (datetime.now() - timedelta(days=random.randint(0, 30))).date().isoformat(),
-                "reservation_time": f"{random.randint(11, 20)}:00",
-                "party_size": random.randint(2, 10),
-                "table_type": random.choice(list(TableType)),
-                "table_number": f"T{random.randint(1, 20):03d}",
-                "special_requests": None,
-                "status": random.choice(status_choices),
-                "deposit_amount": random.randint(5000, 20000),
-                "estimated_amount": random.randint(20000, 80000),
-                "created_at": (datetime.now() - timedelta(days=random.randint(0, 30))).isoformat(),
-                "updated_at": datetime.now().isoformat(),
-                "confirmed_at": datetime.now().isoformat() if random.random() > 0.3 else None,
-                "seated_at": None,
-                "completed_at": None,
-            }
-            reservations.append(reservation)
-        return reservations
+        return []
