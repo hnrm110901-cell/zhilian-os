@@ -368,7 +368,7 @@ class ErrorMonitor:
                 }
         return None
 
-    def clear_old_records(self, hours: int = 24):
+    def clear_old_records(self, hours: int = int(os.getenv("MONITORING_RETENTION_HOURS", "24"))):
         """
         清理旧记录
 

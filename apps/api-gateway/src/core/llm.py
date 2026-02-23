@@ -48,8 +48,8 @@ class BaseLLMClient(ABC):
         self,
         prompt: str,
         system_prompt: Optional[str] = None,
-        temperature: float = 0.7,
-        max_tokens: int = 1000,
+        temperature: float = float(os.getenv("LLM_TEMPERATURE", "0.7")),
+        max_tokens: int = int(os.getenv("LLM_MAX_TOKENS", "1000")),
         **kwargs
     ) -> str:
         """
@@ -71,8 +71,8 @@ class BaseLLMClient(ABC):
     async def generate_with_context(
         self,
         messages: List[Dict[str, str]],
-        temperature: float = 0.7,
-        max_tokens: int = 1000,
+        temperature: float = float(os.getenv("LLM_TEMPERATURE", "0.7")),
+        max_tokens: int = int(os.getenv("LLM_MAX_TOKENS", "1000")),
         **kwargs
     ) -> str:
         """
@@ -123,8 +123,8 @@ class OpenAIClient(BaseLLMClient):
         self,
         prompt: str,
         system_prompt: Optional[str] = None,
-        temperature: float = 0.7,
-        max_tokens: int = 1000,
+        temperature: float = float(os.getenv("LLM_TEMPERATURE", "0.7")),
+        max_tokens: int = int(os.getenv("LLM_MAX_TOKENS", "1000")),
         **kwargs
     ) -> str:
         """生成文本"""
@@ -145,8 +145,8 @@ class OpenAIClient(BaseLLMClient):
     async def generate_with_context(
         self,
         messages: List[Dict[str, str]],
-        temperature: float = 0.7,
-        max_tokens: int = 1000,
+        temperature: float = float(os.getenv("LLM_TEMPERATURE", "0.7")),
+        max_tokens: int = int(os.getenv("LLM_MAX_TOKENS", "1000")),
         **kwargs
     ) -> str:
         """基于对话历史生成文本"""
@@ -206,8 +206,8 @@ class AnthropicClient(BaseLLMClient):
         self,
         prompt: str,
         system_prompt: Optional[str] = None,
-        temperature: float = 0.7,
-        max_tokens: int = 1000,
+        temperature: float = float(os.getenv("LLM_TEMPERATURE", "0.7")),
+        max_tokens: int = int(os.getenv("LLM_MAX_TOKENS", "1000")),
         **kwargs
     ) -> str:
         """生成文本"""
@@ -224,8 +224,8 @@ class AnthropicClient(BaseLLMClient):
     async def generate_with_context(
         self,
         messages: List[Dict[str, str]],
-        temperature: float = 0.7,
-        max_tokens: int = 1000,
+        temperature: float = float(os.getenv("LLM_TEMPERATURE", "0.7")),
+        max_tokens: int = int(os.getenv("LLM_MAX_TOKENS", "1000")),
         system_prompt: Optional[str] = None,
         **kwargs
     ) -> str:
