@@ -3,6 +3,7 @@ Celery异步任务
 用于Neural System的事件处理和向量数据库索引
 """
 from typing import Dict, Any
+import os
 import structlog
 from celery import Task
 
@@ -948,7 +949,7 @@ async def check_inventory_alert(
                     alert_result = await inventory_agent.check_low_stock_alert(
                         store_id=str(store.id),
                         current_inventory=current_inventory,
-                        threshold_hours=4  # 午高峰前4小时预警
+                        threshold_hours=int(os.getenv("INVENTORY_ALERT_THRESHOLD_HOURS", "4"))  # 午高峰前N小时预警
                     )
 
                     if alert_result["success"]:

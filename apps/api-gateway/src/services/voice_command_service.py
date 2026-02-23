@@ -6,6 +6,7 @@
 import uuid
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
+import os
 import structlog
 from sqlalchemy.orm import Session
 import re
@@ -172,7 +173,7 @@ class VoiceCommandService:
                     Queue.store_id == store_id,
                     Queue.actual_wait_time.isnot(None)
                 ).scalar()
-                avg_wait_per_table = int(avg_actual) if avg_actual else 15
+                avg_wait_per_table = int(avg_actual) if avg_actual else int(os.getenv("VOICE_DEFAULT_WAIT_MINUTES", "15"))
                 avg_wait_time = waiting_queues * avg_wait_per_table
                 voice_response = f"当前有{waiting_queues}桌排队，预计等待{avg_wait_time}分钟"
 
@@ -198,8 +199,8 @@ class VoiceCommandService:
     async def _handle_order_reminder(self, store_id: str, db: Session) -> Dict[str, Any]:
         """处理催单提醒"""
         try:
-            # 查询超时订单（超过30分钟未完成）
-            timeout_threshold = datetime.utcnow() - timedelta(minutes=30)
+            # 查询超时订单（超过N分钟未完成）
+            timeout_threshold = datetime.utcnow() - timedelta(minutes=int(os.getenv("VOICE_ORDER_TIMEOUT_MINUTES", "30")))
 
             timeout_orders = db.query(Order).filter(
                 Order.store_id == store_id,

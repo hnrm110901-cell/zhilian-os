@@ -59,7 +59,7 @@ class KMSService:
         self.key_metadata = {}
 
         # 密钥轮换策略（默认90天）
-        self.rotation_days = 90
+        self.rotation_days = int(os.getenv("KMS_ROTATION_DAYS", "90"))
 
         logger.info("KMS Service initialized")
 

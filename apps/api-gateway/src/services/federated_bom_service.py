@@ -337,9 +337,9 @@ class FederatedBOMService:
                 ingredient_id=ingredient_id,
                 season=season,
                 region=region,
-                temperature=20.0,
-                humidity=60.0,
-                storage_days=3
+                temperature=float(os.getenv("BOM_SEASONAL_DEFAULT_TEMP", "20.0")),
+                humidity=float(os.getenv("BOM_SEASONAL_DEFAULT_HUMIDITY", "60.0")),
+                storage_days=int(os.getenv("BOM_SEASONAL_DEFAULT_STORAGE_DAYS", "3"))
             )
             seasonal_loss_rates[season] = loss_rate
 

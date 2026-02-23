@@ -72,9 +72,9 @@ class VectorDatabaseServiceEnhanced:
 
         # 初始化熔断器（防止Silent Failure）
         self.circuit_breaker = CircuitBreaker(
-            failure_threshold=5,  # 连续失败5次后熔断
-            success_threshold=2,  # 半开状态成功2次后恢复
-            timeout=60.0,  # 熔断60秒后尝试恢复
+            failure_threshold=int(os.getenv("VECTOR_DB_CB_FAILURE_THRESHOLD", "5")),    # 连续失败N次后熔断
+            success_threshold=int(os.getenv("VECTOR_DB_CB_SUCCESS_THRESHOLD", "2")),    # 半开状态成功N次后恢复
+            timeout=float(os.getenv("VECTOR_DB_CB_TIMEOUT", "60.0")),                  # 熔断N秒后尝试恢复
             expected_exception=Exception,
         )
 
