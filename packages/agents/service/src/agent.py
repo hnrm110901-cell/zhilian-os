@@ -10,6 +10,7 @@
 6. 满意度分析 - Customer satisfaction analysis
 """
 
+import os
 import asyncio
 import structlog
 from datetime import datetime, timedelta
@@ -635,17 +636,17 @@ class ServiceAgent(BaseAgent):
                 category_breakdown[feedback["category"]] += 1
 
             # 响应时间(模拟)
-            response_time_avg = 25.0  # 平均25分钟
+            response_time_avg = float(os.getenv("SERVICE_MOCK_RESPONSE_TIME_MINUTES", "25.0"))
 
             # 解决率(模拟)
-            resolution_rate = 0.92
+            resolution_rate = float(os.getenv("SERVICE_MOCK_RESOLUTION_RATE", "0.92"))
 
             # 趋势分析
             trend = self._analyze_trend(feedbacks)
 
             metrics: ServiceQualityMetrics = {
                 "store_id": self.store_id,
-                "period_start": start_date or (datetime.now() - timedelta(days=30)).isoformat(),
+                "period_start": start_date or (datetime.now() - timedelta(days=int(os.getenv("AGENT_STATS_DAYS", "30")))).isoformat(),
                 "period_end": end_date or datetime.now().isoformat(),
                 "total_feedbacks": total_feedbacks,
                 "average_rating": round(average_rating, 2),
@@ -812,7 +813,7 @@ class ServiceAgent(BaseAgent):
             "staff_id": staff_id,
             "staff_name": f"员工{staff_id[-3:]}",  # 模拟员工姓名
             "store_id": self.store_id,
-            "period_start": start_date or (datetime.now() - timedelta(days=30)).isoformat(),
+            "period_start": start_date or (datetime.now() - timedelta(days=int(os.getenv("AGENT_STATS_DAYS", "30")))).isoformat(),
             "period_end": end_date or datetime.now().isoformat(),
             "total_feedbacks": total_feedbacks,
             "praise_count": praise_count,
@@ -1032,7 +1033,7 @@ class ServiceAgent(BaseAgent):
             report = {
                 "store_id": self.store_id,
                 "report_date": datetime.now().isoformat(),
-                "period_start": start_date or (datetime.now() - timedelta(days=30)).isoformat(),
+                "period_start": start_date or (datetime.now() - timedelta(days=int(os.getenv("AGENT_STATS_DAYS", "30")))).isoformat(),
                 "period_end": end_date or datetime.now().isoformat(),
                 "quality_metrics": quality_metrics,
                 "staff_performances": staff_performances,

@@ -10,6 +10,7 @@
 6. 冲突检测 - Conflict detection
 """
 
+import os
 import asyncio
 import structlog
 from datetime import datetime, timedelta
@@ -890,7 +891,7 @@ class ReservationAgent(BaseAgent):
 
             analytics: ReservationAnalytics = {
                 "store_id": self.store_id,
-                "period_start": start_date or (datetime.now() - timedelta(days=30)).isoformat(),
+                "period_start": start_date or (datetime.now() - timedelta(days=int(os.getenv("AGENT_STATS_DAYS", "30")))).isoformat(),
                 "period_end": end_date or datetime.now().isoformat(),
                 "total_reservations": total,
                 "confirmed_count": confirmed,

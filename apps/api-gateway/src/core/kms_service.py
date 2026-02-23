@@ -78,7 +78,7 @@ class KMSService:
             algorithm=hashes.SHA256(),
             length=32,
             salt=b'zhilian_os_salt',  # 生产环境应使用随机salt
-            iterations=100000,
+            iterations=int(os.getenv("KMS_PBKDF2_ITERATIONS", "100000")),
         )
 
         key = base64.urlsafe_b64encode(

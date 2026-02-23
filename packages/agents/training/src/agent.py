@@ -11,6 +11,7 @@
 7. 证书管理 - Certification management
 """
 
+import os
 import asyncio
 import structlog
 from datetime import datetime, timedelta
@@ -576,7 +577,7 @@ class TrainingAgent(BaseAgent):
 
         # 检查是否过期
         start_date = datetime.fromisoformat(record["start_date"])
-        if datetime.now() - start_date > timedelta(days=90):
+        if datetime.now() - start_date > timedelta(days=int(os.getenv("TRAINING_RECORD_EXPIRY_DAYS", "90"))):
             return TrainingStatus.EXPIRED
 
         return TrainingStatus.IN_PROGRESS
@@ -658,7 +659,7 @@ class TrainingAgent(BaseAgent):
                     stats["average_score"] = mean(stats["scores"])
 
             evaluation = {
-                "period_start": start_date or (datetime.now() - timedelta(days=30)).isoformat(),
+                "period_start": start_date or (datetime.now() - timedelta(days=int(os.getenv("TRAINING_STATS_DAYS", "30")))).isoformat(),
                 "period_end": end_date or datetime.now().isoformat(),
                 "course_id": course_id,
                 "total_participants": total_participants,
@@ -885,7 +886,7 @@ class TrainingAgent(BaseAgent):
             expiring_soon = [
                 c for c in certificates
                 if c.get("expiry_date") and
-                datetime.fromisoformat(c["expiry_date"]) - datetime.now() < timedelta(days=30)
+                datetime.fromisoformat(c["expiry_date"]) - datetime.now() < timedelta(days=int(os.getenv("TRAINING_CERT_EXPIRY_WARNING_DAYS", "30")))
             ]
 
             if expiring_soon:
@@ -1041,7 +1042,7 @@ class TrainingAgent(BaseAgent):
             report = {
                 "store_id": self.store_id,
                 "report_date": datetime.now().isoformat(),
-                "period_start": start_date or (datetime.now() - timedelta(days=30)).isoformat(),
+                "period_start": start_date or (datetime.now() - timedelta(days=int(os.getenv("TRAINING_STATS_DAYS", "30")))).isoformat(),
                 "period_end": end_date or datetime.now().isoformat(),
                 "training_needs": {
                     "total": len(needs),
@@ -1061,7 +1062,7 @@ class TrainingAgent(BaseAgent):
                     "expiring_soon": sum(
                         1 for c in certificates
                         if c.get("expiry_date") and
-                        datetime.fromisoformat(c["expiry_date"]) - datetime.now() < timedelta(days=30)
+                        datetime.fromisoformat(c["expiry_date"]) - datetime.now() < timedelta(days=int(os.getenv("TRAINING_CERT_EXPIRY_WARNING_DAYS", "30")))
                     )
                 },
                 "training_type_distribution": dict(type_counts)
@@ -1235,7 +1236,7 @@ class TrainingAgent(BaseAgent):
             cid = random.choice(["COURSE_SERVICE_001", "COURSE_COOKING_001", "COURSE_SAFETY_001"])
 
             issue_date = datetime.now() - timedelta(days=random.randint(30, 365))
-            expiry_date = issue_date + timedelta(days=365)
+            expiry_date = issue_date + timedelta(days=int(os.getenv("TRAINING_CERT_VALIDITY_DAYS", "365")))
 
             cert: Certificate = {
                 "certificate_id": f"CERT{i:04d}",

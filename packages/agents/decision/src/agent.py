@@ -11,6 +11,7 @@
 7. 多维度决策支持 - Multi-dimensional decision support
 """
 
+import os
 import asyncio
 import structlog
 from datetime import datetime, timedelta
@@ -1108,7 +1109,7 @@ class DecisionAgent(BaseAgent):
             report = {
                 "store_id": self.store_id,
                 "report_date": datetime.now().isoformat(),
-                "period_start": start_date or (datetime.now() - timedelta(days=30)).isoformat(),
+                "period_start": start_date or (datetime.now() - timedelta(days=int(os.getenv("AGENT_STATS_DAYS", "30")))).isoformat(),
                 "period_end": end_date or datetime.now().isoformat(),
                 "kpi_summary": {
                     "total_kpis": len(kpis),

@@ -16,9 +16,9 @@ if __name__ == "__main__":
     celery_app.worker_main([
         "worker",
         "--loglevel=info",
-        "--concurrency=4",  # 4个并发worker
+        f"--concurrency={os.getenv('CELERY_WORKER_CONCURRENCY', '4')}",  # 并发worker数
         "--queues=high_priority,default,low_priority",  # 监听所有队列
-        "--max-tasks-per-child=1000",  # 每个子进程最多执行1000个任务
-        "--time-limit=300",  # 任务超时时间5分钟
-        "--soft-time-limit=240",  # 软超时4分钟
+        f"--max-tasks-per-child={os.getenv('CELERY_MAX_TASKS_PER_CHILD', '1000')}",  # 每个子进程最多执行任务数
+        f"--time-limit={os.getenv('CELERY_WORKER_TIME_LIMIT', '300')}",  # 任务超时时间
+        f"--soft-time-limit={os.getenv('CELERY_WORKER_SOFT_TIME_LIMIT', '240')}",  # 软超时
     ])
