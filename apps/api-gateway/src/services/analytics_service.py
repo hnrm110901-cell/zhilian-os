@@ -56,15 +56,16 @@ class AnalyticsService:
             }
 
         # 简单的移动平均预测
-        # 计算最近7天的平均值
-        recent_data = historical_data[-7:] if len(historical_data) >= 7 else historical_data
+        # 计算最近N天的平均值
+        _recent_window = int(os.getenv("ANALYTICS_RECENT_WINDOW_DAYS", "7"))
+        recent_data = historical_data[-_recent_window:] if len(historical_data) >= _recent_window else historical_data
         avg_revenue = sum(d.revenue for d in recent_data) / len(recent_data)
         avg_transactions = sum(d.transactions for d in recent_data) / len(recent_data)
 
         # 计算趋势（简单线性趋势）
-        if len(historical_data) >= 7:
-            first_week_avg = sum(d.revenue for d in historical_data[:7]) / 7
-            last_week_avg = sum(d.revenue for d in historical_data[-7:]) / 7
+        if len(historical_data) >= _recent_window:
+            first_week_avg = sum(d.revenue for d in historical_data[:_recent_window]) / _recent_window
+            last_week_avg = sum(d.revenue for d in historical_data[-_recent_window:]) / _recent_window
             trend = (last_week_avg - first_week_avg) / first_week_avg if first_week_avg > 0 else 0
         else:
             trend = 0

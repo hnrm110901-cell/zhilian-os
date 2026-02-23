@@ -192,21 +192,21 @@ class WeatherImpact:
         """
         if restaurant_type == "火锅":
             # 火锅店：温度越低，生意越好
-            if temperature < 0:
+            if temperature < int(os.getenv("TEMP_THRESHOLD_FREEZING", "0")):
                 return float(os.getenv("TEMP_IMPACT_HOTPOT_FREEZING", "1.5"))
-            elif temperature < 10:
+            elif temperature < int(os.getenv("TEMP_THRESHOLD_COLD", "10")):
                 return float(os.getenv("TEMP_IMPACT_HOTPOT_COLD", "1.3"))
-            elif temperature < 20:
+            elif temperature < int(os.getenv("TEMP_THRESHOLD_COOL", "20")):
                 return float(os.getenv("TEMP_IMPACT_HOTPOT_COOL", "1.1"))
-            elif temperature < 30:
+            elif temperature < int(os.getenv("TEMP_THRESHOLD_HOT", "30")):
                 return 1.0
             else:
                 return float(os.getenv("TEMP_IMPACT_HOTPOT_HOT", "0.8"))
         else:
             # 一般餐厅：极端温度影响客流
-            if temperature < 0 or temperature > 35:
+            if temperature < int(os.getenv("TEMP_THRESHOLD_FREEZING", "0")) or temperature > int(os.getenv("TEMP_THRESHOLD_EXTREME_HIGH", "35")):
                 return float(os.getenv("TEMP_IMPACT_NORMAL_EXTREME", "0.8"))
-            elif temperature < 10 or temperature > 30:
+            elif temperature < int(os.getenv("TEMP_THRESHOLD_COLD", "10")) or temperature > int(os.getenv("TEMP_THRESHOLD_HOT", "30")):
                 return float(os.getenv("TEMP_IMPACT_NORMAL_MODERATE", "0.9"))
             else:
                 return 1.0

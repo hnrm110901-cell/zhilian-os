@@ -34,8 +34,8 @@ class BaseAdapter(ABC):
         """
         self.config = config
         self.base_url = config.get("base_url")
-        self.timeout = config.get("timeout", 30)
-        self.retry_times = config.get("retry_times", 3)
+        self.timeout = config.get("timeout", int(os.getenv("ADAPTER_DEFAULT_TIMEOUT", "30")))
+        self.retry_times = config.get("retry_times", int(os.getenv("ADAPTER_DEFAULT_RETRY_TIMES", "3")))
         self.client = httpx.AsyncClient(timeout=self.timeout)
 
     @abstractmethod

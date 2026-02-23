@@ -676,7 +676,7 @@ class ServiceAgent(BaseAgent):
 
     def _analyze_trend(self, feedbacks: List[CustomerFeedback]) -> str:
         """分析趋势"""
-        if len(feedbacks) < 10:
+        if len(feedbacks) < int(os.getenv("SERVICE_TREND_MIN_FEEDBACKS", "10")):
             return "stable"
 
         # 按时间排序

@@ -125,7 +125,7 @@ class VoiceService:
                 "audio_data": audio_data,
                 "format": "pcm",
                 "sample_rate": 16000,
-                "duration": len(text) * 0.3,  # 估算时长
+                "duration": len(text) * float(os.getenv("TTS_DURATION_PER_CHAR", "0.3")),  # 估算时长
             }
 
         except Exception as e:

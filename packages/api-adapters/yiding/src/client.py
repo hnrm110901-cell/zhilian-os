@@ -227,7 +227,7 @@ class YiDingClient:
 
                 # 如果不是最后一次尝试,等待后重试
                 if attempt < self.max_retries - 1:
-                    wait_time = 2 ** attempt  # 指数退避
+                    wait_time = int(os.getenv("YIDING_RETRY_BACKOFF_BASE", "2")) ** attempt  # 指数退避
                     await asyncio.sleep(wait_time)
                     continue
 

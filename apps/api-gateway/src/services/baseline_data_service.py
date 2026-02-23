@@ -390,10 +390,10 @@ class BaselineDataService:
     ) -> str:
         """生成人员配置建议"""
         staff_data = baseline_data.get("staff", {})
-        area = context.get("area", 100)  # 默认100平米
+        area = context.get("area", int(os.getenv("BASELINE_AREA_UNIT", "100")))  # 默认100平米
 
-        front_staff = staff_data.get("前厅", {}).get("平均", 0) * (area / 100)
-        kitchen_staff = staff_data.get("后厨", {}).get("平均", 0) * (area / 100)
+        front_staff = staff_data.get("前厅", {}).get("平均", 0) * (area / int(os.getenv("BASELINE_AREA_UNIT", "100")))
+        kitchen_staff = staff_data.get("后厨", {}).get("平均", 0) * (area / int(os.getenv("BASELINE_AREA_UNIT", "100")))
 
         return (
             f"根据您的餐厅面积（{area}平米），建议配置前厅人员{front_staff:.0f}人，"
