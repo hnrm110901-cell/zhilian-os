@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime, date, timedelta
 from collections import defaultdict
 import structlog
+import os
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_
 
@@ -411,10 +412,11 @@ class AnalyticsService:
         if lunch_hours and dinner_hours:
             lunch_revenue = sum(h["avg_revenue"] for h in lunch_hours)
             dinner_revenue = sum(h["avg_revenue"] for h in dinner_hours)
+            _meal_diff = float(os.getenv("ANALYTICS_MEAL_DIFF_THRESHOLD", "1.2"))
 
-            if dinner_revenue > lunch_revenue * 1.2:
+            if dinner_revenue > lunch_revenue * _meal_diff:
                 insights.append("晚餐时段营收显著高于午餐，建议增加晚餐时段人员配置")
-            elif lunch_revenue > dinner_revenue * 1.2:
+            elif lunch_revenue > dinner_revenue * _meal_diff:
                 insights.append("午餐时段营收显著高于晚餐，建议优化午餐时段服务")
 
         return insights

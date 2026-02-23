@@ -240,13 +240,15 @@ class BenchmarkService(BaseService):
                 return []
 
             area = store.area or 200
+            _area_low = float(os.getenv("BENCHMARK_AREA_LOW_RATIO", "0.7"))
+            _area_high = float(os.getenv("BENCHMARK_AREA_HIGH_RATIO", "1.3"))
             peers_result = await session.execute(
                 select(Store.id).where(
                     Store.city == store.city,
                     Store.id != store_id,
                     Store.is_active == True,
-                    Store.area >= area * 0.7,
-                    Store.area <= area * 1.3,
+                    Store.area >= area * _area_low,
+                    Store.area <= area * _area_high,
                 ).limit(9)
             )
             return [row[0] for row in peers_result.all()]
