@@ -405,36 +405,40 @@ class AIModelOptimizer:
             raise ValueError(f"Test {test_id} not found")
 
         test = self.ab_tests[test_id]
+        raw_a = test["results"]["model_a"]
+        raw_b = test["results"]["model_b"]
 
-        # Simulate results
-        test["results"]["model_a"] = {
-            "requests": 10000,
-            "successes": 8500,
-            "success_rate": 0.85,
-            "avg_latency_ms": 50.0,
-            "p95_latency_ms": 80.0
+        req_a = raw_a.get("requests", 0)
+        req_b = raw_b.get("requests", 0)
+        model_a = {
+            "requests": req_a,
+            "successes": raw_a.get("successes", 0),
+            "success_rate": raw_a.get("successes", 0) / req_a if req_a > 0 else 0.0,
+            "avg_latency_ms": raw_a.get("avg_latency_ms", 0.0),
+            "p95_latency_ms": raw_a.get("avg_latency_ms", 0.0) * 1.6,
+        }
+        model_b = {
+            "requests": req_b,
+            "successes": raw_b.get("successes", 0),
+            "success_rate": raw_b.get("successes", 0) / req_b if req_b > 0 else 0.0,
+            "avg_latency_ms": raw_b.get("avg_latency_ms", 0.0),
+            "p95_latency_ms": raw_b.get("avg_latency_ms", 0.0) * 1.6,
         }
 
-        test["results"]["model_b"] = {
-            "requests": 10000,
-            "successes": 9200,
-            "success_rate": 0.92,
-            "avg_latency_ms": 45.0,
-            "p95_latency_ms": 70.0
-        }
+        improvement = 0.0
+        if model_a["success_rate"] > 0:
+            improvement = (model_b["success_rate"] - model_a["success_rate"]) / model_a["success_rate"] * 100
 
-        # Calculate statistical significance (simplified)
-        improvement = (test["results"]["model_b"]["success_rate"] - test["results"]["model_a"]["success_rate"]) / test["results"]["model_a"]["success_rate"] * 100
-
+        threshold = float(os.getenv("MODEL_AB_SIGNIFICANCE_THRESHOLD", "5"))
         return {
             "test_id": test_id,
             "test_name": test["test_name"],
             "status": test["status"],
-            "model_a_results": test["results"]["model_a"],
-            "model_b_results": test["results"]["model_b"],
+            "model_a_results": model_a,
+            "model_b_results": model_b,
             "improvement_pct": improvement,
-            "statistical_significance": "significant" if abs(improvement) > float(os.getenv("MODEL_AB_SIGNIFICANCE_THRESHOLD", "5")) else "not_significant",
-            "recommendation": "deploy_model_b" if improvement > float(os.getenv("MODEL_AB_SIGNIFICANCE_THRESHOLD", "5")) else "keep_model_a"
+            "statistical_significance": "significant" if abs(improvement) > threshold else "not_significant",
+            "recommendation": "deploy_model_b" if improvement > threshold else "keep_model_a",
         }
 
     def monitor_model_performance(
@@ -461,51 +465,46 @@ class AIModelOptimizer:
         Returns:
             Performance monitoring data
         """
-        # Simulate monitoring data
         days = (end_date - start_date).days
+        model_info = self.models.get(model_id, {})
+        base_accuracy = model_info.get("accuracy", 0.0)
+        base_latency = model_info.get("latency_ms", 0.0)
+        total_requests = model_info.get("total_requests", 0)
 
         metrics_over_time = []
         for day in range(days):
             date = start_date + timedelta(days=day)
-            # Simulate gradual accuracy drift
-            accuracy = 0.92 - (day * 0.001)  # Slight degradation over time
-
             metrics_over_time.append({
                 "date": date.isoformat(),
-                "accuracy": accuracy,
-                "latency_ms": 50.0 + np.random.normal(0, 5),
-                "error_rate": 0.08 + (day * 0.0005),
-                "requests": 10000 + np.random.randint(-1000, 1000)
+                "accuracy": base_accuracy,
+                "latency_ms": base_latency,
+                "error_rate": round(1.0 - base_accuracy, 4) if base_accuracy > 0 else 0.0,
+                "requests": total_requests,
             })
 
-        # Detect anomalies
-        anomalies = []
-        for i, metrics in enumerate(metrics_over_time):
-            if metrics["accuracy"] < float(os.getenv("MODEL_ACCURACY_DRIFT_THRESHOLD", "0.90")):
-                anomalies.append({
-                    "date": metrics["date"],
-                    "type": "accuracy_drift",
-                    "value": metrics["accuracy"],
-                    "threshold": float(os.getenv("MODEL_ACCURACY_DRIFT_THRESHOLD", "0.90"))
-                })
+        threshold = float(os.getenv("MODEL_ACCURACY_DRIFT_THRESHOLD", "0.90"))
+        anomalies = [
+            {"date": m["date"], "type": "accuracy_drift", "value": m["accuracy"], "threshold": threshold}
+            for m in metrics_over_time
+            if m["accuracy"] > 0 and m["accuracy"] < threshold
+        ]
 
+        n = len(metrics_over_time)
+        summary = {
+            "avg_accuracy": sum(m["accuracy"] for m in metrics_over_time) / n if n else 0.0,
+            "avg_latency_ms": sum(m["latency_ms"] for m in metrics_over_time) / n if n else 0.0,
+            "avg_error_rate": sum(m["error_rate"] for m in metrics_over_time) / n if n else 0.0,
+                "total_requests": sum(m["requests"] for m in metrics_over_time),
+        }
         return {
             "model_id": model_id,
-            "period": {
-                "start": start_date.isoformat(),
-                "end": end_date.isoformat()
-            },
+            "period": {"start": start_date.isoformat(), "end": end_date.isoformat()},
             "metrics_over_time": metrics_over_time,
             "anomalies": anomalies,
-            "summary": {
-                "avg_accuracy": np.mean([m["accuracy"] for m in metrics_over_time]),
-                "avg_latency_ms": np.mean([m["latency_ms"] for m in metrics_over_time]),
-                "avg_error_rate": np.mean([m["error_rate"] for m in metrics_over_time]),
-                "total_requests": sum([m["requests"] for m in metrics_over_time])
-            },
+            "summary": summary,
             "recommendations": [
                 "Consider retraining model due to accuracy drift" if anomalies else "Model performance is stable"
-            ]
+            ],
         }
 
     def get_optimization_history(

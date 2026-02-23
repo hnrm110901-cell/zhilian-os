@@ -664,12 +664,69 @@ class IntelligentRecommendationEngine:
         segment: str
     ) -> Dict[str, Any]:
         """Get customer segment data"""
-        return {
-            "segment": segment,
-            "size": 500,
-            "avg_order_value": 120.0,
-            "visit_frequency": 2.5
-        }
+        if not self.db:
+            return {"segment": segment, "size": 0, "avg_order_value": 0.0, "visit_frequency": 0.0}
+        try:
+            from ..models.order import Order
+            from sqlalchemy import func
+            cutoff_30d = datetime.now() - timedelta(days=30)
+
+            if segment == "lapsed":
+                active_phones = (
+                    self.db.query(Order.customer_phone)
+                    .filter(Order.store_id == store_id, Order.order_time >= cutoff_30d)
+                    .distinct()
+                    .subquery()
+                )
+                size = (
+                    self.db.query(func.count(func.distinct(Order.customer_phone)))
+                    .filter(
+                        Order.store_id == store_id,
+                        Order.order_time < cutoff_30d,
+                        ~Order.customer_phone.in_(self.db.query(active_phones)),
+                    )
+                    .scalar() or 0
+                )
+                avg_val = (
+                    self.db.query(func.avg(Order.total_amount))
+                    .filter(Order.store_id == store_id, Order.order_time < cutoff_30d)
+                    .scalar() or 0.0
+                )
+                return {"segment": segment, "size": size, "avg_order_value": float(avg_val), "visit_frequency": 0.0}
+
+            stats = (
+                self.db.query(
+                    Order.customer_phone,
+                    func.count(Order.id).label("order_count"),
+                    func.avg(Order.total_amount).label("avg_value"),
+                    func.sum(Order.total_amount).label("total_spend"),
+                )
+                .filter(Order.store_id == store_id, Order.status == "completed")
+                .group_by(Order.customer_phone)
+                .all()
+            )
+            if not stats:
+                return {"segment": segment, "size": 0, "avg_order_value": 0.0, "visit_frequency": 0.0}
+
+            n = len(stats)
+            total_spends = sorted(float(s.total_spend or 0) for s in stats)
+            avg_values = sorted(float(s.avg_value or 0) for s in stats)
+
+            if segment == "high_value":
+                threshold = total_spends[int(n * 0.8)] if n > 1 else 0
+                filtered = [s for s in stats if float(s.total_spend or 0) >= threshold]
+            elif segment == "price_sensitive":
+                threshold = avg_values[int(n * 0.3)] if n > 1 else float("inf")
+                filtered = [s for s in stats if float(s.avg_value or 0) <= threshold]
+            else:  # "all"
+                filtered = stats
+
+            size = len(filtered)
+            avg_order = sum(float(s.avg_value or 0) for s in filtered) / size if size else 0.0
+            avg_freq = sum(s.order_count for s in filtered) / size if size else 0.0
+            return {"segment": segment, "size": size, "avg_order_value": avg_order, "visit_frequency": avg_freq}
+        except Exception:
+            return {"segment": segment, "size": 0, "avg_order_value": 0.0, "visit_frequency": 0.0}
 
     def _select_promotion_dishes(
         self,
@@ -688,8 +745,19 @@ class IntelligentRecommendationEngine:
         budget: float
     ) -> float:
         """Calculate optimal discount rate"""
-        # Simplified: 15-20% discount
-        return 0.18
+        if not dishes or budget <= 0:
+            return 0.15
+        avg_price = sum(d.get("price", 0) for d in dishes) / len(dishes)
+        avg_margin = sum(d.get("profit_margin", 0.3) for d in dishes) / len(dishes)
+        # Keep at least 10% margin floor
+        max_discount = max(0.05, avg_margin - 0.10)
+        segment_size = max(segment_data.get("size", 1), 1)
+        base_conversion = float(os.getenv("RECOMMEND_BASE_CONVERSION_RATE", "0.05"))
+        expected_orders = segment_size * base_conversion
+        if expected_orders > 0 and avg_price > 0:
+            budget_discount = budget / (expected_orders * avg_price)
+            return round(min(budget_discount, max_discount, 0.30), 2)
+        return round(min(max_discount, 0.20), 2)
 
     def _estimate_conversion_rate(
         self,
@@ -721,8 +789,12 @@ class IntelligentRecommendationEngine:
         expected_revenue: float
     ) -> int:
         """Calculate optimal campaign duration"""
-        # Simplified: 7-14 days
-        return 10
+        if budget <= 0 or expected_revenue <= 0:
+            return 7
+        # Estimate daily revenue contribution and scale duration to budget
+        daily_revenue = expected_revenue / 30
+        days = int(budget / daily_revenue) if daily_revenue > 0 else 7
+        return max(7, min(30, days))
 
     def _generate_campaign_reason(
         self,
