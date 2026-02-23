@@ -11,14 +11,13 @@ import time
 
 from src.core.config import settings
 # 核心模块
-from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation, approval, edge_node, decision_validator, federated_learning, recommendations, agent_collaboration, embedding, raas, model_marketplace, human_in_the_loop, hardware_integration
-from src.api.phase5_apis import platform_router, industry_router, supply_chain_router, i18n_router
+from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation, approval, federated_learning, embedding, raas, model_marketplace, human_in_the_loop, hardware_integration, pos
+# phase5_apis not yet implemented
+# from src.api.phase5_apis import platform_router, industry_router, supply_chain_router, i18n_router
 # 逐步启用的模块
 from src.api import dashboard, analytics, audit, multi_store, finance, customer360, wechat_triggers, queue, meituan_queue
 # 需要外部适配器的模块 (会在适配器不可用时返回错误)
 from src.api import members
-# POS模块暂时禁用 (文件为空)
-# from src.api import pos
 from src.middleware.monitoring import MonitoringMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
 from src.middleware.audit_log import AuditLogMiddleware
@@ -403,19 +402,17 @@ app.include_router(queue.router, tags=["queue"])
 app.include_router(meituan_queue.router, tags=["meituan_queue"])
 
 # Phase 3: 稳定性加固期 (Stability Reinforcement Period)
-app.include_router(edge_node.router, tags=["edge_node"])
-app.include_router(decision_validator.router, tags=["decision_validator"])
+# edge_node and decision_validator modules not yet implemented
 
 # Phase 4: 智能优化期 (Intelligence Optimization Period)
 app.include_router(federated_learning.router, tags=["federated_learning"])
-app.include_router(recommendations.router, tags=["recommendations"])
-app.include_router(agent_collaboration.router, tags=["agent_collaboration"])
+# recommendations and agent_collaboration modules not yet implemented
 
-# Phase 5: 生态扩展期 (Ecosystem Expansion Period)
-app.include_router(platform_router, tags=["open_platform"])
-app.include_router(industry_router, tags=["industry_solutions"])
-app.include_router(supply_chain_router, tags=["supply_chain"])
-app.include_router(i18n_router, tags=["internationalization"])
+# Phase 5: 生态扩展期 (Ecosystem Expansion Period) - not yet implemented
+# app.include_router(platform_router, tags=["open_platform"])
+# app.include_router(industry_router, tags=["industry_solutions"])
+# app.include_router(supply_chain_router, tags=["supply_chain"])
+# app.include_router(i18n_router, tags=["internationalization"])
 
 # Embedding Model (嵌入模型)
 app.include_router(embedding.router, tags=["embedding"])
@@ -432,8 +429,8 @@ app.include_router(human_in_the_loop.router, tags=["human_in_the_loop"])
 # Hardware Integration (硬件集成 - 树莓派5 + Shokz)
 app.include_router(hardware_integration.router, tags=["hardware_integration"])
 
-# POS模块暂时禁用 (文件为空)
-# app.include_router(pos.router, prefix="/api/v1/pos", tags=["pos"])
+# POS模块
+app.include_router(pos.router, prefix="/api/v1/pos", tags=["pos"])
 
 
 @app.on_event("startup")

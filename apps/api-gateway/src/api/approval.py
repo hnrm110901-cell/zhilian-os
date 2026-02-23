@@ -10,8 +10,8 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 import structlog
 
-from ..core.dependencies import get_current_active_user, get_db
-from ..core.permissions import Permission, require_permission
+from ..core.dependencies import get_current_active_user, get_db, require_permission
+from ..core.permissions import Permission
 from ..models import User
 from ..models.decision_log import DecisionLog, DecisionType, DecisionStatus, DecisionOutcome
 from ..services.approval_service import approval_service

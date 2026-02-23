@@ -101,7 +101,7 @@ class Dish(Base, TimestampMixin):
 
     # 额外信息
     notes = Column(Text)  # 备注
-    metadata = Column(JSON)  # 扩展字段
+    dish_metadata = Column(JSON)  # 扩展字段
 
     # 关联关系
     category = relationship("DishCategory", back_populates="dishes")

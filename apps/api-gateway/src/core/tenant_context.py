@@ -5,6 +5,7 @@
 from contextvars import ContextVar
 from typing import Optional
 from functools import wraps
+import asyncio
 import structlog
 
 logger = structlog.get_logger()
@@ -58,7 +59,6 @@ def with_tenant(store_id: str):
     用法:
         @with_tenant("STORE001")
         async def some_function():
-            # 在此函数内可以使用TenantContext.get_current_tenant()
             pass
     """
     def decorator(func):
@@ -78,8 +78,6 @@ def with_tenant(store_id: str):
             finally:
                 TenantContext.clear_current_tenant()
 
-        # 根据函数类型返回对应的wrapper
-        import asyncio
         if asyncio.iscoroutinefunction(func):
             return async_wrapper
         else:

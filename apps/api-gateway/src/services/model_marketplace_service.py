@@ -8,12 +8,17 @@
 - Level 3: 定制模型（¥29,999/年） - 针对特定品类的专属模型
 - Level 4: 数据贡献分成 - 门店贡献数据获得模型销售收益分成
 """
-from datetime import datetime
+import os
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from enum import Enum
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy import select, func
 import structlog
+import uuid
+from src.core.database import get_db_session
+from src.models.ai_model import AIModel, ModelPurchaseRecord, DataContributionRecord
 
 logger = structlog.get_logger()
 
@@ -86,12 +91,12 @@ class DataContribution(BaseModel):
 class ModelMarketplaceService:
     """模型交易市场服务"""
 
-    # 模型定价
-    INDUSTRY_MODEL_PRICE = 9999.0  # 行业模型年费
-    CUSTOM_MODEL_PRICE = 29999.0  # 定制模型年费
+    # 模型定价（支持环境变量覆盖）
+    INDUSTRY_MODEL_PRICE = float(os.getenv("MARKETPLACE_INDUSTRY_PRICE", "9999.0"))
+    CUSTOM_MODEL_PRICE = float(os.getenv("MARKETPLACE_CUSTOM_PRICE", "29999.0"))
 
-    # 数据贡献分成比例
-    DATA_CONTRIBUTION_SHARE = 0.30  # 数据贡献者获得模型销售收入的30%
+    # 数据贡献分成比例（支持环境变量覆盖）
+    DATA_CONTRIBUTION_SHARE = float(os.getenv("MARKETPLACE_DATA_CONTRIBUTION_SHARE", "0.30"))
 
     def __init__(self, db: Session):
         self.db = db
@@ -112,60 +117,34 @@ class ModelMarketplaceService:
             industry_category=industry_category
         )
 
-        # TODO: 从数据库查询模型列表
-        # 这里返回模拟数据
+        async with get_db_session() as session:
+            stmt = select(AIModel).where(AIModel.status == "active")
+            if model_type:
+                stmt = stmt.where(AIModel.model_type == model_type.value)
+            if model_level:
+                stmt = stmt.where(AIModel.model_level == model_level.value)
+            if industry_category:
+                stmt = stmt.where(AIModel.industry_category == industry_category.value)
+            result = await session.execute(stmt)
+            rows = result.scalars().all()
+
         models = [
             ModelInfo(
-                model_id="model_001",
-                model_name="全国快餐店智能排班模型",
-                model_type=ModelType.SCHEDULING,
-                model_level=ModelLevel.INDUSTRY,
-                industry_category=IndustryCategory.FAST_FOOD,
-                description="基于全国1000家快餐店的联邦学习训练，准确预测客流高峰，优化排班方案",
-                price=self.INDUSTRY_MODEL_PRICE,
-                training_stores_count=1000,
-                training_data_points=10000000,
-                accuracy=92.5,
-                created_at=datetime.now(),
-                updated_at=datetime.now()
-            ),
-            ModelInfo(
-                model_id="model_002",
-                model_name="火锅行业最优库存预测模型",
-                model_type=ModelType.INVENTORY,
-                model_level=ModelLevel.CUSTOM,
-                industry_category=IndustryCategory.HOTPOT,
-                description="专为火锅行业定制，精准预测食材需求，降低损耗率5-8%",
-                price=self.CUSTOM_MODEL_PRICE,
-                training_stores_count=500,
-                training_data_points=5000000,
-                accuracy=95.2,
-                created_at=datetime.now(),
-                updated_at=datetime.now()
-            ),
-            ModelInfo(
-                model_id="model_003",
-                model_name="海鲜餐厅BOM损耗控制模型",
-                model_type=ModelType.BOM,
-                model_level=ModelLevel.CUSTOM,
-                industry_category=IndustryCategory.SEAFOOD,
-                description="针对海鲜食材特性，智能控制解冻量和备货量，月省3000-5000元",
-                price=self.CUSTOM_MODEL_PRICE,
-                training_stores_count=300,
-                training_data_points=3000000,
-                accuracy=93.8,
-                created_at=datetime.now(),
-                updated_at=datetime.now()
+                model_id=r.id,
+                model_name=r.model_name,
+                model_type=ModelType(r.model_type),
+                model_level=ModelLevel(r.model_level),
+                industry_category=IndustryCategory(r.industry_category) if r.industry_category else None,
+                description=r.description or "",
+                price=r.price or 0.0,
+                training_stores_count=r.training_stores_count or 0,
+                training_data_points=r.training_data_points or 0,
+                accuracy=r.accuracy or 0.0,
+                created_at=r.created_at,
+                updated_at=r.updated_at or r.created_at,
             )
+            for r in rows
         ]
-
-        # 过滤
-        if model_type:
-            models = [m for m in models if m.model_type == model_type]
-        if model_level:
-            models = [m for m in models if m.model_level == model_level]
-        if industry_category:
-            models = [m for m in models if m.industry_category == industry_category]
 
         return models
 
@@ -179,18 +158,36 @@ class ModelMarketplaceService:
         """
         logger.info("购买模型", store_id=store_id, model_id=model_id)
 
-        # TODO: 从数据库查询模型信息
-        # TODO: 创建购买记录
-        # TODO: 处理支付
+        async with get_db_session() as session:
+            model_result = await session.execute(
+                select(AIModel).where(AIModel.id == model_id)
+            )
+            model = model_result.scalar_one_or_none()
+            if not model:
+                raise ValueError(f"模型不存在: {model_id}")
+
+            price_paid = model.price or self.INDUSTRY_MODEL_PRICE
+            record = ModelPurchaseRecord(
+                id=str(uuid.uuid4()),
+                store_id=store_id,
+                model_id=model_id,
+                purchase_date=datetime.now(),
+                expiry_date=datetime.now() + timedelta(days=int(os.getenv("MODEL_LICENSE_EXPIRY_DAYS", "365"))),
+                price_paid=price_paid,
+                status="active",
+            )
+            session.add(record)
+            await session.commit()
+            purchase_id = record.id
 
         purchase = ModelPurchase(
-            purchase_id=f"purchase_{store_id}_{model_id}_{int(datetime.now().timestamp())}",
+            purchase_id=purchase_id,
             store_id=store_id,
             model_id=model_id,
             purchase_date=datetime.now(),
-            expiry_date=datetime.now().replace(year=datetime.now().year + 1),
-            price_paid=self.INDUSTRY_MODEL_PRICE,
-            status="active"
+            expiry_date=datetime.now() + timedelta(days=int(os.getenv("MODEL_LICENSE_EXPIRY_DAYS", "365"))),
+            price_paid=price_paid,
+            status="active",
         )
 
         logger.info("模型购买成功", purchase_id=purchase.purchase_id)
@@ -216,24 +213,33 @@ class ModelMarketplaceService:
             quality_score=quality_score
         )
 
-        # TODO: 验证数据质量
-        # TODO: 参与联邦学习训练
-        # TODO: 计算分成金额
-
-        # 简单计算：数据质量越高，分成越多
-        base_revenue_share = 100.0  # 基础分成
+        base_revenue_share = float(os.getenv("MARKETPLACE_BASE_REVENUE_SHARE", "100.0"))
         quality_multiplier = quality_score / 100.0
-        data_volume_multiplier = min(data_points / 10000, 10.0)  # 最多10倍
+        data_volume_multiplier = min(data_points / int(os.getenv("MARKETPLACE_DATA_VOLUME_BASE", "10000")), float(os.getenv("MARKETPLACE_DATA_VOLUME_MAX_MULTIPLIER", "10.0")))
         revenue_share = base_revenue_share * quality_multiplier * data_volume_multiplier
 
+        async with get_db_session() as session:
+            record = DataContributionRecord(
+                id=str(uuid.uuid4()),
+                store_id=store_id,
+                model_id=model_id,
+                data_points_contributed=data_points,
+                quality_score=quality_score,
+                contribution_date=datetime.now(),
+                revenue_share=revenue_share,
+            )
+            session.add(record)
+            await session.commit()
+            contribution_id = record.id
+
         contribution = DataContribution(
-            contribution_id=f"contrib_{store_id}_{model_id}_{int(datetime.now().timestamp())}",
+            contribution_id=contribution_id,
             store_id=store_id,
             model_id=model_id,
             data_points_contributed=data_points,
             quality_score=quality_score,
             contribution_date=datetime.now(),
-            revenue_share=revenue_share
+            revenue_share=revenue_share,
         )
 
         logger.info(
@@ -252,10 +258,29 @@ class ModelMarketplaceService:
         """
         logger.info("获取门店已购买模型", store_id=store_id)
 
-        # TODO: 从数据库查询
-        return []
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(ModelPurchaseRecord).where(
+                    ModelPurchaseRecord.store_id == store_id,
+                    ModelPurchaseRecord.status == "active",
+                )
+            )
+            rows = result.scalars().all()
 
-    async def get_store_data_contributions(
+        return [
+            ModelPurchase(
+                purchase_id=r.id,
+                store_id=r.store_id,
+                model_id=r.model_id,
+                purchase_date=r.purchase_date,
+                expiry_date=r.expiry_date,
+                price_paid=r.price_paid or 0.0,
+                status=r.status,
+            )
+            for r in rows
+        ]
+
+    async def get_data_contributions(
         self,
         store_id: str
     ) -> List[DataContribution]:
@@ -264,10 +289,26 @@ class ModelMarketplaceService:
         """
         logger.info("获取门店数据贡献记录", store_id=store_id)
 
-        # TODO: 从数据库查询
-        return []
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(DataContributionRecord).where(
+                    DataContributionRecord.store_id == store_id
+                ).order_by(DataContributionRecord.contribution_date.desc())
+            )
+            rows = result.scalars().all()
 
-    async def calculate_network_effect(self) -> Dict:
+        return [
+            DataContribution(
+                contribution_id=r.id,
+                store_id=r.store_id,
+                model_id=r.model_id,
+                data_points_contributed=r.data_points_contributed or 0,
+                quality_score=r.quality_score or 0.0,
+                contribution_date=r.contribution_date,
+                revenue_share=r.revenue_share or 0.0,
+            )
+            for r in rows
+        ]
         """
         计算网络效应指标
 
@@ -275,15 +316,38 @@ class ModelMarketplaceService:
         """
         logger.info("计算网络效应指标")
 
-        # TODO: 从数据库统计
+        async with get_db_session() as session:
+            total_stores_result = await session.execute(
+                select(func.count(func.distinct(ModelPurchaseRecord.store_id)))
+            )
+            total_stores = int(total_stores_result.scalar() or 0)
+
+            total_models_result = await session.execute(
+                select(func.count(AIModel.id)).where(AIModel.status == "active")
+            )
+            total_models = int(total_models_result.scalar() or 0)
+
+            total_data_result = await session.execute(
+                select(func.coalesce(func.sum(DataContributionRecord.data_points_contributed), 0))
+            )
+            total_data_points = int(total_data_result.scalar() or 0)
+
+            avg_accuracy_result = await session.execute(
+                select(func.avg(AIModel.accuracy)).where(AIModel.status == "active")
+            )
+            avg_accuracy = round(float(avg_accuracy_result.scalar() or 0), 1)
+
+        network_value = total_stores * total_stores * float(os.getenv("MARKETPLACE_NETWORK_VALUE_COEF", "0.5"))
+        moat_strength = "high" if total_stores >= int(os.getenv("MARKETPLACE_MOAT_HIGH_STORES", "500")) else ("medium" if total_stores >= int(os.getenv("MARKETPLACE_MOAT_MED_STORES", "100")) else "low")
+
         network_effect = {
-            "total_stores": 1000,  # 总接入门店数
-            "total_models": 15,  # 总模型数量
-            "total_data_points": 50000000,  # 总训练数据点
-            "avg_model_accuracy": 93.5,  # 平均模型准确率
-            "monthly_new_stores": 50,  # 月新增门店
-            "network_value": 1000 * 1000 * 0.5,  # 网络价值 = n^2 * 单位价值（梅特卡夫定律）
-            "moat_strength": "high"  # 护城河强度
+            "total_stores": total_stores,
+            "total_models": total_models,
+            "total_data_points": total_data_points,
+            "avg_model_accuracy": avg_accuracy,
+            "monthly_new_stores": 0,
+            "network_value": network_value,
+            "moat_strength": moat_strength,
         }
 
         return network_effect

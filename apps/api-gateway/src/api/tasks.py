@@ -3,8 +3,8 @@ Task Management API
 任务管理API
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
-from typing import Optional, List
+from pydantic import BaseModel, Field, field_validator
+from typing import Optional, List, Any
 from datetime import datetime
 import structlog
 import uuid
@@ -69,6 +69,13 @@ class TaskResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+    @field_validator("id", "creator_id", "assignee_id", mode="before")
+    @classmethod
+    def coerce_uuid_to_str(cls, v: Any) -> Optional[str]:
+        if v is None:
+            return v
+        return str(v)
 
 
 # ==================== API Endpoints ====================

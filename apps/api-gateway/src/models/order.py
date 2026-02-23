@@ -34,7 +34,7 @@ class Order(Base, TimestampMixin):
     customer_phone = Column(String(20))
 
     # Order details
-    status = Column(Enum(OrderStatus), default=OrderStatus.PENDING, nullable=False, index=True)
+    status = Column(String(20), default=OrderStatus.PENDING.value, nullable=False, index=True)
     total_amount = Column(Integer, nullable=False)  # Amount in cents
     discount_amount = Column(Integer, default=0)
     final_amount = Column(Integer, nullable=False)

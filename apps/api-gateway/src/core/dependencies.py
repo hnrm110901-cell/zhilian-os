@@ -114,3 +114,24 @@ def require_all_permissions(*required_permissions: Permission):
         return current_user
 
     return permission_checker
+
+
+async def get_current_tenant(
+    current_user: User = Depends(get_current_active_user),
+) -> str:
+    """
+    FastAPI 依赖：从当前登录用户提取租户ID（store_id）
+
+    用法:
+        tenant_id: str = Depends(get_current_tenant)
+    """
+    from .tenant_context import TenantContext
+
+    store_id = getattr(current_user, "store_id", None)
+    if not store_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="当前用户未关联门店，无法确定租户上下文",
+        )
+    TenantContext.set_current_tenant(store_id)
+    return store_id

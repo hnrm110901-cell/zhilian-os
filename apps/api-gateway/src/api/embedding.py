@@ -15,7 +15,7 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 from ..core.database import get_db
-from ..core.tenant_context import get_current_tenant
+from ..core.dependencies import get_current_tenant
 from ..services.embedding_model_service import EmbeddingModelService
 import logging
 
