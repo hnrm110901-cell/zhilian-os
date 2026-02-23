@@ -356,8 +356,34 @@ class IntelligentRecommendationEngine:
         store_id: str
     ) -> List[Dict[str, Any]]:
         """Get customer order history"""
-        # Simplified: query from database
-        return []
+        if not self.db:
+            return []
+        try:
+            from ..models.order import Order, OrderItem
+            orders = (
+                self.db.query(Order)
+                .filter(
+                    Order.store_id == store_id,
+                    Order.customer_phone == customer_id,
+                    Order.status == "completed",
+                )
+                .order_by(Order.order_time.desc())
+                .limit(20)
+                .all()
+            )
+            history = []
+            for order in orders:
+                for item in order.items:
+                    history.append({
+                        "order_id": order.id,
+                        "dish_id": item.item_id,
+                        "dish_name": item.item_name,
+                        "quantity": item.quantity,
+                        "order_time": order.order_time.isoformat() if order.order_time else None,
+                    })
+            return history
+        except Exception:
+            return []
 
     def _get_available_dishes(self, store_id: str) -> List[Dict[str, Any]]:
         """Get available dishes for store"""

@@ -393,28 +393,68 @@ class FinanceRuleEngine:
             Dict: 菜品盈利分析
         """
         try:
-            # 这里应该查询订单数据并分析每个菜品的盈利情况
-            # 简化实现，返回示例数据
+            if db is None:
+                return {
+                    "store_id": store_id,
+                    "period": {"start_date": start_date.isoformat(), "end_date": end_date.isoformat()},
+                    "dishes": [],
+                    "error": "no_db_session"
+                }
+
+            from sqlalchemy import func
+            from ..models.order import Order, OrderItem
+
+            rows = (
+                db.query(
+                    OrderItem.item_id,
+                    OrderItem.item_name,
+                    func.sum(OrderItem.quantity).label("sales_count"),
+                    func.sum(OrderItem.subtotal).label("revenue_cents"),
+                )
+                .join(Order, OrderItem.order_id == Order.id)
+                .filter(
+                    Order.store_id == store_id,
+                    Order.order_time >= start_date,
+                    Order.order_time <= end_date,
+                    Order.status == "completed",
+                )
+                .group_by(OrderItem.item_id, OrderItem.item_name)
+                .all()
+            )
+
+            food_cost_rate = float(os.getenv("DEFAULT_FOOD_COST_RATE", "0.30"))
+            overhead_rate = float(os.getenv("DEFAULT_OVERHEAD_RATE", "0.30"))
+            dishes = []
+            for row in rows:
+                revenue = (row.revenue_cents or 0) / 100.0
+                food_cost = revenue * food_cost_rate
+                gross_profit = revenue - food_cost
+                gpm = gross_profit / revenue if revenue > 0 else 0
+                net_profit = gross_profit - revenue * overhead_rate
+                npm = net_profit / revenue if revenue > 0 else 0
+                if gpm >= 0.6:
+                    rec = "高利润菜品，建议推广"
+                elif gpm >= 0.4:
+                    rec = "利润适中，保持现状"
+                else:
+                    rec = "低利润菜品，考虑调整定价或成本"
+                dishes.append({
+                    "dish_id": row.item_id,
+                    "dish_name": row.item_name,
+                    "sales_count": row.sales_count,
+                    "revenue": round(revenue, 2),
+                    "food_cost": round(food_cost, 2),
+                    "gross_profit": round(gross_profit, 2),
+                    "gross_profit_margin": round(gpm, 2),
+                    "net_profit": round(net_profit, 2),
+                    "net_profit_margin": round(npm, 2),
+                    "recommendation": rec,
+                })
+
             return {
                 "store_id": store_id,
-                "period": {
-                    "start_date": start_date.isoformat(),
-                    "end_date": end_date.isoformat()
-                },
-                "dishes": [
-                    {
-                        "dish_id": "DISH001",
-                        "dish_name": "宫保鸡丁",
-                        "sales_count": 150,
-                        "revenue": 2250.0,
-                        "food_cost": 675.0,
-                        "gross_profit": 1575.0,
-                        "gross_profit_margin": 0.70,
-                        "net_profit": 900.0,
-                        "net_profit_margin": 0.40,
-                        "recommendation": "高利润菜品，建议推广"
-                    }
-                ]
+                "period": {"start_date": start_date.isoformat(), "end_date": end_date.isoformat()},
+                "dishes": sorted(dishes, key=lambda x: x["gross_profit_margin"], reverse=True),
             }
 
         except Exception as e:

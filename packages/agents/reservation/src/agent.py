@@ -424,10 +424,13 @@ class ReservationAgent(BaseAgent):
         party_size: int
     ) -> bool:
         """检查可用性"""
-        # 简化实现：模拟检查
-        # 实际应该查询数据库检查该时段的预定情况
-        import random
-        return random.random() > 0.1  # 90%概率有位
+        existing = await self._get_reservations_by_time(date, time)
+        available_tables = await self._get_available_tables(date, time)
+        occupied = {r.get("table_number") for r in existing if r.get("table_number")}
+        for table in available_tables:
+            if table["table_number"] not in occupied and table["capacity"] >= party_size:
+                return True
+        return False
 
     def _recommend_table_type(self, party_size: int) -> TableType:
         """推荐桌型"""
@@ -510,11 +513,28 @@ class ReservationAgent(BaseAgent):
 
     async def _allocate_table(self, reservation: Reservation) -> str:
         """分配桌位"""
-        # 简化实现：根据桌型分配
-        table_type = reservation["table_type"]
-        # 实际应该查询可用桌位
-        table_number = f"{table_type.upper()[0]}{datetime.now().strftime('%H%M%S')[-3:]}"
-        return table_number
+        date = reservation.get("reservation_date", "")
+        time = reservation.get("reservation_time", "")
+        party_size = reservation.get("party_size", 1)
+        table_type = str(reservation.get("table_type", "")).lower()
+
+        available_tables = await self._get_available_tables(date, time)
+        existing = await self._get_reservations_by_time(date, time)
+        occupied = {r.get("table_number") for r in existing if r.get("table_number")}
+
+        # 优先匹配桌型
+        for table in available_tables:
+            if table["table_number"] not in occupied and table["capacity"] >= party_size:
+                if str(table.get("table_type", "")).lower() == table_type:
+                    return table["table_number"]
+
+        # 退而求其次，任意合适空桌
+        for table in available_tables:
+            if table["table_number"] not in occupied and table["capacity"] >= party_size:
+                return table["table_number"]
+
+        # 无可用桌位时生成临时编号
+        return f"{table_type.upper()[:1]}{datetime.now().strftime('%H%M%S')[-3:]}"
 
     async def cancel_reservation(
         self,

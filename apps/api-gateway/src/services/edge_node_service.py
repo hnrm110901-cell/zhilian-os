@@ -68,10 +68,19 @@ class EdgeNodeService:
             NetworkStatus: 网络状态
         """
         try:
-            # 实际实现应该ping云端服务器或检查网络连接
-            # 这里简化为返回当前状态
-            return self.network_status
-
+            import socket
+            cloud_host = os.getenv("CLOUD_API_HOST", "8.8.8.8")
+            cloud_port = int(os.getenv("CLOUD_API_PORT", "53"))
+            sock = socket.create_connection((cloud_host, cloud_port), timeout=3)
+            sock.close()
+            self.network_status = NetworkStatus.CONNECTED
+            return NetworkStatus.CONNECTED
+        except socket.timeout:
+            self.network_status = NetworkStatus.UNSTABLE
+            return NetworkStatus.UNSTABLE
+        except (OSError, socket.error):
+            self.network_status = NetworkStatus.DISCONNECTED
+            return NetworkStatus.DISCONNECTED
         except Exception as e:
             logger.error("check_network_status_failed", error=str(e))
             return NetworkStatus.DISCONNECTED
@@ -404,10 +413,25 @@ class EdgeNodeService:
 
             for operation in self.pending_sync_queue[:]:
                 try:
-                    # 实际实现应该调用云端API同步数据
-                    # 这里简化为标记为已同步
-                    synced_count += 1
-                    self.pending_sync_queue.remove(operation)
+                    cloud_url = os.getenv("CLOUD_SYNC_URL", "http://localhost:8000/api/v1/sync")
+                    import urllib.request
+                    data = json.dumps(operation, default=str).encode("utf-8")
+                    req = urllib.request.Request(
+                        cloud_url,
+                        data=data,
+                        headers={"Content-Type": "application/json"},
+                        method="POST"
+                    )
+                    with urllib.request.urlopen(req, timeout=10) as resp:
+                        if resp.status in (200, 201, 204):
+                            synced_count += 1
+                            self.pending_sync_queue.remove(operation)
+                        else:
+                            failed_count += 1
+                            failed_operations.append({
+                                "sync_id": operation["sync_id"],
+                                "error": f"HTTP {resp.status}"
+                            })
 
                     logger.info(
                         "operation_synced",
