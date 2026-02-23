@@ -190,8 +190,15 @@ class WeChatTriggerService:
         if not rule.get("enabled", False):
             return False
 
-        # 可以在这里添加更复杂的条件判断
-        # 例如：只在营业时间推送、只推送给特定门店等
+        # 紧急事件不受营业时间限制
+        if rule.get("priority") in ["urgent", "high"]:
+            return True
+
+        # 普通事件只在营业时间推送（8:00-23:00）
+        now_hour = datetime.now().hour
+        if not (8 <= now_hour < 23):
+            logger.debug("非营业时间，跳过推送", event_type=event_type, hour=now_hour)
+            return False
 
         return True
 

@@ -20,18 +20,36 @@ class TrainingService:
     """培训服务类"""
 
     def __init__(self, store_id: str = "STORE001"):
-        """
-        初始化培训服务
-
-        Args:
-            store_id: 门店ID
-        """
         self.store_id = store_id
         self.training_config = {
             "min_passing_score": 70,
             "certificate_validity_months": 12
         }
         logger.info("TrainingService初始化", store_id=store_id)
+
+    async def _get_training_config(self) -> Dict[str, Any]:
+        """从Store配置读取培训参数，失败时使用默认值"""
+        try:
+            from src.models.store import Store
+            async with get_db_session() as session:
+                result = await session.execute(select(Store).where(Store.id == self.store_id))
+                store = result.scalar_one_or_none()
+                if store and store.config:
+                    cfg = store.config
+                    return {
+                        "min_passing_score": int(cfg.get("training_min_passing_score", 70)),
+                        "certificate_validity_months": int(cfg.get("training_certificate_validity_months", 12)),
+                        "warning_threshold": float(cfg.get("training_warning_threshold", 60.0)),
+                        "critical_threshold": float(cfg.get("training_critical_threshold", 50.0)),
+                    }
+        except Exception as e:
+            logger.warning("读取培训配置失败，使用默认值", error=str(e))
+        return {
+            "min_passing_score": 70,
+            "certificate_validity_months": 12,
+            "warning_threshold": 60.0,
+            "critical_threshold": 50.0,
+        }
 
     async def assess_training_needs(
         self,
@@ -93,6 +111,12 @@ class TrainingService:
         """
         async with get_db_session() as session:
             try:
+                # 从Store配置读取培训参数
+                training_cfg = await self._get_training_config()
+                min_passing = training_cfg["min_passing_score"]
+                warning_thr = training_cfg["warning_threshold"]
+                critical_thr = training_cfg["critical_threshold"]
+
                 # 创建培训完成记录（使用KPI记录）
                 kpi_id = f"KPI_TRAINING_{course_name.upper().replace(' ', '_')}"
 
@@ -108,9 +132,9 @@ class TrainingService:
                         category="training",
                         description=f"Training completion for {course_name}",
                         unit="score",
-                        target_value=self.training_config["min_passing_score"],
-                        warning_threshold=60.0,
-                        critical_threshold=50.0,
+                        target_value=min_passing,
+                        warning_threshold=warning_thr,
+                        critical_threshold=critical_thr,
                         calculation_method="average",
                         is_active="true"
                     )
@@ -131,7 +155,7 @@ class TrainingService:
                     kpi_metadata={
                         "staff_id": staff_id,
                         "course_name": course_name,
-                        "passed": (score or 100) >= self.training_config["min_passing_score"],
+                        "passed": (score or 100) >= min_passing,
                         **kwargs
                     }
                 )
@@ -147,7 +171,7 @@ class TrainingService:
                     "course_name": course_name,
                     "completion_date": completion_date,
                     "score": score,
-                    "passed": (score or 100) >= self.training_config["min_passing_score"],
+                    "passed": (score or 100) >= min_passing,
                     "status": kpi_record.status
                 }
 
