@@ -6,6 +6,7 @@ WeChat Push Trigger Service
 """
 from typing import Dict, Any, Optional
 import structlog
+import os
 from datetime import datetime
 from sqlalchemy import select
 
@@ -194,9 +195,11 @@ class WeChatTriggerService:
         if rule.get("priority") in ["urgent", "high"]:
             return True
 
-        # 普通事件只在营业时间推送（8:00-23:00）
+        # 普通事件只在营业时间推送（支持环境变量覆盖）
         now_hour = datetime.now().hour
-        if not (8 <= now_hour < 23):
+        _open_hour = int(os.getenv("BUSINESS_OPEN_HOUR", "8"))
+        _close_hour = int(os.getenv("BUSINESS_CLOSE_HOUR", "23"))
+        if not (_open_hour <= now_hour < _close_hour):
             logger.debug("非营业时间，跳过推送", event_type=event_type, hour=now_hour)
             return False
 

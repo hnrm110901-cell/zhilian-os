@@ -18,6 +18,7 @@ from datetime import datetime, timedelta
 from pydantic import BaseModel
 import numpy as np
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -269,7 +270,7 @@ class FederatedBOMService:
                 f"No global model for ingredient {ingredient_id}, "
                 f"using default loss rate"
             )
-            return 0.05  # 默认5%损耗率
+            return float(os.getenv("BOM_DEFAULT_LOSS_RATE", "0.05"))  # 默认5%损耗率
 
         # 构造特征向量
         season_code = {"spring": 0, "summer": 1, "autumn": 2, "winter": 3}
@@ -404,7 +405,7 @@ class FederatedBOMService:
         # 计算偏差
         global_loss_rate = global_model["loss_rate"]
         deviation = abs(current_loss_rate - global_loss_rate)
-        threshold = global_loss_rate * 0.5  # 50%偏差阈值
+        threshold = global_loss_rate * float(os.getenv("BOM_ANOMALY_THRESHOLD_RATIO", "0.5"))  # 偏差阈值
 
         is_anomaly = deviation > threshold
 
@@ -461,7 +462,7 @@ class FederatedBOMService:
         # 应用到目标区域（带置信度衰减）
         target_pattern = source_pattern.copy()
         target_pattern.region = target_region
-        target_pattern.confidence *= 0.7  # 跨区域置信度衰减
+        target_pattern.confidence *= float(os.getenv("BOM_CROSS_REGION_CONFIDENCE_DECAY", "0.7"))  # 跨区域置信度衰减
 
         # 存储到模式库
         pattern_key = f"{target_region}_{ingredient_id}"
