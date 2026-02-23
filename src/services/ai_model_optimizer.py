@@ -433,8 +433,8 @@ class AIModelOptimizer:
             "model_a_results": test["results"]["model_a"],
             "model_b_results": test["results"]["model_b"],
             "improvement_pct": improvement,
-            "statistical_significance": "significant" if abs(improvement) > 5 else "not_significant",
-            "recommendation": "deploy_model_b" if improvement > 5 else "keep_model_a"
+            "statistical_significance": "significant" if abs(improvement) > float(os.getenv("MODEL_AB_SIGNIFICANCE_THRESHOLD", "5")) else "not_significant",
+            "recommendation": "deploy_model_b" if improvement > float(os.getenv("MODEL_AB_SIGNIFICANCE_THRESHOLD", "5")) else "keep_model_a"
         }
 
     def monitor_model_performance(

@@ -415,14 +415,14 @@ class IntelligentRecommendationEngine:
         # Time-based adjustment
         hour = context.get("hour", 12)
         if dish.get("category") == "早餐" and 6 <= hour <= 10:
-            score += 0.3
+            score += float(os.getenv("RECOMMEND_TIME_SCORE_BOOST", "0.3"))
         elif dish.get("category") == "正餐" and 11 <= hour <= 14:
-            score += 0.3
+            score += float(os.getenv("RECOMMEND_TIME_SCORE_BOOST", "0.3"))
 
         # Weather-based adjustment
         weather = context.get("weather", "")
         if "cold" in weather and "hot" in dish.get("tags", []):
-            score += 0.2
+            score += float(os.getenv("RECOMMEND_WEATHER_SCORE_BOOST", "0.2"))
 
         return min(score, 1.0)
 
@@ -436,11 +436,11 @@ class IntelligentRecommendationEngine:
 
         # Profit margin component
         profit_margin = dish.get("profit_margin", 0.5)
-        score += profit_margin * 0.5
+        score += profit_margin * float(os.getenv("RECOMMEND_PROFIT_WEIGHT", "0.5"))
 
         # Inventory component (promote high inventory items)
         # Simplified
-        score += 0.3
+        score += float(os.getenv("RECOMMEND_TIME_SCORE_BOOST", "0.3"))
 
         return min(score, 1.0)
 

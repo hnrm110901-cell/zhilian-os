@@ -206,7 +206,7 @@ class OpenAPIPlatform:
         # Verify timestamp (prevent replay attacks)
         try:
             request_time = datetime.fromisoformat(timestamp)
-            if abs((datetime.utcnow() - request_time).total_seconds()) > 300:
+            if abs((datetime.utcnow() - request_time).total_seconds()) > int(os.getenv("OPENAPI_REPLAY_WINDOW_SECONDS", "300")):
                 # Request older than 5 minutes
                 return None
         except ValueError:

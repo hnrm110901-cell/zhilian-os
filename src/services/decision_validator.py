@@ -3,6 +3,7 @@
 实现AI决策的双规校验，防止AI幻觉导致的业务灾难
 结合AI的直觉判断和规则引擎的逻辑校验
 """
+import os
 from typing import Dict, List, Optional, Any
 import structlog
 from datetime import datetime
@@ -316,7 +317,7 @@ class ProfitMarginRule(ValidationRule):
                     "severity": "critical"
                 }
 
-            if profit_margin < min_profit_margin * 1.2:
+            if profit_margin < min_profit_margin * float(os.getenv("DECISION_PROFIT_WARNING_FACTOR", "1.2")):
                 return {
                     "passed": True,
                     "rule": self.rule_name,

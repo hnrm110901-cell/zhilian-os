@@ -86,28 +86,28 @@ class RateLimiter:
             scope="ip"
         )
         self.endpoint_limits["/api/v1/auth/register"] = RateLimitRule(
-            requests=3,
-            window=3600,
+            requests=int(os.getenv("RATE_LIMIT_REGISTER_REQUESTS", "3")),
+            window=int(os.getenv("RATE_LIMIT_REGISTER_WINDOW", "3600")),
             scope="ip"
         )
 
         # API endpoints - moderate limits
         self.endpoint_limits["/api/v1/agents/*"] = RateLimitRule(
-            requests=100,
+            requests=int(os.getenv("RATE_LIMIT_AGENT_REQUESTS", "100")),
             window=60,
             scope="user"
         )
 
         # Heavy operations - stricter limits
         self.endpoint_limits["/api/v1/analytics/*"] = RateLimitRule(
-            requests=20,
+            requests=int(os.getenv("RATE_LIMIT_ANALYTICS_REQUESTS", "20")),
             window=60,
             scope="user"
         )
 
         # Webhook endpoints - very strict
         self.endpoint_limits["/api/v1/webhooks/*"] = RateLimitRule(
-            requests=10,
+            requests=int(os.getenv("RATE_LIMIT_WEBHOOK_REQUESTS", "10")),
             window=60,
             scope="ip"
         )

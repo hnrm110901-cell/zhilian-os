@@ -3,6 +3,7 @@
 支持边缘计算和弱网环境下的降级运行
 确保门店在网络中断时仍能正常运营
 """
+import os
 import uuid
 from datetime import datetime
 from typing import Dict, List, Optional, Any
@@ -293,7 +294,7 @@ class EdgeNodeService:
         if staff_ratio < min_ratio:
             alert_level = "critical"
             action = "call_backup"
-        elif staff_ratio < min_ratio * 1.1:
+        elif staff_ratio < min_ratio * float(os.getenv("EDGE_STAFF_WARNING_FACTOR", "1.1")):
             alert_level = "warning"
             action = "monitor"
         else:
