@@ -4,6 +4,7 @@ Dashboard Service
 """
 from typing import Dict, Any, List
 from datetime import datetime, timedelta, date
+import os
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -75,13 +76,13 @@ class DashboardService:
                     begin_date=today,
                     end_date=today,
                     page_index=1,
-                    page_size=1000,
+                    page_size=int(os.getenv("POS_QUERY_PAGE_SIZE", "1000")),
                 )
                 yesterday_orders = await pos_service.query_orders(
                     begin_date=yesterday,
                     end_date=yesterday,
                     page_index=1,
-                    page_size=1000,
+                    page_size=int(os.getenv("POS_QUERY_PAGE_SIZE", "1000")),
                 )
 
                 stats["orders"]["today"] = len(today_orders.get("orders", []))
@@ -145,7 +146,7 @@ class DashboardService:
                         begin_date=date,
                         end_date=date,
                         page_index=1,
-                        page_size=1000,
+                        page_size=int(os.getenv("POS_QUERY_PAGE_SIZE", "1000")),
                     )
 
                     orders = result.get("orders", [])

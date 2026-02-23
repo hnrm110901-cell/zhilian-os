@@ -6,6 +6,7 @@ from typing import List, Optional, Dict
 from sqlalchemy import select, and_, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timedelta
+import os
 
 from ..models.store import Store, StoreStatus
 from ..models.user import User
@@ -230,7 +231,7 @@ class StoreService:
                     begin_date=today,
                     end_date=today,
                     page_index=1,
-                    page_size=1000,
+                    page_size=int(os.getenv("POS_QUERY_PAGE_SIZE", "1000")),
                 )
                 orders = orders_result.get("orders", [])
                 stats["today_orders"] = len(orders)
@@ -247,7 +248,7 @@ class StoreService:
                     begin_date=month_start,
                     end_date=month_end,
                     page_index=1,
-                    page_size=10000,
+                    page_size=int(os.getenv("POS_QUERY_MONTH_PAGE_SIZE", "10000")),
                 )
                 month_orders = month_orders_result.get("orders", [])
                 stats["monthly_revenue"] = sum(order.get("realPrice", 0) for order in month_orders)
@@ -321,7 +322,7 @@ class StoreService:
 
     async def get_performance_ranking(self, metric: str = "revenue", limit: int = 10) -> List[Dict]:
         """获取门店业绩排名"""
-        stores = await self.get_stores(is_active=True, limit=1000)
+        stores = await self.get_stores(is_active=True, limit=int(os.getenv("STORE_RANKING_LIMIT", "1000")))
 
         store_performance = []
         for store in stores:
