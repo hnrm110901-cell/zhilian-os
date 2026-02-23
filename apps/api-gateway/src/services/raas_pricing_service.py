@@ -200,11 +200,11 @@ class RaaSPricingService:
             current_customer_count = baseline.avg_customer_count
             current_order_value = baseline.avg_order_value
 
-        current_food_waste_rate = 3.0
-        current_labor_cost = 45000.0
-        current_energy_cost = 7500.0
-        current_inventory_turnover = 15.0
-        current_repeat_rate = 32.0
+        current_food_waste_rate = float(os.getenv("RAAS_CURRENT_FOOD_WASTE_RATE", "3.0"))
+        current_labor_cost = float(os.getenv("RAAS_CURRENT_LABOR_COST", "45000.0"))
+        current_energy_cost = float(os.getenv("RAAS_CURRENT_ENERGY_COST", "7500.0"))
+        current_inventory_turnover = float(os.getenv("RAAS_CURRENT_INVENTORY_TURNOVER", "15.0"))
+        current_repeat_rate = float(os.getenv("RAAS_CURRENT_REPEAT_RATE", "32.0"))
 
         try:
             from sqlalchemy import and_
