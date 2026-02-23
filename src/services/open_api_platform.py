@@ -6,6 +6,7 @@ Phase 5: 生态扩展期 (Ecosystem Expansion Period)
 Enables third-party developers to build on top of Zhilian OS
 """
 
+import os
 from typing import Dict, List, Optional, Any, Set
 from datetime import datetime, timedelta
 from enum import Enum
@@ -243,7 +244,7 @@ class OpenAPIPlatform:
             return False
 
         now = datetime.utcnow()
-        one_minute_ago = now - timedelta(minutes=1)
+        one_minute_ago = now - timedelta(minutes=int(os.getenv("OPENAPI_RATE_LIMIT_WINDOW_MINUTES", "1")))
 
         # Get recent requests
         if developer_id not in self.rate_limit_tracker:
