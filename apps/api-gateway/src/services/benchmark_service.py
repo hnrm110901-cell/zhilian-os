@@ -207,14 +207,15 @@ class BenchmarkService(BaseService):
             total = total_result.scalar() or 0
             complaints = complaint_result.scalar() or 0
             if total == 0:
-                return 4.0
+                return float(os.getenv("BENCHMARK_DEFAULT_SATISFACTION", "4.0"))
             complaint_rate = complaints / total
-            # 投诉率 0% → 5.0分，10%+ → 3.0分
-            score = 5.0 - complaint_rate * 20
+            # 投诉率 0% → 5.0分，10%+ → 3.0分（系数支持环境变量覆盖）
+            _coeff = float(os.getenv("BENCHMARK_COMPLAINT_SCORE_COEFF", "20"))
+            score = 5.0 - complaint_rate * _coeff
             return round(max(1.0, min(5.0, score)), 1)
         except Exception as e:
             logger.warning("客户满意度计算失败", error=str(e))
-            return 4.0
+            return float(os.getenv("BENCHMARK_DEFAULT_SATISFACTION", "4.0"))
 
     async def _get_benchmark_stores(self, store_id: str) -> List[str]:
         """
