@@ -4,6 +4,7 @@
 """
 from datetime import date, datetime
 from typing import Dict, List, Optional
+import os
 import structlog
 
 logger = structlog.get_logger()
@@ -100,10 +101,10 @@ class ChineseHolidays:
             return 1.0
 
         impact_map = {
-            "very_high": 2.5,  # 春节、国庆
-            "high": 2.0,  # 其他法定节假日、情人节
-            "medium": 1.5,  # 调休、一般营销节日
-            "low": 1.2,  # 小型节日
+            "very_high": float(os.getenv("HOLIDAY_IMPACT_VERY_HIGH", "2.5")),  # 春节、国庆
+            "high": float(os.getenv("HOLIDAY_IMPACT_HIGH", "2.0")),            # 其他法定节假日、情人节
+            "medium": float(os.getenv("HOLIDAY_IMPACT_MEDIUM", "1.5")),        # 调休、一般营销节日
+            "low": float(os.getenv("HOLIDAY_IMPACT_LOW", "1.2")),              # 小型节日
         }
 
         return impact_map.get(info.get("impact", "low"), 1.0)
@@ -189,28 +190,39 @@ class WeatherImpact:
         if restaurant_type == "火锅":
             # 火锅店：温度越低，生意越好
             if temperature < 0:
-                return 1.5
+                return float(os.getenv("TEMP_IMPACT_HOTPOT_FREEZING", "1.5"))
             elif temperature < 10:
-                return 1.3
+                return float(os.getenv("TEMP_IMPACT_HOTPOT_COLD", "1.3"))
             elif temperature < 20:
-                return 1.1
+                return float(os.getenv("TEMP_IMPACT_HOTPOT_COOL", "1.1"))
             elif temperature < 30:
                 return 1.0
             else:
-                return 0.8
+                return float(os.getenv("TEMP_IMPACT_HOTPOT_HOT", "0.8"))
         else:
             # 一般餐厅：极端温度影响客流
             if temperature < 0 or temperature > 35:
-                return 0.8
+                return float(os.getenv("TEMP_IMPACT_NORMAL_EXTREME", "0.8"))
             elif temperature < 10 or temperature > 30:
-                return 0.9
+                return float(os.getenv("TEMP_IMPACT_NORMAL_MODERATE", "0.9"))
             else:
                 return 1.0
 
     @staticmethod
     def get_weather_impact(weather_type: str) -> float:
         """获取天气类型的影响系数"""
-        return WeatherImpact.WEATHER_IMPACT.get(weather_type, 1.0)
+        impact_map = {
+            "晴天": 1.0,
+            "多云": 1.0,
+            "阴天": float(os.getenv("WEATHER_IMPACT_OVERCAST", "0.95")),
+            "小雨": float(os.getenv("WEATHER_IMPACT_LIGHT_RAIN", "0.85")),
+            "中雨": float(os.getenv("WEATHER_IMPACT_MODERATE_RAIN", "0.7")),
+            "大雨": float(os.getenv("WEATHER_IMPACT_HEAVY_RAIN", "0.5")),
+            "暴雨": float(os.getenv("WEATHER_IMPACT_STORM", "0.3")),
+            "雪": float(os.getenv("WEATHER_IMPACT_SNOW", "0.6")),
+            "雾霾": float(os.getenv("WEATHER_IMPACT_SMOG", "0.9")),
+        }
+        return impact_map.get(weather_type, 1.0)
 
 
 class BusinessDistrictEvents:
@@ -231,4 +243,12 @@ class BusinessDistrictEvents:
     @staticmethod
     def get_event_impact(event_type: str) -> float:
         """获取活动类型的影响系数"""
-        return BusinessDistrictEvents.EVENT_IMPACT.get(event_type, 1.0)
+        impact_map = {
+            "大型展会": float(os.getenv("EVENT_IMPACT_EXPO", "1.8")),
+            "音乐会": float(os.getenv("EVENT_IMPACT_CONCERT", "1.5")),
+            "体育赛事": float(os.getenv("EVENT_IMPACT_SPORTS", "1.6")),
+            "商场促销": float(os.getenv("EVENT_IMPACT_MALL_PROMO", "1.3")),
+            "周边施工": float(os.getenv("EVENT_IMPACT_CONSTRUCTION", "0.6")),
+            "交通管制": float(os.getenv("EVENT_IMPACT_TRAFFIC_CONTROL", "0.7")),
+        }
+        return impact_map.get(event_type, 1.0)
