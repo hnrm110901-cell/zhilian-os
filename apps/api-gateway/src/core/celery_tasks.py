@@ -283,7 +283,7 @@ async def batch_index_orders(
         ]
 
         # 等待所有任务完成
-        results = [task.get(timeout=300) for task in tasks]
+        results = [task.get(timeout=int(os.getenv("CELERY_TASK_GET_TIMEOUT", "300"))) for task in tasks]
 
         success_count = sum(1 for r in results if r.get("success"))
 
@@ -333,7 +333,7 @@ async def batch_index_dishes(
         ]
 
         # 等待所有任务完成
-        results = [task.get(timeout=300) for task in tasks]
+        results = [task.get(timeout=int(os.getenv("CELERY_TASK_GET_TIMEOUT", "300"))) for task in tasks]
 
         success_count = sum(1 for r in results if r.get("success"))
 

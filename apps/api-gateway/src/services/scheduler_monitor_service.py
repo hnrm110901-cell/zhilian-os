@@ -2,6 +2,7 @@
 调度任务监控服务
 用于监控Celery Beat定时任务的执行情况
 """
+import os
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from collections import defaultdict
@@ -81,7 +82,7 @@ class SchedulerMonitorService:
                 self.task_health[task_name]["consecutive_failures"] += 1
 
             # 清理旧数据 (保留最近24小时)
-            cutoff_time = datetime.now() - timedelta(hours=24)
+            cutoff_time = datetime.now() - timedelta(hours=int(os.getenv("SCHEDULER_MONITOR_RETENTION_HOURS", "24")))
             self.executions = [
                 e for e in self.executions
                 if e["timestamp"] > cutoff_time
@@ -264,7 +265,7 @@ class SchedulerMonitorService:
                 elif last_success:
                     # 检查是否长时间未执行
                     time_since_success = datetime.now() - last_success
-                    if time_since_success > timedelta(hours=2):
+                    if time_since_success > timedelta(hours=int(os.getenv("SCHEDULER_HEALTH_CHECK_HOURS", "2"))):
                         status = "warning"
                         message = f"已{time_since_success.total_seconds() / 3600:.1f}小时未执行"
                     else:
@@ -349,7 +350,7 @@ class SchedulerMonitorService:
             loop = asyncio.get_event_loop()
 
             def _inspect():
-                insp = celery_app.control.inspect(timeout=2.0)
+                insp = celery_app.control.inspect(timeout=float(os.getenv("SCHEDULER_INSPECT_TIMEOUT", "2.0")))
                 active = insp.active() or {}
                 reserved = insp.reserved() or {}
                 worker_stats = insp.stats() or {}
