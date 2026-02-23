@@ -24,7 +24,7 @@ llama-index==0.9.48
 # Vector Database & Embeddings
 qdrant-client==1.7.3
 sentence-transformers==2.3.1
-torch==2.1.2
+torch>=2.2.0
 numpy==1.26.3
 
 # Task Queue

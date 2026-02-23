@@ -172,7 +172,11 @@ importers:
 
   packages/api-adapters/base: {}
 
+  packages/api-adapters/meituan-saas: {}
+
   packages/api-adapters/pinzhi: {}
+
+  packages/api-adapters/tiancai-shanglong: {}
 
   packages/api-adapters/yiding: {}
 

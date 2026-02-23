@@ -11,13 +11,13 @@ import time
 
 from src.core.config import settings
 # 核心模块
-from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation, approval, federated_learning, embedding, raas, model_marketplace, human_in_the_loop, hardware_integration, pos
-# phase5_apis not yet implemented
-# from src.api.phase5_apis import platform_router, industry_router, supply_chain_router, i18n_router
+from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation, approval, federated_learning, embedding, raas, model_marketplace, human_in_the_loop, hardware_integration, pos, dishes, benchmark
+from src.api.phase5_apis import platform_router, industry_router, supply_chain_router, i18n_router
 # 逐步启用的模块
 from src.api import dashboard, analytics, audit, multi_store, finance, customer360, wechat_triggers, queue, meituan_queue
 # 需要外部适配器的模块 (会在适配器不可用时返回错误)
 from src.api import members
+from src.api import edge_node, decision_validator, recommendations, agent_collaboration
 from src.middleware.monitoring import MonitoringMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
 from src.middleware.audit_log import AuditLogMiddleware
@@ -388,10 +388,12 @@ app.include_router(neural.router, prefix="/api/v1/neural", tags=["neural"])
 app.include_router(adapters.router, tags=["adapters"])
 app.include_router(tasks.router, prefix="/api/v1", tags=["tasks"])
 app.include_router(reconciliation.router, prefix="/api/v1", tags=["reconciliation"])
+app.include_router(dishes.router, prefix="/api/v1", tags=["dishes"])
+app.include_router(benchmark.router, prefix="/api/v1", tags=["benchmark"])
 
 # 逐步启用的模块
 app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["dashboard"])
-app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["analytics"])
+app.include_router(analytics.router, tags=["analytics"])
 app.include_router(audit.router, prefix="/api/v1/audit", tags=["audit"])
 app.include_router(multi_store.router, prefix="/api/v1/multi-store", tags=["multi_store"])
 app.include_router(finance.router, prefix="/api/v1/finance", tags=["finance"])
@@ -402,16 +404,19 @@ app.include_router(queue.router, tags=["queue"])
 app.include_router(meituan_queue.router, tags=["meituan_queue"])
 
 # Phase 3: 稳定性加固期 (Stability Reinforcement Period)
-# edge_node and decision_validator modules not yet implemented
+app.include_router(edge_node.router, tags=["edge_node"])
+app.include_router(decision_validator.router, tags=["decision_validator"])
 
 # Phase 4: 智能优化期 (Intelligence Optimization Period)
 app.include_router(federated_learning.router, tags=["federated_learning"])
-# recommendations and agent_collaboration modules not yet implemented
+app.include_router(recommendations.router, tags=["recommendations"])
+app.include_router(agent_collaboration.router, tags=["agent_collaboration"])
 
-# Phase 5: 生态扩展期 (Ecosystem Expansion Period) - not yet implemented
-# app.include_router(platform_router, tags=["open_platform"])
-# app.include_router(industry_router, tags=["industry_solutions"])
-# app.include_router(supply_chain_router, tags=["supply_chain"])
+# Phase 5: 生态扩展期 (Ecosystem Expansion Period)
+app.include_router(platform_router, tags=["open_platform"])
+app.include_router(industry_router, tags=["industry_solutions"])
+app.include_router(supply_chain_router, tags=["supply_chain"])
+app.include_router(i18n_router, tags=["internationalization"])
 # app.include_router(i18n_router, tags=["internationalization"])
 
 # Embedding Model (嵌入模型)
