@@ -2,6 +2,7 @@
 联邦学习服务
 实现门店间的协同学习，保护数据隐私
 """
+import os
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 import numpy as np
@@ -139,9 +140,9 @@ class FederatedLearningService(BaseService):
             "store_id": store_id,
             "status": "joined",
             "training_config": training_config or {
-                "epochs": 10,
-                "batch_size": 32,
-                "learning_rate": 0.001,
+                "epochs": int(os.getenv("FL_TRAIN_EPOCHS", "10")),
+                "batch_size": int(os.getenv("FL_TRAIN_BATCH_SIZE", "32")),
+                "learning_rate": float(os.getenv("FL_TRAIN_LEARNING_RATE", "0.001")),
             },
         }
 

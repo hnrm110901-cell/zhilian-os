@@ -285,13 +285,13 @@ class MarketingAgentService:
         _high_days = int(os.getenv("CHURN_HIGH_RISK_DAYS", "60"))
 
         if days_since_last < _low_days:
-            risk = 0.1  # 低风险
+            risk = float(os.getenv("CHURN_RISK_LOW", "0.1"))  # 低风险
         elif days_since_last < _mid_days:
-            risk = 0.3  # 中风险
+            risk = float(os.getenv("CHURN_RISK_MID", "0.3"))  # 中风险
         elif days_since_last < _high_days:
-            risk = 0.6  # 高风险
+            risk = float(os.getenv("CHURN_RISK_HIGH", "0.6"))  # 高风险
         else:
-            risk = 0.9  # 极高风险
+            risk = float(os.getenv("CHURN_RISK_CRITICAL", "0.9"))  # 极高风险
 
         return risk
 
@@ -301,13 +301,13 @@ class MarketingAgentService:
         churn_risk: float
     ) -> CustomerSegment:
         """确定客户分群"""
-        if value_score > 70 and churn_risk < 0.3:
+        if value_score > float(os.getenv("SEGMENT_HIGH_VALUE_SCORE", "70")) and churn_risk < float(os.getenv("SEGMENT_HIGH_VALUE_CHURN", "0.3")):
             return CustomerSegment.HIGH_VALUE
-        elif value_score > 50 and churn_risk < 0.5:
+        elif value_score > float(os.getenv("SEGMENT_POTENTIAL_SCORE", "50")) and churn_risk < float(os.getenv("SEGMENT_POTENTIAL_CHURN", "0.5")):
             return CustomerSegment.POTENTIAL
-        elif value_score > 40 and churn_risk > 0.5:
+        elif value_score > float(os.getenv("SEGMENT_AT_RISK_SCORE", "40")) and churn_risk > float(os.getenv("SEGMENT_AT_RISK_CHURN", "0.5")):
             return CustomerSegment.AT_RISK
-        elif churn_risk > 0.8:
+        elif churn_risk > float(os.getenv("SEGMENT_LOST_CHURN", "0.8")):
             return CustomerSegment.LOST
         else:
             return CustomerSegment.NEW

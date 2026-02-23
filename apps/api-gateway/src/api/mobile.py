@@ -459,7 +459,7 @@ async def get_today_orders(
             begin_date=today,
             end_date=today,
             page_index=1,
-            page_size=100,
+            page_size=int(os.getenv("MOBILE_RECENT_ORDERS_PAGE_SIZE", "100")),
         )
 
         orders = result.get("orders", [])
@@ -475,7 +475,7 @@ async def get_today_orders(
                 "status": order.get("billStatus"),
                 "time": order.get("payTime") or order.get("openTime"),
             }
-            for order in orders[:20]  # 只返回最近20条
+            for order in orders[:int(os.getenv("MOBILE_RECENT_ORDERS_LIMIT", "20"))]  # 只返回最近N条
         ]
 
         return {
