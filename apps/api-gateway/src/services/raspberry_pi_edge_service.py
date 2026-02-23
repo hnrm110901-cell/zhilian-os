@@ -292,7 +292,7 @@ class RaspberryPiEdgeService:
             model_name=model.model_name
         )
 
-        # 模拟推理过程
+        # 本地AI推理分发
         if model_type == "asr":
             # 语音识别：调用 voice_service
             from .voice_service import voice_service

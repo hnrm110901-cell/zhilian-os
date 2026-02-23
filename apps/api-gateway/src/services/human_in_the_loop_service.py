@@ -287,7 +287,7 @@ class HumanInTheLoopService:
             expires_at=expires_at
         )
 
-        # TODO: 推送到企业微信
+        # 推送到企业微信
         await self.send_approval_notification(request)
 
         # 保存到数据库
