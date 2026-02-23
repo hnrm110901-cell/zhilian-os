@@ -437,8 +437,8 @@ class WeChatTriggerService:
 # Celery异步任务：处理企微推送
 @celery_app.task(
     bind=True,
-    max_retries=3,
-    default_retry_delay=60,
+    max_retries=int(os.getenv("WECHAT_PUSH_MAX_RETRIES", "3")),
+    default_retry_delay=int(os.getenv("WECHAT_PUSH_RETRY_DELAY", "60")),
 )
 async def send_wechat_push_task(
     self,
