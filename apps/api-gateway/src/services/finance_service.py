@@ -61,7 +61,7 @@ class FinanceService:
         transaction_type: Optional[str] = None,
         category: Optional[str] = None,
         skip: int = 0,
-        limit: int = 100,
+        limit: int = int(os.getenv("FINANCE_QUERY_LIMIT", "100")),
     ) -> Dict[str, Any]:
         """获取财务交易记录列表"""
         query = select(FinancialTransaction)

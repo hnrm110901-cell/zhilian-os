@@ -2,6 +2,7 @@
 Order Service - 订单数据库服务
 处理订单的数据库操作
 """
+import os
 import structlog
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta

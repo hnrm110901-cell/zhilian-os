@@ -7,6 +7,7 @@ Week 2核心功能：
 - 格式化上下文注入LLM
 - 生成增强的AI决策
 """
+import os
 from typing import List, Dict, Any, Optional
 import structlog
 from datetime import datetime
@@ -45,7 +46,7 @@ class RAGService:
         query: str,
         store_id: str,
         collection: str = "events",
-        top_k: int = 5
+        top_k: int = int(os.getenv("RAG_TOP_K", "5"))
     ) -> List[Dict[str, Any]]:
         """
         检索相关上下文
@@ -99,7 +100,7 @@ class RAGService:
     def format_context(
         self,
         results: List[Dict[str, Any]],
-        max_length: int = 2000
+        max_length: int = int(os.getenv("RAG_MAX_CONTEXT_LENGTH", "2000"))
     ) -> str:
         """
         格式化检索结果为上下文文本
@@ -147,7 +148,7 @@ class RAGService:
         query: str,
         store_id: str,
         collection: str = "events",
-        top_k: int = 5,
+        top_k: int = int(os.getenv("RAG_TOP_K", "5")),
         system_prompt: Optional[str] = None
     ) -> Dict[str, Any]:
         """
@@ -257,7 +258,7 @@ class RAGService:
         self,
         query: str,
         store_id: str,
-        top_k: int = 3
+        top_k: int = int(os.getenv("RAG_TOP_K_SHORT", "3"))
     ) -> List[Dict[str, Any]]:
         """
         获取相似案例

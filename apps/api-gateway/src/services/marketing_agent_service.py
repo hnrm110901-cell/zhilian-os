@@ -184,9 +184,9 @@ class MarketingAgentService:
         # 推断偏好时段
         if hours:
             avg_hour = sum(hours) / len(hours)
-            if avg_hour < 10:
+            if avg_hour < int(os.getenv("MARKETING_BREAKFAST_END_HOUR", "10")):
                 preferred_time = "早餐"
-            elif avg_hour < 14:
+            elif avg_hour < int(os.getenv("MARKETING_LUNCH_END_HOUR", "14")):
                 preferred_time = "午餐"
             else:
                 preferred_time = "晚餐"

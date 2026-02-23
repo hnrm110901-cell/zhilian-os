@@ -5,6 +5,7 @@ Neural System Orchestrator
 智链OS作为餐饮门店的神经系统
 统一协调订单、菜品、人员、时间、金额五个核心维度
 """
+import os
 from typing import Dict, Any, List, Optional
 import structlog
 from datetime import datetime
@@ -339,7 +340,7 @@ class NeuralSystemOrchestrator:
         self,
         query: str,
         store_id: str,
-        limit: int = 10,
+        limit: int = int(os.getenv("NEURAL_SEARCH_LIMIT", "10")),
     ) -> List[Dict[str, Any]]:
         """
         语义搜索订单
@@ -368,7 +369,7 @@ class NeuralSystemOrchestrator:
         self,
         query: str,
         store_id: str,
-        limit: int = 10,
+        limit: int = int(os.getenv("NEURAL_SEARCH_LIMIT", "10")),
     ) -> List[Dict[str, Any]]:
         """
         语义搜索菜品
@@ -397,7 +398,7 @@ class NeuralSystemOrchestrator:
         self,
         query: str,
         store_id: str,
-        limit: int = 10,
+        limit: int = int(os.getenv("NEURAL_SEARCH_LIMIT", "10")),
     ) -> List[Dict[str, Any]]:
         """
         语义搜索事件

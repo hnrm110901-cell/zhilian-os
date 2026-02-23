@@ -320,7 +320,7 @@ class StoreService:
 
         return regional_summary
 
-    async def get_performance_ranking(self, metric: str = "revenue", limit: int = 10) -> List[Dict]:
+    async def get_performance_ranking(self, metric: str = "revenue", limit: int = int(os.getenv("STORE_RANKING_LIMIT", "10"))) -> List[Dict]:
         """获取门店业绩排名"""
         stores = await self.get_stores(is_active=True, limit=int(os.getenv("STORE_RANKING_LIMIT", "1000")))
 

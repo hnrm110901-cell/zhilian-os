@@ -2,6 +2,7 @@
 Notification Service
 通知服务 - 处理通知的创建、发送、查询等业务逻辑
 """
+import os
 from typing import List, Optional
 from datetime import datetime
 from sqlalchemy import select, and_, or_
@@ -112,7 +113,7 @@ class NotificationService:
         role: str,
         store_id: Optional[str] = None,
         is_read: Optional[bool] = None,
-        limit: int = 50,
+        limit: int = int(os.getenv("NOTIFICATION_QUERY_LIMIT", "50")),
         offset: int = 0,
     ) -> List[Notification]:
         """

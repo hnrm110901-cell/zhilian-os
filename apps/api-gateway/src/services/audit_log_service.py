@@ -114,7 +114,7 @@ class AuditLogService:
         end_date: Optional[datetime] = None,
         search_query: Optional[str] = None,
         skip: int = 0,
-        limit: int = 100,
+        limit: int = int(os.getenv("AUDIT_QUERY_LIMIT", "100")),
         db: Optional[AsyncSession] = None
     ) -> tuple[List[AuditLog], int]:
         """
@@ -198,7 +198,7 @@ class AuditLogService:
     async def get_user_activity_stats(
         self,
         user_id: str,
-        days: int = 30,
+        days: int = int(os.getenv("AUDIT_STATS_DAYS_SHORT", "30")),
         db: Optional[AsyncSession] = None
     ) -> Dict[str, Any]:
         """
@@ -355,7 +355,7 @@ class AuditLogService:
 
     async def delete_old_logs(
         self,
-        days: int = 90,
+        days: int = int(os.getenv("AUDIT_STATS_DAYS_LONG", "90")),
         db: Optional[AsyncSession] = None
     ) -> int:
         """

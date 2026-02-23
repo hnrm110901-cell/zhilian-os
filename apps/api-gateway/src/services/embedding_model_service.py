@@ -35,7 +35,7 @@ class EmbeddingModelService:
     async def collect_training_data(
         self,
         tenant_id: Optional[str] = None,
-        days: int = 90
+        days: int = int(os.getenv("EMBEDDING_TRAIN_DATA_DAYS", "90"))
     ) -> Dict[str, List]:
         """
         收集训练数据
@@ -407,7 +407,7 @@ class EmbeddingModelService:
     def find_similar_dishes(
         self,
         dish_name: str,
-        top_k: int = 10,
+        top_k: int = int(os.getenv("EMBEDDING_SEARCH_TOP_K", "10")),
         tenant_id: Optional[str] = None
     ) -> List[Dict]:
         """
@@ -464,7 +464,7 @@ class EmbeddingModelService:
     def recommend_dishes_by_order(
         self,
         order_dish_names: List[str],
-        top_k: int = 5,
+        top_k: int = int(os.getenv("EMBEDDING_RECOMMEND_TOP_K", "5")),
         tenant_id: Optional[str] = None
     ) -> List[Dict]:
         """
@@ -577,7 +577,7 @@ class EmbeddingModelService:
     async def batch_compute_embeddings(
         self,
         texts: List[str],
-        batch_size: int = 100
+        batch_size: int = int(os.getenv("EMBEDDING_BATCH_SIZE", "100"))
     ) -> List[Optional[np.ndarray]]:
         """
         批量计算嵌入向量
