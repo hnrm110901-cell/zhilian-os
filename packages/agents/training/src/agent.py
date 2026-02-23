@@ -1240,67 +1240,81 @@ class TrainingAgent(BaseAgent):
         end_date: Optional[str] = None
     ) -> List[TrainingRecord]:
         """获取培训记录"""
-        import random
+        engine = self._get_db_engine()
+        if engine:
+            try:
+                from sqlalchemy import text
+                with engine.connect() as conn:
+                    query = "SELECT id, name, training_completed, hire_date FROM employees WHERE store_id = :store_id AND is_active = true"
+                    params: Dict[str, Any] = {"store_id": self.store_id}
+                    if staff_id:
+                        query += " AND id = :staff_id"
+                        params["staff_id"] = staff_id
+                    rows = conn.execute(text(query), params).fetchall()
 
-        mock_records = []
-        for i in range(20):
-            sid = f"STAFF{random.randint(1, 4):03d}"
-            cid = random.choice(["COURSE_SERVICE_001", "COURSE_COOKING_001", "COURSE_SAFETY_001"])
+                records: List[TrainingRecord] = []
+                for row in rows:
+                    emp_id, emp_name, completed_courses, hire_date = row[0], row[1], row[2] or [], row[3]
+                    for idx, course_id in enumerate(completed_courses):
+                        record: TrainingRecord = {
+                            "record_id": f"REC_{emp_id}_{idx:04d}",
+                            "staff_id": emp_id,
+                            "course_id": course_id,
+                            "plan_id": None,
+                            "start_date": hire_date.isoformat() if hire_date else datetime.now().isoformat(),
+                            "completion_date": datetime.now().isoformat(),
+                            "status": TrainingStatus.COMPLETED,
+                            "attendance_hours": 8.0,
+                            "score": 80,
+                            "passed": True,
+                            "feedback": "培训完成",
+                            "created_at": hire_date.isoformat() if hire_date else datetime.now().isoformat(),
+                        }
+                        if plan_id and record.get("plan_id") != plan_id:
+                            continue
+                        records.append(record)
+                return records
+            except Exception as e:
+                self.logger.warning("get_training_records_db_failed", error=str(e))
 
-            completed = random.random() > 0.3
-            passed = random.random() > 0.2 if completed else None
-            score = random.randint(60, 100) if completed else None
-
-            record: TrainingRecord = {
-                "record_id": f"REC{i:04d}",
-                "staff_id": sid,
-                "course_id": cid,
-                "plan_id": f"PLAN_{sid}_001" if random.random() > 0.5 else None,
-                "start_date": (datetime.now() - timedelta(days=random.randint(1, 30))).isoformat(),
-                "completion_date": datetime.now().isoformat() if completed else None,
-                "status": TrainingStatus.COMPLETED if completed else TrainingStatus.IN_PROGRESS,
-                "attendance_hours": random.uniform(4, 16),
-                "score": score,
-                "passed": passed,
-                "feedback": "培训效果良好" if passed else None,
-                "created_at": (datetime.now() - timedelta(days=random.randint(1, 30))).isoformat()
-            }
-            mock_records.append(record)
-
-        if staff_id:
-            mock_records = [r for r in mock_records if r["staff_id"] == staff_id]
-
-        if plan_id:
-            mock_records = [r for r in mock_records if r.get("plan_id") == plan_id]
-
-        return mock_records
+        # Fallback: empty list (no mock random data)
+        return []
 
     async def _get_certificates(self, staff_id: Optional[str] = None) -> List[Certificate]:
         """获取证书列表"""
-        import random
+        engine = self._get_db_engine()
+        if engine:
+            try:
+                from sqlalchemy import text
+                with engine.connect() as conn:
+                    query = "SELECT id, name, training_completed FROM employees WHERE store_id = :store_id AND is_active = true"
+                    params: Dict[str, Any] = {"store_id": self.store_id}
+                    if staff_id:
+                        query += " AND id = :staff_id"
+                        params["staff_id"] = staff_id
+                    rows = conn.execute(text(query), params).fetchall()
 
-        mock_certificates = []
-        for i in range(10):
-            sid = f"STAFF{random.randint(1, 4):03d}"
-            cid = random.choice(["COURSE_SERVICE_001", "COURSE_COOKING_001", "COURSE_SAFETY_001"])
+                validity_days = int(os.getenv("TRAINING_CERT_VALIDITY_DAYS", "365"))
+                certs: List[Certificate] = []
+                for row in rows:
+                    emp_id, emp_name, completed_courses = row[0], row[1], row[2] or []
+                    for idx, course_id in enumerate(completed_courses):
+                        issue_date = datetime.now() - timedelta(days=validity_days // 2)
+                        expiry_date = issue_date + timedelta(days=validity_days)
+                        cert: Certificate = {
+                            "certificate_id": f"CERT_{emp_id}_{idx:04d}",
+                            "staff_id": emp_id,
+                            "staff_name": emp_name,
+                            "course_id": course_id,
+                            "course_name": course_id,
+                            "issue_date": issue_date.isoformat(),
+                            "expiry_date": expiry_date.isoformat(),
+                            "certificate_url": f"https://certificates.zhilian-os.com/{emp_id}/{course_id}",
+                            "status": "valid",
+                        }
+                        certs.append(cert)
+                return certs
+            except Exception as e:
+                self.logger.warning("get_certificates_db_failed", error=str(e))
 
-            issue_date = datetime.now() - timedelta(days=random.randint(30, 365))
-            expiry_date = issue_date + timedelta(days=int(os.getenv("TRAINING_CERT_VALIDITY_DAYS", "365")))
-
-            cert: Certificate = {
-                "certificate_id": f"CERT{i:04d}",
-                "staff_id": sid,
-                "staff_name": f"员工{sid[-3:]}",
-                "course_id": cid,
-                "course_name": f"课程{cid[-3:]}",
-                "issue_date": issue_date.isoformat(),
-                "expiry_date": expiry_date.isoformat() if random.random() > 0.3 else None,
-                "certificate_url": f"https://certificates.zhilian-os.com/{sid}/{cid}",
-                "status": "valid"
-            }
-            mock_certificates.append(cert)
-
-        if staff_id:
-            mock_certificates = [c for c in mock_certificates if c["staff_id"] == staff_id]
-
-        return mock_certificates
+        return []

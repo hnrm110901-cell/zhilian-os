@@ -150,6 +150,19 @@ class InventoryAgent(BaseAgent):
             "expiring_urgent_days": int(os.getenv("INVENTORY_EXPIRING_URGENT_DAYS", "3")),
         }
         self.logger = logger.bind(agent="inventory", store_id=store_id)
+        self._db_engine = None
+
+    def _get_db_engine(self):
+        """获取数据库引擎（延迟初始化）"""
+        if self._db_engine is None:
+            db_url = os.getenv("DATABASE_URL")
+            if db_url:
+                try:
+                    from sqlalchemy import create_engine
+                    self._db_engine = create_engine(db_url, pool_pre_ping=True)
+                except Exception:
+                    pass
+        return self._db_engine
 
     def get_supported_actions(self) -> List[str]:
         """获取支持的操作列表"""
@@ -362,24 +375,43 @@ class InventoryAgent(BaseAgent):
         days: int
     ) -> List[ConsumptionRecord]:
         """获取历史消耗数据"""
-        # 模拟历史数据
+        engine = self._get_db_engine()
+        if engine:
+            try:
+                from sqlalchemy import text
+                start_dt = datetime.now() - timedelta(days=days)
+                with engine.connect() as conn:
+                    rows = conn.execute(text("""
+                        SELECT DATE(transaction_time) AS date,
+                               SUM(ABS(quantity)) AS quantity
+                        FROM inventory_transactions
+                        WHERE item_id = :item_id
+                          AND transaction_type = 'usage'
+                          AND transaction_time >= :start_dt
+                        GROUP BY DATE(transaction_time)
+                        ORDER BY date
+                    """), {"item_id": item_id, "start_dt": start_dt}).fetchall()
+                history: List[ConsumptionRecord] = [
+                    {"date": str(r[0]), "item_id": item_id, "quantity": float(r[1]), "reason": "sales"}
+                    for r in rows
+                ]
+                if history:
+                    return history
+            except Exception as e:
+                self.logger.warning("consumption_history_db_failed", error=str(e), item_id=item_id)
+
+        # Fallback: use base consumption from env
         history = []
         base_consumption = float(os.getenv("INVENTORY_MOCK_BASE_CONSUMPTION", "10.0"))
-
         for i in range(days):
-            date = (datetime.now() - timedelta(days=days-i)).date().isoformat()
-            # 添加随机波动
-            import random
-            quantity = base_consumption + random.uniform(-3, 3)
-
+            date = (datetime.now() - timedelta(days=days - i)).date().isoformat()
             record: ConsumptionRecord = {
                 "date": date,
                 "item_id": item_id,
-                "quantity": max(0, quantity),
+                "quantity": base_consumption,
                 "reason": "sales"
             }
             history.append(record)
-
         return history
 
     def _predict_moving_average(
