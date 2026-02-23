@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 import structlog
+import os
 
 logger = structlog.get_logger()
 
@@ -105,22 +106,22 @@ class ApprovalRequest(BaseModel):
 class HumanInTheLoopService:
     """Human-in-the-Loop服务"""
 
-    # 风险等级阈值
+    # 风险等级阈值（支持环境变量覆盖）
     RISK_THRESHOLDS = {
         # 采购金额阈值
-        "purchase_amount_threshold": 5000.0,  # 超过5000元需要人工审批
+        "purchase_amount_threshold": float(os.getenv("HITL_PURCHASE_THRESHOLD", "5000.0")),
 
         # 价格调整阈值
-        "price_change_threshold": 0.10,  # 超过10%需要人工审批
+        "price_change_threshold": float(os.getenv("HITL_PRICE_CHANGE_THRESHOLD", "0.10")),
 
         # 优惠券额度阈值
-        "coupon_amount_threshold": 1000.0,  # 单次发放超过1000元需要审批
+        "coupon_amount_threshold": float(os.getenv("HITL_COUPON_THRESHOLD", "1000.0")),
     }
 
-    # 审批超时时间（小时）
+    # 审批超时时间（小时，支持环境变量覆盖）
     APPROVAL_TIMEOUT_HOURS = {
-        RiskLevel.HIGH: 24,  # 高风险操作24小时内需审批
-        RiskLevel.CRITICAL: 2,  # 极高风险操作2小时内需审批
+        RiskLevel.HIGH: int(os.getenv("HITL_HIGH_RISK_TIMEOUT_HOURS", "24")),
+        RiskLevel.CRITICAL: int(os.getenv("HITL_CRITICAL_RISK_TIMEOUT_HOURS", "2")),
     }
 
     def __init__(self, db: Session):
