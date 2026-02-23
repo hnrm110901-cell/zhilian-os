@@ -1213,11 +1213,10 @@ class DecisionAgent(BaseAgent):
                 }
             except Exception as e:
                 self.logger.warning("collect_revenue_db_failed", error=str(e))
-        import random
         return {
-            "total_revenue": random.randint(80000000, 120000000),
-            "previous_revenue": random.randint(70000000, 110000000),
-            "target_revenue": 100000000,
+            "total_revenue": 0,
+            "previous_revenue": 0,
+            "target_revenue": int(os.getenv("DECISION_REVENUE_TARGET", "100000000")),
             "days": 30,
         }
 
@@ -1250,11 +1249,7 @@ class DecisionAgent(BaseAgent):
                 }
             except Exception as e:
                 self.logger.warning("collect_cost_db_failed", error=str(e))
-        import random
-        return {
-            "total_cost": random.randint(30000000, 45000000),
-            "previous_cost": random.randint(28000000, 43000000),
-        }
+        return {"total_cost": 0, "previous_cost": 0}
 
     async def _collect_efficiency_data(
         self,
@@ -1285,11 +1280,7 @@ class DecisionAgent(BaseAgent):
                 }
             except Exception as e:
                 self.logger.warning("collect_efficiency_db_failed", error=str(e))
-        import random
-        return {
-            "revenue_per_staff": random.randint(3000000, 5000000),
-            "previous_revenue_per_staff": random.randint(2800000, 4800000),
-        }
+        return {"revenue_per_staff": 0, "previous_revenue_per_staff": 0}
 
     async def _collect_quality_data(
         self,
@@ -1321,11 +1312,7 @@ class DecisionAgent(BaseAgent):
                 }
             except Exception as e:
                 self.logger.warning("collect_quality_db_failed", error=str(e))
-        import random
-        return {
-            "order_accuracy": random.uniform(0.92, 0.98),
-            "previous_accuracy": random.uniform(0.90, 0.96),
-        }
+        return {"order_accuracy": 0.0, "previous_accuracy": 0.0}
 
     async def _collect_customer_data(
         self,
@@ -1333,11 +1320,31 @@ class DecisionAgent(BaseAgent):
         end_date: Optional[str]
     ) -> Dict[str, Any]:
         """收集客户数据"""
-        import random
-        return {
-            "satisfaction_rate": random.uniform(0.82, 0.92),
-            "previous_satisfaction": random.uniform(0.80, 0.90)
-        }
+        engine = self._get_db_engine()
+        if engine:
+            try:
+                from sqlalchemy import text
+                start, end, prev_start, prev_end, _ = self._parse_period(start_date, end_date)
+                with engine.connect() as conn:
+                    total = conn.execute(text(
+                        "SELECT COUNT(*) FROM orders WHERE store_id=:s AND order_time>=:a AND order_time<=:b"
+                    ), {"s": self.store_id, "a": start, "b": end}).scalar() or 1
+                    completed = conn.execute(text(
+                        "SELECT COUNT(*) FROM orders WHERE store_id=:s AND order_time>=:a AND order_time<=:b AND status='completed'"
+                    ), {"s": self.store_id, "a": start, "b": end}).scalar() or 0
+                    prev_total = conn.execute(text(
+                        "SELECT COUNT(*) FROM orders WHERE store_id=:s AND order_time>=:a AND order_time<=:b"
+                    ), {"s": self.store_id, "a": prev_start, "b": prev_end}).scalar() or 1
+                    prev_completed = conn.execute(text(
+                        "SELECT COUNT(*) FROM orders WHERE store_id=:s AND order_time>=:a AND order_time<=:b AND status='completed'"
+                    ), {"s": self.store_id, "a": prev_start, "b": prev_end}).scalar() or 0
+                return {
+                    "satisfaction_rate": round(completed / total, 4),
+                    "previous_satisfaction": round(prev_completed / prev_total, 4),
+                }
+            except Exception as e:
+                self.logger.warning("collect_customer_db_failed", error=str(e))
+        return {"satisfaction_rate": 0.0, "previous_satisfaction": 0.0}
 
     async def _get_historical_data(
         self,
@@ -1345,11 +1352,24 @@ class DecisionAgent(BaseAgent):
         days: int
     ) -> List[float]:
         """获取历史数据"""
-        import random
-        # 生成模拟历史数据
-        base_value = float(os.getenv("DECISION_MOCK_BASE_REVENUE", "100000.0"))
-        data = []
-        for i in range(days):
-            value = base_value + random.uniform(-10000, 15000) + i * 100
-            data.append(max(0, value))
-        return data
+        engine = self._get_db_engine()
+        if engine:
+            try:
+                from sqlalchemy import text
+                start_dt = datetime.now() - timedelta(days=days)
+                with engine.connect() as conn:
+                    rows = conn.execute(text("""
+                        SELECT DATE(order_time) AS day,
+                               COALESCE(SUM(final_amount), 0) AS daily_revenue
+                        FROM orders
+                        WHERE store_id = :s
+                          AND order_time >= :start_dt
+                          AND status = 'completed'
+                        GROUP BY DATE(order_time)
+                        ORDER BY day
+                    """), {"s": self.store_id, "start_dt": start_dt}).fetchall()
+                if rows:
+                    return [float(r[1]) for r in rows]
+            except Exception as e:
+                self.logger.warning("get_historical_data_db_failed", error=str(e))
+        return []

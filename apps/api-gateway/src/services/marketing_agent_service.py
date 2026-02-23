@@ -25,7 +25,7 @@ import logging
 import os
 from sqlalchemy import select, func
 from src.core.database import get_db_session
-from src.models.order import Order, OrderStatus
+from src.models.order import Order, OrderStatus, OrderItem
 from src.models.dish import Dish
 
 logger = logging.getLogger(__name__)
@@ -173,6 +173,29 @@ class MarketingAgentService:
             )
             hours = [int(h[0]) for h in hour_result.all() if h[0] is not None]
 
+            # 推断偏好星期（按星期统计）
+            dow_result = await session.execute(
+                select(func.extract("dow", Order.order_time)).where(
+                    Order.customer_phone == customer_id,
+                    Order.status.in_([OrderStatus.COMPLETED, OrderStatus.SERVED]),
+                )
+            )
+            days = [int(d[0]) for d in dow_result.all() if d[0] is not None]
+
+            # 获取最常点的菜品
+            dish_result = await session.execute(
+                select(OrderItem.item_name, func.sum(OrderItem.quantity).label("qty"))
+                .join(Order, OrderItem.order_id == Order.id)
+                .where(
+                    Order.customer_phone == customer_id,
+                    Order.status.in_([OrderStatus.COMPLETED, OrderStatus.SERVED]),
+                )
+                .group_by(OrderItem.item_name)
+                .order_by(func.sum(OrderItem.quantity).desc())
+                .limit(5)
+            )
+            favorite_dishes = [row_d[0] for row_d in dish_result.all()]
+
         total_orders = int(row[0] or 0)
         total_amount = float(row[1] or 0) / 100.0
         last_order_time = row[2]
@@ -193,15 +216,24 @@ class MarketingAgentService:
         else:
             preferred_time = "晚餐"
 
+        # 推断偏好星期
+        if days:
+            from collections import Counter
+            most_common_dow = Counter(days).most_common(1)[0][0]
+            day_names = {0: "周日", 1: "周一", 2: "周二", 3: "周三", 4: "周四", 5: "周五", 6: "周六"}
+            preferred_day = day_names.get(most_common_dow, "周末")
+        else:
+            preferred_day = "周末"
+
         return {
             "total_orders": total_orders,
             "total_amount": total_amount,
             "avg_order_amount": avg_order_amount,
             "last_order_date": last_order_date,
             "days_since_last_order": days_since_last,
-            "favorite_dishes": [],
+            "favorite_dishes": favorite_dishes,
             "preferred_time": preferred_time,
-            "preferred_day": "周末",
+            "preferred_day": preferred_day,
         }
 
     async def _vectorize_taste_preference(
@@ -671,15 +703,41 @@ class MarketingAgentService:
 
         return performance
 
-    def get_statistics(self) -> Dict[str, Any]:
+    async def get_statistics(self) -> Dict[str, Any]:
         """获取营销统计"""
-        return {
-            "total_campaigns": 0,
-            "active_campaigns": 0,
-            "total_reach": 0,
-            "total_conversion": 0,
-            "avg_roi": 0.0
-        }
+        try:
+            from src.models.marketing_campaign import MarketingCampaign
+            async with get_db_session() as session:
+                result = await session.execute(
+                    select(
+                        func.count(MarketingCampaign.id),
+                        func.sum(
+                            func.cast(MarketingCampaign.status == "active", func.Integer)
+                        ),
+                        func.coalesce(func.sum(MarketingCampaign.reach_count), 0),
+                        func.coalesce(func.sum(MarketingCampaign.conversion_count), 0),
+                        func.coalesce(func.avg(
+                            (MarketingCampaign.revenue_generated - MarketingCampaign.actual_cost)
+                            / func.nullif(MarketingCampaign.actual_cost, 0)
+                        ), 0.0),
+                    )
+                )
+                row = result.one()
+            return {
+                "total_campaigns": int(row[0] or 0),
+                "active_campaigns": int(row[1] or 0),
+                "total_reach": int(row[2] or 0),
+                "total_conversion": int(row[3] or 0),
+                "avg_roi": round(float(row[4] or 0.0), 4),
+            }
+        except Exception:
+            return {
+                "total_campaigns": 0,
+                "active_campaigns": 0,
+                "total_reach": 0,
+                "total_conversion": 0,
+                "avg_roi": 0.0,
+            }
 
 
 # 全局实例
