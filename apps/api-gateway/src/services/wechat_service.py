@@ -4,6 +4,7 @@ Enterprise WeChat Service for message sending and user management
 """
 from typing import Dict, Any, List, Optional
 import httpx
+import os
 import structlog
 from datetime import datetime, timedelta
 
@@ -39,14 +40,16 @@ class WeChatService:
                         "corpid": self.corp_id,
                         "corpsecret": self.corp_secret,
                     },
-                    timeout=30.0,
+                    timeout=float(os.getenv("WECHAT_HTTP_TIMEOUT", "30.0")),
                 )
                 data = response.json()
 
                 if data.get("errcode") == 0:
                     self.access_token = data["access_token"]
-                    # token有效期7200秒，提前5分钟刷新
-                    self.token_expire_time = datetime.now() + timedelta(seconds=7200 - 300)
+                    # token有效期7200秒，提前N秒刷新
+                    _token_ttl = int(os.getenv("WECHAT_TOKEN_TTL", "7200"))
+                    _token_refresh_buffer = int(os.getenv("WECHAT_TOKEN_REFRESH_BUFFER", "300"))
+                    self.token_expire_time = datetime.now() + timedelta(seconds=_token_ttl - _token_refresh_buffer)
                     logger.info("企业微信access_token获取成功")
                     return self.access_token
                 else:
@@ -91,7 +94,7 @@ class WeChatService:
                     f"{self.base_url}/message/send",
                     params={"access_token": token},
                     json=message_data,
-                    timeout=30.0,
+                    timeout=float(os.getenv("WECHAT_HTTP_TIMEOUT", "30.0")),
                 )
                 result = response.json()
 
@@ -139,7 +142,7 @@ class WeChatService:
                     f"{self.base_url}/message/send",
                     params={"access_token": token},
                     json=message_data,
-                    timeout=30.0,
+                    timeout=float(os.getenv("WECHAT_HTTP_TIMEOUT", "30.0")),
                 )
                 result = response.json()
 
@@ -192,7 +195,7 @@ class WeChatService:
                     f"{self.base_url}/message/send",
                     params={"access_token": token},
                     json=message_data,
-                    timeout=30.0,
+                    timeout=float(os.getenv("WECHAT_HTTP_TIMEOUT", "30.0")),
                 )
                 result = response.json()
 
@@ -221,7 +224,7 @@ class WeChatService:
                 response = await client.get(
                     f"{self.base_url}/user/get",
                     params={"access_token": token, "userid": userid},
-                    timeout=30.0,
+                    timeout=float(os.getenv("WECHAT_HTTP_TIMEOUT", "30.0")),
                 )
                 result = response.json()
 
@@ -254,7 +257,7 @@ class WeChatService:
                         "department_id": department_id,
                         "fetch_child": 1,
                     },
-                    timeout=30.0,
+                    timeout=float(os.getenv("WECHAT_HTTP_TIMEOUT", "30.0")),
                 )
                 result = response.json()
 

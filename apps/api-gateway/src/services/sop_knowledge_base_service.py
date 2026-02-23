@@ -20,6 +20,7 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime
 from pydantic import BaseModel
 from enum import Enum
+import os
 import logging
 
 logger = logging.getLogger(__name__)
@@ -397,28 +398,28 @@ class SOPKnowledgeBaseService:
         query_lower = query.lower()
         for keyword in sop.keywords:
             if keyword in query_lower:
-                score += 0.2
+                score += float(os.getenv("SOP_SCORE_KEYWORD_WEIGHT", "0.2"))
 
         # 场景匹配
         for scenario in sop.scenarios:
             if scenario in context.current_situation:
-                score += 0.3
+                score += float(os.getenv("SOP_SCORE_SCENARIO_WEIGHT", "0.3"))
 
         # 难度匹配
         if context.user_experience_years < 1:
             if sop.difficulty == SOPDifficulty.BEGINNER:
-                score += 0.2
+                score += float(os.getenv("SOP_SCORE_DIFFICULTY_WEIGHT", "0.2"))
         elif context.user_experience_years < 3:
             if sop.difficulty in [SOPDifficulty.BEGINNER, SOPDifficulty.INTERMEDIATE]:
-                score += 0.2
+                score += float(os.getenv("SOP_SCORE_DIFFICULTY_WEIGHT", "0.2"))
         else:
-            score += 0.1  # 经验丰富的员工适用所有难度
+            score += float(os.getenv("SOP_SCORE_EXPERIENCE_WEIGHT", "0.1"))  # 经验丰富的员工适用所有难度
 
         # 评分加权
-        score += (sop.rating / 5.0) * 0.2
+        score += (sop.rating / 5.0) * float(os.getenv("SOP_SCORE_RATING_WEIGHT", "0.2"))
 
         # 使用次数加权
-        score += min(sop.usage_count / 1000, 0.2)
+        score += min(sop.usage_count / float(os.getenv("SOP_SCORE_USAGE_DIVISOR", "1000")), float(os.getenv("SOP_SCORE_USAGE_MAX", "0.2")))
 
         return min(score, 1.0)
 
@@ -428,7 +429,7 @@ class SOPKnowledgeBaseService:
         context: QueryContext
     ) -> float:
         """计算置信度"""
-        confidence = 0.5  # 基础置信度
+        confidence = float(os.getenv("SOP_BASE_CONFIDENCE", "0.5"))  # 基础置信度
 
         # 来源门店加权
         if sop.source_store:
@@ -465,10 +466,10 @@ class SOPKnowledgeBaseService:
         """估算耗时（分钟）"""
         # 简化版：根据难度估算
         time_map = {
-            SOPDifficulty.BEGINNER: 5,
-            SOPDifficulty.INTERMEDIATE: 15,
-            SOPDifficulty.ADVANCED: 30,
-            SOPDifficulty.EXPERT: 60
+            SOPDifficulty.BEGINNER: int(os.getenv("SOP_TIME_BEGINNER_MINUTES", "5")),
+            SOPDifficulty.INTERMEDIATE: int(os.getenv("SOP_TIME_INTERMEDIATE_MINUTES", "15")),
+            SOPDifficulty.ADVANCED: int(os.getenv("SOP_TIME_ADVANCED_MINUTES", "30")),
+            SOPDifficulty.EXPERT: int(os.getenv("SOP_TIME_EXPERT_MINUTES", "60"))
         }
         return time_map.get(sop.difficulty, 15)
 

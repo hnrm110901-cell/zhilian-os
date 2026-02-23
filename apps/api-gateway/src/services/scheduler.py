@@ -11,6 +11,7 @@
 import asyncio
 from datetime import datetime, date
 from typing import Optional, Dict
+import os
 import structlog
 
 logger = structlog.get_logger()
@@ -63,7 +64,7 @@ class TaskScheduler:
 
                 # 每15分钟：营收异常检测
                 last = self._last_run["revenue_anomaly"]
-                if last is None or (now - last).total_seconds() >= 900:
+                if last is None or (now - last).total_seconds() >= int(os.getenv("SCHEDULER_REVENUE_ANOMALY_INTERVAL", "900")):
                     from src.core.celery_tasks import detect_revenue_anomaly
                     detect_revenue_anomaly.delay()
                     self._last_run["revenue_anomaly"] = now
@@ -97,13 +98,13 @@ class TaskScheduler:
                     logger.info("scheduler_triggered", task="perform_daily_reconciliation")
 
                 logger.debug("scheduler_tick", time=now.time())
-                await asyncio.sleep(60)
+                await asyncio.sleep(int(os.getenv("SCHEDULER_TICK_SECONDS", "60")))
 
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 logger.error("scheduler_error", error=str(e))
-                await asyncio.sleep(60)
+                await asyncio.sleep(int(os.getenv("SCHEDULER_TICK_SECONDS", "60")))
 
 
 # 全局调度器实例

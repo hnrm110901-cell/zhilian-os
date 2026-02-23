@@ -4,6 +4,7 @@ Celery配置和应用实例
 from celery import Celery
 from celery.schedules import crontab
 from kombu import Exchange, Queue
+import os
 import structlog
 
 from .config import settings
@@ -27,7 +28,7 @@ celery_app.conf.update(
     enable_utc=True,
 
     # 任务结果配置
-    result_expires=3600,  # 结果保留1小时
+    result_expires=int(os.getenv("CELERY_RESULT_EXPIRES", "3600")),  # 结果保留N秒
     result_backend_transport_options={
         "master_name": "mymaster",
         "retry_on_timeout": True,
@@ -39,12 +40,12 @@ celery_app.conf.update(
     task_track_started=True,  # 跟踪任务开始状态
 
     # 重试配置
-    task_default_retry_delay=60,  # 默认重试延迟60秒
-    task_max_retries=3,  # 最大重试3次
+    task_default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY", "60")),      # 默认重试延迟N秒
+    task_max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),               # 最大重试N次
 
     # Worker配置
-    worker_prefetch_multiplier=4,  # 每个worker预取4个任务
-    worker_max_tasks_per_child=1000,  # 每个worker子进程最多执行1000个任务后重启
+    worker_prefetch_multiplier=int(os.getenv("CELERY_PREFETCH_MULTIPLIER", "4")),          # 每个worker预取N个任务
+    worker_max_tasks_per_child=int(os.getenv("CELERY_MAX_TASKS_PER_CHILD", "1000")),       # 每个worker子进程最多执行N个任务后重启
 
     # 队列配置
     task_queues=(

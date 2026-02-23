@@ -6,6 +6,7 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime
 from enum import Enum
 import asyncio
+import os
 import structlog
 from abc import ABC, abstractmethod
 import smtplib
@@ -325,7 +326,7 @@ class SMSNotificationHandler(NotificationChannelHandler):
                 response = await client.get(
                     f"https://dysmsapi.aliyuncs.com/",
                     params=all_params,
-                    timeout=30.0
+                    timeout=float(os.getenv("NOTIFICATION_HTTP_TIMEOUT", "30.0"))
                 )
                 result = response.json()
 
@@ -418,7 +419,7 @@ class SMSNotificationHandler(NotificationChannelHandler):
                     endpoint,
                     headers=headers,
                     data=payload_str,
-                    timeout=30.0
+                    timeout=float(os.getenv("NOTIFICATION_HTTP_TIMEOUT", "30.0"))
                 )
                 result = response.json()
 
@@ -531,7 +532,7 @@ class WeChatNotificationHandler(NotificationChannelHandler):
 
             # 获取 access_token
             token_url = "https://api.weixin.qq.com/cgi-bin/token"
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=float(os.getenv("NOTIFICATION_HTTP_TIMEOUT_SHORT", "10.0"))) as client:
                 token_resp = await client.get(token_url, params={
                     "grant_type": "client_credential",
                     "appid": wechat_config.WECHAT_APP_ID,
