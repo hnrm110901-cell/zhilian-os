@@ -6,6 +6,7 @@ Phase 4: 智能优化期 (Intelligence Optimization Period)
 Provides personalized recommendations, dynamic pricing, and precision marketing
 """
 
+import os
 from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timedelta
 from enum import Enum
@@ -97,7 +98,7 @@ class IntelligentRecommendationEngine:
         customer_id: str,
         store_id: str,
         context: Optional[Dict[str, Any]] = None,
-        top_k: int = 5
+        top_k: int = int(os.getenv("RECOMMEND_TOP_K", "5"))
     ) -> List[DishRecommendation]:
         """
         Recommend dishes for a customer
@@ -146,10 +147,10 @@ class IntelligentRecommendationEngine:
 
             # Weighted combination
             final_score = (
-                0.3 * cf_score +
-                0.3 * cb_score +
-                0.2 * context_score +
-                0.2 * business_score
+                float(os.getenv("RECOMMEND_CF_WEIGHT", "0.3")) * cf_score +
+                float(os.getenv("RECOMMEND_CB_WEIGHT", "0.3")) * cb_score +
+                float(os.getenv("RECOMMEND_CONTEXT_WEIGHT", "0.2")) * context_score +
+                float(os.getenv("RECOMMEND_BUSINESS_WEIGHT", "0.2")) * business_score
             )
 
             # Generate reason
@@ -409,19 +410,19 @@ class IntelligentRecommendationEngine:
         context: Dict[str, Any]
     ) -> float:
         """Calculate context-aware score"""
-        score = 0.5
+        score = float(os.getenv("RECOMMEND_CONTEXT_BASE_SCORE", "0.5"))
 
         # Time-based adjustment
         hour = context.get("hour", 12)
         if dish.get("category") == "早餐" and 6 <= hour <= 10:
-            score += 0.3
+            score += float(os.getenv("RECOMMEND_TIME_SCORE_BOOST", "0.3"))
         elif dish.get("category") == "正餐" and 11 <= hour <= 14:
-            score += 0.3
+            score += float(os.getenv("RECOMMEND_TIME_SCORE_BOOST", "0.3"))
 
         # Weather-based adjustment
         weather = context.get("weather", "")
         if "cold" in weather and "hot" in dish.get("tags", []):
-            score += 0.2
+            score += float(os.getenv("RECOMMEND_WEATHER_SCORE_BOOST", "0.2"))
 
         return min(score, 1.0)
 
@@ -435,11 +436,11 @@ class IntelligentRecommendationEngine:
 
         # Profit margin component
         profit_margin = dish.get("profit_margin", 0.5)
-        score += profit_margin * 0.5
+        score += profit_margin * float(os.getenv("RECOMMEND_PROFIT_WEIGHT", "0.5"))
 
         # Inventory component (promote high inventory items)
         # Simplified
-        score += 0.3
+        score += float(os.getenv("RECOMMEND_TIME_SCORE_BOOST", "0.3"))
 
         return min(score, 1.0)
 
@@ -454,13 +455,13 @@ class IntelligentRecommendationEngine:
         """Generate human-readable recommendation reason"""
         reasons = []
 
-        if cf_score > 0.7:
+        if cf_score > float(os.getenv("RECOMMEND_SCORE_THRESHOLD", "0.7")):
             reasons.append("相似顾客喜欢")
-        if cb_score > 0.7:
+        if cb_score > float(os.getenv("RECOMMEND_SCORE_THRESHOLD", "0.7")):
             reasons.append("符合您的口味偏好")
-        if context_score > 0.7:
+        if context_score > float(os.getenv("RECOMMEND_SCORE_THRESHOLD", "0.7")):
             reasons.append("适合当前场景")
-        if business_score > 0.7:
+        if business_score > float(os.getenv("RECOMMEND_SCORE_THRESHOLD", "0.7")):
             reasons.append("店长推荐")
 
         return "、".join(reasons) if reasons else "为您精选"
@@ -510,7 +511,7 @@ class IntelligentRecommendationEngine:
         """Calculate peak hour pricing"""
         current_price = dish["price"]
         # Increase price by 10-15% during peak hours
-        return current_price * 1.12
+        return current_price * float(os.getenv("PRICING_PEAK_RATIO", "1.12"))
 
     def _off_peak_pricing(
         self,
@@ -531,7 +532,7 @@ class IntelligentRecommendationEngine:
         current_price = dish["price"]
         demand_level = context.get("demand_level", 0.5)
         # Adjust based on demand
-        return current_price * (0.9 + 0.2 * demand_level)
+        return current_price * (float(os.getenv("PRICING_DEMAND_BASE", "0.9")) + float(os.getenv("PRICING_DEMAND_FACTOR", "0.2")) * demand_level)
 
     def _inventory_based_pricing(
         self,
@@ -542,8 +543,8 @@ class IntelligentRecommendationEngine:
         current_price = dish["price"]
         inventory_level = context.get("inventory_level", 0.5)
         # Lower price to clear inventory
-        if inventory_level > 0.8:
-            return current_price * 0.8
+        if inventory_level > float(os.getenv("PRICING_INVENTORY_CLEAR_THRESHOLD", "0.8")):
+            return current_price * float(os.getenv("PRICING_INVENTORY_CLEAR_RATIO", "0.8"))
         return current_price
 
     def _competitor_based_pricing(
@@ -651,9 +652,9 @@ class IntelligentRecommendationEngine:
         discount_rate: float
     ) -> float:
         """Estimate campaign conversion rate"""
-        base_rate = 0.05  # 5% base conversion
-        discount_boost = discount_rate * 0.5  # Discount effect
-        return min(base_rate + discount_boost, 0.25)
+        base_rate = float(os.getenv("RECOMMEND_BASE_CONVERSION_RATE", "0.05"))  # base conversion
+        discount_boost = discount_rate * float(os.getenv("RECOMMEND_DISCOUNT_BOOST_FACTOR", "0.5"))  # Discount effect
+        return min(base_rate + discount_boost, float(os.getenv("RECOMMEND_MAX_CONVERSION_RATE", "0.25")))
 
     def _estimate_campaign_revenue(
         self,

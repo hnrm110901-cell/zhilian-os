@@ -1,17 +1,21 @@
 """
-奥琦韦微生活系统API适配器
-提供会员管理、交易处理、储值管理、优惠券管理等功能
+奥琦玮供应链开放平台适配器
+Base URL: http://openapi.acescm.cn
+认证方式: AppKey + AppSecret + MD5签名
 """
-from typing import Dict, Any, Optional, List
-import structlog
-from datetime import datetime
+import hashlib
+import os
+import time
+from typing import Any, Dict, List, Optional
+
 import httpx
+import structlog
 
 logger = structlog.get_logger()
 
 
 class AoqiweiAdapter:
-    """奥琦韦微生活系统适配器"""
+    """奥琦玮供应链开放平台适配器"""
 
     def __init__(self, config: Dict[str, Any]):
         """
@@ -20,556 +24,458 @@ class AoqiweiAdapter:
         Args:
             config: 配置字典，包含:
                 - base_url: API基础URL
-                - api_key: API密钥
+                - app_key: AppKey
+                - app_secret: AppSecret
                 - timeout: 超时时间（秒）
                 - retry_times: 重试次数
         """
-        self.config = config
-        self.base_url = config.get("base_url", "https://api.aoqiwei.com")
-        self.api_key = config.get("api_key")
-        self.timeout = config.get("timeout", 30)
-        self.retry_times = config.get("retry_times", 3)
+        self.base_url = config.get("base_url", os.getenv("AOQIWEI_BASE_URL", "http://openapi.acescm.cn"))
+        self.app_key = config.get("app_key", os.getenv("AOQIWEI_APP_KEY", ""))
+        self.app_secret = config.get("app_secret", os.getenv("AOQIWEI_APP_SECRET", ""))
+        self.timeout = config.get("timeout", int(os.getenv("AOQIWEI_TIMEOUT", "30")))
+        self.retry_times = config.get("retry_times", int(os.getenv("AOQIWEI_RETRY_TIMES", "3")))
 
-        if not self.api_key:
-            raise ValueError("API密钥不能为空")
+        if not self.app_key or not self.app_secret:
+            logger.warning("奥琦玮AppKey或AppSecret未配置，将使用降级模式")
 
-        # 初始化HTTP客户端
-        self.client = httpx.AsyncClient(
-            base_url=self.base_url,
-            timeout=self.timeout,
-            headers=self.authenticate(),
-            follow_redirects=True,
-        )
+        logger.info("奥琦玮供应链适配器初始化", base_url=self.base_url)
 
-        logger.info("奥琦韦适配器初始化", base_url=self.base_url)
-
-    def authenticate(self) -> Dict[str, str]:
+    def _sign(self, params: Dict[str, Any]) -> str:
         """
-        认证方法，返回认证头部
+        生成请求签名
+
+        算法：将所有参数按key字母序排列，拼接为 key=value&...，
+        末尾追加 AppSecret，对整体做 MD5（小写）。
+
+        Args:
+            params: 请求参数（不含 sign 字段）
 
         Returns:
-            认证头部字典
+            签名字符串（32位小写MD5）
         """
-        return {
-            "Content-Type": "application/json",
-            "X-API-Key": self.api_key,
+        sorted_keys = sorted(params.keys())
+        parts = [f"{k}={params[k]}" for k in sorted_keys if params[k] is not None and params[k] != ""]
+        raw = "&".join(parts) + self.app_secret
+        return hashlib.md5(raw.encode("utf-8")).hexdigest().lower()
+
+    def _build_params(self, biz_params: Dict[str, Any]) -> Dict[str, Any]:
+        """构建带公共参数和签名的完整请求体"""
+        params: Dict[str, Any] = {
+            "appKey": self.app_key,
+            "timestamp": str(int(time.time() * 1000)),
         }
+        params.update(biz_params)
+        params["sign"] = self._sign(params)
+        return params
 
     async def _request(
         self,
-        method: str,
         endpoint: str,
-        data: Optional[Dict[str, Any]] = None,
+        biz_params: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
-        发送HTTP请求
+        发送 POST 请求
 
         Args:
-            method: HTTP方法 (GET/POST)
-            endpoint: API端点
-            data: 请求数据
+            endpoint: API端点路径（如 /api/stock_v1/remain.html）
+            biz_params: 业务参数
 
         Returns:
             API响应数据
 
         Raises:
-            Exception: 请求失败
+            Exception: 请求失败或业务错误
         """
+        params = self._build_params(biz_params or {})
+        url = f"{self.base_url}{endpoint}"
+
         for attempt in range(self.retry_times):
             try:
-                if method.upper() == "GET":
-                    response = await self.client.get(endpoint, params=data)
-                elif method.upper() == "POST":
-                    response = await self.client.post(endpoint, json=data)
-                else:
-                    raise ValueError(f"不支持的HTTP方法: {method}")
+                async with httpx.AsyncClient(timeout=self.timeout) as client:
+                    response = await client.post(url, json=params)
+                    response.raise_for_status()
+                    result = response.json()
 
-                response.raise_for_status()
-                result = response.json()
-                self.handle_error(result)
-                return result
+                # 奥琦玮通用响应格式：{"code": 0, "msg": "success", "data": {...}}
+                code = result.get("code", result.get("errcode", 0))
+                if code != 0:
+                    msg = result.get("msg", result.get("errmsg", "未知错误"))
+                    raise Exception(f"奥琦玮API错误 [{code}]: {msg}")
+
+                return result.get("data", result)
 
             except httpx.HTTPStatusError as e:
-                logger.error(
-                    "HTTP请求失败",
-                    endpoint=endpoint,
-                    status_code=e.response.status_code,
-                    attempt=attempt + 1,
-                )
+                logger.error("HTTP请求失败", endpoint=endpoint, status=e.response.status_code, attempt=attempt + 1)
                 if attempt == self.retry_times - 1:
                     raise Exception(f"HTTP请求失败: {e.response.status_code}")
 
             except Exception as e:
-                logger.error(
-                    "请求异常",
-                    endpoint=endpoint,
-                    error=str(e),
-                    attempt=attempt + 1,
-                )
+                if "奥琦玮API错误" in str(e):
+                    raise
+                logger.error("请求异常", endpoint=endpoint, error=str(e), attempt=attempt + 1)
                 if attempt == self.retry_times - 1:
                     raise
 
         raise Exception("请求失败，已达到最大重试次数")
 
-    def handle_error(self, response: Dict[str, Any]) -> None:
+    # ==================== POS订单接口 ====================
+
+    async def pos_upload_order(self, order_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        处理业务错误
+        POS订单上传
 
         Args:
-            response: API响应数据
-
-        Raises:
-            APIError: 业务错误
-        """
-        errcode = response.get("errcode", 0)
-        if errcode != 0:
-            errmsg = response.get("errmsg", "未知错误")
-            raise Exception(f"奥琦韦API错误 [{errcode}]: {errmsg}")
-
-    # ==================== 会员管理接口 ====================
-
-    async def query_member(
-        self,
-        card_no: Optional[str] = None,
-        mobile: Optional[str] = None,
-        openid: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """
-        查询会员详情
-
-        Args:
-            card_no: 会员卡号
-            mobile: 手机号
-            openid: 微信openid
+            order_data: 订单数据，包含门店编码、订单号、菜品明细等
 
         Returns:
-            会员信息字典
-
-        Raises:
-            ValueError: 参数错误
-            APIError: API调用失败
+            上传结果
         """
-        if not any([card_no, mobile, openid]):
-            raise ValueError("至少需要提供一个查询条件：card_no, mobile, openid")
-
-        data = {}
-        if card_no:
-            data["cardNo"] = card_no
-        if mobile:
-            data["mobile"] = mobile
-        if openid:
-            data["openid"] = openid
-
-        logger.info("查询会员", data=data)
-
+        logger.info("POS订单上传", order_no=order_data.get("orderNo"))
         try:
-            response = await self._request("POST", "/api/member/get", data=data)
-            return response.get("res", {})
+            return await self._request("/api/pos/order.html", order_data)
         except Exception as e:
-            logger.warning("查询会员失败，返回模拟数据", error=str(e))
-            # 返回模拟数据作为降级方案
-            return {
-                "cardNo": card_no or "M20240001",
-                "mobile": mobile or "13800138000",
-                "name": "张三",
-                "sex": 1,
-                "birthday": "1990-01-01",
-                "level": 2,
-                "points": 1500,
-                "balance": 50000,  # 单位：分
-                "regTime": "2024-01-01 10:00:00",
-                "regStore": "北京朝阳店",
-            }
+            logger.warning("POS订单上传失败，返回降级数据", error=str(e))
+            return {"success": False, "message": str(e)}
 
-    async def add_member(
-        self,
-        mobile: str,
-        name: str,
-        sex: int = 1,
-        birthday: Optional[str] = None,
-        card_type: int = 1,
-        store_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+    async def pos_check_order(self, shop_code: str, date: str) -> Dict[str, Any]:
         """
-        新增会员
+        POS订单校验
 
         Args:
-            mobile: 手机号
-            name: 姓名
-            sex: 性别 (1-男, 2-女)
-            birthday: 生日 (YYYY-MM-DD)
-            card_type: 卡类型 (1-电子卡, 2-实体卡)
-            store_id: 注册门店ID
+            shop_code: 门店编码
+            date: 日期（YYYY-MM-DD）
 
         Returns:
-            新增会员信息
-
-        Raises:
-            APIError: API调用失败
+            校验结果
         """
-        data = {
-            "mobile": mobile,
-            "name": name,
-            "sex": sex,
-            "cardType": card_type,
-        }
-
-        if birthday:
-            data["birthday"] = birthday
-        if store_id:
-            data["storeId"] = store_id
-
-        logger.info("新增会员", mobile=mobile, name=name)
-
+        logger.info("POS订单校验", shop_code=shop_code, date=date)
         try:
-            response = await self._request("POST", "/api/member/add", data=data)
-            return response.get("res", {})
+            return await self._request("/api/pos/ordercheck.html", {"shopCode": shop_code, "date": date})
         except Exception as e:
-            logger.warning("新增会员失败，返回模拟数据", error=str(e))
-            return {
-                "cardNo": f"M{datetime.now().strftime('%Y%m%d%H%M%S')}",
-                "mobile": mobile,
-                "name": name,
-                "message": "会员创建成功",
-            }
+            logger.warning("POS订单校验失败", error=str(e))
+            return {"checked": False, "message": str(e)}
 
-    async def update_member(
-        self, card_no: str, update_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def pos_day_done(self, shop_code: str, date: str) -> Dict[str, Any]:
         """
-        修改会员信息
+        POS日结
 
         Args:
-            card_no: 会员卡号
-            update_data: 更新数据字典，可包含:
-                - name: 姓名
-                - sex: 性别
-                - birthday: 生日
-                - avatar: 头像URL
+            shop_code: 门店编码
+            date: 日结日期（YYYY-MM-DD）
 
         Returns:
-            更新结果
-
-        Raises:
-            APIError: API调用失败
+            日结结果
         """
-        data = {"cardNo": card_no, **update_data}
-
-        logger.info("修改会员信息", card_no=card_no, update_data=update_data)
-
-        # TODO: 实际调用API
-        # response = await self.request("POST", "/api/member/update", data=data)
-        # return response.get("res", {})
-
-        return {"message": "会员信息更新成功"}
-
-    # ==================== 交易处理接口 ====================
-
-    async def trade_preview(
-        self,
-        card_no: str,
-        store_id: str,
-        cashier: str,
-        amount: int,
-        dish_list: Optional[List[Dict[str, Any]]] = None,
-    ) -> Dict[str, Any]:
-        """
-        交易预览（计算优惠）
-
-        Args:
-            card_no: 会员卡号
-            store_id: 门店ID
-            cashier: 收银员
-            amount: 消费总金额（分）
-            dish_list: 菜品列表
-
-        Returns:
-            预览结果，包含:
-                - totalAmount: 消费总额
-                - discountAmount: 优惠金额
-                - payAmount: 应付金额
-                - pointsDeduction: 积分抵扣
-                - couponDeduction: 优惠券抵扣
-                - balanceDeduction: 储值抵扣
-        """
-        data = {
-            "cardNo": card_no,
-            "storeId": store_id,
-            "cashier": cashier,
-            "amount": amount,
-        }
-
-        if dish_list:
-            data["dishList"] = dish_list
-
-        logger.info("交易预览", card_no=card_no, amount=amount)
-
-        # TODO: 实际调用API
-        # response = await self.request("POST", "/api/trade/preview", data=data)
-        # return response.get("res", {})
-
-        # 临时返回模拟数据
-        return {
-            "totalAmount": amount,
-            "discountAmount": int(amount * 0.1),  # 10%优惠
-            "payAmount": int(amount * 0.9),
-            "pointsDeduction": 0,
-            "couponDeduction": int(amount * 0.05),
-            "balanceDeduction": int(amount * 0.85),
-        }
-
-    async def trade_submit(
-        self,
-        card_no: str,
-        store_id: str,
-        cashier: str,
-        amount: int,
-        pay_type: int,
-        trade_no: str,
-        discount_plan: Optional[Dict[str, int]] = None,
-    ) -> Dict[str, Any]:
-        """
-        交易提交
-
-        Args:
-            card_no: 会员卡号
-            store_id: 门店ID
-            cashier: 收银员
-            amount: 实付金额（分）
-            pay_type: 支付方式代码
-            trade_no: 第三方流水号
-            discount_plan: 抵扣方案
-
-        Returns:
-            交易结果
-        """
-        data = {
-            "cardNo": card_no,
-            "storeId": store_id,
-            "cashier": cashier,
-            "amount": amount,
-            "payType": pay_type,
-            "tradeNo": trade_no,
-        }
-
-        if discount_plan:
-            data["discountPlan"] = discount_plan
-
-        logger.info("交易提交", card_no=card_no, amount=amount, trade_no=trade_no)
-
+        logger.info("POS日结", shop_code=shop_code, date=date)
         try:
-            response = await self._request("POST", "/api/trade/submit", data=data)
-            return response.get("res", {})
+            return await self._request("/api/pos/daydone.html", {"shopCode": shop_code, "date": date})
         except Exception as e:
-            logger.warning("交易提交失败，返回模拟数据", error=str(e))
-            return {
-                "tradeId": f"T{datetime.now().strftime('%Y%m%d%H%M%S')}",
-                "status": "success",
-                "message": "交易成功",
-            }
+            logger.warning("POS日结失败", error=str(e))
+            return {"success": False, "message": str(e)}
 
-    async def trade_query(
+    # ==================== 库存接口 ====================
+
+    async def query_stock(
         self,
-        trade_id: Optional[str] = None,
-        trade_no: Optional[str] = None,
-        card_no: Optional[str] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        depot_code: Optional[str] = None,
+        shop_code: Optional[str] = None,
+        good_code: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
-        查询交易记录
+        查询库存
 
         Args:
-            trade_id: 交易ID
-            trade_no: 第三方流水号
-            card_no: 会员卡号
-            start_date: 开始日期 (YYYY-MM-DD)
-            end_date: 结束日期 (YYYY-MM-DD)
+            depot_code: 仓库编码
+            shop_code: 门店编码
+            good_code: 货品编码
 
         Returns:
-            交易记录列表
+            库存列表
         """
-        data = {}
-        if trade_id:
-            data["tradeId"] = trade_id
-        if trade_no:
-            data["tradeNo"] = trade_no
-        if card_no:
-            data["cardNo"] = card_no
-        if start_date:
-            data["startDate"] = start_date
-        if end_date:
-            data["endDate"] = end_date
+        params: Dict[str, Any] = {}
+        if depot_code:
+            params["depotCode"] = depot_code
+        if shop_code:
+            params["shopCode"] = shop_code
+        if good_code:
+            params["goodCode"] = good_code
 
-        logger.info("查询交易", data=data)
+        logger.info("查询库存", params=params)
+        try:
+            result = await self._request("/api/stock_v1/remain.html", params)
+            return result if isinstance(result, list) else result.get("list", [])
+        except Exception as e:
+            logger.warning("查询库存失败，返回空列表", error=str(e))
+            return []
 
-        # TODO: 实际调用API
-        # response = await self.request("POST", "/api/trade/query", data=data)
-        # return response.get("res", [])
-
-        return []
-
-    async def trade_cancel(self, trade_id: str, reason: str = "") -> Dict[str, Any]:
-        """
-        交易撤销
-
-        Args:
-            trade_id: 交易ID
-            reason: 撤销原因
-
-        Returns:
-            撤销结果
-        """
-        data = {"tradeId": trade_id, "reason": reason}
-
-        logger.info("交易撤销", trade_id=trade_id, reason=reason)
-
-        # TODO: 实际调用API
-        # response = await self.request("POST", "/api/trade/cancel", data=data)
-        # return response.get("res", {})
-
-        return {"message": "交易撤销成功"}
-
-    # ==================== 储值管理接口 ====================
-
-    async def recharge_submit(
+    async def query_stock_estimate(
         self,
-        card_no: str,
-        store_id: str,
-        cashier: str,
-        amount: int,
-        pay_type: int,
-        trade_no: str,
+        shop_code: str,
+        start_date: str,
+        end_date: str,
     ) -> Dict[str, Any]:
         """
-        储值提交
+        库存预估
 
         Args:
-            card_no: 会员卡号
-            store_id: 充值门店
-            cashier: 收银员
-            amount: 充值金额（分）
-            pay_type: 支付方式
-            trade_no: 第三方流水号
-
-        Returns:
-            充值结果
-        """
-        data = {
-            "cardNo": card_no,
-            "storeId": store_id,
-            "cashier": cashier,
-            "amount": amount,
-            "payType": pay_type,
-            "tradeNo": trade_no,
-        }
-
-        logger.info("储值提交", card_no=card_no, amount=amount)
-
-        # TODO: 实际调用API
-        # response = await self.request("POST", "/api/recharge/submit", data=data)
-        # return response.get("res", {})
-
-        return {
-            "rechargeId": f"R{datetime.now().strftime('%Y%m%d%H%M%S')}",
-            "balance": amount,
-            "message": "充值成功",
-        }
-
-    async def recharge_query(
-        self, card_no: str, start_date: Optional[str] = None, end_date: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """
-        查询储值记录
-
-        Args:
-            card_no: 会员卡号
+            shop_code: 门店编码
             start_date: 开始日期
             end_date: 结束日期
 
         Returns:
-            储值记录
+            预估数据
         """
-        data = {"cardNo": card_no}
-        if start_date:
-            data["startDate"] = start_date
-        if end_date:
-            data["endDate"] = end_date
+        logger.info("库存预估", shop_code=shop_code)
+        try:
+            return await self._request(
+                "/api/stock_v1/estimate.html",
+                {"shopCode": shop_code, "startDate": start_date, "endDate": end_date},
+            )
+        except Exception as e:
+            logger.warning("库存预估失败", error=str(e))
+            return {}
 
-        logger.info("查询储值", card_no=card_no)
+    # ==================== 货品接口 ====================
 
-        # TODO: 实际调用API
-        # response = await self.request("POST", "/api/recharge/query", data=data)
-        # return response.get("res", {})
-
-        return {"balance": 50000, "records": []}
-
-    # ==================== 优惠券管理接口 ====================
-
-    async def coupon_list(self, card_no: str, store_id: Optional[str] = None) -> List[Dict[str, Any]]:
-        """
-        查询可用优惠券
-
-        Args:
-            card_no: 会员卡号
-            store_id: 门店ID
-
-        Returns:
-            优惠券列表
-        """
-        data = {"cardNo": card_no}
-        if store_id:
-            data["storeId"] = store_id
-
-        logger.info("查询优惠券", card_no=card_no)
-
-        # TODO: 实际调用API
-        # response = await self.request("POST", "/api/coupon/list", data=data)
-        # return response.get("res", [])
-
-        return []
-
-    async def coupon_use(
-        self, code: str, store_id: str, cashier: str, amount: int
+    async def query_goods(
+        self,
+        good_code: Optional[str] = None,
+        good_name: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 100,
     ) -> Dict[str, Any]:
         """
-        券码核销
+        查询货品信息
 
         Args:
-            code: 券码
-            store_id: 门店ID
-            cashier: 收银员
-            amount: 消费金额（分）
+            good_code: 货品编码
+            good_name: 货品名称（模糊查询）
+            page: 页码
+            page_size: 每页数量
 
         Returns:
-            核销结果，包含优惠券信息和使用规则
+            货品列表及分页信息
         """
-        data = {
-            "code": code,
-            "storeId": store_id,
-            "cashier": cashier,
-            "amount": amount,
+        params: Dict[str, Any] = {"page": page, "pageSize": page_size}
+        if good_code:
+            params["goodCode"] = good_code
+        if good_name:
+            params["goodName"] = good_name
+
+        logger.info("查询货品", params=params)
+        try:
+            return await self._request("/api/basic/good.html", params)
+        except Exception as e:
+            logger.warning("查询货品失败", error=str(e))
+            return {"list": [], "total": 0}
+
+    async def query_suppliers(
+        self,
+        supplier_code: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 100,
+    ) -> Dict[str, Any]:
+        """
+        查询供应商信息
+
+        Args:
+            supplier_code: 供应商编码
+            page: 页码
+            page_size: 每页数量
+
+        Returns:
+            供应商列表
+        """
+        params: Dict[str, Any] = {"page": page, "pageSize": page_size}
+        if supplier_code:
+            params["supplierCode"] = supplier_code
+
+        logger.info("查询供应商", params=params)
+        try:
+            return await self._request("/api/basic/supplier.html", params)
+        except Exception as e:
+            logger.warning("查询供应商失败", error=str(e))
+            return {"list": [], "total": 0}
+
+    # ==================== 配送业务接口 ====================
+
+    async def create_delivery_apply(self, apply_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        创建配送申请单
+
+        Args:
+            apply_data: 申请数据，包含门店编码、货品列表、期望配送时间等
+
+        Returns:
+            申请结果，含申请单号
+        """
+        logger.info("创建配送申请", shop_code=apply_data.get("shopCode"))
+        try:
+            return await self._request("/api/delivery_v1/applygood.html", apply_data)
+        except Exception as e:
+            logger.warning("创建配送申请失败", error=str(e))
+            return {"success": False, "message": str(e)}
+
+    async def query_delivery_dispatch_out(
+        self,
+        start_date: str,
+        end_date: str,
+        shop_code: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        查询配送出库单
+
+        Args:
+            start_date: 开始日期（YYYY-MM-DD）
+            end_date: 结束日期（YYYY-MM-DD）
+            shop_code: 门店编码
+
+        Returns:
+            配送出库单列表
+        """
+        params: Dict[str, Any] = {"startDate": start_date, "endDate": end_date}
+        if shop_code:
+            params["shopCode"] = shop_code
+
+        logger.info("查询配送出库单", params=params)
+        try:
+            result = await self._request("/api/delivery_v1/dispatchout.html", params)
+            return result if isinstance(result, list) else result.get("list", [])
+        except Exception as e:
+            logger.warning("查询配送出库单失败", error=str(e))
+            return []
+
+    async def confirm_delivery_in(self, dispatch_in_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        配送入库确认（门店收货）
+
+        Args:
+            dispatch_in_data: 入库数据，包含出库单号、实收数量等
+
+        Returns:
+            确认结果
+        """
+        logger.info("配送入库确认", order_no=dispatch_in_data.get("orderNo"))
+        try:
+            return await self._request("/api/delivery_v1/dispatchin.html", dispatch_in_data)
+        except Exception as e:
+            logger.warning("配送入库确认失败", error=str(e))
+            return {"success": False, "message": str(e)}
+
+    # ==================== 采购业务接口 ====================
+
+    async def query_purchase_orders(
+        self,
+        start_date: str,
+        end_date: str,
+        depot_code: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 50,
+    ) -> Dict[str, Any]:
+        """
+        查询采购入库单
+
+        Args:
+            start_date: 开始日期（YYYY-MM-DD）
+            end_date: 结束日期（YYYY-MM-DD）
+            depot_code: 仓库编码
+            page: 页码
+            page_size: 每页数量
+
+        Returns:
+            采购入库单列表及分页信息
+        """
+        params: Dict[str, Any] = {
+            "startDate": start_date,
+            "endDate": end_date,
+            "page": page,
+            "pageSize": page_size,
         }
+        if depot_code:
+            params["depotCode"] = depot_code
 
-        logger.info("券码核销", code=code, amount=amount)
+        logger.info("查询采购入库单", params=params)
+        try:
+            return await self._request("/api/purchase/pur_order.html", params)
+        except Exception as e:
+            logger.warning("查询采购入库单失败", error=str(e))
+            return {"list": [], "total": 0}
 
-        # TODO: 实际调用API
-        # response = await self.request("POST", "/api/coupon/use", data=data)
-        # return response.get("res", {})
+    async def create_reserve_order(self, reserve_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        创建采购订货单
 
-        return {
-            "couponId": "C001",
-            "couponName": "满100减10",
-            "faceValue": 1000,
-            "validUntil": "2024-12-31",
-            "useRule": {
-                "minAmount": 10000,
-                "canCombine": True,
-                "stores": ["所有门店"],
-            },
-        }
+        Args:
+            reserve_data: 订货数据，包含仓库编码、货品列表、期望到货时间等
 
-    async def close(self):
-        """关闭适配器，释放资源"""
-        logger.info("关闭奥琦韦适配器")
-        await self.client.aclose()
+        Returns:
+            创建结果，含订货单号
+        """
+        logger.info("创建采购订货单", depot_code=reserve_data.get("depotCode"))
+        try:
+            return await self._request("/api/purchase/reserve_order.html", reserve_data)
+        except Exception as e:
+            logger.warning("创建采购订货单失败", error=str(e))
+            return {"success": False, "message": str(e)}
+
+    # ==================== 数据报表接口 ====================
+
+    async def query_inventory_report(
+        self,
+        start_date: str,
+        end_date: str,
+        shop_code: Optional[str] = None,
+        good_code: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        查询进销存报表
+
+        Args:
+            start_date: 开始日期（YYYY-MM-DD）
+            end_date: 结束日期（YYYY-MM-DD）
+            shop_code: 门店编码
+            good_code: 货品编码
+
+        Returns:
+            进销存报表数据
+        """
+        params: Dict[str, Any] = {"startDate": start_date, "endDate": end_date}
+        if shop_code:
+            params["shopCode"] = shop_code
+        if good_code:
+            params["goodCode"] = good_code
+
+        logger.info("查询进销存报表", params=params)
+        try:
+            return await self._request("/api/report/invocingcost.html", params)
+        except Exception as e:
+            logger.warning("查询进销存报表失败", error=str(e))
+            return {"list": [], "total": 0}
+
+    async def query_good_diff_analysis(
+        self,
+        start_date: str,
+        end_date: str,
+        shop_code: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        货品差异分析
+
+        Args:
+            start_date: 开始日期
+            end_date: 结束日期
+            shop_code: 门店编码
+
+        Returns:
+            差异分析数据
+        """
+        params: Dict[str, Any] = {"startDate": start_date, "endDate": end_date}
+        if shop_code:
+            params["shopCode"] = shop_code
+
+        logger.info("货品差异分析", params=params)
+        try:
+            return await self._request("/api/report/goodDiffAnalyse.html", params)
+        except Exception as e:
+            logger.warning("货品差异分析失败", error=str(e))
+            return {"list": []}

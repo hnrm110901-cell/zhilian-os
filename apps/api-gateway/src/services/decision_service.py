@@ -8,6 +8,7 @@ from sqlalchemy import select, and_, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from collections import defaultdict
 from statistics import mean
+import os
 
 from src.core.database import get_db_session
 from src.models import KPI, KPIRecord, Store
@@ -43,7 +44,7 @@ class DecisionService:
                 end_dt = date.fromisoformat(end_date.split('T')[0])
 
             if not start_date:
-                start_dt = end_dt - timedelta(days=30)
+                start_dt = end_dt - timedelta(days=int(os.getenv("DECISION_DEFAULT_DAYS", "30")))
             else:
                 start_dt = date.fromisoformat(start_date.split('T')[0])
 
@@ -198,7 +199,7 @@ class DecisionService:
                     "title": f"{kpi['metric_name']}未达标",
                     "description": f"{kpi['metric_name']}当前为{kpi['current_value']:.2f}{kpi['unit']}，目标为{kpi['target_value']:.2f}{kpi['unit']}，达成率仅{kpi['achievement_rate']:.1%}",
                     "category": kpi["category"],
-                    "impact_level": "high" if kpi["achievement_rate"] < 0.80 else "medium",
+                    "impact_level": "high" if kpi["achievement_rate"] < float(os.getenv("DECISION_HIGH_IMPACT_THRESHOLD", "0.80")) else "medium",
                     "data_points": [
                         {"label": "当前值", "value": kpi["current_value"]},
                         {"label": "目标值", "value": kpi["target_value"]},

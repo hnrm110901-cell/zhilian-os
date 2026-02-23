@@ -3,6 +3,7 @@ ScheduleAgent - 排班优化Agent (RAG增强)
 """
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
+import os
 import structlog
 
 from .llm_agent import LLMEnhancedAgent
@@ -78,7 +79,7 @@ class ScheduleAgent(LLMEnhancedAgent):
                 query=query,
                 store_id=store_id,
                 collection="events",
-                top_k=10
+                top_k=int(os.getenv("RAG_SCHEDULE_TOP_K", "10"))
             )
 
             return self.format_response(
@@ -156,7 +157,7 @@ class ScheduleAgent(LLMEnhancedAgent):
                 query=query,
                 store_id=store_id,
                 collection="events",
-                top_k=15
+                top_k=int(os.getenv("RAG_SCHEDULE_TOP_K", "10"))
             )
 
             return self.format_response(
@@ -224,7 +225,7 @@ class ScheduleAgent(LLMEnhancedAgent):
                 query=query,
                 store_id=store_id,
                 collection="events",
-                top_k=8
+                top_k=int(os.getenv("RAG_SCHEDULE_TOP_K", "10"))
             )
 
             return self.format_response(
@@ -295,7 +296,7 @@ class ScheduleAgent(LLMEnhancedAgent):
                 query=query,
                 store_id=store_id,
                 collection="events",
-                top_k=10
+                top_k=int(os.getenv("RAG_SCHEDULE_TOP_K", "10"))
             )
 
             return self.format_response(

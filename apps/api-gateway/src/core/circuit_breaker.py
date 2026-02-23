@@ -4,6 +4,7 @@ Circuit Breaker模式实现
 """
 import time
 import structlog
+import os
 from enum import Enum
 from typing import Callable, Any
 from functools import wraps
@@ -30,10 +31,10 @@ class CircuitBreaker:
 
     def __init__(
         self,
-        failure_threshold: int = 5,  # 失败阈值
-        success_threshold: int = 2,  # 成功阈值（半开状态）
-        timeout: float = 60.0,  # 熔断超时时间（秒）
-        expected_exception: type = Exception,  # 预期的异常类型
+        failure_threshold: int = int(os.getenv("CIRCUIT_BREAKER_FAILURE_THRESHOLD", "5")),
+        success_threshold: int = int(os.getenv("CIRCUIT_BREAKER_SUCCESS_THRESHOLD", "2")),
+        timeout: float = float(os.getenv("CIRCUIT_BREAKER_TIMEOUT", "60.0")),
+        expected_exception: type = Exception,
     ):
         """
         初始化熔断器
@@ -206,9 +207,9 @@ class CircuitBreakerOpenError(Exception):
 
 
 def circuit_breaker(
-    failure_threshold: int = 5,
-    success_threshold: int = 2,
-    timeout: float = 60.0,
+    failure_threshold: int = int(os.getenv("CB_FAILURE_THRESHOLD", "5")),
+    success_threshold: int = int(os.getenv("CB_SUCCESS_THRESHOLD", "2")),
+    timeout: float = float(os.getenv("CB_TIMEOUT", "60.0")),
     expected_exception: type = Exception,
     fallback: Callable = None,
 ):

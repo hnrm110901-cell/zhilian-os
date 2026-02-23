@@ -4,6 +4,7 @@ RAG增强服务 - 集成行业基线数据
 """
 from typing import Dict, List, Optional, Any
 import structlog
+import os
 
 from src.services.baseline_data_service import BaselineDataService
 
@@ -16,12 +17,12 @@ class EnhancedRAGService:
     自动判断数据充足性，在数据不足时使用行业基线
     """
 
-    # 数据充足性阈值
+    # 数据充足性阈值（支持环境变量覆盖）
     DATA_SUFFICIENCY_THRESHOLDS = {
-        "orders": 100,  # 至少100个订单
-        "days": 30,  # 至少30天数据
-        "inventory_records": 50,  # 至少50条库存记录
-        "reservations": 30,  # 至少30个预订记录
+        "orders": int(os.getenv("RAG_MIN_ORDERS", "100")),
+        "days": int(os.getenv("RAG_MIN_DAYS", "30")),
+        "inventory_records": int(os.getenv("RAG_MIN_INVENTORY_RECORDS", "50")),
+        "reservations": int(os.getenv("RAG_MIN_RESERVATIONS", "30")),
     }
 
     def __init__(self, store_id: str, restaurant_type: str = "正餐"):
@@ -77,37 +78,59 @@ class EnhancedRAGService:
         Returns:
             数据充足性评估结果
         """
-        # TODO: 实现实际的数据库查询逻辑
-        # 这里需要根据query_type查询相关数据的数量
+        from sqlalchemy import select, func
+        from src.core.database import get_db_session
+        from src.models.order import Order
+        from src.models.daily_report import DailyReport
+        from src.models.inventory import InventoryItem
+        from src.models.reservation import Reservation
 
-        # 模拟数据充足性检查
+        async with get_db_session() as session:
+            orders_result = await session.execute(
+                select(func.count(Order.id)).where(Order.store_id == self.store_id)
+            )
+            days_result = await session.execute(
+                select(func.count(func.distinct(DailyReport.report_date))).where(
+                    DailyReport.store_id == self.store_id
+                )
+            )
+            inventory_result = await session.execute(
+                select(func.count(InventoryItem.id)).where(
+                    InventoryItem.store_id == self.store_id
+                )
+            )
+            reservation_result = await session.execute(
+                select(func.count(Reservation.id)).where(
+                    Reservation.store_id == self.store_id
+                )
+            )
+
+        data_counts = {
+            "orders": int(orders_result.scalar() or 0),
+            "days": int(days_result.scalar() or 0),
+            "inventory_records": int(inventory_result.scalar() or 0),
+            "reservations": int(reservation_result.scalar() or 0),
+        }
+
+        missing_data = [
+            {
+                "dimension": key,
+                "current": data_counts.get(key, 0),
+                "required": threshold,
+                "gap": threshold - data_counts.get(key, 0),
+            }
+            for key, threshold in self.DATA_SUFFICIENCY_THRESHOLDS.items()
+            if data_counts.get(key, 0) < threshold
+        ]
+
         sufficiency = {
             "query_type": query_type,
             "store_id": self.store_id,
-            "data_counts": {
-                "orders": 0,
-                "days_of_data": 0,
-                "inventory_records": 0,
-                "reservations": 0,
-            },
+            "data_counts": data_counts,
             "thresholds": self.DATA_SUFFICIENCY_THRESHOLDS,
-            "is_sufficient": False,
-            "missing_data": [],
+            "is_sufficient": len(missing_data) == 0,
+            "missing_data": missing_data,
         }
-
-        # 检查每个维度的数据是否充足
-        for key, threshold in self.DATA_SUFFICIENCY_THRESHOLDS.items():
-            count = sufficiency["data_counts"].get(key, 0)
-            if count < threshold:
-                sufficiency["missing_data"].append({
-                    "dimension": key,
-                    "current": count,
-                    "required": threshold,
-                    "gap": threshold - count,
-                })
-
-        # 如果有任何维度数据不足，则判定为不充足
-        sufficiency["is_sufficient"] = len(sufficiency["missing_data"]) == 0
 
         logger.info(
             "Data sufficiency checked",
@@ -138,9 +161,13 @@ class EnhancedRAGService:
         Returns:
             查询结果
         """
-        # TODO: 实现实际的RAG查询逻辑
-        # 1. 向量检索客户的历史数据
-        # 2. 使用LLM生成回答
+        # 根据query_type从数据库检索相关数据作为上下文
+        from src.core.database import get_db_session
+        from src.models.order import Order, OrderStatus
+        from src.models.daily_report import DailyReport
+        from src.models.inventory import InventoryItem
+        from sqlalchemy import select, func
+        from datetime import date, timedelta
 
         logger.info(
             "Querying with customer data",
@@ -149,12 +176,74 @@ class EnhancedRAGService:
             data_source="customer_data",
         )
 
+        retrieved_docs = []
+        answer_data = {}
+
+        async with get_db_session() as session:
+            if query_type in ("revenue", "sales", "营收", "销售"):
+                # 查询最近30天营收数据
+                cutoff = date.today() - timedelta(days=int(os.getenv("RAG_DATA_DAYS", "30")))
+                result = await session.execute(
+                    select(
+                        func.sum(DailyReport.total_revenue).label("total"),
+                        func.avg(DailyReport.total_revenue).label("avg_daily"),
+                        func.sum(DailyReport.customer_count).label("customers"),
+                        func.count(DailyReport.id).label("days"),
+                    ).where(
+                        DailyReport.store_id == self.store_id,
+                        DailyReport.report_date >= cutoff,
+                    )
+                )
+                row = result.one()
+                answer_data = {
+                    "period": "最近30天",
+                    "total_revenue_fen": row.total or 0,
+                    "avg_daily_revenue_fen": int(row.avg_daily or 0),
+                    "total_customers": row.customers or 0,
+                    "data_days": row.days or 0,
+                }
+                retrieved_docs = [{"type": "daily_report", "days": row.days or 0}]
+
+            elif query_type in ("inventory", "库存"):
+                result = await session.execute(
+                    select(
+                        func.count(InventoryItem.id).label("total"),
+                        func.count(InventoryItem.id).filter(
+                            InventoryItem.current_quantity <= InventoryItem.min_quantity
+                        ).label("low_stock"),
+                    ).where(InventoryItem.store_id == self.store_id)
+                )
+                row = result.one()
+                answer_data = {
+                    "total_items": row.total or 0,
+                    "low_stock_items": row.low_stock or 0,
+                }
+                retrieved_docs = [{"type": "inventory", "items": row.total or 0}]
+
+            else:
+                # 通用：查询最近订单统计
+                result = await session.execute(
+                    select(
+                        func.count(Order.id).label("count"),
+                        func.sum(Order.total_amount).label("revenue"),
+                    ).where(
+                        Order.store_id == self.store_id,
+                        Order.status == OrderStatus.COMPLETED,
+                    )
+                )
+                row = result.one()
+                answer_data = {
+                    "total_orders": row.count or 0,
+                    "total_revenue_fen": int(row.revenue or 0),
+                }
+                retrieved_docs = [{"type": "orders", "count": row.count or 0}]
+
         return {
-            "answer": "基于您的历史数据生成的回答（待实现）",
+            "answer": answer_data,
             "data_source": "customer_data",
             "confidence": "high",
             "data_sufficiency": data_sufficiency,
-            "retrieved_documents": [],  # 检索到的相关文档
+            "retrieved_documents": retrieved_docs,
             "note": "此建议基于您门店的实际运营数据，具有较高的准确性。",
         }
 
@@ -235,11 +324,25 @@ class EnhancedRAGService:
 
         progress["overall_progress"] = total_progress / len(self.DATA_SUFFICIENCY_THRESHOLDS)
 
-        # 估算达到充足所需天数
+        # 估算达到充足所需天数：基于实际数据量和天数计算日增长率
         if progress["overall_progress"] < 100:
-            # 简单估算：假设每天增长1%
-            progress["estimated_days_to_sufficient"] = int(
-                (100 - progress["overall_progress"]) / 1
+            # 从 sufficiency 中获取实际数据量和天数
+            current_orders = sufficiency.get("current_data", {}).get("orders", 0)
+            current_days = sufficiency.get("current_data", {}).get("days", 0)
+            # 日均订单增长率
+            daily_order_rate = (current_orders / current_days) if current_days > 0 else 1.0
+            # 估算最慢维度的剩余天数
+            max_days_needed = 0
+            for dim in progress["dimensions"]:
+                if dim["status"] == "insufficient":
+                    remaining = dim["required"] - dim["current"]
+                    if dim["name"] == "orders" and daily_order_rate > 0:
+                        days_needed = int(remaining / daily_order_rate)
+                    else:
+                        days_needed = int(remaining / max(daily_order_rate, 1))
+                    max_days_needed = max(max_days_needed, days_needed)
+            progress["estimated_days_to_sufficient"] = max_days_needed if max_days_needed > 0 else int(
+                (100 - progress["overall_progress"]) / max(daily_order_rate, 1)
             )
 
         logger.info(

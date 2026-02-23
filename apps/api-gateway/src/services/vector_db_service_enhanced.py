@@ -17,6 +17,7 @@ from datetime import datetime
 import hashlib
 import json
 import asyncio
+import os
 from functools import wraps
 import time
 
@@ -71,15 +72,15 @@ class VectorDatabaseServiceEnhanced:
 
         # 初始化熔断器（防止Silent Failure）
         self.circuit_breaker = CircuitBreaker(
-            failure_threshold=5,  # 连续失败5次后熔断
-            success_threshold=2,  # 半开状态成功2次后恢复
-            timeout=60.0,  # 熔断60秒后尝试恢复
+            failure_threshold=int(os.getenv("VECTOR_DB_CB_FAILURE_THRESHOLD", "5")),    # 连续失败N次后熔断
+            success_threshold=int(os.getenv("VECTOR_DB_CB_SUCCESS_THRESHOLD", "2")),    # 半开状态成功N次后恢复
+            timeout=float(os.getenv("VECTOR_DB_CB_TIMEOUT", "60.0")),                  # 熔断N秒后尝试恢复
             expected_exception=Exception,
         )
 
         logger.info("VectorDatabaseServiceEnhanced初始化完成（带熔断器）")
 
-    @retry_on_failure(max_retries=3, delay=2.0)
+    @retry_on_failure(max_retries=int(os.getenv("VECTOR_DB_RETRY_MAX", "3")), delay=float(os.getenv("VECTOR_DB_RETRY_DELAY_LONG", "2.0")))
     async def initialize(self):
         """初始化Qdrant客户端和嵌入模型（带重试）"""
         if self._initialized:
@@ -103,9 +104,9 @@ class VectorDatabaseServiceEnhanced:
             # 创建客户端（使用gRPC协议以避免HTTP 503错误）
             self.client = QdrantClient(
                 host=self.qdrant_url.replace('http://', '').replace('https://', '').split(':')[0],
-                port=6334,  # gRPC端口
+                port=int(os.getenv("QDRANT_GRPC_PORT", "6334")),  # gRPC端口
                 prefer_grpc=True,
-                timeout=30,
+                timeout=int(os.getenv("QDRANT_TIMEOUT", "30")),
             )
 
             # 测试连接
@@ -149,11 +150,12 @@ class VectorDatabaseServiceEnhanced:
                 pass
 
             # 加载模型（可能需要下载）
+            model_name = os.getenv("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2")
             self.embedding_model = SentenceTransformer(
-                'paraphrase-multilingual-MiniLM-L12-v2',
+                model_name,
                 device='cpu'  # 使用CPU，避免GPU依赖
             )
-            logger.info("嵌入模型加载成功")
+            logger.info("嵌入模型加载成功", model=model_name)
 
         except Exception as e:
             logger.warning(f"嵌入模型加载失败，将使用模拟嵌入: {str(e)}")
@@ -236,12 +238,12 @@ class VectorDatabaseServiceEnhanced:
             return self._generate_mock_embedding(text)
 
     def _generate_mock_embedding(self, text: str) -> List[float]:
-        """生成模拟嵌入向量（用于测试）"""
+        """生成确定性哈希向量（嵌入模型不可用时的fallback，语义无意义）"""
         import random
         random.seed(hashlib.md5(text.encode()).hexdigest())
-        return [random.random() for _ in range(384)]
+        return [random.random() for _ in range(int(os.getenv("VECTOR_EMBEDDING_DIM", "384")))]
 
-    @retry_on_failure(max_retries=2, delay=1.0)
+    @retry_on_failure(max_retries=int(os.getenv("VECTOR_DB_RETRY_MAX_SHORT", "2")), delay=float(os.getenv("VECTOR_DB_RETRY_DELAY", "1.0")))
     async def index_order(self, order_data: Dict[str, Any]) -> bool:
         """
         索引订单到向量数据库（带重试和熔断器）
@@ -445,7 +447,7 @@ class VectorDatabaseServiceEnhanced:
 
             # 测试嵌入生成
             test_embedding = self.generate_embedding("健康检查测试")
-            if len(test_embedding) != 384:
+            if len(test_embedding) != int(os.getenv("VECTOR_EMBEDDING_DIM", "384")):
                 raise ValueError("嵌入向量维度不正确")
 
             health_status["status"] = "healthy"
@@ -457,7 +459,7 @@ class VectorDatabaseServiceEnhanced:
 
         return health_status
 
-    @retry_on_failure(max_retries=2, delay=1.0)
+    @retry_on_failure(max_retries=int(os.getenv("VECTOR_DB_RETRY_MAX_SHORT", "2")), delay=float(os.getenv("VECTOR_DB_RETRY_DELAY", "1.0")))
     async def index_dish(self, dish_data: Dict[str, Any]) -> bool:
         """
         索引菜品到向量数据库（带重试）
@@ -516,7 +518,7 @@ class VectorDatabaseServiceEnhanced:
             logger.error("菜品索引失败", error=str(e))
             return False
 
-    @retry_on_failure(max_retries=2, delay=1.0)
+    @retry_on_failure(max_retries=int(os.getenv("VECTOR_DB_RETRY_MAX_SHORT", "2")), delay=float(os.getenv("VECTOR_DB_RETRY_DELAY", "1.0")))
     async def index_event(self, event_data: Dict[str, Any]) -> bool:
         """
         索引神经系统事件到向量数据库（带重试）
@@ -575,7 +577,7 @@ class VectorDatabaseServiceEnhanced:
             logger.error("事件索引失败", error=str(e))
             return False
 
-    @retry_on_failure(max_retries=2, delay=1.0)
+    @retry_on_failure(max_retries=int(os.getenv("VECTOR_DB_RETRY_MAX_SHORT", "2")), delay=float(os.getenv("VECTOR_DB_RETRY_DELAY", "1.0")))
     async def semantic_search(
         self,
         collection_name: str,

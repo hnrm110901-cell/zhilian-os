@@ -2,6 +2,7 @@
 调度任务监控服务
 用于监控Celery Beat定时任务的执行情况
 """
+import os
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from collections import defaultdict
@@ -81,7 +82,7 @@ class SchedulerMonitorService:
                 self.task_health[task_name]["consecutive_failures"] += 1
 
             # 清理旧数据 (保留最近24小时)
-            cutoff_time = datetime.now() - timedelta(hours=24)
+            cutoff_time = datetime.now() - timedelta(hours=int(os.getenv("SCHEDULER_MONITOR_RETENTION_HOURS", "24")))
             self.executions = [
                 e for e in self.executions
                 if e["timestamp"] > cutoff_time
@@ -255,7 +256,7 @@ class SchedulerMonitorService:
                 consecutive_failures = health["consecutive_failures"]
 
                 # 判断健康状态
-                if consecutive_failures >= 3:
+                if consecutive_failures >= int(os.getenv("SCHEDULER_CRITICAL_FAILURES", "3")):
                     status = "critical"
                     message = f"连续失败{consecutive_failures}次"
                 elif consecutive_failures > 0:
@@ -264,7 +265,7 @@ class SchedulerMonitorService:
                 elif last_success:
                     # 检查是否长时间未执行
                     time_since_success = datetime.now() - last_success
-                    if time_since_success > timedelta(hours=2):
+                    if time_since_success > timedelta(hours=int(os.getenv("SCHEDULER_HEALTH_CHECK_HOURS", "2"))):
                         status = "warning"
                         message = f"已{time_since_success.total_seconds() / 3600:.1f}小时未执行"
                     else:
@@ -337,43 +338,46 @@ class SchedulerMonitorService:
 
     async def get_queue_stats(self) -> Dict[str, Any]:
         """
-        获取队列统计 (模拟)
+        获取队列统计（从 Celery 实时查询）
 
         Returns:
             队列统计数据
         """
         try:
-            # 实际应该从Celery获取队列信息
-            # 这里返回模拟数据
+            from src.core.celery_app import celery_app
+            import asyncio
+
+            loop = asyncio.get_event_loop()
+
+            def _inspect():
+                insp = celery_app.control.inspect(timeout=float(os.getenv("SCHEDULER_INSPECT_TIMEOUT", "2.0")))
+                active = insp.active() or {}
+                reserved = insp.reserved() or {}
+                worker_stats = insp.stats() or {}
+                return active, reserved, worker_stats
+
+            active, reserved, worker_stats = await loop.run_in_executor(None, _inspect)
+
+            active_count = sum(len(tasks) for tasks in active.values())
+            reserved_count = sum(len(tasks) for tasks in reserved.values())
+            worker_count = len(worker_stats)
+
             stats = {
                 "queues": {
-                    "high_priority": {
-                        "pending": 0,
-                        "active": 0,
-                        "completed_last_hour": 0
-                    },
                     "default": {
-                        "pending": 0,
-                        "active": 0,
-                        "completed_last_hour": 0
-                    },
-                    "low_priority": {
-                        "pending": 0,
-                        "active": 0,
-                        "completed_last_hour": 0
+                        "pending": reserved_count,
+                        "active": active_count,
+                        "completed_last_hour": 0,
                     }
                 },
                 "workers": {
-                    "active": 1,
-                    "total": 1
+                    "active": worker_count,
+                    "total": worker_count,
                 },
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
-            return {
-                "success": True,
-                "stats": stats
-            }
+            return {"success": True, "stats": stats}
 
         except Exception as e:
             logger.error(

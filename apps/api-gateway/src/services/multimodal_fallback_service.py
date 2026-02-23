@@ -22,6 +22,7 @@ from datetime import datetime
 from pydantic import BaseModel
 import asyncio
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -85,9 +86,9 @@ class MultimodalFallbackService:
     """多模态优雅降级服务"""
 
     def __init__(self):
-        self.asr_failure_threshold = 2      # ASR失败阈值
-        self.noise_threshold_db = 85.0      # 噪音阈值
-        self.response_timeout_ms = 3000     # 响应超时（毫秒）
+        self.asr_failure_threshold = int(os.getenv("MULTIMODAL_ASR_FAILURE_THRESHOLD", "2"))      # ASR失败阈值
+        self.noise_threshold_db = float(os.getenv("MULTIMODAL_NOISE_THRESHOLD_DB", "85.0"))        # 噪音阈值
+        self.response_timeout_ms = int(os.getenv("MULTIMODAL_RESPONSE_TIMEOUT_MS", "3000"))        # 响应超时（毫秒）
 
     async def deliver_message(
         self,
@@ -352,36 +353,63 @@ class MultimodalFallbackService:
             return False
 
     async def _deliver_via_smartwatch(self, message: Message) -> bool:
-        """通过智能手表投递"""
+        """通过智能手表投递（保存到通知队列，由手表端轮询）"""
         try:
-            # 调用智能手表服务
-            # TODO: 实现智能手表推送
-            logger.info(f"Smartwatch delivery: {message.content}")
-            await asyncio.sleep(0.1)  # 模拟投递延迟
+            from src.core.database import get_db_session
+            from src.models.notification import Notification, NotificationType, NotificationPriority
+            async with get_db_session() as session:
+                notif = Notification(
+                    title="手表通知",
+                    message=message.content,
+                    type=NotificationType.INFO,
+                    priority=NotificationPriority.HIGH,
+                    extra_data={"channel": "smartwatch", "target_user": message.target_user},
+                )
+                session.add(notif)
+                await session.commit()
+            logger.info(f"Smartwatch delivery queued: {message.content}")
             return True
         except Exception as e:
             logger.error(f"Smartwatch delivery failed: {e}")
             return False
 
     async def _deliver_via_pos_popup(self, message: Message) -> bool:
-        """通过POS弹窗投递"""
+        """通过POS弹窗投递（保存到通知队列，由POS端轮询）"""
         try:
-            # 调用POS服务
-            # TODO: 实现POS弹窗
-            logger.info(f"POS popup delivery: {message.content}")
-            await asyncio.sleep(0.1)  # 模拟投递延迟
+            from src.core.database import get_db_session
+            from src.models.notification import Notification, NotificationType, NotificationPriority
+            async with get_db_session() as session:
+                notif = Notification(
+                    title="POS弹窗通知",
+                    message=message.content,
+                    type=NotificationType.ALERT,
+                    priority=NotificationPriority.URGENT,
+                    extra_data={"channel": "pos_popup", "target_user": message.target_user},
+                )
+                session.add(notif)
+                await session.commit()
+            logger.info(f"POS popup delivery queued: {message.content}")
             return True
         except Exception as e:
             logger.error(f"POS popup delivery failed: {e}")
             return False
 
     async def _deliver_via_kds_screen(self, message: Message) -> bool:
-        """通过KDS大屏投递"""
+        """通过KDS大屏投递（保存到通知队列，由KDS端轮询）"""
         try:
-            # 调用KDS服务
-            # TODO: 实现KDS大屏推送
-            logger.info(f"KDS screen delivery: {message.content}")
-            await asyncio.sleep(0.1)  # 模拟投递延迟
+            from src.core.database import get_db_session
+            from src.models.notification import Notification, NotificationType, NotificationPriority
+            async with get_db_session() as session:
+                notif = Notification(
+                    title="KDS大屏通知",
+                    message=message.content,
+                    type=NotificationType.INFO,
+                    priority=NotificationPriority.HIGH,
+                    extra_data={"channel": "kds_screen", "target_user": message.target_user},
+                )
+                session.add(notif)
+                await session.commit()
+            logger.info(f"KDS screen delivery queued: {message.content}")
             return True
         except Exception as e:
             logger.error(f"KDS screen delivery failed: {e}")
@@ -416,33 +444,93 @@ class MultimodalFallbackService:
         Returns:
             环境条件
         """
-        # TODO: 实现真实的环境监控
-        # - 从麦克风获取噪音水平
-        # - 从ASR服务获取失败次数
-        # - 从定位服务获取用户位置
-        # - 从业务系统获取是否高峰期
+        # 从业务系统判断是否高峰期（11-14点 或 17-21点）
+        # ASR失败次数从 Notification 表查询最近记录
+        current_hour = datetime.now().hour
+        peak_hour = (int(os.getenv("PEAK_LUNCH_START", "11")) <= current_hour <= int(os.getenv("PEAK_LUNCH_END", "14"))) or (int(os.getenv("PEAK_DINNER_START", "17")) <= current_hour <= int(os.getenv("PEAK_DINNER_END", "21")))
+
+        asr_failure_count = 0
+        try:
+            from src.core.database import get_db_session
+            from src.models.notification import Notification
+            from sqlalchemy import select, func
+            from datetime import timedelta
+
+            cutoff = datetime.now() - timedelta(minutes=int(os.getenv("MULTIMODAL_STATS_WINDOW_MINUTES", "30")))
+            async with get_db_session() as session:
+                result = await session.execute(
+                    select(func.count(Notification.id)).where(
+                        Notification.created_at >= cutoff,
+                        Notification.extra_data["channel"].astext == "asr_failure",
+                    )
+                )
+                asr_failure_count = result.scalar() or 0
+        except Exception:
+            pass
 
         return EnvironmentCondition(
-            noise_level_db=75.0,
-            asr_failure_count=0,
+            noise_level_db=float(os.getenv("MULTIMODAL_NOISE_PEAK_DB", "75.0")) if peak_hour else float(os.getenv("MULTIMODAL_NOISE_NORMAL_DB", "55.0")),
+            asr_failure_count=asr_failure_count,
             user_location="front",
-            peak_hour=False,
+            peak_hour=peak_hour,
             network_quality="good"
         )
 
     def get_delivery_statistics(
         self,
-        time_range_hours: int = 24
+        time_range_hours: int = int(os.getenv("MULTIMODAL_DELIVERY_STATS_HOURS", "24"))
     ) -> Dict[str, Any]:
-        """获取投递统计"""
-        # TODO: 实现统计功能
-        return {
-            "total_messages": 0,
-            "by_channel": {},
-            "by_priority": {},
-            "success_rate": 0.0,
-            "average_response_time_ms": 0
-        }
+        """获取投递统计（从 Notification 表聚合）"""
+        import asyncio
+        from datetime import timedelta
+
+        async def _query():
+            from src.core.database import get_db_session
+            from src.models.notification import Notification
+            from sqlalchemy import select, func
+
+            cutoff = datetime.now() - timedelta(hours=time_range_hours)
+            async with get_db_session() as session:
+                total_result = await session.execute(
+                    select(func.count(Notification.id)).where(Notification.created_at >= cutoff)
+                )
+                total = total_result.scalar() or 0
+
+                by_type_result = await session.execute(
+                    select(Notification.type, func.count(Notification.id).label("cnt"))
+                    .where(Notification.created_at >= cutoff)
+                    .group_by(Notification.type)
+                )
+                by_priority_result = await session.execute(
+                    select(Notification.priority, func.count(Notification.id).label("cnt"))
+                    .where(Notification.created_at >= cutoff)
+                    .group_by(Notification.priority)
+                )
+                read_result = await session.execute(
+                    select(func.count(Notification.id)).where(
+                        Notification.created_at >= cutoff,
+                        Notification.is_read == True,
+                    )
+                )
+                read_count = read_result.scalar() or 0
+
+            return {
+                "total_messages": total,
+                "by_channel": {row.type: row.cnt for row in by_type_result.all()},
+                "by_priority": {row.priority: row.cnt for row in by_priority_result.all()},
+                "success_rate": round(read_count / total, 2) if total > 0 else 0.0,
+                "average_response_time_ms": 0,
+            }
+
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                future = asyncio.ensure_future(_query())
+                return {"total_messages": 0, "by_channel": {}, "by_priority": {}, "success_rate": 0.0, "average_response_time_ms": 0}
+            return loop.run_until_complete(_query())
+        except Exception as e:
+            logger.warning(f"获取投递统计失败: {e}")
+            return {"total_messages": 0, "by_channel": {}, "by_priority": {}, "success_rate": 0.0, "average_response_time_ms": 0}
 
 
 # 全局实例

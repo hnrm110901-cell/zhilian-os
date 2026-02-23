@@ -2,6 +2,7 @@
 Database Repository Layer
 Provides convenient methods for querying database models
 """
+import os
 from typing import List, Optional
 from datetime import date, datetime
 from sqlalchemy import select, and_, or_, desc
@@ -137,7 +138,7 @@ class KPIRepository:
     async def get_latest_records(
         session: AsyncSession,
         store_id: str,
-        limit: int = 30
+        limit: int = int(os.getenv("REPO_KPI_LIMIT", "30"))
     ) -> List[KPIRecord]:
         """Get latest KPI records"""
         result = await session.execute(
@@ -155,7 +156,7 @@ class OrderRepository:
     async def get_by_store(
         session: AsyncSession,
         store_id: str,
-        limit: int = 100
+        limit: int = int(os.getenv("REPO_ORDER_LIMIT", "100"))
     ) -> List[Order]:
         """Get orders for a store"""
         result = await session.execute(

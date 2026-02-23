@@ -10,6 +10,7 @@ Provides sophisticated rate limiting with multiple strategies:
 - Redis-backed distributed rate limiting
 """
 
+import os
 from fastapi import Request, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 from typing import Dict, Optional, Callable
@@ -52,8 +53,8 @@ class RateLimiter:
     def __init__(
         self,
         redis_client: Optional[redis.Redis] = None,
-        default_limit: int = 100,
-        default_window: int = 60,
+        default_limit: int = int(os.getenv("RATE_LIMIT_DEFAULT_REQUESTS", "100")),
+        default_window: int = int(os.getenv("RATE_LIMIT_DEFAULT_WINDOW", "60")),
         enable_redis: bool = True
     ):
         self.redis_client = redis_client
@@ -80,33 +81,33 @@ class RateLimiter:
         """Initialize default rate limits for different endpoints"""
         # Public endpoints - stricter limits
         self.endpoint_limits["/api/v1/auth/login"] = RateLimitRule(
-            requests=5,
+            requests=int(os.getenv("RATE_LIMIT_LOGIN_REQUESTS", "5")),
             window=60,
             scope="ip"
         )
         self.endpoint_limits["/api/v1/auth/register"] = RateLimitRule(
-            requests=3,
-            window=3600,
+            requests=int(os.getenv("RATE_LIMIT_REGISTER_REQUESTS", "3")),
+            window=int(os.getenv("RATE_LIMIT_REGISTER_WINDOW", "3600")),
             scope="ip"
         )
 
         # API endpoints - moderate limits
         self.endpoint_limits["/api/v1/agents/*"] = RateLimitRule(
-            requests=100,
+            requests=int(os.getenv("RATE_LIMIT_AGENT_REQUESTS", "100")),
             window=60,
             scope="user"
         )
 
         # Heavy operations - stricter limits
         self.endpoint_limits["/api/v1/analytics/*"] = RateLimitRule(
-            requests=20,
+            requests=int(os.getenv("RATE_LIMIT_ANALYTICS_REQUESTS", "20")),
             window=60,
             scope="user"
         )
 
         # Webhook endpoints - very strict
         self.endpoint_limits["/api/v1/webhooks/*"] = RateLimitRule(
-            requests=10,
+            requests=int(os.getenv("RATE_LIMIT_WEBHOOK_REQUESTS", "10")),
             window=60,
             scope="ip"
         )
@@ -349,7 +350,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self,
         app,
         redis_client: Optional[redis.Redis] = None,
-        default_limit: int = 100,
+        default_limit: int = int(os.getenv("RATE_LIMIT_DEFAULT_REQUESTS", "100")),
         default_window: int = 60
     ):
         super().__init__(app)

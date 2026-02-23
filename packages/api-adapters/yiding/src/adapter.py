@@ -4,6 +4,7 @@
 实现智链OS统一接口,对接易订预订系统
 """
 
+import os
 import structlog
 from typing import List, Optional
 
@@ -46,7 +47,7 @@ class YiDingAdapter:
         self.config = config
         self.client = YiDingClient(config)
         self.mapper = YiDingMapper()
-        self.cache = YiDingCache(ttl=config.get("cache_ttl", 300))
+        self.cache = YiDingCache(ttl=config.get("cache_ttl", int(os.getenv("YIDING_CACHE_TTL", "300"))))
 
         self.logger = logger.bind(adapter="yiding")
 
@@ -233,7 +234,7 @@ class YiDingAdapter:
             params={
                 "store_id": store_id,
                 "date": date,
-                "page_size": 1000
+                "page_size": int(os.getenv("YIDING_PAGE_SIZE", "1000"))
             }
         )
 

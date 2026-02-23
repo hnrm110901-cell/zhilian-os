@@ -4,6 +4,7 @@
 """
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
+import os
 import structlog
 
 logger = structlog.get_logger()
@@ -237,19 +238,49 @@ class BaselineDataService:
         Returns:
             包含数据充足性评估的字典
         """
-        # TODO: 实现实际的数据量检查逻辑
-        # 这里需要查询数据库，统计各类数据的数量
+        from sqlalchemy import select, func
+        from src.core.database import get_db_session
+        from src.models.order import Order
+        from src.models.daily_report import DailyReport
+        from src.models.inventory import InventoryItem
+
+        async with get_db_session() as session:
+            orders_result = await session.execute(
+                select(func.count(Order.id)).where(Order.store_id == self.store_id)
+            )
+            orders_count = int(orders_result.scalar() or 0)
+
+            days_result = await session.execute(
+                select(func.count(func.distinct(DailyReport.report_date))).where(
+                    DailyReport.store_id == self.store_id
+                )
+            )
+            days_of_data = int(days_result.scalar() or 0)
+
+            inventory_result = await session.execute(
+                select(func.count(InventoryItem.id)).where(
+                    InventoryItem.store_id == self.store_id
+                )
+            )
+            inventory_records = int(inventory_result.scalar() or 0)
+
+        threshold = {
+            "orders": int(os.getenv("BASELINE_MIN_ORDERS", "100")),
+            "days": int(os.getenv("BASELINE_MIN_DAYS", "30")),
+            "inventory": int(os.getenv("BASELINE_MIN_INVENTORY", "50")),
+        }
+        is_sufficient = (
+            orders_count >= threshold["orders"]
+            and days_of_data >= threshold["days"]
+            and inventory_records >= threshold["inventory"]
+        )
 
         return {
-            "orders_count": 0,  # 订单数量
-            "days_of_data": 0,  # 数据天数
-            "inventory_records": 0,  # 库存记录数
-            "is_sufficient": False,  # 是否充足
-            "threshold": {
-                "orders": 100,  # 至少100个订单
-                "days": 30,  # 至少30天数据
-                "inventory": 50,  # 至少50条库存记录
-            },
+            "orders_count": orders_count,
+            "days_of_data": days_of_data,
+            "inventory_records": inventory_records,
+            "is_sufficient": is_sufficient,
+            "threshold": threshold,
         }
 
     async def should_use_baseline(self) -> bool:
@@ -359,10 +390,10 @@ class BaselineDataService:
     ) -> str:
         """生成人员配置建议"""
         staff_data = baseline_data.get("staff", {})
-        area = context.get("area", 100)  # 默认100平米
+        area = context.get("area", int(os.getenv("BASELINE_AREA_UNIT", "100")))  # 默认100平米
 
-        front_staff = staff_data.get("前厅", {}).get("平均", 0) * (area / 100)
-        kitchen_staff = staff_data.get("后厨", {}).get("平均", 0) * (area / 100)
+        front_staff = staff_data.get("前厅", {}).get("平均", 0) * (area / int(os.getenv("BASELINE_AREA_UNIT", "100")))
+        kitchen_staff = staff_data.get("后厨", {}).get("平均", 0) * (area / int(os.getenv("BASELINE_AREA_UNIT", "100")))
 
         return (
             f"根据您的餐厅面积（{area}平米），建议配置前厅人员{front_staff:.0f}人，"

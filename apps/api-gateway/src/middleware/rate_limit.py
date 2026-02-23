@@ -4,6 +4,7 @@ API速率限制中间件
 使用Redis存储，支持分布式部署
 """
 import time
+import os
 from typing import Dict, Optional
 from datetime import datetime, timedelta
 import structlog
@@ -30,27 +31,27 @@ class RedisRateLimiter:
         self.redis_url = redis_url
         self._initialized = False
 
-        # 速率限制配置
+        # 速率限制配置（支持环境变量覆盖）
         self.limits = {
             "default": {
-                "requests": 100,  # 请求数
-                "window": 60,     # 时间窗口（秒）
+                "requests": int(os.getenv("RATE_LIMIT_DEFAULT_REQUESTS", "100")),
+                "window": int(os.getenv("RATE_LIMIT_DEFAULT_WINDOW", "60")),
             },
             "auth": {
-                "requests": 10,
-                "window": 60,
+                "requests": int(os.getenv("RATE_LIMIT_AUTH_REQUESTS", "10")),
+                "window": int(os.getenv("RATE_LIMIT_AUTH_WINDOW", "60")),
             },
             "oauth": {
-                "requests": 5,
-                "window": 300,  # OAuth登录限制更严格
+                "requests": int(os.getenv("RATE_LIMIT_OAUTH_REQUESTS", "5")),
+                "window": int(os.getenv("RATE_LIMIT_OAUTH_WINDOW", "300")),
             },
             "backup": {
-                "requests": 5,
-                "window": 300,  # 5分钟
+                "requests": int(os.getenv("RATE_LIMIT_BACKUP_REQUESTS", "5")),
+                "window": int(os.getenv("RATE_LIMIT_BACKUP_WINDOW", "300")),
             },
             "analytics": {
-                "requests": 30,
-                "window": 60,
+                "requests": int(os.getenv("RATE_LIMIT_ANALYTICS_REQUESTS", "30")),
+                "window": int(os.getenv("RATE_LIMIT_ANALYTICS_WINDOW", "60")),
             },
         }
 
@@ -64,7 +65,7 @@ class RedisRateLimiter:
                 self.redis_url,
                 encoding="utf-8",
                 decode_responses=True,
-                max_connections=50,
+                max_connections=int(os.getenv("REDIS_MAX_CONNECTIONS", "50")),
             )
             await self.redis_client.ping()
             self._initialized = True

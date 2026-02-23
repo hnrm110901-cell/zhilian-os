@@ -9,6 +9,7 @@ Restaurant Industry Embedding Model Training Service
 4. 相似度计算
 """
 
+import os
 import numpy as np
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime, timedelta
@@ -27,14 +28,14 @@ class EmbeddingModelService:
         self.db = db
         self.model = None
         self.vocab = {}
-        self.embedding_dim = 128
+        self.embedding_dim = int(os.getenv("EMBEDDING_DIM", "128"))
 
     # ==================== 数据收集 ====================
 
     async def collect_training_data(
         self,
         tenant_id: Optional[str] = None,
-        days: int = 90
+        days: int = int(os.getenv("EMBEDDING_TRAIN_DATA_DAYS", "90"))
     ) -> Dict[str, List]:
         """
         收集训练数据
@@ -225,10 +226,10 @@ class EmbeddingModelService:
     def train_word2vec(
         self,
         training_data: Dict[str, List],
-        embedding_dim: int = 128,
-        window_size: int = 5,
-        epochs: int = 10,
-        learning_rate: float = 0.025
+        embedding_dim: int = int(os.getenv("EMBEDDING_DIM", "128")),
+        window_size: int = int(os.getenv("EMBEDDING_WINDOW_SIZE", "5")),
+        epochs: int = int(os.getenv("EMBEDDING_EPOCHS", "10")),
+        learning_rate: float = float(os.getenv("EMBEDDING_LEARNING_RATE", "0.025"))
     ) -> np.ndarray:
         """
         训练 Word2Vec 模型（Skip-gram）
@@ -302,7 +303,7 @@ class EmbeddingModelService:
             logger.info(f"Epoch {epoch + 1}/{epochs}, Loss: {avg_loss:.4f}")
 
             # 学习率衰减
-            learning_rate *= 0.95
+            learning_rate *= float(os.getenv("EMBEDDING_LR_DECAY", "0.95"))
 
         self.model = embeddings
         logger.info(f"Training completed. Embedding shape: {embeddings.shape}")
@@ -406,7 +407,7 @@ class EmbeddingModelService:
     def find_similar_dishes(
         self,
         dish_name: str,
-        top_k: int = 10,
+        top_k: int = int(os.getenv("EMBEDDING_SEARCH_TOP_K", "10")),
         tenant_id: Optional[str] = None
     ) -> List[Dict]:
         """
@@ -463,7 +464,7 @@ class EmbeddingModelService:
     def recommend_dishes_by_order(
         self,
         order_dish_names: List[str],
-        top_k: int = 5,
+        top_k: int = int(os.getenv("EMBEDDING_RECOMMEND_TOP_K", "5")),
         tenant_id: Optional[str] = None
     ) -> List[Dict]:
         """
@@ -576,7 +577,7 @@ class EmbeddingModelService:
     async def batch_compute_embeddings(
         self,
         texts: List[str],
-        batch_size: int = 100
+        batch_size: int = int(os.getenv("EMBEDDING_BATCH_SIZE", "100"))
     ) -> List[Optional[np.ndarray]]:
         """
         批量计算嵌入向量

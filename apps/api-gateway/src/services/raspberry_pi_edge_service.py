@@ -21,6 +21,7 @@ from enum import Enum
 from pydantic import BaseModel
 import structlog
 import asyncio
+import os
 
 logger = structlog.get_logger()
 
@@ -187,11 +188,11 @@ class RaspberryPiEdgeService:
         node.updated_at = datetime.now()
 
         # 健康检查
-        if temperature > 80:
+        if temperature > float(os.getenv("EDGE_TEMP_ALERT_THRESHOLD", "80")):
             logger.warning("边缘节点温度过高", node_id=node_id, temperature=temperature)
             node.status = EdgeNodeStatus.ERROR
 
-        if cpu_usage > 90 or memory_usage > 90:
+        if cpu_usage > float(os.getenv("EDGE_CPU_ALERT_THRESHOLD", "90")) or memory_usage > float(os.getenv("EDGE_MEMORY_ALERT_THRESHOLD", "90")):
             logger.warning("边缘节点资源紧张", node_id=node_id, cpu=cpu_usage, memory=memory_usage)
 
         return node
@@ -292,21 +293,36 @@ class RaspberryPiEdgeService:
             model_name=model.model_name
         )
 
-        # 模拟推理过程
+        # 本地AI推理分发
         if model_type == "asr":
-            # 语音识别
-            result = {
-                "text": "帮我查一下今天的营业额",
-                "confidence": 0.95,
-                "inference_time_ms": 200
-            }
+            # 语音识别：调用 voice_service
+            from .voice_service import voice_service
+            import base64
+            try:
+                audio_bytes = base64.b64decode(input_data) if isinstance(input_data, str) else (input_data or b"")
+                stt = await voice_service.speech_to_text(audio_bytes)
+                result = {
+                    "text": stt.get("text", ""),
+                    "confidence": stt.get("confidence", 0.0),
+                    "inference_time_ms": 200,
+                }
+            except Exception:
+                result = {"text": "", "confidence": 0.0, "inference_time_ms": 200}
         elif model_type == "tts":
-            # 语音合成
-            result = {
-                "audio_data": "base64_encoded_audio",
-                "duration_ms": 2000,
-                "inference_time_ms": 100
-            }
+            # 语音合成：调用 voice_service
+            from .voice_service import voice_service
+            import base64
+            try:
+                text = input_data if isinstance(input_data, str) else ""
+                tts = await voice_service.text_to_speech(text)
+                audio_b64 = base64.b64encode(tts.get("audio_data", b"")).decode() if tts.get("success") else ""
+                result = {
+                    "audio_data": audio_b64,
+                    "duration_ms": int(tts.get("duration", 0) * 1000),
+                    "inference_time_ms": 100,
+                }
+            except Exception:
+                result = {"audio_data": "", "duration_ms": 0, "inference_time_ms": 100}
         elif model_type == "intent":
             # 意图识别
             result = {
@@ -348,13 +364,45 @@ class RaspberryPiEdgeService:
 
         logger.info("开始云边同步", node_id=node_id)
 
-        # 模拟同步过程
-        await asyncio.sleep(1)
+        # 查询 DB 统计实际待同步记录数
+        import time
+        sync_start = time.time()
+        uploaded_records = 0
+        downloaded_models = 0
+        try:
+            from src.core.database import get_db_session
+            from src.models.order import Order
+            from src.models.inventory import InventoryItem
+            from src.models.fl_training_round import FLTrainingRound
+            from sqlalchemy import select, func
 
+            since = node.last_sync_time or datetime.now().replace(hour=0, minute=0, second=0)
+            async with get_db_session() as session:
+                order_cnt = await session.execute(
+                    select(func.count(Order.id)).where(Order.order_time >= since)
+                )
+                inv_cnt = await session.execute(
+                    select(func.count(InventoryItem.id)).where(InventoryItem.updated_at >= since)
+                )
+                uploaded_records = (order_cnt.scalar() or 0) + (inv_cnt.scalar() or 0)
+
+                # 检查是否有新模型
+                latest_model = await session.execute(
+                    select(FLTrainingRound).where(
+                        FLTrainingRound.status == "completed",
+                        FLTrainingRound.completed_at >= since,
+                    ).limit(1)
+                )
+                downloaded_models = 1 if latest_model.scalar_one_or_none() else 0
+        except Exception as e:
+            logger.warning("云边同步DB查询失败，使用估算值", error=str(e))
+            uploaded_records = 0
+
+        sync_duration = round(time.time() - sync_start, 2)
         sync_result = {
-            "uploaded_records": 1250,  # 上传1250条记录
-            "downloaded_models": 0,  # 无模型更新
-            "sync_duration_seconds": 1.2,
+            "uploaded_records": uploaded_records,
+            "downloaded_models": downloaded_models,
+            "sync_duration_seconds": sync_duration,
             "last_sync_time": datetime.now()
         }
 

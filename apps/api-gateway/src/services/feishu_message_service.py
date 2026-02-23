@@ -42,7 +42,7 @@ class FeishuMessageService:
                     "app_id": settings.FEISHU_APP_ID,
                     "app_secret": settings.FEISHU_APP_SECRET,
                 },
-                timeout=30.0
+                timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
             )
             data = response.json()
 
@@ -100,7 +100,7 @@ class FeishuMessageService:
                     headers=headers,
                     json=message_data,
                     params={"receive_id_type": receive_id_type},
-                    timeout=30.0
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
                 )
                 result = response.json()
 
@@ -187,7 +187,7 @@ class FeishuMessageService:
                     headers=headers,
                     json=message_data,
                     params={"receive_id_type": receive_id_type},
-                    timeout=30.0
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
                 )
                 result = response.json()
 
@@ -264,7 +264,7 @@ class FeishuMessageService:
                     headers=headers,
                     json=message_data,
                     params={"receive_id_type": receive_id_type},
-                    timeout=30.0
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
                 )
                 result = response.json()
 

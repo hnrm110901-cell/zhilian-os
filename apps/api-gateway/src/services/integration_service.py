@@ -6,6 +6,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from sqlalchemy import select, and_, or_, desc
 from sqlalchemy.ext.asyncio import AsyncSession
+import os
 import structlog
 import httpx
 import json
@@ -180,7 +181,7 @@ class IntegrationService:
             return {"success": False, "error": "未配置API端点"}
 
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=float(os.getenv("INTEGRATION_HTTP_TIMEOUT", "10.0"))) as client:
                 response = await client.get(
                     f"{system.api_endpoint}/health",
                     headers={"Authorization": f"Bearer {system.api_key}"},
@@ -199,15 +200,57 @@ class IntegrationService:
         self, system: ExternalSystem
     ) -> Dict[str, Any]:
         """测试供应商系统连接"""
-        # 占位符实现
-        return {"success": True, "message": "供应商系统连接测试(占位符)"}
+        if not system.api_endpoint:
+            return {"success": False, "error": "未配置API端点"}
+
+        try:
+            headers = {}
+            if system.api_key:
+                headers["Authorization"] = f"Bearer {system.api_key}"
+            if system.api_secret:
+                headers["X-API-Secret"] = system.api_secret
+
+            async with httpx.AsyncClient(timeout=float(os.getenv("INTEGRATION_HTTP_TIMEOUT", "10.0"))) as client:
+                for path in ["/health", "/api/health", "/ping"]:
+                    try:
+                        response = await client.get(
+                            f"{system.api_endpoint}{path}",
+                            headers=headers,
+                        )
+                        if response.status_code < 500:
+                            return {"success": True, "message": f"供应商系统连接成功 (HTTP {response.status_code})"}
+                    except (httpx.ConnectError, httpx.TimeoutException):
+                        continue
+            return {"success": False, "error": "无法连接到供应商系统"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
     async def _test_member_connection(
         self, system: ExternalSystem
     ) -> Dict[str, Any]:
         """测试会员系统连接"""
-        # 占位符实现
-        return {"success": True, "message": "会员系统连接测试(占位符)"}
+        if not system.api_endpoint:
+            return {"success": False, "error": "未配置API端点"}
+
+        try:
+            headers = {}
+            if system.api_key:
+                headers["Authorization"] = f"Bearer {system.api_key}"
+
+            async with httpx.AsyncClient(timeout=float(os.getenv("INTEGRATION_HTTP_TIMEOUT", "10.0"))) as client:
+                for path in ["/health", "/api/v1/health", "/ping"]:
+                    try:
+                        response = await client.get(
+                            f"{system.api_endpoint}{path}",
+                            headers=headers,
+                        )
+                        if response.status_code < 500:
+                            return {"success": True, "message": f"会员系统连接成功 (HTTP {response.status_code})"}
+                    except (httpx.ConnectError, httpx.TimeoutException):
+                        continue
+            return {"success": False, "error": "无法连接到会员系统"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
     # POS Transaction Methods
     async def create_pos_transaction(

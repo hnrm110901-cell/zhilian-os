@@ -2,6 +2,7 @@
 审计日志服务
 记录和查询系统操作日志
 """
+import os
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -113,7 +114,7 @@ class AuditLogService:
         end_date: Optional[datetime] = None,
         search_query: Optional[str] = None,
         skip: int = 0,
-        limit: int = 100,
+        limit: int = int(os.getenv("AUDIT_QUERY_LIMIT", "100")),
         db: Optional[AsyncSession] = None
     ) -> tuple[List[AuditLog], int]:
         """
@@ -197,7 +198,7 @@ class AuditLogService:
     async def get_user_activity_stats(
         self,
         user_id: str,
-        days: int = 30,
+        days: int = int(os.getenv("AUDIT_STATS_DAYS_SHORT", "30")),
         db: Optional[AsyncSession] = None
     ) -> Dict[str, Any]:
         """
@@ -316,7 +317,7 @@ class AuditLogService:
                 func.count(AuditLog.id).label('count')
             ).where(
                 AuditLog.created_at >= start_date
-            ).group_by(AuditLog.action).order_by(desc('count')).limit(10)
+            ).group_by(AuditLog.action).order_by(desc('count')).limit(int(os.getenv("AUDIT_TOP_OPS_LIMIT", "10")))
 
             action_stats_result = await session.execute(action_stats_stmt)
             top_actions = [{"action": row[0], "count": row[1]} for row in action_stats_result]
@@ -354,7 +355,7 @@ class AuditLogService:
 
     async def delete_old_logs(
         self,
-        days: int = 90,
+        days: int = int(os.getenv("AUDIT_STATS_DAYS_LONG", "90")),
         db: Optional[AsyncSession] = None
     ) -> int:
         """

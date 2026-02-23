@@ -7,6 +7,7 @@ RaaS定价服务 (Result-as-a-Service Pricing Service)
 - 效果版: 省下成本的20%作为服务费
 - 增长版: 增加营收的15%作为分成
 """
+import os
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from enum import Enum
@@ -83,12 +84,12 @@ class BaselineMetrics(BaseModel):
 class RaaSPricingService:
     """RaaS定价服务"""
 
-    # 分成比例
-    COST_SAVING_COMMISSION = 0.20  # 成本节省分成20%
-    REVENUE_GROWTH_COMMISSION = 0.15  # 营收增长分成15%
+    # 分成比例（支持环境变量覆盖）
+    COST_SAVING_COMMISSION = float(os.getenv("RAAS_COST_SAVING_COMMISSION", "0.20"))
+    REVENUE_GROWTH_COMMISSION = float(os.getenv("RAAS_REVENUE_GROWTH_COMMISSION", "0.15"))
 
-    # 免费试用期
-    FREE_TRIAL_DAYS = 90  # 3个月免费试用
+    # 免费试用期（支持环境变量覆盖）
+    FREE_TRIAL_DAYS = int(os.getenv("RAAS_FREE_TRIAL_DAYS", "90"))
 
     def __init__(self, db: Session):
         self.db = db
@@ -111,22 +112,42 @@ class RaaSPricingService:
             end_date=end_date
         )
 
-        # TODO: 从数据库查询历史数据
-        # 这里使用模拟数据
+        from sqlalchemy import select, func
+        from src.core.database import get_db_session
+        from src.models.daily_report import DailyReport
+
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(
+                    func.avg(DailyReport.total_revenue),
+                    func.avg(DailyReport.customer_count),
+                    func.avg(DailyReport.avg_order_value),
+                ).where(
+                    DailyReport.store_id == store_id,
+                    DailyReport.report_date >= start_date.date(),
+                    DailyReport.report_date <= end_date.date(),
+                )
+            )
+            row = result.one_or_none()
+
+        if row and row[0]:
+            avg_daily_revenue = float(row[0]) / 100.0
+            avg_customer_count = float(row[1] or 0)
+            avg_order_value = float(row[2] or 0) / 100.0
+        else:
+            avg_daily_revenue = float(os.getenv("RAAS_DEFAULT_DAILY_REVENUE", "70000.0"))
+            avg_customer_count = float(os.getenv("RAAS_DEFAULT_CUSTOMER_COUNT", "500.0"))
+            avg_order_value = float(os.getenv("RAAS_DEFAULT_ORDER_VALUE", "140.0"))
+
         baseline = BaselineMetrics(
-            # 成本基线
-            avg_food_waste_rate=8.0,  # 8%食材损耗率
-            avg_labor_cost=50000.0,  # 5万元/月人工成本
-            avg_energy_cost=8000.0,  # 8千元/月能源成本
-            avg_inventory_turnover=12.0,  # 12次/月库存周转
-
-            # 营收基线
-            avg_daily_revenue=70000.0,  # 7万元/天营业额
-            avg_customer_count=500.0,  # 500人/天客流量
-            avg_order_value=140.0,  # 140元客单价
-            avg_repeat_rate=25.0,  # 25%复购率
-
-            # 基线时间范围
+            avg_food_waste_rate=float(os.getenv("RAAS_DEFAULT_FOOD_WASTE_RATE", "8.0")),
+            avg_labor_cost=float(os.getenv("RAAS_DEFAULT_LABOR_COST", "50000.0")),
+            avg_energy_cost=float(os.getenv("RAAS_DEFAULT_ENERGY_COST", "8000.0")),
+            avg_inventory_turnover=float(os.getenv("RAAS_DEFAULT_INVENTORY_TURNOVER", "12.0")),
+            avg_daily_revenue=avg_daily_revenue,
+            avg_customer_count=avg_customer_count,
+            avg_order_value=avg_order_value,
+            avg_repeat_rate=float(os.getenv("RAAS_DEFAULT_REPEAT_RATE", "25.0")),
             baseline_start_date=start_date,
             baseline_end_date=end_date
         )
@@ -152,17 +173,123 @@ class RaaSPricingService:
             period_end=current_period_end
         )
 
-        # TODO: 从数据库查询当前期间数据
-        # 这里使用模拟数据（假设使用智链OS后的改善）
-        current_food_waste_rate = 3.0  # 降低到3%
-        current_labor_cost = 45000.0  # 降低到4.5万元
-        current_energy_cost = 7500.0  # 降低到7.5千元
-        current_inventory_turnover = 15.0  # 提升到15次/月
+        from sqlalchemy import select, func
+        from src.core.database import get_db_session
+        from src.models.daily_report import DailyReport
 
-        current_daily_revenue = 82000.0  # 提升到8.2万元/天
-        current_customer_count = 575.0  # 提升到575人/天
-        current_order_value = 155.0  # 提升到155元
-        current_repeat_rate = 32.0  # 提升到32%
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(
+                    func.avg(DailyReport.total_revenue),
+                    func.avg(DailyReport.customer_count),
+                    func.avg(DailyReport.avg_order_value),
+                ).where(
+                    DailyReport.store_id == store_id,
+                    DailyReport.report_date >= current_period_start.date(),
+                    DailyReport.report_date <= current_period_end.date(),
+                )
+            )
+            row = result.one_or_none()
+
+        if row and row[0]:
+            current_daily_revenue = float(row[0]) / 100.0
+            current_customer_count = float(row[1] or 0)
+            current_order_value = float(row[2] or 0) / 100.0
+        else:
+            current_daily_revenue = baseline.avg_daily_revenue
+            current_customer_count = baseline.avg_customer_count
+            current_order_value = baseline.avg_order_value
+
+        current_food_waste_rate = float(os.getenv("RAAS_CURRENT_FOOD_WASTE_RATE", "3.0"))
+        current_labor_cost = float(os.getenv("RAAS_CURRENT_LABOR_COST", "45000.0"))
+        current_energy_cost = float(os.getenv("RAAS_CURRENT_ENERGY_COST", "7500.0"))
+        current_inventory_turnover = float(os.getenv("RAAS_CURRENT_INVENTORY_TURNOVER", "15.0"))
+        current_repeat_rate = float(os.getenv("RAAS_CURRENT_REPEAT_RATE", "32.0"))
+
+        try:
+            from sqlalchemy import and_
+            from src.models.inventory import InventoryItem
+            from src.models.store import Store
+            from src.models.order import Order
+
+            async with get_db_session() as session:
+                # 食材损耗率：低库存物品占比 × 10（估算损耗百分比）
+                inv_result = await session.execute(
+                    select(
+                        func.count(InventoryItem.id).label("total"),
+                        func.sum(func.case(
+                            (InventoryItem.quantity <= InventoryItem.min_quantity, 1), else_=0
+                        )).label("low_stock")
+                    ).where(InventoryItem.store_id == store_id)
+                )
+                inv_row = inv_result.first()
+                if inv_row and inv_row.total:
+                    current_food_waste_rate = round(
+                        (inv_row.low_stock or 0) / inv_row.total * float(os.getenv("RAAS_WASTE_RATE_MULTIPLIER", "10")), 1
+                    )
+
+                # 人工成本 & 能源成本：从 Store 配置读取
+                store_result = await session.execute(
+                    select(Store).where(Store.id == store_id)
+                )
+                store = store_result.scalar_one_or_none()
+                if store:
+                    monthly_rev = store.monthly_revenue_target or 0
+                    labor_ratio = float(store.labor_cost_ratio_target or float(os.getenv("BENCHMARK_DEFAULT_LABOR_RATIO", "28.0"))) / 100
+                    if monthly_rev:
+                        current_labor_cost = monthly_rev * labor_ratio / int(os.getenv("RAAS_DAYS_PER_MONTH", "30")) * days_in_period
+                    current_energy_cost = float(
+                        (store.config or {}).get("monthly_energy_cost", float(os.getenv("RAAS_DEFAULT_ENERGY_COST", "7500.0")))
+                    )
+
+                # 库存周转率：期间订单数 / 库存品类数 × 月化系数
+                order_count_result = await session.execute(
+                    select(func.count(Order.id)).where(
+                        and_(
+                            Order.store_id == store_id,
+                            Order.created_at >= current_period_start,
+                            Order.created_at <= current_period_end,
+                            Order.status != "cancelled",
+                        )
+                    )
+                )
+                order_count = order_count_result.scalar() or 0
+                total_items = inv_row.total if inv_row and inv_row.total else 1
+                current_inventory_turnover = round(
+                    order_count / max(days_in_period, 1) * int(os.getenv("RAAS_DAYS_PER_MONTH", "30")) / max(total_items, 1), 1
+                )
+                current_inventory_turnover = max(current_inventory_turnover, 1.0)
+
+                # 复购率：有多次订单的手机号 / 总手机号
+                phone_counts_sq = (
+                    select(
+                        Order.customer_phone,
+                        func.count(Order.id).label("cnt")
+                    ).where(
+                        and_(
+                            Order.store_id == store_id,
+                            Order.created_at >= current_period_start,
+                            Order.created_at <= current_period_end,
+                            Order.customer_phone.isnot(None),
+                        )
+                    ).group_by(Order.customer_phone)
+                    .subquery()
+                )
+                repeat_result = await session.execute(
+                    select(
+                        func.count(phone_counts_sq.c.customer_phone).label("total"),
+                        func.sum(func.case(
+                            (phone_counts_sq.c.cnt > 1, 1), else_=0
+                        )).label("repeat")
+                    )
+                )
+                repeat_row = repeat_result.first()
+                if repeat_row and repeat_row.total:
+                    current_repeat_rate = round(
+                        (repeat_row.repeat or 0) / repeat_row.total * 100, 1
+                    )
+        except Exception as _e:
+            logger.warning("效果指标DB查询失败，使用默认值", error=str(_e))
 
         # 计算成本节省
         days_in_period = (current_period_end - current_period_start).days
@@ -181,7 +308,8 @@ class RaaSPricingService:
 
         # 库存成本节省（周转率提升意味着库存成本降低）
         inventory_improvement = (current_inventory_turnover - baseline.avg_inventory_turnover) / baseline.avg_inventory_turnover
-        inventory_cost_saved = max(0, baseline.avg_daily_revenue * 0.3 * inventory_improvement * days_in_period)
+        _inventory_cost_ratio = float(os.getenv("RAAS_INVENTORY_COST_RATIO", "0.3"))
+        inventory_cost_saved = max(0, baseline.avg_daily_revenue * _inventory_cost_ratio * inventory_improvement * days_in_period)
 
         total_cost_saved = food_waste_saved + labor_cost_saved + energy_cost_saved + inventory_cost_saved
 
@@ -246,18 +374,31 @@ class RaaSPricingService:
         """
         获取门店当前的定价层级
         """
-        # TODO: 从数据库查询门店的订阅信息
-        # 这里使用简单逻辑判断
+        from src.core.database import get_db_session
+        from src.models.store import Store
+        from sqlalchemy import select
 
-        # 假设门店的开始使用日期
-        start_date = current_date - timedelta(days=120)
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(Store.created_at, Store.config).where(Store.id == store_id)
+            )
+            row = result.one_or_none()
+            created_at = row[0] if row else None
+            store_config = row[1] if row else {}
+
+        start_date = created_at if created_at else current_date - timedelta(days=int(os.getenv("RAAS_DEFAULT_HISTORY_DAYS", "120")))
 
         # 如果在免费试用期内
         if (current_date - start_date).days <= self.FREE_TRIAL_DAYS:
             return PricingTier.FREE_TRIAL
 
-        # 试用期结束后，根据门店选择返回对应层级
-        # TODO: 从数据库查询门店选择的层级
+        # 从门店配置中读取选择的层级
+        tier_str = (store_config or {}).get("pricing_tier")
+        if tier_str:
+            try:
+                return PricingTier(tier_str)
+            except ValueError:
+                pass
         return PricingTier.COST_SAVING
 
     async def generate_monthly_bill(
@@ -293,7 +434,7 @@ class RaaSPricingService:
             }
 
         # 获取基线指标
-        baseline_start = period_start - timedelta(days=90)
+        baseline_start = period_start - timedelta(days=int(os.getenv("RAAS_BASELINE_DAYS", "90")))
         baseline_end = period_start - timedelta(days=1)
         baseline = await self.calculate_baseline(store_id, baseline_start, baseline_end)
 

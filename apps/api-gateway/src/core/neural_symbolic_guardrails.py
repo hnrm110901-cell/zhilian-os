@@ -19,6 +19,7 @@ from enum import Enum
 from datetime import datetime
 from pydantic import BaseModel
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -181,7 +182,7 @@ class NeuralSymbolicGuardrails:
                 "check": lambda proposal, context: (
                     abs(proposal.get("price", 0) -
                         context.get("market_price", 0)) /
-                    context.get("market_price", 1) <= 0.3
+                    context.get("market_price", 1) <= float(os.getenv("GUARDRAIL_PRICE_DEVIATION_MAX", "0.3"))
                 ),
                 "threshold_key": "market_price"
             },

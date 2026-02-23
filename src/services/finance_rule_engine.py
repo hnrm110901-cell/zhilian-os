@@ -2,6 +2,7 @@
 财务规则引擎
 处理复杂的财务规则，包括平台抽佣、成本核算、利润计算等
 """
+import os
 import uuid
 from datetime import datetime
 from typing import Dict, List, Optional, Any
@@ -242,11 +243,11 @@ class FinanceRuleEngine:
         self.rules["meituan_commission"] = PlatformCommissionRule(
             rule_id="meituan_001",
             platform="美团",
-            base_rate=0.18,  # 基础抽佣18%
+            base_rate=float(os.getenv("MEITUAN_COMMISSION_BASE_RATE", "0.18")),  # 基础抽佣
             rules=[
                 {
                     "type": "discount",
-                    "min_amount": 20,
+                    "min_amount": float(os.getenv("COMMISSION_MIN_AMOUNT", "20")),
                     "rate_adjustment": 0.03  # 满减20元以上，抽佣率+3%
                 },
                 {
@@ -264,7 +265,7 @@ class FinanceRuleEngine:
         self.rules["eleme_commission"] = PlatformCommissionRule(
             rule_id="eleme_001",
             platform="饿了么",
-            base_rate=0.20,  # 基础抽佣20%
+            base_rate=float(os.getenv("ELEME_COMMISSION_BASE_RATE", "0.20")),  # 基础抽佣
             rules=[
                 {
                     "type": "discount",

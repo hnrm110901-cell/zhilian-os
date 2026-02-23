@@ -6,6 +6,7 @@
 import uuid
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
+import os
 import structlog
 from sqlalchemy.orm import Session
 import re
@@ -156,8 +157,6 @@ class VoiceCommandService:
     async def _handle_queue_status(self, store_id: str, db: Session) -> Dict[str, Any]:
         """处理排队状态查询"""
         try:
-            # 查询当前排队数据（从Queue表或美团API）
-            # 这里使用模拟数据，实际应从数据库或API获取
             from ..models.queue import Queue, QueueStatus
 
             waiting_queues = db.query(Queue).filter(
@@ -168,8 +167,14 @@ class VoiceCommandService:
             if waiting_queues == 0:
                 voice_response = "当前没有排队，可以直接接待顾客"
             else:
-                # 计算预计等待时间
-                avg_wait_time = waiting_queues * 15  # 假设每桌15分钟
+                # 从历史数据计算每桌平均等待时间
+                from sqlalchemy import func as sa_func
+                avg_actual = db.query(sa_func.avg(Queue.actual_wait_time)).filter(
+                    Queue.store_id == store_id,
+                    Queue.actual_wait_time.isnot(None)
+                ).scalar()
+                avg_wait_per_table = int(avg_actual) if avg_actual else int(os.getenv("VOICE_DEFAULT_WAIT_MINUTES", "15"))
+                avg_wait_time = waiting_queues * avg_wait_per_table
                 voice_response = f"当前有{waiting_queues}桌排队，预计等待{avg_wait_time}分钟"
 
             return {
@@ -194,8 +199,8 @@ class VoiceCommandService:
     async def _handle_order_reminder(self, store_id: str, db: Session) -> Dict[str, Any]:
         """处理催单提醒"""
         try:
-            # 查询超时订单（超过30分钟未完成）
-            timeout_threshold = datetime.utcnow() - timedelta(minutes=30)
+            # 查询超时订单（超过N分钟未完成）
+            timeout_threshold = datetime.utcnow() - timedelta(minutes=int(os.getenv("VOICE_ORDER_TIMEOUT_MINUTES", "30")))
 
             timeout_orders = db.query(Order).filter(
                 Order.store_id == store_id,
@@ -357,8 +362,13 @@ class VoiceCommandService:
                 raise ValueError(f"Store not found: {store_id}")
 
             # 发送支援请求到企微群
-            # 这里应该调用企微API发送消息
-            # 简化实现：记录支援请求
+            try:
+                from .wechat_work_message_service import WeChatWorkMessageService
+                wechat = WeChatWorkMessageService()
+                msg = f"【支援请求】\n门店：{store.name}\n请求人：{user_id}\n时间：{datetime.utcnow().strftime('%H:%M:%S')}\n请附近同事尽快赶来支援"
+                await wechat.send_text_message("@all", msg)
+            except Exception as we:
+                logger.warning("企微支援通知发送失败", error=str(we))
 
             support_request = {
                 "id": str(uuid.uuid4()),

@@ -2,6 +2,7 @@
 美团等位集成API
 Meituan Queue Integration API
 """
+import os
 from fastapi import APIRouter, Depends, HTTPException, Body, Request
 from typing import Optional, Dict, Any
 import structlog
@@ -186,27 +187,28 @@ async def sync_waiting_info(
         queues = await queue_service.get_queue_list(
             store_id=store_id,
             status=QueueStatus.WAITING,
-            limit=100,
+            limit=int(os.getenv("MEITUAN_QUEUE_LIST_LIMIT", "100")),
         )
 
         # 构建订单等位列表
         order_wait_list = []
+        table_type_counts: Dict[str, int] = {}
         for queue in queues:
-            # 假设已经有美团订单ID存储在notes字段
-            # 实际应该在Queue模型中添加meituan_order_view_id字段
             order_wait_list.append({
-                "orderViewId": queue.get("notes", ""),  # 需要改进
+                "orderViewId": queue["queue_id"],
                 "orderId": queue["queue_id"],
                 "index": len(order_wait_list) + 1,
             })
+            t = queue.get("table_type") or "default"
+            table_type_counts[t] = table_type_counts.get(t, 0) + 1
 
-        # 构建桌型等位列表（简化版本，实际需要按桌型统计）
+        # 按桌型统计等位数
         table_type_wait_list = [
-            {
-                "tableTypeId": 1,
-                "waitCount": len(queues),
-            }
+            {"tableTypeId": i + 1, "tableTypeName": t, "waitCount": cnt}
+            for i, (t, cnt) in enumerate(table_type_counts.items())
         ]
+        if not table_type_wait_list:
+            table_type_wait_list = [{"tableTypeId": 1, "tableTypeName": "default", "waitCount": 0}]
 
         # 同步到美团
         result = await meituan_queue_service.sync_waiting_info(

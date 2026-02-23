@@ -335,7 +335,31 @@ class VectorDBSecurity:
 
         logger.info(f"Vector DB Audit: {audit_log}")
 
-        # TODO: 写入专门的审计日志系统
+        # 写入审计日志表
+        try:
+            import asyncio
+            from src.models.audit_log import AuditLog
+
+            async def _save():
+                from src.core.database import get_db_session
+                async with get_db_session() as session:
+                    log = AuditLog(
+                        action=f"vector_db_{operation}",
+                        resource_type="vector_collection",
+                        resource_id=collection_name,
+                        user_id=tenant_id or "system",
+                        description=f"向量DB操作: {operation} on {collection_name}",
+                        changes=details or {},
+                        store_id=tenant_id,
+                    )
+                    session.add(log)
+                    await session.commit()
+
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.ensure_future(_save())
+        except Exception as e:
+            logger.warning(f"向量DB审计日志写入失败: {e}")
 
     def get_tenant_statistics(self, tenant_id: str) -> Dict[str, Any]:
         """

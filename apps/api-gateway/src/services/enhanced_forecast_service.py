@@ -6,6 +6,7 @@ from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional, Any
 import structlog
 import numpy as np
+import os
 
 from src.services.forecast_features import ChineseHolidays, WeatherImpact, BusinessDistrictEvents
 from src.services.base_service import BaseService
@@ -41,14 +42,16 @@ class EnhancedForecastService(BaseService):
         """
         store_id = self.require_store_id()
 
-        # 1. 获取历史基准数据
+        # 1. 获取历史基准数据 + 计算真实周末系数
         historical_baseline = await self._get_historical_baseline(target_date)
+        computed_weekend_factor = await self._compute_weekend_factor(store_id)
 
         # 2. 计算各维度影响因子
         factors = self._calculate_impact_factors(
             target_date,
             weather_forecast,
-            events
+            events,
+            weekend_factor=computed_weekend_factor
         )
 
         # 3. 综合预测
@@ -62,8 +65,8 @@ class EnhancedForecastService(BaseService):
         # 4. 计算置信区间
         std_dev = historical_baseline["std_dev"]
         confidence_interval = {
-            "lower": max(0, predicted_sales - 1.96 * std_dev),  # 95%置信区间下限
-            "upper": predicted_sales + 1.96 * std_dev,  # 95%置信区间上限
+            "lower": max(0, predicted_sales - float(os.getenv("FORECAST_CONFIDENCE_Z", "1.96")) * std_dev),  # 95%置信区间下限
+            "upper": predicted_sales + float(os.getenv("FORECAST_CONFIDENCE_Z", "1.96")) * std_dev,  # 95%置信区间上限
         }
 
         # 5. 生成预测说明
@@ -94,6 +97,7 @@ class EnhancedForecastService(BaseService):
         target_date: date,
         weather_forecast: Optional[Dict[str, Any]],
         events: Optional[List[Dict[str, Any]]],
+        weekend_factor: float = float(os.getenv("FORECAST_WEEKEND_FACTOR", "1.4")),
     ) -> Dict[str, float]:
         """
         计算各维度影响因子
@@ -106,7 +110,7 @@ class EnhancedForecastService(BaseService):
         # 1. 星期因子
         weekday = target_date.weekday()
         if weekday in [5, 6]:  # 周末
-            factors["weekend_factor"] = 1.4
+            factors["weekend_factor"] = weekend_factor
         else:
             factors["weekday_factor"] = 1.0
 
@@ -118,9 +122,9 @@ class EnhancedForecastService(BaseService):
         # 3. 节假日时期因子（节前、节中、节后）
         holiday_period = ChineseHolidays.get_holiday_period(target_date)
         if holiday_period == "节前":
-            factors["pre_holiday_factor"] = 1.2
+            factors["pre_holiday_factor"] = float(os.getenv("FORECAST_PRE_HOLIDAY_FACTOR", "1.2"))
         elif holiday_period == "节后":
-            factors["post_holiday_factor"] = 0.9
+            factors["post_holiday_factor"] = float(os.getenv("FORECAST_POST_HOLIDAY_FACTOR", "0.9"))
 
         # 4. 天气因子
         if weather_forecast:
@@ -155,12 +159,38 @@ class EnhancedForecastService(BaseService):
         month = target_date.month
         if month in [1, 2]:  # 冬季，火锅旺季
             if self.restaurant_type == "火锅":
-                factors["season_factor"] = 1.3
+                factors["season_factor"] = float(os.getenv("FORECAST_HOTPOT_WINTER_FACTOR", "1.3"))
         elif month in [7, 8]:  # 夏季，火锅淡季
             if self.restaurant_type == "火锅":
-                factors["season_factor"] = 0.8
+                factors["season_factor"] = float(os.getenv("FORECAST_HOTPOT_SUMMER_FACTOR", "0.8"))
 
         return factors
+
+    async def _compute_weekend_factor(self, store_id: str) -> float:
+        """从过去30天DailyReport计算实际周末/工作日营收比"""
+        try:
+            from sqlalchemy import select, func as sa_func
+            from src.core.database import get_db_session
+            from src.models.daily_report import DailyReport
+            cutoff = date.today() - timedelta(days=int(os.getenv("FORECAST_HISTORY_DAYS", "30")))
+            async with get_db_session() as session:
+                result = await session.execute(
+                    select(DailyReport.report_date, DailyReport.total_revenue).where(
+                        DailyReport.store_id == store_id,
+                        DailyReport.report_date >= cutoff,
+                    )
+                )
+                rows = result.all()
+            if not rows:
+                return float(os.getenv("FORECAST_DEFAULT_WEEKEND_FACTOR", "1.4"))
+            weekend_revs = [float(r.total_revenue) for r in rows if r.report_date.weekday() in [5, 6]]
+            weekday_revs = [float(r.total_revenue) for r in rows if r.report_date.weekday() not in [5, 6]]
+            if weekend_revs and weekday_revs:
+                factor = sum(weekend_revs) / len(weekend_revs) / (sum(weekday_revs) / len(weekday_revs))
+                return round(max(1.0, min(float(os.getenv("FORECAST_WEEKEND_FACTOR_MAX", "2.5")), factor)), 2)
+        except Exception as e:
+            logger.warning("周末系数计算失败，使用默认值", error=str(e))
+        return float(os.getenv("FORECAST_DEFAULT_WEEKEND_FACTOR", "1.4"))
 
     async def _get_historical_baseline(self, target_date: date) -> Dict[str, float]:
         """
@@ -172,27 +202,51 @@ class EnhancedForecastService(BaseService):
         Returns:
             历史基准数据
         """
-        # TODO: 实现实际的数据库查询
-        # 这里应该查询过去同类型日期（同星期、同月份）的历史销售数据
+        from sqlalchemy import select
+        from src.core.database import get_db_session
+        from src.models.daily_report import DailyReport
 
-        # 模拟数据
+        store_id = self.store_id
         weekday = target_date.weekday()
-        is_weekend = weekday in [5, 6]
+        samples = []
 
+        if store_id:
+            async with get_db_session() as session:
+                for weeks_ago in range(1, int(os.getenv("FORECAST_HISTORICAL_WEEKS", "8")) + 1):
+                    past_date = target_date - timedelta(weeks=weeks_ago)
+                    result = await session.execute(
+                        select(DailyReport.total_revenue).where(
+                            DailyReport.store_id == store_id,
+                            DailyReport.report_date == past_date,
+                        )
+                    )
+                    row = result.scalar_one_or_none()
+                    if row is not None:
+                        samples.append(float(row) / 100.0)
+
+        if len(samples) >= 3:
+            return {
+                "average_sales": float(np.mean(samples)),
+                "std_dev": float(np.std(samples)),
+                "sample_count": len(samples),
+            }
+
+        # Fallback to industry baseline
+        is_weekend = weekday in [5, 6]
         if self.restaurant_type == "火锅":
-            base_sales = 68000 if is_weekend else 42000
-            std_dev = 11000 if is_weekend else 7000
+            base_sales = int(os.getenv("FORECAST_HOTPOT_WEEKEND_SALES", "68000")) if is_weekend else int(os.getenv("FORECAST_HOTPOT_WEEKDAY_SALES", "42000"))
+            std_dev = int(os.getenv("FORECAST_HOTPOT_WEEKEND_STD", "11000")) if is_weekend else int(os.getenv("FORECAST_HOTPOT_WEEKDAY_STD", "7000"))
         elif self.restaurant_type == "快餐":
-            base_sales = 25000 if is_weekend else 18000
-            std_dev = 4500 if is_weekend else 3500
-        else:  # 正餐
-            base_sales = 55000 if is_weekend else 35000
-            std_dev = 9000 if is_weekend else 6000
+            base_sales = int(os.getenv("FORECAST_FASTFOOD_WEEKEND_SALES", "25000")) if is_weekend else int(os.getenv("FORECAST_FASTFOOD_WEEKDAY_SALES", "18000"))
+            std_dev = int(os.getenv("FORECAST_FASTFOOD_WEEKEND_STD", "4500")) if is_weekend else int(os.getenv("FORECAST_FASTFOOD_WEEKDAY_STD", "3500"))
+        else:
+            base_sales = int(os.getenv("FORECAST_RESTAURANT_WEEKEND_SALES", "55000")) if is_weekend else int(os.getenv("FORECAST_RESTAURANT_WEEKDAY_SALES", "35000"))
+            std_dev = int(os.getenv("FORECAST_RESTAURANT_WEEKEND_STD", "9000")) if is_weekend else int(os.getenv("FORECAST_RESTAURANT_WEEKDAY_STD", "6000"))
 
         return {
             "average_sales": base_sales,
             "std_dev": std_dev,
-            "sample_count": 20,  # 历史样本数量
+            "sample_count": 0,
         }
 
     def _generate_explanation(
@@ -221,7 +275,7 @@ class EnhancedForecastService(BaseService):
 
         if "holiday_factor" in factors:
             impact = factors["holiday_factor"]
-            if impact >= 2.0:
+            if impact >= float(os.getenv("FORECAST_HOLIDAY_IMPACT_THRESHOLD", "2.0")):
                 explanations.append(f"法定节假日，预计客流增加{(impact-1)*100:.0f}%")
 
         if "pre_holiday_factor" in factors:
@@ -270,9 +324,9 @@ class EnhancedForecastService(BaseService):
         """
         sample_count = historical_baseline.get("sample_count", 0)
 
-        if sample_count >= 30:
+        if sample_count >= int(os.getenv("FORECAST_HIGH_CONFIDENCE_SAMPLES", "30")):
             return "high"
-        elif sample_count >= 10:
+        elif sample_count >= int(os.getenv("FORECAST_MED_CONFIDENCE_SAMPLES", "10")):
             return "medium"
         else:
             return "low"
@@ -297,8 +351,24 @@ class EnhancedForecastService(BaseService):
         # 获取基准客流
         day_type = "周末" if target_date.weekday() in [5, 6] else "工作日"
 
-        # TODO: 从数据库获取历史客流数据
-        # 这里使用行业基线数据作为示例
+        # 从数据库获取历史客流数据（过去8周同星期）
+        from src.core.database import get_db_session
+        from src.models.daily_report import DailyReport
+        from sqlalchemy import select, func
+
+        historical_traffic = None
+        async with get_db_session() as session:
+            dates = [target_date - timedelta(weeks=w) for w in range(1, 9)]
+            result = await session.execute(
+                select(func.avg(DailyReport.customer_count)).where(
+                    DailyReport.store_id == self.store_id,
+                    DailyReport.report_date.in_(dates),
+                    DailyReport.customer_count > 0,
+                )
+            )
+            avg_traffic = result.scalar()
+            if avg_traffic and avg_traffic > 0:
+                historical_traffic = float(avg_traffic)
         from src.services.baseline_data_service import IndustryBaselineData
 
         baseline = IndustryBaselineData.get_traffic_baseline(
@@ -307,10 +377,12 @@ class EnhancedForecastService(BaseService):
             meal_period
         )
 
-        if not baseline:
+        if historical_traffic:
+            base_traffic = historical_traffic
+        elif baseline:
+            base_traffic = baseline["平均客流"]
+        else:
             return {"error": "No baseline data available"}
-
-        base_traffic = baseline["平均客流"]
 
         # 计算影响因子
         factors = self._calculate_impact_factors(target_date, weather_forecast, None)

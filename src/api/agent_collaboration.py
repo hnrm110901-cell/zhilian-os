@@ -5,6 +5,7 @@ Agent协同API端点
 Phase 4: 智能优化期 (Intelligence Optimization Period)
 """
 
+import os
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
@@ -59,7 +60,7 @@ class SubmitDecisionRequest(BaseModel):
 class CoordinateRequest(BaseModel):
     """Coordinate decisions request"""
     store_id: str
-    time_window: int = 3600  # seconds
+    time_window: int = int(os.getenv("AGENT_COLLAB_TIME_WINDOW", "3600"))  # seconds
 
 
 class ResolveConflictRequest(BaseModel):

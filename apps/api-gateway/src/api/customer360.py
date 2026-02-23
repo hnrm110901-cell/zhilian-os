@@ -151,17 +151,54 @@ async def search_customers(
         if not current_user.is_super_admin and current_user.store_id:
             store_id = current_user.store_id
 
-        # Note: Use existing get_customer_profile endpoint for search
-        # Customer search can be implemented using query parameters
+        from src.core.database import get_db_session
+        from src.models.order import Order, OrderStatus
+        from sqlalchemy import select, func, or_
+
+        async with get_db_session() as session:
+            conditions = [
+                or_(
+                    Order.customer_phone.ilike(f"%{query}%"),
+                    Order.customer_name.ilike(f"%{query}%"),
+                )
+            ]
+            if store_id:
+                conditions.append(Order.store_id == store_id)
+
+            from sqlalchemy import and_
+            rows = (await session.execute(
+                select(
+                    Order.customer_phone,
+                    Order.customer_name,
+                    func.count(Order.id).label("order_count"),
+                    func.sum(Order.final_amount).label("total_spend"),
+                    func.max(Order.order_time).label("last_visit"),
+                )
+                .where(and_(*conditions))
+                .group_by(Order.customer_phone, Order.customer_name)
+                .order_by(func.max(Order.order_time).desc())
+                .limit(limit)
+            )).all()
+
+        results = [
+            {
+                "phone": r.customer_phone,
+                "name": r.customer_name,
+                "order_count": r.order_count,
+                "total_spend": round((r.total_spend or 0) / 100, 2),
+                "last_visit": r.last_visit.isoformat() if r.last_visit else None,
+            }
+            for r in rows
+        ]
 
         return {
             "success": True,
             "data": {
                 "query": query,
-                "results": [],
-                "total": 0,
+                "results": results,
+                "total": len(results),
             },
-            "message": "客户搜索功能开发中",
+            "message": "success",
         }
 
     except Exception as e:

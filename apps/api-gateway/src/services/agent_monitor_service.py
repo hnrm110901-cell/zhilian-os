@@ -5,6 +5,7 @@ Agent决策监控服务
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from collections import defaultdict
+import os
 import structlog
 
 logger = structlog.get_logger()
@@ -72,7 +73,7 @@ class AgentMonitorService:
             self.decisions.append(decision_record)
 
             # 清理旧数据 (保留最近24小时)
-            cutoff_time = datetime.now() - timedelta(hours=24)
+            cutoff_time = datetime.now() - timedelta(hours=int(os.getenv("AGENT_MONITOR_RETENTION_HOURS", "24")))
             self.decisions = [
                 d for d in self.decisions
                 if d["timestamp"] > cutoff_time
@@ -242,34 +243,34 @@ class AgentMonitorService:
 
             # 成功率权重: 40%
             success_rate = metrics.get("success_rate", 0)
-            quality_score += (success_rate / 100) * 40
+            quality_score += (success_rate / 100) * float(os.getenv("AGENT_SCORE_SUCCESS_WEIGHT", "40"))
 
             # 响应时间权重: 30% (目标<1000ms)
             avg_time = metrics.get("avg_execution_time_ms", 0)
-            time_score = max(0, 100 - (avg_time / 10))  # 每10ms扣1分
-            quality_score += (time_score / 100) * 30
+            time_score = max(0, 100 - (avg_time / float(os.getenv("AGENT_SCORE_TIME_DEDUCT_PER_MS", "10"))))  # 每10ms扣1分
+            quality_score += (time_score / 100) * float(os.getenv("AGENT_SCORE_TIME_WEIGHT", "30"))
 
             # RAG使用率权重: 30% (目标>80%)
             rag_rate = metrics.get("rag_usage_rate", 0)
-            quality_score += (rag_rate / 100) * 30
+            quality_score += (rag_rate / 100) * float(os.getenv("AGENT_SCORE_RAG_WEIGHT", "30"))
 
             # 质量等级
-            if quality_score >= 90:
+            if quality_score >= float(os.getenv("AGENT_QUALITY_EXCELLENT", "90")):
                 quality_level = "优秀"
-            elif quality_score >= 75:
+            elif quality_score >= float(os.getenv("AGENT_QUALITY_GOOD", "75")):
                 quality_level = "良好"
-            elif quality_score >= 60:
+            elif quality_score >= float(os.getenv("AGENT_QUALITY_PASS", "60")):
                 quality_level = "及格"
             else:
                 quality_level = "待改进"
 
             # 改进建议
             recommendations = []
-            if success_rate < 95:
+            if success_rate < float(os.getenv("AGENT_MONITOR_SUCCESS_RATE_THRESHOLD", "95")):
                 recommendations.append(f"成功率偏低({success_rate:.1f}%)，需要优化错误处理")
-            if avg_time > 1000:
+            if avg_time > float(os.getenv("AGENT_MONITOR_AVG_TIME_THRESHOLD", "1000")):
                 recommendations.append(f"响应时间偏慢({avg_time:.0f}ms)，需要性能优化")
-            if rag_rate < 80:
+            if rag_rate < float(os.getenv("AGENT_MONITOR_RAG_RATE_THRESHOLD", "80")):
                 recommendations.append(f"RAG使用率偏低({rag_rate:.1f}%)，建议增加上下文检索")
 
             analysis = {
@@ -314,14 +315,14 @@ class AgentMonitorService:
         """
         try:
             # 最近1小时的数据
-            one_hour_ago = datetime.now() - timedelta(hours=1)
+            one_hour_ago = datetime.now() - timedelta(hours=int(os.getenv("AGENT_STATS_WINDOW_HOURS", "1")))
             recent_decisions = [
                 d for d in self.decisions
                 if d["timestamp"] > one_hour_ago
             ]
 
             # 最近5分钟的数据
-            five_min_ago = datetime.now() - timedelta(minutes=5)
+            five_min_ago = datetime.now() - timedelta(minutes=int(os.getenv("AGENT_STATS_RECENT_MINUTES", "5")))
             very_recent_decisions = [
                 d for d in self.decisions
                 if d["timestamp"] > five_min_ago

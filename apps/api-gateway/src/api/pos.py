@@ -2,6 +2,7 @@
 POS API Endpoints
 POS系统集成API接口
 """
+import os
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
@@ -45,7 +46,7 @@ async def get_orders(
     if not end_date:
         end_date = datetime.now()
     if not start_date:
-        start_date = end_date - timedelta(days=7)
+        start_date = end_date - timedelta(days=int(os.getenv("POS_DEFAULT_QUERY_DAYS", "7")))
 
     try:
         orders = await pos_service.get_orders(
@@ -324,7 +325,7 @@ async def get_current_queue(
         queues = await queue_service.get_queue_list(
             store_id=store_id,
             status=QueueStatus.WAITING,
-            limit=50,
+            limit=int(os.getenv("POS_QUEUE_LIST_LIMIT", "50")),
         )
 
         # 获取统计信息

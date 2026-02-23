@@ -10,6 +10,7 @@
 6. 冲突检测 - Conflict detection
 """
 
+import os
 import asyncio
 import structlog
 from datetime import datetime, timedelta
@@ -194,12 +195,12 @@ class ReservationAgent(BaseAgent):
         self.store_id = store_id
         self.order_agent = order_agent
         self.config = config or {
-            "advance_booking_days": 30,  # 提前预定天数
+            "advance_booking_days": int(os.getenv("RESERVATION_ADVANCE_BOOKING_DAYS", "30")),  # 提前预定天数
             "min_party_size": 1,  # 最小人数
-            "max_party_size": 50,  # 最大人数
-            "deposit_rate": 0.3,  # 定金比例
-            "cancellation_hours": 24,  # 取消提前时间(小时)
-            "reminder_hours": 2,  # 提醒提前时间(小时)
+            "max_party_size": int(os.getenv("RESERVATION_MAX_PARTY_SIZE", "50")),  # 最大人数
+            "deposit_rate": float(os.getenv("RESERVATION_DEPOSIT_RATE", "0.3")),  # 定金比例
+            "cancellation_hours": int(os.getenv("RESERVATION_CANCELLATION_HOURS", "24")),  # 取消提前时间(小时)
+            "reminder_hours": int(os.getenv("RESERVATION_REMINDER_HOURS", "2")),  # 提醒提前时间(小时)
         }
         self.logger = logger.bind(agent="reservation", store_id=store_id)
 
@@ -432,11 +433,11 @@ class ReservationAgent(BaseAgent):
         """推荐桌型"""
         if party_size <= 2:
             return TableType.SMALL
-        elif party_size <= 4:
+        elif party_size <= int(os.getenv("TABLE_SIZE_MEDIUM_MAX", "4")):
             return TableType.MEDIUM
-        elif party_size <= 6:
+        elif party_size <= int(os.getenv("TABLE_SIZE_LARGE_MAX", "6")):
             return TableType.LARGE
-        elif party_size <= 10:
+        elif party_size <= int(os.getenv("TABLE_SIZE_ROUND_MAX", "10")):
             return TableType.ROUND
         else:
             return TableType.BANQUET
@@ -449,10 +450,10 @@ class ReservationAgent(BaseAgent):
         """预估消费金额"""
         # 基础人均消费(分)
         base_per_person = {
-            ReservationType.REGULAR: 8000,  # 80元/人
-            ReservationType.BANQUET: 15000,  # 150元/人
-            ReservationType.PRIVATE_ROOM: 12000,  # 120元/人
-            ReservationType.VIP: 20000,  # 200元/人
+            ReservationType.REGULAR: int(os.getenv("RESERVATION_AMOUNT_REGULAR", "8000")),  # 80元/人
+            ReservationType.BANQUET: int(os.getenv("RESERVATION_AMOUNT_BANQUET", "15000")),  # 150元/人
+            ReservationType.PRIVATE_ROOM: int(os.getenv("RESERVATION_AMOUNT_PRIVATE_ROOM", "12000")),  # 120元/人
+            ReservationType.VIP: int(os.getenv("RESERVATION_AMOUNT_VIP", "20000")),  # 200元/人
         }
 
         per_person = base_per_person.get(reservation_type, 8000)
@@ -890,7 +891,7 @@ class ReservationAgent(BaseAgent):
 
             analytics: ReservationAnalytics = {
                 "store_id": self.store_id,
-                "period_start": start_date or (datetime.now() - timedelta(days=30)).isoformat(),
+                "period_start": start_date or (datetime.now() - timedelta(days=int(os.getenv("AGENT_STATS_DAYS", "30")))).isoformat(),
                 "period_end": end_date or datetime.now().isoformat(),
                 "total_reservations": total,
                 "confirmed_count": confirmed,

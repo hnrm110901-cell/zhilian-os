@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import select, and_, or_, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
+import os
 
 from ..models.order import Order
 from ..models.reservation import Reservation
@@ -196,7 +197,7 @@ class Customer360Service:
                 query = query.where(Order.store_id == store_id)
 
             # 限制最近100笔订单
-            query = query.limit(100)
+            query = query.limit(int(os.getenv("CUSTOMER360_ORDER_LIMIT", "100")))
 
             result = await session.execute(query)
             orders = result.scalars().all()
@@ -241,7 +242,7 @@ class Customer360Service:
             if store_id:
                 query = query.where(Reservation.store_id == store_id)
 
-            query = query.limit(50)
+            query = query.limit(int(os.getenv("CUSTOMER360_RESERVATION_LIMIT", "50")))
 
             result = await session.execute(query)
             reservations = result.scalars().all()
@@ -270,7 +271,7 @@ class Customer360Service:
             if store_id:
                 sync_query = sync_query.where(ReservationSync.store_id == store_id)
 
-            sync_query = sync_query.limit(50)
+            sync_query = sync_query.limit(int(os.getenv("CUSTOMER360_RESERVATION_LIMIT", "50")))
 
             sync_result = await session.execute(sync_query)
             sync_reservations = sync_result.scalars().all()
@@ -309,15 +310,19 @@ class Customer360Service:
             query = select(POSTransaction).order_by(desc(POSTransaction.transaction_time))
 
             # POS交易主要通过手机号关联
-            if identifier_type in ["phone", "member_id"]:
-                # 假设customer_info字段存储JSON，包含phone或member_id
-                # 这里需要根据实际数据结构调整
-                pass
+            if identifier_type == "phone":
+                query = query.where(
+                    POSTransaction.customer_info["phone"].astext == identifier
+                )
+            elif identifier_type == "member_id":
+                query = query.where(
+                    POSTransaction.customer_info["member_id"].astext == identifier
+                )
 
             if store_id:
                 query = query.where(POSTransaction.store_id == store_id)
 
-            query = query.limit(100)
+            query = query.limit(int(os.getenv("CUSTOMER360_ORDER_LIMIT", "100")))
 
             result = await session.execute(query)
             transactions = result.scalars().all()
@@ -350,10 +355,13 @@ class Customer360Service:
         """获取活动日志"""
         try:
             # 审计日志可能通过user_id或resource_id关联
-            query = select(AuditLog).order_by(desc(AuditLog.timestamp)).limit(100)
+            query = select(AuditLog).order_by(desc(AuditLog.timestamp)).limit(int(os.getenv("CUSTOMER360_ORDER_LIMIT", "100")))
 
-            # 这里需要根据实际情况调整查询条件
-            # 可能需要通过user_id或其他字段关联
+            if identifier_type == "user_id":
+                query = query.where(AuditLog.user_id == identifier)
+            elif identifier_type in ["phone", "member_id"]:
+                # 通过 resource_id 关联（resource_id 可能存储手机号或会员ID）
+                query = query.where(AuditLog.resource_id == identifier)
 
             result = await session.execute(query)
             logs = result.scalars().all()
@@ -468,8 +476,8 @@ class Customer360Service:
             if last_order_time:
                 days_since_last_order = (datetime.now() - datetime.fromisoformat(last_order_time)).days
                 recency_score = max(0, 100 - days_since_last_order)  # 越近越高
-                frequency_score = min(100, order_frequency * 10)  # 频率越高越好
-                monetary_score = min(100, total_spent / 100)  # 金额越高越好
+                frequency_score = min(100, order_frequency * float(os.getenv("RFM360_FREQUENCY_MULTIPLIER", "10")))  # 频率越高越好
+                monetary_score = min(100, total_spent / float(os.getenv("RFM360_MONETARY_DIVISOR", "100")))  # 金额越高越好
                 rfm_score = (recency_score + frequency_score + monetary_score) / 3
 
             return {
@@ -489,14 +497,18 @@ class Customer360Service:
             return {}
 
     def _get_customer_tier(self, rfm_score: float) -> str:
-        """根据RFM评分获取客户等级"""
-        if rfm_score >= 80:
+        """根据RFM评分获取客户等级（阈值支持环境变量覆盖）"""
+        _vip = float(os.getenv("RFM_VIP_THRESHOLD", "80"))
+        _high = float(os.getenv("RFM_HIGH_THRESHOLD", "60"))
+        _mid = float(os.getenv("RFM_MID_THRESHOLD", "40"))
+        _low = float(os.getenv("RFM_LOW_THRESHOLD", "20"))
+        if rfm_score >= _vip:
             return "VIP"
-        elif rfm_score >= 60:
+        elif rfm_score >= _high:
             return "高价值"
-        elif rfm_score >= 40:
+        elif rfm_score >= _mid:
             return "中价值"
-        elif rfm_score >= 20:
+        elif rfm_score >= _low:
             return "低价值"
         else:
             return "流失风险"
@@ -522,26 +534,28 @@ class Customer360Service:
             tags.append(customer_value["customer_tier"])
 
         # 消费习惯标签
-        if customer_value.get("order_frequency_per_month", 0) > 4:
+        _freq_high = float(os.getenv("CUSTOMER_FREQ_HIGH_THRESHOLD", "4"))
+        _freq_mid = float(os.getenv("CUSTOMER_FREQ_MID_THRESHOLD", "2"))
+        if customer_value.get("order_frequency_per_month", 0) > _freq_high:
             tags.append("高频消费")
-        elif customer_value.get("order_frequency_per_month", 0) > 2:
+        elif customer_value.get("order_frequency_per_month", 0) > _freq_mid:
             tags.append("中频消费")
 
-        if customer_value.get("avg_order_value", 0) > 200:
+        if customer_value.get("avg_order_value", 0) > float(os.getenv("CUSTOMER_HIGH_VALUE_THRESHOLD", "200")):
             tags.append("高客单价")
 
         # 预订习惯标签
-        if len(reservations) > 5:
+        if len(reservations) > int(os.getenv("CUSTOMER_REGULAR_RESERVATION_COUNT", "5")):
             tags.append("预订常客")
 
         # 活跃度标签
         if customer_value.get("last_order_time"):
             days_since_last = (datetime.now() - datetime.fromisoformat(customer_value["last_order_time"])).days
-            if days_since_last <= 7:
+            if days_since_last <= int(os.getenv("CUSTOMER_ACTIVE_DAYS", "7")):
                 tags.append("活跃用户")
-            elif days_since_last <= 30:
+            elif days_since_last <= int(os.getenv("CUSTOMER_NORMAL_DAYS", "30")):
                 tags.append("一般活跃")
-            elif days_since_last <= 90:
+            elif days_since_last <= int(os.getenv("CUSTOMER_SLEEP_DAYS", "90")):
                 tags.append("沉睡用户")
             else:
                 tags.append("流失用户")

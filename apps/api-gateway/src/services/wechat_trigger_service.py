@@ -6,6 +6,7 @@ WeChat Push Trigger Service
 """
 from typing import Dict, Any, Optional
 import structlog
+import os
 from datetime import datetime
 from sqlalchemy import select
 
@@ -190,8 +191,17 @@ class WeChatTriggerService:
         if not rule.get("enabled", False):
             return False
 
-        # 可以在这里添加更复杂的条件判断
-        # 例如：只在营业时间推送、只推送给特定门店等
+        # 紧急事件不受营业时间限制
+        if rule.get("priority") in ["urgent", "high"]:
+            return True
+
+        # 普通事件只在营业时间推送（支持环境变量覆盖）
+        now_hour = datetime.now().hour
+        _open_hour = int(os.getenv("BUSINESS_OPEN_HOUR", "8"))
+        _close_hour = int(os.getenv("BUSINESS_CLOSE_HOUR", "23"))
+        if not (_open_hour <= now_hour < _close_hour):
+            logger.debug("非营业时间，跳过推送", event_type=event_type, hour=now_hour)
+            return False
 
         return True
 
@@ -427,8 +437,8 @@ class WeChatTriggerService:
 # Celery异步任务：处理企微推送
 @celery_app.task(
     bind=True,
-    max_retries=3,
-    default_retry_delay=60,
+    max_retries=int(os.getenv("WECHAT_PUSH_MAX_RETRIES", "3")),
+    default_retry_delay=int(os.getenv("WECHAT_PUSH_RETRY_DELAY", "60")),
 )
 async def send_wechat_push_task(
     self,

@@ -1,12 +1,14 @@
 """
 订单协同Agent
 处理预定、排位、等位、点单、结账全流程
+无状态设计：状态由调用方从DB查询后传入，Agent不持有任何内存状态
 """
 from typing import Dict, Any, List, Optional, TypedDict
 from datetime import datetime, timedelta
 from enum import Enum
 import structlog
 import uuid
+import os
 import sys
 from pathlib import Path
 
@@ -22,40 +24,50 @@ logger = structlog.get_logger()
 class OrderStatus(Enum):
     """订单状态"""
 
-    RESERVED = "reserved"  # 已预定
-    WAITING = "waiting"  # 等位中
-    SEATED = "seated"  # 已入座
-    ORDERING = "ordering"  # 点餐中
-    ORDERED = "ordered"  # 已下单
-    COOKING = "cooking"  # 制作中
-    SERVED = "served"  # 已上菜
-    PAYING = "paying"  # 结账中
-    PAID = "paid"  # 已支付
-    COMPLETED = "completed"  # 已完成
-    CANCELLED = "cancelled"  # 已取消
+    RESERVED = "reserved"
+    WAITING = "waiting"
+    SEATED = "seated"
+    ORDERING = "ordering"
+    ORDERED = "ordered"
+    COOKING = "cooking"
+    SERVED = "served"
+    PAYING = "paying"
+    PAID = "paid"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+
+
+# 合法状态转换表（含取消规则，统一来源）
+_VALID_TRANSITIONS: Dict[str, List[str]] = {
+    OrderStatus.ORDERING.value: [OrderStatus.ORDERED.value, OrderStatus.CANCELLED.value],
+    OrderStatus.ORDERED.value: [OrderStatus.COOKING.value, OrderStatus.CANCELLED.value],
+    OrderStatus.COOKING.value: [OrderStatus.SERVED.value, OrderStatus.CANCELLED.value],
+    OrderStatus.SERVED.value: [OrderStatus.PAYING.value, OrderStatus.CANCELLED.value],
+    OrderStatus.PAYING.value: [OrderStatus.PAID.value, OrderStatus.CANCELLED.value],
+    OrderStatus.PAID.value: [OrderStatus.COMPLETED.value],
+    OrderStatus.COMPLETED.value: [],
+    OrderStatus.CANCELLED.value: [],
+}
+
+# 不可取消的终态（与 _VALID_TRANSITIONS 保持一致）
+_NON_CANCELLABLE = {OrderStatus.PAID.value, OrderStatus.COMPLETED.value, OrderStatus.CANCELLED.value}
 
 
 class ReservationType(Enum):
-    """预定类型"""
-
-    ONLINE = "online"  # 线上预定
-    PHONE = "phone"  # 电话预定
-    WALKIN = "walkin"  # 现场预定
+    ONLINE = "online"
+    PHONE = "phone"
+    WALKIN = "walkin"
 
 
 class PaymentMethod(Enum):
-    """支付方式"""
-
-    CASH = "cash"  # 现金
-    WECHAT = "wechat"  # 微信支付
-    ALIPAY = "alipay"  # 支付宝
-    CARD = "card"  # 银行卡
-    MEMBER = "member"  # 会员储值
+    CASH = "cash"
+    WECHAT = "wechat"
+    ALIPAY = "alipay"
+    CARD = "card"
+    MEMBER = "member"
 
 
 class OrderState(TypedDict):
-    """订单状态"""
-
     order_id: str
     store_id: str
     customer_info: Dict[str, Any]
@@ -73,42 +85,25 @@ class OrderState(TypedDict):
 
 
 class OrderAgent(BaseAgent):
-    """订单协同Agent"""
+    """订单协同Agent（无状态设计，状态由调用方传入，多进程安全）"""
 
     def __init__(self, config: Dict[str, Any]):
-        """
-        初始化订单Agent
-
-        Args:
-            config: 配置字典
-        """
         super().__init__()
         self.config = config
-        self.average_wait_time = config.get("average_wait_time", 30)  # 平均等位时间（分钟）
-        self.average_dining_time = config.get("average_dining_time", 90)  # 平均用餐时间（分钟）
-
-        logger.info("订单协同Agent初始化", config=config)
+        self.average_wait_time = config.get("average_wait_time", 30)
+        self.average_dining_time = config.get("average_dining_time", 90)
+        # 不持有任何内存状态
+        logger.info("订单协同Agent初始化", store_id=config.get("store_id"))
 
     def get_supported_actions(self) -> List[str]:
-        """获取支持的操作列表"""
         return [
             "create_reservation", "join_queue", "get_queue_status",
             "create_order", "add_dish", "recommend_dishes",
             "calculate_bill", "process_payment", "get_order",
-            "update_order_status", "cancel_order"
+            "update_order_status", "cancel_order",
         ]
 
     async def execute(self, action: str, params: Dict[str, Any]) -> AgentResponse:
-        """
-        执行Agent操作
-
-        Args:
-            action: 操作名称
-            params: 操作参数
-
-        Returns:
-            AgentResponse: 统一的响应格式
-        """
         try:
             if action == "create_reservation":
                 result = await self.create_reservation(**params)
@@ -133,23 +128,15 @@ class OrderAgent(BaseAgent):
             elif action == "cancel_order":
                 result = await self.cancel_order(**params)
             else:
-                return AgentResponse(
-                    success=False,
-                    data=None,
-                    error=f"Unsupported action: {action}"
-                )
+                return AgentResponse(success=False, data=None, error=f"Unsupported action: {action}")
 
             return AgentResponse(
                 success=result.get("success", True),
                 data=result,
-                error=result.get("error") if not result.get("success", True) else None
+                error=result.get("error") if not result.get("success", True) else None,
             )
         except Exception as e:
-            return AgentResponse(
-                success=False,
-                data=None,
-                error=str(e)
-            )
+            return AgentResponse(success=False, data=None, error=str(e))
 
     # ==================== 预定管理 ====================
 
@@ -160,48 +147,29 @@ class OrderAgent(BaseAgent):
         customer_mobile: str,
         party_size: int,
         reservation_time: str,
+        existing_reservations: Optional[List[Dict[str, Any]]] = None,
         special_requests: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         创建预定
 
         Args:
-            store_id: 门店ID
-            customer_name: 客户姓名
-            customer_mobile: 客户手机号
-            party_size: 用餐人数
-            reservation_time: 预定时间 (YYYY-MM-DD HH:mm)
-            special_requests: 特殊需求
-
-        Returns:
-            预定结果
+            existing_reservations: 当前已有预定列表（由调用方从DB查询后传入）
         """
-        logger.info(
-            "创建预定",
-            store_id=store_id,
-            customer=customer_name,
-            party_size=party_size,
-            time=reservation_time,
-        )
+        logger.info("创建预定", store_id=store_id, customer=customer_name,
+                    party_size=party_size, time=reservation_time)
 
-        # 生成预定ID
-        reservation_id = f"RSV{uuid.uuid4().hex[:12].upper()}"
-
-        # 检查时间可用性
-        is_available = await self._check_time_availability(
-            store_id, reservation_time, party_size
-        )
-
-        if not is_available:
+        reservations = existing_reservations or []
+        if not self._check_time_availability(store_id, reservation_time, reservations):
             return {
                 "success": False,
                 "message": "该时间段已满，请选择其他时间",
-                "alternative_times": await self._suggest_alternative_times(
-                    store_id, reservation_time, party_size
+                "alternative_times": self._suggest_alternative_times(
+                    store_id, reservation_time, reservations
                 ),
             }
 
-        # 创建预定记录
+        reservation_id = f"RSV{uuid.uuid4().hex[:12].upper()}"
         reservation = {
             "reservation_id": reservation_id,
             "store_id": store_id,
@@ -213,33 +181,33 @@ class OrderAgent(BaseAgent):
             "status": "confirmed",
             "created_at": datetime.now().isoformat(),
         }
-
         logger.info("预定创建成功", reservation_id=reservation_id)
+        return {"success": True, "reservation": reservation, "message": "预定成功"}
 
-        return {
-            "success": True,
-            "reservation": reservation,
-            "message": "预定成功",
-        }
-
-    async def _check_time_availability(
-        self, store_id: str, time: str, party_size: int
+    def _check_time_availability(
+        self, store_id: str, time: str, existing_reservations: List[Dict[str, Any]]
     ) -> bool:
-        """检查时间可用性"""
-        # TODO: 查询数据库检查该时间段的预定情况
-        # TODO: 考虑桌台容量和已有预定
-        return True  # 临时返回可用
-
-    async def _suggest_alternative_times(
-        self, store_id: str, requested_time: str, party_size: int
-    ) -> List[str]:
-        """建议替代时间"""
-        # TODO: 基于当前预定情况推荐可用时间
-        base_time = datetime.fromisoformat(requested_time)
-        alternatives = [
-            (base_time + timedelta(hours=i)).strftime("%Y-%m-%d %H:%M")
-            for i in [1, 2, -1]
+        same_time = [
+            r for r in existing_reservations
+            if r["store_id"] == store_id
+            and r["reservation_time"] == time
+            and r["status"] == "confirmed"
         ]
+        max_concurrent = int(os.getenv("ORDER_MAX_CONCURRENT_RESERVATIONS", "10"))
+        return len(same_time) < max_concurrent
+
+    def _suggest_alternative_times(
+        self, store_id: str, requested_time: str, existing_reservations: List[Dict[str, Any]]
+    ) -> List[str]:
+        base_time = datetime.fromisoformat(requested_time)
+        candidates = [base_time + timedelta(hours=i) for i in [1, 2, -1, 3]]
+        alternatives = []
+        for t in candidates:
+            t_str = t.strftime("%Y-%m-%d %H:%M")
+            if self._check_time_availability(store_id, t_str, existing_reservations):
+                alternatives.append(t_str)
+            if len(alternatives) >= 3:
+                break
         return alternatives
 
     # ==================== 排位/等位管理 ====================
@@ -250,31 +218,19 @@ class OrderAgent(BaseAgent):
         customer_name: str,
         customer_mobile: str,
         party_size: int,
+        existing_queues: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
         """
         加入排队
 
         Args:
-            store_id: 门店ID
-            customer_name: 客户姓名
-            customer_mobile: 客户手机号
-            party_size: 用餐人数
-
-        Returns:
-            排队结果
+            existing_queues: 当前门店所有排队记录（由调用方从DB查询后传入）
         """
-        logger.info(
-            "加入排队",
-            store_id=store_id,
-            customer=customer_name,
-            party_size=party_size,
-        )
+        logger.info("加入排队", store_id=store_id, customer=customer_name, party_size=party_size)
 
-        # 生成排队号
-        queue_number = await self._generate_queue_number(store_id)
-
-        # 预估等待时间
-        estimated_wait = await self._estimate_wait_time(store_id, party_size)
+        queues = existing_queues or []
+        queue_number = self._generate_queue_number(store_id, queues)
+        estimated_wait = self._estimate_wait_time(store_id, party_size, queues)
 
         queue_info = {
             "queue_id": f"Q{uuid.uuid4().hex[:12].upper()}",
@@ -287,52 +243,62 @@ class OrderAgent(BaseAgent):
             "status": "waiting",
             "joined_at": datetime.now().isoformat(),
         }
-
-        logger.info(
-            "排队成功",
-            queue_number=queue_number,
-            estimated_wait=estimated_wait,
-        )
-
+        logger.info("排队成功", queue_number=queue_number, estimated_wait=estimated_wait)
         return {
             "success": True,
             "queue_info": queue_info,
             "message": f"您的排队号是{queue_number}，预计等待{estimated_wait}分钟",
         }
 
-    async def _generate_queue_number(self, store_id: str) -> str:
-        """生成排队号"""
-        # TODO: 从数据库获取当前最大排队号并递增
-        # 临时生成格式：A001, A002, ...
-        return f"A{datetime.now().strftime('%H%M%S')[-3:]}"
+    def _generate_queue_number(self, store_id: str, existing_queues: List[Dict[str, Any]]) -> str:
+        """生成排队号（取历史最大序号+1，避免入座后重号）"""
+        store_queues = [q for q in existing_queues if q["store_id"] == store_id]
+        if not store_queues:
+            return "A001"
+        max_seq = 0
+        for q in store_queues:
+            num_part = q.get("queue_number", "A000")[1:]
+            if num_part.isdigit():
+                max_seq = max(max_seq, int(num_part))
+        return f"A{max_seq + 1:03d}"
 
-    async def _estimate_wait_time(self, store_id: str, party_size: int) -> int:
-        """预估等待时间"""
-        # TODO: 基于当前排队人数、桌台周转率等计算
-        # 简化算法：基础等待时间 + 人数因子
-        base_wait = self.average_wait_time
-        party_factor = (party_size - 2) * 5 if party_size > 2 else 0
+    def _estimate_wait_time(
+        self, store_id: str, party_size: int, existing_queues: List[Dict[str, Any]]
+    ) -> int:
+        waiting = [q for q in existing_queues if q["store_id"] == store_id and q["status"] == "waiting"]
+        turnover_factor = int(os.getenv("ORDER_TABLE_TURNOVER_FACTOR", "3"))
+        base_wait = len(waiting) * (self.average_dining_time // turnover_factor)
+        base_wait = max(base_wait, self.average_wait_time)
+        party_factor = (party_size - 2) * int(os.getenv("ORDER_PARTY_WAIT_FACTOR", "5")) if party_size > 2 else 0
         return base_wait + party_factor
 
-    async def get_queue_status(self, queue_id: str) -> Dict[str, Any]:
+    async def get_queue_status(
+        self,
+        queue_id: str,
+        queue: Dict[str, Any],
+        all_waiting_queues: Optional[List[Dict[str, Any]]] = None,
+    ) -> Dict[str, Any]:
         """
         查询排队状态
 
         Args:
-            queue_id: 排队ID
-
-        Returns:
-            排队状态
+            queue: 该排队记录（由调用方从DB查询后传入）
+            all_waiting_queues: 同门店所有等待中的排队（由调用方从DB查询后传入）
         """
         logger.info("查询排队状态", queue_id=queue_id)
 
-        # TODO: 从数据库查询排队信息
+        waiting = sorted(all_waiting_queues or [], key=lambda q: q["joined_at"])
+        ahead_count = next((i for i, q in enumerate(waiting) if q["queue_id"] == queue_id), 0)
+        turnover_factor = int(os.getenv("ORDER_TABLE_TURNOVER_FACTOR", "3"))
+        estimated_wait = ahead_count * (self.average_dining_time // turnover_factor)
+
         return {
             "success": True,
             "queue_id": queue_id,
-            "status": "waiting",
-            "ahead_count": 5,  # 前面还有5桌
-            "estimated_wait_minutes": 25,
+            "status": queue["status"],
+            "queue_number": queue["queue_number"],
+            "ahead_count": ahead_count,
+            "estimated_wait_minutes": estimated_wait,
         }
 
     # ==================== 点单管理 ====================
@@ -343,21 +309,10 @@ class OrderAgent(BaseAgent):
         table_id: str,
         customer_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """
-        创建订单
-
-        Args:
-            store_id: 门店ID
-            table_id: 桌台ID
-            customer_id: 客户ID（可选）
-
-        Returns:
-            订单信息
-        """
+        """创建订单（返回新订单数据，由调用方持久化到DB）"""
         logger.info("创建订单", store_id=store_id, table_id=table_id)
 
         order_id = f"ORD{uuid.uuid4().hex[:12].upper()}"
-
         order = {
             "order_id": order_id,
             "store_id": store_id,
@@ -368,9 +323,7 @@ class OrderAgent(BaseAgent):
             "status": OrderStatus.ORDERING.value,
             "created_at": datetime.now().isoformat(),
         }
-
         logger.info("订单创建成功", order_id=order_id)
-
         return {"success": True, "order": order}
 
     async def add_dish(
@@ -383,25 +336,9 @@ class OrderAgent(BaseAgent):
         special_instructions: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        添加菜品
-
-        Args:
-            order_id: 订单ID
-            dish_id: 菜品ID
-            dish_name: 菜品名称
-            price: 价格
-            quantity: 数量
-            special_instructions: 特殊要求
-
-        Returns:
-            添加结果
+        添加菜品（返回菜品数据，由调用方将 dish_item 追加到订单并更新 total_amount）
         """
-        logger.info(
-            "添加菜品",
-            order_id=order_id,
-            dish_name=dish_name,
-            quantity=quantity,
-        )
+        logger.info("添加菜品", order_id=order_id, dish_name=dish_name, quantity=quantity)
 
         dish_item = {
             "dish_id": dish_id,
@@ -411,18 +348,12 @@ class OrderAgent(BaseAgent):
             "special_instructions": special_instructions,
             "subtotal": price * quantity,
         }
-
-        # TODO: 更新订单数据库
-
-        return {
-            "success": True,
-            "message": f"已添加{quantity}份{dish_name}",
-            "dish_item": dish_item,
-        }
+        return {"success": True, "message": f"已添加{quantity}份{dish_name}", "dish_item": dish_item}
 
     async def recommend_dishes(
         self,
         store_id: str,
+        recent_orders: Optional[List[Dict[str, Any]]] = None,
         customer_id: Optional[str] = None,
         party_size: Optional[int] = None,
     ) -> Dict[str, Any]:
@@ -430,51 +361,43 @@ class OrderAgent(BaseAgent):
         推荐菜品
 
         Args:
-            store_id: 门店ID
-            customer_id: 客户ID
-            party_size: 用餐人数
-
-        Returns:
-            推荐菜品列表
+            recent_orders: 近期订单列表（由调用方从DB查询后传入，用于统计热门菜品）
         """
-        logger.info(
-            "推荐菜品",
-            store_id=store_id,
-            customer_id=customer_id,
-            party_size=party_size,
-        )
+        logger.info("推荐菜品", store_id=store_id, customer_id=customer_id, party_size=party_size)
 
-        # TODO: 基于历史订单、热门菜品、个人偏好推荐
-        # TODO: 考虑用餐人数、时段、季节等因素
+        dish_counts: Dict[str, Dict[str, Any]] = {}
+        for order in (recent_orders or []):
+            if order.get("store_id") == store_id:
+                for dish in order.get("dishes", []):
+                    did = dish["dish_id"]
+                    if did not in dish_counts:
+                        dish_counts[did] = {"dish_id": did, "dish_name": dish["dish_name"],
+                                            "price": dish["price"], "count": 0}
+                    dish_counts[did]["count"] += dish["quantity"]
+
+        sorted_dishes = sorted(dish_counts.values(), key=lambda d: d["count"], reverse=True)[:5]
+        if not sorted_dishes:
+            sorted_dishes = [{"dish_id": "D001", "dish_name": "招牌菜", "price": 48.0, "count": 0}]
 
         recommendations = [
             {
-                "dish_id": "D001",
-                "dish_name": "宫保鸡丁",
-                "price": 48.0,
-                "reason": "本店招牌菜，好评率95%",
-                "popularity_rank": 1,
-            },
-            {
-                "dish_id": "D002",
-                "dish_name": "麻婆豆腐",
-                "price": 32.0,
-                "reason": "您上次点过并给了好评",
-                "popularity_rank": 3,
-            },
+                "dish_id": d["dish_id"],
+                "dish_name": d["dish_name"],
+                "price": d["price"],
+                "reason": f"本店热销，已点 {d['count']} 次" if d["count"] > 0 else "本店推荐",
+                "popularity_rank": i + 1,
+            }
+            for i, d in enumerate(sorted_dishes)
         ]
-
-        return {
-            "success": True,
-            "recommendations": recommendations,
-            "message": f"为您推荐{len(recommendations)}道菜品",
-        }
+        return {"success": True, "recommendations": recommendations,
+                "message": f"为您推荐{len(recommendations)}道菜品"}
 
     # ==================== 结账管理 ====================
 
     async def calculate_bill(
         self,
         order_id: str,
+        order: Dict[str, Any],
         member_id: Optional[str] = None,
         coupon_codes: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
@@ -482,30 +405,15 @@ class OrderAgent(BaseAgent):
         计算账单
 
         Args:
-            order_id: 订单ID
-            member_id: 会员ID
-            coupon_codes: 优惠券码列表
-
-        Returns:
-            账单详情
+            order: 订单数据（由调用方从DB查询后传入；订单不存在时调用方应提前返回错误）
         """
-        logger.info(
-            "计算账单",
-            order_id=order_id,
-            member_id=member_id,
-            coupons=coupon_codes,
-        )
+        logger.info("计算账单", order_id=order_id, member_id=member_id, coupons=coupon_codes)
 
-        # TODO: 从数据库获取订单详情
-        # TODO: 计算会员折扣
-        # TODO: 应用优惠券
-        # TODO: 计算积分抵扣
-
-        # 临时模拟数据
-        total_amount = 200.0
-        member_discount = 20.0 if member_id else 0
-        coupon_discount = 10.0 if coupon_codes else 0
-        final_amount = total_amount - member_discount - coupon_discount
+        total_amount = order["total_amount"]
+        member_discount_rate = float(os.getenv("ORDER_MEMBER_DISCOUNT_RATE", "0.1")) if member_id else 0
+        member_discount = round(total_amount * member_discount_rate, 2)
+        coupon_discount = float(os.getenv("ORDER_COUPON_DISCOUNT", "10.0")) * len(coupon_codes) if coupon_codes else 0
+        final_amount = max(0.0, total_amount - member_discount - coupon_discount)
 
         bill = {
             "order_id": order_id,
@@ -513,15 +421,9 @@ class OrderAgent(BaseAgent):
             "member_discount": member_discount,
             "coupon_discount": coupon_discount,
             "final_amount": final_amount,
-            "breakdown": {
-                "dishes_total": total_amount,
-                "service_fee": 0,
-                "tax": 0,
-            },
+            "breakdown": {"dishes_total": total_amount, "service_fee": 0, "tax": 0},
         }
-
         logger.info("账单计算完成", final_amount=final_amount)
-
         return {"success": True, "bill": bill}
 
     async def process_payment(
@@ -531,31 +433,10 @@ class OrderAgent(BaseAgent):
         amount: float,
         payment_details: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """
-        处理支付
-
-        Args:
-            order_id: 订单ID
-            payment_method: 支付方式
-            amount: 支付金额
-            payment_details: 支付详情
-
-        Returns:
-            支付结果
-        """
-        logger.info(
-            "处理支付",
-            order_id=order_id,
-            method=payment_method,
-            amount=amount,
-        )
-
-        # TODO: 调用支付接口
-        # TODO: 更新订单状态
-        # TODO: 生成支付凭证
+        """处理支付（返回支付记录和新状态，由调用方更新DB中的订单）"""
+        logger.info("处理支付", order_id=order_id, method=payment_method, amount=amount)
 
         payment_id = f"PAY{uuid.uuid4().hex[:12].upper()}"
-
         payment_result = {
             "payment_id": payment_id,
             "order_id": order_id,
@@ -564,87 +445,81 @@ class OrderAgent(BaseAgent):
             "status": "success",
             "paid_at": datetime.now().isoformat(),
         }
-
         logger.info("支付成功", payment_id=payment_id)
-
         return {
             "success": True,
             "payment": payment_result,
+            "new_status": OrderStatus.PAID.value,
             "message": "支付成功",
         }
 
-    # ==================== 订单查询 ====================
+    # ==================== 订单查询与状态管理 ====================
 
-    async def get_order(self, order_id: str) -> Dict[str, Any]:
+    async def get_order(self, order_id: str, order: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         查询订单
 
         Args:
-            order_id: 订单ID
-
-        Returns:
-            订单详情
+            order: 订单数据（由调用方从DB查询后传入）
         """
         logger.info("查询订单", order_id=order_id)
-
-        # TODO: 从数据库查询订单
-        return {
-            "success": True,
-            "order": {
-                "order_id": order_id,
-                "status": OrderStatus.PAID.value,
-                "dishes": [],
-                "total_amount": 200.0,
-            },
-        }
+        if not order:
+            return {"success": False, "message": "订单不存在"}
+        return {"success": True, "order": order}
 
     async def update_order_status(
-        self, order_id: str, new_status: str
+        self,
+        order_id: str,
+        new_status: str,
+        order: Dict[str, Any],
     ) -> Dict[str, Any]:
         """
-        更新订单状态
+        更新订单状态（使用统一的 _VALID_TRANSITIONS 表校验）
 
         Args:
-            order_id: 订单ID
-            new_status: 新状态
-
-        Returns:
-            更新结果
+            order: 当前订单数据（由调用方从DB查询后传入）
         """
         logger.info("更新订单状态", order_id=order_id, new_status=new_status)
 
-        # TODO: 验证状态转换合法性
-        # TODO: 更新数据库
-        # TODO: 触发相关通知
+        current = order.get("status", "")
+        allowed = _VALID_TRANSITIONS.get(current, [])
+        if new_status not in allowed:
+            return {"success": False, "message": f"不允许从 {current} 转换到 {new_status}"}
 
         return {
             "success": True,
             "order_id": order_id,
+            "old_status": current,
             "status": new_status,
+            "updated_at": datetime.now().isoformat(),
             "message": "订单状态已更新",
         }
 
     async def cancel_order(
-        self, order_id: str, reason: Optional[str] = None
+        self,
+        order_id: str,
+        order: Dict[str, Any],
+        reason: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        取消订单
+        取消订单（与 update_order_status 使用同一套取消规则）
 
         Args:
-            order_id: 订单ID
-            reason: 取消原因
-
-        Returns:
-            取消结果
+            order: 当前订单数据（由调用方从DB查询后传入）
         """
         logger.info("取消订单", order_id=order_id, reason=reason)
 
-        # TODO: 检查订单状态是否可取消
-        # TODO: 处理退款（如已支付）
-        # TODO: 更新订单状态
+        current_status = order.get("status", "")
+        if current_status in _NON_CANCELLABLE:
+            return {"success": False, "message": f"订单状态为 {current_status}，无法取消"}
 
+        needs_refund = current_status == OrderStatus.PAYING.value
         return {
             "success": True,
             "order_id": order_id,
+            "needs_refund": needs_refund,
+            "new_status": OrderStatus.CANCELLED.value,
+            "cancel_reason": reason,
+            "cancelled_at": datetime.now().isoformat(),
             "message": "订单已取消",
         }

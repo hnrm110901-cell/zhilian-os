@@ -2,6 +2,7 @@
 飞书服务
 Feishu (Lark) Service for message sending and user management
 """
+import os
 from typing import Dict, Any, List, Optional
 import httpx
 import structlog
@@ -38,7 +39,7 @@ class FeishuService:
                         "app_id": self.app_id,
                         "app_secret": self.app_secret,
                     },
-                    timeout=30.0,
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0")),
                 )
                 data = response.json()
 
@@ -88,7 +89,7 @@ class FeishuService:
                     params={"receive_id_type": receive_id_type},
                     headers={"Authorization": f"Bearer {token}"},
                     json=message_data,
-                    timeout=30.0,
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0")),
                 )
                 result = response.json()
 
@@ -141,7 +142,7 @@ class FeishuService:
                     params={"receive_id_type": receive_id_type},
                     headers={"Authorization": f"Bearer {token}"},
                     json=message_data,
-                    timeout=30.0,
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0")),
                 )
                 result = response.json()
 
@@ -185,7 +186,7 @@ class FeishuService:
                     params={"receive_id_type": receive_id_type},
                     headers={"Authorization": f"Bearer {token}"},
                     json=message_data,
-                    timeout=30.0,
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0")),
                 )
                 result = response.json()
 
@@ -214,7 +215,7 @@ class FeishuService:
                 response = await client.get(
                     f"{self.base_url}/contact/v3/users/{user_id}",
                     headers={"Authorization": f"Bearer {token}"},
-                    timeout=30.0,
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0")),
                 )
                 result = response.json()
 
@@ -230,7 +231,7 @@ class FeishuService:
             raise
 
     async def get_department_users(
-        self, department_id: str = "0", page_size: int = 50
+        self, department_id: str = "0", page_size: int = int(os.getenv("FEISHU_PAGE_SIZE", "50"))
     ) -> List[Dict[str, Any]]:
         """
         获取部门用户列表
@@ -250,7 +251,7 @@ class FeishuService:
                         "page_size": page_size,
                     },
                     headers={"Authorization": f"Bearer {token}"},
-                    timeout=30.0,
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0")),
                 )
                 result = response.json()
 

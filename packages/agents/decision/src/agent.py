@@ -11,6 +11,7 @@
 7. 多维度决策支持 - Multi-dimensional decision support
 """
 
+import os
 import asyncio
 import structlog
 from datetime import datetime, timedelta
@@ -181,11 +182,11 @@ class DecisionAgent(BaseAgent):
         self.service_agent = service_agent
         self.training_agent = training_agent
         self.kpi_targets = kpi_targets or {
-            "revenue_growth": 0.15,  # 营收增长15%
-            "cost_ratio": 0.35,  # 成本率35%
-            "customer_satisfaction": 0.90,  # 客户满意度90%
-            "staff_efficiency": 0.85,  # 员工效率85%
-            "inventory_turnover": 12,  # 库存周转率12次/年
+            "revenue_growth": float(os.getenv("DECISION_KPI_REVENUE_GROWTH_TARGET", "0.15")),
+            "cost_ratio": float(os.getenv("DECISION_KPI_COST_RATIO_TARGET", "0.35")),
+            "customer_satisfaction": float(os.getenv("DECISION_KPI_CUSTOMER_SATISFACTION_TARGET", "0.90")),
+            "staff_efficiency": float(os.getenv("DECISION_KPI_STAFF_EFFICIENCY_TARGET", "0.85")),
+            "inventory_turnover": int(os.getenv("DECISION_KPI_INVENTORY_TURNOVER_TARGET", "12")),
         }
         self.logger = logger.bind(agent="decision", store_id=store_id)
 
@@ -336,7 +337,7 @@ class DecisionAgent(BaseAgent):
         # 总营收
         total_revenue = revenue_data.get("total_revenue", 0)
         previous_revenue = revenue_data.get("previous_revenue", 0)
-        target_revenue = revenue_data.get("target_revenue", total_revenue * 1.15)
+        target_revenue = revenue_data.get("target_revenue", total_revenue * float(os.getenv("TARGET_REVENUE_GROWTH_RATE", "1.15")))
 
         kpi: KPIMetric = {
             "metric_id": "KPI_REVENUE_001",
@@ -413,7 +414,7 @@ class DecisionAgent(BaseAgent):
         # 人效(人均营收)
         revenue_per_staff = efficiency_data.get("revenue_per_staff", 0)
         previous_revenue_per_staff = efficiency_data.get("previous_revenue_per_staff", 0)
-        target_revenue_per_staff = revenue_per_staff * 1.1
+        target_revenue_per_staff = revenue_per_staff * float(os.getenv("TARGET_STAFF_EFFICIENCY_GROWTH_RATE", "1.1"))
 
         kpi: KPIMetric = {
             "metric_id": "KPI_EFFICIENCY_001",
@@ -438,7 +439,7 @@ class DecisionAgent(BaseAgent):
         # 订单准确率
         order_accuracy = quality_data.get("order_accuracy", 0.95)
         previous_accuracy = quality_data.get("previous_accuracy", 0.93)
-        target_accuracy = 0.98
+        target_accuracy = float(os.getenv("DECISION_TARGET_ORDER_ACCURACY", "0.98"))
 
         kpi: KPIMetric = {
             "metric_id": "KPI_QUALITY_001",
@@ -497,13 +498,13 @@ class DecisionAgent(BaseAgent):
         if inverse:
             change_rate = -change_rate
 
-        if abs(change_rate) < 0.05:
+        if abs(change_rate) < float(os.getenv("DECISION_TREND_STABLE_THRESHOLD", "0.05")):
             return TrendDirection.STABLE
-        elif change_rate > 0.15:
+        elif change_rate > float(os.getenv("DECISION_TREND_INCREASE_THRESHOLD", "0.15")):
             return TrendDirection.INCREASING
-        elif change_rate < -0.15:
+        elif change_rate < -float(os.getenv("DECISION_TREND_INCREASE_THRESHOLD", "0.15")):
             return TrendDirection.DECREASING
-        elif abs(change_rate) > 0.10:
+        elif abs(change_rate) > float(os.getenv("DECISION_TREND_VOLATILE_THRESHOLD", "0.10")):
             return TrendDirection.VOLATILE
         else:
             return TrendDirection.STABLE
@@ -512,9 +513,9 @@ class DecisionAgent(BaseAgent):
         """评估KPI状态"""
         achievement_rate = kpi["achievement_rate"]
 
-        if achievement_rate >= 0.95:
+        if achievement_rate >= float(os.getenv("DECISION_KPI_ON_TRACK_THRESHOLD", "0.95")):
             return "on_track"
-        elif achievement_rate >= 0.85:
+        elif achievement_rate >= float(os.getenv("DECISION_KPI_AT_RISK_THRESHOLD", "0.85")):
             return "at_risk"
         else:
             return "off_track"
@@ -586,7 +587,7 @@ class DecisionAgent(BaseAgent):
             "title": f"{kpi['metric_name']}未达标",
             "description": f"{kpi['metric_name']}当前为{kpi['current_value']:.2f}{kpi['unit']},目标为{kpi['target_value']:.2f}{kpi['unit']},达成率仅{kpi['achievement_rate']:.1%}",
             "category": kpi["category"],
-            "impact_level": "high" if kpi["achievement_rate"] < 0.80 else "medium",
+            "impact_level": "high" if kpi["achievement_rate"] < float(os.getenv("DECISION_KPI_HIGH_IMPACT_THRESHOLD", "0.80")) else "medium",
             "data_points": [
                 {"label": "当前值", "value": kpi["current_value"]},
                 {"label": "目标值", "value": kpi["target_value"]},
@@ -788,8 +789,8 @@ class DecisionAgent(BaseAgent):
     async def forecast_trends(
         self,
         metric_name: str,
-        forecast_days: int = 30,
-        historical_days: int = 90
+        forecast_days: int = int(os.getenv("DECISION_FORECAST_DAYS", "30")),
+        historical_days: int = int(os.getenv("DECISION_HISTORICAL_DAYS", "90"))
     ) -> TrendForecast:
         """
         预测趋势
@@ -1108,7 +1109,7 @@ class DecisionAgent(BaseAgent):
             report = {
                 "store_id": self.store_id,
                 "report_date": datetime.now().isoformat(),
-                "period_start": start_date or (datetime.now() - timedelta(days=30)).isoformat(),
+                "period_start": start_date or (datetime.now() - timedelta(days=int(os.getenv("AGENT_STATS_DAYS", "30")))).isoformat(),
                 "period_end": end_date or datetime.now().isoformat(),
                 "kpi_summary": {
                     "total_kpis": len(kpis),
@@ -1233,7 +1234,7 @@ class DecisionAgent(BaseAgent):
         """获取历史数据"""
         import random
         # 生成模拟历史数据
-        base_value = 100000.0
+        base_value = float(os.getenv("DECISION_MOCK_BASE_REVENUE", "100000.0"))
         data = []
         for i in range(days):
             value = base_value + random.uniform(-10000, 15000) + i * 100

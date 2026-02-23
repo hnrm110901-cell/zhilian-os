@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 import structlog
+import os
 
 logger = structlog.get_logger()
 
@@ -105,22 +106,22 @@ class ApprovalRequest(BaseModel):
 class HumanInTheLoopService:
     """Human-in-the-Loop服务"""
 
-    # 风险等级阈值
+    # 风险等级阈值（支持环境变量覆盖）
     RISK_THRESHOLDS = {
         # 采购金额阈值
-        "purchase_amount_threshold": 5000.0,  # 超过5000元需要人工审批
+        "purchase_amount_threshold": float(os.getenv("HITL_PURCHASE_THRESHOLD", "5000.0")),
 
         # 价格调整阈值
-        "price_change_threshold": 0.10,  # 超过10%需要人工审批
+        "price_change_threshold": float(os.getenv("HITL_PRICE_CHANGE_THRESHOLD", "0.10")),
 
         # 优惠券额度阈值
-        "coupon_amount_threshold": 1000.0,  # 单次发放超过1000元需要审批
+        "coupon_amount_threshold": float(os.getenv("HITL_COUPON_THRESHOLD", "1000.0")),
     }
 
-    # 审批超时时间（小时）
+    # 审批超时时间（小时，支持环境变量覆盖）
     APPROVAL_TIMEOUT_HOURS = {
-        RiskLevel.HIGH: 24,  # 高风险操作24小时内需审批
-        RiskLevel.CRITICAL: 2,  # 极高风险操作2小时内需审批
+        RiskLevel.HIGH: int(os.getenv("HITL_HIGH_RISK_TIMEOUT_HOURS", "24")),
+        RiskLevel.CRITICAL: int(os.getenv("HITL_CRITICAL_RISK_TIMEOUT_HOURS", "2")),
     }
 
     def __init__(self, db: Session):
@@ -287,10 +288,29 @@ class HumanInTheLoopService:
             expires_at=expires_at
         )
 
-        # TODO: 推送到企业微信
+        # 推送到企业微信
         await self.send_approval_notification(request)
 
-        # TODO: 保存到数据库
+        # 保存到数据库
+        from src.core.database import get_db_session
+        from src.models.decision_log import DecisionLog, DecisionStatus, DecisionType
+        import uuid
+
+        async with get_db_session() as session:
+            log = DecisionLog(
+                id=decision.decision_id,
+                decision_type=DecisionType.PURCHASE_SUGGESTION,
+                agent_type="human_in_the_loop",
+                agent_method="create_approval_request",
+                store_id=decision.store_id,
+                ai_suggestion={"operation_type": decision.operation_type, "expected_impact": decision.expected_impact},
+                ai_confidence=decision.confidence_score,
+                ai_reasoning=decision.reasoning,
+                decision_status=DecisionStatus.PENDING,
+            )
+            session.add(log)
+            await session.commit()
+
         return request
 
     async def send_approval_notification(
@@ -302,9 +322,7 @@ class HumanInTheLoopService:
         """
         logger.info("发送审批通知", request_id=request.request_id)
 
-        # TODO: 调用企业微信API发送消息
-        message = f"""
-【智链OS - 需要您的审批】
+        message = f"""【智链OS - 需要您的审批】
 
 操作类型: {request.operation_type}
 风险等级: {request.risk_level}
@@ -315,10 +333,17 @@ AI推理: {request.reasoning}
 预期影响:
 {request.expected_impact}
 
-请在{request.expires_at.strftime('%Y-%m-%d %H:%M')}前完成审批
-        """
+请在{request.expires_at.strftime('%Y-%m-%d %H:%M')}前完成审批"""
 
-        logger.info("审批通知已发送", message=message)
+        try:
+            from src.services.wechat_work_message_service import WeChatWorkMessageService
+            wechat_service = WeChatWorkMessageService()
+            target = request.approver_id or "@all"
+            await wechat_service.send_text_message(target, message)
+            logger.info("审批通知已发送", request_id=request.request_id, target=target)
+        except Exception as e:
+            logger.error("审批通知发送失败，降级为日志记录", request_id=request.request_id, error=str(e))
+            logger.info("审批通知内容", message=message)
 
     async def approve_request(
         self,
@@ -337,29 +362,59 @@ AI推理: {request.reasoning}
             approved=approved
         )
 
-        # TODO: 从数据库查询审批请求
-        # TODO: 更新审批状态
-        # TODO: 如果批准，执行操作
+        from src.core.database import get_db_session
+        from src.models.decision_log import DecisionLog, DecisionStatus
 
-        # 模拟返回
-        request = ApprovalRequest(
+        decision_id = request_id.replace("approval_", "")
+        now = datetime.now()
+
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(DecisionLog).where(DecisionLog.id == decision_id)
+            )
+            log = result.scalar_one_or_none()
+
+            if log:
+                log.decision_status = DecisionStatus.APPROVED if approved else DecisionStatus.REJECTED
+                log.manager_id = approver_id
+                log.approved_at = now
+                log.manager_feedback = comment
+                await session.commit()
+
+                return ApprovalRequest(
+                    request_id=request_id,
+                    decision_id=decision_id,
+                    store_id=log.store_id,
+                    operation_type=OperationType(log.ai_suggestion.get("operation_type", OperationType.LARGE_PURCHASE)),
+                    risk_level=RiskLevel.HIGH,
+                    description=log.ai_reasoning or "",
+                    reasoning=log.ai_reasoning or "",
+                    expected_impact=log.ai_suggestion.get("expected_impact", {}),
+                    approver_id=approver_id,
+                    approval_status=ApprovalStatus.APPROVED if approved else ApprovalStatus.REJECTED,
+                    approval_comment=comment,
+                    created_at=log.created_at,
+                    approved_at=now,
+                    expires_at=now
+                )
+
+        # fallback if not found
+        return ApprovalRequest(
             request_id=request_id,
-            decision_id="decision_xxx",
-            store_id="store_xxx",
+            decision_id=decision_id,
+            store_id="",
             operation_type=OperationType.LARGE_PURCHASE,
             risk_level=RiskLevel.HIGH,
-            description="采购10000元食材",
-            reasoning="AI预测明天客流量增加30%",
-            expected_impact={"revenue_increase": 15000},
+            description="",
+            reasoning="",
+            expected_impact={},
             approver_id=approver_id,
             approval_status=ApprovalStatus.APPROVED if approved else ApprovalStatus.REJECTED,
             approval_comment=comment,
-            created_at=datetime.now(),
-            approved_at=datetime.now(),
-            expires_at=datetime.now()
+            created_at=now,
+            approved_at=now,
+            expires_at=now
         )
-
-        return request
 
     async def get_store_trust_phase(
         self,
@@ -386,9 +441,9 @@ AI推理: {request.reasoning}
         else:
             days_since_onboarding = 0
 
-        if days_since_onboarding < 90:
+        if days_since_onboarding < int(os.getenv("HITL_OBSERVATION_DAYS", "90")):
             return TrustPhase.OBSERVATION
-        elif days_since_onboarding < 180:
+        elif days_since_onboarding < int(os.getenv("HITL_ASSISTANCE_DAYS", "180")):
             return TrustPhase.ASSISTANCE
         else:
             return TrustPhase.AUTONOMOUS
@@ -407,7 +462,27 @@ AI推理: {request.reasoning}
             action=action
         )
 
-        # TODO: 保存到审计日志表
+        # 保存到审计日志表
+        from src.core.database import get_db_session
+        from src.models.audit_log import AuditLog
+
+        async with get_db_session() as session:
+            audit = AuditLog(
+                action=action,
+                resource_type="ai_decision",
+                resource_id=decision.decision_id,
+                user_id="system",
+                description=decision.description,
+                store_id=decision.store_id,
+                changes={
+                    "decision_id": decision.decision_id,
+                    "operation_type": decision.operation_type,
+                    "risk_level": decision.risk_level,
+                    "confidence_score": decision.confidence_score,
+                },
+            )
+            session.add(audit)
+            await session.commit()
 
     async def get_pending_approvals(
         self,
@@ -418,8 +493,36 @@ AI推理: {request.reasoning}
         """
         logger.info("获取待审批请求", store_id=store_id)
 
-        # TODO: 从数据库查询
-        return []
+        from src.core.database import get_db_session
+        from src.models.decision_log import DecisionLog, DecisionStatus
+        from sqlalchemy import select
+
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(DecisionLog).where(
+                    DecisionLog.store_id == store_id,
+                    DecisionLog.decision_status == DecisionStatus.PENDING,
+                ).order_by(DecisionLog.created_at.desc()).limit(int(os.getenv("HITL_PENDING_LIMIT", "20")))
+            )
+            logs = result.scalars().all()
+
+        requests = []
+        for log in logs:
+            request = ApprovalRequest(
+                request_id=log.id,
+                decision_id=log.id,
+                risk_level=RiskLevel.HIGH,
+                action_type=log.decision_type.value if log.decision_type else "unknown",
+                action_description=str(log.ai_suggestion) if log.ai_suggestion else "",
+                expected_impact={},
+                approval_comment=None,
+                created_at=log.created_at,
+                approved_at=None,
+                expires_at=log.created_at + timedelta(hours=int(os.getenv("HITL_LOG_EXPIRE_HOURS", "24"))) if log.created_at else datetime.now(),
+            )
+            requests.append(request)
+
+        return requests
 
     async def get_approval_statistics(
         self,
@@ -432,15 +535,75 @@ AI推理: {request.reasoning}
         """
         logger.info("获取审批统计", store_id=store_id)
 
-        # TODO: 从数据库统计
+        from src.core.database import get_db_session
+        from src.models.decision_log import DecisionLog, DecisionStatus
+        from sqlalchemy import select, func
+
+        async with get_db_session() as session:
+            total_result = await session.execute(
+                select(func.count(DecisionLog.id)).where(DecisionLog.store_id == store_id)
+            )
+            total_decisions = int(total_result.scalar() or 0)
+
+            auto_result = await session.execute(
+                select(func.count(DecisionLog.id)).where(
+                    DecisionLog.store_id == store_id,
+                    DecisionLog.decision_status == DecisionStatus.EXECUTED,
+                    DecisionLog.manager_id == None,
+                )
+            )
+            auto_executed = int(auto_result.scalar() or 0)
+
+            approval_result = await session.execute(
+                select(func.count(DecisionLog.id)).where(
+                    DecisionLog.store_id == store_id,
+                    DecisionLog.decision_status.in_([
+                        DecisionStatus.APPROVED, DecisionStatus.REJECTED, DecisionStatus.MODIFIED
+                    ])
+                )
+            )
+            approval_required = int(approval_result.scalar() or 0)
+
+            approved_result = await session.execute(
+                select(func.count(DecisionLog.id)).where(
+                    DecisionLog.store_id == store_id,
+                    DecisionLog.decision_status == DecisionStatus.APPROVED,
+                )
+            )
+            approved_count = int(approved_result.scalar() or 0)
+
+            time_result = await session.execute(
+                select(
+                    func.avg(
+                        func.extract("epoch", DecisionLog.approved_at) -
+                        func.extract("epoch", DecisionLog.created_at)
+                    )
+                ).where(
+                    DecisionLog.store_id == store_id,
+                    DecisionLog.approved_at != None,
+                )
+            )
+            avg_seconds = float(time_result.scalar() or 0)
+
+            trust_result = await session.execute(
+                select(func.avg(DecisionLog.trust_score)).where(
+                    DecisionLog.store_id == store_id,
+                    DecisionLog.trust_score != None,
+                )
+            )
+            avg_trust = float(trust_result.scalar() or 85.0)
+
+        approval_rate = round(approved_count / approval_required, 2) if approval_required > 0 else 0.0
+        current_trust_phase = await self.get_store_trust_phase(store_id)
+
         stats = {
-            "total_decisions": 1000,
-            "auto_executed": 850,
-            "approval_required": 150,
-            "approval_rate": 0.90,  # 90%的审批请求被批准
-            "avg_approval_time_hours": 2.5,
-            "trust_score": 0.85,  # 信任评分（0-1）
-            "current_trust_phase": TrustPhase.ASSISTANCE
+            "total_decisions": total_decisions,
+            "auto_executed": auto_executed,
+            "approval_required": approval_required,
+            "approval_rate": approval_rate,
+            "avg_approval_time_hours": round(avg_seconds / 3600, 1),
+            "trust_score": round(avg_trust / 100.0, 2),
+            "current_trust_phase": current_trust_phase,
         }
 
         return stats

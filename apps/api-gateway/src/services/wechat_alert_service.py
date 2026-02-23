@@ -4,6 +4,7 @@
 """
 from typing import Dict, Any, List, Optional
 from datetime import datetime
+import os
 import structlog
 
 from ..core.config import settings
@@ -53,10 +54,12 @@ class WeChatAlertService:
         """
         try:
             # 确定告警级别和emoji
-            if abs(deviation) > 30:
+            _critical_threshold = float(os.getenv("REVENUE_ALERT_CRITICAL_THRESHOLD", "30"))
+            _warning_threshold = float(os.getenv("REVENUE_ALERT_WARNING_THRESHOLD", "20"))
+            if abs(deviation) > _critical_threshold:
                 level = "严重"
                 emoji = "🚨"
-            elif abs(deviation) > 20:
+            elif abs(deviation) > _warning_threshold:
                 level = "警告"
                 emoji = "⚠️"
             else:

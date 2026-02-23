@@ -5,6 +5,7 @@
 from typing import List, Dict, Any, Optional
 from datetime import datetime, date, timedelta
 from calendar import monthrange
+import os
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func, extract
@@ -60,7 +61,7 @@ class FinanceService:
         transaction_type: Optional[str] = None,
         category: Optional[str] = None,
         skip: int = 0,
-        limit: int = 100,
+        limit: int = int(os.getenv("FINANCE_QUERY_LIMIT", "100")),
     ) -> Dict[str, Any]:
         """获取财务交易记录列表"""
         query = select(FinancialTransaction)
@@ -138,10 +139,23 @@ class FinanceService:
             expenses[category] = amount
             total_expenses += amount
 
-        # 计算利润
+        # 计算利润（含税费）
         gross_profit = total_revenue - expenses.get("food_cost", 0)
         operating_profit = total_revenue - total_expenses
-        net_profit = operating_profit  # 简化版，实际应考虑税费等
+        # 从门店配置读取税率，默认 6%（餐饮业增值税小规模纳税人）
+        tax_rate = float(os.getenv("FINANCE_DEFAULT_TAX_RATE", "0.06"))
+        try:
+            from src.core.database import get_db_session
+            from src.models.store import Store
+            from sqlalchemy import select
+            async with get_db_session() as session:
+                result = await session.execute(select(Store.config).where(Store.id == store_id))
+                cfg = result.scalar_one_or_none() or {}
+                tax_rate = float(cfg.get("tax_rate", os.getenv("FINANCE_DEFAULT_TAX_RATE", "0.06")))
+        except Exception:
+            pass
+        tax_amount = int(operating_profit * tax_rate) if operating_profit > 0 else 0
+        net_profit = operating_profit - tax_amount
 
         # 计算比率
         gross_margin = (gross_profit / total_revenue * 100) if total_revenue > 0 else 0

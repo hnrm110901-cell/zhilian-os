@@ -7,6 +7,7 @@ Cache Decorators
 import functools
 import hashlib
 import json
+import os
 from typing import Any, Callable, Optional
 import structlog
 
@@ -15,7 +16,7 @@ logger = structlog.get_logger()
 
 def cache_result(
     key_prefix: str,
-    expire: int = 300,
+    expire: int = int(os.getenv("CACHE_DEFAULT_EXPIRE", "300")),
     key_builder: Optional[Callable] = None
 ):
     """
@@ -68,7 +69,7 @@ def cache_result(
     return decorator
 
 
-def cache_user_permissions(expire: int = 600):
+def cache_user_permissions(expire: int = int(os.getenv("CACHE_PERMISSIONS_EXPIRE", "600"))):
     """
     缓存用户权限装饰器
 
@@ -86,7 +87,7 @@ def cache_user_permissions(expire: int = 600):
     return cache_result("user:permissions", expire=expire, key_builder=key_builder)
 
 
-def cache_user_info(expire: int = 300):
+def cache_user_info(expire: int = int(os.getenv("CACHE_USER_INFO_EXPIRE", "300"))):
     """
     缓存用户信息装饰器
 
@@ -176,8 +177,8 @@ class CacheManager:
         """预热用户缓存"""
         from .redis_cache_service import redis_cache
 
-        await redis_cache.set(f"user:permissions:{user_id}", permissions, expire=600)
-        await redis_cache.set(f"user:info:{user_id}", user_info, expire=300)
+        await redis_cache.set(f"user:permissions:{user_id}", permissions, expire=int(os.getenv("CACHE_PERMISSIONS_EXPIRE", "600")))
+        await redis_cache.set(f"user:info:{user_id}", user_info, expire=int(os.getenv("CACHE_USER_INFO_EXPIRE", "300")))
 
         logger.info("预热用户缓存", user_id=user_id)
 

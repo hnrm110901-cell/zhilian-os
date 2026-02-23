@@ -2,6 +2,7 @@
 菜品服务
 管理菜品主档的业务逻辑
 """
+import os
 from typing import List, Optional, Dict, Any
 from sqlalchemy import select, func, and_, or_
 from sqlalchemy.orm import joinedload
@@ -378,7 +379,7 @@ class DishService(BaseService):
 
             return breakdown
 
-    async def get_popular_dishes(self, limit: int = 10) -> List[Dict[str, Any]]:
+    async def get_popular_dishes(self, limit: int = int(os.getenv("DISH_POPULAR_LIMIT", "10"))) -> List[Dict[str, Any]]:
         """
         获取热门菜品
 

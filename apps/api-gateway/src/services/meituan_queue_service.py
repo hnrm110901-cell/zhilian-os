@@ -87,7 +87,7 @@ class MeituanQueueService:
             # 发起请求
             url = f"{self.base_url}{endpoint}"
 
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))) as client:
                 response = await client.post(
                     url,
                     data=urlencode(params),

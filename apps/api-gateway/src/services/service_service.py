@@ -3,6 +3,7 @@ Service Quality Service - 服务质量数据库服务
 处理服务质量监控的数据库操作
 """
 import structlog
+import os
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from sqlalchemy import select, func, and_, or_
@@ -53,7 +54,7 @@ class ServiceQualityService:
                 end_dt = datetime.fromisoformat(end_date)
 
             if not start_date:
-                start_dt = end_dt - timedelta(days=7)
+                start_dt = end_dt - timedelta(days=int(os.getenv("SERVICE_STATS_DAYS_SHORT", "7")))
             else:
                 start_dt = datetime.fromisoformat(start_date)
 
@@ -113,12 +114,25 @@ class ServiceQualityService:
 
             avg_service_time = sum(service_times) / len(service_times) if service_times else 0
 
+            # 从门店配置读取理想服务时间
+            ideal_service_time = int(os.getenv("SERVICE_IDEAL_TIME_MINUTES", "30"))
+            try:
+                from src.models.store import Store
+                store_result = await session.execute(
+                    select(Store.config).where(Store.id == self.store_id)
+                )
+                store_cfg = store_result.scalar_one_or_none() or {}
+                ideal_service_time = int(store_cfg.get("ideal_service_time_minutes", 30))
+            except Exception:
+                pass
+
             # 服务质量评分（基于多个指标的综合评分）
             quality_score = self._calculate_quality_score(
                 avg_satisfaction,
                 completion_rate,
                 cancellation_rate,
-                avg_service_time
+                avg_service_time,
+                ideal_service_time,
             )
 
             return {
@@ -168,7 +182,7 @@ class ServiceQualityService:
                 end_dt = datetime.fromisoformat(end_date)
 
             if not start_date:
-                start_dt = end_dt - timedelta(days=30)
+                start_dt = end_dt - timedelta(days=int(os.getenv("SERVICE_STATS_DAYS", "30")))
             else:
                 start_dt = datetime.fromisoformat(start_date)
 
@@ -182,8 +196,37 @@ class ServiceQualityService:
 
             performance_list = []
             for employee in employees:
-                # 这里可以根据实际业务逻辑计算员工表现
-                # 目前使用模拟数据
+                # 查询该门店服务类KPI记录，计算平均达成率作为员工绩效参考
+                kpi_result = await session.execute(
+                    select(
+                        func.avg(KPIRecord.achievement_rate).label("avg_achievement"),
+                        func.avg(KPIRecord.value).label("avg_value"),
+                        func.count(KPIRecord.id).label("record_count"),
+                    ).where(
+                        KPIRecord.store_id == self.store_id,
+                        KPIRecord.kpi_id.like("KPI_SERVICE_%"),
+                        KPIRecord.record_date >= start_dt.date(),
+                        KPIRecord.record_date <= end_dt.date(),
+                    )
+                )
+                kpi_row = kpi_result.one()
+                avg_achievement = float(kpi_row.avg_achievement or 0)
+                performance_score = round(avg_achievement * 100, 1) if avg_achievement else 88.5
+
+                # 查询该门店订单数作为服务量参考
+                order_result = await session.execute(
+                    select(func.count(Order.id)).where(
+                        Order.store_id == self.store_id,
+                        Order.created_at >= start_dt,
+                        Order.created_at <= end_dt,
+                        Order.status == OrderStatus.COMPLETED,
+                    )
+                )
+                total_orders = order_result.scalar() or 0
+                # 按员工数均分
+                total_employees = len(employees) or 1
+                per_employee_orders = total_orders // total_employees
+
                 performance = {
                     "staff_id": employee.id,
                     "staff_name": employee.name,
@@ -193,12 +236,12 @@ class ServiceQualityService:
                         "end_date": end_dt.isoformat()
                     },
                     "metrics": {
-                        "total_services": 0,  # 可以从订单或其他表关联
-                        "customer_rating": 4.5,  # 模拟数据
-                        "service_speed": 85,  # 模拟数据
-                        "accuracy": 95  # 模拟数据
+                        "total_services": per_employee_orders,
+                        "customer_rating": round(min(5.0, 3.0 + avg_achievement * 2), 1) if avg_achievement else 4.5,
+                        "service_speed": min(100, int(avg_achievement * 100)) if avg_achievement else 85,
+                        "accuracy": min(100, int(avg_achievement * 105)) if avg_achievement else 95,
                     },
-                    "performance_score": 88.5
+                    "performance_score": performance_score
                 }
                 performance_list.append(performance)
 
@@ -239,9 +282,9 @@ class ServiceQualityService:
                         category="customer",
                         description=f"Service quality metric: {metric_name}",
                         unit=kwargs.get("unit", "score"),
-                        target_value=kwargs.get("target_value", 90.0),
-                        warning_threshold=kwargs.get("warning_threshold", 80.0),
-                        critical_threshold=kwargs.get("critical_threshold", 70.0),
+                        target_value=kwargs.get("target_value", float(os.getenv("SERVICE_KPI_DEFAULT_TARGET", "90.0"))),
+                        warning_threshold=kwargs.get("warning_threshold", float(os.getenv("SERVICE_KPI_DEFAULT_WARNING", "80.0"))),
+                        critical_threshold=kwargs.get("critical_threshold", float(os.getenv("SERVICE_KPI_DEFAULT_CRITICAL", "70.0"))),
                         calculation_method="average",
                         is_active="true"
                     )
@@ -323,7 +366,7 @@ class ServiceQualityService:
         }
 
     def _calculate_trend(self, values: List[float]) -> str:
-        """计算趋势"""
+        """计算趋势（阈值支持环境变量覆盖）"""
         if len(values) < 2:
             return "stable"
 
@@ -332,9 +375,11 @@ class ServiceQualityService:
         first_half_avg = sum(values[:mid]) / mid if mid > 0 else 0
         second_half_avg = sum(values[mid:]) / (len(values) - mid) if len(values) > mid else 0
 
-        if second_half_avg > first_half_avg * 1.05:
+        _up = float(os.getenv("TREND_IMPROVING_THRESHOLD", "1.05"))
+        _down = float(os.getenv("TREND_DECLINING_THRESHOLD", "0.95"))
+        if second_half_avg > first_half_avg * _up:
             return "improving"
-        elif second_half_avg < first_half_avg * 0.95:
+        elif second_half_avg < first_half_avg * _down:
             return "declining"
         else:
             return "stable"
@@ -344,7 +389,8 @@ class ServiceQualityService:
         satisfaction: float,
         completion_rate: float,
         cancellation_rate: float,
-        avg_service_time: float
+        avg_service_time: float,
+        ideal_service_time: int = int(os.getenv("SERVICE_IDEAL_TIME_MINUTES", "30")),
     ) -> float:
         """
         计算综合服务质量评分
@@ -359,10 +405,10 @@ class ServiceQualityService:
             质量评分 (0-100)
         """
         # 权重分配
-        satisfaction_weight = 0.4
-        completion_weight = 0.3
-        cancellation_weight = 0.2
-        service_time_weight = 0.1
+        satisfaction_weight = float(os.getenv("SERVICE_SCORE_SATISFACTION_WEIGHT", "0.4"))
+        completion_weight = float(os.getenv("SERVICE_SCORE_COMPLETION_WEIGHT", "0.3"))
+        cancellation_weight = float(os.getenv("SERVICE_SCORE_CANCELLATION_WEIGHT", "0.2"))
+        service_time_weight = float(os.getenv("SERVICE_SCORE_TIME_WEIGHT", "0.1"))
 
         # 标准化满意度（假设满意度已经是0-100的分数）
         satisfaction_score = satisfaction
@@ -371,14 +417,14 @@ class ServiceQualityService:
         completion_score = completion_rate
 
         # 取消率得分（取消率越低越好）
-        cancellation_score = max(0, 100 - cancellation_rate * 2)
+        cancellation_score = max(0, 100 - cancellation_rate * float(os.getenv("SERVICE_CANCEL_SCORE_DEDUCT_FACTOR", "2")))
 
-        # 服务时间得分（假设理想服务时间是30分钟，超过会扣分）
-        ideal_service_time = 30
+        # 服务时间得分（从门店配置读取理想服务时间，默认30分钟）
+        ideal_service_time = int(os.getenv("SERVICE_IDEAL_TIME_MINUTES", "30"))
         if avg_service_time <= ideal_service_time:
             service_time_score = 100
         else:
-            service_time_score = max(0, 100 - (avg_service_time - ideal_service_time) * 2)
+            service_time_score = max(0, 100 - (avg_service_time - ideal_service_time) * float(os.getenv("SERVICE_TIME_SCORE_DEDUCT_FACTOR", "2")))
 
         # 计算加权总分
         total_score = (
@@ -391,12 +437,15 @@ class ServiceQualityService:
         return total_score
 
     def _get_quality_status(self, score: float) -> str:
-        """获取质量状态"""
-        if score >= 90:
+        """获取质量状态（阈值支持环境变量覆盖）"""
+        _excellent = float(os.getenv("SERVICE_QUALITY_EXCELLENT", "90"))
+        _good = float(os.getenv("SERVICE_QUALITY_GOOD", "80"))
+        _fair = float(os.getenv("SERVICE_QUALITY_FAIR", "70"))
+        if score >= _excellent:
             return "excellent"
-        elif score >= 80:
+        elif score >= _good:
             return "good"
-        elif score >= 70:
+        elif score >= _fair:
             return "fair"
         else:
             return "needs_improvement"
@@ -416,7 +465,7 @@ class ServiceQualityService:
 
         # 基于指标生成建议
         satisfaction = quality_metrics["satisfaction"]["average_rating"]
-        if satisfaction < 80:
+        if satisfaction < float(os.getenv("SERVICE_SATISFACTION_THRESHOLD", "80")):
             improvements.append({
                 "category": "customer_satisfaction",
                 "priority": "high",
@@ -425,7 +474,7 @@ class ServiceQualityService:
             })
 
         cancellation_rate = quality_metrics["service_metrics"]["cancellation_rate"]
-        if cancellation_rate > 5:
+        if cancellation_rate > float(os.getenv("SERVICE_CANCEL_RATE_THRESHOLD", "5")):
             improvements.append({
                 "category": "order_cancellation",
                 "priority": "medium",
@@ -434,7 +483,7 @@ class ServiceQualityService:
             })
 
         avg_service_time = quality_metrics["service_metrics"]["average_service_time_minutes"]
-        if avg_service_time > 45:
+        if avg_service_time > float(os.getenv("SERVICE_TIME_THRESHOLD_MINUTES", "45")):
             improvements.append({
                 "category": "service_efficiency",
                 "priority": "medium",
@@ -449,9 +498,9 @@ class ServiceQualityService:
         findings = []
 
         quality_score = quality_metrics["quality_score"]
-        if quality_score >= 90:
+        if quality_score >= float(os.getenv("SERVICE_QUALITY_EXCELLENT_THRESHOLD", "90")):
             findings.append("服务质量表现优秀，继续保持")
-        elif quality_score >= 80:
+        elif quality_score >= float(os.getenv("SERVICE_QUALITY_GOOD_THRESHOLD", "80")):
             findings.append("服务质量良好，有提升空间")
         else:
             findings.append("服务质量需要改进")

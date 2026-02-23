@@ -6,6 +6,7 @@ from typing import Dict, List, Optional, Any
 from datetime import date, datetime, timedelta
 import structlog
 import numpy as np
+import os
 
 from sqlalchemy import select, func
 from src.services.base_service import BaseService
@@ -148,18 +149,18 @@ class BenchmarkService(BaseService):
         total_orders = sum(r.order_count for r in reports)
         avg_spend = total_revenue / total_customers if total_customers > 0 else 0
 
-        seats = (store.seats or 50) if store else 50
+        seats = (store.seats or int(os.getenv("BENCHMARK_DEFAULT_SEATS", "50"))) if store else int(os.getenv("BENCHMARK_DEFAULT_SEATS", "50"))
         table_turnover = round(total_orders / days / seats, 1) if seats > 0 and days > 0 else 0.0
 
-        labor_cost_ratio = float(store.labor_cost_ratio_target or 28.0) if store else 28.0
-        food_cost_ratio = float(store.cost_ratio_target or 38.0) if store else 38.0
+        labor_cost_ratio = float(store.labor_cost_ratio_target or float(os.getenv("BENCHMARK_DEFAULT_LABOR_RATIO", "28.0"))) if store else float(os.getenv("BENCHMARK_DEFAULT_LABOR_RATIO", "28.0"))
+        food_cost_ratio = float(store.cost_ratio_target or float(os.getenv("BENCHMARK_DEFAULT_FOOD_RATIO", "38.0"))) if store else float(os.getenv("BENCHMARK_DEFAULT_FOOD_RATIO", "38.0"))
         profit_margin = round(100 - labor_cost_ratio - food_cost_ratio, 1)
 
         return {
             "store_id": store_id,
             "city": store.city if store else "未知",
             "restaurant_type": "正餐",
-            "area": store.area if store else 200,
+            "area": store.area if store else int(os.getenv("BENCHMARK_DEFAULT_AREA", "200")),
             "sales": round(total_revenue),
             "customer_count": total_customers,
             "average_spend": round(avg_spend, 1),
@@ -167,9 +168,54 @@ class BenchmarkService(BaseService):
             "labor_cost_ratio": labor_cost_ratio,
             "food_cost_ratio": food_cost_ratio,
             "profit_margin": profit_margin,
-            "customer_satisfaction": 4.0,
+            "customer_satisfaction": await self._get_customer_satisfaction(store_id, start_date, end_date),
             "days": days,
         }
+
+    async def _get_customer_satisfaction(
+        self,
+        store_id: str,
+        start_date: date,
+        end_date: date
+    ) -> float:
+        """基于投诉通知率估算客户满意度（1-5分）"""
+        try:
+            from src.models.notification import Notification, NotificationType
+            from sqlalchemy import and_
+            start_dt = datetime.combine(start_date, datetime.min.time())
+            end_dt = datetime.combine(end_date, datetime.max.time())
+            async with get_db_session() as session:
+                total_result = await session.execute(
+                    select(func.count(Notification.id)).where(
+                        and_(
+                            Notification.store_id == store_id,
+                            Notification.created_at >= start_dt,
+                            Notification.created_at <= end_dt,
+                        )
+                    )
+                )
+                complaint_result = await session.execute(
+                    select(func.count(Notification.id)).where(
+                        and_(
+                            Notification.store_id == store_id,
+                            Notification.created_at >= start_dt,
+                            Notification.created_at <= end_dt,
+                            Notification.type == NotificationType.ERROR,
+                        )
+                    )
+                )
+            total = total_result.scalar() or 0
+            complaints = complaint_result.scalar() or 0
+            if total == 0:
+                return float(os.getenv("BENCHMARK_DEFAULT_SATISFACTION", "4.0"))
+            complaint_rate = complaints / total
+            # 投诉率 0% → 5.0分，10%+ → 3.0分（系数支持环境变量覆盖）
+            _coeff = float(os.getenv("BENCHMARK_COMPLAINT_SCORE_COEFF", "20"))
+            score = 5.0 - complaint_rate * _coeff
+            return round(max(1.0, min(5.0, score)), 1)
+        except Exception as e:
+            logger.warning("客户满意度计算失败", error=str(e))
+            return float(os.getenv("BENCHMARK_DEFAULT_SATISFACTION", "4.0"))
 
     async def _get_benchmark_stores(self, store_id: str) -> List[str]:
         """
@@ -195,14 +241,16 @@ class BenchmarkService(BaseService):
                 return []
 
             area = store.area or 200
+            _area_low = float(os.getenv("BENCHMARK_AREA_LOW_RATIO", "0.7"))
+            _area_high = float(os.getenv("BENCHMARK_AREA_HIGH_RATIO", "1.3"))
             peers_result = await session.execute(
                 select(Store.id).where(
                     Store.city == store.city,
                     Store.id != store_id,
                     Store.is_active == True,
-                    Store.area >= area * 0.7,
-                    Store.area <= area * 1.3,
-                ).limit(9)
+                    Store.area >= area * _area_low,
+                    Store.area <= area * _area_high,
+                ).limit(int(os.getenv("BENCHMARK_PEER_STORES_LIMIT", "9")))
             )
             return [row[0] for row in peers_result.all()]
 
@@ -293,22 +341,18 @@ class BenchmarkService(BaseService):
         return rankings
 
     def _get_performance_level(self, percentile: float) -> str:
-        """
-        根据分位数判断表现水平
-
-        Args:
-            percentile: 分位数（0-100）
-
-        Returns:
-            表现水平
-        """
-        if percentile >= 90:
+        """根据分位数判断表现水平（阈值支持环境变量覆盖）"""
+        _excellent = float(os.getenv("BENCHMARK_EXCELLENT_PERCENTILE", "90"))
+        _good = float(os.getenv("BENCHMARK_GOOD_PERCENTILE", "75"))
+        _mid = float(os.getenv("BENCHMARK_MID_PERCENTILE", "50"))
+        _low = float(os.getenv("BENCHMARK_LOW_PERCENTILE", "25"))
+        if percentile >= _excellent:
             return "优秀"
-        elif percentile >= 75:
+        elif percentile >= _good:
             return "良好"
-        elif percentile >= 50:
+        elif percentile >= _mid:
             return "中等"
-        elif percentile >= 25:
+        elif percentile >= _low:
             return "待提升"
         else:
             return "需改进"
@@ -331,8 +375,10 @@ class BenchmarkService(BaseService):
 
         for dimension, data in rankings.items():
             percentile = data["percentile"]
+            _strength_threshold = float(os.getenv("BENCHMARK_STRENGTH_PERCENTILE", "75"))
+            _weakness_threshold = float(os.getenv("BENCHMARK_WEAKNESS_PERCENTILE", "50"))
 
-            if percentile >= 75:
+            if percentile >= _strength_threshold:
                 # 优势：排名前25%
                 strengths.append({
                     "dimension": dimension,
@@ -341,7 +387,7 @@ class BenchmarkService(BaseService):
                     "level": data["level"],
                     "vs_mean": data["vs_mean"],
                 })
-            elif percentile < 50:
+            elif percentile < _weakness_threshold:
                 # 劣势：排名后50%
                 weaknesses.append({
                     "dimension": dimension,

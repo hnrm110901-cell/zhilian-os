@@ -98,14 +98,19 @@ class Settings(BaseSettings):
     XUNFEI_API_KEY: str = ""
     XUNFEI_API_SECRET: str = ""
 
+    # Azure 语音服务
+    AZURE_SPEECH_KEY: str = ""
+    AZURE_SPEECH_REGION: str = "eastasia"
+
     # 美团等位配置
     MEITUAN_DEVELOPER_ID: str = ""  # 美团开发者ID
     MEITUAN_SIGN_KEY: str = ""  # 美团签名密钥
     MEITUAN_BUSINESS_ID: str = "49"  # 到店餐饮排队业务ID
 
-    # 外部API配置 - 奥琦韦
-    AOQIWEI_API_KEY: str = ""
-    AOQIWEI_BASE_URL: str = "https://api.aoqiwei.com"
+    # 外部API配置 - 奥琦玮供应链
+    AOQIWEI_APP_KEY: str = ""
+    AOQIWEI_APP_SECRET: str = ""
+    AOQIWEI_BASE_URL: str = "http://openapi.acescm.cn"
     AOQIWEI_TIMEOUT: int = 30
     AOQIWEI_RETRY_TIMES: int = 3
 

@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime, date, timedelta
 from collections import defaultdict
 import structlog
+import os
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_
 
@@ -25,9 +26,9 @@ class AnalyticsService:
         self, store_id: str, days_ahead: int = 7
     ) -> Dict[str, Any]:
         """销售预测 - 基于历史数据预测未来销售"""
-        # 获取过去30天的销售数据
+        # 获取过去N天的销售数据
         end_date = date.today()
-        start_date = end_date - timedelta(days=30)
+        start_date = end_date - timedelta(days=int(os.getenv("ANALYTICS_HISTORY_DAYS", "30")))
 
         query = select(
             func.date(FinancialTransaction.transaction_date).label("date"),
@@ -55,31 +56,49 @@ class AnalyticsService:
             }
 
         # 简单的移动平均预测
-        # 计算最近7天的平均值
-        recent_data = historical_data[-7:] if len(historical_data) >= 7 else historical_data
+        # 计算最近N天的平均值
+        _recent_window = int(os.getenv("ANALYTICS_RECENT_WINDOW_DAYS", "7"))
+        recent_data = historical_data[-_recent_window:] if len(historical_data) >= _recent_window else historical_data
         avg_revenue = sum(d.revenue for d in recent_data) / len(recent_data)
         avg_transactions = sum(d.transactions for d in recent_data) / len(recent_data)
 
         # 计算趋势（简单线性趋势）
-        if len(historical_data) >= 7:
-            first_week_avg = sum(d.revenue for d in historical_data[:7]) / 7
-            last_week_avg = sum(d.revenue for d in historical_data[-7:]) / 7
+        if len(historical_data) >= _recent_window:
+            first_week_avg = sum(d.revenue for d in historical_data[:_recent_window]) / _recent_window
+            last_week_avg = sum(d.revenue for d in historical_data[-_recent_window:]) / _recent_window
             trend = (last_week_avg - first_week_avg) / first_week_avg if first_week_avg > 0 else 0
         else:
             trend = 0
+
+        # 从历史数据计算实际周末效应系数
+        weekend_revs = [
+            d.revenue for d in historical_data
+            if date.fromisoformat(str(d.date)).weekday() in [5, 6]
+        ]
+        weekday_revs = [
+            d.revenue for d in historical_data
+            if date.fromisoformat(str(d.date)).weekday() not in [5, 6]
+        ]
+        if weekend_revs and weekday_revs:
+            avg_wkend = sum(weekend_revs) / len(weekend_revs)
+            avg_wkday = sum(weekday_revs) / len(weekday_revs)
+            _default_wkend = float(os.getenv("ANALYTICS_DEFAULT_WEEKEND_FACTOR", "1.2"))
+            computed_weekend_factor = round(avg_wkend / avg_wkday, 2) if avg_wkday > 0 else _default_wkend
+        else:
+            computed_weekend_factor = float(os.getenv("ANALYTICS_DEFAULT_WEEKEND_FACTOR", "1.2"))
 
         # 生成预测
         predictions = []
         for i in range(1, days_ahead + 1):
             pred_date = end_date + timedelta(days=i)
 
-            # 考虑周末效应（周末通常销售更高）
+            # 考虑周末效应（基于历史实际数据）
             weekday = pred_date.weekday()
-            weekend_factor = 1.2 if weekday in [5, 6] else 1.0
+            weekend_factor = computed_weekend_factor if weekday in [5, 6] else 1.0
 
             # 应用趋势和周末因素
-            predicted_revenue = int(avg_revenue * (1 + trend * i / 30) * weekend_factor)
-            predicted_transactions = int(avg_transactions * (1 + trend * i / 30) * weekend_factor)
+            predicted_revenue = int(avg_revenue * (1 + trend * i / int(os.getenv("ANALYTICS_TREND_PERIOD_DAYS", "30"))) * weekend_factor)
+            predicted_transactions = int(avg_transactions * (1 + trend * i / int(os.getenv("ANALYTICS_TREND_PERIOD_DAYS", "30"))) * weekend_factor)
 
             predictions.append({
                 "date": pred_date.isoformat(),
@@ -103,7 +122,7 @@ class AnalyticsService:
         }
 
     async def detect_anomalies(
-        self, store_id: str, metric: str = "revenue", days: int = 30
+        self, store_id: str, metric: str = "revenue", days: int = int(os.getenv("ANALYTICS_ANOMALY_DAYS", "30"))
     ) -> Dict[str, Any]:
         """异常检测 - 检测销售、成本等指标的异常"""
         end_date = date.today()
@@ -199,12 +218,12 @@ class AnalyticsService:
         }
 
     async def analyze_associations(
-        self, store_id: str, min_support: float = 0.1
+        self, store_id: str, min_support: float = float(os.getenv("ANALYTICS_MIN_SUPPORT", "0.1"))
     ) -> Dict[str, Any]:
         """关联分析 - 分析菜品之间的关联关系"""
-        # 获取最近30天的订单数据
+        # 获取最近N天的订单数据
         end_date = date.today()
-        start_date = end_date - timedelta(days=30)
+        start_date = end_date - timedelta(days=int(os.getenv("ANALYTICS_HISTORY_DAYS", "30")))
 
         # 查询订单及其商品
         query = select(Order).where(
@@ -219,7 +238,7 @@ class AnalyticsService:
         result = await self.db.execute(query)
         orders = result.scalars().all()
 
-        if len(orders) < 10:
+        if len(orders) < int(os.getenv("ANALYTICS_MIN_ORDERS_FOR_ANALYSIS", "10")):
             return {
                 "store_id": store_id,
                 "associations": [],
@@ -270,7 +289,7 @@ class AnalyticsService:
                 "confidence_2_to_1": round(confidence_2_to_1, 3),
                 "lift": round(lift, 2),
                 "count": count,
-                "strength": "strong" if lift > 1.5 else "moderate" if lift > 1.0 else "weak"
+                "strength": "strong" if lift > float(os.getenv("ANALYTICS_LIFT_STRONG", "1.5")) else "moderate" if lift > float(os.getenv("ANALYTICS_LIFT_MODERATE", "1.0")) else "weak"
             })
 
         # 按提升度排序
@@ -289,7 +308,7 @@ class AnalyticsService:
         }
 
     async def analyze_time_patterns(
-        self, store_id: str, days: int = 30
+        self, store_id: str, days: int = int(os.getenv("ANALYTICS_TIME_PATTERN_DAYS", "30"))
     ) -> Dict[str, Any]:
         """时段分析 - 分析不同时段的销售模式"""
         end_date = date.today()
@@ -333,13 +352,18 @@ class AnalyticsService:
                 avg_transactions = stats["transactions"] / stats["count"]
 
                 # 判断时段类型
-                if 6 <= hour < 11:
+                _breakfast_start = int(os.getenv("BUSINESS_HOURS_BREAKFAST_START", "6"))
+                _lunch_start = int(os.getenv("BUSINESS_HOURS_LUNCH_START", "11"))
+                _afternoon_start = int(os.getenv("BUSINESS_HOURS_AFTERNOON_START", "14"))
+                _dinner_start = int(os.getenv("BUSINESS_HOURS_DINNER_START", "17"))
+                _dinner_end = int(os.getenv("BUSINESS_HOURS_DINNER_END", "21"))
+                if _breakfast_start <= hour < _lunch_start:
                     period = "早餐"
-                elif 11 <= hour < 14:
+                elif _lunch_start <= hour < _afternoon_start:
                     period = "午餐"
-                elif 14 <= hour < 17:
+                elif _afternoon_start <= hour < _dinner_start:
                     period = "下午茶"
-                elif 17 <= hour < 21:
+                elif _dinner_start <= hour < _dinner_end:
                     period = "晚餐"
                 else:
                     period = "其他"
@@ -395,10 +419,11 @@ class AnalyticsService:
         if lunch_hours and dinner_hours:
             lunch_revenue = sum(h["avg_revenue"] for h in lunch_hours)
             dinner_revenue = sum(h["avg_revenue"] for h in dinner_hours)
+            _meal_diff = float(os.getenv("ANALYTICS_MEAL_DIFF_THRESHOLD", "1.2"))
 
-            if dinner_revenue > lunch_revenue * 1.2:
+            if dinner_revenue > lunch_revenue * _meal_diff:
                 insights.append("晚餐时段营收显著高于午餐，建议增加晚餐时段人员配置")
-            elif lunch_revenue > dinner_revenue * 1.2:
+            elif lunch_revenue > dinner_revenue * _meal_diff:
                 insights.append("午餐时段营收显著高于晚餐，建议优化午餐时段服务")
 
         return insights

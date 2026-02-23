@@ -4,6 +4,7 @@
 """
 from datetime import date, datetime
 from typing import Dict, List, Optional
+import os
 import structlog
 
 logger = structlog.get_logger()
@@ -100,10 +101,10 @@ class ChineseHolidays:
             return 1.0
 
         impact_map = {
-            "very_high": 2.5,  # 春节、国庆
-            "high": 2.0,  # 其他法定节假日、情人节
-            "medium": 1.5,  # 调休、一般营销节日
-            "low": 1.2,  # 小型节日
+            "very_high": float(os.getenv("HOLIDAY_IMPACT_VERY_HIGH", "2.5")),  # 春节、国庆
+            "high": float(os.getenv("HOLIDAY_IMPACT_HIGH", "2.0")),            # 其他法定节假日、情人节
+            "medium": float(os.getenv("HOLIDAY_IMPACT_MEDIUM", "1.5")),        # 调休、一般营销节日
+            "low": float(os.getenv("HOLIDAY_IMPACT_LOW", "1.2")),              # 小型节日
         }
 
         return impact_map.get(info.get("impact", "low"), 1.0)
@@ -120,12 +121,13 @@ class ChineseHolidays:
         """获取距离下一个节假日的天数"""
         from datetime import timedelta
 
-        for i in range(1, 365):
+        _max_days = int(os.getenv("HOLIDAY_LOOKUP_MAX_DAYS", "365"))
+        for i in range(1, _max_days + 1):
             check_date = target_date + timedelta(days=i)
             if cls.is_holiday(check_date):
                 return i
 
-        return 365  # 一年内没有节假日
+        return _max_days  # 一年内没有节假日
 
     @classmethod
     def get_holiday_period(cls, target_date: date) -> Optional[str]:
@@ -140,14 +142,16 @@ class ChineseHolidays:
         if cls.is_holiday(target_date):
             return "节中"
 
-        # 检查是否为节前3天
-        for i in range(1, 4):
+        # 检查是否为节前N天
+        _pre_days = int(os.getenv("HOLIDAY_PRE_DAYS", "3"))
+        for i in range(1, _pre_days + 1):
             check_date = target_date + timedelta(days=i)
             if cls.is_holiday(check_date):
                 return "节前"
 
-        # 检查是否为节后3天
-        for i in range(1, 4):
+        # 检查是否为节后N天
+        _post_days = int(os.getenv("HOLIDAY_POST_DAYS", "3"))
+        for i in range(1, _post_days + 1):
             check_date = target_date - timedelta(days=i)
             if cls.is_holiday(check_date):
                 return "节后"
@@ -162,15 +166,15 @@ class WeatherImpact:
 
     # 天气类型对餐饮的影响系数
     WEATHER_IMPACT = {
-        "晴天": 1.0,
-        "多云": 1.0,
-        "阴天": 0.95,
-        "小雨": 0.85,
-        "中雨": 0.7,
-        "大雨": 0.5,
-        "暴雨": 0.3,
-        "雪": 0.6,
-        "雾霾": 0.9,
+        "晴天": float(os.getenv("WEATHER_IMPACT_SUNNY", "1.0")),
+        "多云": float(os.getenv("WEATHER_IMPACT_CLOUDY", "1.0")),
+        "阴天": float(os.getenv("WEATHER_IMPACT_OVERCAST", "0.95")),
+        "小雨": float(os.getenv("WEATHER_IMPACT_LIGHT_RAIN", "0.85")),
+        "中雨": float(os.getenv("WEATHER_IMPACT_MODERATE_RAIN", "0.7")),
+        "大雨": float(os.getenv("WEATHER_IMPACT_HEAVY_RAIN", "0.5")),
+        "暴雨": float(os.getenv("WEATHER_IMPACT_STORM", "0.3")),
+        "雪": float(os.getenv("WEATHER_IMPACT_SNOW", "0.6")),
+        "雾霾": float(os.getenv("WEATHER_IMPACT_HAZE", "0.9")),
     }
 
     # 温度对餐饮的影响（火锅店特别受益于寒冷天气）
@@ -188,29 +192,40 @@ class WeatherImpact:
         """
         if restaurant_type == "火锅":
             # 火锅店：温度越低，生意越好
-            if temperature < 0:
-                return 1.5
-            elif temperature < 10:
-                return 1.3
-            elif temperature < 20:
-                return 1.1
-            elif temperature < 30:
+            if temperature < int(os.getenv("TEMP_THRESHOLD_FREEZING", "0")):
+                return float(os.getenv("TEMP_IMPACT_HOTPOT_FREEZING", "1.5"))
+            elif temperature < int(os.getenv("TEMP_THRESHOLD_COLD", "10")):
+                return float(os.getenv("TEMP_IMPACT_HOTPOT_COLD", "1.3"))
+            elif temperature < int(os.getenv("TEMP_THRESHOLD_COOL", "20")):
+                return float(os.getenv("TEMP_IMPACT_HOTPOT_COOL", "1.1"))
+            elif temperature < int(os.getenv("TEMP_THRESHOLD_HOT", "30")):
                 return 1.0
             else:
-                return 0.8
+                return float(os.getenv("TEMP_IMPACT_HOTPOT_HOT", "0.8"))
         else:
             # 一般餐厅：极端温度影响客流
-            if temperature < 0 or temperature > 35:
-                return 0.8
-            elif temperature < 10 or temperature > 30:
-                return 0.9
+            if temperature < int(os.getenv("TEMP_THRESHOLD_FREEZING", "0")) or temperature > int(os.getenv("TEMP_THRESHOLD_EXTREME_HIGH", "35")):
+                return float(os.getenv("TEMP_IMPACT_NORMAL_EXTREME", "0.8"))
+            elif temperature < int(os.getenv("TEMP_THRESHOLD_COLD", "10")) or temperature > int(os.getenv("TEMP_THRESHOLD_HOT", "30")):
+                return float(os.getenv("TEMP_IMPACT_NORMAL_MODERATE", "0.9"))
             else:
                 return 1.0
 
     @staticmethod
     def get_weather_impact(weather_type: str) -> float:
         """获取天气类型的影响系数"""
-        return WeatherImpact.WEATHER_IMPACT.get(weather_type, 1.0)
+        impact_map = {
+            "晴天": 1.0,
+            "多云": 1.0,
+            "阴天": float(os.getenv("WEATHER_IMPACT_OVERCAST", "0.95")),
+            "小雨": float(os.getenv("WEATHER_IMPACT_LIGHT_RAIN", "0.85")),
+            "中雨": float(os.getenv("WEATHER_IMPACT_MODERATE_RAIN", "0.7")),
+            "大雨": float(os.getenv("WEATHER_IMPACT_HEAVY_RAIN", "0.5")),
+            "暴雨": float(os.getenv("WEATHER_IMPACT_STORM", "0.3")),
+            "雪": float(os.getenv("WEATHER_IMPACT_SNOW", "0.6")),
+            "雾霾": float(os.getenv("WEATHER_IMPACT_SMOG", "0.9")),
+        }
+        return impact_map.get(weather_type, 1.0)
 
 
 class BusinessDistrictEvents:
@@ -220,15 +235,23 @@ class BusinessDistrictEvents:
 
     # 活动类型影响系数
     EVENT_IMPACT = {
-        "大型展会": 1.8,
-        "音乐会": 1.5,
-        "体育赛事": 1.6,
-        "商场促销": 1.3,
-        "周边施工": 0.6,
-        "交通管制": 0.7,
+        "大型展会": float(os.getenv("EVENT_IMPACT_EXPO", "1.8")),
+        "音乐会": float(os.getenv("EVENT_IMPACT_CONCERT", "1.5")),
+        "体育赛事": float(os.getenv("EVENT_IMPACT_SPORTS", "1.6")),
+        "商场促销": float(os.getenv("EVENT_IMPACT_MALL_PROMO", "1.3")),
+        "周边施工": float(os.getenv("EVENT_IMPACT_CONSTRUCTION", "0.6")),
+        "交通管制": float(os.getenv("EVENT_IMPACT_TRAFFIC_CONTROL", "0.7")),
     }
 
     @staticmethod
     def get_event_impact(event_type: str) -> float:
         """获取活动类型的影响系数"""
-        return BusinessDistrictEvents.EVENT_IMPACT.get(event_type, 1.0)
+        impact_map = {
+            "大型展会": float(os.getenv("EVENT_IMPACT_EXPO", "1.8")),
+            "音乐会": float(os.getenv("EVENT_IMPACT_CONCERT", "1.5")),
+            "体育赛事": float(os.getenv("EVENT_IMPACT_SPORTS", "1.6")),
+            "商场促销": float(os.getenv("EVENT_IMPACT_MALL_PROMO", "1.3")),
+            "周边施工": float(os.getenv("EVENT_IMPACT_CONSTRUCTION", "0.6")),
+            "交通管制": float(os.getenv("EVENT_IMPACT_TRAFFIC_CONTROL", "0.7")),
+        }
+        return impact_map.get(event_type, 1.0)

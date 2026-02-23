@@ -20,6 +20,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 from enum import Enum
 from pydantic import BaseModel
+import os
 import structlog
 
 logger = structlog.get_logger()
@@ -254,7 +255,7 @@ class ShokzDeviceService:
         device.updated_at = datetime.now()
 
         # 低电量预警
-        if battery_level < 20:
+        if battery_level < int(os.getenv("SHOKZ_LOW_BATTERY_THRESHOLD", "20")):
             device.status = DeviceStatus.LOW_BATTERY
             logger.warning(
                 "Shokz设备电量低",
@@ -286,16 +287,34 @@ class ShokzDeviceService:
             user_role=device.user_role
         )
 
-        # 模拟ASR识别
-        text_input = "帮我查一下今天的营业额"
-        intent = "query_revenue"
-        confidence = 0.95
+        # ASR识别：调用 voice_service
+        import base64
+        from .voice_service import voice_service
+        try:
+            audio_bytes = base64.b64decode(audio_data) if isinstance(audio_data, str) else audio_data
+            stt_result = await voice_service.speech_to_text(audio_bytes)
+            text_input = stt_result.get("text", "") if stt_result.get("success") else ""
+            confidence = stt_result.get("confidence", 0.0)
+        except Exception as e:
+            logger.error("ASR识别失败", error=str(e))
+            text_input = ""
+            confidence = 0.0
 
-        # 生成响应
-        text_output = "今天截至目前营业额为5.2万元，同比昨天增长15%"
+        # 意图识别
+        from .message_router import message_router
+        intent, _, _ = message_router.route_message(text_input, device.user_id or device_id)
 
-        # 模拟TTS合成
-        audio_output = "base64_encoded_audio_data"
+        # 生成响应（由上层业务逻辑填充，这里保留占位）
+        text_output = f"已收到指令：{text_input}" if text_input else "未能识别语音内容"
+
+        # TTS合成
+        try:
+            tts_result = await voice_service.text_to_speech(text_output)
+            audio_bytes_out = tts_result.get("audio_data", b"") if tts_result.get("success") else b""
+            audio_output = base64.b64encode(audio_bytes_out).decode("utf-8") if audio_bytes_out else ""
+        except Exception as e:
+            logger.error("TTS合成失败", error=str(e))
+            audio_output = ""
 
         processing_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
 
@@ -355,8 +374,16 @@ class ShokzDeviceService:
             priority=priority
         )
 
-        # 模拟TTS合成
-        audio_data = "base64_encoded_audio_data"
+        # TTS合成：调用 voice_service
+        import base64
+        from .voice_service import voice_service
+        try:
+            tts_result = await voice_service.text_to_speech(text)
+            audio_bytes = tts_result.get("audio_data", b"") if tts_result.get("success") else b""
+            audio_data = base64.b64encode(audio_bytes).decode("utf-8") if audio_bytes else ""
+        except Exception as e:
+            logger.error("TTS合成失败", error=str(e))
+            audio_data = ""
 
         # 通过蓝牙发送到Shokz耳机
         result = {

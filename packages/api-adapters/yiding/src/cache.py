@@ -5,6 +5,7 @@
 """
 
 import asyncio
+import os
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timedelta
 import json
@@ -15,7 +16,7 @@ from .types import UnifiedReservation
 class YiDingCache:
     """易订缓存管理器"""
 
-    def __init__(self, ttl: int = 300):
+    def __init__(self, ttl: int = int(os.getenv("YIDING_CACHE_TTL", "300"))):
         """
         初始化缓存
 

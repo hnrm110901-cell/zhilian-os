@@ -10,6 +10,7 @@
 """
 
 import asyncio
+import os
 import structlog
 from datetime import datetime, timedelta
 from enum import Enum
@@ -143,10 +144,10 @@ class InventoryAgent(BaseAgent):
         self.store_id = store_id
         self.pinzhi_adapter = pinzhi_adapter
         self.alert_thresholds = alert_thresholds or {
-            "low_stock_ratio": 0.3,  # 低库存比例(当前/安全库存)
-            "critical_stock_ratio": 0.1,  # 严重不足比例
-            "expiring_soon_days": 7,  # 即将过期天数
-            "expiring_urgent_days": 3,  # 紧急过期天数
+            "low_stock_ratio": float(os.getenv("INVENTORY_LOW_STOCK_RATIO", "0.3")),
+            "critical_stock_ratio": float(os.getenv("INVENTORY_CRITICAL_STOCK_RATIO", "0.1")),
+            "expiring_soon_days": int(os.getenv("INVENTORY_EXPIRING_SOON_DAYS", "7")),
+            "expiring_urgent_days": int(os.getenv("INVENTORY_EXPIRING_URGENT_DAYS", "3")),
         }
         self.logger = logger.bind(agent="inventory", store_id=store_id)
 
@@ -279,7 +280,7 @@ class InventoryAgent(BaseAgent):
     async def predict_consumption(
         self,
         item_id: str,
-        history_days: int = 30,
+        history_days: int = int(os.getenv("INVENTORY_PREDICT_HISTORY_DAYS", "30")),
         forecast_days: int = 7,
         method: PredictionMethod = PredictionMethod.WEIGHTED_AVERAGE
     ) -> PredictionResult:
@@ -363,7 +364,7 @@ class InventoryAgent(BaseAgent):
         """获取历史消耗数据"""
         # 模拟历史数据
         history = []
-        base_consumption = 10.0
+        base_consumption = float(os.getenv("INVENTORY_MOCK_BASE_CONSUMPTION", "10.0"))
 
         for i in range(days):
             date = (datetime.now() - timedelta(days=days-i)).date().isoformat()
@@ -407,7 +408,7 @@ class InventoryAgent(BaseAgent):
             return 0.0
 
         # 使用指数加权
-        weights = [0.5 ** i for i in range(len(history))]
+        weights = [float(os.getenv("INVENTORY_FORECAST_WEIGHT_BASE", "0.5")) ** i for i in range(len(history))]
         weights.reverse()  # 最近的权重最高
 
         weighted_sum = sum(h["quantity"] * w for h, w in zip(history, weights))
@@ -688,7 +689,7 @@ class InventoryAgent(BaseAgent):
     async def optimize_stock_levels(
         self,
         item_id: str,
-        analysis_days: int = 90
+        analysis_days: int = int(os.getenv("INVENTORY_OPTIMIZE_ANALYSIS_DAYS", "90"))
     ) -> Dict[str, Any]:
         """
         优化库存水平(安全库存、最低库存、最高库存)
@@ -732,7 +733,7 @@ class InventoryAgent(BaseAgent):
 
             # 计算优化后的库存水平
             # 安全库存 = 日均消耗 * 采购周期 + 安全系数 * 标准差 * sqrt(采购周期)
-            safety_factor = 1.65  # 95%服务水平
+            safety_factor = float(os.getenv("INVENTORY_SAFETY_FACTOR", "1.65"))  # 95%服务水平
             safe_stock = daily_avg * lead_time + safety_factor * daily_std * (lead_time ** 0.5)
 
             # 最低库存 = 日均消耗 * 采购周期

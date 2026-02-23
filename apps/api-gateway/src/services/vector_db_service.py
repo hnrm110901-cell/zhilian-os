@@ -7,6 +7,7 @@ Vector Database Service
 """
 from typing import List, Dict, Any, Optional
 import structlog
+import os
 from datetime import datetime
 import hashlib
 import json
@@ -40,12 +41,12 @@ class VectorDatabaseService:
                 api_key=self.qdrant_api_key if self.qdrant_api_key else None,
             )
 
-            # 初始化嵌入模型（使用sentence-transformers）
-            # TODO: 可以替换为其他嵌入模型
+            # 初始化嵌入模型（使用sentence-transformers，可通过EMBEDDING_MODEL环境变量替换）
             try:
                 from sentence_transformers import SentenceTransformer
-                self.embedding_model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
-                logger.info("嵌入模型加载成功")
+                model_name = os.getenv("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2")
+                self.embedding_model = SentenceTransformer(model_name)
+                logger.info("嵌入模型加载成功", model=model_name)
             except Exception as e:
                 logger.warning("嵌入模型加载失败，将使用模拟嵌入", error=str(e))
                 self.embedding_model = None
@@ -121,10 +122,10 @@ class VectorDatabaseService:
             embedding = self.embedding_model.encode(text)
             return embedding.tolist()
         else:
-            # 模拟嵌入（用于测试）
+            # 嵌入模型不可用时，使用确定性哈希向量（语义无意义，仅保证服务不崩溃）
             import random
             random.seed(hashlib.md5(text.encode()).hexdigest())
-            return [random.random() for _ in range(384)]
+            return [random.random() for _ in range(int(os.getenv("VECTOR_EMBEDDING_DIM", "384")))]
 
     async def index_order(self, order_data: Dict[str, Any]) -> bool:
         """
@@ -268,7 +269,7 @@ class VectorDatabaseService:
         self,
         collection_name: str,
         query: str,
-        limit: int = 10,
+        limit: int = int(os.getenv("VECTOR_DB_SEARCH_LIMIT", "10")),
         filters: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
         """
@@ -367,7 +368,7 @@ class VectorDatabaseService:
         self,
         query: str,
         store_id: str,
-        limit: int = 10
+        limit: int = int(os.getenv("VECTOR_DB_SEARCH_LIMIT", "10"))
     ) -> List[Dict[str, Any]]:
         """搜索订单"""
         return await self.semantic_search(
@@ -381,7 +382,7 @@ class VectorDatabaseService:
         self,
         query: str,
         store_id: str,
-        limit: int = 10
+        limit: int = int(os.getenv("VECTOR_DB_SEARCH_LIMIT", "10"))
     ) -> List[Dict[str, Any]]:
         """搜索菜品"""
         return await self.semantic_search(
@@ -395,7 +396,7 @@ class VectorDatabaseService:
         self,
         query: str,
         store_id: str,
-        limit: int = 10
+        limit: int = int(os.getenv("VECTOR_DB_SEARCH_LIMIT", "10"))
     ) -> List[Dict[str, Any]]:
         """搜索事件"""
         return await self.semantic_search(

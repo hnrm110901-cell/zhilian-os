@@ -11,6 +11,7 @@
 7. 证书管理 - Certification management
 """
 
+import os
 import asyncio
 import structlog
 from datetime import datetime, timedelta
@@ -369,7 +370,7 @@ class TrainingAgent(BaseAgent):
 
         # 基于技能差距识别需求
         for gap in skill_gaps:
-            if gap["gap_score"] >= 30:  # 差距分数>=30需要培训
+            if gap["gap_score"] >= int(os.getenv("TRAINING_NEED_GAP_THRESHOLD", "30")):  # 差距分数>=30需要培训
                 # 推荐课程
                 recommended_courses = self._recommend_courses_for_skill(
                     gap["skill_name"],
@@ -576,7 +577,7 @@ class TrainingAgent(BaseAgent):
 
         # 检查是否过期
         start_date = datetime.fromisoformat(record["start_date"])
-        if datetime.now() - start_date > timedelta(days=90):
+        if datetime.now() - start_date > timedelta(days=int(os.getenv("TRAINING_RECORD_EXPIRY_DAYS", "90"))):
             return TrainingStatus.EXPIRED
 
         return TrainingStatus.IN_PROGRESS
@@ -658,7 +659,7 @@ class TrainingAgent(BaseAgent):
                     stats["average_score"] = mean(stats["scores"])
 
             evaluation = {
-                "period_start": start_date or (datetime.now() - timedelta(days=30)).isoformat(),
+                "period_start": start_date or (datetime.now() - timedelta(days=int(os.getenv("TRAINING_STATS_DAYS", "30")))).isoformat(),
                 "period_end": end_date or datetime.now().isoformat(),
                 "course_id": course_id,
                 "total_participants": total_participants,
@@ -695,16 +696,19 @@ class TrainingAgent(BaseAgent):
         average_score: float
     ) -> str:
         """计算培训效果评级"""
-        # 综合评分 = 完成率*30% + 通过率*40% + 平均分/100*30%
-        score = (completion_rate * 0.3 + pass_rate * 0.4 + (average_score / 100) * 0.3) * 100
+        # 综合评分 = 完成率*权重 + 通过率*权重 + 平均分/100*权重
+        _w_completion = float(os.getenv("TRAINING_COMPLETION_WEIGHT", "0.3"))
+        _w_pass = float(os.getenv("TRAINING_PASS_WEIGHT", "0.4"))
+        _w_score = float(os.getenv("TRAINING_SCORE_WEIGHT", "0.3"))
+        score = (completion_rate * _w_completion + pass_rate * _w_pass + (average_score / 100) * _w_score) * 100
 
-        if score >= 90:
+        if score >= float(os.getenv("TRAINING_SCORE_EXCELLENT", "90")):
             return "excellent"
-        elif score >= 80:
+        elif score >= float(os.getenv("TRAINING_SCORE_GOOD", "80")):
             return "good"
-        elif score >= 70:
+        elif score >= float(os.getenv("TRAINING_SCORE_SATISFACTORY", "70")):
             return "satisfactory"
-        elif score >= 60:
+        elif score >= float(os.getenv("TRAINING_SCORE_NEEDS_IMPROVEMENT", "60")):
             return "needs_improvement"
         else:
             return "poor"
@@ -834,16 +838,16 @@ class TrainingAgent(BaseAgent):
         critical_skills = ["食品安全", "服务礼仪", "菜品制作"]
 
         if skill_name in critical_skills:
-            if gap_score >= 50:
+            if gap_score >= int(os.getenv("TRAINING_PRIORITY_CRITICAL_URGENT", "50")):
                 return TrainingPriority.URGENT
-            elif gap_score >= 30:
+            elif gap_score >= int(os.getenv("TRAINING_PRIORITY_CRITICAL_HIGH", "30")):
                 return TrainingPriority.HIGH
             else:
                 return TrainingPriority.MEDIUM
         else:
-            if gap_score >= 66:
+            if gap_score >= int(os.getenv("TRAINING_PRIORITY_NORMAL_HIGH", "66")):
                 return TrainingPriority.HIGH
-            elif gap_score >= 33:
+            elif gap_score >= int(os.getenv("TRAINING_PRIORITY_NORMAL_MEDIUM", "33")):
                 return TrainingPriority.MEDIUM
             else:
                 return TrainingPriority.LOW
@@ -885,7 +889,7 @@ class TrainingAgent(BaseAgent):
             expiring_soon = [
                 c for c in certificates
                 if c.get("expiry_date") and
-                datetime.fromisoformat(c["expiry_date"]) - datetime.now() < timedelta(days=30)
+                datetime.fromisoformat(c["expiry_date"]) - datetime.now() < timedelta(days=int(os.getenv("TRAINING_CERT_EXPIRY_WARNING_DAYS", "30")))
             ]
 
             if expiring_soon:
@@ -1041,7 +1045,7 @@ class TrainingAgent(BaseAgent):
             report = {
                 "store_id": self.store_id,
                 "report_date": datetime.now().isoformat(),
-                "period_start": start_date or (datetime.now() - timedelta(days=30)).isoformat(),
+                "period_start": start_date or (datetime.now() - timedelta(days=int(os.getenv("TRAINING_STATS_DAYS", "30")))).isoformat(),
                 "period_end": end_date or datetime.now().isoformat(),
                 "training_needs": {
                     "total": len(needs),
@@ -1061,7 +1065,7 @@ class TrainingAgent(BaseAgent):
                     "expiring_soon": sum(
                         1 for c in certificates
                         if c.get("expiry_date") and
-                        datetime.fromisoformat(c["expiry_date"]) - datetime.now() < timedelta(days=30)
+                        datetime.fromisoformat(c["expiry_date"]) - datetime.now() < timedelta(days=int(os.getenv("TRAINING_CERT_EXPIRY_WARNING_DAYS", "30")))
                     )
                 },
                 "training_type_distribution": dict(type_counts)
@@ -1235,7 +1239,7 @@ class TrainingAgent(BaseAgent):
             cid = random.choice(["COURSE_SERVICE_001", "COURSE_COOKING_001", "COURSE_SAFETY_001"])
 
             issue_date = datetime.now() - timedelta(days=random.randint(30, 365))
-            expiry_date = issue_date + timedelta(days=365)
+            expiry_date = issue_date + timedelta(days=int(os.getenv("TRAINING_CERT_VALIDITY_DAYS", "365")))
 
             cert: Certificate = {
                 "certificate_id": f"CERT{i:04d}",

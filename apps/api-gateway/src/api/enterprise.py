@@ -2,6 +2,7 @@
 企业微信和飞书集成API
 Enterprise WeChat and Feishu Integration API
 """
+import os
 from fastapi import APIRouter, Depends, HTTPException, Request, Body, Query
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
@@ -339,7 +340,7 @@ async def feishu_webhook(request: Request):
 @router.get("/feishu/users", summary="获取飞书用户列表")
 async def get_feishu_users(
     department_id: str = "0",
-    page_size: int = 50,
+    page_size: int = int(os.getenv("FEISHU_PAGE_SIZE", "50")),
     current_user: User = Depends(get_current_active_user),
 ):
     """获取飞书部门用户列表"""

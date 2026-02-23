@@ -18,6 +18,7 @@ from datetime import datetime, timedelta
 from pydantic import BaseModel
 import numpy as np
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -157,11 +158,11 @@ class FederatedBOMService:
             for record in historical_data
         ])
 
-        # 简化的梯度下降
+        # 简化的梯度下降（超参数支持环境变量覆盖）
         n_features = features.shape[1]
         weights = np.random.randn(n_features) * 0.01
-        learning_rate = 0.01
-        epochs = 10
+        learning_rate = float(os.getenv("BOM_LEARNING_RATE", "0.01"))
+        epochs = int(os.getenv("BOM_TRAIN_EPOCHS", "10"))
 
         for epoch in range(epochs):
             # 前向传播
@@ -269,17 +270,33 @@ class FederatedBOMService:
                 f"No global model for ingredient {ingredient_id}, "
                 f"using default loss rate"
             )
-            return 0.05  # 默认5%损耗率
+            return float(os.getenv("BOM_DEFAULT_LOSS_RATE", "0.05"))  # 默认5%损耗率
 
         # 构造特征向量
         season_code = {"spring": 0, "summer": 1, "autumn": 2, "winter": 3}
+
+        # 查询实际采购量
+        purchase_quantity = int(os.getenv("BOM_DEFAULT_PURCHASE_QUANTITY", "100"))  # fallback
+        try:
+            from src.core.database import get_db_session
+            from src.models.inventory import InventoryItem
+            from sqlalchemy import select
+            async with get_db_session() as session:
+                result = await session.execute(
+                    select(InventoryItem.current_quantity).where(InventoryItem.id == ingredient_id)
+                )
+                qty = result.scalar_one_or_none()
+                if qty is not None:
+                    purchase_quantity = float(qty)
+        except Exception:
+            pass
         features = np.array([
             season_code.get(season, 0),
             temperature,
             humidity,
             storage_days,
             0,  # is_holiday
-            100,  # purchase_quantity (假设)
+            purchase_quantity,  # 从库存记录获取实际采购量
         ])
 
         # 使用全局模型预测
@@ -320,9 +337,9 @@ class FederatedBOMService:
                 ingredient_id=ingredient_id,
                 season=season,
                 region=region,
-                temperature=20.0,
-                humidity=60.0,
-                storage_days=3
+                temperature=float(os.getenv("BOM_SEASONAL_DEFAULT_TEMP", "20.0")),
+                humidity=float(os.getenv("BOM_SEASONAL_DEFAULT_HUMIDITY", "60.0")),
+                storage_days=int(os.getenv("BOM_SEASONAL_DEFAULT_STORAGE_DAYS", "3"))
             )
             seasonal_loss_rates[season] = loss_rate
 
@@ -331,7 +348,21 @@ class FederatedBOMService:
 
         # 计算最优订货量
         average_loss_rate = np.mean(list(seasonal_loss_rates.values()))
-        optimal_order_quantity = 100 / (1 - average_loss_rate)  # 简化计算
+        optimal_order_quantity = float(os.getenv("BOM_OPTIMAL_ORDER_BASE", "100")) / (1 - average_loss_rate)  # 简化计算
+
+        # 分析高损耗日期（损耗率超过均值+1个标准差的季节对应的月份）
+        std_loss = np.std(list(seasonal_loss_rates.values()))
+        threshold = average_loss_rate + std_loss
+        season_months = {
+            "spring": [3, 4, 5],
+            "summer": [6, 7, 8],
+            "autumn": [9, 10, 11],
+            "winter": [12, 1, 2],
+        }
+        peak_loss_days = []
+        for season, rate in seasonal_loss_rates.items():
+            if rate >= threshold:
+                peak_loss_days.extend([f"{m}月" for m in season_months.get(season, [])])
 
         return IngredientLossPattern(
             ingredient_id=ingredient_id,
@@ -340,9 +371,9 @@ class FederatedBOMService:
             region=region,
             average_loss_rate=average_loss_rate,
             std_loss_rate=np.std(list(seasonal_loss_rates.values())),
-            peak_loss_days=[],  # TODO: 分析具体日期
+            peak_loss_days=peak_loss_days,
             optimal_order_quantity=optimal_order_quantity,
-            confidence=0.8 if global_model else 0.3
+            confidence=float(os.getenv("BOM_GLOBAL_MODEL_CONFIDENCE", "0.8")) if global_model else float(os.getenv("BOM_LOCAL_MODEL_CONFIDENCE", "0.3"))
         )
 
     async def detect_anomaly(
@@ -374,7 +405,7 @@ class FederatedBOMService:
         # 计算偏差
         global_loss_rate = global_model["loss_rate"]
         deviation = abs(current_loss_rate - global_loss_rate)
-        threshold = global_loss_rate * 0.5  # 50%偏差阈值
+        threshold = global_loss_rate * float(os.getenv("BOM_ANOMALY_THRESHOLD_RATIO", "0.5"))  # 偏差阈值
 
         is_anomaly = deviation > threshold
 
@@ -431,7 +462,7 @@ class FederatedBOMService:
         # 应用到目标区域（带置信度衰减）
         target_pattern = source_pattern.copy()
         target_pattern.region = target_region
-        target_pattern.confidence *= 0.7  # 跨区域置信度衰减
+        target_pattern.confidence *= float(os.getenv("BOM_CROSS_REGION_CONFIDENCE_DECAY", "0.7"))  # 跨区域置信度衰减
 
         # 存储到模式库
         pattern_key = f"{target_region}_{ingredient_id}"

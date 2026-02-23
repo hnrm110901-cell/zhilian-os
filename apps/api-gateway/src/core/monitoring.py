@@ -2,6 +2,7 @@
 错误监控和追踪模块
 提供错误日志记录、性能监控和告警功能
 """
+import os
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
 from enum import Enum
@@ -82,7 +83,7 @@ class ErrorMonitor:
         self.error_records: List[ErrorRecord] = []
         self.performance_metrics: List[PerformanceMetric] = []
         self.error_counts: Dict[str, int] = defaultdict(int)
-        self.max_records = 1000  # 最多保存1000条记录
+        self.max_records = int(os.getenv("MONITORING_MAX_RECORDS", "1000"))  # 最多保存记录数
 
     def log_error(
         self,
@@ -210,7 +211,7 @@ class ErrorMonitor:
             self.performance_metrics.pop(0)
 
         # 记录慢请求
-        if duration_ms > 1000:  # 超过1秒
+        if duration_ms > int(os.getenv("MONITORING_SLOW_REQUEST_MS", "1000")):  # 超过阈值
             logger.warning(
                 "Slow request detected",
                 endpoint=endpoint,
@@ -222,7 +223,7 @@ class ErrorMonitor:
 
     def get_error_summary(
         self,
-        time_window_minutes: int = 60
+        time_window_minutes: int = int(os.getenv("MONITORING_ERROR_WINDOW_MINUTES", "60"))
     ) -> Dict[str, Any]:
         """
         获取错误摘要
@@ -273,7 +274,7 @@ class ErrorMonitor:
 
     def get_performance_summary(
         self,
-        time_window_minutes: int = 60
+        time_window_minutes: int = int(os.getenv("MONITORING_ERROR_WINDOW_MINUTES", "60"))
     ) -> Dict[str, Any]:
         """
         获取性能摘要
@@ -367,7 +368,7 @@ class ErrorMonitor:
                 }
         return None
 
-    def clear_old_records(self, hours: int = 24):
+    def clear_old_records(self, hours: int = int(os.getenv("MONITORING_RETENTION_HOURS", "24"))):
         """
         清理旧记录
 

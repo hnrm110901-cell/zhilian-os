@@ -119,7 +119,7 @@ class POSService:
         begin_date: Optional[str] = None,
         end_date: Optional[str] = None,
         page_index: int = 1,
-        page_size: int = 20,
+        page_size: int = int(os.getenv("DEFAULT_PAGE_SIZE", "20")),
     ) -> Dict[str, Any]:
         """
         查询订单

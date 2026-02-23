@@ -10,6 +10,7 @@
 
 import asyncio
 import hashlib
+import os
 import secrets
 import time
 from typing import Any, Dict, Optional
@@ -55,8 +56,8 @@ class YiDingClient:
         self.base_url = config["base_url"]
         self.app_id = config["app_id"]
         self.app_secret = config["app_secret"]
-        self.timeout = config.get("timeout", 10)
-        self.max_retries = config.get("max_retries", 3)
+        self.timeout = config.get("timeout", int(os.getenv("YIDING_TIMEOUT", "10")))
+        self.max_retries = config.get("max_retries", int(os.getenv("YIDING_MAX_RETRIES", "3")))
 
         self.logger = logger.bind(
             adapter="yiding",
@@ -101,7 +102,7 @@ class YiDingClient:
 
     def _generate_nonce(self) -> str:
         """生成随机字符串"""
-        return secrets.token_hex(16)
+        return secrets.token_hex(int(os.getenv("YIDING_NONCE_LENGTH", "16")))
 
     def _get_auth_headers(self) -> Dict[str, str]:
         """
@@ -226,7 +227,7 @@ class YiDingClient:
 
                 # 如果不是最后一次尝试,等待后重试
                 if attempt < self.max_retries - 1:
-                    wait_time = 2 ** attempt  # 指数退避
+                    wait_time = int(os.getenv("YIDING_RETRY_BACKOFF_BASE", "2")) ** attempt  # 指数退避
                     await asyncio.sleep(wait_time)
                     continue
 

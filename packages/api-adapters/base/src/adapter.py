@@ -2,6 +2,7 @@
 API适配器基础类
 提供统一的接口规范和通用功能
 """
+import os
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 import httpx
@@ -33,8 +34,8 @@ class BaseAdapter(ABC):
         """
         self.config = config
         self.base_url = config.get("base_url")
-        self.timeout = config.get("timeout", 30)
-        self.retry_times = config.get("retry_times", 3)
+        self.timeout = config.get("timeout", int(os.getenv("ADAPTER_DEFAULT_TIMEOUT", "30")))
+        self.retry_times = config.get("retry_times", int(os.getenv("ADAPTER_DEFAULT_RETRY_TIMES", "3")))
         self.client = httpx.AsyncClient(timeout=self.timeout)
 
     @abstractmethod
@@ -48,8 +49,8 @@ class BaseAdapter(ABC):
         pass
 
     @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=2, max=10),
+        stop=stop_after_attempt(int(os.getenv("ADAPTER_RETRY_ATTEMPTS", "3"))),
+        wait=wait_exponential(multiplier=int(os.getenv("ADAPTER_RETRY_MULTIPLIER", "1")), min=int(os.getenv("ADAPTER_RETRY_MIN", "2")), max=int(os.getenv("ADAPTER_RETRY_MAX", "10"))),
     )
     async def request(
         self,

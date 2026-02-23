@@ -10,6 +10,7 @@
 6. 满意度分析 - Customer satisfaction analysis
 """
 
+import os
 import asyncio
 import structlog
 from datetime import datetime, timedelta
@@ -181,10 +182,10 @@ class ServiceAgent(BaseAgent):
         self.store_id = store_id
         self.aoqiwei_adapter = aoqiwei_adapter
         self.quality_thresholds = quality_thresholds or {
-            "min_satisfaction_rate": 0.85,  # 最低满意度
-            "max_complaint_rate": 0.05,  # 最高投诉率
-            "max_response_time": 30,  # 最长响应时间(分钟)
-            "min_resolution_rate": 0.90,  # 最低解决率
+            "min_satisfaction_rate": float(os.getenv("SERVICE_MIN_SATISFACTION_RATE", "0.85")),
+            "max_complaint_rate": float(os.getenv("SERVICE_MAX_COMPLAINT_RATE", "0.05")),
+            "max_response_time": int(os.getenv("SERVICE_MAX_RESPONSE_TIME_MINUTES", "30")),
+            "min_resolution_rate": float(os.getenv("SERVICE_MIN_RESOLUTION_RATE", "0.90")),
         }
         self.logger = logger.bind(agent="service", store_id=store_id)
 
@@ -377,9 +378,9 @@ class ServiceAgent(BaseAgent):
         negative_count = sum(1 for kw in negative_keywords if kw in content_lower)
         positive_count = sum(1 for kw in positive_keywords if kw in content_lower)
 
-        if rating >= 4 and positive_count > negative_count:
+        if rating >= int(os.getenv("SERVICE_POSITIVE_RATING_THRESHOLD", "4")) and positive_count > negative_count:
             return "positive"
-        elif rating <= 2 or negative_count > positive_count:
+        elif rating <= int(os.getenv("SERVICE_NEGATIVE_RATING_THRESHOLD", "2")) or negative_count > positive_count:
             return "negative"
         else:
             return "neutral"
@@ -622,7 +623,7 @@ class ServiceAgent(BaseAgent):
             average_rating = mean(ratings)
 
             # 满意度(评分>=4的比例)
-            satisfied_count = sum(1 for r in ratings if r >= 4)
+            satisfied_count = sum(1 for r in ratings if r >= int(os.getenv("SERVICE_SATISFIED_RATING_MIN", "4")))
             satisfaction_rate = satisfied_count / total_feedbacks
 
             # 投诉率
@@ -635,17 +636,17 @@ class ServiceAgent(BaseAgent):
                 category_breakdown[feedback["category"]] += 1
 
             # 响应时间(模拟)
-            response_time_avg = 25.0  # 平均25分钟
+            response_time_avg = float(os.getenv("SERVICE_MOCK_RESPONSE_TIME_MINUTES", "25.0"))
 
             # 解决率(模拟)
-            resolution_rate = 0.92
+            resolution_rate = float(os.getenv("SERVICE_MOCK_RESOLUTION_RATE", "0.92"))
 
             # 趋势分析
             trend = self._analyze_trend(feedbacks)
 
             metrics: ServiceQualityMetrics = {
                 "store_id": self.store_id,
-                "period_start": start_date or (datetime.now() - timedelta(days=30)).isoformat(),
+                "period_start": start_date or (datetime.now() - timedelta(days=int(os.getenv("AGENT_STATS_DAYS", "30")))).isoformat(),
                 "period_end": end_date or datetime.now().isoformat(),
                 "total_feedbacks": total_feedbacks,
                 "average_rating": round(average_rating, 2),
@@ -675,7 +676,7 @@ class ServiceAgent(BaseAgent):
 
     def _analyze_trend(self, feedbacks: List[CustomerFeedback]) -> str:
         """分析趋势"""
-        if len(feedbacks) < 10:
+        if len(feedbacks) < int(os.getenv("SERVICE_TREND_MIN_FEEDBACKS", "10")):
             return "stable"
 
         # 按时间排序
@@ -692,9 +693,9 @@ class ServiceAgent(BaseAgent):
 
         # 判断趋势
         diff = second_avg - first_avg
-        if diff > 0.3:
+        if diff > float(os.getenv("SERVICE_TREND_IMPROVING_THRESHOLD", "0.3")):
             return "improving"
-        elif diff < -0.3:
+        elif diff < -float(os.getenv("SERVICE_TREND_DECLINING_THRESHOLD", "0.3")):
             return "declining"
         else:
             return "stable"
@@ -802,7 +803,7 @@ class ServiceAgent(BaseAgent):
 
         # 计算服务得分(0-100)
         # 基础分60 + 平均评分*8 - 投诉数*2 + 表扬数*1
-        service_score = 60 + (average_rating * 8) - (complaint_count * 2) + (praise_count * 1)
+        service_score = float(os.getenv("SERVICE_SCORE_BASE", "60")) + (average_rating * float(os.getenv("SERVICE_SCORE_RATING_WEIGHT", "8"))) - (complaint_count * float(os.getenv("SERVICE_SCORE_COMPLAINT_DEDUCT", "2"))) + (praise_count * float(os.getenv("SERVICE_SCORE_PRAISE_ADD", "1")))
         service_score = max(0, min(100, service_score))
 
         # 识别改进领域
@@ -812,7 +813,7 @@ class ServiceAgent(BaseAgent):
             "staff_id": staff_id,
             "staff_name": f"员工{staff_id[-3:]}",  # 模拟员工姓名
             "store_id": self.store_id,
-            "period_start": start_date or (datetime.now() - timedelta(days=30)).isoformat(),
+            "period_start": start_date or (datetime.now() - timedelta(days=int(os.getenv("AGENT_STATS_DAYS", "30")))).isoformat(),
             "period_end": end_date or datetime.now().isoformat(),
             "total_feedbacks": total_feedbacks,
             "praise_count": praise_count,
@@ -880,7 +881,7 @@ class ServiceAgent(BaseAgent):
 
             # 基于分类统计生成改进建议
             for category, count in metrics["category_breakdown"].items():
-                if count >= 5:  # 至少5条反馈才生成建议
+                if count >= int(os.getenv("SERVICE_MIN_FEEDBACK_COUNT", "5")):  # 至少5条反馈才生成建议
                     # 分析该分类的负面反馈
                     category_feedbacks = [
                         f for f in feedbacks
@@ -947,11 +948,11 @@ class ServiceAgent(BaseAgent):
 
         # 评估优先级
         negative_rate = len(feedbacks) / metrics["total_feedbacks"]
-        if negative_rate > 0.2:
+        if negative_rate > float(os.getenv("SERVICE_NEGATIVE_RATE_URGENT", "0.2")):
             priority = ComplaintPriority.URGENT
-        elif negative_rate > 0.1:
+        elif negative_rate > float(os.getenv("SERVICE_NEGATIVE_RATE_HIGH", "0.1")):
             priority = ComplaintPriority.HIGH
-        elif negative_rate > 0.05:
+        elif negative_rate > float(os.getenv("SERVICE_NEGATIVE_RATE_MEDIUM", "0.05")):
             priority = ComplaintPriority.MEDIUM
         else:
             priority = ComplaintPriority.LOW
@@ -1032,7 +1033,7 @@ class ServiceAgent(BaseAgent):
             report = {
                 "store_id": self.store_id,
                 "report_date": datetime.now().isoformat(),
-                "period_start": start_date or (datetime.now() - timedelta(days=30)).isoformat(),
+                "period_start": start_date or (datetime.now() - timedelta(days=int(os.getenv("AGENT_STATS_DAYS", "30")))).isoformat(),
                 "period_end": end_date or datetime.now().isoformat(),
                 "quality_metrics": quality_metrics,
                 "staff_performances": staff_performances,
@@ -1074,7 +1075,7 @@ class ServiceAgent(BaseAgent):
         import random
 
         mock_feedbacks = []
-        base_date = datetime.now() - timedelta(days=7)
+        base_date = datetime.now() - timedelta(days=int(os.getenv("SERVICE_TREND_DAYS", "7")))
 
         feedback_templates = [
             {

@@ -5,6 +5,7 @@ Neural System Orchestrator
 智链OS作为餐饮门店的神经系统
 统一协调订单、菜品、人员、时间、金额五个核心维度
 """
+import os
 from typing import Dict, Any, List, Optional
 import structlog
 from datetime import datetime
@@ -219,41 +220,118 @@ class NeuralSystemOrchestrator:
     async def _handle_staff_shift_start(self, event: Dict[str, Any]) -> Dict[str, Any]:
         """处理员工上班事件"""
         staff_data = event["data"]
-
-        # 1. 记录考勤
-        # 2. 通知排班Agent
-        # 3. 更新人员状态
-
+        try:
+            from src.core.database import get_db_session
+            from src.models.notification import Notification
+            async with get_db_session() as session:
+                session.add(Notification(
+                    store_id=staff_data.get("store_id", ""),
+                    type="system",
+                    title="员工上班",
+                    content=f"{staff_data.get('name', '员工')} 已上班签到",
+                    priority="low",
+                    extra_data={"employee_id": staff_data.get("employee_id"), "event": "shift_start"},
+                ))
+                await session.commit()
+        except Exception as e:
+            logger.error("处理员工上班事件失败", error=str(e))
         return {"success": True, "action": "shift_start_recorded"}
 
     async def _handle_staff_shift_end(self, event: Dict[str, Any]) -> Dict[str, Any]:
         """处理员工下班事件"""
         staff_data = event["data"]
-
-        # 1. 记录考勤
-        # 2. 计算工时
-        # 3. 更新人员状态
-
+        try:
+            from src.core.database import get_db_session
+            from src.models.notification import Notification
+            from datetime import datetime as dt
+            start_str = staff_data.get("shift_start_time")
+            work_hours = 0.0
+            if start_str:
+                try:
+                    start = dt.fromisoformat(start_str)
+                    work_hours = round((dt.utcnow() - start).total_seconds() / 3600, 2)
+                except Exception:
+                    pass
+            async with get_db_session() as session:
+                session.add(Notification(
+                    store_id=staff_data.get("store_id", ""),
+                    type="system",
+                    title="员工下班",
+                    content=f"{staff_data.get('name', '员工')} 已下班，本次工时 {work_hours} 小时",
+                    priority="low",
+                    extra_data={"employee_id": staff_data.get("employee_id"), "work_hours": work_hours, "event": "shift_end"},
+                ))
+                await session.commit()
+        except Exception as e:
+            logger.error("处理员工下班事件失败", error=str(e))
         return {"success": True, "action": "shift_end_recorded"}
 
     async def _handle_payment_completed(self, event: Dict[str, Any]) -> Dict[str, Any]:
         """处理支付完成事件"""
         payment_data = event["data"]
-
-        # 1. 记录交易
-        # 2. 更新财务数据
-        # 3. 触发会员积分更新
-
+        try:
+            from src.core.database import get_db_session
+            from src.models.order import Order, OrderStatus
+            from src.models.notification import Notification
+            from sqlalchemy import select
+            async with get_db_session() as session:
+                order_id = payment_data.get("order_id")
+                if order_id:
+                    result = await session.execute(select(Order).where(Order.id == order_id))
+                    order = result.scalar_one_or_none()
+                    if order:
+                        order.status = OrderStatus.COMPLETED
+                        from datetime import datetime as dt
+                        order.completed_at = dt.utcnow()
+                # 会员积分通知
+                customer_phone = payment_data.get("customer_phone")
+                if customer_phone:
+                    amount = payment_data.get("amount", 0)
+                    points = int(amount / 100)  # 每消费1元积1分
+                    session.add(Notification(
+                        store_id=payment_data.get("store_id", ""),
+                        type="member",
+                        title="积分更新",
+                        content=f"本次消费获得 {points} 积分",
+                        priority="low",
+                        extra_data={"customer_phone": customer_phone, "points_earned": points},
+                    ))
+                await session.commit()
+        except Exception as e:
+            logger.error("处理支付完成事件失败", error=str(e))
         return {"success": True, "action": "payment_recorded"}
 
     async def _handle_inventory_low_stock(self, event: Dict[str, Any]) -> Dict[str, Any]:
         """处理库存不足事件"""
         inventory_data = event["data"]
-
-        # 1. 发送语音通知到后厨
-        # 2. 触发补货Agent
-        # 3. 记录预警事件
-
+        try:
+            from src.core.database import get_db_session
+            from src.models.notification import Notification
+            item_name = inventory_data.get("item_name", "未知物料")
+            current_qty = inventory_data.get("current_quantity", 0)
+            store_id = inventory_data.get("store_id", "")
+            async with get_db_session() as session:
+                session.add(Notification(
+                    store_id=store_id,
+                    type="inventory",
+                    title="库存预警",
+                    content=f"【库存不足】{item_name} 当前库存 {current_qty}，请及时补货",
+                    priority="high",
+                    extra_data={"item_id": inventory_data.get("item_id"), "current_quantity": current_qty},
+                ))
+                await session.commit()
+            # 企微推送
+            try:
+                from src.services.wechat_work_message_service import WeChatWorkMessageService
+                wechat = WeChatWorkMessageService()
+                await wechat.send_text_message(
+                    "@all",
+                    f"【库存预警】{item_name} 库存不足（当前：{current_qty}），请尽快补货！"
+                )
+            except Exception as we:
+                logger.warning("库存预警企微推送失败", error=str(we))
+        except Exception as e:
+            logger.error("处理库存不足事件失败", error=str(e))
         return {"success": True, "action": "low_stock_alert_sent"}
 
     # ==================== 语义搜索接口 ====================
@@ -262,7 +340,7 @@ class NeuralSystemOrchestrator:
         self,
         query: str,
         store_id: str,
-        limit: int = 10,
+        limit: int = int(os.getenv("NEURAL_SEARCH_LIMIT", "10")),
     ) -> List[Dict[str, Any]]:
         """
         语义搜索订单
@@ -291,7 +369,7 @@ class NeuralSystemOrchestrator:
         self,
         query: str,
         store_id: str,
-        limit: int = 10,
+        limit: int = int(os.getenv("NEURAL_SEARCH_LIMIT", "10")),
     ) -> List[Dict[str, Any]]:
         """
         语义搜索菜品
@@ -320,7 +398,7 @@ class NeuralSystemOrchestrator:
         self,
         query: str,
         store_id: str,
-        limit: int = 10,
+        limit: int = int(os.getenv("NEURAL_SEARCH_LIMIT", "10")),
     ) -> List[Dict[str, Any]]:
         """
         语义搜索事件

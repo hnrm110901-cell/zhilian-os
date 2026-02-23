@@ -52,7 +52,6 @@ async def create_training_round(
 
     需要管理员权限
     """
-    # TODO: 检查用户权限
     if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
 
@@ -169,28 +168,27 @@ async def list_training_rounds(
     """
     列出训练轮次
     """
-    # TODO: 从数据库获取训练轮次列表
-    # 这里返回示例数据
+    from src.core.database import get_db_session
+    from src.models.federated_learning import FLTrainingRound
+    from sqlalchemy import select
+
+    async with get_db_session() as session:
+        stmt = select(FLTrainingRound).order_by(FLTrainingRound.created_at.desc()).limit(50)
+        if status:
+            stmt = stmt.where(FLTrainingRound.status == status)
+        result = await session.execute(stmt)
+        fl_rounds = result.scalars().all()
 
     rounds = [
         {
-            "round_id": "round_abc123",
-            "model_type": "sales_forecast",
-            "status": "completed",
-            "participating_stores": 5,
-            "created_at": "2026-02-20T10:00:00",
-            "completed_at": "2026-02-21T15:30:00",
-        },
-        {
-            "round_id": "round_def456",
-            "model_type": "demand_prediction",
-            "status": "in_progress",
-            "participating_stores": 3,
-            "created_at": "2026-02-22T09:00:00",
-        },
+            "round_id": r.id,
+            "model_type": r.model_type,
+            "status": r.status,
+            "participating_stores": r.num_participating_stores or 0,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "completed_at": r.completed_at.isoformat() if r.completed_at else None,
+        }
+        for r in fl_rounds
     ]
-
-    if status:
-        rounds = [r for r in rounds if r["status"] == status]
 
     return {"rounds": rounds, "total": len(rounds)}

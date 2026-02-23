@@ -3,6 +3,7 @@ Celery异步任务
 用于Neural System的事件处理和向量数据库索引
 """
 from typing import Dict, Any
+import os
 import structlog
 from celery import Task
 
@@ -47,11 +48,11 @@ class CallbackTask(Task):
 @celery_app.task(
     base=CallbackTask,
     bind=True,
-    max_retries=3,
-    default_retry_delay=60,
+    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
+    default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY", "60")),
     autoretry_for=(Exception,),
     retry_backoff=True,
-    retry_backoff_max=600,
+    retry_backoff_max=int(os.getenv("CELERY_RETRY_BACKOFF_MAX", "600")),
     retry_jitter=True,
 )
 async def process_neural_event(
@@ -154,8 +155,8 @@ async def process_neural_event(
 @celery_app.task(
     base=CallbackTask,
     bind=True,
-    max_retries=3,
-    default_retry_delay=30,
+    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
+    default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY_SHORT", "30")),
 )
 async def index_to_vector_db(
     self,
@@ -216,7 +217,7 @@ async def index_to_vector_db(
 @celery_app.task(
     base=CallbackTask,
     bind=True,
-    max_retries=3,
+    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
 )
 async def index_order_to_vector_db(
     self,
@@ -237,7 +238,7 @@ async def index_order_to_vector_db(
 @celery_app.task(
     base=CallbackTask,
     bind=True,
-    max_retries=3,
+    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
 )
 async def index_dish_to_vector_db(
     self,
@@ -282,7 +283,7 @@ async def batch_index_orders(
         ]
 
         # 等待所有任务完成
-        results = [task.get(timeout=300) for task in tasks]
+        results = [task.get(timeout=int(os.getenv("CELERY_TASK_GET_TIMEOUT", "300"))) for task in tasks]
 
         success_count = sum(1 for r in results if r.get("success"))
 
@@ -332,7 +333,7 @@ async def batch_index_dishes(
         ]
 
         # 等待所有任务完成
-        results = [task.get(timeout=300) for task in tasks]
+        results = [task.get(timeout=int(os.getenv("CELERY_TASK_GET_TIMEOUT", "300"))) for task in tasks]
 
         success_count = sum(1 for r in results if r.get("success"))
 
@@ -358,8 +359,8 @@ async def batch_index_dishes(
 @celery_app.task(
     base=CallbackTask,
     bind=True,
-    max_retries=3,
-    default_retry_delay=300,  # 5分钟
+    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
+    default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY_LONG", "300")),  # 5分钟
 )
 async def generate_and_send_daily_report(
     self,
@@ -491,8 +492,8 @@ async def generate_and_send_daily_report(
 @celery_app.task(
     base=CallbackTask,
     bind=True,
-    max_retries=3,
-    default_retry_delay=300,  # 5分钟
+    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
+    default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY_LONG", "300")),  # 5分钟
 )
 async def perform_daily_reconciliation(
     self,
@@ -563,8 +564,8 @@ async def perform_daily_reconciliation(
 @celery_app.task(
     base=CallbackTask,
     bind=True,
-    max_retries=3,
-    default_retry_delay=60,
+    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
+    default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY", "60")),
 )
 async def detect_revenue_anomaly(
     self,
@@ -655,8 +656,8 @@ async def detect_revenue_anomaly(
                     # 计算偏差
                     deviation = ((current_revenue - expected_revenue) / expected_revenue) * 100
 
-                    # 只有偏差超过15%才告警
-                    if abs(deviation) > 15:
+                    # 只有偏差超过阈值才告警
+                    if abs(deviation) > float(os.getenv("REVENUE_ANOMALY_THRESHOLD_PERCENT", "15")):
                         # 使用DecisionAgent分析
                         analysis = await decision_agent.analyze_revenue_anomaly(
                             store_id=str(store.id),
@@ -737,8 +738,8 @@ async def detect_revenue_anomaly(
 @celery_app.task(
     base=CallbackTask,
     bind=True,
-    max_retries=3,
-    default_retry_delay=300,
+    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
+    default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY_LONG", "300")),
 )
 async def generate_daily_report_with_rag(
     self,
@@ -873,8 +874,8 @@ AI经营分析:
 @celery_app.task(
     base=CallbackTask,
     bind=True,
-    max_retries=3,
-    default_retry_delay=60,
+    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
+    default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY", "60")),
 )
 async def check_inventory_alert(
     self,
@@ -948,7 +949,7 @@ async def check_inventory_alert(
                     alert_result = await inventory_agent.check_low_stock_alert(
                         store_id=str(store.id),
                         current_inventory=current_inventory,
-                        threshold_hours=4  # 午高峰前4小时预警
+                        threshold_hours=int(os.getenv("INVENTORY_ALERT_THRESHOLD_HOURS", "4"))  # 午高峰前N小时预警
                     )
 
                     if alert_result["success"]:

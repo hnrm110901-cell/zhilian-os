@@ -6,6 +6,7 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from sqlalchemy import select, and_, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
+import os
 import structlog
 import uuid
 
@@ -154,16 +155,26 @@ class QueueService:
         )
         waiting_count = result.scalar() or 0
 
-        # 简单估算：每组客人平均等待15分钟
-        # 实际应该基于历史数据和当前餐厅状态
-        base_wait_time = 15
+        # 基于历史实际等待时间计算均值，fallback 15 分钟
+        from datetime import timedelta
+        hist_result = await session.execute(
+            select(func.avg(Queue.actual_wait_time)).where(
+                and_(
+                    Queue.store_id == store_id,
+                    Queue.actual_wait_time.isnot(None),
+                    Queue.created_at >= (datetime.utcnow() - timedelta(days=int(os.getenv("QUEUE_HISTORY_DAYS", "7")))),
+                )
+            )
+        )
+        avg_wait = hist_result.scalar()
+        base_wait_time = int(avg_wait) if avg_wait else int(os.getenv("QUEUE_DEFAULT_WAIT_MINUTES", "15"))
         estimated_time = waiting_count * base_wait_time
 
         # 根据人数调整（大桌等待时间可能更长）
-        if party_size >= 6:
-            estimated_time = int(estimated_time * 1.3)
+        if party_size >= int(os.getenv("QUEUE_LARGE_PARTY_SIZE", "6")):
+            estimated_time = int(estimated_time * float(os.getenv("QUEUE_LARGE_PARTY_MULTIPLIER", "1.3")))
 
-        return max(10, estimated_time)  # 最少10分钟
+        return max(int(os.getenv("QUEUE_MIN_WAIT_MINUTES", "10")), estimated_time)  # 最少N分钟
 
     async def call_next(
         self,

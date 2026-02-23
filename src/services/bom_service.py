@@ -3,6 +3,7 @@ BOM管理服务
 处理配方卡管理、成本计算、损耗分析等业务逻辑
 """
 import uuid
+import os
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 import structlog
@@ -25,7 +26,7 @@ class BOMService:
         dish_name: str,
         store_id: str,
         ingredients: List[Dict[str, Any]],
-        yield_portions: float = 1.0,
+        yield_portions: float = float(os.getenv("BOM_DEFAULT_YIELD_PORTIONS", "1.0")),
         preparation_notes: Optional[str] = None,
         cooking_time: Optional[int] = None,
         difficulty_level: Optional[str] = None,

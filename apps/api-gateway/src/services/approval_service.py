@@ -6,6 +6,7 @@
 import uuid
 from datetime import datetime
 from typing import Dict, List, Optional, Any
+import os
 import structlog
 from sqlalchemy.orm import Session
 
@@ -368,10 +369,47 @@ class ApprovalService:
         """执行决策"""
         try:
             # 根据决策类型执行相应操作
-            # 这里是占位符，实际执行逻辑需要根据具体决策类型实现
+            suggestion = decision_log.ai_suggestion or {}
+
+            if decision_log.decision_type == DecisionType.PURCHASE_SUGGESTION:
+                # 采购建议：创建采购通知
+                from ..models.notification import Notification, NotificationType, NotificationPriority
+                notif = Notification(
+                    title="AI采购建议已批准",
+                    message=f"采购建议已批准执行：{decision_log.ai_reasoning or ''}",
+                    type=NotificationType.INFO,
+                    priority=NotificationPriority.HIGH,
+                    store_id=decision_log.store_id,
+                    extra_data=suggestion,
+                )
+                db.add(notif)
+
+            elif decision_log.decision_type == DecisionType.INVENTORY_ALERT:
+                # 库存预警：记录处理通知
+                from ..models.notification import Notification, NotificationType, NotificationPriority
+                notif = Notification(
+                    title="库存预警已处理",
+                    message=f"库存预警决策已执行：{decision_log.ai_reasoning or ''}",
+                    type=NotificationType.WARNING,
+                    priority=NotificationPriority.HIGH,
+                    store_id=decision_log.store_id,
+                )
+                db.add(notif)
+
+            elif decision_log.decision_type == DecisionType.SCHEDULE_OPTIMIZATION:
+                # 排班优化：记录排班通知
+                from ..models.notification import Notification, NotificationType, NotificationPriority
+                notif = Notification(
+                    title="排班优化已执行",
+                    message=f"AI排班优化方案已批准：{decision_log.ai_reasoning or ''}",
+                    type=NotificationType.INFO,
+                    priority=NotificationPriority.NORMAL,
+                    store_id=decision_log.store_id,
+                )
+                db.add(notif)
+
             decision_log.decision_status = DecisionStatus.EXECUTED
             decision_log.executed_at = datetime.utcnow()
-
             db.commit()
 
             logger.info(
@@ -464,24 +502,24 @@ class ApprovalService:
 
         # AI置信度得分
         if decision_log.ai_confidence:
-            score += decision_log.ai_confidence * 30
+            score += decision_log.ai_confidence * float(os.getenv("APPROVAL_AI_CONFIDENCE_WEIGHT", "30"))
 
         # 决策采纳情况得分
         if decision_log.decision_status == DecisionStatus.APPROVED:
-            score += 40  # 完全采纳
+            score += float(os.getenv("APPROVAL_SCORE_ADOPTED", "40"))    # 完全采纳
         elif decision_log.decision_status == DecisionStatus.MODIFIED:
-            score += 20  # 部分采纳
+            score += float(os.getenv("APPROVAL_SCORE_MODIFIED", "20"))   # 部分采纳
         elif decision_log.decision_status == DecisionStatus.REJECTED:
             score += 0  # 未采纳
 
         # 结果偏差得分
         if decision_log.result_deviation is not None:
-            if decision_log.result_deviation < 10:
-                score += 30  # 偏差<10%
-            elif decision_log.result_deviation < 20:
-                score += 20  # 偏差<20%
-            elif decision_log.result_deviation < 30:
-                score += 10  # 偏差<30%
+            if decision_log.result_deviation < float(os.getenv("APPROVAL_DEVIATION_LOW", "10")):
+                score += float(os.getenv("APPROVAL_SCORE_DEV_LOW", "30"))    # 偏差<10%
+            elif decision_log.result_deviation < float(os.getenv("APPROVAL_DEVIATION_MID", "20")):
+                score += float(os.getenv("APPROVAL_SCORE_DEV_MID", "20"))    # 偏差<20%
+            elif decision_log.result_deviation < float(os.getenv("APPROVAL_DEVIATION_HIGH", "30")):
+                score += float(os.getenv("APPROVAL_SCORE_DEV_HIGH", "10"))   # 偏差<30%
             else:
                 score += 0  # 偏差≥30%
 

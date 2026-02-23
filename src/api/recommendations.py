@@ -6,6 +6,7 @@ Phase 4: 智能优化期 (Intelligence Optimization Period)
 """
 
 from fastapi import APIRouter, HTTPException, Depends
+import os
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
@@ -29,7 +30,7 @@ class RecommendDishesRequest(BaseModel):
     customer_id: str
     store_id: str
     context: Optional[Dict[str, Any]] = None
-    top_k: int = 5
+    top_k: int = int(os.getenv("RECOMMEND_TOP_K", "5"))
 
 
 class OptimizePricingRequest(BaseModel):

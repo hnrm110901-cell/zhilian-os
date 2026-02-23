@@ -2,6 +2,7 @@
 Reservation Service with Database Integration
 Provides reservation management using real database data
 """
+import os
 from datetime import datetime, date, time, timedelta
 from typing import List, Dict, Any, Optional
 from sqlalchemy import select, and_, or_, desc
@@ -298,7 +299,7 @@ class ReservationService:
                 end_dt = date.fromisoformat(end_date)
 
             if not start_date:
-                start_dt = end_dt - timedelta(days=30)
+                start_dt = end_dt - timedelta(days=int(os.getenv("RESERVATION_STATS_DAYS", "30")))
             else:
                 start_dt = date.fromisoformat(start_date)
 

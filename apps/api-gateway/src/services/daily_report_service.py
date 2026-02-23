@@ -4,8 +4,9 @@ Daily Report Service
 """
 from typing import Dict, Any, Optional, List
 from datetime import datetime, date, timedelta
-from sqlalchemy import select, and_, func
+from sqlalchemy import select, and_, func, or_
 import structlog
+import os
 import uuid
 
 from src.core.database import get_db_session
@@ -295,8 +296,25 @@ class DailyReportService:
                 (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0.0
             )
 
-            # 3. 服务问题数（暂时返回0，后续可以从反馈系统获取）
-            service_issue_count = 0
+            # 3. 服务问题数（从Notification表查询高优先级或错误类型通知）
+            from src.models.notification import Notification, NotificationPriority, NotificationType
+            notif_result = await session.execute(
+                select(func.count(Notification.id)).where(
+                    and_(
+                        Notification.store_id == store_id,
+                        Notification.created_at >= start_datetime,
+                        Notification.created_at <= end_datetime,
+                        or_(
+                            Notification.type == NotificationType.ERROR,
+                            Notification.priority.in_([
+                                NotificationPriority.HIGH,
+                                NotificationPriority.URGENT
+                            ])
+                        )
+                    )
+                )
+            )
+            service_issue_count = notif_result.scalar() or 0
 
             return {
                 "inventory_alert_count": inventory_alert_count,
@@ -318,12 +336,55 @@ class DailyReportService:
         store_id: str,
         report_date: date
     ) -> Dict[str, Any]:
-        """聚合详细数据"""
-        # 简化实现，返回空数据
-        # 实际应该从订单明细中统计热销菜品、高峰时段等
+        """聚合详细数据：热销菜品、高峰时段"""
+        from src.models.order import OrderItem, OrderStatus
+        from sqlalchemy import extract
+
+        # 热销菜品 Top5
+        top_dishes_result = await session.execute(
+            select(
+                OrderItem.item_name,
+                func.sum(OrderItem.quantity).label("qty"),
+                func.sum(OrderItem.subtotal).label("revenue"),
+            )
+            .join(Order, OrderItem.order_id == Order.id)
+            .where(
+                Order.store_id == store_id,
+                func.date(Order.order_time) == report_date,
+                Order.status == OrderStatus.COMPLETED,
+            )
+            .group_by(OrderItem.item_name)
+            .order_by(func.sum(OrderItem.quantity).desc())
+            .limit(5)
+        )
+        top_dishes = [
+            {"name": row.item_name, "quantity": int(row.qty), "revenue": int(row.revenue)}
+            for row in top_dishes_result.all()
+        ]
+
+        # 高峰时段（按小时统计订单数）
+        peak_hours_result = await session.execute(
+            select(
+                extract("hour", Order.order_time).label("hour"),
+                func.count(Order.id).label("order_count"),
+            )
+            .where(
+                Order.store_id == store_id,
+                func.date(Order.order_time) == report_date,
+                Order.status == OrderStatus.COMPLETED,
+            )
+            .group_by(extract("hour", Order.order_time))
+            .order_by(func.count(Order.id).desc())
+            .limit(3)
+        )
+        peak_hours = [
+            {"hour": int(row.hour), "order_count": int(row.order_count)}
+            for row in peak_hours_result.all()
+        ]
+
         return {
-            "top_dishes": [],
-            "peak_hours": [],
+            "top_dishes": top_dishes,
+            "peak_hours": peak_hours,
             "payment_methods": {}
         }
 
@@ -341,31 +402,36 @@ class DailyReportService:
         return summary
 
     def _generate_highlights(self, report: DailyReport) -> List[str]:
-        """生成亮点数据"""
+        """生成亮点数据（阈值支持环境变量覆盖）"""
         highlights = []
+        _rev_up = float(os.getenv("REPORT_HIGHLIGHT_REVENUE_UP", "10"))
+        _task_good = float(os.getenv("REPORT_HIGHLIGHT_TASK_RATE", "90"))
+        _order_milestone = int(os.getenv("REPORT_HIGHLIGHT_ORDER_COUNT", "100"))
 
-        if report.revenue_change_rate > 10:
+        if report.revenue_change_rate > _rev_up:
             highlights.append(f"营收大幅增长{report.revenue_change_rate:.1f}%")
 
-        if report.task_completion_rate >= 90:
+        if report.task_completion_rate >= _task_good:
             highlights.append(f"任务完成率达{report.task_completion_rate:.1f}%")
 
-        if report.order_count > 100:
+        if report.order_count > _order_milestone:
             highlights.append(f"订单量突破{report.order_count}笔")
 
         return highlights
 
     def _generate_alerts(self, report: DailyReport) -> List[str]:
-        """生成预警信息"""
+        """生成预警信息（阈值支持环境变量覆盖）"""
         alerts = []
+        _rev_down = float(os.getenv("REPORT_ALERT_REVENUE_DOWN", "10"))
+        _task_warn = float(os.getenv("REPORT_ALERT_TASK_RATE", "70"))
 
-        if report.revenue_change_rate < -10:
+        if report.revenue_change_rate < -_rev_down:
             alerts.append(f"营收下降{abs(report.revenue_change_rate):.1f}%，需关注")
 
         if report.inventory_alert_count > 0:
             alerts.append(f"{report.inventory_alert_count}个商品库存不足")
 
-        if report.task_completion_rate < 70:
+        if report.task_completion_rate < _task_warn:
             alerts.append(f"任务完成率仅{report.task_completion_rate:.1f}%")
 
         return alerts

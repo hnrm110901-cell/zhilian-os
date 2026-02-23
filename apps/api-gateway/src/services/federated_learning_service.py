@@ -2,13 +2,18 @@
 联邦学习服务
 实现门店间的协同学习，保护数据隐私
 """
+import os
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 import numpy as np
 import structlog
 from enum import Enum
+import uuid
+from sqlalchemy import select, func
 
 from src.services.base_service import BaseService
+from src.core.database import get_db_session
+from src.models.federated_learning import FLTrainingRound, FLModelUpload, RoundStatus
 
 logger = structlog.get_logger()
 
@@ -41,8 +46,8 @@ class FederatedLearningService(BaseService):
 
     def __init__(self, store_id: Optional[str] = None):
         super().__init__(store_id)
-        self.min_stores = 3  # 最少参与门店数
-        self.aggregation_threshold = 0.8  # 聚合阈值
+        self.min_stores = int(os.getenv("FL_MIN_STORES", "3"))
+        self.aggregation_threshold = float(os.getenv("FL_AGGREGATION_THRESHOLD", "0.8"))
 
     async def create_training_round(
         self,
@@ -60,6 +65,18 @@ class FederatedLearningService(BaseService):
             训练轮次信息
         """
         round_id = self._generate_round_id()
+
+        async with get_db_session() as session:
+            record = FLTrainingRound(
+                id=round_id,
+                model_type=model_type.value if hasattr(model_type, "value") else str(model_type),
+                status=RoundStatus.INITIALIZED,
+                config=config,
+                num_participating_stores=0,
+                created_at=datetime.now(),
+            )
+            session.add(record)
+            await session.commit()
 
         training_round = {
             "round_id": round_id,
@@ -94,8 +111,17 @@ class FederatedLearningService(BaseService):
         """
         store_id = self.require_store_id()
 
-        # TODO: 实际实现需要从数据库获取训练轮次信息
-        # 这里是示例逻辑
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(FLTrainingRound).where(FLTrainingRound.id == round_id)
+            )
+            round_record = result.scalar_one_or_none()
+            if not round_record:
+                raise ValueError(f"训练轮次不存在: {round_id}")
+            round_record.status = RoundStatus.COLLECTING
+            round_record.num_participating_stores = (round_record.num_participating_stores or 0) + 1
+            await session.commit()
+            training_config = round_record.config or {}
 
         logger.info(
             "Store joined training round",
@@ -107,10 +133,10 @@ class FederatedLearningService(BaseService):
             "round_id": round_id,
             "store_id": store_id,
             "status": "joined",
-            "training_config": {
-                "epochs": 10,
-                "batch_size": 32,
-                "learning_rate": 0.001,
+            "training_config": training_config or {
+                "epochs": int(os.getenv("FL_TRAIN_EPOCHS", "10")),
+                "batch_size": int(os.getenv("FL_TRAIN_BATCH_SIZE", "32")),
+                "learning_rate": float(os.getenv("FL_TRAIN_LEARNING_RATE", "0.001")),
             },
         }
 
@@ -136,12 +162,31 @@ class FederatedLearningService(BaseService):
         # 应用差分隐私
         noisy_parameters = self._apply_differential_privacy(
             model_parameters,
-            epsilon=1.0,  # 隐私预算
+            epsilon=float(os.getenv("FL_PRIVACY_EPSILON", "1.0")),
         )
 
         # 验证模型参数
         if not self._validate_model_parameters(noisy_parameters):
             raise ValueError("Invalid model parameters")
+
+        # 序列化 numpy arrays 为 list
+        serialized = {
+            k: v.tolist() if isinstance(v, np.ndarray) else v
+            for k, v in noisy_parameters.items()
+        }
+
+        async with get_db_session() as session:
+            upload = FLModelUpload(
+                id=str(uuid.uuid4()),
+                round_id=round_id,
+                store_id=store_id,
+                model_parameters=serialized,
+                training_metrics=training_metrics,
+                training_samples=training_metrics.get("samples", 0),
+                uploaded_at=datetime.now(),
+            )
+            session.add(upload)
+            await session.commit()
 
         logger.info(
             "Local model uploaded",
@@ -173,11 +218,8 @@ class FederatedLearningService(BaseService):
         Returns:
             聚合后的全局模型
         """
-        # TODO: 从数据库获取所有参与门店的模型参数
-        # 这里是示例逻辑
-
-        # 模拟获取多个门店的模型参数
-        store_models = self._get_store_models(round_id)
+        # 从数据库获取所有参与门店的模型参数
+        store_models = await self._get_store_models(round_id)
 
         if len(store_models) < self.min_stores:
             raise ValueError(
@@ -192,6 +234,23 @@ class FederatedLearningService(BaseService):
             global_model = self._weighted_aggregation(store_models)
         else:
             raise ValueError(f"Unsupported aggregation method: {method}")
+
+        # 保存全局模型到 DB
+        global_params_serialized = {
+            k: v.tolist() if isinstance(v, np.ndarray) else v
+            for k, v in global_model.items()
+        }
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(FLTrainingRound).where(FLTrainingRound.id == round_id)
+            )
+            round_record = result.scalar_one_or_none()
+            if round_record:
+                round_record.status = RoundStatus.COMPLETED
+                round_record.global_model_parameters = global_params_serialized
+                round_record.aggregation_method = method.value if hasattr(method, "value") else str(method)
+                round_record.completed_at = datetime.now()
+                await session.commit()
 
         logger.info(
             "Models aggregated",
@@ -381,49 +440,30 @@ class FederatedLearningService(BaseService):
 
         return True
 
-    def _get_store_models(self, round_id: str) -> List[Dict[str, Any]]:
+    async def _get_store_models(self, round_id: str) -> List[Dict[str, Any]]:
         """
-        获取训练轮次中所有门店的模型
-
-        Args:
-            round_id: 训练轮次ID
-
-        Returns:
-            门店模型列表
+        从数据库获取训练轮次中所有门店的模型
         """
-        # TODO: 从数据库获取实际数据
-        # 这里返回模拟数据
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(FLModelUpload).where(FLModelUpload.round_id == round_id)
+            )
+            uploads = result.scalars().all()
 
-        # 模拟3个门店的模型参数
-        store_models = [
-            {
-                "store_id": "STORE001",
-                "parameters": {
-                    "layer1": np.random.randn(10, 5),
-                    "layer2": np.random.randn(5, 1),
-                },
+        store_models = []
+        for upload in uploads:
+            params = upload.model_parameters or {}
+            # 反序列化 list → numpy array
+            np_params = {
+                k: np.array(v) if isinstance(v, list) else v
+                for k, v in params.items()
+            }
+            store_models.append({
+                "store_id": upload.store_id,
+                "parameters": np_params,
                 "weight": 1.0,
-                "training_samples": 1000,
-            },
-            {
-                "store_id": "STORE002",
-                "parameters": {
-                    "layer1": np.random.randn(10, 5),
-                    "layer2": np.random.randn(5, 1),
-                },
-                "weight": 1.2,
-                "training_samples": 1200,
-            },
-            {
-                "store_id": "STORE003",
-                "parameters": {
-                    "layer1": np.random.randn(10, 5),
-                    "layer2": np.random.randn(5, 1),
-                },
-                "weight": 0.8,
-                "training_samples": 800,
-            },
-        ]
+                "training_samples": upload.training_samples or 0,
+            })
 
         return store_models
 
@@ -442,15 +482,31 @@ class FederatedLearningService(BaseService):
         Returns:
             训练状态信息
         """
-        # TODO: 从数据库获取实际状态
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(FLTrainingRound).where(FLTrainingRound.id == round_id)
+            )
+            round_record = result.scalar_one_or_none()
+
+            if not round_record:
+                return {"round_id": round_id, "status": "not_found"}
+
+            uploads_result = await session.execute(
+                select(func.count(FLModelUpload.id)).where(FLModelUpload.round_id == round_id)
+            )
+            completed_stores = int(uploads_result.scalar() or 0)
+
+        total = round_record.num_participating_stores or 0
+        progress = completed_stores / total if total > 0 else 0.0
 
         return {
             "round_id": round_id,
-            "status": "in_progress",
-            "participating_stores": 5,
-            "completed_stores": 3,
-            "progress": 0.6,
-            "estimated_completion": "2026-02-23T10:00:00",
+            "status": round_record.status.value if round_record.status else "unknown",
+            "participating_stores": total,
+            "completed_stores": completed_stores,
+            "progress": round(progress, 2),
+            "created_at": round_record.created_at.isoformat() if round_record.created_at else None,
+            "completed_at": round_record.completed_at.isoformat() if round_record.completed_at else None,
         }
 
     async def download_global_model(
@@ -468,7 +524,14 @@ class FederatedLearningService(BaseService):
         """
         store_id = self.require_store_id()
 
-        # TODO: 从数据库获取全局模型
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(FLTrainingRound).where(FLTrainingRound.id == round_id)
+            )
+            round_record = result.scalar_one_or_none()
+
+        if not round_record or not round_record.global_model_parameters:
+            raise ValueError(f"全局模型尚未生成: {round_id}")
 
         logger.info(
             "Global model downloaded",
@@ -478,8 +541,8 @@ class FederatedLearningService(BaseService):
 
         return {
             "round_id": round_id,
-            "model_version": "v1.0",
-            "parameters": {},  # 实际的模型参数
+            "model_version": f"v{round_record.completed_at.strftime('%Y%m%d') if round_record.completed_at else 'unknown'}",
+            "parameters": round_record.global_model_parameters,
             "download_time": datetime.now().isoformat(),
         }
 

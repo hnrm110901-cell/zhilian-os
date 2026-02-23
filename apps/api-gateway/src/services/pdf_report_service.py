@@ -13,23 +13,49 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+import os
 import structlog
 
 logger = structlog.get_logger()
+
+
+def _register_chinese_font() -> Optional[str]:
+    """尝试注册中文字体，返回字体名称或None"""
+    candidates = [
+        ("/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc", "NotoSansCJK"),
+        ("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", "NotoSansCJK"),
+        ("/usr/share/fonts/noto-cjk/NotoSansCJKsc-Regular.otf", "NotoSansCJK"),
+        ("/usr/share/fonts/truetype/wqy/wqy-microhei.ttc", "WQYMicroHei"),
+        ("/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc", "WQYZenHei"),
+        ("/System/Library/Fonts/PingFang.ttc", "PingFang"),
+        ("/System/Library/Fonts/STHeiti Light.ttc", "STHeiti"),
+    ]
+    for path, name in candidates:
+        if os.path.exists(path):
+            try:
+                pdfmetrics.registerFont(TTFont(name, path))
+                logger.info("中文字体注册成功", font=name, path=path)
+                return name
+            except Exception as e:
+                logger.warning("字体注册失败", font=name, error=str(e))
+    logger.warning("未找到中文字体，PDF中文可能显示为乱码。建议运行: apt-get install fonts-noto-cjk")
+    return None
 
 
 class PDFReportService:
     """PDF报表生成服务"""
 
     def __init__(self):
-        # 注册中文字体（如果有的话）
-        # 这里使用默认字体，实际部署时需要添加中文字体支持
+        # 尝试注册中文字体
+        self._chinese_font = _register_chinese_font()
         self.styles = getSampleStyleSheet()
+        font_name = self._chinese_font or "Helvetica"
 
         # 创建自定义样式
         self.title_style = ParagraphStyle(
             'CustomTitle',
             parent=self.styles['Heading1'],
+            fontName=font_name,
             fontSize=18,
             textColor=colors.HexColor('#1890ff'),
             spaceAfter=30,
@@ -39,6 +65,7 @@ class PDFReportService:
         self.heading_style = ParagraphStyle(
             'CustomHeading',
             parent=self.styles['Heading2'],
+            fontName=font_name,
             fontSize=14,
             textColor=colors.HexColor('#262626'),
             spaceAfter=12,
@@ -47,6 +74,7 @@ class PDFReportService:
         self.normal_style = ParagraphStyle(
             'CustomNormal',
             parent=self.styles['Normal'],
+            fontName=font_name,
             fontSize=10,
             textColor=colors.HexColor('#595959'),
         )

@@ -11,6 +11,7 @@
 import asyncio
 from datetime import datetime, date
 from typing import Optional, Dict
+import os
 import structlog
 
 logger = structlog.get_logger()
@@ -63,7 +64,7 @@ class TaskScheduler:
 
                 # 每15分钟：营收异常检测
                 last = self._last_run["revenue_anomaly"]
-                if last is None or (now - last).total_seconds() >= 900:
+                if last is None or (now - last).total_seconds() >= int(os.getenv("SCHEDULER_REVENUE_ANOMALY_INTERVAL", "900")):
                     from src.core.celery_tasks import detect_revenue_anomaly
                     detect_revenue_anomaly.delay()
                     self._last_run["revenue_anomaly"] = now
@@ -71,7 +72,9 @@ class TaskScheduler:
 
                 # 每天22:30：营业日报
                 last = self._last_run["daily_report"]
-                if (now.hour == 22 and now.minute == 30 and
+                _report_hour = int(os.getenv("DAILY_REPORT_SCHEDULE_HOUR", "22"))
+                _report_minute = int(os.getenv("DAILY_REPORT_SCHEDULE_MINUTE", "30"))
+                if (now.hour == _report_hour and now.minute == _report_minute and
                         (last is None or last.date() < today)):
                     from src.core.celery_tasks import generate_and_send_daily_report
                     generate_and_send_daily_report.delay()
@@ -80,7 +83,9 @@ class TaskScheduler:
 
                 # 每天10:00：库存预警
                 last = self._last_run["inventory_alert"]
-                if (now.hour == 10 and now.minute == 0 and
+                _inv_hour = int(os.getenv("INVENTORY_ALERT_SCHEDULE_HOUR", "10"))
+                _inv_minute = int(os.getenv("INVENTORY_ALERT_SCHEDULE_MINUTE", "0"))
+                if (now.hour == _inv_hour and now.minute == _inv_minute and
                         (last is None or last.date() < today)):
                     from src.core.celery_tasks import check_inventory_alert
                     check_inventory_alert.delay()
@@ -89,7 +94,9 @@ class TaskScheduler:
 
                 # 每天03:00：POS对账
                 last = self._last_run["reconciliation"]
-                if (now.hour == 3 and now.minute == 0 and
+                _recon_hour = int(os.getenv("RECONCILIATION_SCHEDULE_HOUR", "3"))
+                _recon_minute = int(os.getenv("RECONCILIATION_SCHEDULE_MINUTE", "0"))
+                if (now.hour == _recon_hour and now.minute == _recon_minute and
                         (last is None or last.date() < today)):
                     from src.core.celery_tasks import perform_daily_reconciliation
                     perform_daily_reconciliation.delay()
@@ -97,13 +104,13 @@ class TaskScheduler:
                     logger.info("scheduler_triggered", task="perform_daily_reconciliation")
 
                 logger.debug("scheduler_tick", time=now.time())
-                await asyncio.sleep(60)
+                await asyncio.sleep(int(os.getenv("SCHEDULER_TICK_SECONDS", "60")))
 
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 logger.error("scheduler_error", error=str(e))
-                await asyncio.sleep(60)
+                await asyncio.sleep(int(os.getenv("SCHEDULER_TICK_SECONDS", "60")))
 
 
 # 全局调度器实例

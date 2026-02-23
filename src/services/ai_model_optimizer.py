@@ -11,6 +11,7 @@ Provides comprehensive AI model optimization capabilities:
 - Auto-scaling
 """
 
+import os
 from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime
 from enum import Enum
@@ -95,9 +96,9 @@ class AIModelOptimizer:
         self,
         model_id: str,
         training_data: List[Dict[str, Any]],
-        epochs: int = 10,
-        learning_rate: float = 0.001,
-        batch_size: int = 32
+        epochs: int = int(os.getenv("MODEL_FINE_TUNE_EPOCHS", "10")),
+        learning_rate: float = float(os.getenv("MODEL_FINE_TUNE_LR", "0.001")),
+        batch_size: int = int(os.getenv("MODEL_FINE_TUNE_BATCH_SIZE", "32"))
     ) -> Dict[str, Any]:
         """
         Fine-tune model on specific data
@@ -178,7 +179,7 @@ class AIModelOptimizer:
         model_id: str,
         param_space: Dict[str, List[Any]],
         optimization_metric: str = "f1_score",
-        max_trials: int = 50
+        max_trials: int = int(os.getenv("MODEL_HYPERPARAM_MAX_TRIALS", "50"))
     ) -> Dict[str, Any]:
         """
         Optimize model hyperparameters
@@ -223,14 +224,14 @@ class AIModelOptimizer:
             "max_trials": max_trials,
             "best_params": best_params,
             "best_score": best_score,
-            "improvement_pct": (best_score - 0.85) / 0.85 * 100
+            "improvement_pct": (best_score - float(os.getenv("MODEL_BASELINE_SCORE", "0.85"))) / float(os.getenv("MODEL_BASELINE_SCORE", "0.85")) * 100
         }
 
     def compress_model(
         self,
         model_id: str,
         compression_method: str = "quantization",
-        target_size_reduction: float = 0.5
+        target_size_reduction: float = float(os.getenv("MODEL_COMPRESS_TARGET_REDUCTION", "0.5"))
     ) -> Dict[str, Any]:
         """
         Compress model to reduce size and latency
@@ -262,8 +263,8 @@ class AIModelOptimizer:
 
         if compression_method == "quantization":
             # INT8 quantization typically reduces size by 4x
-            size_reduction = 0.75
-            accuracy_loss = 0.01  # 1% accuracy loss
+            size_reduction = float(os.getenv("MODEL_QUANTIZATION_SIZE_REDUCTION", "0.75"))
+            accuracy_loss = float(os.getenv("MODEL_QUANTIZATION_ACCURACY_LOSS", "0.01"))  # accuracy loss
 
             optimized_metrics = ModelMetrics(
                 accuracy=original_metrics.accuracy - accuracy_loss,
@@ -294,8 +295,8 @@ class AIModelOptimizer:
 
         else:  # distillation
             # Distillation can reduce size significantly with minimal accuracy loss
-            size_reduction = 0.8
-            accuracy_loss = 0.02  # 2% accuracy loss
+            size_reduction = float(os.getenv("MODEL_DISTILLATION_SIZE_REDUCTION", "0.8"))
+            accuracy_loss = float(os.getenv("MODEL_DISTILLATION_ACCURACY_LOSS", "0.02"))  # accuracy loss
 
             optimized_metrics = ModelMetrics(
                 accuracy=original_metrics.accuracy - accuracy_loss,
@@ -343,8 +344,8 @@ class AIModelOptimizer:
         test_name: str,
         model_a_id: str,
         model_b_id: str,
-        traffic_split: float = 0.5,
-        duration_hours: int = 24
+        traffic_split: float = float(os.getenv("MODEL_AB_TRAFFIC_SPLIT", "0.5")),
+        duration_hours: int = int(os.getenv("MODEL_AB_DURATION_HOURS", "24"))
     ) -> Dict[str, Any]:
         """
         Create A/B test for model comparison
@@ -432,8 +433,8 @@ class AIModelOptimizer:
             "model_a_results": test["results"]["model_a"],
             "model_b_results": test["results"]["model_b"],
             "improvement_pct": improvement,
-            "statistical_significance": "significant" if abs(improvement) > 5 else "not_significant",
-            "recommendation": "deploy_model_b" if improvement > 5 else "keep_model_a"
+            "statistical_significance": "significant" if abs(improvement) > float(os.getenv("MODEL_AB_SIGNIFICANCE_THRESHOLD", "5")) else "not_significant",
+            "recommendation": "deploy_model_b" if improvement > float(os.getenv("MODEL_AB_SIGNIFICANCE_THRESHOLD", "5")) else "keep_model_a"
         }
 
     def monitor_model_performance(
@@ -480,12 +481,12 @@ class AIModelOptimizer:
         # Detect anomalies
         anomalies = []
         for i, metrics in enumerate(metrics_over_time):
-            if metrics["accuracy"] < 0.90:
+            if metrics["accuracy"] < float(os.getenv("MODEL_ACCURACY_DRIFT_THRESHOLD", "0.90")):
                 anomalies.append({
                     "date": metrics["date"],
                     "type": "accuracy_drift",
                     "value": metrics["accuracy"],
-                    "threshold": 0.90
+                    "threshold": float(os.getenv("MODEL_ACCURACY_DRIFT_THRESHOLD", "0.90"))
                 })
 
         return {

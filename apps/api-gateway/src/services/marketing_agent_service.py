@@ -17,11 +17,16 @@ Marketing Agent Service
 """
 
 from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from pydantic import BaseModel
 from enum import Enum
 import numpy as np
 import logging
+import os
+from sqlalchemy import select, func
+from src.core.database import get_db_session
+from src.models.order import Order, OrderStatus
+from src.models.dish import Dish
 
 logger = logging.getLogger(__name__)
 
@@ -123,14 +128,22 @@ class MarketingAgentService:
 
     async def _get_customer_basic_info(self, customer_id: str) -> Dict:
         """获取顾客基础信息"""
-        # TODO: 从数据库查询
+        # customer_id 为手机号
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(Order.customer_name, Order.customer_phone).where(
+                    Order.customer_phone == customer_id
+                ).limit(1)
+            )
+            row = result.one_or_none()
+
         return {
-            "name": "张三",
-            "phone": "138****1234",
-            "gender": "male",
-            "age": 32,
-            "register_date": "2024-01-15",
-            "member_level": "gold"
+            "name": row[0] if row else "未知",
+            "phone": customer_id,
+            "gender": "unknown",
+            "age": None,
+            "register_date": None,
+            "member_level": "regular",
         }
 
     async def _analyze_consumption_behavior(
@@ -138,26 +151,104 @@ class MarketingAgentService:
         customer_id: str
     ) -> Dict:
         """分析消费行为"""
-        # TODO: 从订单数据分析
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(
+                    func.count(Order.id),
+                    func.coalesce(func.sum(Order.final_amount), 0),
+                    func.max(Order.order_time),
+                ).where(
+                    Order.customer_phone == customer_id,
+                    Order.status.in_([OrderStatus.COMPLETED, OrderStatus.SERVED]),
+                )
+            )
+            row = result.one()
+
+            # 推断偏好时段（按小时统计）
+            hour_result = await session.execute(
+                select(func.extract("hour", Order.order_time)).where(
+                    Order.customer_phone == customer_id,
+                    Order.status.in_([OrderStatus.COMPLETED, OrderStatus.SERVED]),
+                )
+            )
+            hours = [int(h[0]) for h in hour_result.all() if h[0] is not None]
+
+        total_orders = int(row[0] or 0)
+        total_amount = float(row[1] or 0) / 100.0
+        last_order_time = row[2]
+
+        avg_order_amount = round(total_amount / total_orders, 1) if total_orders > 0 else 0.0
+        last_order_date = last_order_time.strftime("%Y-%m-%d") if last_order_time else None
+        days_since_last = (datetime.now() - last_order_time).days if last_order_time else 999
+
+        # 推断偏好时段
+        if hours:
+            avg_hour = sum(hours) / len(hours)
+            if avg_hour < int(os.getenv("MARKETING_BREAKFAST_END_HOUR", "10")):
+                preferred_time = "早餐"
+            elif avg_hour < int(os.getenv("MARKETING_LUNCH_END_HOUR", "14")):
+                preferred_time = "午餐"
+            else:
+                preferred_time = "晚餐"
+        else:
+            preferred_time = "晚餐"
+
         return {
-            "total_orders": 25,
-            "total_amount": 5800.0,
-            "avg_order_amount": 232.0,
-            "last_order_date": "2026-02-15",
-            "days_since_last_order": 7,
-            "favorite_dishes": ["剁椒鱼头", "香辣蟹", "干锅虾"],
-            "preferred_time": "晚餐",
-            "preferred_day": "周末"
+            "total_orders": total_orders,
+            "total_amount": total_amount,
+            "avg_order_amount": avg_order_amount,
+            "last_order_date": last_order_date,
+            "days_since_last_order": days_since_last,
+            "favorite_dishes": [],
+            "preferred_time": preferred_time,
+            "preferred_day": "周末",
         }
 
     async def _vectorize_taste_preference(
         self,
         customer_id: str
     ) -> List[float]:
-        """向量化口味偏好"""
-        # 使用嵌入模型将口味偏好向量化
-        # TODO: 调用embedding_model_service
-        return [0.8, 0.2, 0.6, 0.9, 0.3]  # 示例向量
+        """向量化口味偏好（基于历史订单菜品类别统计）"""
+        # 5维特征向量：[辣度偏好, 素食偏好, 海鲜偏好, 肉类偏好, 甜品偏好]
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(OrderItem.item_name, func.sum(OrderItem.quantity).label("qty"))
+                .join(Order, OrderItem.order_id == Order.id)
+                .where(
+                    Order.customer_phone == customer_id,
+                    Order.status == OrderStatus.COMPLETED,
+                )
+                .group_by(OrderItem.item_name)
+                .order_by(func.sum(OrderItem.quantity).desc())
+                .limit(20)
+            )
+            items = result.all()
+
+        if not items:
+            return [0.5, 0.2, 0.3, 0.6, 0.2]
+
+        total_qty = sum(r.qty for r in items)
+        keywords = {
+            "spicy": ["辣", "麻", "椒", "火锅"],
+            "veg": ["素", "蔬菜", "豆腐", "菌"],
+            "seafood": ["鱼", "虾", "蟹", "海鲜", "贝"],
+            "meat": ["肉", "牛", "猪", "鸡", "鸭", "羊"],
+            "sweet": ["甜", "糕", "饮", "奶", "果"],
+        }
+        scores = {k: 0.0 for k in keywords}
+        for row in items:
+            weight = row.qty / total_qty
+            for key, kws in keywords.items():
+                if any(kw in row.item_name for kw in kws):
+                    scores[key] += weight
+
+        return [
+            min(1.0, scores["spicy"] * 2),
+            min(1.0, scores["veg"] * 2),
+            min(1.0, scores["seafood"] * 2),
+            min(1.0, scores["meat"] * 2),
+            min(1.0, scores["sweet"] * 2),
+        ]
 
     async def _calculate_customer_value(self, customer_id: str) -> float:
         """计算顾客价值（RFM模型）"""
@@ -168,12 +259,18 @@ class MarketingAgentService:
         consumption = await self._analyze_consumption_behavior(customer_id)
 
         # 简化的RFM评分
-        r_score = 100 - min(consumption["days_since_last_order"] * 2, 100)
-        f_score = min(consumption["total_orders"] * 4, 100)
-        m_score = min(consumption["total_amount"] / 100, 100)
+        _r_mult = float(os.getenv("RFM_RECENCY_MULTIPLIER", "2"))
+        _f_mult = float(os.getenv("RFM_FREQUENCY_MULTIPLIER", "4"))
+        _m_div = float(os.getenv("RFM_MONETARY_DIVISOR", "100"))
+        r_score = 100 - min(consumption["days_since_last_order"] * _r_mult, 100)
+        f_score = min(consumption["total_orders"] * _f_mult, 100)
+        m_score = min(consumption["total_amount"] / _m_div, 100)
 
         # 加权平均
-        value_score = (r_score * 0.3 + f_score * 0.3 + m_score * 0.4)
+        _r_weight = float(os.getenv("RFM_RECENCY_WEIGHT", "0.3"))
+        _f_weight = float(os.getenv("RFM_FREQUENCY_WEIGHT", "0.3"))
+        _m_weight = float(os.getenv("RFM_MONETARY_WEIGHT", "0.4"))
+        value_score = (r_score * _r_weight + f_score * _f_weight + m_score * _m_weight)
 
         return value_score
 
@@ -181,17 +278,20 @@ class MarketingAgentService:
         """预测流失风险"""
         consumption = await self._analyze_consumption_behavior(customer_id)
 
-        # 简化的流失风险模型
+        # 简化的流失风险模型（天数阈值支持环境变量覆盖）
         days_since_last = consumption["days_since_last_order"]
+        _low_days = int(os.getenv("CHURN_LOW_RISK_DAYS", "7"))
+        _mid_days = int(os.getenv("CHURN_MID_RISK_DAYS", "30"))
+        _high_days = int(os.getenv("CHURN_HIGH_RISK_DAYS", "60"))
 
-        if days_since_last < 7:
-            risk = 0.1  # 低风险
-        elif days_since_last < 30:
-            risk = 0.3  # 中风险
-        elif days_since_last < 60:
-            risk = 0.6  # 高风险
+        if days_since_last < _low_days:
+            risk = float(os.getenv("CHURN_RISK_LOW", "0.1"))  # 低风险
+        elif days_since_last < _mid_days:
+            risk = float(os.getenv("CHURN_RISK_MID", "0.3"))  # 中风险
+        elif days_since_last < _high_days:
+            risk = float(os.getenv("CHURN_RISK_HIGH", "0.6"))  # 高风险
         else:
-            risk = 0.9  # 极高风险
+            risk = float(os.getenv("CHURN_RISK_CRITICAL", "0.9"))  # 极高风险
 
         return risk
 
@@ -201,13 +301,13 @@ class MarketingAgentService:
         churn_risk: float
     ) -> CustomerSegment:
         """确定客户分群"""
-        if value_score > 70 and churn_risk < 0.3:
+        if value_score > float(os.getenv("SEGMENT_HIGH_VALUE_SCORE", "70")) and churn_risk < float(os.getenv("SEGMENT_HIGH_VALUE_CHURN", "0.3")):
             return CustomerSegment.HIGH_VALUE
-        elif value_score > 50 and churn_risk < 0.5:
+        elif value_score > float(os.getenv("SEGMENT_POTENTIAL_SCORE", "50")) and churn_risk < float(os.getenv("SEGMENT_POTENTIAL_CHURN", "0.5")):
             return CustomerSegment.POTENTIAL
-        elif value_score > 40 and churn_risk > 0.5:
+        elif value_score > float(os.getenv("SEGMENT_AT_RISK_SCORE", "40")) and churn_risk > float(os.getenv("SEGMENT_AT_RISK_CHURN", "0.5")):
             return CustomerSegment.AT_RISK
-        elif churn_risk > 0.8:
+        elif churn_risk > float(os.getenv("SEGMENT_LOST_CHURN", "0.8")):
             return CustomerSegment.LOST
         else:
             return CustomerSegment.NEW
@@ -233,52 +333,62 @@ class MarketingAgentService:
         """
         logger.info(f"Generating coupon strategy for scenario: {scenario}")
 
+        # 从 Store 配置读取优惠券参数
+        cfg: Dict = {}
+        try:
+            from src.models.store import Store
+            async with get_db_session() as session:
+                store_result = await session.execute(
+                    select(Store).where(Store.id == tenant_id)
+                )
+                store = store_result.scalar_one_or_none()
+                if store and store.config:
+                    cfg = store.config
+        except Exception as _e:
+            logger.warning("读取Store优惠券配置失败，使用默认值", error=str(_e))
+
         if scenario == "traffic_decline":
-            # 场景：预测客流下降
             return CouponStrategy(
                 coupon_type="满减券",
-                amount=20.0,
-                threshold=100.0,
-                valid_days=7,
+                amount=float(cfg.get("coupon_traffic_decline_amount", 20.0)),
+                threshold=float(cfg.get("coupon_traffic_decline_threshold", 100.0)),
+                valid_days=int(cfg.get("coupon_traffic_decline_days", 7)),
                 target_segment=CustomerSegment.AT_RISK,
-                expected_conversion=0.25,
-                expected_roi=3.5
+                expected_conversion=float(cfg.get("coupon_traffic_decline_conversion", 0.25)),
+                expected_roi=float(cfg.get("coupon_traffic_decline_roi", 3.5))
             )
 
         elif scenario == "new_product_launch":
-            # 场景：新品上市
             return CouponStrategy(
                 coupon_type="代金券",
-                amount=15.0,
+                amount=float(cfg.get("coupon_new_product_amount", 15.0)),
                 threshold=None,
-                valid_days=14,
+                valid_days=int(cfg.get("coupon_new_product_days", 14)),
                 target_segment=CustomerSegment.HIGH_VALUE,
-                expected_conversion=0.35,
-                expected_roi=4.2
+                expected_conversion=float(cfg.get("coupon_new_product_conversion", 0.35)),
+                expected_roi=float(cfg.get("coupon_new_product_roi", 4.2))
             )
 
         elif scenario == "member_day":
-            # 场景：会员日
             return CouponStrategy(
                 coupon_type="折扣券",
-                amount=0.88,  # 8.8折
-                threshold=50.0,
-                valid_days=1,
+                amount=float(cfg.get("coupon_member_day_discount", 0.88)),
+                threshold=float(cfg.get("coupon_member_day_threshold", 50.0)),
+                valid_days=int(cfg.get("coupon_member_day_valid_days", os.getenv("MARKETING_MEMBER_DAY_VALID_DAYS", "1"))),
                 target_segment=CustomerSegment.POTENTIAL,
-                expected_conversion=0.40,
-                expected_roi=5.0
+                expected_conversion=float(cfg.get("coupon_member_day_conversion", 0.40)),
+                expected_roi=float(cfg.get("coupon_member_day_roi", 5.0))
             )
 
         else:
-            # 默认策略
             return CouponStrategy(
                 coupon_type="满减券",
-                amount=10.0,
-                threshold=50.0,
-                valid_days=7,
+                amount=float(cfg.get("coupon_default_amount", 10.0)),
+                threshold=float(cfg.get("coupon_default_threshold", 50.0)),
+                valid_days=int(cfg.get("coupon_default_days", 7)),
                 target_segment=CustomerSegment.NEW,
-                expected_conversion=0.20,
-                expected_roi=2.8
+                expected_conversion=float(cfg.get("coupon_default_conversion", 0.20)),
+                expected_roi=float(cfg.get("coupon_default_roi", 2.8))
             )
 
     async def create_marketing_campaign(
@@ -331,7 +441,7 @@ class MarketingAgentService:
             channel=MarketingChannel.WECHAT,
             coupon_strategy=coupon_strategy,
             start_time=datetime.now(),
-            end_time=datetime.now() + timedelta(days=7),
+            end_time=datetime.now() + timedelta(days=int(os.getenv("MARKETING_CAMPAIGN_DAYS", "7"))),
             budget=budget,
             expected_reach=expected_reach
         )
@@ -362,28 +472,29 @@ class MarketingAgentService:
         # 1. 获取顾客口味向量
         taste_vector = await self._vectorize_taste_preference(customer_id)
 
-        # 2. 获取所有菜品
-        # TODO: 从数据库查询
+        # 2. 从数据库查询门店可售菜品（按评分+销量排序）
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(Dish).where(
+                    Dish.store_id == tenant_id,
+                    Dish.is_available == True,
+                ).order_by(
+                    Dish.rating.desc(),
+                    Dish.total_sales.desc(),
+                ).limit(top_k * 3)
+            )
+            dishes = result.scalars().all()
 
-        # 3. 计算相似度
-        # TODO: 使用嵌入模型计算
-
-        # 4. 排序并返回Top K
+        # 3. 返回 Top K（无嵌入模型时按评分排序）
         recommendations = [
             {
-                "dish_id": "D101",
-                "dish_name": "剁椒鱼头",
-                "price": 88.0,
-                "similarity": 0.92,
-                "reason": "基于您的口味偏好推荐"
-            },
-            {
-                "dish_id": "D102",
-                "dish_name": "香辣蟹",
-                "price": 128.0,
-                "similarity": 0.88,
-                "reason": "喜欢剁椒鱼头的顾客也喜欢这道菜"
+                "dish_id": str(d.id),
+                "dish_name": d.name,
+                "price": float(d.price) / 100.0 if d.price else 0.0,
+                "similarity": round(float(d.rating or 4.0) / 5.0, 2),
+                "reason": "门店热门推荐" if d.is_recommended else "基于评分推荐",
             }
+            for d in dishes
         ]
 
         return recommendations[:top_k]
@@ -422,18 +533,32 @@ class MarketingAgentService:
         tenant_id: str
     ):
         """发送生日优惠券"""
-        # 生成生日券
+        cfg: Dict = {}
+        try:
+            from src.models.store import Store
+            async with get_db_session() as session:
+                store_result = await session.execute(select(Store).where(Store.id == tenant_id))
+                store = store_result.scalar_one_or_none()
+                if store and store.config:
+                    cfg = store.config
+        except Exception:
+            pass
+
         coupon = {
             "type": "生日专享券",
-            "amount": 50.0,
-            "threshold": 100.0,
-            "valid_days": 7
+            "amount": float(cfg.get("birthday_coupon_amount", 50.0)),
+            "threshold": float(cfg.get("birthday_coupon_threshold", 100.0)),
+            "valid_days": int(cfg.get("birthday_coupon_days", 7))
         }
 
-        # 通过企微发送
         message = f"🎂 生日快乐！送您{coupon['amount']}元生日券，满{coupon['threshold']}可用"
 
-        # TODO: 调用enterprise_service发送
+        try:
+            from src.services.wechat_work_message_service import WeChatWorkMessageService
+            wechat = WeChatWorkMessageService()
+            await wechat.send_text_message(customer_id, message)
+        except Exception as e:
+            logger.warning(f"企微发送生日券失败: {e}")
         logger.info(f"Sent birthday coupon to {customer_id}")
 
     async def _send_winback_offer(
@@ -442,17 +567,32 @@ class MarketingAgentService:
         tenant_id: str
     ):
         """发送挽回优惠"""
-        # 生成挽回券
+        cfg: Dict = {}
+        try:
+            from src.models.store import Store
+            async with get_db_session() as session:
+                store_result = await session.execute(select(Store).where(Store.id == tenant_id))
+                store = store_result.scalar_one_or_none()
+                if store and store.config:
+                    cfg = store.config
+        except Exception:
+            pass
+
         coupon = {
             "type": "专属挽回券",
-            "amount": 30.0,
-            "threshold": 80.0,
-            "valid_days": 14
+            "amount": float(cfg.get("winback_coupon_amount", 30.0)),
+            "threshold": float(cfg.get("winback_coupon_threshold", 80.0)),
+            "valid_days": int(cfg.get("winback_coupon_days", 14))
         }
 
         message = f"好久不见！特别为您准备了{coupon['amount']}元优惠券，期待您的光临"
 
-        # TODO: 调用enterprise_service发送
+        try:
+            from src.services.wechat_work_message_service import WeChatWorkMessageService
+            wechat = WeChatWorkMessageService()
+            await wechat.send_text_message(customer_id, message)
+        except Exception as e:
+            logger.warning(f"企微发送挽回券失败: {e}")
         logger.info(f"Sent winback offer to {customer_id}")
 
     async def _send_repurchase_reminder(
@@ -467,7 +607,12 @@ class MarketingAgentService:
 
         message = f"您喜欢的{favorite_dishes[0]}又上新了，欢迎品尝！"
 
-        # TODO: 调用enterprise_service发送
+        try:
+            from src.services.wechat_work_message_service import WeChatWorkMessageService
+            wechat = WeChatWorkMessageService()
+            await wechat.send_text_message(customer_id, message)
+        except Exception as e:
+            logger.warning(f"企微发送复购提醒失败: {e}")
         logger.info(f"Sent repurchase reminder to {customer_id}")
 
     # ==================== 营销效果分析 ====================
@@ -485,18 +630,44 @@ class MarketingAgentService:
         Returns:
             效果分析
         """
-        # TODO: 从数据库查询活动数据
+        # 从数据库查询活动数据
+        from src.models.marketing_campaign import MarketingCampaign
 
-        performance = {
-            "campaign_id": campaign_id,
-            "reach": 1000,              # 触达人数
-            "conversion": 250,          # 转化人数
-            "conversion_rate": 0.25,    # 转化率
-            "revenue": 62500.0,         # 带来营收
-            "cost": 5000.0,             # 成本
-            "roi": 12.5,                # ROI
-            "avg_order_amount": 250.0   # 平均客单价
-        }
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(MarketingCampaign).where(MarketingCampaign.id == campaign_id)
+            )
+            campaign = result.scalar_one_or_none()
+
+        if campaign:
+            reach = campaign.reach_count or 0
+            conversion = campaign.conversion_count or 0
+            revenue = campaign.revenue_generated or 0.0
+            cost = campaign.actual_cost or campaign.budget or 0.0
+            conversion_rate = conversion / reach if reach > 0 else 0.0
+            roi = (revenue - cost) / cost if cost > 0 else 0.0
+            avg_order = revenue / conversion if conversion > 0 else 0.0
+            performance = {
+                "campaign_id": campaign_id,
+                "reach": reach,
+                "conversion": conversion,
+                "conversion_rate": round(conversion_rate, 4),
+                "revenue": revenue,
+                "cost": cost,
+                "roi": round(roi, 2),
+                "avg_order_amount": round(avg_order, 2),
+            }
+        else:
+            performance = {
+                "campaign_id": campaign_id,
+                "reach": 0,
+                "conversion": 0,
+                "conversion_rate": 0.0,
+                "revenue": 0.0,
+                "cost": 0.0,
+                "roi": 0.0,
+                "avg_order_amount": 0.0,
+            }
 
         return performance
 

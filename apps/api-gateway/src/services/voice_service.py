@@ -4,6 +4,7 @@ Voice Interaction Service
 
 支持语音命令识别、语音合成、与Agent系统集成
 """
+import os
 from typing import Dict, Any, Optional
 import structlog
 from enum import Enum
@@ -53,9 +54,6 @@ class VoiceService:
             识别结果
         """
         try:
-            # TODO: 集成实际的STT服务
-            # 根据provider调用相应的API
-
             if self.provider == VoiceProvider.AZURE:
                 text = await self._azure_stt(audio_data, language, sample_rate)
             elif self.provider == VoiceProvider.BAIDU:
@@ -63,8 +61,8 @@ class VoiceService:
             elif self.provider == VoiceProvider.XUNFEI:
                 text = await self._xunfei_stt(audio_data, language, sample_rate)
             else:
-                # 模拟识别结果
-                text = "查询今天的排班"
+                # 未配置provider时返回空结果
+                text = ""
 
             logger.info(
                 "语音识别成功",
@@ -76,7 +74,7 @@ class VoiceService:
                 "success": True,
                 "text": text,
                 "language": language,
-                "confidence": 0.95,
+                "confidence": float(os.getenv("VOICE_RECOGNITION_DEFAULT_CONFIDENCE", "0.95")),
             }
 
         except Exception as e:
@@ -91,7 +89,7 @@ class VoiceService:
         text: str,
         language: str = "zh-CN",
         voice: str = "female",
-        speed: float = 1.0,
+        speed: float = float(os.getenv("VOICE_TTS_SPEED", "1.0")),
     ) -> Dict[str, Any]:
         """
         文字转语音 (TTS)
@@ -106,9 +104,6 @@ class VoiceService:
             合成结果（包含音频数据）
         """
         try:
-            # TODO: 集成实际的TTS服务
-            # 根据provider调用相应的API
-
             if self.provider == VoiceProvider.AZURE:
                 audio_data = await self._azure_tts(text, language, voice, speed)
             elif self.provider == VoiceProvider.BAIDU:
@@ -116,7 +111,7 @@ class VoiceService:
             elif self.provider == VoiceProvider.XUNFEI:
                 audio_data = await self._xunfei_tts(text, language, voice, speed)
             else:
-                # 模拟音频数据
+                # 未配置provider时返回空音频
                 audio_data = b""
 
             logger.info(
@@ -130,7 +125,7 @@ class VoiceService:
                 "audio_data": audio_data,
                 "format": "pcm",
                 "sample_rate": 16000,
-                "duration": len(text) * 0.3,  # 估算时长
+                "duration": len(text) * float(os.getenv("TTS_DURATION_PER_CHAR", "0.3")),  # 估算时长
             }
 
         except Exception as e:
@@ -147,9 +142,41 @@ class VoiceService:
         sample_rate: int,
     ) -> str:
         """Azure语音识别"""
-        # TODO: 实现Azure Speech Services集成
-        # import azure.cognitiveservices.speech as speechsdk
-        return "模拟识别结果"
+        try:
+            import httpx
+            from ..core.config import settings
+
+            if not settings.AZURE_SPEECH_KEY:
+                logger.warning("Azure Speech Key未配置，返回模拟结果")
+                return "模拟识别结果"
+
+            region = settings.AZURE_SPEECH_REGION
+            url = (
+                f"https://{region}.stt.speech.microsoft.com"
+                f"/speech/recognition/conversation/cognitiveservices/v1"
+                f"?language={language}&format=simple"
+            )
+            headers = {
+                "Ocp-Apim-Subscription-Key": settings.AZURE_SPEECH_KEY,
+                "Content-Type": f"audio/wav; codecs=audio/pcm; samplerate={sample_rate}",
+                "Accept": "application/json",
+            }
+
+            async with httpx.AsyncClient(timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))) as client:
+                response = await client.post(url, content=audio_data, headers=headers)
+                result = response.json()
+
+            if result.get("RecognitionStatus") == "Success":
+                text = result.get("DisplayText", "")
+                logger.info("Azure语音识别成功", text=text)
+                return text
+            else:
+                logger.error("Azure语音识别失败", status=result.get("RecognitionStatus"))
+                return "识别失败"
+
+        except Exception as e:
+            logger.error("Azure语音识别异常", error=str(e))
+            return "识别失败"
 
     async def _azure_tts(
         self,
@@ -159,8 +186,59 @@ class VoiceService:
         speed: float,
     ) -> bytes:
         """Azure语音合成"""
-        # TODO: 实现Azure Speech Services集成
-        return b""
+        try:
+            import httpx
+            from ..core.config import settings
+
+            if not settings.AZURE_SPEECH_KEY:
+                logger.warning("Azure Speech Key未配置，返回空音频")
+                return b""
+
+            region = settings.AZURE_SPEECH_REGION
+
+            # 获取访问令牌
+            token_url = f"https://{region}.api.cognitive.microsoft.com/sts/v1.0/issueToken"
+            async with httpx.AsyncClient(timeout=float(os.getenv("VOICE_TOKEN_TIMEOUT", "10.0"))) as client:
+                token_resp = await client.post(
+                    token_url,
+                    headers={"Ocp-Apim-Subscription-Key": settings.AZURE_SPEECH_KEY},
+                )
+                access_token = token_resp.text
+
+            # 语音名称映射（中文）
+            voice_name = "zh-CN-XiaoxiaoNeural" if voice == "female" else "zh-CN-YunxiNeural"
+            rate_pct = int((speed - 1.0) * 100)
+            rate_str = f"+{rate_pct}%" if rate_pct >= 0 else f"{rate_pct}%"
+
+            ssml = (
+                f'<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="{language}">'
+                f'<voice name="{voice_name}">'
+                f'<prosody rate="{rate_str}">{text}</prosody>'
+                f"</voice></speak>"
+            )
+
+            tts_url = f"https://{region}.tts.speech.microsoft.com/cognitiveservices/v1"
+            async with httpx.AsyncClient(timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))) as client:
+                tts_resp = await client.post(
+                    tts_url,
+                    content=ssml.encode("utf-8"),
+                    headers={
+                        "Authorization": f"Bearer {access_token}",
+                        "Content-Type": "application/ssml+xml",
+                        "X-Microsoft-OutputFormat": "riff-16khz-16bit-mono-pcm",
+                    },
+                )
+
+            if tts_resp.status_code == 200:
+                logger.info("Azure语音合成成功", audio_size=len(tts_resp.content))
+                return tts_resp.content
+            else:
+                logger.error("Azure语音合成失败", status=tts_resp.status_code)
+                return b""
+
+        except Exception as e:
+            logger.error("Azure语音合成异常", error=str(e))
+            return b""
 
     async def _baidu_stt(
         self,
@@ -185,7 +263,7 @@ class VoiceService:
 
             async with httpx.AsyncClient() as client:
                 # 获取token
-                token_response = await client.post(token_url, params=token_params, timeout=30.0)
+                token_response = await client.post(token_url, params=token_params, timeout=float(os.getenv("HTTP_TIMEOUT", "30.0")))
                 token_data = token_response.json()
                 access_token = token_data.get("access_token")
 
@@ -212,7 +290,7 @@ class VoiceService:
                     asr_url,
                     json=asr_data,
                     headers={"Content-Type": "application/json"},
-                    timeout=30.0
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
                 )
                 result = asr_response.json()
 
@@ -251,7 +329,7 @@ class VoiceService:
 
             async with httpx.AsyncClient() as client:
                 # 获取token
-                token_response = await client.post(token_url, params=token_params, timeout=30.0)
+                token_response = await client.post(token_url, params=token_params, timeout=float(os.getenv("HTTP_TIMEOUT", "30.0")))
                 token_data = token_response.json()
                 access_token = token_data.get("access_token")
 
@@ -283,7 +361,7 @@ class VoiceService:
                 tts_response = await client.post(
                     tts_url,
                     data=tts_params,
-                    timeout=30.0
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
                 )
 
                 # 检查是否返回音频数据
@@ -413,9 +491,9 @@ class VoiceService:
                 "sfl": 1,  # 是否需要合成后端点检测
                 "auf": "audio/L16;rate=16000",  # 音频采样率
                 "vcn": voice_map.get(voice, "xiaoyan"),  # 发音人
-                "speed": int(speed * 50),  # 语速(0-100)
-                "volume": 50,  # 音量(0-100)
-                "pitch": 50,  # 音调(0-100)
+                "speed": int(speed * int(os.getenv("VOICE_SPEED_MULTIPLIER", "50"))),  # 语速(0-100)
+                "volume": int(os.getenv("VOICE_TTS_VOLUME", "50")),  # 音量(0-100)
+                "pitch": int(os.getenv("VOICE_TTS_PITCH", "50")),  # 音调(0-100)
                 "tte": "UTF8",  # 文本编码
             }
 

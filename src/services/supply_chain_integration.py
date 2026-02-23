@@ -6,6 +6,7 @@ Phase 5: 生态扩展期 (Ecosystem Expansion Period)
 Integrates with suppliers for automated procurement
 """
 
+import os
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from enum import Enum
@@ -113,7 +114,7 @@ class SupplyChainIntegration:
             contact="400-123-4567",
             rating=4.5,
             delivery_time_days=1,
-            min_order_amount=500.0,
+            min_order_amount=float(os.getenv("SUPPLY_CHAIN_MIN_ORDER_AMOUNT_1", "500.0")),
             payment_terms="Net 30",
             api_endpoint="https://api.supplier001.com",
             created_at=datetime.utcnow()
@@ -127,7 +128,7 @@ class SupplyChainIntegration:
             contact="400-234-5678",
             rating=4.2,
             delivery_time_days=0,  # Same day
-            min_order_amount=300.0,
+            min_order_amount=float(os.getenv("SUPPLY_CHAIN_MIN_ORDER_AMOUNT_2", "300.0")),
             payment_terms="Net 15",
             api_endpoint="https://api.supplier002.com",
             created_at=datetime.utcnow()
@@ -239,7 +240,7 @@ class SupplyChainIntegration:
         quote_id = f"quote_{supplier_id}_{material_id}_{datetime.utcnow().timestamp()}"
 
         # Simulate pricing (base price with random variation)
-        base_price = 10.0
+        base_price = float(os.getenv("SUPPLY_CHAIN_MOCK_BASE_PRICE", "10.0"))
         unit_price = base_price * (0.9 + random.random() * 0.2)  # ±10% variation
         total_price = unit_price * quantity
 
@@ -251,7 +252,7 @@ class SupplyChainIntegration:
             unit_price=unit_price,
             total_price=total_price,
             delivery_date=required_date,
-            valid_until=datetime.utcnow() + timedelta(days=3),
+            valid_until=datetime.utcnow() + timedelta(days=int(os.getenv("SUPPLY_CHAIN_QUOTE_VALID_DAYS", "3"))),
             status=QuoteStatus.RECEIVED,
             created_at=datetime.utcnow()
         )
@@ -382,7 +383,7 @@ class SupplyChainIntegration:
         options = []
 
         # Option 1: Early payment discount
-        early_payment_discount = 0.02  # 2% discount
+        early_payment_discount = float(os.getenv("SUPPLY_CHAIN_EARLY_PAYMENT_DISCOUNT", "0.02"))  # early payment discount
         early_payment_amount = order.total_amount * (1 - early_payment_discount)
         options.append({
             "type": "early_payment_discount",
@@ -402,7 +403,7 @@ class SupplyChainIntegration:
         })
 
         # Option 3: Extended payment terms (with interest)
-        extended_interest = 0.05  # 5% interest
+        extended_interest = float(os.getenv("SUPPLY_CHAIN_EXTENDED_INTEREST", "0.05"))  # extended interest
         extended_amount = order.total_amount * (1 + extended_interest)
         options.append({
             "type": "extended_terms",
