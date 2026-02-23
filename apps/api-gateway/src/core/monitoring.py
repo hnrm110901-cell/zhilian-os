@@ -223,7 +223,7 @@ class ErrorMonitor:
 
     def get_error_summary(
         self,
-        time_window_minutes: int = 60
+        time_window_minutes: int = int(os.getenv("MONITORING_ERROR_WINDOW_MINUTES", "60"))
     ) -> Dict[str, Any]:
         """
         获取错误摘要
@@ -274,7 +274,7 @@ class ErrorMonitor:
 
     def get_performance_summary(
         self,
-        time_window_minutes: int = 60
+        time_window_minutes: int = int(os.getenv("MONITORING_ERROR_WINDOW_MINUTES", "60"))
     ) -> Dict[str, Any]:
         """
         获取性能摘要

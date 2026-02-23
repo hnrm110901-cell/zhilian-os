@@ -2,6 +2,7 @@
 Neural System API
 Provides REST API access to Zhilian OS neural system capabilities
 """
+import os
 from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
@@ -39,7 +40,7 @@ class SemanticSearchRequest(BaseModel):
     """Request for semantic search"""
     query: str = Field(..., description="Search query text")
     store_id: str = Field(..., description="Store identifier for data isolation")
-    top_k: int = Field(default=10, ge=1, le=100, description="Number of results to return")
+    top_k: int = Field(default=int(os.getenv("NEURAL_SEARCH_TOP_K", "10")), ge=1, le=100, description="Number of results to return")
     filters: Optional[Dict[str, Any]] = Field(default=None, description="Additional filters")
 
 

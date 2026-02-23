@@ -269,7 +269,7 @@ class VectorDatabaseService:
         self,
         collection_name: str,
         query: str,
-        limit: int = 10,
+        limit: int = int(os.getenv("VECTOR_DB_SEARCH_LIMIT", "10")),
         filters: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
         """
@@ -368,7 +368,7 @@ class VectorDatabaseService:
         self,
         query: str,
         store_id: str,
-        limit: int = 10
+        limit: int = int(os.getenv("VECTOR_DB_SEARCH_LIMIT", "10"))
     ) -> List[Dict[str, Any]]:
         """搜索订单"""
         return await self.semantic_search(
@@ -382,7 +382,7 @@ class VectorDatabaseService:
         self,
         query: str,
         store_id: str,
-        limit: int = 10
+        limit: int = int(os.getenv("VECTOR_DB_SEARCH_LIMIT", "10"))
     ) -> List[Dict[str, Any]]:
         """搜索菜品"""
         return await self.semantic_search(
@@ -396,7 +396,7 @@ class VectorDatabaseService:
         self,
         query: str,
         store_id: str,
-        limit: int = 10
+        limit: int = int(os.getenv("VECTOR_DB_SEARCH_LIMIT", "10"))
     ) -> List[Dict[str, Any]]:
         """搜索事件"""
         return await self.semantic_search(

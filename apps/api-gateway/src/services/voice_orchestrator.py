@@ -4,6 +4,7 @@ Voice Interaction Orchestrator
 
 整合Shokz设备、语音服务和Agent系统，提供完整的语音交互流程
 """
+import os
 from typing import Dict, Any, Optional
 import structlog
 
@@ -225,11 +226,11 @@ class VoiceInteractionOrchestrator:
         """
         try:
             # 根据优先级调整语速
-            speed = 1.0
+            speed = float(os.getenv("VOICE_SPEED_NORMAL", "1.0"))
             if priority == "high":
-                speed = 1.2
+                speed = float(os.getenv("VOICE_SPEED_HIGH", "1.2"))
             elif priority == "urgent":
-                speed = 1.5
+                speed = float(os.getenv("VOICE_SPEED_URGENT", "1.5"))
 
             # 语音合成
             tts_result = await voice_service.text_to_speech(

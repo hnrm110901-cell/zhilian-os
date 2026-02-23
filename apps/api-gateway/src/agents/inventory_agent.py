@@ -119,7 +119,7 @@ class InventoryAgent(LLMEnhancedAgent):
         self,
         store_id: str,
         current_inventory: Dict[str, int],
-        threshold_hours: int = 4
+        threshold_hours: int = int(os.getenv("INVENTORY_ALERT_THRESHOLD_HOURS", "4"))
     ) -> Dict[str, Any]:
         """
         检查低库存预警

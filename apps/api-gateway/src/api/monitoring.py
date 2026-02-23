@@ -2,6 +2,7 @@
 监控API端点
 提供错误和性能监控数据的查询接口
 """
+import os
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
@@ -335,7 +336,7 @@ async def get_monitoring_dashboard(
     queue_stats = await scheduler_monitor_service.get_queue_stats()
 
     # 错误监控
-    error_summary = error_monitor.get_error_summary(time_window_minutes=60)
+    error_summary = error_monitor.get_error_summary(time_window_minutes=int(os.getenv("MONITORING_ERROR_WINDOW_MINUTES", "60")))
 
     return {
         "success": True,

@@ -2,6 +2,7 @@
 飞书服务
 Feishu (Lark) Service for message sending and user management
 """
+import os
 from typing import Dict, Any, List, Optional
 import httpx
 import structlog
@@ -230,7 +231,7 @@ class FeishuService:
             raise
 
     async def get_department_users(
-        self, department_id: str = "0", page_size: int = 50
+        self, department_id: str = "0", page_size: int = int(os.getenv("FEISHU_PAGE_SIZE", "50"))
     ) -> List[Dict[str, Any]]:
         """
         获取部门用户列表
