@@ -4,6 +4,7 @@
 """
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
+import os
 import structlog
 
 logger = structlog.get_logger()
@@ -263,7 +264,11 @@ class BaselineDataService:
             )
             inventory_records = int(inventory_result.scalar() or 0)
 
-        threshold = {"orders": 100, "days": 30, "inventory": 50}
+        threshold = {
+            "orders": int(os.getenv("BASELINE_MIN_ORDERS", "100")),
+            "days": int(os.getenv("BASELINE_MIN_DAYS", "30")),
+            "inventory": int(os.getenv("BASELINE_MIN_INVENTORY", "50")),
+        }
         is_sufficient = (
             orders_count >= threshold["orders"]
             and days_of_data >= threshold["days"]
