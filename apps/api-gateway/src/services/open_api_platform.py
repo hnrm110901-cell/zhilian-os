@@ -13,6 +13,10 @@ from enum import Enum
 from dataclasses import dataclass
 from sqlalchemy.orm import Session
 import secrets
+import logging
+import json
+
+logger = logging.getLogger(__name__)
 import hashlib
 import hmac
 
@@ -613,9 +617,20 @@ class OpenAPIPlatform:
         webhook_url: str,
         payload: Dict[str, Any]
     ):
-        """Trigger webhook (simplified)"""
-        # In production, use async HTTP client
-        pass
+        """Trigger webhook via HTTP POST (fire-and-forget)"""
+        try:
+            import urllib.request
+            data = json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(
+                webhook_url,
+                data=data,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                logger.info("webhook_triggered", url=webhook_url, status=resp.status)
+        except Exception as e:
+            logger.warning("webhook_failed", url=webhook_url, error=str(e))
 
     def log_api_usage(
         self,

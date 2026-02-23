@@ -152,8 +152,8 @@ class FinanceService:
                 result = await session.execute(select(Store.config).where(Store.id == store_id))
                 cfg = result.scalar_one_or_none() or {}
                 tax_rate = float(cfg.get("tax_rate", os.getenv("FINANCE_DEFAULT_TAX_RATE", "0.06")))
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("tax_rate_fetch_failed", store_id=store_id, error=str(e))
         tax_amount = int(operating_profit * tax_rate) if operating_profit > 0 else 0
         net_profit = operating_profit - tax_amount
 
