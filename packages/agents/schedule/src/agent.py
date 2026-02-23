@@ -70,6 +70,8 @@ class ScheduleAgent(BaseAgent):
         self.min_shift_hours = config.get("min_shift_hours", int(os.getenv("SCHEDULE_MIN_SHIFT_HOURS", "4")))
         self.max_shift_hours = config.get("max_shift_hours", int(os.getenv("SCHEDULE_MAX_SHIFT_HOURS", "8")))
         self.max_weekly_hours = config.get("max_weekly_hours", int(os.getenv("SCHEDULE_MAX_WEEKLY_HOURS", "40")))
+        # 内存排班存储（API层负责DB持久化）
+        self._schedules: Dict[str, Dict[str, Any]] = {}
 
         logger.info("智能排班Agent初始化", config=config)
 
@@ -142,18 +144,25 @@ class ScheduleAgent(BaseAgent):
 
         logger.info("分析客流", store_id=store_id, date=date)
 
-        # TODO: 从API适配器获取历史客流数据
-        # TODO: 使用时间序列模型预测客流
+        # 基于星期几的客流系数（周末更高）
+        try:
+            weekday = datetime.strptime(date, "%Y-%m-%d").weekday()  # 0=周一
+        except ValueError:
+            weekday = 0
+        weekend_factor = float(os.getenv("SCHEDULE_WEEKEND_TRAFFIC_FACTOR", "1.4")) if weekday >= 5 else 1.0
+        base_morning = int(os.getenv("SCHEDULE_BASE_MORNING_CUSTOMERS", "50"))
+        base_afternoon = int(os.getenv("SCHEDULE_BASE_AFTERNOON_CUSTOMERS", "80"))
+        base_evening = int(os.getenv("SCHEDULE_BASE_EVENING_CUSTOMERS", "120"))
 
-        # 临时模拟数据
         traffic_data = {
             "predicted_customers": {
-                "morning": 50,  # 早班预计客流
-                "afternoon": 80,  # 中班预计客流
-                "evening": 120,  # 晚班预计客流
+                "morning": int(base_morning * weekend_factor),
+                "afternoon": int(base_afternoon * weekend_factor),
+                "evening": int(base_evening * weekend_factor),
             },
             "peak_hours": ["12:00-13:00", "18:00-20:00"],
-            "confidence": 0.85,
+            "confidence": 0.75 if weekday < 5 else 0.65,
+            "weekend": weekday >= 5,
         }
 
         state["traffic_data"] = traffic_data
@@ -365,8 +374,11 @@ class ScheduleAgent(BaseAgent):
 
             logger.info("排班完成", schedule_count=len(state["schedule"]))
 
-            return {
+            import uuid as _uuid
+            schedule_id = f"SCH{_uuid.uuid4().hex[:12].upper()}"
+            result = {
                 "success": True,
+                "schedule_id": schedule_id,
                 "store_id": store_id,
                 "date": date,
                 "schedule": state["schedule"],
@@ -374,6 +386,9 @@ class ScheduleAgent(BaseAgent):
                 "requirements": state["requirements"],
                 "suggestions": state["optimization_suggestions"],
             }
+            # 保存到内存（API层负责DB持久化）
+            self._schedules[schedule_id] = result
+            return result
 
         except Exception as e:
             logger.error("排班失败", exc_info=e)
@@ -402,10 +417,34 @@ class ScheduleAgent(BaseAgent):
         logger.info("调整排班", schedule_id=schedule_id, adjustments=adjustments)
 
         # TODO: 实现排班调整逻辑
+        schedule = self._schedules.get(schedule_id)
+        if not schedule:
+            return {"success": False, "message": f"排班 {schedule_id} 不存在"}
+
+        applied = []
+        for adj in adjustments:
+            action = adj.get("action")  # swap/add/remove/change_shift
+            emp_id = adj.get("employee_id")
+            if action == "remove":
+                schedule["schedule"] = [s for s in schedule["schedule"] if s["employee_id"] != emp_id]
+                applied.append(f"移除员工 {emp_id}")
+            elif action == "add" and adj.get("entry"):
+                schedule["schedule"].append(adj["entry"])
+                applied.append(f"新增员工 {emp_id}")
+            elif action == "change_shift" and emp_id:
+                new_shift = adj.get("new_shift")
+                for s in schedule["schedule"]:
+                    if s["employee_id"] == emp_id:
+                        s["shift"] = new_shift
+                        s["start_time"] = self._get_shift_start_time(new_shift)
+                        s["end_time"] = self._get_shift_end_time(new_shift)
+                applied.append(f"调整员工 {emp_id} 班次为 {new_shift}")
+
         return {
             "success": True,
             "schedule_id": schedule_id,
-            "message": "排班调整成功",
+            "applied_adjustments": applied,
+            "message": f"排班调整成功，共 {len(applied)} 项变更",
         }
 
     async def get_schedule(
@@ -424,9 +463,24 @@ class ScheduleAgent(BaseAgent):
         """
         logger.info("查询排班", store_id=store_id, start_date=start_date, end_date=end_date)
 
-        # TODO: 从数据库查询排班数据
+        # 从内存查询排班（API层负责DB持久化）
+        try:
+            start = datetime.strptime(start_date, "%Y-%m-%d")
+            end = datetime.strptime(end_date, "%Y-%m-%d")
+        except ValueError:
+            return {"success": False, "message": "日期格式错误，请使用 YYYY-MM-DD"}
+
+        matched = [
+            s for s in self._schedules.values()
+            if s.get("store_id") == store_id
+            and start <= datetime.strptime(s["date"], "%Y-%m-%d") <= end
+        ]
+
         return {
             "success": True,
             "store_id": store_id,
-            "schedules": [],
+            "start_date": start_date,
+            "end_date": end_date,
+            "schedules": matched,
+            "total": len(matched),
         }

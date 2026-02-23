@@ -242,13 +242,16 @@ class OrderAgent(BaseAgent):
     async def _suggest_alternative_times(
         self, store_id: str, requested_time: str, party_size: int
     ) -> List[str]:
-        """建议替代时间"""
-        # TODO: 基于当前预定情况推荐可用时间
+        """建议替代时间（过滤掉已满的时段）"""
         base_time = datetime.fromisoformat(requested_time)
-        alternatives = [
-            (base_time + timedelta(hours=i)).strftime("%Y-%m-%d %H:%M")
-            for i in [1, 2, -1]
-        ]
+        candidates = [base_time + timedelta(hours=i) for i in [1, 2, -1, 3]]
+        alternatives = []
+        for t in candidates:
+            t_str = t.strftime("%Y-%m-%d %H:%M")
+            if await self._check_time_availability(store_id, t_str, party_size):
+                alternatives.append(t_str)
+            if len(alternatives) >= 3:
+                break
         return alternatives
 
     # ==================== 排位/等位管理 ====================
@@ -470,24 +473,39 @@ class OrderAgent(BaseAgent):
             party_size=party_size,
         )
 
-        # TODO: 基于历史订单、热门菜品、个人偏好推荐
-        # TODO: 考虑用餐人数、时段、季节等因素
+        # 基于内存订单统计热门菜品
+        dish_counts: Dict[str, Dict[str, Any]] = {}
+        for order in self._orders.values():
+            if order.get("store_id") == store_id:
+                for dish in order.get("dishes", []):
+                    did = dish["dish_id"]
+                    if did not in dish_counts:
+                        dish_counts[did] = {
+                            "dish_id": did,
+                            "dish_name": dish["dish_name"],
+                            "price": dish["price"],
+                            "count": 0,
+                        }
+                    dish_counts[did]["count"] += dish["quantity"]
+
+        # 按点单次数排序，取前5
+        sorted_dishes = sorted(dish_counts.values(), key=lambda d: d["count"], reverse=True)[:5]
+
+        # 如果内存中没有历史数据，返回默认推荐
+        if not sorted_dishes:
+            sorted_dishes = [
+                {"dish_id": "D001", "dish_name": "招牌菜", "price": 48.0, "count": 0},
+            ]
 
         recommendations = [
             {
-                "dish_id": "D001",
-                "dish_name": "宫保鸡丁",
-                "price": 48.0,
-                "reason": "本店招牌菜，好评率95%",
-                "popularity_rank": 1,
-            },
-            {
-                "dish_id": "D002",
-                "dish_name": "麻婆豆腐",
-                "price": 32.0,
-                "reason": "您上次点过并给了好评",
-                "popularity_rank": 3,
-            },
+                "dish_id": d["dish_id"],
+                "dish_name": d["dish_name"],
+                "price": d["price"],
+                "reason": f"本店热销，已点 {d['count']} 次" if d["count"] > 0 else "本店推荐",
+                "popularity_rank": i + 1,
+            }
+            for i, d in enumerate(sorted_dishes)
         ]
 
         return {
