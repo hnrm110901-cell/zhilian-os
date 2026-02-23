@@ -416,7 +416,6 @@ class ScheduleAgent(BaseAgent):
         """
         logger.info("调整排班", schedule_id=schedule_id, adjustments=adjustments)
 
-        # TODO: 实现排班调整逻辑
         schedule = self._schedules.get(schedule_id)
         if not schedule:
             return {"success": False, "message": f"排班 {schedule_id} 不存在"}
