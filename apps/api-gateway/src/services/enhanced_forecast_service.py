@@ -65,8 +65,8 @@ class EnhancedForecastService(BaseService):
         # 4. 计算置信区间
         std_dev = historical_baseline["std_dev"]
         confidence_interval = {
-            "lower": max(0, predicted_sales - 1.96 * std_dev),  # 95%置信区间下限
-            "upper": predicted_sales + 1.96 * std_dev,  # 95%置信区间上限
+            "lower": max(0, predicted_sales - float(os.getenv("FORECAST_CONFIDENCE_Z", "1.96")) * std_dev),  # 95%置信区间下限
+            "upper": predicted_sales + float(os.getenv("FORECAST_CONFIDENCE_Z", "1.96")) * std_dev,  # 95%置信区间上限
         }
 
         # 5. 生成预测说明
@@ -187,7 +187,7 @@ class EnhancedForecastService(BaseService):
             weekday_revs = [float(r.total_revenue) for r in rows if r.report_date.weekday() not in [5, 6]]
             if weekend_revs and weekday_revs:
                 factor = sum(weekend_revs) / len(weekend_revs) / (sum(weekday_revs) / len(weekday_revs))
-                return round(max(1.0, min(2.5, factor)), 2)
+                return round(max(1.0, min(float(os.getenv("FORECAST_WEEKEND_FACTOR_MAX", "2.5")), factor)), 2)
         except Exception as e:
             logger.warning("周末系数计算失败，使用默认值", error=str(e))
         return float(os.getenv("FORECAST_DEFAULT_WEEKEND_FACTOR", "1.4"))

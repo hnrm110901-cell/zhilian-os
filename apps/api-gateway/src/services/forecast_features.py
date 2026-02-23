@@ -163,15 +163,15 @@ class WeatherImpact:
 
     # 天气类型对餐饮的影响系数
     WEATHER_IMPACT = {
-        "晴天": 1.0,
-        "多云": 1.0,
-        "阴天": 0.95,
-        "小雨": 0.85,
-        "中雨": 0.7,
-        "大雨": 0.5,
-        "暴雨": 0.3,
-        "雪": 0.6,
-        "雾霾": 0.9,
+        "晴天": float(os.getenv("WEATHER_IMPACT_SUNNY", "1.0")),
+        "多云": float(os.getenv("WEATHER_IMPACT_CLOUDY", "1.0")),
+        "阴天": float(os.getenv("WEATHER_IMPACT_OVERCAST", "0.95")),
+        "小雨": float(os.getenv("WEATHER_IMPACT_LIGHT_RAIN", "0.85")),
+        "中雨": float(os.getenv("WEATHER_IMPACT_MODERATE_RAIN", "0.7")),
+        "大雨": float(os.getenv("WEATHER_IMPACT_HEAVY_RAIN", "0.5")),
+        "暴雨": float(os.getenv("WEATHER_IMPACT_STORM", "0.3")),
+        "雪": float(os.getenv("WEATHER_IMPACT_SNOW", "0.6")),
+        "雾霾": float(os.getenv("WEATHER_IMPACT_HAZE", "0.9")),
     }
 
     # 温度对餐饮的影响（火锅店特别受益于寒冷天气）
@@ -232,12 +232,12 @@ class BusinessDistrictEvents:
 
     # 活动类型影响系数
     EVENT_IMPACT = {
-        "大型展会": 1.8,
-        "音乐会": 1.5,
-        "体育赛事": 1.6,
-        "商场促销": 1.3,
-        "周边施工": 0.6,
-        "交通管制": 0.7,
+        "大型展会": float(os.getenv("EVENT_IMPACT_EXPO", "1.8")),
+        "音乐会": float(os.getenv("EVENT_IMPACT_CONCERT", "1.5")),
+        "体育赛事": float(os.getenv("EVENT_IMPACT_SPORTS", "1.6")),
+        "商场促销": float(os.getenv("EVENT_IMPACT_MALL_PROMO", "1.3")),
+        "周边施工": float(os.getenv("EVENT_IMPACT_CONSTRUCTION", "0.6")),
+        "交通管制": float(os.getenv("EVENT_IMPACT_TRAFFIC_CONTROL", "0.7")),
     }
 
     @staticmethod

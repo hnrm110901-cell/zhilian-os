@@ -57,8 +57,8 @@ class DashboardService:
                     "growth_rate": 0.0,
                 },
                 "agents": {
-                    "total": 7,
-                    "active": 7,
+                    "total": int(os.getenv("DASHBOARD_AGENT_COUNT", "7")),
+                    "active": int(os.getenv("DASHBOARD_AGENT_COUNT", "7")),
                 },
             }
 
@@ -122,7 +122,7 @@ class DashboardService:
             logger.error("获取概览统计数据失败", error=str(e))
             raise
 
-    async def get_sales_trend(self, days: int = 7) -> Dict[str, Any]:
+    async def get_sales_trend(self, days: int = int(os.getenv("DASHBOARD_SALES_TREND_DAYS", "7"))) -> Dict[str, Any]:
         """
         获取销售趋势数据
 
