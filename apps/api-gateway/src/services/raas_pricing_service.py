@@ -135,19 +135,19 @@ class RaaSPricingService:
             avg_customer_count = float(row[1] or 0)
             avg_order_value = float(row[2] or 0) / 100.0
         else:
-            avg_daily_revenue = 70000.0
-            avg_customer_count = 500.0
-            avg_order_value = 140.0
+            avg_daily_revenue = float(os.getenv("RAAS_DEFAULT_DAILY_REVENUE", "70000.0"))
+            avg_customer_count = float(os.getenv("RAAS_DEFAULT_CUSTOMER_COUNT", "500.0"))
+            avg_order_value = float(os.getenv("RAAS_DEFAULT_ORDER_VALUE", "140.0"))
 
         baseline = BaselineMetrics(
-            avg_food_waste_rate=8.0,
-            avg_labor_cost=50000.0,
-            avg_energy_cost=8000.0,
-            avg_inventory_turnover=12.0,
+            avg_food_waste_rate=float(os.getenv("RAAS_DEFAULT_FOOD_WASTE_RATE", "8.0")),
+            avg_labor_cost=float(os.getenv("RAAS_DEFAULT_LABOR_COST", "50000.0")),
+            avg_energy_cost=float(os.getenv("RAAS_DEFAULT_ENERGY_COST", "8000.0")),
+            avg_inventory_turnover=float(os.getenv("RAAS_DEFAULT_INVENTORY_TURNOVER", "12.0")),
             avg_daily_revenue=avg_daily_revenue,
             avg_customer_count=avg_customer_count,
             avg_order_value=avg_order_value,
-            avg_repeat_rate=25.0,
+            avg_repeat_rate=float(os.getenv("RAAS_DEFAULT_REPEAT_RATE", "25.0")),
             baseline_start_date=start_date,
             baseline_end_date=end_date
         )
