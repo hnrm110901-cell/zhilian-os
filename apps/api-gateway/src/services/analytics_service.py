@@ -81,9 +81,10 @@ class AnalyticsService:
         if weekend_revs and weekday_revs:
             avg_wkend = sum(weekend_revs) / len(weekend_revs)
             avg_wkday = sum(weekday_revs) / len(weekday_revs)
-            computed_weekend_factor = round(avg_wkend / avg_wkday, 2) if avg_wkday > 0 else 1.2
+            _default_wkend = float(os.getenv("ANALYTICS_DEFAULT_WEEKEND_FACTOR", "1.2"))
+            computed_weekend_factor = round(avg_wkend / avg_wkday, 2) if avg_wkday > 0 else _default_wkend
         else:
-            computed_weekend_factor = 1.2
+            computed_weekend_factor = float(os.getenv("ANALYTICS_DEFAULT_WEEKEND_FACTOR", "1.2"))
 
         # 生成预测
         predictions = []
