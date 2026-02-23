@@ -195,12 +195,12 @@ class ReservationAgent(BaseAgent):
         self.store_id = store_id
         self.order_agent = order_agent
         self.config = config or {
-            "advance_booking_days": 30,  # 提前预定天数
+            "advance_booking_days": int(os.getenv("RESERVATION_ADVANCE_BOOKING_DAYS", "30")),  # 提前预定天数
             "min_party_size": 1,  # 最小人数
-            "max_party_size": 50,  # 最大人数
-            "deposit_rate": 0.3,  # 定金比例
-            "cancellation_hours": 24,  # 取消提前时间(小时)
-            "reminder_hours": 2,  # 提醒提前时间(小时)
+            "max_party_size": int(os.getenv("RESERVATION_MAX_PARTY_SIZE", "50")),  # 最大人数
+            "deposit_rate": float(os.getenv("RESERVATION_DEPOSIT_RATE", "0.3")),  # 定金比例
+            "cancellation_hours": int(os.getenv("RESERVATION_CANCELLATION_HOURS", "24")),  # 取消提前时间(小时)
+            "reminder_hours": int(os.getenv("RESERVATION_REMINDER_HOURS", "2")),  # 提醒提前时间(小时)
         }
         self.logger = logger.bind(agent="reservation", store_id=store_id)
 

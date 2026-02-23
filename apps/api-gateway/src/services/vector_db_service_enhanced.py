@@ -447,7 +447,7 @@ class VectorDatabaseServiceEnhanced:
 
             # 测试嵌入生成
             test_embedding = self.generate_embedding("健康检查测试")
-            if len(test_embedding) != 384:
+            if len(test_embedding) != int(os.getenv("VECTOR_EMBEDDING_DIM", "384")):
                 raise ValueError("嵌入向量维度不正确")
 
             health_status["status"] = "healthy"

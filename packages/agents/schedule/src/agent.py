@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import structlog
 from enum import Enum
 import sys
+import os
 from pathlib import Path
 
 # Add core module to path
@@ -66,9 +67,9 @@ class ScheduleAgent(BaseAgent):
         """
         super().__init__()
         self.config = config
-        self.min_shift_hours = config.get("min_shift_hours", 4)
-        self.max_shift_hours = config.get("max_shift_hours", 8)
-        self.max_weekly_hours = config.get("max_weekly_hours", 40)
+        self.min_shift_hours = config.get("min_shift_hours", int(os.getenv("SCHEDULE_MIN_SHIFT_HOURS", "4")))
+        self.max_shift_hours = config.get("max_shift_hours", int(os.getenv("SCHEDULE_MAX_SHIFT_HOURS", "8")))
+        self.max_weekly_hours = config.get("max_weekly_hours", int(os.getenv("SCHEDULE_MAX_WEEKLY_HOURS", "40")))
 
         logger.info("智能排班Agent初始化", config=config)
 

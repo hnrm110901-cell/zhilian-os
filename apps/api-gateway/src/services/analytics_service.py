@@ -307,7 +307,7 @@ class AnalyticsService:
         }
 
     async def analyze_time_patterns(
-        self, store_id: str, days: int = 30
+        self, store_id: str, days: int = int(os.getenv("ANALYTICS_TIME_PATTERN_DAYS", "30"))
     ) -> Dict[str, Any]:
         """时段分析 - 分析不同时段的销售模式"""
         end_date = date.today()

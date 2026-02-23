@@ -478,7 +478,7 @@ class MultimodalFallbackService:
 
     def get_delivery_statistics(
         self,
-        time_range_hours: int = 24
+        time_range_hours: int = int(os.getenv("MULTIMODAL_DELIVERY_STATS_HOURS", "24"))
     ) -> Dict[str, Any]:
         """获取投递统计（从 Notification 表聚合）"""
         import asyncio

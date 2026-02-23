@@ -417,14 +417,14 @@ class ServiceQualityService:
         completion_score = completion_rate
 
         # 取消率得分（取消率越低越好）
-        cancellation_score = max(0, 100 - cancellation_rate * 2)
+        cancellation_score = max(0, 100 - cancellation_rate * float(os.getenv("SERVICE_CANCEL_SCORE_DEDUCT_FACTOR", "2")))
 
         # 服务时间得分（从门店配置读取理想服务时间，默认30分钟）
         ideal_service_time = int(os.getenv("SERVICE_IDEAL_TIME_MINUTES", "30"))
         if avg_service_time <= ideal_service_time:
             service_time_score = 100
         else:
-            service_time_score = max(0, 100 - (avg_service_time - ideal_service_time) * 2)
+            service_time_score = max(0, 100 - (avg_service_time - ideal_service_time) * float(os.getenv("SERVICE_TIME_SCORE_DEDUCT_FACTOR", "2")))
 
         # 计算加权总分
         total_score = (
