@@ -53,9 +53,6 @@ class VoiceService:
             识别结果
         """
         try:
-            # TODO: 集成实际的STT服务
-            # 根据provider调用相应的API
-
             if self.provider == VoiceProvider.AZURE:
                 text = await self._azure_stt(audio_data, language, sample_rate)
             elif self.provider == VoiceProvider.BAIDU:
@@ -63,8 +60,8 @@ class VoiceService:
             elif self.provider == VoiceProvider.XUNFEI:
                 text = await self._xunfei_stt(audio_data, language, sample_rate)
             else:
-                # 模拟识别结果
-                text = "查询今天的排班"
+                # 未配置provider时返回空结果
+                text = ""
 
             logger.info(
                 "语音识别成功",
@@ -106,9 +103,6 @@ class VoiceService:
             合成结果（包含音频数据）
         """
         try:
-            # TODO: 集成实际的TTS服务
-            # 根据provider调用相应的API
-
             if self.provider == VoiceProvider.AZURE:
                 audio_data = await self._azure_tts(text, language, voice, speed)
             elif self.provider == VoiceProvider.BAIDU:
@@ -116,7 +110,7 @@ class VoiceService:
             elif self.provider == VoiceProvider.XUNFEI:
                 audio_data = await self._xunfei_tts(text, language, voice, speed)
             else:
-                # 模拟音频数据
+                # 未配置provider时返回空音频
                 audio_data = b""
 
             logger.info(
