@@ -337,7 +337,7 @@ class DecisionAgent(BaseAgent):
         # 总营收
         total_revenue = revenue_data.get("total_revenue", 0)
         previous_revenue = revenue_data.get("previous_revenue", 0)
-        target_revenue = revenue_data.get("target_revenue", total_revenue * 1.15)
+        target_revenue = revenue_data.get("target_revenue", total_revenue * float(os.getenv("TARGET_REVENUE_GROWTH_RATE", "1.15")))
 
         kpi: KPIMetric = {
             "metric_id": "KPI_REVENUE_001",
@@ -414,7 +414,7 @@ class DecisionAgent(BaseAgent):
         # 人效(人均营收)
         revenue_per_staff = efficiency_data.get("revenue_per_staff", 0)
         previous_revenue_per_staff = efficiency_data.get("previous_revenue_per_staff", 0)
-        target_revenue_per_staff = revenue_per_staff * 1.1
+        target_revenue_per_staff = revenue_per_staff * float(os.getenv("TARGET_STAFF_EFFICIENCY_GROWTH_RATE", "1.1"))
 
         kpi: KPIMetric = {
             "metric_id": "KPI_EFFICIENCY_001",

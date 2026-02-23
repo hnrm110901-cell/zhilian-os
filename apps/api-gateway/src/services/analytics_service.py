@@ -96,8 +96,8 @@ class AnalyticsService:
             weekend_factor = computed_weekend_factor if weekday in [5, 6] else 1.0
 
             # 应用趋势和周末因素
-            predicted_revenue = int(avg_revenue * (1 + trend * i / 30) * weekend_factor)
-            predicted_transactions = int(avg_transactions * (1 + trend * i / 30) * weekend_factor)
+            predicted_revenue = int(avg_revenue * (1 + trend * i / int(os.getenv("ANALYTICS_TREND_PERIOD_DAYS", "30"))) * weekend_factor)
+            predicted_transactions = int(avg_transactions * (1 + trend * i / int(os.getenv("ANALYTICS_TREND_PERIOD_DAYS", "30"))) * weekend_factor)
 
             predictions.append({
                 "date": pred_date.isoformat(),
@@ -237,7 +237,7 @@ class AnalyticsService:
         result = await self.db.execute(query)
         orders = result.scalars().all()
 
-        if len(orders) < 10:
+        if len(orders) < int(os.getenv("ANALYTICS_MIN_ORDERS_FOR_ANALYSIS", "10")):
             return {
                 "store_id": store_id,
                 "associations": [],
@@ -351,13 +351,18 @@ class AnalyticsService:
                 avg_transactions = stats["transactions"] / stats["count"]
 
                 # 判断时段类型
-                if 6 <= hour < 11:
+                _breakfast_start = int(os.getenv("BUSINESS_HOURS_BREAKFAST_START", "6"))
+                _lunch_start = int(os.getenv("BUSINESS_HOURS_LUNCH_START", "11"))
+                _afternoon_start = int(os.getenv("BUSINESS_HOURS_AFTERNOON_START", "14"))
+                _dinner_start = int(os.getenv("BUSINESS_HOURS_DINNER_START", "17"))
+                _dinner_end = int(os.getenv("BUSINESS_HOURS_DINNER_END", "21"))
+                if _breakfast_start <= hour < _lunch_start:
                     period = "早餐"
-                elif 11 <= hour < 14:
+                elif _lunch_start <= hour < _afternoon_start:
                     period = "午餐"
-                elif 14 <= hour < 17:
+                elif _afternoon_start <= hour < _dinner_start:
                     period = "下午茶"
-                elif 17 <= hour < 21:
+                elif _dinner_start <= hour < _dinner_end:
                     period = "晚餐"
                 else:
                     period = "其他"

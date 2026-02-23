@@ -212,7 +212,7 @@ class EnhancedForecastService(BaseService):
 
         if store_id:
             async with get_db_session() as session:
-                for weeks_ago in range(1, 9):
+                for weeks_ago in range(1, int(os.getenv("FORECAST_HISTORICAL_WEEKS", "8")) + 1):
                     past_date = target_date - timedelta(weeks=weeks_ago)
                     result = await session.execute(
                         select(DailyReport.total_revenue).where(

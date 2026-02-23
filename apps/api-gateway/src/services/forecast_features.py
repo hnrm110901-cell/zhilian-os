@@ -121,12 +121,13 @@ class ChineseHolidays:
         """获取距离下一个节假日的天数"""
         from datetime import timedelta
 
-        for i in range(1, 365):
+        _max_days = int(os.getenv("HOLIDAY_LOOKUP_MAX_DAYS", "365"))
+        for i in range(1, _max_days + 1):
             check_date = target_date + timedelta(days=i)
             if cls.is_holiday(check_date):
                 return i
 
-        return 365  # 一年内没有节假日
+        return _max_days  # 一年内没有节假日
 
     @classmethod
     def get_holiday_period(cls, target_date: date) -> Optional[str]:
@@ -141,14 +142,16 @@ class ChineseHolidays:
         if cls.is_holiday(target_date):
             return "节中"
 
-        # 检查是否为节前3天
-        for i in range(1, 4):
+        # 检查是否为节前N天
+        _pre_days = int(os.getenv("HOLIDAY_PRE_DAYS", "3"))
+        for i in range(1, _pre_days + 1):
             check_date = target_date + timedelta(days=i)
             if cls.is_holiday(check_date):
                 return "节前"
 
-        # 检查是否为节后3天
-        for i in range(1, 4):
+        # 检查是否为节后N天
+        _post_days = int(os.getenv("HOLIDAY_POST_DAYS", "3"))
+        for i in range(1, _post_days + 1):
             check_date = target_date - timedelta(days=i)
             if cls.is_holiday(check_date):
                 return "节后"

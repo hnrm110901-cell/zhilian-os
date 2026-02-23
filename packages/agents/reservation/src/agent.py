@@ -433,11 +433,11 @@ class ReservationAgent(BaseAgent):
         """推荐桌型"""
         if party_size <= 2:
             return TableType.SMALL
-        elif party_size <= 4:
+        elif party_size <= int(os.getenv("TABLE_SIZE_MEDIUM_MAX", "4")):
             return TableType.MEDIUM
-        elif party_size <= 6:
+        elif party_size <= int(os.getenv("TABLE_SIZE_LARGE_MAX", "6")):
             return TableType.LARGE
-        elif party_size <= 10:
+        elif party_size <= int(os.getenv("TABLE_SIZE_ROUND_MAX", "10")):
             return TableType.ROUND
         else:
             return TableType.BANQUET

@@ -177,21 +177,22 @@ class ScheduleAgent(BaseAgent):
         logger.info("计算人力需求", predicted_customers=predicted_customers)
 
         # 根据客流计算各岗位需求
-        # 简化算法：每10个客人需要1个服务员，每30个客人需要1个厨师
+        _customers_per_waiter = int(os.getenv("SCHEDULE_CUSTOMERS_PER_WAITER", "10"))
+        _customers_per_chef = int(os.getenv("SCHEDULE_CUSTOMERS_PER_CHEF", "30"))
         requirements = {
             "morning": {
-                "waiter": max(2, predicted_customers["morning"] // 10),
-                "chef": max(1, predicted_customers["morning"] // 30),
+                "waiter": max(int(os.getenv("SCHEDULE_MIN_WAITERS_MORNING", "2")), predicted_customers["morning"] // _customers_per_waiter),
+                "chef": max(int(os.getenv("SCHEDULE_MIN_CHEFS_MORNING", "1")), predicted_customers["morning"] // _customers_per_chef),
                 "cashier": 1,
             },
             "afternoon": {
-                "waiter": max(2, predicted_customers["afternoon"] // 10),
-                "chef": max(1, predicted_customers["afternoon"] // 30),
+                "waiter": max(int(os.getenv("SCHEDULE_MIN_WAITERS_MORNING", "2")), predicted_customers["afternoon"] // _customers_per_waiter),
+                "chef": max(int(os.getenv("SCHEDULE_MIN_CHEFS_MORNING", "1")), predicted_customers["afternoon"] // _customers_per_chef),
                 "cashier": 1,
             },
             "evening": {
-                "waiter": max(3, predicted_customers["evening"] // 10),
-                "chef": max(2, predicted_customers["evening"] // 30),
+                "waiter": max(int(os.getenv("SCHEDULE_MIN_WAITERS_EVENING", "3")), predicted_customers["evening"] // _customers_per_waiter),
+                "chef": max(int(os.getenv("SCHEDULE_MIN_CHEFS_EVENING", "2")), predicted_customers["evening"] // _customers_per_chef),
                 "cashier": 1,
             },
         }

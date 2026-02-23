@@ -656,8 +656,8 @@ async def detect_revenue_anomaly(
                     # 计算偏差
                     deviation = ((current_revenue - expected_revenue) / expected_revenue) * 100
 
-                    # 只有偏差超过15%才告警
-                    if abs(deviation) > 15:
+                    # 只有偏差超过阈值才告警
+                    if abs(deviation) > float(os.getenv("REVENUE_ANOMALY_THRESHOLD_PERCENT", "15")):
                         # 使用DecisionAgent分析
                         analysis = await decision_agent.analyze_revenue_anomaly(
                             store_id=str(store.id),
