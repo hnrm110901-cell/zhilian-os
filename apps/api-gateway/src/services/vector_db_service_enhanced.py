@@ -279,46 +279,47 @@ class VectorDatabaseServiceEnhanced:
         Returns:
             是否成功
         """
-        # 验证必需字段
-        required_fields = ["order_id", "order_number", "order_type", "total", "created_at", "store_id"]
-        for field in required_fields:
-            if field not in order_data:
-                logger.error(f"订单数据缺少必需字段: {field}")
-                return False
+        try:
+            # 验证必需字段
+            required_fields = ["order_id", "order_number", "order_type", "total", "created_at", "store_id"]
+            for field in required_fields:
+                if field not in order_data:
+                    logger.error(f"订单数据缺少必需字段: {field}")
+                    return False
 
-        # 生成订单的文本表示
-        text = self._order_to_text(order_data)
+            # 生成订单的文本表示
+            text = self._order_to_text(order_data)
 
-        # 生成嵌入向量
-        embedding = self.generate_embedding(text)
+            # 生成嵌入向量
+            embedding = self.generate_embedding(text)
 
-        # 存储到Qdrant
-        from qdrant_client.models import PointStruct
+            # 存储到Qdrant
+            from qdrant_client.models import PointStruct
 
-        # 生成唯一ID（使用order_id的哈希值转换为整数）
-        point_id = int(hashlib.md5(order_data["order_id"].encode()).hexdigest()[:16], 16)
+            # 生成唯一ID（使用order_id的哈希值转换为整数）
+            point_id = int(hashlib.md5(order_data["order_id"].encode()).hexdigest()[:16], 16)
 
-        point = PointStruct(
-            id=point_id,
-            vector=embedding,
-            payload={
-                "order_id": order_data["order_id"],
-                "order_number": order_data["order_number"],
-                "order_type": order_data["order_type"],
-                "total": float(order_data["total"]),
-                "created_at": order_data["created_at"].isoformat() if isinstance(order_data["created_at"], datetime) else order_data["created_at"],
-                "store_id": order_data["store_id"],
-                "text": text,
-            },
-        )
+            point = PointStruct(
+                id=point_id,
+                vector=embedding,
+                payload={
+                    "order_id": order_data["order_id"],
+                    "order_number": order_data["order_number"],
+                    "order_type": order_data["order_type"],
+                    "total": float(order_data["total"]),
+                    "created_at": order_data["created_at"].isoformat() if isinstance(order_data["created_at"], datetime) else order_data["created_at"],
+                    "store_id": order_data["store_id"],
+                    "text": text,
+                },
+            )
 
-        self.client.upsert(
-            collection_name="orders",
-            points=[point],
-        )
+            self.client.upsert(
+                collection_name="orders",
+                points=[point],
+            )
 
-        logger.info("订单索引成功", order_id=order_data["order_id"])
-        return True
+            logger.info("订单索引成功", order_id=order_data["order_id"])
+            return True
         except Exception as e:
             logger.error("订单索引失败", error=str(e))
             return False

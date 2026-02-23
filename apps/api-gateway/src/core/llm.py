@@ -27,9 +27,9 @@ class LLMModel(str, Enum):
     GPT_35_TURBO = "gpt-3.5-turbo"
 
     # Anthropic models
-    CLAUDE_3_OPUS = "claude-3-opus-20240229"
-    CLAUDE_3_SONNET = "claude-3-sonnet-20240229"
-    CLAUDE_3_HAIKU = "claude-3-haiku-20240307"
+    CLAUDE_3_OPUS = "claude-opus-4-6"
+    CLAUDE_3_SONNET = "claude-sonnet-4-6"
+    CLAUDE_3_HAIKU = "claude-haiku-4-5-20251001"
 
     # DeepSeek models
     DEEPSEEK_CHAT = "deepseek-chat"
