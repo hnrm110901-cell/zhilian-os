@@ -10,6 +10,7 @@
 """
 
 import asyncio
+import os
 import structlog
 from datetime import datetime, timedelta
 from enum import Enum
@@ -363,7 +364,7 @@ class InventoryAgent(BaseAgent):
         """获取历史消耗数据"""
         # 模拟历史数据
         history = []
-        base_consumption = 10.0
+        base_consumption = float(os.getenv("INVENTORY_MOCK_BASE_CONSUMPTION", "10.0"))
 
         for i in range(days):
             date = (datetime.now() - timedelta(days=days-i)).date().isoformat()
@@ -732,7 +733,7 @@ class InventoryAgent(BaseAgent):
 
             # 计算优化后的库存水平
             # 安全库存 = 日均消耗 * 采购周期 + 安全系数 * 标准差 * sqrt(采购周期)
-            safety_factor = 1.65  # 95%服务水平
+            safety_factor = float(os.getenv("INVENTORY_SAFETY_FACTOR", "1.65"))  # 95%服务水平
             safe_stock = daily_avg * lead_time + safety_factor * daily_std * (lead_time ** 0.5)
 
             # 最低库存 = 日均消耗 * 采购周期

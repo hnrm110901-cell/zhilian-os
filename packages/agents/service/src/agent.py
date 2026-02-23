@@ -378,9 +378,9 @@ class ServiceAgent(BaseAgent):
         negative_count = sum(1 for kw in negative_keywords if kw in content_lower)
         positive_count = sum(1 for kw in positive_keywords if kw in content_lower)
 
-        if rating >= 4 and positive_count > negative_count:
+        if rating >= int(os.getenv("SERVICE_POSITIVE_RATING_THRESHOLD", "4")) and positive_count > negative_count:
             return "positive"
-        elif rating <= 2 or negative_count > positive_count:
+        elif rating <= int(os.getenv("SERVICE_NEGATIVE_RATING_THRESHOLD", "2")) or negative_count > positive_count:
             return "negative"
         else:
             return "neutral"
@@ -948,11 +948,11 @@ class ServiceAgent(BaseAgent):
 
         # 评估优先级
         negative_rate = len(feedbacks) / metrics["total_feedbacks"]
-        if negative_rate > 0.2:
+        if negative_rate > float(os.getenv("SERVICE_NEGATIVE_RATE_URGENT", "0.2")):
             priority = ComplaintPriority.URGENT
-        elif negative_rate > 0.1:
+        elif negative_rate > float(os.getenv("SERVICE_NEGATIVE_RATE_HIGH", "0.1")):
             priority = ComplaintPriority.HIGH
-        elif negative_rate > 0.05:
+        elif negative_rate > float(os.getenv("SERVICE_NEGATIVE_RATE_MEDIUM", "0.05")):
             priority = ComplaintPriority.MEDIUM
         else:
             priority = ComplaintPriority.LOW

@@ -439,7 +439,7 @@ class DecisionAgent(BaseAgent):
         # 订单准确率
         order_accuracy = quality_data.get("order_accuracy", 0.95)
         previous_accuracy = quality_data.get("previous_accuracy", 0.93)
-        target_accuracy = 0.98
+        target_accuracy = float(os.getenv("DECISION_TARGET_ORDER_ACCURACY", "0.98"))
 
         kpi: KPIMetric = {
             "metric_id": "KPI_QUALITY_001",
@@ -498,13 +498,13 @@ class DecisionAgent(BaseAgent):
         if inverse:
             change_rate = -change_rate
 
-        if abs(change_rate) < 0.05:
+        if abs(change_rate) < float(os.getenv("DECISION_TREND_STABLE_THRESHOLD", "0.05")):
             return TrendDirection.STABLE
-        elif change_rate > 0.15:
+        elif change_rate > float(os.getenv("DECISION_TREND_INCREASE_THRESHOLD", "0.15")):
             return TrendDirection.INCREASING
-        elif change_rate < -0.15:
+        elif change_rate < -float(os.getenv("DECISION_TREND_INCREASE_THRESHOLD", "0.15")):
             return TrendDirection.DECREASING
-        elif abs(change_rate) > 0.10:
+        elif abs(change_rate) > float(os.getenv("DECISION_TREND_VOLATILE_THRESHOLD", "0.10")):
             return TrendDirection.VOLATILE
         else:
             return TrendDirection.STABLE
@@ -513,9 +513,9 @@ class DecisionAgent(BaseAgent):
         """评估KPI状态"""
         achievement_rate = kpi["achievement_rate"]
 
-        if achievement_rate >= 0.95:
+        if achievement_rate >= float(os.getenv("DECISION_KPI_ON_TRACK_THRESHOLD", "0.95")):
             return "on_track"
-        elif achievement_rate >= 0.85:
+        elif achievement_rate >= float(os.getenv("DECISION_KPI_AT_RISK_THRESHOLD", "0.85")):
             return "at_risk"
         else:
             return "off_track"
@@ -1234,7 +1234,7 @@ class DecisionAgent(BaseAgent):
         """获取历史数据"""
         import random
         # 生成模拟历史数据
-        base_value = 100000.0
+        base_value = float(os.getenv("DECISION_MOCK_BASE_REVENUE", "100000.0"))
         data = []
         for i in range(days):
             value = base_value + random.uniform(-10000, 15000) + i * 100
