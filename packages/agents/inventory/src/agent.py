@@ -280,7 +280,7 @@ class InventoryAgent(BaseAgent):
     async def predict_consumption(
         self,
         item_id: str,
-        history_days: int = 30,
+        history_days: int = int(os.getenv("INVENTORY_PREDICT_HISTORY_DAYS", "30")),
         forecast_days: int = 7,
         method: PredictionMethod = PredictionMethod.WEIGHTED_AVERAGE
     ) -> PredictionResult:
@@ -689,7 +689,7 @@ class InventoryAgent(BaseAgent):
     async def optimize_stock_levels(
         self,
         item_id: str,
-        analysis_days: int = 90
+        analysis_days: int = int(os.getenv("INVENTORY_OPTIMIZE_ANALYSIS_DAYS", "90"))
     ) -> Dict[str, Any]:
         """
         优化库存水平(安全库存、最低库存、最高库存)

@@ -370,7 +370,7 @@ class TrainingAgent(BaseAgent):
 
         # 基于技能差距识别需求
         for gap in skill_gaps:
-            if gap["gap_score"] >= 30:  # 差距分数>=30需要培训
+            if gap["gap_score"] >= int(os.getenv("TRAINING_NEED_GAP_THRESHOLD", "30")):  # 差距分数>=30需要培训
                 # 推荐课程
                 recommended_courses = self._recommend_courses_for_skill(
                     gap["skill_name"],
@@ -699,13 +699,13 @@ class TrainingAgent(BaseAgent):
         # 综合评分 = 完成率*30% + 通过率*40% + 平均分/100*30%
         score = (completion_rate * 0.3 + pass_rate * 0.4 + (average_score / 100) * 0.3) * 100
 
-        if score >= 90:
+        if score >= float(os.getenv("TRAINING_SCORE_EXCELLENT", "90")):
             return "excellent"
-        elif score >= 80:
+        elif score >= float(os.getenv("TRAINING_SCORE_GOOD", "80")):
             return "good"
-        elif score >= 70:
+        elif score >= float(os.getenv("TRAINING_SCORE_SATISFACTORY", "70")):
             return "satisfactory"
-        elif score >= 60:
+        elif score >= float(os.getenv("TRAINING_SCORE_NEEDS_IMPROVEMENT", "60")):
             return "needs_improvement"
         else:
             return "poor"
@@ -835,16 +835,16 @@ class TrainingAgent(BaseAgent):
         critical_skills = ["食品安全", "服务礼仪", "菜品制作"]
 
         if skill_name in critical_skills:
-            if gap_score >= 50:
+            if gap_score >= int(os.getenv("TRAINING_PRIORITY_CRITICAL_URGENT", "50")):
                 return TrainingPriority.URGENT
-            elif gap_score >= 30:
+            elif gap_score >= int(os.getenv("TRAINING_PRIORITY_CRITICAL_HIGH", "30")):
                 return TrainingPriority.HIGH
             else:
                 return TrainingPriority.MEDIUM
         else:
-            if gap_score >= 66:
+            if gap_score >= int(os.getenv("TRAINING_PRIORITY_NORMAL_HIGH", "66")):
                 return TrainingPriority.HIGH
-            elif gap_score >= 33:
+            elif gap_score >= int(os.getenv("TRAINING_PRIORITY_NORMAL_MEDIUM", "33")):
                 return TrainingPriority.MEDIUM
             else:
                 return TrainingPriority.LOW

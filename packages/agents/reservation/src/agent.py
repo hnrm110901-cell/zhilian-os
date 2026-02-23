@@ -450,10 +450,10 @@ class ReservationAgent(BaseAgent):
         """预估消费金额"""
         # 基础人均消费(分)
         base_per_person = {
-            ReservationType.REGULAR: 8000,  # 80元/人
-            ReservationType.BANQUET: 15000,  # 150元/人
-            ReservationType.PRIVATE_ROOM: 12000,  # 120元/人
-            ReservationType.VIP: 20000,  # 200元/人
+            ReservationType.REGULAR: int(os.getenv("RESERVATION_AMOUNT_REGULAR", "8000")),  # 80元/人
+            ReservationType.BANQUET: int(os.getenv("RESERVATION_AMOUNT_BANQUET", "15000")),  # 150元/人
+            ReservationType.PRIVATE_ROOM: int(os.getenv("RESERVATION_AMOUNT_PRIVATE_ROOM", "12000")),  # 120元/人
+            ReservationType.VIP: int(os.getenv("RESERVATION_AMOUNT_VIP", "20000")),  # 200元/人
         }
 
         per_person = base_per_person.get(reservation_type, 8000)

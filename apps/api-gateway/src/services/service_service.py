@@ -115,7 +115,7 @@ class ServiceQualityService:
             avg_service_time = sum(service_times) / len(service_times) if service_times else 0
 
             # 从门店配置读取理想服务时间
-            ideal_service_time = 30
+            ideal_service_time = int(os.getenv("SERVICE_IDEAL_TIME_MINUTES", "30"))
             try:
                 from src.models.store import Store
                 store_result = await session.execute(
@@ -390,7 +390,7 @@ class ServiceQualityService:
         completion_rate: float,
         cancellation_rate: float,
         avg_service_time: float,
-        ideal_service_time: int = 30,
+        ideal_service_time: int = int(os.getenv("SERVICE_IDEAL_TIME_MINUTES", "30")),
     ) -> float:
         """
         计算综合服务质量评分

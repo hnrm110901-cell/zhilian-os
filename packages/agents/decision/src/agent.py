@@ -789,8 +789,8 @@ class DecisionAgent(BaseAgent):
     async def forecast_trends(
         self,
         metric_name: str,
-        forecast_days: int = 30,
-        historical_days: int = 90
+        forecast_days: int = int(os.getenv("DECISION_FORECAST_DAYS", "30")),
+        historical_days: int = int(os.getenv("DECISION_HISTORICAL_DAYS", "90"))
     ) -> TrendForecast:
         """
         预测趋势

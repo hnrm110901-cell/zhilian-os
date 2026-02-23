@@ -121,7 +121,7 @@ class AnalyticsService:
         }
 
     async def detect_anomalies(
-        self, store_id: str, metric: str = "revenue", days: int = 30
+        self, store_id: str, metric: str = "revenue", days: int = int(os.getenv("ANALYTICS_ANOMALY_DAYS", "30"))
     ) -> Dict[str, Any]:
         """异常检测 - 检测销售、成本等指标的异常"""
         end_date = date.today()
