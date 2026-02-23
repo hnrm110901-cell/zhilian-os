@@ -435,7 +435,7 @@ class MarketingAgentService:
             channel=MarketingChannel.WECHAT,
             coupon_strategy=coupon_strategy,
             start_time=datetime.now(),
-            end_time=datetime.now() + timedelta(days=7),
+            end_time=datetime.now() + timedelta(days=int(os.getenv("MARKETING_CAMPAIGN_DAYS", "7"))),
             budget=budget,
             expected_reach=expected_reach
         )
