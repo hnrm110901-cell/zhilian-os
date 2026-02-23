@@ -447,7 +447,7 @@ class MultimodalFallbackService:
         # 从业务系统判断是否高峰期（11-14点 或 17-21点）
         # ASR失败次数从 Notification 表查询最近记录
         current_hour = datetime.now().hour
-        peak_hour = (11 <= current_hour <= 14) or (17 <= current_hour <= 21)
+        peak_hour = (int(os.getenv("PEAK_LUNCH_START", "11")) <= current_hour <= int(os.getenv("PEAK_LUNCH_END", "14"))) or (int(os.getenv("PEAK_DINNER_START", "17")) <= current_hour <= int(os.getenv("PEAK_DINNER_END", "21")))
 
         asr_failure_count = 0
         try:

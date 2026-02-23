@@ -373,7 +373,7 @@ class FederatedBOMService:
             std_loss_rate=np.std(list(seasonal_loss_rates.values())),
             peak_loss_days=peak_loss_days,
             optimal_order_quantity=optimal_order_quantity,
-            confidence=0.8 if global_model else 0.3
+            confidence=float(os.getenv("BOM_GLOBAL_MODEL_CONFIDENCE", "0.8")) if global_model else float(os.getenv("BOM_LOCAL_MODEL_CONFIDENCE", "0.3"))
         )
 
     async def detect_anomaly(

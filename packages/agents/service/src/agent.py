@@ -803,7 +803,7 @@ class ServiceAgent(BaseAgent):
 
         # 计算服务得分(0-100)
         # 基础分60 + 平均评分*8 - 投诉数*2 + 表扬数*1
-        service_score = 60 + (average_rating * 8) - (complaint_count * 2) + (praise_count * 1)
+        service_score = float(os.getenv("SERVICE_SCORE_BASE", "60")) + (average_rating * float(os.getenv("SERVICE_SCORE_RATING_WEIGHT", "8"))) - (complaint_count * float(os.getenv("SERVICE_SCORE_COMPLAINT_DEDUCT", "2"))) + (praise_count * float(os.getenv("SERVICE_SCORE_PRAISE_ADD", "1")))
         service_score = max(0, min(100, service_score))
 
         # 识别改进领域

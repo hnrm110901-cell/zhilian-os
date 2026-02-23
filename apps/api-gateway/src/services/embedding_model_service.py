@@ -303,7 +303,7 @@ class EmbeddingModelService:
             logger.info(f"Epoch {epoch + 1}/{epochs}, Loss: {avg_loss:.4f}")
 
             # 学习率衰减
-            learning_rate *= 0.95
+            learning_rate *= float(os.getenv("EMBEDDING_LR_DECAY", "0.95"))
 
         self.model = embeddings
         logger.info(f"Training completed. Embedding shape: {embeddings.shape}")

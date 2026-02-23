@@ -159,10 +159,10 @@ class EnhancedForecastService(BaseService):
         month = target_date.month
         if month in [1, 2]:  # 冬季，火锅旺季
             if self.restaurant_type == "火锅":
-                factors["season_factor"] = 1.3
+                factors["season_factor"] = float(os.getenv("FORECAST_HOTPOT_WINTER_FACTOR", "1.3"))
         elif month in [7, 8]:  # 夏季，火锅淡季
             if self.restaurant_type == "火锅":
-                factors["season_factor"] = 0.8
+                factors["season_factor"] = float(os.getenv("FORECAST_HOTPOT_SUMMER_FACTOR", "0.8"))
 
         return factors
 
