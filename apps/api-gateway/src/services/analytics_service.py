@@ -68,14 +68,30 @@ class AnalyticsService:
         else:
             trend = 0
 
+        # 从历史数据计算实际周末效应系数
+        weekend_revs = [
+            d.revenue for d in historical_data
+            if date.fromisoformat(str(d.date)).weekday() in [5, 6]
+        ]
+        weekday_revs = [
+            d.revenue for d in historical_data
+            if date.fromisoformat(str(d.date)).weekday() not in [5, 6]
+        ]
+        if weekend_revs and weekday_revs:
+            avg_wkend = sum(weekend_revs) / len(weekend_revs)
+            avg_wkday = sum(weekday_revs) / len(weekday_revs)
+            computed_weekend_factor = round(avg_wkend / avg_wkday, 2) if avg_wkday > 0 else 1.2
+        else:
+            computed_weekend_factor = 1.2
+
         # 生成预测
         predictions = []
         for i in range(1, days_ahead + 1):
             pred_date = end_date + timedelta(days=i)
 
-            # 考虑周末效应（周末通常销售更高）
+            # 考虑周末效应（基于历史实际数据）
             weekday = pred_date.weekday()
-            weekend_factor = 1.2 if weekday in [5, 6] else 1.0
+            weekend_factor = computed_weekend_factor if weekday in [5, 6] else 1.0
 
             # 应用趋势和周末因素
             predicted_revenue = int(avg_revenue * (1 + trend * i / 30) * weekend_factor)

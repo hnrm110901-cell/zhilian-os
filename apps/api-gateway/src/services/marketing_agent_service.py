@@ -323,36 +323,47 @@ class MarketingAgentService:
         """
         logger.info(f"Generating coupon strategy for scenario: {scenario}")
 
+        # 从 Store 配置读取优惠券参数
+        cfg: Dict = {}
+        try:
+            from src.models.store import Store
+            async with get_db_session() as session:
+                store_result = await session.execute(
+                    select(Store).where(Store.id == tenant_id)
+                )
+                store = store_result.scalar_one_or_none()
+                if store and store.config:
+                    cfg = store.config
+        except Exception as _e:
+            logger.warning("读取Store优惠券配置失败，使用默认值", error=str(_e))
+
         if scenario == "traffic_decline":
-            # 场景：预测客流下降
             return CouponStrategy(
                 coupon_type="满减券",
-                amount=20.0,
-                threshold=100.0,
-                valid_days=7,
+                amount=float(cfg.get("coupon_traffic_decline_amount", 20.0)),
+                threshold=float(cfg.get("coupon_traffic_decline_threshold", 100.0)),
+                valid_days=int(cfg.get("coupon_traffic_decline_days", 7)),
                 target_segment=CustomerSegment.AT_RISK,
                 expected_conversion=0.25,
                 expected_roi=3.5
             )
 
         elif scenario == "new_product_launch":
-            # 场景：新品上市
             return CouponStrategy(
                 coupon_type="代金券",
-                amount=15.0,
+                amount=float(cfg.get("coupon_new_product_amount", 15.0)),
                 threshold=None,
-                valid_days=14,
+                valid_days=int(cfg.get("coupon_new_product_days", 14)),
                 target_segment=CustomerSegment.HIGH_VALUE,
                 expected_conversion=0.35,
                 expected_roi=4.2
             )
 
         elif scenario == "member_day":
-            # 场景：会员日
             return CouponStrategy(
                 coupon_type="折扣券",
-                amount=0.88,  # 8.8折
-                threshold=50.0,
+                amount=float(cfg.get("coupon_member_day_discount", 0.88)),
+                threshold=float(cfg.get("coupon_member_day_threshold", 50.0)),
                 valid_days=1,
                 target_segment=CustomerSegment.POTENTIAL,
                 expected_conversion=0.40,
@@ -360,12 +371,11 @@ class MarketingAgentService:
             )
 
         else:
-            # 默认策略
             return CouponStrategy(
                 coupon_type="满减券",
-                amount=10.0,
-                threshold=50.0,
-                valid_days=7,
+                amount=float(cfg.get("coupon_default_amount", 10.0)),
+                threshold=float(cfg.get("coupon_default_threshold", 50.0)),
+                valid_days=int(cfg.get("coupon_default_days", 7)),
                 target_segment=CustomerSegment.NEW,
                 expected_conversion=0.20,
                 expected_roi=2.8

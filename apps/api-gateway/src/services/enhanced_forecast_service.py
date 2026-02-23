@@ -41,14 +41,16 @@ class EnhancedForecastService(BaseService):
         """
         store_id = self.require_store_id()
 
-        # 1. 获取历史基准数据
+        # 1. 获取历史基准数据 + 计算真实周末系数
         historical_baseline = await self._get_historical_baseline(target_date)
+        computed_weekend_factor = await self._compute_weekend_factor(store_id)
 
         # 2. 计算各维度影响因子
         factors = self._calculate_impact_factors(
             target_date,
             weather_forecast,
-            events
+            events,
+            weekend_factor=computed_weekend_factor
         )
 
         # 3. 综合预测
@@ -94,6 +96,7 @@ class EnhancedForecastService(BaseService):
         target_date: date,
         weather_forecast: Optional[Dict[str, Any]],
         events: Optional[List[Dict[str, Any]]],
+        weekend_factor: float = 1.4,
     ) -> Dict[str, float]:
         """
         计算各维度影响因子
@@ -106,7 +109,7 @@ class EnhancedForecastService(BaseService):
         # 1. 星期因子
         weekday = target_date.weekday()
         if weekday in [5, 6]:  # 周末
-            factors["weekend_factor"] = 1.4
+            factors["weekend_factor"] = weekend_factor
         else:
             factors["weekday_factor"] = 1.0
 
@@ -161,6 +164,32 @@ class EnhancedForecastService(BaseService):
                 factors["season_factor"] = 0.8
 
         return factors
+
+    async def _compute_weekend_factor(self, store_id: str) -> float:
+        """从过去30天DailyReport计算实际周末/工作日营收比"""
+        try:
+            from sqlalchemy import select, func as sa_func
+            from src.core.database import get_db_session
+            from src.models.daily_report import DailyReport
+            cutoff = date.today() - timedelta(days=30)
+            async with get_db_session() as session:
+                result = await session.execute(
+                    select(DailyReport.report_date, DailyReport.total_revenue).where(
+                        DailyReport.store_id == store_id,
+                        DailyReport.report_date >= cutoff,
+                    )
+                )
+                rows = result.all()
+            if not rows:
+                return 1.4
+            weekend_revs = [float(r.total_revenue) for r in rows if r.report_date.weekday() in [5, 6]]
+            weekday_revs = [float(r.total_revenue) for r in rows if r.report_date.weekday() not in [5, 6]]
+            if weekend_revs and weekday_revs:
+                factor = sum(weekend_revs) / len(weekend_revs) / (sum(weekday_revs) / len(weekday_revs))
+                return round(max(1.0, min(2.5, factor)), 2)
+        except Exception as e:
+            logger.warning("周末系数计算失败，使用默认值", error=str(e))
+        return 1.4
 
     async def _get_historical_baseline(self, target_date: date) -> Dict[str, float]:
         """
