@@ -96,9 +96,9 @@ class AIModelOptimizer:
         self,
         model_id: str,
         training_data: List[Dict[str, Any]],
-        epochs: int = 10,
-        learning_rate: float = 0.001,
-        batch_size: int = 32
+        epochs: int = int(os.getenv("MODEL_FINE_TUNE_EPOCHS", "10")),
+        learning_rate: float = float(os.getenv("MODEL_FINE_TUNE_LR", "0.001")),
+        batch_size: int = int(os.getenv("MODEL_FINE_TUNE_BATCH_SIZE", "32"))
     ) -> Dict[str, Any]:
         """
         Fine-tune model on specific data
@@ -179,7 +179,7 @@ class AIModelOptimizer:
         model_id: str,
         param_space: Dict[str, List[Any]],
         optimization_metric: str = "f1_score",
-        max_trials: int = 50
+        max_trials: int = int(os.getenv("MODEL_HYPERPARAM_MAX_TRIALS", "50"))
     ) -> Dict[str, Any]:
         """
         Optimize model hyperparameters
@@ -231,7 +231,7 @@ class AIModelOptimizer:
         self,
         model_id: str,
         compression_method: str = "quantization",
-        target_size_reduction: float = 0.5
+        target_size_reduction: float = float(os.getenv("MODEL_COMPRESS_TARGET_REDUCTION", "0.5"))
     ) -> Dict[str, Any]:
         """
         Compress model to reduce size and latency
@@ -344,8 +344,8 @@ class AIModelOptimizer:
         test_name: str,
         model_a_id: str,
         model_b_id: str,
-        traffic_split: float = 0.5,
-        duration_hours: int = 24
+        traffic_split: float = float(os.getenv("MODEL_AB_TRAFFIC_SPLIT", "0.5")),
+        duration_hours: int = int(os.getenv("MODEL_AB_DURATION_HOURS", "24"))
     ) -> Dict[str, Any]:
         """
         Create A/B test for model comparison
@@ -481,12 +481,12 @@ class AIModelOptimizer:
         # Detect anomalies
         anomalies = []
         for i, metrics in enumerate(metrics_over_time):
-            if metrics["accuracy"] < 0.90:
+            if metrics["accuracy"] < float(os.getenv("MODEL_ACCURACY_DRIFT_THRESHOLD", "0.90")):
                 anomalies.append({
                     "date": metrics["date"],
                     "type": "accuracy_drift",
                     "value": metrics["accuracy"],
-                    "threshold": 0.90
+                    "threshold": float(os.getenv("MODEL_ACCURACY_DRIFT_THRESHOLD", "0.90"))
                 })
 
         return {

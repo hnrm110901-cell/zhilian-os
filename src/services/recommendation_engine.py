@@ -98,7 +98,7 @@ class IntelligentRecommendationEngine:
         customer_id: str,
         store_id: str,
         context: Optional[Dict[str, Any]] = None,
-        top_k: int = 5
+        top_k: int = int(os.getenv("RECOMMEND_TOP_K", "5"))
     ) -> List[DishRecommendation]:
         """
         Recommend dishes for a customer
@@ -410,7 +410,7 @@ class IntelligentRecommendationEngine:
         context: Dict[str, Any]
     ) -> float:
         """Calculate context-aware score"""
-        score = 0.5
+        score = float(os.getenv("RECOMMEND_CONTEXT_BASE_SCORE", "0.5"))
 
         # Time-based adjustment
         hour = context.get("hour", 12)

@@ -311,7 +311,7 @@ class EdgeNodeService:
             "recommendation": f"人员配置{staff_ratio*100:.1f}%，建议{action}"
         }
 
-    async def cache_data(self, key: str, data: Any, ttl: int = 3600):
+    async def cache_data(self, key: str, data: Any, ttl: int = int(os.getenv("EDGE_CACHE_TTL", "3600"))):
         """
         缓存数据到本地
 
