@@ -527,15 +527,24 @@ class MarketingAgentService:
         tenant_id: str
     ):
         """发送生日优惠券"""
-        # 生成生日券
+        cfg: Dict = {}
+        try:
+            from src.models.store import Store
+            async with get_db_session() as session:
+                store_result = await session.execute(select(Store).where(Store.id == tenant_id))
+                store = store_result.scalar_one_or_none()
+                if store and store.config:
+                    cfg = store.config
+        except Exception:
+            pass
+
         coupon = {
             "type": "生日专享券",
-            "amount": 50.0,
-            "threshold": 100.0,
-            "valid_days": 7
+            "amount": float(cfg.get("birthday_coupon_amount", 50.0)),
+            "threshold": float(cfg.get("birthday_coupon_threshold", 100.0)),
+            "valid_days": int(cfg.get("birthday_coupon_days", 7))
         }
 
-        # 通过企微发送
         message = f"🎂 生日快乐！送您{coupon['amount']}元生日券，满{coupon['threshold']}可用"
 
         try:
@@ -552,12 +561,22 @@ class MarketingAgentService:
         tenant_id: str
     ):
         """发送挽回优惠"""
-        # 生成挽回券
+        cfg: Dict = {}
+        try:
+            from src.models.store import Store
+            async with get_db_session() as session:
+                store_result = await session.execute(select(Store).where(Store.id == tenant_id))
+                store = store_result.scalar_one_or_none()
+                if store and store.config:
+                    cfg = store.config
+        except Exception:
+            pass
+
         coupon = {
             "type": "专属挽回券",
-            "amount": 30.0,
-            "threshold": 80.0,
-            "valid_days": 14
+            "amount": float(cfg.get("winback_coupon_amount", 30.0)),
+            "threshold": float(cfg.get("winback_coupon_threshold", 80.0)),
+            "valid_days": int(cfg.get("winback_coupon_days", 14))
         }
 
         message = f"好久不见！特别为您准备了{coupon['amount']}元优惠券，期待您的光临"
