@@ -335,8 +335,8 @@ class ModelMarketplaceService:
             )
             avg_accuracy = round(float(avg_accuracy_result.scalar() or 0), 1)
 
-        network_value = total_stores * total_stores * 0.5
-        moat_strength = "high" if total_stores >= 500 else ("medium" if total_stores >= 100 else "low")
+        network_value = total_stores * total_stores * float(os.getenv("MARKETPLACE_NETWORK_VALUE_COEF", "0.5"))
+        moat_strength = "high" if total_stores >= int(os.getenv("MARKETPLACE_MOAT_HIGH_STORES", "500")) else ("medium" if total_stores >= int(os.getenv("MARKETPLACE_MOAT_MED_STORES", "100")) else "low")
 
         network_effect = {
             "total_stores": total_stores,

@@ -217,7 +217,7 @@ class AnalyticsService:
         }
 
     async def analyze_associations(
-        self, store_id: str, min_support: float = 0.1
+        self, store_id: str, min_support: float = float(os.getenv("ANALYTICS_MIN_SUPPORT", "0.1"))
     ) -> Dict[str, Any]:
         """关联分析 - 分析菜品之间的关联关系"""
         # 获取最近N天的订单数据

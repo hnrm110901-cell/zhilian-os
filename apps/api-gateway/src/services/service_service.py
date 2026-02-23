@@ -465,7 +465,7 @@ class ServiceQualityService:
 
         # 基于指标生成建议
         satisfaction = quality_metrics["satisfaction"]["average_rating"]
-        if satisfaction < 80:
+        if satisfaction < float(os.getenv("SERVICE_SATISFACTION_THRESHOLD", "80")):
             improvements.append({
                 "category": "customer_satisfaction",
                 "priority": "high",
@@ -498,9 +498,9 @@ class ServiceQualityService:
         findings = []
 
         quality_score = quality_metrics["quality_score"]
-        if quality_score >= 90:
+        if quality_score >= float(os.getenv("SERVICE_QUALITY_EXCELLENT_THRESHOLD", "90")):
             findings.append("服务质量表现优秀，继续保持")
-        elif quality_score >= 80:
+        elif quality_score >= float(os.getenv("SERVICE_QUALITY_GOOD_THRESHOLD", "80")):
             findings.append("服务质量良好，有提升空间")
         else:
             findings.append("服务质量需要改进")

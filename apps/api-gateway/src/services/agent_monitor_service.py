@@ -266,11 +266,11 @@ class AgentMonitorService:
 
             # 改进建议
             recommendations = []
-            if success_rate < 95:
+            if success_rate < float(os.getenv("AGENT_MONITOR_SUCCESS_RATE_THRESHOLD", "95")):
                 recommendations.append(f"成功率偏低({success_rate:.1f}%)，需要优化错误处理")
-            if avg_time > 1000:
+            if avg_time > float(os.getenv("AGENT_MONITOR_AVG_TIME_THRESHOLD", "1000")):
                 recommendations.append(f"响应时间偏慢({avg_time:.0f}ms)，需要性能优化")
-            if rag_rate < 80:
+            if rag_rate < float(os.getenv("AGENT_MONITOR_RAG_RATE_THRESHOLD", "80")):
                 recommendations.append(f"RAG使用率偏低({rag_rate:.1f}%)，建议增加上下文检索")
 
             analysis = {

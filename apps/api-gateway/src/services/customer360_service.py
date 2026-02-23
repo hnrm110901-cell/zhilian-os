@@ -549,11 +549,11 @@ class Customer360Service:
         # 活跃度标签
         if customer_value.get("last_order_time"):
             days_since_last = (datetime.now() - datetime.fromisoformat(customer_value["last_order_time"])).days
-            if days_since_last <= 7:
+            if days_since_last <= int(os.getenv("CUSTOMER_ACTIVE_DAYS", "7")):
                 tags.append("活跃用户")
-            elif days_since_last <= 30:
+            elif days_since_last <= int(os.getenv("CUSTOMER_NORMAL_DAYS", "30")):
                 tags.append("一般活跃")
-            elif days_since_last <= 90:
+            elif days_since_last <= int(os.getenv("CUSTOMER_SLEEP_DAYS", "90")):
                 tags.append("沉睡用户")
             else:
                 tags.append("流失用户")
