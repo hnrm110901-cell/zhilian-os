@@ -5,7 +5,7 @@ External System Integration Models
 import enum
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import Column, String, DateTime, Enum, Text, Boolean, Integer, Float, JSON
+from sqlalchemy import Column, String, DateTime, Enum, Text, Boolean, Integer, Float, JSON, Numeric
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 
@@ -168,10 +168,10 @@ class POSTransaction(Base):
     transaction_type = Column(String(50), comment="交易类型: sale/refund/void")
 
     # 金额信息
-    subtotal = Column(Float, default=0, comment="小计")
-    tax = Column(Float, default=0, comment="税费")
-    discount = Column(Float, default=0, comment="折扣")
-    total = Column(Float, default=0, comment="总金额")
+    subtotal = Column(Numeric(12, 2), default=0, comment="小计")
+    tax = Column(Numeric(12, 2), default=0, comment="税费")
+    discount = Column(Numeric(12, 2), default=0, comment="折扣")
+    total = Column(Numeric(12, 2), default=0, comment="总金额")
     payment_method = Column(String(50), comment="支付方式")
 
     # 订单详情
@@ -230,10 +230,10 @@ class SupplierOrder(Base):
     status = Column(String(50), comment="订单状态: pending/confirmed/shipped/delivered/cancelled")
 
     # 金额信息
-    subtotal = Column(Float, default=0, comment="小计")
-    tax = Column(Float, default=0, comment="税费")
-    shipping = Column(Float, default=0, comment="运费")
-    total = Column(Float, default=0, comment="总金额")
+    subtotal = Column(Numeric(12, 2), default=0, comment="小计")
+    tax = Column(Numeric(12, 2), default=0, comment="税费")
+    shipping = Column(Numeric(12, 2), default=0, comment="运费")
+    total = Column(Numeric(12, 2), default=0, comment="总金额")
 
     # 订单详情
     items = Column(JSON, comment="订单项目")
@@ -298,7 +298,7 @@ class MemberSync(Base):
     # 会员等级和积分
     level = Column(String(50), comment="会员等级")
     points = Column(Integer, default=0, comment="积分")
-    balance = Column(Float, default=0, comment="余额")
+    balance = Column(Numeric(12, 2), default=0, comment="余额")
 
     # 同步状态
     sync_status = Column(
@@ -371,7 +371,7 @@ class ReservationSync(Base):
 
     # 预付信息
     deposit_required = Column(Boolean, default=False, comment="是否需要预付")
-    deposit_amount = Column(Float, default=0, comment="预付金额")
+    deposit_amount = Column(Numeric(12, 2), default=0, comment="预付金额")
     deposit_paid = Column(Boolean, default=False, comment="是否已预付")
 
     # 来源信息

@@ -3,7 +3,7 @@
 用于记录AI Agent的决策建议、店长的实际决策和最终结果
 支持Human-in-the-loop和联邦学习
 """
-from sqlalchemy import Column, String, Integer, Float, DateTime, Text, JSON, Enum as SQLEnum, ForeignKey
+from sqlalchemy import Column, String, Integer, Float, DateTime, Text, JSON, Enum as SQLEnum, ForeignKey, Numeric
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -80,8 +80,8 @@ class DecisionLog(Base):
 
     # 业务指标
     business_impact = Column(JSON, comment="业务影响指标")
-    cost_impact = Column(Float, comment="成本影响 (元)")
-    revenue_impact = Column(Float, comment="营收影响 (元)")
+    cost_impact = Column(Numeric(12, 2), comment="成本影响 (元)")
+    revenue_impact = Column(Numeric(12, 2), comment="营收影响 (元)")
 
     # 学习数据
     is_training_data = Column(Integer, default=0, comment="是否用于训练 (0=否, 1=是)")

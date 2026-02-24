@@ -1,7 +1,7 @@
 """
 Store Model
 """
-from sqlalchemy import Column, String, Boolean, JSON, Integer, Float
+from sqlalchemy import Column, String, Boolean, JSON, Integer, Float, Numeric
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import uuid
@@ -58,7 +58,7 @@ class Store(Base, TimestampMixin):
     config = Column(JSON, default=dict)  # 其他配置
 
     # Business metrics targets
-    monthly_revenue_target = Column(Float)  # 月营业额目标
+    monthly_revenue_target = Column(Numeric(12, 2))  # 月营业额目标
     daily_customer_target = Column(Integer)  # 日客流量目标
     cost_ratio_target = Column(Float)  # 成本率目标
     labor_cost_ratio_target = Column(Float)  # 人力成本率目标
