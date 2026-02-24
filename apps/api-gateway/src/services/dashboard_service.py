@@ -207,7 +207,8 @@ class DashboardService:
                         {"name": c.get("rcNAME", "未知"), "value": 0}
                         for c in categories[:5]
                     ]
-                except Exception:
+                except Exception as e:
+                    logger.warning("dashboard_pos_categories_fallback_failed", error=str(e))
                     category_sales = []
 
             return {"categories": category_sales}

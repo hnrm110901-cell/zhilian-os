@@ -288,8 +288,8 @@ class FederatedBOMService:
                 qty = result.scalar_one_or_none()
                 if qty is not None:
                     purchase_quantity = float(qty)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("federated_bom_inventory_fetch_failed", ingredient_id=ingredient_id, error=str(e))
         features = np.array([
             season_code.get(season, 0),
             temperature,

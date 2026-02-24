@@ -276,8 +276,8 @@ class BenchmarkService(BaseService):
             try:
                 m = await self._get_store_metrics(sid, start_date, end_date)
                 metrics_list.append(m)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("benchmark_store_metrics_failed", store_id=sid, error=str(e))
         return metrics_list
 
     def _calculate_rankings(

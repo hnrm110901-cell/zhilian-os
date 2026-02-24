@@ -13,6 +13,9 @@ from enum import Enum
 from dataclasses import dataclass
 from sqlalchemy.orm import Session
 import numpy as np
+import structlog
+
+logger = structlog.get_logger()
 
 
 class RecommendationType(Enum):
@@ -579,8 +582,8 @@ class IntelligentRecommendationEngine:
                         "cost": float(dish.cost) if dish.cost else 0.0,
                         "profit_margin": float(dish.profit_margin) / 100 if dish.profit_margin else 0.0,
                     }
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("recommendation_dish_pricing_failed", dish_id=dish_id, error=str(e))
         return {"dish_id": dish_id, "price": 0.0, "cost": 0.0, "profit_margin": 0.0}
 
     def _determine_pricing_strategy(
