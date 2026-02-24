@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 import os
 import structlog
 
-from .llm_agent import LLMEnhancedAgent
+from .llm_agent import LLMEnhancedAgent, AgentResult
 from ..services.rag_service import RAGService
 from ..core.monitoring import error_monitor, ErrorSeverity, ErrorCategory
 
@@ -38,7 +38,7 @@ class OrderAgent(LLMEnhancedAgent):
         store_id: str,
         order_id: Optional[str] = None,
         time_period: str = "today"
-    ) -> Dict[str, Any]:
+    ) -> AgentResult:
         """
         分析订单异常
 
@@ -48,7 +48,7 @@ class OrderAgent(LLMEnhancedAgent):
             time_period: 时间周期
 
         Returns:
-            异常分析结果
+            AgentResult（含 reasoning / confidence / source_data）
         """
         try:
             if order_id:
@@ -87,7 +87,6 @@ class OrderAgent(LLMEnhancedAgent):
                 time_period=time_period
             )
 
-            # 使用RAG检索历史订单异常数据
             rag_result = await self.rag_service.analyze_with_rag(
                 query=query,
                 store_id=store_id,
@@ -95,27 +94,25 @@ class OrderAgent(LLMEnhancedAgent):
                 top_k=int(os.getenv("RAG_ORDER_TOP_K", "12"))
             )
 
+            ctx_count = rag_result["metadata"]["context_count"]
+            scope = f"订单 {order_id}" if order_id else f"{time_period} 整体"
             return self.format_response(
                 success=True,
                 data={
                     "analysis": rag_result["response"],
                     "order_id": order_id,
                     "time_period": time_period,
-                    "context_used": rag_result["metadata"]["context_count"],
+                    "context_used": ctx_count,
                     "timestamp": rag_result["metadata"]["timestamp"]
                 },
-                message="订单异常分析完成"
+                message="订单异常分析完成",
+                reasoning=f"基于 {ctx_count} 条历史订单，分析 {scope} 异常",
+                confidence=min(0.9, 0.45 + ctx_count * 0.05),
+                source_data={"store_id": store_id, "order_id": order_id, "time_period": time_period},
             )
 
         except Exception as e:
-            logger.error(
-                "Order anomaly analysis failed",
-                store_id=store_id,
-                order_id=order_id,
-                error=str(e),
-                exc_info=e
-            )
-
+            logger.error("Order anomaly analysis failed", store_id=store_id, order_id=order_id, error=str(e), exc_info=e)
             error_monitor.log_error(
                 message=f"Order anomaly analysis failed for {store_id}",
                 severity=ErrorSeverity.ERROR,
@@ -123,11 +120,10 @@ class OrderAgent(LLMEnhancedAgent):
                 exception=e,
                 context={"store_id": store_id, "order_id": order_id}
             )
-
             return self.format_response(
-                success=False,
-                data=None,
-                message=f"分析失败: {str(e)}"
+                success=False, data=None, message=f"分析失败: {str(e)}",
+                reasoning=f"分析过程中发生异常: {str(e)}", confidence=0.0,
+                source_data={"store_id": store_id},
             )
 
     async def predict_order_volume(
@@ -135,18 +131,8 @@ class OrderAgent(LLMEnhancedAgent):
         store_id: str,
         time_range: str = "7d",
         granularity: str = "day"
-    ) -> Dict[str, Any]:
-        """
-        预测订单量
-
-        Args:
-            store_id: 门店ID
-            time_range: 预测范围
-            granularity: 粒度 (hour/day/week)
-
-        Returns:
-            订单量预测结果
-        """
+    ) -> AgentResult:
+        """预测订单量"""
         try:
             query = f"""
             预测门店{store_id}未来{time_range}的订单量(按{granularity}):
@@ -163,45 +149,35 @@ class OrderAgent(LLMEnhancedAgent):
             4. 风险提示
             """
 
-            logger.info(
-                "Predicting order volume with RAG",
-                store_id=store_id,
-                time_range=time_range,
-                granularity=granularity
-            )
+            logger.info("Predicting order volume with RAG", store_id=store_id, time_range=time_range)
 
-            # 使用RAG检索历史订单数据
             rag_result = await self.rag_service.analyze_with_rag(
-                query=query,
-                store_id=store_id,
-                collection="orders",
+                query=query, store_id=store_id, collection="orders",
                 top_k=int(os.getenv("RAG_ORDER_TOP_K", "12"))
             )
 
+            ctx_count = rag_result["metadata"]["context_count"]
             return self.format_response(
                 success=True,
                 data={
                     "prediction": rag_result["response"],
                     "time_range": time_range,
                     "granularity": granularity,
-                    "context_used": rag_result["metadata"]["context_count"],
+                    "context_used": ctx_count,
                     "timestamp": rag_result["metadata"]["timestamp"]
                 },
-                message="订单量预测完成"
+                message="订单量预测完成",
+                reasoning=f"基于 {ctx_count} 条历史订单，预测未来 {time_range}（粒度: {granularity}）",
+                confidence=min(0.85, 0.4 + ctx_count * 0.05),
+                source_data={"store_id": store_id, "time_range": time_range, "granularity": granularity},
             )
 
         except Exception as e:
-            logger.error(
-                "Order volume prediction failed",
-                store_id=store_id,
-                error=str(e),
-                exc_info=e
-            )
-
+            logger.error("Order volume prediction failed", store_id=store_id, error=str(e), exc_info=e)
             return self.format_response(
-                success=False,
-                data=None,
-                message=f"预测失败: {str(e)}"
+                success=False, data=None, message=f"预测失败: {str(e)}",
+                reasoning=f"预测过程中发生异常: {str(e)}", confidence=0.0,
+                source_data={"store_id": store_id},
             )
 
     async def analyze_customer_behavior(
@@ -209,18 +185,8 @@ class OrderAgent(LLMEnhancedAgent):
         store_id: str,
         customer_id: Optional[str] = None,
         segment: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """
-        分析客户行为
-
-        Args:
-            store_id: 门店ID
-            customer_id: 客户ID (可选，分析特定客户)
-            segment: 客户分群 (可选，如"高价值客户")
-
-        Returns:
-            客户行为分析结果
-        """
+    ) -> AgentResult:
+        """分析客户行为"""
         try:
             if customer_id:
                 query = f"""
@@ -252,63 +218,44 @@ class OrderAgent(LLMEnhancedAgent):
                 4. 增长机会
                 """
 
-            logger.info(
-                "Analyzing customer behavior with RAG",
-                store_id=store_id,
-                customer_id=customer_id,
-                segment=segment
-            )
+            logger.info("Analyzing customer behavior with RAG", store_id=store_id, customer_id=customer_id, segment=segment)
 
-            # 使用RAG检索历史客户数据
             rag_result = await self.rag_service.analyze_with_rag(
-                query=query,
-                store_id=store_id,
-                collection="orders",
+                query=query, store_id=store_id, collection="orders",
                 top_k=int(os.getenv("RAG_ORDER_TOP_K", "12"))
             )
 
+            ctx_count = rag_result["metadata"]["context_count"]
+            scope = f"客户 {customer_id}" if customer_id else (f"{segment}群体" if segment else "整体客户")
             return self.format_response(
                 success=True,
                 data={
                     "analysis": rag_result["response"],
                     "customer_id": customer_id,
                     "segment": segment,
-                    "context_used": rag_result["metadata"]["context_count"],
+                    "context_used": ctx_count,
                     "timestamp": rag_result["metadata"]["timestamp"]
                 },
-                message="客户行为分析完成"
+                message="客户行为分析完成",
+                reasoning=f"基于 {ctx_count} 条历史订单，分析 {scope} 行为特征",
+                confidence=min(0.9, 0.45 + ctx_count * 0.05),
+                source_data={"store_id": store_id, "customer_id": customer_id, "segment": segment},
             )
 
         except Exception as e:
-            logger.error(
-                "Customer behavior analysis failed",
-                store_id=store_id,
-                customer_id=customer_id,
-                error=str(e),
-                exc_info=e
-            )
-
+            logger.error("Customer behavior analysis failed", store_id=store_id, customer_id=customer_id, error=str(e), exc_info=e)
             return self.format_response(
-                success=False,
-                data=None,
-                message=f"分析失败: {str(e)}"
+                success=False, data=None, message=f"分析失败: {str(e)}",
+                reasoning=f"分析过程中发生异常: {str(e)}", confidence=0.0,
+                source_data={"store_id": store_id},
             )
 
     async def optimize_menu_pricing(
         self,
         store_id: str,
         dish_ids: List[str]
-    ) -> Dict[str, Any]:
-        """
-        优化菜品定价
-
-        Args:
-            store_id: 门店ID
-            dish_ids: 菜品ID列表
-
-        Returns:
-            定价优化建议
-        """
+    ) -> AgentResult:
+        """优化菜品定价"""
         try:
             dishes_text = ", ".join(dish_ids)
 
@@ -325,41 +272,32 @@ class OrderAgent(LLMEnhancedAgent):
             目标: 提升营收和利润率
             """
 
-            logger.info(
-                "Optimizing menu pricing with RAG",
-                store_id=store_id,
-                dish_count=len(dish_ids)
-            )
+            logger.info("Optimizing menu pricing with RAG", store_id=store_id, dish_count=len(dish_ids))
 
-            # 使用RAG检索历史定价和销售数据
             rag_result = await self.rag_service.analyze_with_rag(
-                query=query,
-                store_id=store_id,
-                collection="orders",
+                query=query, store_id=store_id, collection="orders",
                 top_k=int(os.getenv("RAG_ORDER_TOP_K", "12"))
             )
 
+            ctx_count = rag_result["metadata"]["context_count"]
             return self.format_response(
                 success=True,
                 data={
                     "optimization": rag_result["response"],
                     "dish_count": len(dish_ids),
-                    "context_used": rag_result["metadata"]["context_count"],
+                    "context_used": ctx_count,
                     "timestamp": rag_result["metadata"]["timestamp"]
                 },
-                message="定价优化完成"
+                message="定价优化完成",
+                reasoning=f"基于 {ctx_count} 条历史数据，优化 {len(dish_ids)} 种菜品定价",
+                confidence=min(0.85, 0.4 + ctx_count * 0.05),
+                source_data={"store_id": store_id, "dish_count": len(dish_ids)},
             )
 
         except Exception as e:
-            logger.error(
-                "Menu pricing optimization failed",
-                store_id=store_id,
-                error=str(e),
-                exc_info=e
-            )
-
+            logger.error("Menu pricing optimization failed", store_id=store_id, error=str(e), exc_info=e)
             return self.format_response(
-                success=False,
-                data=None,
-                message=f"优化失败: {str(e)}"
+                success=False, data=None, message=f"优化失败: {str(e)}",
+                reasoning=f"优化过程中发生异常: {str(e)}", confidence=0.0,
+                source_data={"store_id": store_id},
             )

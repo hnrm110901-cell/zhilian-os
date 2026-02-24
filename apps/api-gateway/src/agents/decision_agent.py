@@ -2,10 +2,11 @@
 DecisionAgent - 决策分析Agent (RAG增强)
 """
 from typing import Dict, Any, Optional
+from decimal import Decimal
 import os
 import structlog
 
-from .llm_agent import LLMEnhancedAgent
+from .llm_agent import LLMEnhancedAgent, AgentResult
 from ..services.rag_service import RAGService
 from ..core.monitoring import error_monitor, ErrorSeverity, ErrorCategory
 
@@ -35,25 +36,25 @@ class DecisionAgent(LLMEnhancedAgent):
     async def analyze_revenue_anomaly(
         self,
         store_id: str,
-        current_revenue: float,
-        expected_revenue: float,
+        current_revenue: Decimal,
+        expected_revenue: Decimal,
         time_period: str = "today"
-    ) -> Dict[str, Any]:
+    ) -> AgentResult:
         """
         分析营收异常
 
         Args:
             store_id: 门店ID
-            current_revenue: 当前营收
-            expected_revenue: 预期营收
+            current_revenue: 当前营收（Decimal，元）
+            expected_revenue: 预期营收（Decimal，元）
             time_period: 时间周期
 
         Returns:
-            分析结果和建议
+            AgentResult（含 reasoning / confidence / source_data）
         """
         try:
             # 计算异常程度
-            deviation = ((current_revenue - expected_revenue) / expected_revenue) * 100
+            deviation = float((current_revenue - expected_revenue) / expected_revenue * 100)
 
             # 构建查询
             query = f"""
@@ -68,8 +69,8 @@ class DecisionAgent(LLMEnhancedAgent):
             logger.info(
                 "Analyzing revenue anomaly with RAG",
                 store_id=store_id,
-                current_revenue=current_revenue,
-                expected_revenue=expected_revenue,
+                current_revenue=str(current_revenue),
+                expected_revenue=str(expected_revenue),
                 deviation=deviation
             )
 
@@ -86,12 +87,22 @@ class DecisionAgent(LLMEnhancedAgent):
                 data={
                     "analysis": rag_result["response"],
                     "deviation": deviation,
-                    "current_revenue": current_revenue,
-                    "expected_revenue": expected_revenue,
+                    "current_revenue": str(current_revenue),
+                    "expected_revenue": str(expected_revenue),
                     "context_used": rag_result["metadata"]["context_count"],
                     "timestamp": rag_result["metadata"]["timestamp"]
                 },
-                message="营收异常分析完成"
+                message="营收异常分析完成",
+                reasoning=f"当前营收 ¥{current_revenue}，预期 ¥{expected_revenue}，偏差 {deviation:.1f}%，"
+                          f"基于 {rag_result['metadata']['context_count']} 条历史事件分析",
+                confidence=min(0.95, 0.5 + rag_result["metadata"]["context_count"] * 0.05),
+                source_data={
+                    "store_id": store_id,
+                    "current_revenue": str(current_revenue),
+                    "expected_revenue": str(expected_revenue),
+                    "time_period": time_period,
+                    "deviation_pct": deviation,
+                },
             )
 
         except Exception as e:
@@ -113,14 +124,17 @@ class DecisionAgent(LLMEnhancedAgent):
             return self.format_response(
                 success=False,
                 data=None,
-                message=f"分析失败: {str(e)}"
+                message=f"分析失败: {str(e)}",
+                reasoning=f"分析过程中发生异常: {str(e)}",
+                confidence=0.0,
+                source_data={"store_id": store_id},
             )
 
     async def analyze_order_trend(
         self,
         store_id: str,
         time_range: str = "7d"
-    ) -> Dict[str, Any]:
+    ) -> AgentResult:
         """
         分析订单趋势
 
@@ -129,7 +143,7 @@ class DecisionAgent(LLMEnhancedAgent):
             time_range: 时间范围
 
         Returns:
-            趋势分析结果
+            AgentResult（含 reasoning / confidence / source_data）
         """
         try:
             query = f"""
@@ -164,7 +178,10 @@ class DecisionAgent(LLMEnhancedAgent):
                     "context_used": rag_result["metadata"]["context_count"],
                     "timestamp": rag_result["metadata"]["timestamp"]
                 },
-                message="订单趋势分析完成"
+                message="订单趋势分析完成",
+                reasoning=f"基于 {rag_result['metadata']['context_count']} 条历史订单数据，分析 {time_range} 趋势",
+                confidence=min(0.9, 0.4 + rag_result["metadata"]["context_count"] * 0.05),
+                source_data={"store_id": store_id, "time_range": time_range},
             )
 
         except Exception as e:
@@ -178,14 +195,17 @@ class DecisionAgent(LLMEnhancedAgent):
             return self.format_response(
                 success=False,
                 data=None,
-                message=f"分析失败: {str(e)}"
+                message=f"分析失败: {str(e)}",
+                reasoning=f"分析过程中发生异常: {str(e)}",
+                confidence=0.0,
+                source_data={"store_id": store_id},
             )
 
     async def generate_business_recommendations(
         self,
         store_id: str,
         focus_area: Optional[str] = None
-    ) -> Dict[str, Any]:
+    ) -> AgentResult:
         """
         生成经营建议
 
@@ -194,7 +214,7 @@ class DecisionAgent(LLMEnhancedAgent):
             focus_area: 关注领域 (revenue/orders/inventory/staff)
 
         Returns:
-            经营建议
+            AgentResult（含 reasoning / confidence / source_data）
         """
         try:
             focus_text = f"重点关注{focus_area}" if focus_area else "全面分析"
@@ -223,15 +243,19 @@ class DecisionAgent(LLMEnhancedAgent):
                 top_k=int(os.getenv("RAG_DECISION_TOP_K", "8"))
             )
 
+            ctx_count = rag_result["metadata"]["context_count"]
             return self.format_response(
                 success=True,
                 data={
                     "recommendations": rag_result["response"],
                     "focus_area": focus_area,
-                    "context_used": rag_result["metadata"]["context_count"],
+                    "context_used": ctx_count,
                     "timestamp": rag_result["metadata"]["timestamp"]
                 },
-                message="经营建议生成完成"
+                message="经营建议生成完成",
+                reasoning=f"基于 {ctx_count} 条历史事件，{focus_text}，生成可执行经营建议",
+                confidence=min(0.9, 0.45 + ctx_count * 0.05),
+                source_data={"store_id": store_id, "focus_area": focus_area},
             )
 
         except Exception as e:
@@ -245,5 +269,8 @@ class DecisionAgent(LLMEnhancedAgent):
             return self.format_response(
                 success=False,
                 data=None,
-                message=f"生成失败: {str(e)}"
+                message=f"生成失败: {str(e)}",
+                reasoning=f"生成过程中发生异常: {str(e)}",
+                confidence=0.0,
+                source_data={"store_id": store_id},
             )

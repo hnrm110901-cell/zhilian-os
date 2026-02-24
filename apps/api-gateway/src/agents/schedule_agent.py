@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 import os
 import structlog
 
-from .llm_agent import LLMEnhancedAgent
+from .llm_agent import LLMEnhancedAgent, AgentResult
 from ..services.rag_service import RAGService
 from ..core.monitoring import error_monitor, ErrorSeverity, ErrorCategory
 
@@ -39,7 +39,7 @@ class ScheduleAgent(LLMEnhancedAgent):
         date: str,
         current_staff_count: int,
         expected_customer_flow: Optional[int] = None
-    ) -> Dict[str, Any]:
+    ) -> AgentResult:
         """
         优化排班
 
@@ -50,7 +50,7 @@ class ScheduleAgent(LLMEnhancedAgent):
             expected_customer_flow: 预期客流
 
         Returns:
-            排班优化建议
+            AgentResult（含 reasoning / confidence / source_data）
         """
         try:
             query = f"""
@@ -74,7 +74,6 @@ class ScheduleAgent(LLMEnhancedAgent):
                 current_staff_count=current_staff_count
             )
 
-            # 使用RAG检索历史排班和客流数据
             rag_result = await self.rag_service.analyze_with_rag(
                 query=query,
                 store_id=store_id,
@@ -82,6 +81,7 @@ class ScheduleAgent(LLMEnhancedAgent):
                 top_k=int(os.getenv("RAG_SCHEDULE_TOP_K", "10"))
             )
 
+            ctx_count = rag_result["metadata"]["context_count"]
             return self.format_response(
                 success=True,
                 data={
@@ -89,20 +89,17 @@ class ScheduleAgent(LLMEnhancedAgent):
                     "date": date,
                     "current_staff_count": current_staff_count,
                     "expected_customer_flow": expected_customer_flow,
-                    "context_used": rag_result["metadata"]["context_count"],
+                    "context_used": ctx_count,
                     "timestamp": rag_result["metadata"]["timestamp"]
                 },
-                message="排班优化完成"
+                message="排班优化完成",
+                reasoning=f"基于 {ctx_count} 条历史数据，为 {date} 优化排班（当前 {current_staff_count} 人）",
+                confidence=min(0.9, 0.45 + ctx_count * 0.05),
+                source_data={"store_id": store_id, "date": date, "current_staff_count": current_staff_count},
             )
 
         except Exception as e:
-            logger.error(
-                "Schedule optimization failed",
-                store_id=store_id,
-                error=str(e),
-                exc_info=e
-            )
-
+            logger.error("Schedule optimization failed", store_id=store_id, error=str(e), exc_info=e)
             error_monitor.log_error(
                 message=f"Schedule optimization failed for {store_id}",
                 severity=ErrorSeverity.ERROR,
@@ -110,28 +107,18 @@ class ScheduleAgent(LLMEnhancedAgent):
                 exception=e,
                 context={"store_id": store_id, "date": date}
             )
-
             return self.format_response(
-                success=False,
-                data=None,
-                message=f"优化失败: {str(e)}"
+                success=False, data=None, message=f"优化失败: {str(e)}",
+                reasoning=f"优化过程中发生异常: {str(e)}", confidence=0.0,
+                source_data={"store_id": store_id},
             )
 
     async def predict_staffing_needs(
         self,
         store_id: str,
         date_range: str = "7d"
-    ) -> Dict[str, Any]:
-        """
-        预测人力需求
-
-        Args:
-            store_id: 门店ID
-            date_range: 预测范围
-
-        Returns:
-            人力需求预测
-        """
+    ) -> AgentResult:
+        """预测人力需求"""
         try:
             query = f"""
             预测门店{store_id}未来{date_range}的人力需求:
@@ -146,60 +133,42 @@ class ScheduleAgent(LLMEnhancedAgent):
             3. 弹性调整建议
             """
 
-            logger.info(
-                "Predicting staffing needs with RAG",
-                store_id=store_id,
-                date_range=date_range
-            )
+            logger.info("Predicting staffing needs with RAG", store_id=store_id, date_range=date_range)
 
-            # 使用RAG检索历史数据
             rag_result = await self.rag_service.analyze_with_rag(
-                query=query,
-                store_id=store_id,
-                collection="events",
+                query=query, store_id=store_id, collection="events",
                 top_k=int(os.getenv("RAG_SCHEDULE_TOP_K", "10"))
             )
 
+            ctx_count = rag_result["metadata"]["context_count"]
             return self.format_response(
                 success=True,
                 data={
                     "prediction": rag_result["response"],
                     "date_range": date_range,
-                    "context_used": rag_result["metadata"]["context_count"],
+                    "context_used": ctx_count,
                     "timestamp": rag_result["metadata"]["timestamp"]
                 },
-                message="人力需求预测完成"
+                message="人力需求预测完成",
+                reasoning=f"基于 {ctx_count} 条历史数据，预测未来 {date_range} 人力需求",
+                confidence=min(0.85, 0.4 + ctx_count * 0.05),
+                source_data={"store_id": store_id, "date_range": date_range},
             )
 
         except Exception as e:
-            logger.error(
-                "Staffing needs prediction failed",
-                store_id=store_id,
-                error=str(e),
-                exc_info=e
-            )
-
+            logger.error("Staffing needs prediction failed", store_id=store_id, error=str(e), exc_info=e)
             return self.format_response(
-                success=False,
-                data=None,
-                message=f"预测失败: {str(e)}"
+                success=False, data=None, message=f"预测失败: {str(e)}",
+                reasoning=f"预测过程中发生异常: {str(e)}", confidence=0.0,
+                source_data={"store_id": store_id},
             )
 
     async def analyze_shift_efficiency(
         self,
         store_id: str,
         shift_id: str
-    ) -> Dict[str, Any]:
-        """
-        分析班次效率
-
-        Args:
-            store_id: 门店ID
-            shift_id: 班次ID
-
-        Returns:
-            班次效率分析
-        """
+    ) -> AgentResult:
+        """分析班次效率"""
         try:
             query = f"""
             分析门店{store_id}班次{shift_id}的效率:
@@ -214,43 +183,34 @@ class ScheduleAgent(LLMEnhancedAgent):
             3. 最佳实践参考
             """
 
-            logger.info(
-                "Analyzing shift efficiency with RAG",
-                store_id=store_id,
-                shift_id=shift_id
-            )
+            logger.info("Analyzing shift efficiency with RAG", store_id=store_id, shift_id=shift_id)
 
-            # 使用RAG检索班次数据
             rag_result = await self.rag_service.analyze_with_rag(
-                query=query,
-                store_id=store_id,
-                collection="events",
+                query=query, store_id=store_id, collection="events",
                 top_k=int(os.getenv("RAG_SCHEDULE_TOP_K", "10"))
             )
 
+            ctx_count = rag_result["metadata"]["context_count"]
             return self.format_response(
                 success=True,
                 data={
                     "analysis": rag_result["response"],
                     "shift_id": shift_id,
-                    "context_used": rag_result["metadata"]["context_count"],
+                    "context_used": ctx_count,
                     "timestamp": rag_result["metadata"]["timestamp"]
                 },
-                message="班次效率分析完成"
+                message="班次效率分析完成",
+                reasoning=f"基于 {ctx_count} 条历史数据，分析班次 {shift_id} 效率",
+                confidence=min(0.9, 0.45 + ctx_count * 0.05),
+                source_data={"store_id": store_id, "shift_id": shift_id},
             )
 
         except Exception as e:
-            logger.error(
-                "Shift efficiency analysis failed",
-                store_id=store_id,
-                error=str(e),
-                exc_info=e
-            )
-
+            logger.error("Shift efficiency analysis failed", store_id=store_id, error=str(e), exc_info=e)
             return self.format_response(
-                success=False,
-                data=None,
-                message=f"分析失败: {str(e)}"
+                success=False, data=None, message=f"分析失败: {str(e)}",
+                reasoning=f"分析过程中发生异常: {str(e)}", confidence=0.0,
+                source_data={"store_id": store_id},
             )
 
     async def balance_workload(
@@ -258,18 +218,8 @@ class ScheduleAgent(LLMEnhancedAgent):
         store_id: str,
         staff_ids: List[str],
         time_period: str = "week"
-    ) -> Dict[str, Any]:
-        """
-        平衡员工工作量
-
-        Args:
-            store_id: 门店ID
-            staff_ids: 员工ID列表
-            time_period: 时间周期
-
-        Returns:
-            工作量平衡建议
-        """
+    ) -> AgentResult:
+        """平衡员工工作量"""
         try:
             query = f"""
             为门店{store_id}平衡{len(staff_ids)}名员工的工作量({time_period}):
@@ -284,43 +234,33 @@ class ScheduleAgent(LLMEnhancedAgent):
             3. 预期效果
             """
 
-            logger.info(
-                "Balancing workload with RAG",
-                store_id=store_id,
-                staff_count=len(staff_ids),
-                time_period=time_period
-            )
+            logger.info("Balancing workload with RAG", store_id=store_id, staff_count=len(staff_ids), time_period=time_period)
 
-            # 使用RAG检索员工数据
             rag_result = await self.rag_service.analyze_with_rag(
-                query=query,
-                store_id=store_id,
-                collection="events",
+                query=query, store_id=store_id, collection="events",
                 top_k=int(os.getenv("RAG_SCHEDULE_TOP_K", "10"))
             )
 
+            ctx_count = rag_result["metadata"]["context_count"]
             return self.format_response(
                 success=True,
                 data={
                     "balance_plan": rag_result["response"],
                     "staff_count": len(staff_ids),
                     "time_period": time_period,
-                    "context_used": rag_result["metadata"]["context_count"],
+                    "context_used": ctx_count,
                     "timestamp": rag_result["metadata"]["timestamp"]
                 },
-                message="工作量平衡完成"
+                message="工作量平衡完成",
+                reasoning=f"基于 {ctx_count} 条历史数据，平衡 {len(staff_ids)} 名员工 {time_period} 工作量",
+                confidence=min(0.9, 0.45 + ctx_count * 0.05),
+                source_data={"store_id": store_id, "staff_count": len(staff_ids), "time_period": time_period},
             )
 
         except Exception as e:
-            logger.error(
-                "Workload balancing failed",
-                store_id=store_id,
-                error=str(e),
-                exc_info=e
-            )
-
+            logger.error("Workload balancing failed", store_id=store_id, error=str(e), exc_info=e)
             return self.format_response(
-                success=False,
-                data=None,
-                message=f"平衡失败: {str(e)}"
+                success=False, data=None, message=f"平衡失败: {str(e)}",
+                reasoning=f"平衡过程中发生异常: {str(e)}", confidence=0.0,
+                source_data={"store_id": store_id},
             )

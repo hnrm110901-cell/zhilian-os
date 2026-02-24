@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 import os
 import structlog
 
-from .llm_agent import LLMEnhancedAgent
+from .llm_agent import LLMEnhancedAgent, AgentResult
 from ..services.rag_service import RAGService
 from ..core.monitoring import error_monitor, ErrorSeverity, ErrorCategory
 
@@ -38,7 +38,7 @@ class InventoryAgent(LLMEnhancedAgent):
         store_id: str,
         dish_id: str,
         time_range: str = "3d"
-    ) -> Dict[str, Any]:
+    ) -> AgentResult:
         """
         预测库存需求
 
@@ -48,7 +48,7 @@ class InventoryAgent(LLMEnhancedAgent):
             time_range: 预测时间范围
 
         Returns:
-            库存需求预测
+            AgentResult（含 reasoning / confidence / source_data）
         """
         try:
             query = f"""
@@ -72,7 +72,6 @@ class InventoryAgent(LLMEnhancedAgent):
                 time_range=time_range
             )
 
-            # 使用RAG检索历史销售和库存数据
             rag_result = await self.rag_service.analyze_with_rag(
                 query=query,
                 store_id=store_id,
@@ -80,27 +79,24 @@ class InventoryAgent(LLMEnhancedAgent):
                 top_k=int(os.getenv("RAG_INVENTORY_TOP_K", "10"))
             )
 
+            ctx_count = rag_result["metadata"]["context_count"]
             return self.format_response(
                 success=True,
                 data={
                     "prediction": rag_result["response"],
                     "dish_id": dish_id,
                     "time_range": time_range,
-                    "context_used": rag_result["metadata"]["context_count"],
+                    "context_used": ctx_count,
                     "timestamp": rag_result["metadata"]["timestamp"]
                 },
-                message="库存需求预测完成"
+                message="库存需求预测完成",
+                reasoning=f"基于 {ctx_count} 条历史订单，预测菜品 {dish_id} 未来 {time_range} 需求",
+                confidence=min(0.9, 0.45 + ctx_count * 0.05),
+                source_data={"store_id": store_id, "dish_id": dish_id, "time_range": time_range},
             )
 
         except Exception as e:
-            logger.error(
-                "Inventory needs prediction failed",
-                store_id=store_id,
-                dish_id=dish_id,
-                error=str(e),
-                exc_info=e
-            )
-
+            logger.error("Inventory needs prediction failed", store_id=store_id, dish_id=dish_id, error=str(e), exc_info=e)
             error_monitor.log_error(
                 message=f"Inventory needs prediction failed for {store_id}",
                 severity=ErrorSeverity.ERROR,
@@ -108,11 +104,10 @@ class InventoryAgent(LLMEnhancedAgent):
                 exception=e,
                 context={"store_id": store_id, "dish_id": dish_id}
             )
-
             return self.format_response(
-                success=False,
-                data=None,
-                message=f"预测失败: {str(e)}"
+                success=False, data=None, message=f"预测失败: {str(e)}",
+                reasoning=f"预测过程中发生异常: {str(e)}", confidence=0.0,
+                source_data={"store_id": store_id},
             )
 
     async def check_low_stock_alert(
@@ -120,18 +115,8 @@ class InventoryAgent(LLMEnhancedAgent):
         store_id: str,
         current_inventory: Dict[str, int],
         threshold_hours: int = int(os.getenv("INVENTORY_ALERT_THRESHOLD_HOURS", "4"))
-    ) -> Dict[str, Any]:
-        """
-        检查低库存预警
-
-        Args:
-            store_id: 门店ID
-            current_inventory: 当前库存 {dish_id: quantity}
-            threshold_hours: 预警阈值(小时)
-
-        Returns:
-            低库存预警结果
-        """
+    ) -> AgentResult:
+        """检查低库存预警"""
         try:
             inventory_summary = "\n".join([
                 f"- {dish_id}: {qty}份"
@@ -151,62 +136,44 @@ class InventoryAgent(LLMEnhancedAgent):
             请标注风险等级(高/中/低)。
             """
 
-            logger.info(
-                "Checking low stock alert with RAG",
-                store_id=store_id,
-                inventory_count=len(current_inventory),
-                threshold_hours=threshold_hours
-            )
+            logger.info("Checking low stock alert with RAG", store_id=store_id,
+                        inventory_count=len(current_inventory), threshold_hours=threshold_hours)
 
-            # 使用RAG检索历史销售速度数据
             rag_result = await self.rag_service.analyze_with_rag(
-                query=query,
-                store_id=store_id,
-                collection="orders",
+                query=query, store_id=store_id, collection="orders",
                 top_k=int(os.getenv("RAG_INVENTORY_TOP_K", "10"))
             )
 
+            ctx_count = rag_result["metadata"]["context_count"]
             return self.format_response(
                 success=True,
                 data={
                     "alert": rag_result["response"],
                     "inventory_count": len(current_inventory),
                     "threshold_hours": threshold_hours,
-                    "context_used": rag_result["metadata"]["context_count"],
+                    "context_used": ctx_count,
                     "timestamp": rag_result["metadata"]["timestamp"]
                 },
-                message="低库存检查完成"
+                message="低库存检查完成",
+                reasoning=f"基于 {ctx_count} 条历史销售数据，检查 {len(current_inventory)} 种菜品 {threshold_hours}h 内风险",
+                confidence=min(0.9, 0.45 + ctx_count * 0.05),
+                source_data={"store_id": store_id, "inventory_count": len(current_inventory), "threshold_hours": threshold_hours},
             )
 
         except Exception as e:
-            logger.error(
-                "Low stock alert check failed",
-                store_id=store_id,
-                error=str(e),
-                exc_info=e
-            )
-
+            logger.error("Low stock alert check failed", store_id=store_id, error=str(e), exc_info=e)
             return self.format_response(
-                success=False,
-                data=None,
-                message=f"检查失败: {str(e)}"
+                success=False, data=None, message=f"检查失败: {str(e)}",
+                reasoning=f"检查过程中发生异常: {str(e)}", confidence=0.0,
+                source_data={"store_id": store_id},
             )
 
     async def optimize_inventory_levels(
         self,
         store_id: str,
         dish_ids: List[str]
-    ) -> Dict[str, Any]:
-        """
-        优化库存水平
-
-        Args:
-            store_id: 门店ID
-            dish_ids: 菜品ID列表
-
-        Returns:
-            库存优化建议
-        """
+    ) -> AgentResult:
+        """优化库存水平"""
         try:
             dishes_text = ", ".join(dish_ids)
 
@@ -223,60 +190,42 @@ class InventoryAgent(LLMEnhancedAgent):
             目标: 减少损耗，提高周转率。
             """
 
-            logger.info(
-                "Optimizing inventory levels with RAG",
-                store_id=store_id,
-                dish_count=len(dish_ids)
-            )
+            logger.info("Optimizing inventory levels with RAG", store_id=store_id, dish_count=len(dish_ids))
 
-            # 使用RAG检索历史库存和销售数据
             rag_result = await self.rag_service.analyze_with_rag(
-                query=query,
-                store_id=store_id,
-                collection="orders",
+                query=query, store_id=store_id, collection="orders",
                 top_k=int(os.getenv("RAG_INVENTORY_TOP_K", "10"))
             )
 
+            ctx_count = rag_result["metadata"]["context_count"]
             return self.format_response(
                 success=True,
                 data={
                     "optimization": rag_result["response"],
                     "dish_count": len(dish_ids),
-                    "context_used": rag_result["metadata"]["context_count"],
+                    "context_used": ctx_count,
                     "timestamp": rag_result["metadata"]["timestamp"]
                 },
-                message="库存优化完成"
+                message="库存优化完成",
+                reasoning=f"基于 {ctx_count} 条历史数据，优化 {len(dish_ids)} 种菜品库存水平",
+                confidence=min(0.9, 0.45 + ctx_count * 0.05),
+                source_data={"store_id": store_id, "dish_count": len(dish_ids)},
             )
 
         except Exception as e:
-            logger.error(
-                "Inventory optimization failed",
-                store_id=store_id,
-                error=str(e),
-                exc_info=e
-            )
-
+            logger.error("Inventory optimization failed", store_id=store_id, error=str(e), exc_info=e)
             return self.format_response(
-                success=False,
-                data=None,
-                message=f"优化失败: {str(e)}"
+                success=False, data=None, message=f"优化失败: {str(e)}",
+                reasoning=f"优化过程中发生异常: {str(e)}", confidence=0.0,
+                source_data={"store_id": store_id},
             )
 
     async def analyze_waste(
         self,
         store_id: str,
         time_period: str = "7d"
-    ) -> Dict[str, Any]:
-        """
-        分析库存损耗
-
-        Args:
-            store_id: 门店ID
-            time_period: 分析周期
-
-        Returns:
-            损耗分析结果
-        """
+    ) -> AgentResult:
+        """分析库存损耗"""
         try:
             query = f"""
             分析门店{store_id}最近{time_period}的库存损耗:
@@ -292,60 +241,42 @@ class InventoryAgent(LLMEnhancedAgent):
             4. 预期节省成本
             """
 
-            logger.info(
-                "Analyzing waste with RAG",
-                store_id=store_id,
-                time_period=time_period
-            )
+            logger.info("Analyzing waste with RAG", store_id=store_id, time_period=time_period)
 
-            # 使用RAG检索历史损耗记录
             rag_result = await self.rag_service.analyze_with_rag(
-                query=query,
-                store_id=store_id,
-                collection="events",
+                query=query, store_id=store_id, collection="events",
                 top_k=int(os.getenv("RAG_INVENTORY_TOP_K", "10"))
             )
 
+            ctx_count = rag_result["metadata"]["context_count"]
             return self.format_response(
                 success=True,
                 data={
                     "analysis": rag_result["response"],
                     "time_period": time_period,
-                    "context_used": rag_result["metadata"]["context_count"],
+                    "context_used": ctx_count,
                     "timestamp": rag_result["metadata"]["timestamp"]
                 },
-                message="损耗分析完成"
+                message="损耗分析完成",
+                reasoning=f"基于 {ctx_count} 条历史记录，分析 {time_period} 内库存损耗",
+                confidence=min(0.9, 0.45 + ctx_count * 0.05),
+                source_data={"store_id": store_id, "time_period": time_period},
             )
 
         except Exception as e:
-            logger.error(
-                "Waste analysis failed",
-                store_id=store_id,
-                error=str(e),
-                exc_info=e
-            )
-
+            logger.error("Waste analysis failed", store_id=store_id, error=str(e), exc_info=e)
             return self.format_response(
-                success=False,
-                data=None,
-                message=f"分析失败: {str(e)}"
+                success=False, data=None, message=f"分析失败: {str(e)}",
+                reasoning=f"分析过程中发生异常: {str(e)}", confidence=0.0,
+                source_data={"store_id": store_id},
             )
 
     async def generate_restock_plan(
         self,
         store_id: str,
         target_date: str
-    ) -> Dict[str, Any]:
-        """
-        生成补货计划
-
-        Args:
-            store_id: 门店ID
-            target_date: 目标日期
-
-        Returns:
-            补货计划
-        """
+    ) -> AgentResult:
+        """生成补货计划"""
         try:
             query = f"""
             为门店{store_id}生成{target_date}的补货计划:
@@ -361,41 +292,32 @@ class InventoryAgent(LLMEnhancedAgent):
             4. 成本预估
             """
 
-            logger.info(
-                "Generating restock plan with RAG",
-                store_id=store_id,
-                target_date=target_date
-            )
+            logger.info("Generating restock plan with RAG", store_id=store_id, target_date=target_date)
 
-            # 使用RAG检索历史补货和销售数据
             rag_result = await self.rag_service.analyze_with_rag(
-                query=query,
-                store_id=store_id,
-                collection="orders",
+                query=query, store_id=store_id, collection="orders",
                 top_k=int(os.getenv("RAG_INVENTORY_TOP_K", "10"))
             )
 
+            ctx_count = rag_result["metadata"]["context_count"]
             return self.format_response(
                 success=True,
                 data={
                     "plan": rag_result["response"],
                     "target_date": target_date,
-                    "context_used": rag_result["metadata"]["context_count"],
+                    "context_used": ctx_count,
                     "timestamp": rag_result["metadata"]["timestamp"]
                 },
-                message="补货计划生成完成"
+                message="补货计划生成完成",
+                reasoning=f"基于 {ctx_count} 条历史数据，生成 {target_date} 补货计划",
+                confidence=min(0.9, 0.45 + ctx_count * 0.05),
+                source_data={"store_id": store_id, "target_date": target_date},
             )
 
         except Exception as e:
-            logger.error(
-                "Restock plan generation failed",
-                store_id=store_id,
-                error=str(e),
-                exc_info=e
-            )
-
+            logger.error("Restock plan generation failed", store_id=store_id, error=str(e), exc_info=e)
             return self.format_response(
-                success=False,
-                data=None,
-                message=f"生成失败: {str(e)}"
+                success=False, data=None, message=f"生成失败: {str(e)}",
+                reasoning=f"生成过程中发生异常: {str(e)}", confidence=0.0,
+                source_data={"store_id": store_id},
             )
