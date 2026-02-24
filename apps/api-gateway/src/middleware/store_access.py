@@ -129,7 +129,7 @@ class StoreAccessMiddleware(BaseHTTPMiddleware):
                         if isinstance(data, dict) and "store_id" in data:
                             return data["store_id"]
                     except json.JSONDecodeError:
-                        pass
+                        logger.debug("request_body_not_json", path=str(request.url.path))
             except Exception as e:
                 logger.warning("request_body_parse_failed", error=str(e))
 

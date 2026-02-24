@@ -33,6 +33,11 @@ jobs:
         run: |
           black --check apps/api-gateway/src
 
+      - name: Syntax Check (py_compile)
+        run: |
+          find apps/api-gateway/src -name "*.py" -exec python -m py_compile {} \;
+          echo "All Python files passed syntax check"
+
       - name: Run isort (Import Sorting)
         run: |
           isort --check-only apps/api-gateway/src

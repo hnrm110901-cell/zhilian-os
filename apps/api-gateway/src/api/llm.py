@@ -87,7 +87,7 @@ async def update_llm_config(
     {
         "enabled": true,
         "provider": "anthropic",
-        "model": "claude-3-sonnet-20240229",
+        "model": "claude-sonnet-4-6",
         "api_key": "sk-ant-...",
         "temperature": 0.8,
         "max_tokens": 3000

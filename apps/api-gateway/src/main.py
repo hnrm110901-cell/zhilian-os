@@ -20,6 +20,7 @@ from src.api import members
 from src.api import edge_node, decision_validator, recommendations, agent_collaboration
 # Phase 1: CRUD API
 from src.api import employees, inventory, schedules, reservations, kpis
+from src.api import ai_evolution_dashboard
 from src.middleware.monitoring import MonitoringMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
 from src.middleware.audit_log import AuditLogMiddleware
@@ -444,6 +445,7 @@ app.include_router(inventory.router, prefix="/api/v1", tags=["inventory"])
 app.include_router(schedules.router, prefix="/api/v1", tags=["schedules"])
 app.include_router(reservations.router, prefix="/api/v1", tags=["reservations"])
 app.include_router(kpis.router, prefix="/api/v1", tags=["kpis"])
+app.include_router(ai_evolution_dashboard.router, tags=["ai_evolution"])
 
 
 @app.on_event("startup")
