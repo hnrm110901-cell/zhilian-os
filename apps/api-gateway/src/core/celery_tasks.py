@@ -115,7 +115,7 @@ def process_neural_event(
         wechat_sent = False
 
         try:
-            # 2. 向量化存储
+            # 2. 向量化存储（全局索引 + 领域分割索引）
             event_payload = {
                 "event_id": event_id,
                 "event_type": event_type,
@@ -126,6 +126,8 @@ def process_neural_event(
                 "priority": priority,
             }
             await vector_db_service.index_event(event_payload)
+            from ..services.domain_vector_service import domain_vector_service
+            await domain_vector_service.index_neural_event(store_id, event_payload)
             vector_indexed = True
             actions_taken.append("vector_indexed")
 
@@ -281,9 +283,12 @@ def index_order_to_vector_db(
     """
     async def _run():
         from ..services.vector_db_service import vector_db_service
+        from ..services.domain_vector_service import domain_vector_service
+        store_id = order_data.get("store_id", "")
         logger.info("开始索引到向量数据库", collection="orders", data_id=order_data.get("id"))
         await vector_db_service.index_order(order_data)
-        logger.info("向量数据库索引完成", collection="orders", data_id=order_data.get("id"))
+        await domain_vector_service.index_revenue_event(store_id, order_data)
+        logger.info("向量数据库索引完成", collection="orders/revenue", data_id=order_data.get("id"))
         return {"success": True, "collection": "orders", "data_id": order_data.get("id")}
     try:
         return asyncio.run(_run())
@@ -311,9 +316,12 @@ def index_dish_to_vector_db(
     """
     async def _run():
         from ..services.vector_db_service import vector_db_service
+        from ..services.domain_vector_service import domain_vector_service
+        store_id = dish_data.get("store_id", "")
         logger.info("开始索引到向量数据库", collection="dishes", data_id=dish_data.get("id"))
         await vector_db_service.index_dish(dish_data)
-        logger.info("向量数据库索引完成", collection="dishes", data_id=dish_data.get("id"))
+        await domain_vector_service.index_menu_item(store_id, dish_data)
+        logger.info("向量数据库索引完成", collection="dishes/menu", data_id=dish_data.get("id"))
         return {"success": True, "collection": "dishes", "data_id": dish_data.get("id")}
     try:
         return asyncio.run(_run())
