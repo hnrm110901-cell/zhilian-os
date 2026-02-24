@@ -1,7 +1,7 @@
 """
 Reservation Model
 """
-from sqlalchemy import Column, String, Integer, Date, Time, ForeignKey, Enum, JSON, Index
+from sqlalchemy import Column, String, Integer, Date, Time, DateTime, ForeignKey, Enum, JSON, Index
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 import enum
@@ -63,6 +63,10 @@ class Reservation(Base, TimestampMixin):
 
     # Notes
     notes = Column(String(500))
+
+    # Timestamps for status transitions
+    arrival_time = Column(DateTime(timezone=True))
+    cancelled_at = Column(DateTime(timezone=True))
 
     # Composite indexes for common query patterns
     __table_args__ = (
