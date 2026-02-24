@@ -13,7 +13,7 @@ Federated BOM (Bill of Materials) Learning Service
 - 节假日vs平日食材消耗模式
 """
 
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
 from pydantic import BaseModel
 import numpy as np
@@ -180,8 +180,8 @@ class FederatedBOMService:
             if epoch % 5 == 0:
                 logger.debug(f"Epoch {epoch}, Loss: {loss:.4f}")
 
-        # 返回梯度（用于联邦聚合）
-        return gradients.tolist()
+        # 返回梯度（用于联邦聚合）；clip inf/nan that can arise from zero-target records
+        return np.nan_to_num(gradients, nan=0.0, posinf=0.0, neginf=0.0).tolist()
 
     async def federated_aggregate(
         self,
@@ -362,7 +362,7 @@ class FederatedBOMService:
         peak_loss_days = []
         for season, rate in seasonal_loss_rates.items():
             if rate >= threshold:
-                peak_loss_days.extend([f"{m}月" for m in season_months.get(season, [])])
+                peak_loss_days.extend(season_months.get(season, []))
 
         return IngredientLossPattern(
             ingredient_id=ingredient_id,
