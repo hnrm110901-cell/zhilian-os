@@ -31,6 +31,7 @@ from .integration import (
 )
 from .decision_log import DecisionLog, DecisionType, DecisionStatus, DecisionOutcome
 from .compliance import ComplianceLicense, LicenseType, LicenseStatus
+from .quality import QualityInspection, InspectionStatus
 
 __all__ = [
     "Base",
@@ -82,4 +83,6 @@ __all__ = [
     "ComplianceLicense",
     "LicenseType",
     "LicenseStatus",
+    "QualityInspection",
+    "InspectionStatus",
 ]
