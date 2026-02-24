@@ -11,7 +11,7 @@ from typing import Dict, List, Optional, Any, Set
 from datetime import datetime, timedelta
 from enum import Enum
 from dataclasses import dataclass
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 import secrets
 import logging
 import json
@@ -115,7 +115,7 @@ class OpenAPIPlatform:
     - Usage analytics
     """
 
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
         # Store developers
         self.developers: Dict[str, Developer] = {}

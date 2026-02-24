@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from enum import Enum
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
 
 logger = structlog.get_logger()
@@ -91,7 +91,7 @@ class RaaSPricingService:
     # 免费试用期（支持环境变量覆盖）
     FREE_TRIAL_DAYS = int(os.getenv("RAAS_FREE_TRIAL_DAYS", "90"))
 
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
 
     async def calculate_baseline(
@@ -465,6 +465,6 @@ class RaaSPricingService:
 raas_pricing_service: Optional[RaaSPricingService] = None
 
 
-def get_raas_pricing_service(db: Session) -> RaaSPricingService:
+def get_raas_pricing_service(db: AsyncSession) -> RaaSPricingService:
     """获取RaaS定价服务实例"""
     return RaaSPricingService(db)

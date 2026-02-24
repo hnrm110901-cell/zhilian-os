@@ -14,7 +14,7 @@ from enum import Enum
 
 from src.services.decision_validator import DecisionValidator, ValidationResult
 from src.core.database import get_db
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 router = APIRouter(prefix="/api/v1/validator", tags=["decision_validator"])
@@ -52,7 +52,7 @@ class ValidationResultEnum(str, Enum):
 @router.post("/validate")
 async def validate_decision(
     request: ValidateDecisionRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Validate AI decision using dual validation
@@ -104,7 +104,7 @@ async def validate_decision(
 @router.post("/validate/batch")
 async def validate_batch_decisions(
     requests: List[ValidateDecisionRequest],
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Validate multiple AI decisions in batch
@@ -155,7 +155,7 @@ async def validate_batch_decisions(
 
 
 @router.get("/rules")
-async def get_validation_rules(db: Session = Depends(get_db)):
+async def get_validation_rules(db: AsyncSession = Depends(get_db)):
     """
     Get all validation rules
     获取所有验证规则
@@ -186,7 +186,7 @@ async def detect_anomaly(
     store_id: str,
     metric_name: str,
     current_value: float,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Detect anomaly in metric value

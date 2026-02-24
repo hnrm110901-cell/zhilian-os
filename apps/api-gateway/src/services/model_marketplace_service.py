@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from enum import Enum
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 import structlog
 import uuid
@@ -98,7 +98,7 @@ class ModelMarketplaceService:
     # 数据贡献分成比例（支持环境变量覆盖）
     DATA_CONTRIBUTION_SHARE = float(os.getenv("MARKETPLACE_DATA_CONTRIBUTION_SHARE", "0.30"))
 
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
 
     async def list_available_models(
@@ -357,6 +357,6 @@ class ModelMarketplaceService:
 model_marketplace_service: Optional[ModelMarketplaceService] = None
 
 
-def get_model_marketplace_service(db: Session) -> ModelMarketplaceService:
+def get_model_marketplace_service(db: AsyncSession) -> ModelMarketplaceService:
     """获取模型交易市场服务实例"""
     return ModelMarketplaceService(db)

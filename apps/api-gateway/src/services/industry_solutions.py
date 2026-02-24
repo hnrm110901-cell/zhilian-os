@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime
 from enum import Enum
 from dataclasses import dataclass
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class IndustryType(Enum):
@@ -94,7 +94,7 @@ class IndustrySolutionsService:
     - One-click deployment
     """
 
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
         # Store solutions
         self.solutions: Dict[str, IndustrySolution] = {}

@@ -96,8 +96,9 @@ class VectorDatabaseServiceEnhanced:
             try:
                 import qdrant_client
                 self._client_version = getattr(qdrant_client, '__version__', 'unknown')
-            except:
+            except Exception as e:
                 self._client_version = 'unknown'
+                logger.warning("qdrant_version_check_failed", error=str(e))
 
             logger.info(f"使用qdrant-client版本: {self._client_version}")
 
@@ -146,10 +147,8 @@ class VectorDatabaseServiceEnhanced:
                 import sentence_transformers
                 version = getattr(sentence_transformers, '__version__', 'unknown')
                 logger.info(f"sentence-transformers版本: {version}")
-            except:
-                pass
-
-            # 加载模型（可能需要下载）
+            except Exception as e:
+                logger.warning("sentence_transformers_version_check_failed", error=str(e))
             model_name = os.getenv("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2")
             self.embedding_model = SentenceTransformer(
                 model_name,

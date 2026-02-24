@@ -3,7 +3,7 @@ Human-in-the-Loop API - 人机协同审批API
 "机器不可信"安全防线 - 高危操作分级审批
 """
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, List, Dict
 
 from src.core.dependencies import get_db, get_current_user
@@ -42,7 +42,7 @@ class ApprovalDecision(BaseModel):
 @router.post("/submit-decision")
 async def submit_ai_decision(
     request: AIDecisionRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -74,7 +74,7 @@ async def submit_ai_decision(
 @router.post("/approve")
 async def approve_request(
     decision: ApprovalDecision,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -101,7 +101,7 @@ async def approve_request(
 @router.get("/pending-approvals/{store_id}")
 async def get_pending_approvals(
     store_id: str,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -122,7 +122,7 @@ async def get_pending_approvals(
 @router.get("/trust-phase/{store_id}")
 async def get_trust_phase(
     store_id: str,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -167,7 +167,7 @@ async def get_trust_phase(
 @router.get("/statistics/{store_id}")
 async def get_approval_statistics(
     store_id: str,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -194,7 +194,7 @@ async def get_approval_statistics(
 
 @router.get("/risk-classification")
 async def get_risk_classification(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """

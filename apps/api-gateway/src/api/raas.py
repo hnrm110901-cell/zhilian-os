@@ -5,7 +5,7 @@ RaaS API - Result-as-a-Service API
 核心理念: 不卖软件，卖结果
 """
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 from datetime import datetime
 
@@ -25,7 +25,7 @@ router = APIRouter(prefix="/api/v1/raas")
 @router.get("/pricing-tier/{store_id}")
 async def get_pricing_tier(
     store_id: str,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -54,7 +54,7 @@ async def get_pricing_tier(
 @router.get("/baseline/{store_id}")
 async def get_baseline_metrics(
     store_id: str,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -81,7 +81,7 @@ async def get_effect_metrics(
     store_id: str,
     year: Optional[int] = None,
     month: Optional[int] = None,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -129,7 +129,7 @@ async def get_monthly_bill(
     store_id: str,
     year: int,
     month: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -146,7 +146,7 @@ async def get_monthly_bill(
 @router.get("/value-proposition/{store_id}")
 async def get_value_proposition(
     store_id: str,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """

@@ -123,10 +123,8 @@ class ServiceQualityService:
                 )
                 store_cfg = store_result.scalar_one_or_none() or {}
                 ideal_service_time = int(store_cfg.get("ideal_service_time_minutes", 30))
-            except Exception:
-                pass
-
-            # 服务质量评分（基于多个指标的综合评分）
+            except Exception as e:
+                logger.warning("store_config_query_failed", store_id=self.store_id, error=str(e))
             quality_score = self._calculate_quality_score(
                 avg_satisfaction,
                 completion_rate,

@@ -185,9 +185,8 @@ class ShokzService:
             if device._ble_client is not None:
                 try:
                     await device._ble_client.disconnect()
-                except Exception:
-                    pass
-                device._ble_client = None
+                except Exception as e:
+                    logger.warning("ble_disconnect_failed", error=str(e))
 
             device.is_connected = False
 

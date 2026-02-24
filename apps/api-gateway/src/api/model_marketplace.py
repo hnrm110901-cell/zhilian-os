@@ -3,7 +3,7 @@ Model Marketplace API - 模型交易市场API
 联邦学习商业化 - 售卖行业最佳实践
 """
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, List
 
 from src.core.dependencies import get_db, get_current_user
@@ -27,7 +27,7 @@ async def list_models(
     model_type: Optional[ModelType] = None,
     model_level: Optional[ModelLevel] = None,
     industry_category: Optional[IndustryCategory] = None,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -54,7 +54,7 @@ async def list_models(
 async def purchase_model(
     store_id: str,
     model_id: str,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -78,7 +78,7 @@ async def contribute_data(
     model_id: str,
     data_points: int,
     quality_score: float,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -105,7 +105,7 @@ async def contribute_data(
 @router.get("/my-models/{store_id}")
 async def get_my_models(
     store_id: str,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -124,7 +124,7 @@ async def get_my_models(
 @router.get("/my-contributions/{store_id}")
 async def get_my_contributions(
     store_id: str,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -145,7 +145,7 @@ async def get_my_contributions(
 
 @router.get("/network-effect")
 async def get_network_effect(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """

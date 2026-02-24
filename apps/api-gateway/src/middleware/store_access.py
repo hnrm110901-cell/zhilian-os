@@ -130,10 +130,8 @@ class StoreAccessMiddleware(BaseHTTPMiddleware):
                             return data["store_id"]
                     except json.JSONDecodeError:
                         pass
-            except Exception:
-                pass
-
-        return None
+            except Exception as e:
+                logger.warning("request_body_parse_failed", error=str(e))
 
     async def _validate_store_access(
         self, request: Request, store_id: str

@@ -36,7 +36,7 @@ from src.services.internationalization import (
     Currency
 )
 from src.core.database import get_db
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 # ==================== Open API Platform ====================
@@ -79,7 +79,7 @@ class SubmitPluginRequest(BaseModel):
 @platform_router.post("/developer/register")
 async def register_developer(
     request: RegisterDeveloperRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Register new developer"""
     try:
@@ -105,7 +105,7 @@ async def register_developer(
 @platform_router.post("/plugin/submit")
 async def submit_plugin(
     request: SubmitPluginRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Submit plugin for review"""
     try:
@@ -134,7 +134,7 @@ async def submit_plugin(
 async def get_marketplace_plugins(
     category: Optional[PluginCategoryEnum] = None,
     sort_by: str = "installs",
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get marketplace plugins"""
     try:
@@ -180,7 +180,7 @@ class IndustryTypeEnum(str, Enum):
 @industry_router.get("/solution/{industry_type}")
 async def get_industry_solution(
     industry_type: IndustryTypeEnum,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get industry solution"""
     try:
@@ -212,7 +212,7 @@ async def get_industry_solution(
 async def apply_industry_solution(
     store_id: str,
     industry_type: IndustryTypeEnum,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Apply industry solution to store"""
     try:
@@ -244,7 +244,7 @@ class RequestQuotesRequest(BaseModel):
 @supply_chain_router.post("/quotes/request")
 async def request_quotes(
     request: RequestQuotesRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Request quotes from suppliers"""
     try:
@@ -277,7 +277,7 @@ async def request_quotes(
 @supply_chain_router.post("/quotes/compare")
 async def compare_quotes(
     quote_ids: List[str],
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Compare quotes"""
     try:
@@ -319,7 +319,7 @@ class CurrencyEnum(str, Enum):
 
 
 @i18n_router.get("/languages")
-async def get_supported_languages(db: Session = Depends(get_db)):
+async def get_supported_languages(db: AsyncSession = Depends(get_db)):
     """Get supported languages"""
     try:
         service = InternationalizationService(db)
@@ -334,7 +334,7 @@ async def get_supported_languages(db: Session = Depends(get_db)):
 
 
 @i18n_router.get("/currencies")
-async def get_supported_currencies(db: Session = Depends(get_db)):
+async def get_supported_currencies(db: AsyncSession = Depends(get_db)):
     """Get supported currencies"""
     try:
         service = InternationalizationService(db)
@@ -353,7 +353,7 @@ async def convert_currency(
     amount: float,
     from_currency: CurrencyEnum,
     to_currency: CurrencyEnum,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Convert currency"""
     try:

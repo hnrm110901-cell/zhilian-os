@@ -465,10 +465,8 @@ class MultimodalFallbackService:
                     )
                 )
                 asr_failure_count = result.scalar() or 0
-        except Exception:
-            pass
-
-        return EnvironmentCondition(
+        except Exception as e:
+            logger.warning("asr_stats_query_failed", error=str(e))
             noise_level_db=float(os.getenv("MULTIMODAL_NOISE_PEAK_DB", "75.0")) if peak_hour else float(os.getenv("MULTIMODAL_NOISE_NORMAL_DB", "55.0")),
             asr_failure_count=asr_failure_count,
             user_location="front",

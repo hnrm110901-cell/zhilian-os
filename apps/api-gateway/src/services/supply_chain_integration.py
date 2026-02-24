@@ -11,7 +11,7 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from enum import Enum
 from dataclasses import dataclass
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class SupplierType(Enum):
@@ -93,7 +93,7 @@ class SupplyChainIntegration:
     - Supply chain financing
     """
 
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
         # Store suppliers
         self.suppliers: Dict[str, Supplier] = {}

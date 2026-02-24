@@ -250,8 +250,8 @@ class NeuralSystemOrchestrator:
                 try:
                     start = dt.fromisoformat(start_str)
                     work_hours = round((dt.utcnow() - start).total_seconds() / 3600, 2)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning("time_parse_failed", start_str=start_str, error=str(e))
             async with get_db_session() as session:
                 session.add(Notification(
                     store_id=staff_data.get("store_id", ""),

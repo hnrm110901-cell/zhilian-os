@@ -10,7 +10,7 @@ Embedding Model API
 """
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 from pydantic import BaseModel, Field
 
@@ -105,7 +105,7 @@ class EmbeddingResponse(BaseModel):
 async def train_model(
     request: TrainModelRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     tenant_id: str = Depends(get_current_tenant)
 ):
     """
@@ -165,7 +165,7 @@ async def train_model(
 @router.post("/similarity", response_model=SimilarityResponse)
 async def calculate_similarity(
     request: SimilarityRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     tenant_id: str = Depends(get_current_tenant)
 ):
     """
@@ -207,7 +207,7 @@ async def calculate_similarity(
 @router.post("/similar-dishes", response_model=List[SimilarDish])
 async def find_similar_dishes(
     request: FindSimilarDishesRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     tenant_id: str = Depends(get_current_tenant)
 ):
     """
@@ -247,7 +247,7 @@ async def find_similar_dishes(
 @router.post("/recommend", response_model=List[RecommendedDish])
 async def recommend_dishes(
     request: RecommendDishesRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     tenant_id: str = Depends(get_current_tenant)
 ):
     """
@@ -293,7 +293,7 @@ async def recommend_dishes(
 @router.post("/embedding", response_model=EmbeddingResponse)
 async def get_embedding(
     request: EmbeddingRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     tenant_id: str = Depends(get_current_tenant)
 ):
     """
@@ -338,7 +338,7 @@ async def get_embedding(
 
 @router.get("/model/status")
 async def get_model_status(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     tenant_id: str = Depends(get_current_tenant)
 ):
     """

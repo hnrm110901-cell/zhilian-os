@@ -20,7 +20,7 @@ from src.services.agent_collaboration_optimizer import (
     ResolutionStrategy
 )
 from src.core.database import get_db
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 router = APIRouter(prefix="/api/v1/collaboration", tags=["agent_collaboration"])
@@ -80,7 +80,7 @@ class AgentPerformanceRequest(BaseModel):
 @router.post("/decision/submit")
 async def submit_decision(
     request: SubmitDecisionRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Submit decision from agent
@@ -119,7 +119,7 @@ async def submit_decision(
 @router.post("/coordinate")
 async def coordinate_decisions(
     request: CoordinateRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Coordinate all pending decisions
@@ -148,7 +148,7 @@ async def coordinate_decisions(
 @router.post("/conflict/resolve")
 async def resolve_conflict(
     request: ResolveConflictRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Resolve specific conflict
@@ -191,7 +191,7 @@ async def resolve_conflict(
 @router.get("/status/{store_id}")
 async def get_collaboration_status(
     store_id: str,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Get agent collaboration status
@@ -219,7 +219,7 @@ async def get_collaboration_status(
 @router.post("/performance")
 async def get_agent_performance(
     request: AgentPerformanceRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Get agent performance metrics

@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Any, Set
 from datetime import datetime
 from enum import Enum
 from dataclasses import dataclass
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 import numpy as np
 import os
 
@@ -98,7 +98,7 @@ class AgentCollaborationOptimizer:
     - Priority management
     """
 
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
         # Pending decisions from agents
         self.pending_decisions: Dict[AgentType, List[AgentDecision]] = {

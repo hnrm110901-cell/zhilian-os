@@ -14,7 +14,7 @@ from enum import Enum
 
 from src.services.edge_node_service import EdgeNodeService, OperationMode
 from src.core.database import get_db
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 router = APIRouter(prefix="/api/v1/edge", tags=["edge_node"])
@@ -57,7 +57,7 @@ class SyncRequest(BaseModel):
 @router.post("/mode/set")
 async def set_operation_mode(
     request: SetModeRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Set edge node operation mode
@@ -69,7 +69,7 @@ async def set_operation_mode(
     - hybrid: Automatic switching based on network status
     """
     try:
-        edge_service = EdgeNodeService(db)
+        edge_service = EdgeNodeService()
         edge_service.set_mode(request.store_id, OperationMode(request.mode.value))
 
         return {
@@ -85,7 +85,7 @@ async def set_operation_mode(
 @router.post("/network/status")
 async def update_network_status(
     request: NetworkStatusRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Update network status for edge node
@@ -94,7 +94,7 @@ async def update_network_status(
     Used in hybrid mode to trigger automatic mode switching
     """
     try:
-        edge_service = EdgeNodeService(db)
+        edge_service = EdgeNodeService()
         edge_service.update_network_status(
             request.store_id,
             request.is_connected,
@@ -115,14 +115,14 @@ async def update_network_status(
 @router.get("/mode/{store_id}")
 async def get_operation_mode(
     store_id: str,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Get current operation mode for edge node
     获取边缘节点当前运行模式
     """
     try:
-        edge_service = EdgeNodeService(db)
+        edge_service = EdgeNodeService()
         mode = edge_service.get_current_mode(store_id)
 
         return {
@@ -137,7 +137,7 @@ async def get_operation_mode(
 @router.post("/offline/execute")
 async def execute_offline_operation(
     request: OfflineOperationRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Execute operation using offline rules engine
@@ -150,7 +150,7 @@ async def execute_offline_operation(
     - schedule: Generate schedules
     """
     try:
-        edge_service = EdgeNodeService(db)
+        edge_service = EdgeNodeService()
         result = edge_service.execute_offline(
             request.store_id,
             request.operation_type,
@@ -170,7 +170,7 @@ async def execute_offline_operation(
 @router.post("/sync")
 async def sync_offline_data(
     request: SyncRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Sync offline operations to cloud
@@ -179,7 +179,7 @@ async def sync_offline_data(
     Called when network is restored to upload cached operations
     """
     try:
-        edge_service = EdgeNodeService(db)
+        edge_service = EdgeNodeService()
         synced_count = edge_service.sync_to_cloud(request.store_id)
 
         return {
@@ -195,14 +195,14 @@ async def sync_offline_data(
 @router.get("/cache/{store_id}")
 async def get_cache_status(
     store_id: str,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Get cache status for edge node
     获取边缘节点缓存状态
     """
     try:
-        edge_service = EdgeNodeService(db)
+        edge_service = EdgeNodeService()
         cache_data = edge_service.local_cache.get(store_id, {})
         sync_queue = edge_service.sync_queue.get(store_id, [])
 

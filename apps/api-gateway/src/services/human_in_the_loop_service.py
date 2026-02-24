@@ -14,7 +14,7 @@ from datetime import datetime, date
 from typing import Dict, List, Optional
 from enum import Enum
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import structlog
 import os
@@ -124,7 +124,7 @@ class HumanInTheLoopService:
         RiskLevel.CRITICAL: int(os.getenv("HITL_CRITICAL_RISK_TIMEOUT_HOURS", "2")),
     }
 
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
 
     def classify_risk_level(
@@ -613,6 +613,6 @@ AI推理: {request.reasoning}
 human_in_the_loop_service: Optional[HumanInTheLoopService] = None
 
 
-def get_human_in_the_loop_service(db: Session) -> HumanInTheLoopService:
+def get_human_in_the_loop_service(db: AsyncSession) -> HumanInTheLoopService:
     """获取Human-in-the-Loop服务实例"""
     return HumanInTheLoopService(db)

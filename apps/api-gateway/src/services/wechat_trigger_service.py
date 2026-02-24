@@ -5,6 +5,7 @@ WeChat Push Trigger Service
 基于Neural System事件自动触发企业微信推送
 """
 from typing import Dict, Any, Optional
+import asyncio
 import structlog
 import os
 from datetime import datetime
@@ -440,7 +441,7 @@ class WeChatTriggerService:
     max_retries=int(os.getenv("WECHAT_PUSH_MAX_RETRIES", "3")),
     default_retry_delay=int(os.getenv("WECHAT_PUSH_RETRY_DELAY", "60")),
 )
-async def send_wechat_push_task(
+def send_wechat_push_task(
     self,
     event_type: str,
     event_data: Dict[str, Any],
@@ -454,32 +455,35 @@ async def send_wechat_push_task(
         event_data: 事件数据
         store_id: 门店ID
     """
-    try:
-        trigger_service = WeChatTriggerService()
+    async def _run():
+        try:
+            trigger_service = WeChatTriggerService()
 
-        result = await trigger_service.trigger_push(
-            event_type=event_type,
-            event_data=event_data,
-            store_id=store_id,
-        )
+            result = await trigger_service.trigger_push(
+                event_type=event_type,
+                event_data=event_data,
+                store_id=store_id,
+            )
 
-        logger.info(
-            "企微推送任务完成",
-            event_type=event_type,
-            result=result,
-        )
+            logger.info(
+                "企微推送任务完成",
+                event_type=event_type,
+                result=result,
+            )
 
-        return result
+            return result
 
-    except Exception as e:
-        logger.error(
-            "企微推送任务失败",
-            event_type=event_type,
-            error=str(e),
-            exc_info=e,
-        )
-        # 重试任务
-        raise self.retry(exc=e)
+        except Exception as e:
+            logger.error(
+                "企微推送任务失败",
+                event_type=event_type,
+                error=str(e),
+                exc_info=e,
+            )
+            # 重试任务
+            raise self.retry(exc=e)
+
+    return asyncio.run(_run())
 
 
 # 全局服务实例

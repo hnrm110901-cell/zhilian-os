@@ -573,8 +573,8 @@ class MarketingAgentService:
                 store = store_result.scalar_one_or_none()
                 if store and store.config:
                     cfg = store.config
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("store_config_query_failed", error=str(e))
 
         coupon = {
             "type": "生日专享券",
@@ -607,8 +607,8 @@ class MarketingAgentService:
                 store = store_result.scalar_one_or_none()
                 if store and store.config:
                     cfg = store.config
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("store_config_query_failed", error=str(e))
 
         coupon = {
             "type": "专属挽回券",

@@ -268,11 +268,8 @@ class MeituanQueueIntegration:
                     success=False,
                     error_msg="系统异常，请稍后再试",
                 )
-            except:
-                pass
-
-            return {
-                "success": False,
+            except Exception as e:
+                logger.warning("meituan_callback_failed", error=str(e))
                 "error": str(e),
             }
 
