@@ -246,3 +246,59 @@ class LLMEnhancedAgent:
             source_data=source_data or {},
             recommendations=recommendations,
         )
+
+    # ── Agent Memory Bus helpers ──────────────────────────────────────────────
+
+    async def publish_finding(
+        self,
+        store_id: str,
+        action: str,
+        summary: str,
+        confidence: float = 0.0,
+        data: dict = None,
+    ) -> None:
+        """
+        Publish a finding to the shared agent memory bus.
+
+        Call this after any significant insight so peer agents can see it.
+        Failures are silently swallowed — the bus must never break agent logic.
+        """
+        try:
+            from ..services.agent_memory_bus import agent_memory_bus
+            await agent_memory_bus.publish(
+                store_id=store_id,
+                agent_id=self.agent_type,
+                action=action,
+                summary=summary,
+                confidence=confidence,
+                data=data,
+            )
+        except Exception as e:
+            logger.warning(
+                "agent_publish_finding_failed",
+                agent=self.agent_type,
+                store_id=store_id,
+                error=str(e),
+            )
+
+    async def get_peer_context(self, store_id: str, last_n: int = 10) -> str:
+        """
+        Return recent findings from peer agents as a formatted string
+        suitable for LLM context injection.
+        """
+        try:
+            from ..services.agent_memory_bus import agent_memory_bus
+            return await agent_memory_bus.get_peer_context(
+                store_id=store_id,
+                requesting_agent=self.agent_type,
+                last_n=last_n,
+            )
+        except Exception as e:
+            logger.warning(
+                "agent_get_peer_context_failed",
+                agent=self.agent_type,
+                store_id=store_id,
+                error=str(e),
+            )
+            return ""
+
