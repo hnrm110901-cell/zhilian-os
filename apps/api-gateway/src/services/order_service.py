@@ -363,15 +363,15 @@ class OrderService:
 
             # 计算统计数据
             total_orders = len(orders)
-            completed_orders = sum(1 for o in orders if o.status == OrderStatus.COMPLETED)
-            cancelled_orders = sum(1 for o in orders if o.status == OrderStatus.CANCELLED)
-            total_revenue = sum(o.final_amount for o in orders if o.status == OrderStatus.COMPLETED)
+            completed_orders = sum(1 for o in orders if o.status == OrderStatus.COMPLETED.value)
+            cancelled_orders = sum(1 for o in orders if o.status == OrderStatus.CANCELLED.value)
+            total_revenue = sum(o.final_amount for o in orders if o.status == OrderStatus.COMPLETED.value)
             average_order_value = total_revenue / completed_orders if completed_orders > 0 else 0
 
             # 按状态统计
             status_counts = {}
             for status in OrderStatus:
-                status_counts[status.value] = sum(1 for o in orders if o.status == status)
+                status_counts[status.value] = sum(1 for o in orders if o.status == status.value)
 
             return {
                 "total_orders": total_orders,

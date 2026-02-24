@@ -69,6 +69,8 @@ class NeuralSystemOrchestrator:
             "staff.shift_end": self._handle_staff_shift_end,
             "payment.completed": self._handle_payment_completed,
             "inventory.low_stock": self._handle_inventory_low_stock,
+            "compliance.expire_soon": self._handle_compliance_expire_soon,
+            "compliance.expired": self._handle_compliance_expired,
         }
 
     async def emit_event(
@@ -333,6 +335,73 @@ class NeuralSystemOrchestrator:
         except Exception as e:
             logger.error("处理库存不足事件失败", error=str(e))
         return {"success": True, "action": "low_stock_alert_sent"}
+
+    async def _handle_compliance_expire_soon(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        """处理证照即将到期事件"""
+        data = event["data"]
+        store_id = data.get("store_id", "")
+        license_name = data.get("license_name", "未知证照")
+        days_left = data.get("days_left", 0)
+        holder = data.get("holder_name", "")
+        holder_str = f"（{holder}）" if holder else ""
+        try:
+            from src.core.database import get_db_session
+            from src.models.notification import Notification
+            async with get_db_session() as session:
+                session.add(Notification(
+                    store_id=store_id,
+                    type="compliance",
+                    title="证照即将到期",
+                    content=f"【证照预警】{license_name}{holder_str} 还剩 {days_left} 天到期，请尽快续期",
+                    priority="high" if days_left <= 7 else "medium",
+                    extra_data=data,
+                ))
+                await session.commit()
+            try:
+                from src.services.wechat_work_message_service import WeChatWorkMessageService
+                wechat = WeChatWorkMessageService()
+                await wechat.send_text_message(
+                    "@all",
+                    f"【证照预警】{license_name}{holder_str} 还剩 {days_left} 天到期，请尽快续期！"
+                )
+            except Exception as we:
+                logger.warning("compliance_expire_soon_wechat_failed", error=str(we))
+        except Exception as e:
+            logger.error("handle_compliance_expire_soon_failed", error=str(e))
+        return {"success": True, "action": "compliance_expire_soon_alerted"}
+
+    async def _handle_compliance_expired(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        """处理证照已过期事件"""
+        data = event["data"]
+        store_id = data.get("store_id", "")
+        license_name = data.get("license_name", "未知证照")
+        holder = data.get("holder_name", "")
+        holder_str = f"（{holder}）" if holder else ""
+        try:
+            from src.core.database import get_db_session
+            from src.models.notification import Notification
+            async with get_db_session() as session:
+                session.add(Notification(
+                    store_id=store_id,
+                    type="compliance",
+                    title="证照已过期",
+                    content=f"【紧急】{license_name}{holder_str} 已过期，请立即处理，否则面临合规风险",
+                    priority="critical",
+                    extra_data=data,
+                ))
+                await session.commit()
+            try:
+                from src.services.wechat_work_message_service import WeChatWorkMessageService
+                wechat = WeChatWorkMessageService()
+                await wechat.send_text_message(
+                    "@all",
+                    f"【紧急】{license_name}{holder_str} 已过期！请立即续期，否则面临合规风险！"
+                )
+            except Exception as we:
+                logger.warning("compliance_expired_wechat_failed", error=str(we))
+        except Exception as e:
+            logger.error("handle_compliance_expired_failed", error=str(e))
+        return {"success": True, "action": "compliance_expired_alerted"}
 
     # ==================== 语义搜索接口 ====================
 
