@@ -22,6 +22,7 @@ from ..models.integration import (
     IntegrationStatus,
     SyncStatus,
 )
+from ..models.reservation import ReservationStatus
 
 logger = structlog.get_logger()
 
@@ -577,13 +578,13 @@ class IntegrationService:
 
         reservation.status = status
 
-        if status == "arrived" and kwargs.get("arrival_time"):
+        if status == ReservationStatus.ARRIVED.value and kwargs.get("arrival_time"):
             reservation.arrival_time = datetime.fromisoformat(kwargs["arrival_time"])
 
-        if status == "seated" and kwargs.get("table_number"):
+        if status == ReservationStatus.SEATED.value and kwargs.get("table_number"):
             reservation.table_number = kwargs["table_number"]
 
-        if status == "cancelled":
+        if status == ReservationStatus.CANCELLED.value:
             reservation.cancelled_at = datetime.utcnow()
 
         reservation.updated_at = datetime.utcnow()

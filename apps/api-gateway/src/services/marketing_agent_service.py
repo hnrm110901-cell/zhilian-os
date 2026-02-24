@@ -23,6 +23,7 @@ from enum import Enum
 import numpy as np
 import logging
 import os
+from decimal import Decimal
 from sqlalchemy import select, func
 from src.core.database import get_db_session
 from src.models.order import Order, OrderStatus, OrderItem
@@ -51,8 +52,8 @@ class MarketingChannel(str, Enum):
 class CouponStrategy(BaseModel):
     """优惠券策略"""
     coupon_type: str                   # 券类型（满减/折扣/代金）
-    amount: float                      # 金额
-    threshold: Optional[float]         # 门槛
+    amount: Decimal                    # 金额
+    threshold: Optional[Decimal]       # 门槛
     valid_days: int                    # 有效天数
     target_segment: CustomerSegment    # 目标客群
     expected_conversion: float         # 预期转化率
@@ -69,7 +70,7 @@ class MarketingCampaign(BaseModel):
     coupon_strategy: CouponStrategy
     start_time: datetime
     end_time: datetime
-    budget: float
+    budget: Decimal
     expected_reach: int                # 预期触达人数
 
 
@@ -197,10 +198,10 @@ class MarketingAgentService:
             favorite_dishes = [row_d[0] for row_d in dish_result.all()]
 
         total_orders = int(row[0] or 0)
-        total_amount = float(row[1] or 0) / 100.0
+        total_amount = Decimal(str(row[1] or 0)) / 100
         last_order_time = row[2]
 
-        avg_order_amount = round(total_amount / total_orders, 1) if total_orders > 0 else 0.0
+        avg_order_amount = round(float(total_amount / total_orders), 1) if total_orders > 0 else 0.0
         last_order_date = last_order_time.strftime("%Y-%m-%d") if last_order_time else None
         days_since_last = (datetime.now() - last_order_time).days if last_order_time else 999
 
@@ -382,8 +383,8 @@ class MarketingAgentService:
         if scenario == "traffic_decline":
             return CouponStrategy(
                 coupon_type="满减券",
-                amount=float(cfg.get("coupon_traffic_decline_amount", 20.0)),
-                threshold=float(cfg.get("coupon_traffic_decline_threshold", 100.0)),
+                amount=Decimal(str(cfg.get("coupon_traffic_decline_amount", "20.0"))),
+                threshold=Decimal(str(cfg.get("coupon_traffic_decline_threshold", "100.0"))),
                 valid_days=int(cfg.get("coupon_traffic_decline_days", 7)),
                 target_segment=CustomerSegment.AT_RISK,
                 expected_conversion=float(cfg.get("coupon_traffic_decline_conversion", 0.25)),
@@ -393,7 +394,7 @@ class MarketingAgentService:
         elif scenario == "new_product_launch":
             return CouponStrategy(
                 coupon_type="代金券",
-                amount=float(cfg.get("coupon_new_product_amount", 15.0)),
+                amount=Decimal(str(cfg.get("coupon_new_product_amount", "15.0"))),
                 threshold=None,
                 valid_days=int(cfg.get("coupon_new_product_days", 14)),
                 target_segment=CustomerSegment.HIGH_VALUE,
@@ -404,8 +405,8 @@ class MarketingAgentService:
         elif scenario == "member_day":
             return CouponStrategy(
                 coupon_type="折扣券",
-                amount=float(cfg.get("coupon_member_day_discount", 0.88)),
-                threshold=float(cfg.get("coupon_member_day_threshold", 50.0)),
+                amount=Decimal(str(cfg.get("coupon_member_day_discount", "0.88"))),
+                threshold=Decimal(str(cfg.get("coupon_member_day_threshold", "50.0"))),
                 valid_days=int(cfg.get("coupon_member_day_valid_days", os.getenv("MARKETING_MEMBER_DAY_VALID_DAYS", "1"))),
                 target_segment=CustomerSegment.POTENTIAL,
                 expected_conversion=float(cfg.get("coupon_member_day_conversion", 0.40)),
@@ -415,8 +416,8 @@ class MarketingAgentService:
         else:
             return CouponStrategy(
                 coupon_type="满减券",
-                amount=float(cfg.get("coupon_default_amount", 10.0)),
-                threshold=float(cfg.get("coupon_default_threshold", 50.0)),
+                amount=Decimal(str(cfg.get("coupon_default_amount", "10.0"))),
+                threshold=Decimal(str(cfg.get("coupon_default_threshold", "50.0"))),
                 valid_days=int(cfg.get("coupon_default_days", 7)),
                 target_segment=CustomerSegment.NEW,
                 expected_conversion=float(cfg.get("coupon_default_conversion", 0.20)),
@@ -463,7 +464,8 @@ class MarketingAgentService:
         )
 
         # 计算预期触达人数
-        expected_reach = int(budget / coupon_strategy.amount)
+        budget_decimal = Decimal(str(budget))
+        expected_reach = int(budget_decimal / coupon_strategy.amount)
 
         campaign = MarketingCampaign(
             campaign_id=f"CAMP_{datetime.now().strftime('%Y%m%d%H%M%S')}",
@@ -474,7 +476,7 @@ class MarketingAgentService:
             coupon_strategy=coupon_strategy,
             start_time=datetime.now(),
             end_time=datetime.now() + timedelta(days=int(os.getenv("MARKETING_CAMPAIGN_DAYS", "7"))),
-            budget=budget,
+            budget=budget_decimal,
             expected_reach=expected_reach
         )
 
@@ -522,7 +524,7 @@ class MarketingAgentService:
             {
                 "dish_id": str(d.id),
                 "dish_name": d.name,
-                "price": float(d.price) / 100.0 if d.price else 0.0,
+                "price": str(Decimal(str(d.price)) / 100) if d.price else "0.00",
                 "similarity": round(float(d.rating or 4.0) / 5.0, 2),
                 "reason": "门店热门推荐" if d.is_recommended else "基于评分推荐",
             }
@@ -578,8 +580,8 @@ class MarketingAgentService:
 
         coupon = {
             "type": "生日专享券",
-            "amount": float(cfg.get("birthday_coupon_amount", 50.0)),
-            "threshold": float(cfg.get("birthday_coupon_threshold", 100.0)),
+            "amount": Decimal(str(cfg.get("birthday_coupon_amount", "50.0"))),
+            "threshold": Decimal(str(cfg.get("birthday_coupon_threshold", "100.0"))),
             "valid_days": int(cfg.get("birthday_coupon_days", 7))
         }
 
@@ -612,8 +614,8 @@ class MarketingAgentService:
 
         coupon = {
             "type": "专属挽回券",
-            "amount": float(cfg.get("winback_coupon_amount", 30.0)),
-            "threshold": float(cfg.get("winback_coupon_threshold", 80.0)),
+            "amount": Decimal(str(cfg.get("winback_coupon_amount", "30.0"))),
+            "threshold": Decimal(str(cfg.get("winback_coupon_threshold", "80.0"))),
             "valid_days": int(cfg.get("winback_coupon_days", 14))
         }
 

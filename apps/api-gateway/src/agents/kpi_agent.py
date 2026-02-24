@@ -8,6 +8,7 @@ import structlog
 
 from .llm_agent import LLMEnhancedAgent, AgentResult
 from ..services.rag_service import RAGService
+from ..services.decision_validator import DecisionValidator, ValidationResult
 from ..core.monitoring import error_monitor, ErrorSeverity, ErrorCategory
 
 logger = structlog.get_logger()
@@ -32,6 +33,7 @@ class KPIAgent(LLMEnhancedAgent):
     def __init__(self):
         super().__init__(agent_type="kpi")
         self.rag_service = RAGService()
+        self.validator = DecisionValidator()
 
     async def evaluate_store_performance(
         self,
@@ -185,7 +187,8 @@ class KPIAgent(LLMEnhancedAgent):
         self,
         store_id: str,
         kpi_type: str,
-        target_value: Optional[float] = None
+        target_value: Optional[float] = None,
+        validation_context: Optional[Dict] = None
     ) -> AgentResult:
         """生成改进计划"""
         try:
@@ -213,6 +216,29 @@ class KPIAgent(LLMEnhancedAgent):
             )
 
             ctx_count = rag_result["metadata"]["context_count"]
+
+            # 步骤4：合规性校验（预算）
+            validation = None
+            if validation_context:
+                decision = {"action": "improvement_plan", **validation_context.get("decision_overrides", {})}
+                validation = await self.validator.validate_decision(
+                    decision=decision,
+                    context=validation_context,
+                    rules_to_apply=["budget_check"]
+                )
+                if validation["result"] == ValidationResult.REJECTED.value:
+                    return self.format_response(
+                        success=False,
+                        data={"plan": rag_result["response"], "kpi_type": kpi_type},
+                        message="改进计划未通过合规校验",
+                        reasoning=f"预算校验拒绝: {validation.get('reason', '')}",
+                        confidence=0.0,
+                        source_data={"store_id": store_id, "validation": validation},
+                    )
+
+            source = {"store_id": store_id, "kpi_type": kpi_type, "target_value": target_value}
+            if validation:
+                source["validation"] = validation
             return self.format_response(
                 success=True,
                 data={
@@ -222,10 +248,10 @@ class KPIAgent(LLMEnhancedAgent):
                     "context_used": ctx_count,
                     "timestamp": rag_result["metadata"]["timestamp"]
                 },
-                message="改进计划生成完成",
+                message="改进计划生成完成" + ("（含合规警告）" if validation and validation["result"] == ValidationResult.WARNING.value else ""),
                 reasoning=f"基于 {ctx_count} 条历史案例，为 {kpi_type} 生成改进计划（{target_text}）",
                 confidence=min(0.85, 0.4 + ctx_count * 0.05),
-                source_data={"store_id": store_id, "kpi_type": kpi_type, "target_value": target_value},
+                source_data=source,
             )
 
         except Exception as e:

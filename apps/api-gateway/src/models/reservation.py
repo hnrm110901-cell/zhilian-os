@@ -14,6 +14,7 @@ class ReservationStatus(str, enum.Enum):
     PENDING = "pending"
     CONFIRMED = "confirmed"
     ARRIVED = "arrived"
+    SEATED = "seated"
     COMPLETED = "completed"
     CANCELLED = "cancelled"
     NO_SHOW = "no_show"

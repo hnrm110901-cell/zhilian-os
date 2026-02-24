@@ -8,6 +8,7 @@ import structlog
 
 from .llm_agent import LLMEnhancedAgent, AgentResult
 from ..services.rag_service import RAGService
+from ..services.decision_validator import DecisionValidator, ValidationResult
 from ..core.monitoring import error_monitor, ErrorSeverity, ErrorCategory
 
 logger = structlog.get_logger()
@@ -32,13 +33,15 @@ class ScheduleAgent(LLMEnhancedAgent):
     def __init__(self):
         super().__init__(agent_type="schedule")
         self.rag_service = RAGService()
+        self.validator = DecisionValidator()
 
     async def optimize_schedule(
         self,
         store_id: str,
         date: str,
         current_staff_count: int,
-        expected_customer_flow: Optional[int] = None
+        expected_customer_flow: Optional[int] = None,
+        validation_context: Optional[Dict] = None
     ) -> AgentResult:
         """
         优化排班
@@ -48,6 +51,7 @@ class ScheduleAgent(LLMEnhancedAgent):
             date: 日期
             current_staff_count: 当前排班人数
             expected_customer_flow: 预期客流
+            validation_context: 合规校验上下文（可选）
 
         Returns:
             AgentResult（含 reasoning / confidence / source_data）
@@ -82,6 +86,29 @@ class ScheduleAgent(LLMEnhancedAgent):
             )
 
             ctx_count = rag_result["metadata"]["context_count"]
+
+            # 步骤4：合规性校验（人力成本预算）
+            validation = None
+            if validation_context:
+                decision = {"action": "schedule_optimization", **validation_context.get("decision_overrides", {})}
+                validation = await self.validator.validate_decision(
+                    decision=decision,
+                    context=validation_context,
+                    rules_to_apply=["budget_check"]
+                )
+                if validation["result"] == ValidationResult.REJECTED.value:
+                    return self.format_response(
+                        success=False,
+                        data={"optimization": rag_result["response"], "date": date},
+                        message="排班方案未通过合规校验",
+                        reasoning=f"预算校验拒绝: {validation.get('reason', '')}",
+                        confidence=0.0,
+                        source_data={"store_id": store_id, "validation": validation},
+                    )
+
+            source = {"store_id": store_id, "date": date, "current_staff_count": current_staff_count}
+            if validation:
+                source["validation"] = validation
             return self.format_response(
                 success=True,
                 data={
@@ -92,10 +119,10 @@ class ScheduleAgent(LLMEnhancedAgent):
                     "context_used": ctx_count,
                     "timestamp": rag_result["metadata"]["timestamp"]
                 },
-                message="排班优化完成",
+                message="排班优化完成" + ("（含合规警告）" if validation and validation["result"] == ValidationResult.WARNING.value else ""),
                 reasoning=f"基于 {ctx_count} 条历史数据，为 {date} 优化排班（当前 {current_staff_count} 人）",
                 confidence=min(0.9, 0.45 + ctx_count * 0.05),
-                source_data={"store_id": store_id, "date": date, "current_staff_count": current_staff_count},
+                source_data=source,
             )
 
         except Exception as e:

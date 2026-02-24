@@ -31,6 +31,15 @@ class QuoteStatus(Enum):
     REJECTED = "rejected"
 
 
+class PurchaseOrderStatus(Enum):
+    """Purchase order status enum"""
+    PENDING = "pending"
+    CONFIRMED = "confirmed"
+    SHIPPED = "shipped"
+    DELIVERED = "delivered"
+    CANCELLED = "cancelled"
+
+
 @dataclass
 class Supplier:
     """Supplier"""
@@ -457,7 +466,7 @@ class SupplyChainIntegration:
         # Calculate metrics
         total_orders = len(orders)
         total_amount = sum(o.total_amount for o in orders)
-        on_time_deliveries = len([o for o in orders if o.status == "delivered"])
+        on_time_deliveries = len([o for o in orders if o.status == PurchaseOrderStatus.DELIVERED.value])
         on_time_rate = on_time_deliveries / total_orders if total_orders > 0 else 0
 
         return {

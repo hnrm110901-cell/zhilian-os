@@ -3,6 +3,7 @@
 管理菜品主档的业务逻辑
 """
 import os
+from decimal import Decimal
 from typing import List, Optional, Dict, Any
 from sqlalchemy import select, func, and_, or_
 from sqlalchemy.orm import joinedload
@@ -352,8 +353,8 @@ class DishService(BaseService):
             for dish_ingredient in dish.ingredients:
                 ingredient = dish_ingredient.ingredient
                 cost = (
-                    float(dish_ingredient.quantity) *
-                    float(ingredient.unit_price or 0)
+                    Decimal(str(dish_ingredient.quantity)) *
+                    Decimal(str(ingredient.unit_price or 0))
                 )
                 total_ingredient_cost += cost
 
@@ -361,20 +362,20 @@ class DishService(BaseService):
                     "ingredient_name": ingredient.name,
                     "quantity": float(dish_ingredient.quantity),
                     "unit": dish_ingredient.unit,
-                    "unit_price": float(ingredient.unit_price or 0),
-                    "cost": cost,
+                    "unit_price": str(Decimal(str(ingredient.unit_price or 0))),
+                    "cost": str(cost),
                 })
 
             # 成本分解
             breakdown = {
                 "dish_id": str(dish.id),
                 "dish_name": dish.name,
-                "price": float(dish.price),
-                "recorded_cost": float(dish.cost or 0),
-                "calculated_ingredient_cost": total_ingredient_cost,
+                "price": str(Decimal(str(dish.price))),
+                "recorded_cost": str(Decimal(str(dish.cost or 0))),
+                "calculated_ingredient_cost": str(total_ingredient_cost),
                 "ingredients": ingredients_cost,
                 "profit_margin": float(dish.profit_margin or 0),
-                "profit_amount": float(dish.price) - total_ingredient_cost,
+                "profit_amount": str(Decimal(str(dish.price)) - total_ingredient_cost),
             }
 
             return breakdown
@@ -411,9 +412,9 @@ class DishService(BaseService):
                 {
                     "id": str(dish.id),
                     "name": dish.name,
-                    "price": float(dish.price),
+                    "price": str(Decimal(str(dish.price))),
                     "total_sales": dish.total_sales,
-                    "total_revenue": float(dish.total_revenue or 0),
+                    "total_revenue": str(Decimal(str(dish.total_revenue or 0))),
                     "rating": float(dish.rating or 0),
                 }
                 for dish in dishes
