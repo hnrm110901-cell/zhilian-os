@@ -239,7 +239,7 @@ class ReconcileService:
                         Order.store_id == store_id,
                         Order.created_at >= start_datetime,
                         Order.created_at <= end_datetime,
-                        Order.status != "cancelled"
+                        Order.status != OrderStatus.CANCELLED.value
                     )
                 )
             )
