@@ -13,6 +13,7 @@ from enum import Enum
 from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 import numpy as np
 import structlog
 
@@ -381,7 +382,7 @@ class IntelligentRecommendationEngine:
         try:
             from ..models.order import Order, OrderItem, OrderStatus
             result = await self.db.execute(
-                select(Order).where(
+                select(Order).options(selectinload(Order.items)).where(
                     Order.store_id == store_id,
                     Order.customer_phone == customer_id,
                     Order.status == OrderStatus.COMPLETED.value,

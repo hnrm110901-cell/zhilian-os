@@ -348,7 +348,7 @@ class OrderService:
             统计信息
         """
         async with get_db_session() as session:
-            stmt = select(Order).where(Order.store_id == self.store_id)
+            stmt = select(Order).options(selectinload(Order.items)).where(Order.store_id == self.store_id)
 
             if start_date:
                 start_dt = datetime.fromisoformat(start_date)
