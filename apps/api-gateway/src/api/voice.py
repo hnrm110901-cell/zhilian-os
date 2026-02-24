@@ -30,6 +30,7 @@ class RegisterDeviceRequest(BaseModel):
     device_type: str = Field(..., description="设备类型: opencomm_2, openrun_pro_2")
     role: str = Field(..., description="设备角色: front_of_house, cashier, kitchen")
     bluetooth_address: str = Field(..., description="蓝牙地址")
+    store_id: str = Field("", description="门店ID")
 
 
 class VoiceCommandRequest(BaseModel):
@@ -78,6 +79,7 @@ async def register_device(
             role=role,
             user_id=current_user.id,
             bluetooth_address=request.bluetooth_address,
+            store_id=request.store_id,
         )
 
         if not result["success"]:
