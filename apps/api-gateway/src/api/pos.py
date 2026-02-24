@@ -2,16 +2,19 @@
 POS API Endpoints
 POS系统集成API接口
 """
+import hashlib
+import hmac
 import os
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Header
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, Optional
+from sqlalchemy import select
+from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 
 from src.core.database import get_db
 from src.core.dependencies import get_current_user
 from src.services.pos_service import POSService
-from src.models.order import Order, OrderStatus
+from src.models.order import Order, OrderItem, OrderStatus
 from src.models.store import Store
 
 router = APIRouter(prefix="/pos", tags=["POS"])
@@ -340,4 +343,167 @@ async def get_current_queue(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取排队情况失败: {str(e)}")
+
+
+# ── POS Webhook ───────────────────────────────────────────────────────────────
+
+def _verify_signature(body: bytes, secret: str, signature: str) -> bool:
+    """Verify HMAC-SHA256 webhook signature from POS system."""
+    expected = hmac.new(
+        secret.encode(),
+        body,
+        hashlib.sha256,
+    ).hexdigest()
+    return hmac.compare_digest(f"sha256={expected}", signature)
+
+
+async def _upsert_order(session: AsyncSession, store_id: str, payload: Dict[str, Any]) -> Order:
+    """Create or update an Order row from webhook payload."""
+    order_id = payload.get("order_id") or payload.get("id")
+    if not order_id:
+        raise ValueError("payload missing order_id")
+
+    result = await session.execute(select(Order).where(Order.id == order_id))
+    order = result.scalar_one_or_none()
+
+    status_raw = payload.get("status", OrderStatus.PENDING.value)
+    try:
+        status = OrderStatus(status_raw)
+    except ValueError:
+        status = OrderStatus.PENDING
+
+    if order is None:
+        order = Order(
+            id=order_id,
+            store_id=store_id,
+            table_number=payload.get("table_number"),
+            customer_name=payload.get("customer_name"),
+            customer_phone=payload.get("customer_phone"),
+            status=status.value,
+            total_amount=int(payload.get("total_amount", 0)),
+            discount_amount=int(payload.get("discount_amount", 0)),
+            final_amount=int(payload.get("final_amount", payload.get("total_amount", 0))),
+            order_time=datetime.fromisoformat(payload["order_time"])
+            if payload.get("order_time") else datetime.utcnow(),
+            notes=payload.get("notes"),
+            order_metadata=payload.get("metadata", {}),
+        )
+        session.add(order)
+    else:
+        order.status = status.value
+        if payload.get("final_amount"):
+            order.final_amount = int(payload["final_amount"])
+        if status == OrderStatus.COMPLETED and not order.completed_at:
+            order.completed_at = datetime.utcnow()
+
+    await session.flush()
+    return order
+
+
+@router.post("/webhook/{store_id}", status_code=200)
+async def pos_webhook(
+    store_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    x_pos_signature: Optional[str] = Header(None, alias="X-POS-Signature"),
+    x_pos_system_id: Optional[str] = Header(None, alias="X-POS-System-ID"),
+):
+    """
+    POS实时推送Webhook
+
+    POS系统在订单状态变更时主动推送，替代轮询方式。
+    目标延迟: <500ms（从POS事件到企微告警）
+
+    支持的事件类型:
+    - order.created / order.updated / order.completed / order.cancelled
+    - payment.completed
+    - inventory.low_stock
+
+    安全: HMAC-SHA256签名验证（Header: X-POS-Signature: sha256=<hex>）
+    系统ID: Header X-POS-System-ID 用于查找签名密钥
+    """
+    import structlog
+    logger = structlog.get_logger()
+
+    body = await request.body()
+    payload: Dict[str, Any] = await request.json()
+    event_type = payload.get("event_type") or payload.get("type", "unknown")
+
+    # --- signature verification ---
+    if x_pos_system_id:
+        from src.models.integration import ExternalSystem
+        result = await db.execute(
+            select(ExternalSystem).where(ExternalSystem.id == x_pos_system_id)
+        )
+        system = result.scalar_one_or_none()
+        if system and x_pos_signature:
+            secret = system.webhook_secret or system.api_secret
+            if secret and not _verify_signature(body, secret, x_pos_signature):
+                logger.warning(
+                    "pos_webhook_invalid_signature",
+                    store_id=store_id,
+                    system_id=x_pos_system_id,
+                )
+                raise HTTPException(status_code=401, detail="Invalid webhook signature")
+
+    logger.info(
+        "pos_webhook_received",
+        store_id=store_id,
+        event_type=event_type,
+        order_id=payload.get("order_id"),
+    )
+
+    # --- persist order to DB ---
+    if event_type.startswith("order.") and payload.get("order_id"):
+        try:
+            await _upsert_order(db, store_id, payload)
+            await db.commit()
+        except Exception as e:
+            await db.rollback()
+            logger.error("pos_webhook_order_upsert_failed", error=str(e), store_id=store_id)
+
+    # --- persist POS transaction for payment events ---
+    if event_type == "payment.completed" and payload.get("transaction_id"):
+        try:
+            from src.services.integration_service import integration_service
+            await integration_service.create_pos_transaction(
+                session=db,
+                system_id=x_pos_system_id or "unknown",
+                store_id=store_id,
+                transaction_data=payload,
+            )
+        except Exception as e:
+            logger.warning("pos_webhook_transaction_persist_failed", error=str(e))
+
+    # --- emit to Neural System (async via Celery) ---
+    neural_event_map = {
+        "order.created": ("order.created", 8),
+        "order.updated": ("order.updated", 5),
+        "order.completed": ("order.completed", 7),
+        "order.cancelled": ("order.cancelled", 6),
+        "payment.completed": ("payment.completed", 7),
+        "inventory.low_stock": ("inventory.low_stock", 9),
+    }
+
+    if event_type in neural_event_map:
+        neural_type, priority = neural_event_map[event_type]
+        try:
+            from src.services.neural_system import neural_system
+            await neural_system.emit_event(
+                event_type=neural_type,
+                event_source=f"pos_webhook_{x_pos_system_id or store_id}",
+                data=payload,
+                store_id=store_id,
+                priority=priority,
+            )
+        except Exception as e:
+            # Neural emission failure must not block the 200 response
+            logger.error("pos_webhook_neural_emit_failed", error=str(e), event_type=event_type)
+
+    return {
+        "received": True,
+        "event_type": event_type,
+        "store_id": store_id,
+    }
+
 
