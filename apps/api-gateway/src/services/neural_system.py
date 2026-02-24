@@ -71,6 +71,18 @@ class NeuralSystemOrchestrator:
             "inventory.low_stock": self._handle_inventory_low_stock,
             "compliance.expire_soon": self._handle_compliance_expire_soon,
             "compliance.expired": self._handle_compliance_expired,
+            # quality.*
+            "quality.inspection_failed": self._handle_quality_inspection_failed,
+            "quality.inspection_passed": self._handle_quality_inspection_passed,
+            "quality.alert": self._handle_quality_alert,
+            # equipment.*
+            "equipment.fault": self._handle_equipment_fault,
+            "equipment.maintenance_due": self._handle_equipment_maintenance_due,
+            "equipment.repaired": self._handle_equipment_repaired,
+            # crm.*
+            "crm.member_joined": self._handle_crm_member_joined,
+            "crm.member_birthday": self._handle_crm_member_birthday,
+            "crm.review_received": self._handle_crm_review_received,
         }
 
     async def emit_event(
@@ -403,6 +415,261 @@ class NeuralSystemOrchestrator:
             logger.error("handle_compliance_expired_failed", error=str(e))
         return {"success": True, "action": "compliance_expired_alerted"}
 
+    # ==================== quality.* 事件处理器 ====================
+
+    async def _handle_quality_inspection_failed(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        """菜品质量检测不合格"""
+        data = event["data"]
+        store_id = data.get("store_id", "")
+        dish_name = data.get("dish_name", "未知菜品")
+        score = data.get("quality_score", 0)
+        try:
+            from src.core.database import get_db_session
+            from src.models.notification import Notification
+            async with get_db_session() as session:
+                session.add(Notification(
+                    store_id=store_id,
+                    type="alert",
+                    title="菜品质量不合格",
+                    message=f"【质量预警】{dish_name} 质量评分 {score:.1f}，低于合格线，请立即检查",
+                    priority="high",
+                    extra_data=data,
+                    source="quality_agent",
+                ))
+                await session.commit()
+            try:
+                from src.services.wechat_work_message_service import WeChatWorkMessageService
+                wechat = WeChatWorkMessageService()
+                await wechat.send_text_message(
+                    "@all",
+                    f"【质量预警】{dish_name} 质量评分 {score:.1f}，请立即检查！"
+                )
+            except Exception as we:
+                logger.warning("quality_fail_wechat_failed", error=str(we))
+        except Exception as e:
+            logger.error("handle_quality_inspection_failed_error", error=str(e))
+        return {"success": True, "action": "quality_fail_alerted"}
+
+    async def _handle_quality_inspection_passed(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        """菜品质量检测合格"""
+        data = event["data"]
+        store_id = data.get("store_id", "")
+        dish_name = data.get("dish_name", "未知菜品")
+        score = data.get("quality_score", 0)
+        try:
+            from src.core.database import get_db_session
+            from src.models.notification import Notification
+            async with get_db_session() as session:
+                session.add(Notification(
+                    store_id=store_id,
+                    type="info",
+                    title="菜品质量合格",
+                    message=f"{dish_name} 质量检测通过，评分 {score:.1f}",
+                    priority="low",
+                    extra_data=data,
+                    source="quality_agent",
+                ))
+                await session.commit()
+        except Exception as e:
+            logger.error("handle_quality_inspection_passed_error", error=str(e))
+        return {"success": True, "action": "quality_pass_recorded"}
+
+    async def _handle_quality_alert(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        """质量告警（批量/趋势异常）"""
+        data = event["data"]
+        store_id = data.get("store_id", "")
+        message = data.get("message", "质量异常告警")
+        try:
+            from src.core.database import get_db_session
+            from src.models.notification import Notification
+            async with get_db_session() as session:
+                session.add(Notification(
+                    store_id=store_id,
+                    type="alert",
+                    title="质量告警",
+                    message=message,
+                    priority="high",
+                    extra_data=data,
+                    source="quality_agent",
+                ))
+                await session.commit()
+            try:
+                from src.services.wechat_work_message_service import WeChatWorkMessageService
+                wechat = WeChatWorkMessageService()
+                await wechat.send_text_message("@all", f"【质量告警】{message}")
+            except Exception as we:
+                logger.warning("quality_alert_wechat_failed", error=str(we))
+        except Exception as e:
+            logger.error("handle_quality_alert_error", error=str(e))
+        return {"success": True, "action": "quality_alert_sent"}
+
+    # ==================== equipment.* 事件处理器 ====================
+
+    async def _handle_equipment_fault(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        """设备故障"""
+        data = event["data"]
+        store_id = data.get("store_id", "")
+        equipment_name = data.get("equipment_name", "未知设备")
+        fault_desc = data.get("fault_description", "故障详情未知")
+        try:
+            from src.core.database import get_db_session
+            from src.models.notification import Notification
+            async with get_db_session() as session:
+                session.add(Notification(
+                    store_id=store_id,
+                    type="alert",
+                    title="设备故障",
+                    message=f"【设备故障】{equipment_name}：{fault_desc}，请立即处理",
+                    priority="urgent",
+                    extra_data=data,
+                    source="equipment_monitor",
+                ))
+                await session.commit()
+            try:
+                from src.services.wechat_work_message_service import WeChatWorkMessageService
+                wechat = WeChatWorkMessageService()
+                await wechat.send_text_message(
+                    "@all",
+                    f"【设备故障】{equipment_name} 发生故障：{fault_desc}，请立即处理！"
+                )
+            except Exception as we:
+                logger.warning("equipment_fault_wechat_failed", error=str(we))
+        except Exception as e:
+            logger.error("handle_equipment_fault_error", error=str(e))
+        return {"success": True, "action": "equipment_fault_alerted"}
+
+    async def _handle_equipment_maintenance_due(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        """设备保养到期"""
+        data = event["data"]
+        store_id = data.get("store_id", "")
+        equipment_name = data.get("equipment_name", "未知设备")
+        due_date = data.get("due_date", "")
+        try:
+            from src.core.database import get_db_session
+            from src.models.notification import Notification
+            async with get_db_session() as session:
+                session.add(Notification(
+                    store_id=store_id,
+                    type="warning",
+                    title="设备保养提醒",
+                    message=f"{equipment_name} 保养到期日：{due_date}，请安排保养",
+                    priority="normal",
+                    extra_data=data,
+                    source="equipment_monitor",
+                ))
+                await session.commit()
+        except Exception as e:
+            logger.error("handle_equipment_maintenance_due_error", error=str(e))
+        return {"success": True, "action": "equipment_maintenance_notified"}
+
+    async def _handle_equipment_repaired(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        """设备修复完成"""
+        data = event["data"]
+        store_id = data.get("store_id", "")
+        equipment_name = data.get("equipment_name", "未知设备")
+        try:
+            from src.core.database import get_db_session
+            from src.models.notification import Notification
+            async with get_db_session() as session:
+                session.add(Notification(
+                    store_id=store_id,
+                    type="info",
+                    title="设备修复完成",
+                    message=f"{equipment_name} 已修复，恢复正常使用",
+                    priority="low",
+                    extra_data=data,
+                    source="equipment_monitor",
+                ))
+                await session.commit()
+        except Exception as e:
+            logger.error("handle_equipment_repaired_error", error=str(e))
+        return {"success": True, "action": "equipment_repaired_recorded"}
+
+    # ==================== crm.* 事件处理器 ====================
+
+    async def _handle_crm_member_joined(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        """新会员注册"""
+        data = event["data"]
+        store_id = data.get("store_id", "")
+        member_name = data.get("member_name", "新会员")
+        phone = data.get("phone", "")
+        try:
+            from src.core.database import get_db_session
+            from src.models.notification import Notification
+            async with get_db_session() as session:
+                session.add(Notification(
+                    store_id=store_id,
+                    type="info",
+                    title="新会员注册",
+                    message=f"新会员 {member_name}（{phone}）已注册，请做好欢迎服务",
+                    priority="low",
+                    extra_data=data,
+                    source="crm",
+                ))
+                await session.commit()
+        except Exception as e:
+            logger.error("handle_crm_member_joined_error", error=str(e))
+        return {"success": True, "action": "member_joined_recorded"}
+
+    async def _handle_crm_member_birthday(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        """会员生日提醒"""
+        data = event["data"]
+        store_id = data.get("store_id", "")
+        member_name = data.get("member_name", "会员")
+        try:
+            from src.core.database import get_db_session
+            from src.models.notification import Notification
+            async with get_db_session() as session:
+                session.add(Notification(
+                    store_id=store_id,
+                    type="info",
+                    title="会员生日提醒",
+                    message=f"今日是会员 {member_name} 的生日，可发送生日祝福或优惠券",
+                    priority="normal",
+                    extra_data=data,
+                    source="crm",
+                ))
+                await session.commit()
+        except Exception as e:
+            logger.error("handle_crm_member_birthday_error", error=str(e))
+        return {"success": True, "action": "member_birthday_notified"}
+
+    async def _handle_crm_review_received(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        """收到顾客评价"""
+        data = event["data"]
+        store_id = data.get("store_id", "")
+        rating = data.get("rating", 0)
+        platform = data.get("platform", "未知平台")
+        content = data.get("content", "")
+        priority = "high" if rating <= 2 else "normal"
+        try:
+            from src.core.database import get_db_session
+            from src.models.notification import Notification
+            async with get_db_session() as session:
+                session.add(Notification(
+                    store_id=store_id,
+                    type="warning" if rating <= 2 else "info",
+                    title=f"{'差评' if rating <= 2 else '新评价'}（{platform} {rating}星）",
+                    message=f"来自 {platform} 的 {rating} 星评价：{content[:100]}",
+                    priority=priority,
+                    extra_data=data,
+                    source="crm",
+                ))
+                await session.commit()
+            if rating <= 2:
+                try:
+                    from src.services.wechat_work_message_service import WeChatWorkMessageService
+                    wechat = WeChatWorkMessageService()
+                    await wechat.send_text_message(
+                        "@all",
+                        f"【差评预警】{platform} 收到 {rating} 星差评，请及时处理！\n内容：{content[:100]}"
+                    )
+                except Exception as we:
+                    logger.warning("crm_review_wechat_failed", error=str(we))
+        except Exception as e:
+            logger.error("handle_crm_review_received_error", error=str(e))
+        return {"success": True, "action": "review_recorded"}
+
     # ==================== 语义搜索接口 ====================
 
     async def semantic_search_orders(
@@ -540,8 +807,8 @@ class NeuralSystemOrchestrator:
 
         return {
             "neural_system": "operational",
-            "event_queue_size": len(self.event_queue),
             "registered_event_types": len(self.event_handlers),
+            "event_types": sorted(self.event_handlers.keys()),
             "federated_learning": fl_status,
             "vector_database": "connected",
             "data_isolation": "enabled",
