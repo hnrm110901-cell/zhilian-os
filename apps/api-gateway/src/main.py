@@ -28,6 +28,8 @@ from src.api import agent_memory
 from src.api import event_sourcing
 from src.api import voice_ws
 from src.api import vector_index
+from src.api import forecast
+from src.api import cross_store_insights
 from src.middleware.monitoring import MonitoringMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
 from src.middleware.audit_log import AuditLogMiddleware
@@ -460,6 +462,8 @@ app.include_router(agent_memory.router, tags=["agent_memory"])
 app.include_router(event_sourcing.router, tags=["event_sourcing"])
 app.include_router(voice_ws.router, tags=["voice_ws"])
 app.include_router(vector_index.router, tags=["vector_index"])
+app.include_router(forecast.router, tags=["forecast"])
+app.include_router(cross_store_insights.router, tags=["cross_store_insights"])
 
 
 @app.on_event("startup")
