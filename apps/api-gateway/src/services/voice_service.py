@@ -386,57 +386,15 @@ class VoiceService:
         language: str,
         sample_rate: int,
     ) -> str:
-        """讯飞语音识别"""
-        try:
-            import httpx
-            import json
-            import base64
-            import hmac
-            import hashlib
-            from datetime import datetime
-            from urllib.parse import urlencode
-            from ..core.config import settings
-
-            # 讯飞语音识别API
-            host = "iat-api.xfyun.cn"
-            path = "/v2/iat"
-
-            # 生成RFC1123格式的时间戳
-            now = datetime.utcnow()
-            date = now.strftime("%a, %d %b %Y %H:%M:%S GMT")
-
-            # 构建签名字符串
-            signature_origin = f"host: {host}\ndate: {date}\nGET {path} HTTP/1.1"
-
-            # 计算签名
-            signature_sha = hmac.new(
-                settings.XUNFEI_API_SECRET.encode('utf-8'),
-                signature_origin.encode('utf-8'),
-                hashlib.sha256
-            ).digest()
-            signature = base64.b64encode(signature_sha).decode('utf-8')
-
-            # 构建authorization
-            authorization_origin = f'api_key="{settings.XUNFEI_API_KEY}", algorithm="hmac-sha256", headers="host date request-line", signature="{signature}"'
-            authorization = base64.b64encode(authorization_origin.encode('utf-8')).decode('utf-8')
-
-            # 构建请求URL
-            params = {
-                "authorization": authorization,
-                "date": date,
-                "host": host,
-            }
-            url = f"wss://{host}{path}?{urlencode(params)}"
-
-            # 注意: WebSocket实现较复杂,这里提供HTTP REST API的简化版本
-            # 实际生产环境建议使用WebSocket或官方SDK
-
-            logger.info("讯飞语音识别(简化实现)", audio_size=len(audio_data))
-            return "讯飞语音识别结果"
-
-        except Exception as e:
-            logger.error("讯飞语音识别异常", error=str(e))
-            return "识别失败"
+        """讯飞语音识别 (WebSocket IAT)"""
+        from .iflytek_websocket_service import iflytek_ws_service
+        # 讯飞语言代码: zh-CN → zh_cn, en-US → en_us
+        lang = language.lower().replace("-", "_")
+        return await iflytek_ws_service.speech_to_text(
+            audio_data=audio_data,
+            language=lang,
+            sample_rate=sample_rate,
+        )
 
     async def _xunfei_tts(
         self,
@@ -445,71 +403,16 @@ class VoiceService:
         voice: str,
         speed: float,
     ) -> bytes:
-        """讯飞语音合成"""
-        try:
-            import httpx
-            import json
-            import base64
-            import hmac
-            import hashlib
-            from datetime import datetime
-            from urllib.parse import urlencode
-            from ..core.config import settings
-
-            # 讯飞语音合成API
-            host = "tts-api.xfyun.cn"
-            path = "/v2/tts"
-
-            # 生成RFC1123格式的时间戳
-            now = datetime.utcnow()
-            date = now.strftime("%a, %d %b %Y %H:%M:%S GMT")
-
-            # 构建签名字符串
-            signature_origin = f"host: {host}\ndate: {date}\nGET {path} HTTP/1.1"
-
-            # 计算签名
-            signature_sha = hmac.new(
-                settings.XUNFEI_API_SECRET.encode('utf-8'),
-                signature_origin.encode('utf-8'),
-                hashlib.sha256
-            ).digest()
-            signature = base64.b64encode(signature_sha).decode('utf-8')
-
-            # 构建authorization
-            authorization_origin = f'api_key="{settings.XUNFEI_API_KEY}", algorithm="hmac-sha256", headers="host date request-line", signature="{signature}"'
-            authorization = base64.b64encode(authorization_origin.encode('utf-8')).decode('utf-8')
-
-            # 语音参数
-            voice_map = {
-                "female": "xiaoyan",  # 女声
-                "male": "aisjiuxu",   # 男声
-            }
-
-            # 构建请求参数
-            business = {
-                "aue": "lame",  # 音频编码,lame(mp3)
-                "sfl": 1,  # 是否需要合成后端点检测
-                "auf": "audio/L16;rate=16000",  # 音频采样率
-                "vcn": voice_map.get(voice, "xiaoyan"),  # 发音人
-                "speed": int(speed * int(os.getenv("VOICE_SPEED_MULTIPLIER", "50"))),  # 语速(0-100)
-                "volume": int(os.getenv("VOICE_TTS_VOLUME", "50")),  # 音量(0-100)
-                "pitch": int(os.getenv("VOICE_TTS_PITCH", "50")),  # 音调(0-100)
-                "tte": "UTF8",  # 文本编码
-            }
-
-            data = {
-                "text": base64.b64encode(text.encode('utf-8')).decode('utf-8')
-            }
-
-            # 注意: WebSocket实现较复杂,这里提供简化版本
-            # 实际生产环境建议使用WebSocket或官方SDK
-
-            logger.info("讯飞语音合成(简化实现)", text_length=len(text))
-            return b""  # 返回空字节,实际应返回音频数据
-
-        except Exception as e:
-            logger.error("讯飞语音合成异常", error=str(e))
-            return b""
+        """讯飞语音合成 (WebSocket TTS)"""
+        from .iflytek_websocket_service import iflytek_ws_service
+        voice_map = {"female": "xiaoyan", "male": "aisjiuxu"}
+        vcn = voice_map.get(voice, "xiaoyan")
+        speed_int = max(0, min(100, int(speed * 50)))
+        return await iflytek_ws_service.text_to_speech(
+            text=text,
+            voice=vcn,
+            speed=speed_int,
+        )
 
 
 class VoiceCommandRouter:
