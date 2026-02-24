@@ -270,8 +270,6 @@ class MeituanQueueIntegration:
                 )
             except Exception as e:
                 logger.warning("meituan_callback_failed", error=str(e))
-                "error": str(e),
-            }
 
     async def _calculate_queue_index_by_id(self, queue_id: str) -> int:
         """根据queue_id计算队列位置"""
