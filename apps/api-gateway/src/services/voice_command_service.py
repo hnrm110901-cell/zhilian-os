@@ -8,7 +8,8 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 import os
 import structlog
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func as sa_func
 import re
 
 from ..models.store import Store
@@ -98,7 +99,7 @@ class VoiceCommandService:
         voice_text: str,
         store_id: str,
         user_id: str,
-        db: Session = None
+        db: AsyncSession = None
     ) -> Dict[str, Any]:
         """
         处理语音指令
@@ -154,25 +155,30 @@ class VoiceCommandService:
                 "voice_response": "抱歉，处理指令时出现错误"
             }
 
-    async def _handle_queue_status(self, store_id: str, db: Session) -> Dict[str, Any]:
+    async def _handle_queue_status(self, store_id: str, db: AsyncSession) -> Dict[str, Any]:
         """处理排队状态查询"""
         try:
             from ..models.queue import Queue, QueueStatus
 
-            waiting_queues = db.query(Queue).filter(
-                Queue.store_id == store_id,
-                Queue.status == QueueStatus.WAITING
-            ).count()
+            count_result = await db.execute(
+                select(sa_func.count()).select_from(Queue).where(
+                    Queue.store_id == store_id,
+                    Queue.status == QueueStatus.WAITING
+                )
+            )
+            waiting_queues = count_result.scalar() or 0
 
             if waiting_queues == 0:
                 voice_response = "当前没有排队，可以直接接待顾客"
             else:
                 # 从历史数据计算每桌平均等待时间
-                from sqlalchemy import func as sa_func
-                avg_actual = db.query(sa_func.avg(Queue.actual_wait_time)).filter(
-                    Queue.store_id == store_id,
-                    Queue.actual_wait_time.isnot(None)
-                ).scalar()
+                avg_result = await db.execute(
+                    select(sa_func.avg(Queue.actual_wait_time)).where(
+                        Queue.store_id == store_id,
+                        Queue.actual_wait_time.isnot(None)
+                    )
+                )
+                avg_actual = avg_result.scalar()
                 avg_wait_per_table = int(avg_actual) if avg_actual else int(os.getenv("VOICE_DEFAULT_WAIT_MINUTES", "15"))
                 avg_wait_time = waiting_queues * avg_wait_per_table
                 voice_response = f"当前有{waiting_queues}桌排队，预计等待{avg_wait_time}分钟"
@@ -196,17 +202,20 @@ class VoiceCommandService:
                 "voice_response": "抱歉，查询排队状态失败"
             }
 
-    async def _handle_order_reminder(self, store_id: str, db: Session) -> Dict[str, Any]:
+    async def _handle_order_reminder(self, store_id: str, db: AsyncSession) -> Dict[str, Any]:
         """处理催单提醒"""
         try:
             # 查询超时订单（超过N分钟未完成）
             timeout_threshold = datetime.utcnow() - timedelta(minutes=int(os.getenv("VOICE_ORDER_TIMEOUT_MINUTES", "30")))
 
-            timeout_orders = db.query(Order).filter(
-                Order.store_id == store_id,
-                Order.status.in_(["pending", "preparing"]),
-                Order.created_at < timeout_threshold
-            ).all()
+            result = await db.execute(
+                select(Order).where(
+                    Order.store_id == store_id,
+                    Order.status.in_(["pending", "preparing"]),
+                    Order.created_at < timeout_threshold
+                )
+            )
+            timeout_orders = result.scalars().all()
 
             if not timeout_orders:
                 voice_response = "当前没有超时订单"
@@ -249,16 +258,19 @@ class VoiceCommandService:
         self,
         store_id: str,
         voice_text: str,
-        db: Session
+        db: AsyncSession
     ) -> Dict[str, Any]:
         """处理库存查询"""
         try:
             # 从语音文本中提取物品名称
             # 简单实现：查询所有低库存物品
-            low_stock_items = db.query(InventoryItem).filter(
-                InventoryItem.store_id == store_id,
-                InventoryItem.quantity < InventoryItem.min_quantity
-            ).all()
+            result = await db.execute(
+                select(InventoryItem).where(
+                    InventoryItem.store_id == store_id,
+                    InventoryItem.quantity < InventoryItem.min_quantity
+                )
+            )
+            low_stock_items = result.scalars().all()
 
             if not low_stock_items:
                 voice_response = "当前库存充足，没有低库存物品"
@@ -294,27 +306,33 @@ class VoiceCommandService:
                 "voice_response": "抱歉，查询库存失败"
             }
 
-    async def _handle_revenue_today(self, store_id: str, db: Session) -> Dict[str, Any]:
+    async def _handle_revenue_today(self, store_id: str, db: AsyncSession) -> Dict[str, Any]:
         """处理今日营收查询"""
         try:
             # 查询今日营收
             today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
             from sqlalchemy import func
-            today_revenue = db.query(func.sum(Order.total_amount)).filter(
-                Order.store_id == store_id,
-                Order.created_at >= today_start,
-                Order.status.in_(["completed", "paid"])
-            ).scalar() or 0
+            today_rev = await db.execute(
+                select(func.sum(Order.total_amount)).where(
+                    Order.store_id == store_id,
+                    Order.created_at >= today_start,
+                    Order.status.in_(["completed", "paid"])
+                )
+            )
+            today_revenue = today_rev.scalar() or 0
 
             # 查询昨日营收用于对比
             yesterday_start = today_start - timedelta(days=1)
-            yesterday_revenue = db.query(func.sum(Order.total_amount)).filter(
-                Order.store_id == store_id,
-                Order.created_at >= yesterday_start,
-                Order.created_at < today_start,
-                Order.status.in_(["completed", "paid"])
-            ).scalar() or 0
+            yest_rev = await db.execute(
+                select(func.sum(Order.total_amount)).where(
+                    Order.store_id == store_id,
+                    Order.created_at >= yesterday_start,
+                    Order.created_at < today_start,
+                    Order.status.in_(["completed", "paid"])
+                )
+            )
+            yesterday_revenue = yest_rev.scalar() or 0
 
             # 计算增长率
             if yesterday_revenue > 0:
@@ -352,12 +370,13 @@ class VoiceCommandService:
         self,
         store_id: str,
         user_id: str,
-        db: Session
+        db: AsyncSession
     ) -> Dict[str, Any]:
         """处理呼叫支援"""
         try:
             # 获取门店信息
-            store = db.query(Store).filter(Store.id == store_id).first()
+            store_result = await db.execute(select(Store).where(Store.id == store_id))
+            store = store_result.scalar_one_or_none()
             if not store:
                 raise ValueError(f"Store not found: {store_id}")
 

@@ -4,7 +4,7 @@ SQLAlchemy租户过滤器
 支持PostgreSQL Row-Level Security (RLS)
 """
 from sqlalchemy import event, text
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
 import structlog
 
@@ -45,12 +45,12 @@ SYSTEM_TABLES = {
 }
 
 
-def enable_tenant_filter(session: Session, use_rls: bool = True) -> None:
+async def enable_tenant_filter(session: AsyncSession, use_rls: bool = True) -> None:
     """
     为Session启用租户过滤器
 
     Args:
-        session: SQLAlchemy Session实例
+        session: SQLAlchemy AsyncSession实例
         use_rls: 是否使用PostgreSQL Row-Level Security（默认True）
     """
     tenant_id = TenantContext.get_current_tenant()
@@ -66,7 +66,7 @@ def enable_tenant_filter(session: Session, use_rls: bool = True) -> None:
     if use_rls:
         try:
             # 设置PostgreSQL session变量，RLS策略会自动使用
-            session.execute(
+            await session.execute(
                 text("SELECT set_config('app.current_tenant', :tenant_id, FALSE)"),
                 {"tenant_id": tenant_id}
             )
@@ -135,7 +135,7 @@ def _has_store_filter(statement: Select) -> bool:
     return "store_id" in where_str.lower()
 
 
-def disable_tenant_filter(session: Session) -> None:
+def disable_tenant_filter(session: AsyncSession) -> None:
     """
     为Session禁用租户过滤器
     用于需要跨租户查询的场景（如超级管理员）
@@ -158,13 +158,13 @@ class TenantFilterContext:
             result = await session.execute(select(Order))
     """
 
-    def __init__(self, session: Session, enable: bool = True):
+    def __init__(self, session: AsyncSession, enable: bool = True):
         self.session = session
         self.enable = enable
 
     async def __aenter__(self):
         if self.enable:
-            enable_tenant_filter(self.session)
+            await enable_tenant_filter(self.session)
         return self.session
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):

@@ -11,7 +11,8 @@ from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timedelta
 from enum import Enum
 from dataclasses import dataclass
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
 import numpy as np
 import structlog
 
@@ -87,7 +88,7 @@ class IntelligentRecommendationEngine:
     and reinforcement learning for optimization.
     """
 
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
         # User-dish interaction matrix (simplified)
         self.user_dish_matrix: Dict[str, Dict[str, float]] = {}
@@ -96,7 +97,7 @@ class IntelligentRecommendationEngine:
         # Price elasticity data
         self.price_elasticity: Dict[str, float] = {}
 
-    def recommend_dishes(
+    async def recommend_dishes(
         self,
         customer_id: str,
         store_id: str,
@@ -125,21 +126,21 @@ class IntelligentRecommendationEngine:
         context = context or {}
 
         # Get customer history
-        customer_history = self._get_customer_history(customer_id, store_id)
+        customer_history = await self._get_customer_history(customer_id, store_id)
 
         # Get available dishes
-        available_dishes = self._get_available_dishes(store_id)
+        available_dishes = await self._get_available_dishes(store_id)
 
         # Calculate recommendation scores
         recommendations = []
 
         for dish in available_dishes:
             # Skip if customer ordered recently
-            if self._recently_ordered(customer_id, dish["dish_id"]):
+            if await self._recently_ordered(customer_id, dish["dish_id"]):
                 continue
 
             # Calculate score components
-            cf_score = self._collaborative_filtering_score(
+            cf_score = await self._collaborative_filtering_score(
                 customer_id, dish["dish_id"]
             )
             cb_score = self._content_based_score(
@@ -175,7 +176,7 @@ class IntelligentRecommendationEngine:
         recommendations.sort(key=lambda x: x.score, reverse=True)
         return recommendations[:top_k]
 
-    def optimize_pricing(
+    async def optimize_pricing(
         self,
         store_id: str,
         dish_id: str,
@@ -203,7 +204,7 @@ class IntelligentRecommendationEngine:
         context = context or {}
 
         # Get current dish data
-        dish = self._get_dish_data(store_id, dish_id)
+        dish = await self._get_dish_data(store_id, dish_id)
         current_price = dish["price"]
 
         # Determine pricing strategy
@@ -246,7 +247,7 @@ class IntelligentRecommendationEngine:
             reason=reason
         )
 
-    def generate_marketing_campaign(
+    async def generate_marketing_campaign(
         self,
         store_id: str,
         objective: str,
@@ -280,7 +281,7 @@ class IntelligentRecommendationEngine:
         segment_data = self._get_segment_data(store_id, target_segment)
 
         # Select dishes to promote
-        promoted_dishes = self._select_promotion_dishes(
+        promoted_dishes = await self._select_promotion_dishes(
             store_id, objective, segment_data
         )
 
@@ -318,7 +319,7 @@ class IntelligentRecommendationEngine:
             reason=reason
         )
 
-    def get_recommendation_performance(
+    async def get_recommendation_performance(
         self,
         store_id: str,
         start_date: datetime,
@@ -342,17 +343,16 @@ class IntelligentRecommendationEngine:
                 "metrics": {},
             }
         try:
-            from ..models.order import Order, OrderItem
-            total_orders = (
-                self.db.query(Order)
-                .filter(
+            from ..models.order import Order
+            count_result = await self.db.execute(
+                select(func.count()).select_from(Order).where(
                     Order.store_id == store_id,
                     Order.order_time >= start_date,
                     Order.order_time <= end_date,
                     Order.status == "completed",
                 )
-                .count()
             )
+            total_orders = count_result.scalar() or 0
             return {
                 "store_id": store_id,
                 "period": {"start": start_date.isoformat(), "end": end_date.isoformat()},
@@ -370,7 +370,7 @@ class IntelligentRecommendationEngine:
 
     # Helper methods for recommendation logic
 
-    def _get_customer_history(
+    async def _get_customer_history(
         self,
         customer_id: str,
         store_id: str
@@ -380,17 +380,14 @@ class IntelligentRecommendationEngine:
             return []
         try:
             from ..models.order import Order, OrderItem
-            orders = (
-                self.db.query(Order)
-                .filter(
+            result = await self.db.execute(
+                select(Order).where(
                     Order.store_id == store_id,
                     Order.customer_phone == customer_id,
                     Order.status == "completed",
-                )
-                .order_by(Order.order_time.desc())
-                .limit(20)
-                .all()
+                ).order_by(Order.order_time.desc()).limit(20)
             )
+            orders = result.scalars().all()
             history = []
             for order in orders:
                 for item in order.items:
@@ -405,18 +402,16 @@ class IntelligentRecommendationEngine:
         except Exception:
             return []
 
-    def _get_available_dishes(self, store_id: str) -> List[Dict[str, Any]]:
+    async def _get_available_dishes(self, store_id: str) -> List[Dict[str, Any]]:
         """Get available dishes for store"""
-        # Simplified: query from database
         if not self.db:
             return []
         try:
             from ..models.dish import Dish
-            dishes = (
-                self.db.query(Dish)
-                .filter(Dish.store_id == store_id, Dish.is_available == True)
-                .all()
+            result = await self.db.execute(
+                select(Dish).where(Dish.store_id == store_id, Dish.is_available == True)
             )
+            dishes = result.scalars().all()
             return [
                 {
                     "dish_id": str(d.id),
@@ -431,28 +426,25 @@ class IntelligentRecommendationEngine:
         except Exception:
             return []
 
-    def _recently_ordered(self, customer_id: str, dish_id: str) -> bool:
+    async def _recently_ordered(self, customer_id: str, dish_id: str) -> bool:
         """Check if customer ordered this dish recently"""
         if not self.db:
             return False
         try:
             from ..models.order import Order, OrderItem
             cutoff = datetime.now() - timedelta(days=7)
-            result = (
-                self.db.query(OrderItem)
-                .join(Order, Order.id == OrderItem.order_id)
-                .filter(
+            result = await self.db.execute(
+                select(OrderItem).join(Order, Order.id == OrderItem.order_id).where(
                     Order.customer_phone == customer_id,
                     Order.order_time >= cutoff,
                     OrderItem.item_id == dish_id,
-                )
-                .first()
+                ).limit(1)
             )
-            return result is not None
+            return result.scalar_one_or_none() is not None
         except Exception:
             return False
 
-    def _collaborative_filtering_score(
+    async def _collaborative_filtering_score(
         self,
         customer_id: str,
         dish_id: str
@@ -463,17 +455,16 @@ class IntelligentRecommendationEngine:
         try:
             from ..models.order import Order, OrderItem
             # Count how many completed orders for this store include this dish
-            dish_orders = (
-                self.db.query(OrderItem)
-                .join(Order, Order.id == OrderItem.order_id)
-                .filter(OrderItem.item_id == dish_id, Order.status == "completed")
-                .count()
+            dish_count = await self.db.execute(
+                select(func.count()).select_from(OrderItem).join(
+                    Order, Order.id == OrderItem.order_id
+                ).where(OrderItem.item_id == dish_id, Order.status == "completed")
             )
-            total_orders = (
-                self.db.query(Order)
-                .filter(Order.status == "completed")
-                .count()
+            dish_orders = dish_count.scalar() or 0
+            total_count = await self.db.execute(
+                select(func.count()).select_from(Order).where(Order.status == "completed")
             )
+            total_orders = total_count.scalar() or 0
             if total_orders == 0:
                 return 0.5
             # Popularity-based CF score, capped at 0.95
@@ -565,7 +556,7 @@ class IntelligentRecommendationEngine:
 
         return "、".join(reasons) if reasons else "为您精选"
 
-    def _get_dish_data(
+    async def _get_dish_data(
         self,
         store_id: str,
         dish_id: str
@@ -574,7 +565,8 @@ class IntelligentRecommendationEngine:
         if self.db:
             try:
                 from ..models.dish import Dish
-                dish = self.db.query(Dish).filter(Dish.id == dish_id).first()
+                result = await self.db.execute(select(Dish).where(Dish.id == dish_id))
+                dish = result.scalar_one_or_none()
                 if dish:
                     return {
                         "dish_id": str(dish.id),
@@ -732,7 +724,7 @@ class IntelligentRecommendationEngine:
             "visit_frequency": 2.5
         }
 
-    def _select_promotion_dishes(
+    async def _select_promotion_dishes(
         self,
         store_id: str,
         objective: str,
@@ -740,7 +732,7 @@ class IntelligentRecommendationEngine:
     ) -> List[Dict[str, Any]]:
         """Select dishes for promotion"""
         # Simplified
-        return self._get_available_dishes(store_id)[:3]
+        return (await self._get_available_dishes(store_id))[:3]
 
     def _calculate_optimal_discount(
         self,

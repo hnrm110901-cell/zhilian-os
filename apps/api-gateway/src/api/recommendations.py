@@ -12,13 +12,13 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
 
-from src.services.recommendation_engine import (
+from ..services.recommendation_engine import (
     IntelligentRecommendationEngine,
     RecommendationType,
     PricingStrategy
 )
-from src.core.database import get_db
-from sqlalchemy.orm import Session
+from ..core.database import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 router = APIRouter(prefix="/api/v1/recommendations", tags=["recommendations"])
@@ -59,7 +59,7 @@ class PerformanceRequest(BaseModel):
 @router.post("/dishes")
 async def recommend_dishes(
     request: RecommendDishesRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Recommend dishes for customer
@@ -74,7 +74,7 @@ async def recommend_dishes(
     try:
         engine = IntelligentRecommendationEngine(db)
 
-        recommendations = engine.recommend_dishes(
+        recommendations = await engine.recommend_dishes(
             customer_id=request.customer_id,
             store_id=request.store_id,
             context=request.context,
@@ -105,7 +105,7 @@ async def recommend_dishes(
 @router.post("/pricing/optimize")
 async def optimize_pricing(
     request: OptimizePricingRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Optimize pricing for dish
@@ -121,7 +121,7 @@ async def optimize_pricing(
     try:
         engine = IntelligentRecommendationEngine(db)
 
-        pricing = engine.optimize_pricing(
+        pricing = await engine.optimize_pricing(
             store_id=request.store_id,
             dish_id=request.dish_id,
             context=request.context
@@ -146,7 +146,7 @@ async def optimize_pricing(
 @router.post("/marketing/campaign")
 async def generate_marketing_campaign(
     request: GenerateCampaignRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Generate precision marketing campaign
@@ -161,7 +161,7 @@ async def generate_marketing_campaign(
     try:
         engine = IntelligentRecommendationEngine(db)
 
-        campaign = engine.generate_marketing_campaign(
+        campaign = await engine.generate_marketing_campaign(
             store_id=request.store_id,
             objective=request.objective,
             budget=request.budget,
@@ -188,7 +188,7 @@ async def generate_marketing_campaign(
 @router.post("/performance")
 async def get_recommendation_performance(
     request: PerformanceRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Get recommendation performance metrics
@@ -203,7 +203,7 @@ async def get_recommendation_performance(
     try:
         engine = IntelligentRecommendationEngine(db)
 
-        performance = engine.get_recommendation_performance(
+        performance = await engine.get_recommendation_performance(
             store_id=request.store_id,
             start_date=request.start_date,
             end_date=request.end_date

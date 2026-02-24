@@ -385,7 +385,7 @@ async def broadcast_voice_notification(
 
 from ..services.voice_command_service import voice_command_service
 from ..core.database import get_db
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class SimpleVoiceCommandRequest(BaseModel):
@@ -412,7 +412,7 @@ class TimeoutOrderAlertRequest(BaseModel):
 async def handle_simple_voice_command(
     request: SimpleVoiceCommandRequest,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     处理简单语音指令 (轻量级MVP)

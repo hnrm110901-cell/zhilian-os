@@ -13,7 +13,7 @@ import os
 import numpy as np
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime, timedelta
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 import json
 import logging
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 class EmbeddingModelService:
     """嵌入模型训练与推理服务"""
 
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
         self.model = None
         self.vocab = {}
@@ -76,7 +76,8 @@ class EmbeddingModelService:
             if tenant_id:
                 params["tenant_id"] = tenant_id
 
-            dishes = self.db.execute(text(dish_query), params).fetchall()
+            result = await self.db.execute(text(dish_query), params)
+            dishes = result.fetchall()
 
             for dish in dishes:
                 # 组合菜品文本
@@ -110,7 +111,8 @@ class EmbeddingModelService:
                 order_query += " AND o.tenant_id = :tenant_id"
             order_query += " GROUP BY o.id"
 
-            orders = self.db.execute(text(order_query), params).fetchall()
+            result = await self.db.execute(text(order_query), params)
+            orders = result.fetchall()
 
             for order in orders:
                 if order.dish_sequence:
@@ -129,7 +131,8 @@ class EmbeddingModelService:
             if tenant_id:
                 ingredient_query += " AND d1.tenant_id = :tenant_id"
 
-            ingredient_pairs = self.db.execute(text(ingredient_query), params).fetchall()
+            result = await self.db.execute(text(ingredient_query), params)
+            ingredient_pairs = result.fetchall()
 
             for pair in ingredient_pairs:
                 if pair.ing1 and pair.ing2:
@@ -404,7 +407,7 @@ class EmbeddingModelService:
         else:
             raise ValueError(f"Unknown similarity method: {method}")
 
-    def find_similar_dishes(
+    async def find_similar_dishes(
         self,
         dish_name: str,
         top_k: int = int(os.getenv("EMBEDDING_SEARCH_TOP_K", "10")),
@@ -437,10 +440,10 @@ class EmbeddingModelService:
             query += " WHERE tenant_id = :tenant_id"
             params["tenant_id"] = tenant_id
 
-        dishes = self.db.execute(text(query), params).fetchall()
+        result = await self.db.execute(text(query), params)
+        dishes = result.fetchall()
 
         # 计算相似度
-        similarities = []
         for dish in dishes:
             if dish.name == dish_name:
                 continue
@@ -461,7 +464,7 @@ class EmbeddingModelService:
         similarities.sort(key=lambda x: x["similarity"], reverse=True)
         return similarities[:top_k]
 
-    def recommend_dishes_by_order(
+    async def recommend_dishes_by_order(
         self,
         order_dish_names: List[str],
         top_k: int = int(os.getenv("EMBEDDING_RECOMMEND_TOP_K", "5")),
@@ -501,7 +504,8 @@ class EmbeddingModelService:
             query += " WHERE tenant_id = :tenant_id"
             params["tenant_id"] = tenant_id
 
-        dishes = self.db.execute(text(query), params).fetchall()
+        result = await self.db.execute(text(query), params)
+        dishes = result.fetchall()
 
         # 计算相似度
         recommendations = []
