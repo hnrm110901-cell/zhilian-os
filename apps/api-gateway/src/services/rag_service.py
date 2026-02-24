@@ -13,6 +13,7 @@ import structlog
 from datetime import datetime
 
 from .vector_db_service import vector_db_service
+from .domain_vector_service import domain_vector_service, LEGACY_COLLECTION_MAP
 from ..core.llm import get_llm_client
 from .rag_signal_router import classify_query, QuerySignal, route_numerical_query
 
@@ -52,46 +53,39 @@ class RAGService:
         """
         检索相关上下文
 
-        Args:
-            query: 查询文本
-            store_id: 门店ID
-            collection: 集合名称（events, orders, dishes等）
-            top_k: 返回前K个结果
-
-        Returns:
-            相关历史记录列表
+        优先使用领域分割索引（domain_vector_service），
+        collection 参数映射到对应领域：
+          events  → events
+          orders  → revenue
+          dishes  → menu
+          staff   → staff
         """
         try:
-            # 根据集合类型选择搜索方法
-            if collection == "events":
-                results = await self.vector_db.search_events(
-                    query=query,
-                    store_id=store_id,
-                    limit=top_k
-                )
-            elif collection == "orders":
-                results = await self.vector_db.search_orders(
-                    query=query,
-                    store_id=store_id,
-                    limit=top_k
-                )
-            elif collection == "dishes":
-                results = await self.vector_db.search_dishes(
-                    query=query,
-                    store_id=store_id,
-                    limit=top_k
-                )
-            else:
-                logger.warning(f"未知的集合类型: {collection}")
-                results = []
+            # 映射旧 collection 名称到新领域
+            domain = LEGACY_COLLECTION_MAP.get(collection, collection)
+
+            results = await domain_vector_service.search(
+                domain=domain,
+                store_id=store_id,
+                query=query,
+                top_k=top_k,
+            )
+
+            # 降级：领域索引无数据时回退到旧全局索引
+            if not results:
+                if collection == "events":
+                    results = await self.vector_db.search_events(query=query, store_id=store_id, limit=top_k)
+                elif collection == "orders":
+                    results = await self.vector_db.search_orders(query=query, store_id=store_id, limit=top_k)
+                elif collection == "dishes":
+                    results = await self.vector_db.search_dishes(query=query, store_id=store_id, limit=top_k)
 
             logger.info(
                 "检索相关上下文",
                 query=query,
-                collection=collection,
+                domain=domain,
                 results_count=len(results)
             )
-
             return results
 
         except Exception as e:
