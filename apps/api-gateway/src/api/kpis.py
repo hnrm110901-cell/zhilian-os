@@ -64,6 +64,22 @@ async def list_kpis(
     ) for k in kpis]
 
 
+@router.get("/kpis/records/store", response_model=List[KPIRecordResponse])
+async def get_kpi_records(
+    store_id: str = Query(..., description="门店ID"),
+    start_date: date = Query(..., description="开始日期"),
+    end_date: date = Query(..., description="结束日期"),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """获取门店KPI历史记录"""
+    records = await KPIRepository.get_records_by_date_range(session, store_id, start_date, end_date)
+    return [KPIRecordResponse(
+        id=str(r.id), kpi_id=r.kpi_id, store_id=r.store_id,
+        record_date=r.record_date, value=r.value, notes=getattr(r, "notes", None)
+    ) for r in records]
+
+
 @router.get("/kpis/{kpi_id}", response_model=KPIResponse)
 async def get_kpi(
     kpi_id: str,
@@ -80,22 +96,6 @@ async def get_kpi(
         unit=kpi.unit, target_value=kpi.target_value, warning_threshold=kpi.warning_threshold,
         critical_threshold=kpi.critical_threshold, is_active=kpi.is_active or "true"
     )
-
-
-@router.get("/kpis/records/store", response_model=List[KPIRecordResponse])
-async def get_kpi_records(
-    store_id: str = Query(..., description="门店ID"),
-    start_date: date = Query(..., description="开始日期"),
-    end_date: date = Query(..., description="结束日期"),
-    session: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
-):
-    """获取门店KPI历史记录"""
-    records = await KPIRepository.get_records_by_date_range(session, store_id, start_date, end_date)
-    return [KPIRecordResponse(
-        id=str(r.id), kpi_id=r.kpi_id, store_id=r.store_id,
-        record_date=r.record_date, value=r.value, notes=getattr(r, "notes", None)
-    ) for r in records]
 
 
 @router.post("/kpis/records", response_model=KPIRecordResponse, status_code=201)

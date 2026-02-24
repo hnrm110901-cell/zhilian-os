@@ -12,6 +12,7 @@ from src.models import (
     User, Store, Employee, Order, OrderItem, InventoryItem, InventoryTransaction,
     Schedule, Shift, Reservation, KPI, KPIRecord
 )
+from src.models.reservation import ReservationStatus
 
 
 class UserRepository:
@@ -238,7 +239,7 @@ class ReservationRepository:
                 and_(
                     Reservation.store_id == store_id,
                     Reservation.reservation_date >= today,
-                    Reservation.status.in_(['pending', 'confirmed'])
+                    Reservation.status.in_([ReservationStatus.PENDING, ReservationStatus.CONFIRMED])
                 )
             ).order_by(Reservation.reservation_date, Reservation.reservation_time)
         )
