@@ -8,6 +8,7 @@ import structlog
 
 from .llm_agent import LLMEnhancedAgent, AgentResult
 from ..services.rag_service import RAGService
+from ..services.decision_validator import DecisionValidator, ValidationResult
 from ..core.monitoring import error_monitor, ErrorSeverity, ErrorCategory
 
 logger = structlog.get_logger()
@@ -32,6 +33,7 @@ class DecisionAgent(LLMEnhancedAgent):
     def __init__(self):
         super().__init__(agent_type="decision")
         self.rag_service = RAGService()
+        self.validator = DecisionValidator()
 
     async def analyze_revenue_anomaly(
         self,
@@ -204,7 +206,8 @@ class DecisionAgent(LLMEnhancedAgent):
     async def generate_business_recommendations(
         self,
         store_id: str,
-        focus_area: Optional[str] = None
+        focus_area: Optional[str] = None,
+        validation_context: Optional[Dict] = None
     ) -> AgentResult:
         """
         生成经营建议
@@ -244,6 +247,30 @@ class DecisionAgent(LLMEnhancedAgent):
             )
 
             ctx_count = rag_result["metadata"]["context_count"]
+
+            # 步骤4：合规性校验（预算）
+            validation = None
+            if validation_context:
+                decision = {"action": "recommendation", **validation_context.get("decision_overrides", {})}
+                validation = await self.validator.validate_decision(
+                    decision=decision,
+                    context=validation_context,
+                    rules_to_apply=["budget_check"]
+                )
+                if validation["result"] == ValidationResult.REJECTED.value:
+                    return self.format_response(
+                        success=False,
+                        data={"recommendations": rag_result["response"], "focus_area": focus_area},
+                        message=f"经营建议被合规校验拒绝: {validation['message']}",
+                        reasoning=f"LLM 生成了经营建议，但预算校验拒绝: {validation['message']}",
+                        confidence=0.0,
+                        source_data={"store_id": store_id, "focus_area": focus_area, "validation": validation},
+                    )
+
+            source = {"store_id": store_id, "focus_area": focus_area}
+            if validation:
+                source["validation"] = validation
+
             return self.format_response(
                 success=True,
                 data={
@@ -252,10 +279,10 @@ class DecisionAgent(LLMEnhancedAgent):
                     "context_used": ctx_count,
                     "timestamp": rag_result["metadata"]["timestamp"]
                 },
-                message="经营建议生成完成",
+                message="经营建议生成完成" + ("（含合规警告）" if validation and validation["result"] == ValidationResult.WARNING.value else ""),
                 reasoning=f"基于 {ctx_count} 条历史事件，{focus_text}，生成可执行经营建议",
                 confidence=min(0.9, 0.45 + ctx_count * 0.05),
-                source_data={"store_id": store_id, "focus_area": focus_area},
+                source_data=source,
             )
 
         except Exception as e:

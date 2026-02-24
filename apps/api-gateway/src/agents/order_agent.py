@@ -8,6 +8,7 @@ import structlog
 
 from .llm_agent import LLMEnhancedAgent, AgentResult
 from ..services.rag_service import RAGService
+from ..services.decision_validator import DecisionValidator, ValidationResult
 from ..core.monitoring import error_monitor, ErrorSeverity, ErrorCategory
 
 logger = structlog.get_logger()
@@ -32,6 +33,7 @@ class OrderAgent(LLMEnhancedAgent):
     def __init__(self):
         super().__init__(agent_type="order")
         self.rag_service = RAGService()
+        self.validator = DecisionValidator()
 
     async def analyze_order_anomaly(
         self,
@@ -253,7 +255,8 @@ class OrderAgent(LLMEnhancedAgent):
     async def optimize_menu_pricing(
         self,
         store_id: str,
-        dish_ids: List[str]
+        dish_ids: List[str],
+        validation_context: Optional[Dict] = None
     ) -> AgentResult:
         """优化菜品定价"""
         try:
@@ -280,6 +283,30 @@ class OrderAgent(LLMEnhancedAgent):
             )
 
             ctx_count = rag_result["metadata"]["context_count"]
+
+            # 步骤4：合规性校验（利润率）
+            validation = None
+            if validation_context:
+                decision = {"action": "pricing", **validation_context.get("decision_overrides", {})}
+                validation = await self.validator.validate_decision(
+                    decision=decision,
+                    context=validation_context,
+                    rules_to_apply=["profit_margin"]
+                )
+                if validation["result"] == ValidationResult.REJECTED.value:
+                    return self.format_response(
+                        success=False,
+                        data={"optimization": rag_result["response"], "dish_count": len(dish_ids)},
+                        message=f"定价方案被合规校验拒绝: {validation['message']}",
+                        reasoning=f"LLM 生成了定价建议，但利润率校验拒绝: {validation['message']}",
+                        confidence=0.0,
+                        source_data={"store_id": store_id, "dish_count": len(dish_ids), "validation": validation},
+                    )
+
+            source = {"store_id": store_id, "dish_count": len(dish_ids)}
+            if validation:
+                source["validation"] = validation
+
             return self.format_response(
                 success=True,
                 data={
@@ -288,10 +315,10 @@ class OrderAgent(LLMEnhancedAgent):
                     "context_used": ctx_count,
                     "timestamp": rag_result["metadata"]["timestamp"]
                 },
-                message="定价优化完成",
+                message="定价优化完成" + ("（含合规警告）" if validation and validation["result"] == ValidationResult.WARNING.value else ""),
                 reasoning=f"基于 {ctx_count} 条历史数据，优化 {len(dish_ids)} 种菜品定价",
                 confidence=min(0.85, 0.4 + ctx_count * 0.05),
-                source_data={"store_id": store_id, "dish_count": len(dish_ids)},
+                source_data=source,
             )
 
         except Exception as e:

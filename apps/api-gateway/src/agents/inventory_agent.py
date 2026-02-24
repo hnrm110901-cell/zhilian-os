@@ -8,6 +8,7 @@ import structlog
 
 from .llm_agent import LLMEnhancedAgent, AgentResult
 from ..services.rag_service import RAGService
+from ..services.decision_validator import DecisionValidator, ValidationResult
 from ..core.monitoring import error_monitor, ErrorSeverity, ErrorCategory
 
 logger = structlog.get_logger()
@@ -32,6 +33,7 @@ class InventoryAgent(LLMEnhancedAgent):
     def __init__(self):
         super().__init__(agent_type="inventory")
         self.rag_service = RAGService()
+        self.validator = DecisionValidator()
 
     async def predict_inventory_needs(
         self,
@@ -274,7 +276,8 @@ class InventoryAgent(LLMEnhancedAgent):
     async def generate_restock_plan(
         self,
         store_id: str,
-        target_date: str
+        target_date: str,
+        validation_context: Optional[Dict] = None
     ) -> AgentResult:
         """生成补货计划"""
         try:
@@ -300,6 +303,30 @@ class InventoryAgent(LLMEnhancedAgent):
             )
 
             ctx_count = rag_result["metadata"]["context_count"]
+
+            # 步骤4：合规性校验（预算/库存容量/历史消耗/供应商）
+            validation = None
+            if validation_context:
+                decision = {"action": "purchase", **validation_context.get("decision_overrides", {})}
+                validation = await self.validator.validate_decision(
+                    decision=decision,
+                    context=validation_context,
+                    rules_to_apply=["budget_check", "inventory_capacity", "historical_consumption", "supplier_availability"]
+                )
+                if validation["result"] == ValidationResult.REJECTED.value:
+                    return self.format_response(
+                        success=False,
+                        data={"plan": rag_result["response"], "target_date": target_date},
+                        message=f"补货计划被合规校验拒绝: {validation['message']}",
+                        reasoning=f"LLM 生成了补货计划，但合规校验拒绝: {validation['message']}",
+                        confidence=0.0,
+                        source_data={"store_id": store_id, "target_date": target_date, "validation": validation},
+                    )
+
+            source = {"store_id": store_id, "target_date": target_date}
+            if validation:
+                source["validation"] = validation
+
             return self.format_response(
                 success=True,
                 data={
@@ -308,10 +335,10 @@ class InventoryAgent(LLMEnhancedAgent):
                     "context_used": ctx_count,
                     "timestamp": rag_result["metadata"]["timestamp"]
                 },
-                message="补货计划生成完成",
+                message="补货计划生成完成" + ("（含合规警告）" if validation and validation["result"] == ValidationResult.WARNING.value else ""),
                 reasoning=f"基于 {ctx_count} 条历史数据，生成 {target_date} 补货计划",
                 confidence=min(0.9, 0.45 + ctx_count * 0.05),
-                source_data={"store_id": store_id, "target_date": target_date},
+                source_data=source,
             )
 
         except Exception as e:
