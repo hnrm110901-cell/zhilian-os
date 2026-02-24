@@ -254,7 +254,8 @@ class DashboardService:
                     payment_distribution = [
                         {"name": p.get("name", "未知"), "value": 0} for p in pay_types
                     ]
-                except Exception:
+                except Exception as e:
+                    logger.warning("dashboard_pos_pay_types_failed", error=str(e))
                     payment_distribution = [
                         {"name": "微信支付", "value": 0},
                         {"name": "支付宝", "value": 0},

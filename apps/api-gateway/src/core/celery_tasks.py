@@ -122,9 +122,9 @@ async def process_neural_event(
 
         # 3. 根据事件类型调用相应的处理任务
         if event_type.startswith("order."):
-            await index_order_to_vector_db.delay(data)
+            index_order_to_vector_db.delay(data)
         elif event_type.startswith("dish."):
-            await index_dish_to_vector_db.delay(data)
+            index_dish_to_vector_db.delay(data)
 
         # 4. 标记为已处理
         event["processed"] = True
