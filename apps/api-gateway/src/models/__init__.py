@@ -30,6 +30,7 @@ from .integration import (
     SyncStatus,
 )
 from .decision_log import DecisionLog, DecisionType, DecisionStatus, DecisionOutcome
+from .compliance import ComplianceLicense, LicenseType, LicenseStatus
 
 __all__ = [
     "Base",
@@ -78,4 +79,7 @@ __all__ = [
     "DecisionType",
     "DecisionStatus",
     "DecisionOutcome",
+    "ComplianceLicense",
+    "LicenseType",
+    "LicenseStatus",
 ]
