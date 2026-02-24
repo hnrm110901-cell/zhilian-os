@@ -9,6 +9,7 @@ import structlog
 import os
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_
+from sqlalchemy.orm import selectinload
 
 from src.models import Order, OrderItem, InventoryItem, FinancialTransaction, Store
 from src.models.order import OrderStatus
@@ -227,7 +228,7 @@ class AnalyticsService:
         start_date = end_date - timedelta(days=int(os.getenv("ANALYTICS_HISTORY_DAYS", "30")))
 
         # 查询订单及其商品
-        query = select(Order).where(
+        query = select(Order).options(selectinload(Order.items)).where(
             and_(
                 Order.store_id == store_id,
                 Order.created_at >= datetime.combine(start_date, datetime.min.time()),
@@ -255,7 +256,7 @@ class AnalyticsService:
             if not order.items:
                 continue
 
-            items = [item.get("name", "") for item in order.items if item.get("name")]
+            items = [item.item_name for item in order.items if item.item_name]
 
             # 统计单个商品出现次数
             for item in items:
