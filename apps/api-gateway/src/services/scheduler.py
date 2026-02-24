@@ -77,9 +77,18 @@ class TaskScheduler:
                 if (now.hour == _report_hour and now.minute == _report_minute and
                         (last is None or last.date() < today)):
                     from src.core.celery_tasks import generate_and_send_daily_report
-                    generate_and_send_daily_report.delay()
+                    from src.core.database import get_db_session
+                    from src.models.store import Store
+                    from sqlalchemy import select
+                    async with get_db_session() as session:
+                        result = await session.execute(
+                            select(Store.id).where(Store.is_active == True)
+                        )
+                        store_ids = [str(row[0]) for row in result.all()]
+                    for sid in store_ids:
+                        generate_and_send_daily_report.delay(sid)
                     self._last_run["daily_report"] = now
-                    logger.info("scheduler_triggered", task="generate_and_send_daily_report")
+                    logger.info("scheduler_triggered", task="generate_and_send_daily_report", stores=len(store_ids))
 
                 # 每天10:00：库存预警
                 last = self._last_run["inventory_alert"]
@@ -99,9 +108,18 @@ class TaskScheduler:
                 if (now.hour == _recon_hour and now.minute == _recon_minute and
                         (last is None or last.date() < today)):
                     from src.core.celery_tasks import perform_daily_reconciliation
-                    perform_daily_reconciliation.delay()
+                    from src.core.database import get_db_session
+                    from src.models.store import Store
+                    from sqlalchemy import select
+                    async with get_db_session() as session:
+                        result = await session.execute(
+                            select(Store.id).where(Store.is_active == True)
+                        )
+                        store_ids = [str(row[0]) for row in result.all()]
+                    for sid in store_ids:
+                        perform_daily_reconciliation.delay(sid)
                     self._last_run["reconciliation"] = now
-                    logger.info("scheduler_triggered", task="perform_daily_reconciliation")
+                    logger.info("scheduler_triggered", task="perform_daily_reconciliation", stores=len(store_ids))
 
                 logger.debug("scheduler_tick", time=now.time())
                 await asyncio.sleep(int(os.getenv("SCHEDULER_TICK_SECONDS", "60")))

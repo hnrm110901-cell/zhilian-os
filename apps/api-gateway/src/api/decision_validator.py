@@ -74,12 +74,15 @@ async def validate_decision(
     - recommendations: Suggested modifications
     """
     try:
-        validator = DecisionValidator(db)
-        validation_result = validator.validate_decision(
-            request.store_id,
-            request.decision_type.value,
-            request.ai_suggestion,
-            request.context or {}
+        validator = DecisionValidator()
+        context = {
+            "store_id": request.store_id,
+            "decision_type": request.decision_type.value,
+            **(request.context or {})
+        }
+        validation_result = await validator.validate_decision(
+            decision=request.ai_suggestion,
+            context=context
         )
 
         return {
@@ -87,11 +90,11 @@ async def validate_decision(
             "store_id": request.store_id,
             "decision_type": request.decision_type.value,
             "validation": {
-                "result": validation_result.result.value,
-                "confidence": validation_result.confidence,
-                "violations": validation_result.violations,
-                "recommendations": validation_result.recommendations,
-                "validated_at": validation_result.validated_at.isoformat()
+                "result": validation_result["result"],
+                "confidence": 1.0 if not validation_result["critical_failures"] else max(0.0, 1.0 - len(validation_result["critical_failures"]) * 0.2),
+                "violations": [f["reason"] for f in validation_result["critical_failures"]],
+                "recommendations": [w["reason"] for w in validation_result["warnings"]],
+                "validated_at": validation_result["timestamp"]
             }
         }
     except Exception as e:
@@ -110,23 +113,26 @@ async def validate_batch_decisions(
     Useful for validating a set of related decisions together
     """
     try:
-        validator = DecisionValidator(db)
+        validator = DecisionValidator()
         results = []
 
         for req in requests:
-            validation_result = validator.validate_decision(
-                req.store_id,
-                req.decision_type.value,
-                req.ai_suggestion,
-                req.context or {}
+            context = {
+                "store_id": req.store_id,
+                "decision_type": req.decision_type.value,
+                **(req.context or {})
+            }
+            validation_result = await validator.validate_decision(
+                decision=req.ai_suggestion,
+                context=context
             )
 
             results.append({
                 "store_id": req.store_id,
                 "decision_type": req.decision_type.value,
-                "result": validation_result.result.value,
-                "confidence": validation_result.confidence,
-                "violations": validation_result.violations
+                "result": validation_result["result"],
+                "confidence": 1.0 if not validation_result["critical_failures"] else max(0.0, 1.0 - len(validation_result["critical_failures"]) * 0.2),
+                "violations": [f["reason"] for f in validation_result["critical_failures"]]
             })
 
         # Summary statistics
@@ -157,10 +163,10 @@ async def get_validation_rules(db: Session = Depends(get_db)):
     Returns list of available validation rules with descriptions
     """
     try:
-        validator = DecisionValidator(db)
+        validator = DecisionValidator()
         rules_info = []
 
-        for rule in validator.rules:
+        for rule in validator.rules.values():
             rules_info.append({
                 "name": rule.name,
                 "description": getattr(rule, "description", "No description available")
@@ -189,7 +195,7 @@ async def detect_anomaly(
     Uses z-score method with 3σ threshold
     """
     try:
-        validator = DecisionValidator(db)
+        validator = DecisionValidator()
         is_anomaly = validator.detect_anomaly(store_id, metric_name, current_value)
 
         return {
