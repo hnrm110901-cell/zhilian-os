@@ -18,6 +18,8 @@ from src.api import dashboard, analytics, audit, multi_store, finance, customer3
 # 需要外部适配器的模块 (会在适配器不可用时返回错误)
 from src.api import members
 from src.api import edge_node, decision_validator, recommendations, agent_collaboration
+# Phase 1: CRUD API
+from src.api import employees, inventory, schedules, reservations, kpis
 from src.middleware.monitoring import MonitoringMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
 from src.middleware.audit_log import AuditLogMiddleware
@@ -436,6 +438,12 @@ app.include_router(hardware_integration.router, tags=["hardware_integration"])
 
 # POS模块
 app.include_router(pos.router, prefix="/api/v1/pos", tags=["pos"])
+# Phase 1: CRUD API
+app.include_router(employees.router, prefix="/api/v1", tags=["employees"])
+app.include_router(inventory.router, prefix="/api/v1", tags=["inventory"])
+app.include_router(schedules.router, prefix="/api/v1", tags=["schedules"])
+app.include_router(reservations.router, prefix="/api/v1", tags=["reservations"])
+app.include_router(kpis.router, prefix="/api/v1", tags=["kpis"])
 
 
 @app.on_event("startup")
