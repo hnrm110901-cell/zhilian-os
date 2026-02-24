@@ -40,12 +40,14 @@ class ShokzDevice:
         role: DeviceRole,
         user_id: str,
         bluetooth_address: str,
+        store_id: str = "",
     ):
         self.device_id = device_id
         self.device_type = device_type
         self.role = role
         self.user_id = user_id
         self.bluetooth_address = bluetooth_address
+        self.store_id = store_id
         self.is_connected = False
         self.battery_level = 100
         self.last_activity = None
@@ -68,6 +70,7 @@ class ShokzService:
         role: DeviceRole,
         user_id: str,
         bluetooth_address: str,
+        store_id: str = "",
     ) -> Dict[str, Any]:
         """
         注册Shokz设备
@@ -78,6 +81,7 @@ class ShokzService:
             role: 设备角色
             user_id: 用户ID
             bluetooth_address: 蓝牙地址
+            store_id: 门店ID
 
         Returns:
             注册结果
@@ -89,6 +93,7 @@ class ShokzService:
                 role=role,
                 user_id=user_id,
                 bluetooth_address=bluetooth_address,
+                store_id=store_id,
             )
 
             self.devices[device_id] = device
@@ -210,14 +215,16 @@ class ShokzService:
         device_id: str,
         audio_data: bytes,
         format: str = "pcm",
+        sample_rate: int = 16000,
     ) -> Dict[str, Any]:
         """
         发送音频到Shokz设备
 
         Args:
             device_id: 设备ID
-            audio_data: 音频数据
+            audio_data: 音频数据 (PCM s16le)
             format: 音频格式
+            sample_rate: 采样率 (讯飞TTS输出16000Hz)
 
         Returns:
             发送结果
@@ -238,7 +245,6 @@ class ShokzService:
 
         try:
             # 通过 PulseAudio 将音频数据发送到蓝牙 A2DP sink
-            # 先将音频数据写入临时文件，再用 paplay 播放到蓝牙设备
             bt_addr_clean = device.bluetooth_address.replace(":", "_")
             sink_name = f"bluez_sink.{bt_addr_clean}.a2dp_sink"
 
@@ -251,8 +257,8 @@ class ShokzService:
                     "paplay",
                     "--device", sink_name,
                     "--format=s16le",
-                    "--rate=44100",
-                    "--channels=2",
+                    f"--rate={sample_rate}",
+                    "--channels=1",
                     tmp_path,
                     stdout=asyncio.subprocess.DEVNULL,
                     stderr=asyncio.subprocess.PIPE,
@@ -309,6 +315,7 @@ class ShokzService:
 
         try:
             # 通过 PulseAudio 从蓝牙 HFP/HSP source 录音
+            # parec 持续运行不会自动退出，需要在录音时长后主动终止
             bt_addr_clean = device.bluetooth_address.replace(":", "_")
             source_name = f"bluez_source.{bt_addr_clean}.handsfree_head_unit"
             sample_rate = int(os.getenv("SHOKZ_AUDIO_SAMPLE_RATE", "16000"))
@@ -329,7 +336,14 @@ class ShokzService:
                     stdout=asyncio.subprocess.DEVNULL,
                     stderr=asyncio.subprocess.PIPE,
                 )
-                await asyncio.wait_for(proc.communicate(), timeout=duration_seconds + 2)
+                # 等待录音时长后终止 parec（它不会自动退出）
+                await asyncio.sleep(duration_seconds)
+                proc.terminate()
+                try:
+                    await asyncio.wait_for(proc.wait(), timeout=2)
+                except asyncio.TimeoutError:
+                    proc.kill()
+
                 with open(tmp_path, "rb") as f:
                     audio_data = f.read()
             finally:
@@ -374,6 +388,7 @@ class ShokzService:
             "device_type": device.device_type.value,
             "role": device.role.value,
             "user_id": device.user_id,
+            "store_id": device.store_id,
             "bluetooth_address": device.bluetooth_address,
             "is_connected": device.is_connected,
             "battery_level": device.battery_level,

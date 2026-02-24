@@ -10,6 +10,7 @@ import structlog
 
 from .shokz_service import shokz_service, DeviceRole
 from .voice_service import voice_service, voice_command_router
+from .iflytek_websocket_service import iflytek_ws_service
 from .agent_service import AgentService
 from .message_router import message_router
 
@@ -60,21 +61,28 @@ class VoiceInteractionOrchestrator:
                 user_id=user_id,
             )
 
-            # 2. 语音识别（STT）
-            stt_result = await voice_service.speech_to_text(
-                audio_data=audio_data,
-                language="zh-CN",
-                sample_rate=sample_rate,
-            )
+            # 2. 语音识别（STT）— 优先使用讯飞 WebSocket IAT
+            if iflytek_ws_service._is_configured():
+                text = await iflytek_ws_service.speech_to_text(
+                    audio_data=audio_data,
+                    language="zh_cn",
+                    sample_rate=sample_rate,
+                )
+                stt_success = bool(text)
+            else:
+                stt_result = await voice_service.speech_to_text(
+                    audio_data=audio_data,
+                    language="zh-CN",
+                    sample_rate=sample_rate,
+                )
+                stt_success = stt_result["success"]
+                text = stt_result.get("text", "") if stt_success else ""
 
-            if not stt_result["success"]:
+            if not stt_success or not text:
                 return {
                     "success": False,
                     "error": "语音识别失败",
-                    "details": stt_result,
                 }
-
-            text = stt_result["text"]
             logger.info("语音识别成功", text=text)
 
             # 3. 命令路由
@@ -115,26 +123,36 @@ class VoiceInteractionOrchestrator:
                 # 简化语音响应（去除emoji和格式化）
                 response_text = self._simplify_for_voice(response_text)
 
-            # 6. 语音合成（TTS）
-            tts_result = await voice_service.text_to_speech(
-                text=response_text,
-                language="zh-CN",
-                voice="female",
-                speed=1.0,
-            )
+            # 6. 语音合成（TTS）— 优先使用讯飞 WebSocket TTS
+            tts_sample_rate = sample_rate
+            if iflytek_ws_service._is_configured():
+                audio_bytes = await iflytek_ws_service.text_to_speech(
+                    text=response_text,
+                    sample_rate=tts_sample_rate,
+                )
+                tts_ok = bool(audio_bytes)
+            else:
+                tts_result = await voice_service.text_to_speech(
+                    text=response_text,
+                    language="zh-CN",
+                    voice="female",
+                    speed=1.0,
+                )
+                tts_ok = tts_result["success"]
+                audio_bytes = tts_result.get("audio_data", b"") if tts_ok else b""
 
-            if not tts_result["success"]:
+            if not tts_ok or not audio_bytes:
                 return {
                     "success": False,
                     "error": "语音合成失败",
-                    "details": tts_result,
                 }
 
-            # 7. 发送音频到设备
+            # 7. 发送音频到设备（传入正确的采样率）
             send_result = await shokz_service.send_audio(
                 device_id=device_id,
-                audio_data=tts_result["audio_data"],
+                audio_data=audio_bytes,
                 format="pcm",
+                sample_rate=tts_sample_rate,
             )
 
             if not send_result["success"]:
@@ -232,25 +250,31 @@ class VoiceInteractionOrchestrator:
             elif priority == "urgent":
                 speed = float(os.getenv("VOICE_SPEED_URGENT", "1.5"))
 
-            # 语音合成
-            tts_result = await voice_service.text_to_speech(
-                text=message,
-                language="zh-CN",
-                voice="female",
-                speed=speed,
-            )
+            # 语音合成 — 优先使用讯飞 WebSocket TTS
+            speed_int = max(0, min(100, int(speed * 50)))
+            if iflytek_ws_service._is_configured():
+                audio_bytes = await iflytek_ws_service.text_to_speech(
+                    text=message,
+                    speed=speed_int,
+                )
+            else:
+                tts_result = await voice_service.text_to_speech(
+                    text=message,
+                    language="zh-CN",
+                    voice="female",
+                    speed=speed,
+                )
+                audio_bytes = tts_result.get("audio_data", b"") if tts_result.get("success") else b""
 
-            if not tts_result["success"]:
-                return {
-                    "success": False,
-                    "error": "语音合成失败",
-                }
+            if not audio_bytes:
+                return {"success": False, "error": "语音合成失败"}
 
             # 发送音频
             send_result = await shokz_service.send_audio(
                 device_id=device_id,
-                audio_data=tts_result["audio_data"],
+                audio_data=audio_bytes,
                 format="pcm",
+                sample_rate=16000,
             )
 
             return send_result
