@@ -14,6 +14,7 @@ from datetime import datetime
 
 from .vector_db_service import vector_db_service
 from ..core.llm import get_llm_client
+from .rag_signal_router import classify_query, QuerySignal, route_numerical_query
 
 logger = structlog.get_logger()
 
@@ -170,39 +171,71 @@ class RAGService:
             包含分析结果和元数据的字典
         """
         try:
-            # 1. 检索相关历史
-            relevant_context = await self.search_relevant_context(
-                query=query,
-                store_id=store_id,
-                collection=collection,
-                top_k=top_k
-            )
+            signal = classify_query(query)
+            route_label = signal.value
 
-            # 2. 格式化上下文
-            context_text = self.format_context(relevant_context)
+            if signal == QuerySignal.NUMERICAL:
+                # --- 数值类：走 PostgreSQL 精确查询 ---
+                structured = await route_numerical_query(query, store_id)
+                if structured:
+                    context_text = structured["summary"]
+                    context_detail = structured
+                    context_used = 1
+                    logger.info(
+                        "rag.routed_to_postgresql",
+                        store_id=store_id,
+                        metric=structured.get("metric"),
+                    )
+                else:
+                    # PostgreSQL 查询失败，降级到向量检索
+                    route_label = "numerical_fallback_semantic"
+                    relevant_context = await self.search_relevant_context(
+                        query=query, store_id=store_id,
+                        collection=collection, top_k=top_k,
+                    )
+                    context_text = self.format_context(relevant_context)
+                    context_detail = None
+                    context_used = len(relevant_context)
+            else:
+                # --- 语义类：走 Qdrant 向量检索 ---
+                relevant_context = await self.search_relevant_context(
+                    query=query, store_id=store_id,
+                    collection=collection, top_k=top_k,
+                )
+                context_text = self.format_context(relevant_context)
+                context_detail = None
+                context_used = len(relevant_context)
+                logger.info(
+                    "rag.routed_to_qdrant",
+                    store_id=store_id,
+                    results=context_used,
+                )
 
-            # 3. 构建增强提示
+            # 构建增强提示
             enhanced_prompt = self._build_enhanced_prompt(
                 query=query,
                 context=context_text,
-                system_prompt=system_prompt
+                system_prompt=system_prompt,
             )
 
-            # 4. LLM生成
+            # LLM 生成
             if self.llm:
                 response = await self.llm.generate(enhanced_prompt)
             else:
                 response = "LLM未初始化，无法生成响应"
 
-            # 5. 返回结果
-            return {
+            result = {
                 "success": True,
                 "query": query,
                 "response": response,
-                "context_used": len(relevant_context),
+                "context_used": context_used,
                 "context_text": context_text,
-                "timestamp": datetime.now().isoformat()
+                "route": route_label,
+                "timestamp": datetime.now().isoformat(),
             }
+            if context_detail:
+                result["structured_data"] = context_detail
+            return result
 
         except Exception as e:
             logger.error("RAG分析失败", error=str(e))
@@ -210,7 +243,7 @@ class RAGService:
                 "success": False,
                 "query": query,
                 "error": str(e),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
     def _build_enhanced_prompt(
