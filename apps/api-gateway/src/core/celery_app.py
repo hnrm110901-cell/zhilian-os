@@ -94,6 +94,18 @@ celery_app.conf.update(
             "queue": "default",
             "routing_key": "default",
         },
+        "src.core.celery_tasks.detect_revenue_anomaly": {
+            "queue": "default",
+            "routing_key": "default",
+        },
+        "src.core.celery_tasks.generate_daily_report_with_rag": {
+            "queue": "default",
+            "routing_key": "default",
+        },
+        "src.core.celery_tasks.check_inventory_alert": {
+            "queue": "default",
+            "routing_key": "default",
+        },
     },
 
     # Celery Beat定时任务调度
