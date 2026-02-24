@@ -65,6 +65,7 @@ class ExternalSystem(Base):
     api_key = Column(String(500), comment="API密钥")
     api_secret = Column(String(500), comment="API密钥")
     webhook_url = Column(String(500), comment="Webhook URL")
+    webhook_secret = Column(String(500), comment="Webhook签名密钥(HMAC-SHA256)")
     config = Column(JSON, comment="其他配置(JSON)")
 
     # 同步配置
