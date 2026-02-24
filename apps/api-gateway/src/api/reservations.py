@@ -96,7 +96,10 @@ async def create_reservation(
     current_user: User = Depends(get_current_active_user),
 ):
     """创建预约"""
+    from datetime import datetime as dt
+    reservation_id = f"RES_{req.reservation_date.strftime('%Y%m%d')}_{str(uuid.uuid4())[:8].upper()}"
     r = Reservation(
+        id=reservation_id,
         store_id=req.store_id,
         customer_name=req.customer_name,
         customer_phone=req.customer_phone,
