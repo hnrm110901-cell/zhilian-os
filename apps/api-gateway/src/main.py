@@ -25,6 +25,7 @@ from src.api import compliance
 from src.api import quality
 from src.api import scheduler
 from src.api import agent_memory
+from src.api import event_sourcing
 from src.middleware.monitoring import MonitoringMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
 from src.middleware.audit_log import AuditLogMiddleware
@@ -454,6 +455,7 @@ app.include_router(compliance.router)
 app.include_router(quality.router)
 app.include_router(scheduler.router, tags=["scheduler"])
 app.include_router(agent_memory.router, tags=["agent_memory"])
+app.include_router(event_sourcing.router, tags=["event_sourcing"])
 
 
 @app.on_event("startup")

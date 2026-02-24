@@ -80,33 +80,56 @@ def process_neural_event(
         处理结果
     """
     async def _run():
-        try:
-            from datetime import datetime
-            from ..services.vector_db_service import vector_db_service
+        from datetime import datetime
+        from ..services.vector_db_service import vector_db_service
+        from ..core.database import AsyncSessionLocal
+        from ..models.neural_event_log import NeuralEventLog, EventProcessingStatus
 
-            # 构建事件对象
-            event = {
+        # 1. 写入 DB — 标记为 processing
+        async with AsyncSessionLocal() as session:
+            log = NeuralEventLog(
+                event_id=event_id,
+                celery_task_id=self.request.id,
+                event_type=event_type,
+                event_source=event_source,
+                store_id=store_id,
+                priority=priority,
+                data=data,
+                processing_status=EventProcessingStatus.PROCESSING,
+                queued_at=datetime.utcnow(),
+                started_at=datetime.utcnow(),
+            )
+            session.add(log)
+            await session.commit()
+
+        logger.info(
+            "开始处理神经系统事件",
+            event_id=event_id,
+            event_type=event_type,
+            store_id=store_id,
+        )
+
+        actions_taken = []
+        downstream_tasks = []
+        vector_indexed = False
+        wechat_sent = False
+
+        try:
+            # 2. 向量化存储
+            event_payload = {
                 "event_id": event_id,
                 "event_type": event_type,
                 "event_source": event_source,
-                "timestamp": datetime.now(),
+                "timestamp": datetime.utcnow(),
                 "store_id": store_id,
                 "data": data,
                 "priority": priority,
-                "processed": False,
             }
+            await vector_db_service.index_event(event_payload)
+            vector_indexed = True
+            actions_taken.append("vector_indexed")
 
-            logger.info(
-                "开始处理神经系统事件",
-                event_id=event_id,
-                event_type=event_type,
-                store_id=store_id,
-            )
-
-            # 1. 向量化存储
-            await vector_db_service.index_event(event)
-
-            # 2. 触发企微推送（如果配置了触发规则）
+            # 3. 触发企微推送
             from ..services.wechat_trigger_service import wechat_trigger_service
             try:
                 await wechat_trigger_service.trigger_push(
@@ -114,43 +137,60 @@ def process_neural_event(
                     event_data=data,
                     store_id=store_id,
                 )
+                wechat_sent = True
+                actions_taken.append("wechat_sent")
             except Exception as e:
-                # 企微推送失败不影响主流程
-                logger.warning(
-                    "企微推送触发失败",
-                    event_type=event_type,
-                    error=str(e),
-                )
+                logger.warning("企微推送触发失败", event_type=event_type, error=str(e))
 
-            # 3. 根据事件类型调用相应的处理任务
+            # 4. 根据事件类型触发下游任务
             if event_type.startswith("order."):
-                index_order_to_vector_db.delay(data)
+                t = index_order_to_vector_db.delay(data)
+                downstream_tasks.append({"task_name": "index_order_to_vector_db", "task_id": t.id})
+                actions_taken.append("dispatched:index_order_to_vector_db")
             elif event_type.startswith("dish."):
-                index_dish_to_vector_db.delay(data)
+                t = index_dish_to_vector_db.delay(data)
+                downstream_tasks.append({"task_name": "index_dish_to_vector_db", "task_id": t.id})
+                actions_taken.append("dispatched:index_dish_to_vector_db")
 
-            # 4. 标记为已处理
-            event["processed"] = True
+            processed_at = datetime.utcnow()
 
-            logger.info(
-                "神经系统事件处理完成",
-                event_id=event_id,
-                event_type=event_type,
-            )
+            # 5. 写回 DB — 标记为 completed
+            async with AsyncSessionLocal() as session:
+                db_log = await session.get(NeuralEventLog, event_id)
+                if db_log:
+                    db_log.processing_status = EventProcessingStatus.COMPLETED
+                    db_log.vector_indexed = vector_indexed
+                    db_log.wechat_sent = wechat_sent
+                    db_log.downstream_tasks = downstream_tasks
+                    db_log.actions_taken = actions_taken
+                    db_log.processed_at = processed_at
+                    await session.commit()
 
+            logger.info("神经系统事件处理完成", event_id=event_id, event_type=event_type)
             return {
                 "success": True,
                 "event_id": event_id,
-                "processed_at": datetime.now().isoformat(),
+                "processed_at": processed_at.isoformat(),
+                "actions_taken": actions_taken,
             }
 
         except Exception as e:
-            logger.error(
-                "神经系统事件处理失败",
-                event_id=event_id,
-                error=str(e),
-                exc_info=e,
-            )
-            # 重试任务
+            logger.error("神经系统事件处理失败", event_id=event_id, error=str(e), exc_info=e)
+            # 写回 DB — 标记为 failed / retrying
+            try:
+                is_last_retry = self.request.retries >= self.max_retries
+                async with AsyncSessionLocal() as session:
+                    db_log = await session.get(NeuralEventLog, event_id)
+                    if db_log:
+                        db_log.processing_status = (
+                            EventProcessingStatus.FAILED if is_last_retry
+                            else EventProcessingStatus.RETRYING
+                        )
+                        db_log.error_message = str(e)
+                        db_log.retry_count = self.request.retries + 1
+                        await session.commit()
+            except Exception:
+                pass
             raise self.retry(exc=e)
 
     return asyncio.run(_run())
