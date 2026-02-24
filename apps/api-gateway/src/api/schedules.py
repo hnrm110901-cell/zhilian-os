@@ -15,7 +15,8 @@ from ..models.schedule import Schedule, Shift
 from ..models.user import User, UserRole
 from ..repositories import ScheduleRepository
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, and_
+from sqlalchemy.orm import selectinload
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -64,9 +65,8 @@ async def list_schedules(
     current_user: User = Depends(get_current_active_user),
 ):
     """获取排班列表"""
-    from sqlalchemy import and_
     result = await session.execute(
-        select(Schedule).where(
+        select(Schedule).options(selectinload(Schedule.shifts)).where(
             and_(
                 Schedule.store_id == store_id,
                 Schedule.schedule_date >= start_date,
@@ -85,7 +85,9 @@ async def get_schedule(
     current_user: User = Depends(get_current_active_user),
 ):
     """获取排班详情"""
-    result = await session.execute(select(Schedule).where(Schedule.id == schedule_id))
+    result = await session.execute(
+        select(Schedule).options(selectinload(Schedule.shifts)).where(Schedule.id == schedule_id)
+    )
     schedule = result.scalar_one_or_none()
     if not schedule:
         raise HTTPException(status_code=404, detail="排班不存在")
@@ -123,7 +125,10 @@ async def create_schedule(
         session.add(shift)
 
     await session.commit()
-    await session.refresh(schedule)
+    result2 = await session.execute(
+        select(Schedule).options(selectinload(Schedule.shifts)).where(Schedule.id == schedule.id)
+    )
+    schedule = result2.scalar_one()
     logger.info("schedule_created", schedule_id=str(schedule.id), date=str(req.schedule_date))
     return _to_schedule_response(schedule)
 
@@ -135,14 +140,15 @@ async def publish_schedule(
     current_user: User = Depends(require_role(UserRole.STORE_MANAGER)),
 ):
     """发布排班"""
-    result = await session.execute(select(Schedule).where(Schedule.id == schedule_id))
+    result = await session.execute(
+        select(Schedule).options(selectinload(Schedule.shifts)).where(Schedule.id == schedule_id)
+    )
     schedule = result.scalar_one_or_none()
     if not schedule:
         raise HTTPException(status_code=404, detail="排班不存在")
     schedule.is_published = True
     schedule.published_by = str(current_user.id)
     await session.commit()
-    await session.refresh(schedule)
     return _to_schedule_response(schedule)
 
 
