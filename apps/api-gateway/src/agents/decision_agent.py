@@ -84,7 +84,7 @@ class DecisionAgent(LLMEnhancedAgent):
                 top_k=int(os.getenv("RAG_DECISION_TOP_K", "8"))
             )
 
-            return self.format_response(
+            result = self.format_response(
                 success=True,
                 data={
                     "analysis": rag_result["response"],
@@ -106,6 +106,17 @@ class DecisionAgent(LLMEnhancedAgent):
                     "deviation_pct": deviation,
                 },
             )
+
+            # Publish to shared memory bus so peer agents can react
+            await self.publish_finding(
+                store_id=store_id,
+                action="revenue_anomaly",
+                summary=f"营收偏差 {deviation:.1f}%，当前 ¥{current_revenue} vs 预期 ¥{expected_revenue}",
+                confidence=result.confidence,
+                data={"deviation": deviation, "current": str(current_revenue), "expected": str(expected_revenue)},
+            )
+
+            return result
 
         except Exception as e:
             logger.error(

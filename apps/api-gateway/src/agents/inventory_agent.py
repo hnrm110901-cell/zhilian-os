@@ -147,7 +147,7 @@ class InventoryAgent(LLMEnhancedAgent):
             )
 
             ctx_count = rag_result["metadata"]["context_count"]
-            return self.format_response(
+            result = self.format_response(
                 success=True,
                 data={
                     "alert": rag_result["response"],
@@ -161,6 +161,17 @@ class InventoryAgent(LLMEnhancedAgent):
                 confidence=min(0.9, 0.45 + ctx_count * 0.05),
                 source_data={"store_id": store_id, "inventory_count": len(current_inventory), "threshold_hours": threshold_hours},
             )
+
+            # Publish to shared memory bus so peer agents (e.g. DecisionAgent) can react
+            await self.publish_finding(
+                store_id=store_id,
+                action="low_stock_alert",
+                summary=f"{len(current_inventory)} 种菜品库存不足，{threshold_hours}h 内存在售罄风险",
+                confidence=result.confidence,
+                data={"inventory_count": len(current_inventory), "threshold_hours": threshold_hours},
+            )
+
+            return result
 
         except Exception as e:
             logger.error("Low stock alert check failed", store_id=store_id, error=str(e), exc_info=e)

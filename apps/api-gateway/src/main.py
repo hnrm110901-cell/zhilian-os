@@ -24,6 +24,7 @@ from src.api import ai_evolution_dashboard
 from src.api import compliance
 from src.api import quality
 from src.api import scheduler
+from src.api import agent_memory
 from src.middleware.monitoring import MonitoringMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
 from src.middleware.audit_log import AuditLogMiddleware
@@ -452,6 +453,7 @@ app.include_router(ai_evolution_dashboard.router, tags=["ai_evolution"])
 app.include_router(compliance.router)
 app.include_router(quality.router)
 app.include_router(scheduler.router, tags=["scheduler"])
+app.include_router(agent_memory.router, tags=["agent_memory"])
 
 
 @app.on_event("startup")
