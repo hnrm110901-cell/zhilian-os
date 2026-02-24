@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'rls_001_tenant_isolation'
-down_revision = None  # 需要根据实际情况设置
+down_revision = 'm01_sync_phase1_models'
 branch_labels = None
 depends_on = None
 
