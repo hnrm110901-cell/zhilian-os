@@ -11,7 +11,7 @@ import os
 
 from src.core.database import get_db_session
 from src.models.reconciliation import ReconciliationRecord, ReconciliationStatus
-from src.models.order import Order
+from src.models.order import Order, OrderStatus
 from src.models.store import Store
 from src.services.neural_system import neural_system
 
@@ -283,7 +283,7 @@ class ReconcileService:
                         Order.store_id == store_id,
                         Order.created_at >= start_datetime,
                         Order.created_at <= end_datetime,
-                        Order.status == "completed"  # 只统计已完成的订单
+                        Order.status == OrderStatus.COMPLETED.value  # 只统计已完成的订单
                     )
                 )
             )

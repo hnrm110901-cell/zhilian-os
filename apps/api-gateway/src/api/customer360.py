@@ -9,6 +9,7 @@ import structlog
 from ..services.customer360_service import customer360_service
 from ..core.dependencies import get_current_user
 from ..models.user import User
+from ..utils.pii import mask_phone
 
 router = APIRouter(prefix="/api/v1/customer360", tags=["Customer360"])
 logger = structlog.get_logger()
@@ -182,7 +183,7 @@ async def search_customers(
 
         results = [
             {
-                "phone": r.customer_phone,
+                "phone": mask_phone(r.customer_phone),
                 "name": r.customer_name,
                 "order_count": r.order_count,
                 "total_spend": round((r.total_spend or 0) / 100, 2),

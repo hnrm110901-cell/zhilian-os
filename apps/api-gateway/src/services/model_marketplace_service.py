@@ -18,7 +18,7 @@ from sqlalchemy import select, func
 import structlog
 import uuid
 from src.core.database import get_db_session
-from src.models.ai_model import AIModel, ModelPurchaseRecord, DataContributionRecord
+from src.models.ai_model import AIModel, ModelPurchaseRecord, DataContributionRecord, ModelStatus, PurchaseStatus
 
 logger = structlog.get_logger()
 
@@ -118,7 +118,7 @@ class ModelMarketplaceService:
         )
 
         async with get_db_session() as session:
-            stmt = select(AIModel).where(AIModel.status == "active")
+            stmt = select(AIModel).where(AIModel.status == ModelStatus.ACTIVE)
             if model_type:
                 stmt = stmt.where(AIModel.model_type == model_type.value)
             if model_level:
@@ -262,7 +262,7 @@ class ModelMarketplaceService:
             result = await session.execute(
                 select(ModelPurchaseRecord).where(
                     ModelPurchaseRecord.store_id == store_id,
-                    ModelPurchaseRecord.status == "active",
+                    ModelPurchaseRecord.status == PurchaseStatus.ACTIVE,
                 )
             )
             rows = result.scalars().all()
@@ -323,7 +323,7 @@ class ModelMarketplaceService:
             total_stores = int(total_stores_result.scalar() or 0)
 
             total_models_result = await session.execute(
-                select(func.count(AIModel.id)).where(AIModel.status == "active")
+                select(func.count(AIModel.id)).where(AIModel.status == ModelStatus.ACTIVE)
             )
             total_models = int(total_models_result.scalar() or 0)
 
@@ -333,7 +333,7 @@ class ModelMarketplaceService:
             total_data_points = int(total_data_result.scalar() or 0)
 
             avg_accuracy_result = await session.execute(
-                select(func.avg(AIModel.accuracy)).where(AIModel.status == "active")
+                select(func.avg(AIModel.accuracy)).where(AIModel.status == ModelStatus.ACTIVE)
             )
             avg_accuracy = round(float(avg_accuracy_result.scalar() or 0), 1)
 

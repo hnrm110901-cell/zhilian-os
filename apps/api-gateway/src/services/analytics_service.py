@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_
 
 from src.models import Order, OrderItem, InventoryItem, FinancialTransaction, Store
+from src.models.order import OrderStatus
 from src.core.exceptions import NotFoundError, ValidationError
 
 logger = structlog.get_logger()
@@ -231,7 +232,7 @@ class AnalyticsService:
                 Order.store_id == store_id,
                 Order.created_at >= datetime.combine(start_date, datetime.min.time()),
                 Order.created_at <= datetime.combine(end_date, datetime.max.time()),
-                Order.status == "completed"
+                Order.status == OrderStatus.COMPLETED.value
             )
         )
 

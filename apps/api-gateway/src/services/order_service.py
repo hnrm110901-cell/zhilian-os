@@ -210,9 +210,9 @@ class OrderService:
 
                 order.status = OrderStatus(status)
 
-                if status == "confirmed":
+                if status == OrderStatus.CONFIRMED.value:
                     order.confirmed_at = datetime.utcnow()
-                elif status == "completed":
+                elif status == OrderStatus.COMPLETED.value:
                     order.completed_at = datetime.utcnow()
 
                 if notes:

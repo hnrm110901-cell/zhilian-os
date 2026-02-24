@@ -343,13 +343,13 @@ class IntelligentRecommendationEngine:
                 "metrics": {},
             }
         try:
-            from ..models.order import Order
+            from ..models.order import Order, OrderStatus
             count_result = await self.db.execute(
                 select(func.count()).select_from(Order).where(
                     Order.store_id == store_id,
                     Order.order_time >= start_date,
                     Order.order_time <= end_date,
-                    Order.status == "completed",
+                    Order.status == OrderStatus.COMPLETED.value,
                 )
             )
             total_orders = count_result.scalar() or 0
@@ -379,12 +379,12 @@ class IntelligentRecommendationEngine:
         if not self.db:
             return []
         try:
-            from ..models.order import Order, OrderItem
+            from ..models.order import Order, OrderItem, OrderStatus
             result = await self.db.execute(
                 select(Order).where(
                     Order.store_id == store_id,
                     Order.customer_phone == customer_id,
-                    Order.status == "completed",
+                    Order.status == OrderStatus.COMPLETED.value,
                 ).order_by(Order.order_time.desc()).limit(20)
             )
             orders = result.scalars().all()
@@ -431,7 +431,7 @@ class IntelligentRecommendationEngine:
         if not self.db:
             return False
         try:
-            from ..models.order import Order, OrderItem
+            from ..models.order import Order, OrderItem, OrderStatus
             cutoff = datetime.now() - timedelta(days=7)
             result = await self.db.execute(
                 select(OrderItem).join(Order, Order.id == OrderItem.order_id).where(
@@ -453,16 +453,16 @@ class IntelligentRecommendationEngine:
         if not self.db:
             return 0.5
         try:
-            from ..models.order import Order, OrderItem
+            from ..models.order import Order, OrderItem, OrderStatus
             # Count how many completed orders for this store include this dish
             dish_count = await self.db.execute(
                 select(func.count()).select_from(OrderItem).join(
                     Order, Order.id == OrderItem.order_id
-                ).where(OrderItem.item_id == dish_id, Order.status == "completed")
+                ).where(OrderItem.item_id == dish_id, Order.status == OrderStatus.COMPLETED.value)
             )
             dish_orders = dish_count.scalar() or 0
             total_count = await self.db.execute(
-                select(func.count()).select_from(Order).where(Order.status == "completed")
+                select(func.count()).select_from(Order).where(Order.status == OrderStatus.COMPLETED.value)
             )
             total_orders = total_count.scalar() or 0
             if total_orders == 0:
