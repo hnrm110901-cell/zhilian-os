@@ -15,7 +15,8 @@ from ..core.permissions import Permission
 from ..models import User
 from ..models.decision_log import DecisionLog, DecisionType, DecisionStatus, DecisionOutcome
 from ..services.approval_service import approval_service
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 logger = structlog.get_logger()
 
@@ -109,7 +110,7 @@ class DecisionStatisticsResponse(BaseModel):
 async def create_approval(
     request: CreateApprovalRequest,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     创建审批请求
@@ -158,7 +159,7 @@ async def create_approval(
 async def get_pending_approvals(
     store_id: Optional[str] = Query(None, description="门店ID"),
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     获取待审批决策列表
@@ -190,7 +191,7 @@ async def get_pending_approvals(
 async def get_approval_detail(
     decision_id: str,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     获取审批详情
@@ -198,7 +199,8 @@ async def get_approval_detail(
     查看特定决策的完整信息，包括AI建议、审批历史等。
     """
     try:
-        decision_log = db.query(DecisionLog).filter(DecisionLog.id == decision_id).first()
+        result = await db.execute(select(DecisionLog).where(DecisionLog.id == decision_id))
+        decision_log = result.scalar_one_or_none()
         if not decision_log:
             raise HTTPException(status_code=404, detail="Decision not found")
 
@@ -216,7 +218,7 @@ async def approve_decision(
     decision_id: str,
     request: ApproveDecisionRequest,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     批准决策
@@ -251,7 +253,7 @@ async def reject_decision(
     decision_id: str,
     request: RejectDecisionRequest,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     拒绝决策
@@ -288,7 +290,7 @@ async def modify_decision(
     decision_id: str,
     request: ModifyDecisionRequest,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     修改决策
@@ -325,7 +327,7 @@ async def record_decision_outcome(
     decision_id: str,
     request: RecordOutcomeRequest,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     记录决策结果
@@ -371,7 +373,7 @@ async def get_decision_statistics(
     start_date: Optional[datetime] = Query(None, description="开始日期"),
     end_date: Optional[datetime] = Query(None, description="结束日期"),
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     获取决策统计数据
@@ -403,7 +405,7 @@ async def wechat_approval_callback(
     user_id: str = Query(..., description="用户ID"),
     feedback: Optional[str] = Query(None, description="反馈意见"),
     modified_data: Optional[Dict[str, Any]] = None,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     企微审批回调

@@ -8,12 +8,12 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any
 import os
 import structlog
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from ..models.decision_log import DecisionLog, DecisionType, DecisionStatus, DecisionOutcome
 from ..models.store import Store
 from ..models.user import User
-from ..core.database import get_db
 from .wechat_alert_service import WeChatAlertService
 
 logger = structlog.get_logger()
@@ -37,7 +37,7 @@ class ApprovalService:
         ai_alternatives: Optional[List[Dict[str, Any]]] = None,
         context_data: Optional[Dict[str, Any]] = None,
         rag_context: Optional[Dict[str, Any]] = None,
-        db: Session = None
+        db: AsyncSession = None
     ) -> DecisionLog:
         """
         创建审批请求
@@ -79,8 +79,8 @@ class ApprovalService:
             # 保存到数据库
             if db:
                 db.add(decision_log)
-                db.commit()
-                db.refresh(decision_log)
+                await db.commit()
+                await db.refresh(decision_log)
 
             logger.info(
                 "approval_request_created",
@@ -98,23 +98,27 @@ class ApprovalService:
         except Exception as e:
             logger.error("create_approval_request_failed", error=str(e))
             if db:
-                db.rollback()
+                await db.rollback()
             raise
 
-    async def _send_approval_notification(self, decision_log: DecisionLog, db: Session):
+    async def _send_approval_notification(self, decision_log: DecisionLog, db: AsyncSession):
         """发送企微审批通知"""
         try:
             # 获取门店信息
-            store = db.query(Store).filter(Store.id == decision_log.store_id).first()
+            result = await db.execute(select(Store).where(Store.id == decision_log.store_id))
+            store = result.scalar_one_or_none()
             if not store:
                 logger.warning("store_not_found", store_id=decision_log.store_id)
                 return
 
             # 获取店长信息
-            managers = db.query(User).filter(
-                User.store_id == decision_log.store_id,
-                User.role.in_(["store_manager", "assistant_manager"])
-            ).all()
+            result = await db.execute(
+                select(User).where(
+                    User.store_id == decision_log.store_id,
+                    User.role.in_(["store_manager", "assistant_manager"])
+                )
+            )
+            managers = result.scalars().all()
 
             if not managers:
                 logger.warning("no_managers_found", store_id=decision_log.store_id)
@@ -180,7 +184,7 @@ class ApprovalService:
         decision_id: str,
         manager_id: str,
         manager_feedback: Optional[str] = None,
-        db: Session = None
+        db: AsyncSession = None
     ) -> DecisionLog:
         """
         批准决策
@@ -195,7 +199,8 @@ class ApprovalService:
             DecisionLog: 更新后的决策日志
         """
         try:
-            decision_log = db.query(DecisionLog).filter(DecisionLog.id == decision_id).first()
+            result = await db.execute(select(DecisionLog).where(DecisionLog.id == decision_id))
+            decision_log = result.scalar_one_or_none()
             if not decision_log:
                 raise ValueError(f"Decision log not found: {decision_id}")
 
@@ -216,8 +221,8 @@ class ApprovalService:
             })
             decision_log.approval_chain = approval_chain
 
-            db.commit()
-            db.refresh(decision_log)
+            await db.commit()
+            await db.refresh(decision_log)
 
             logger.info(
                 "decision_approved",
@@ -233,7 +238,7 @@ class ApprovalService:
         except Exception as e:
             logger.error("approve_decision_failed", error=str(e))
             if db:
-                db.rollback()
+                await db.rollback()
             raise
 
     async def reject_decision(
@@ -241,7 +246,7 @@ class ApprovalService:
         decision_id: str,
         manager_id: str,
         manager_feedback: str,
-        db: Session = None
+        db: AsyncSession = None
     ) -> DecisionLog:
         """
         拒绝决策
@@ -256,7 +261,8 @@ class ApprovalService:
             DecisionLog: 更新后的决策日志
         """
         try:
-            decision_log = db.query(DecisionLog).filter(DecisionLog.id == decision_id).first()
+            result = await db.execute(select(DecisionLog).where(DecisionLog.id == decision_id))
+            decision_log = result.scalar_one_or_none()
             if not decision_log:
                 raise ValueError(f"Decision log not found: {decision_id}")
 
@@ -279,8 +285,8 @@ class ApprovalService:
             # 标记为训练数据（拒绝的决策对学习很有价值）
             decision_log.is_training_data = 1
 
-            db.commit()
-            db.refresh(decision_log)
+            await db.commit()
+            await db.refresh(decision_log)
 
             logger.info(
                 "decision_rejected",
@@ -294,7 +300,7 @@ class ApprovalService:
         except Exception as e:
             logger.error("reject_decision_failed", error=str(e))
             if db:
-                db.rollback()
+                await db.rollback()
             raise
 
     async def modify_decision(
@@ -303,7 +309,7 @@ class ApprovalService:
         manager_id: str,
         modified_decision: Dict[str, Any],
         manager_feedback: Optional[str] = None,
-        db: Session = None
+        db: AsyncSession = None
     ) -> DecisionLog:
         """
         修改决策
@@ -319,7 +325,8 @@ class ApprovalService:
             DecisionLog: 更新后的决策日志
         """
         try:
-            decision_log = db.query(DecisionLog).filter(DecisionLog.id == decision_id).first()
+            result = await db.execute(select(DecisionLog).where(DecisionLog.id == decision_id))
+            decision_log = result.scalar_one_or_none()
             if not decision_log:
                 raise ValueError(f"Decision log not found: {decision_id}")
 
@@ -345,8 +352,8 @@ class ApprovalService:
             # 标记为训练数据（修改的决策对学习很有价值）
             decision_log.is_training_data = 1
 
-            db.commit()
-            db.refresh(decision_log)
+            await db.commit()
+            await db.refresh(decision_log)
 
             logger.info(
                 "decision_modified",
@@ -362,10 +369,10 @@ class ApprovalService:
         except Exception as e:
             logger.error("modify_decision_failed", error=str(e))
             if db:
-                db.rollback()
+                await db.rollback()
             raise
 
-    async def _execute_decision(self, decision_log: DecisionLog, db: Session):
+    async def _execute_decision(self, decision_log: DecisionLog, db: AsyncSession):
         """执行决策"""
         try:
             # 根据决策类型执行相应操作
@@ -410,7 +417,7 @@ class ApprovalService:
 
             decision_log.decision_status = DecisionStatus.EXECUTED
             decision_log.executed_at = datetime.utcnow()
-            db.commit()
+            await db.commit()
 
             logger.info(
                 "decision_executed",
@@ -429,7 +436,7 @@ class ApprovalService:
         actual_result: Dict[str, Any],
         expected_result: Dict[str, Any],
         business_impact: Optional[Dict[str, Any]] = None,
-        db: Session = None
+        db: AsyncSession = None
     ) -> DecisionLog:
         """
         记录决策结果
@@ -446,7 +453,8 @@ class ApprovalService:
             DecisionLog: 更新后的决策日志
         """
         try:
-            decision_log = db.query(DecisionLog).filter(DecisionLog.id == decision_id).first()
+            result = await db.execute(select(DecisionLog).where(DecisionLog.id == decision_id))
+            decision_log = result.scalar_one_or_none()
             if not decision_log:
                 raise ValueError(f"Decision log not found: {decision_id}")
 
@@ -471,8 +479,8 @@ class ApprovalService:
             # 标记为训练数据
             decision_log.is_training_data = 1
 
-            db.commit()
-            db.refresh(decision_log)
+            await db.commit()
+            await db.refresh(decision_log)
 
             logger.info(
                 "decision_outcome_recorded",
@@ -486,7 +494,7 @@ class ApprovalService:
         except Exception as e:
             logger.error("record_decision_outcome_failed", error=str(e))
             if db:
-                db.rollback()
+                await db.rollback()
             raise
 
     def _calculate_trust_score(self, decision_log: DecisionLog) -> float:
@@ -529,7 +537,7 @@ class ApprovalService:
         self,
         store_id: Optional[str] = None,
         manager_id: Optional[str] = None,
-        db: Session = None
+        db: AsyncSession = None
     ) -> List[DecisionLog]:
         """
         获取待审批决策列表
@@ -543,22 +551,24 @@ class ApprovalService:
             List[DecisionLog]: 待审批决策列表
         """
         try:
-            query = db.query(DecisionLog).filter(
+            stmt = select(DecisionLog).where(
                 DecisionLog.decision_status == DecisionStatus.PENDING
             )
 
             if store_id:
-                query = query.filter(DecisionLog.store_id == store_id)
+                stmt = stmt.where(DecisionLog.store_id == store_id)
 
             if manager_id:
                 # 获取店长管理的门店
-                stores = db.query(Store).filter(Store.manager_id == manager_id).all()
-                store_ids = [store.id for store in stores]
-                query = query.filter(DecisionLog.store_id.in_(store_ids))
+                stores_result = await db.execute(
+                    select(Store.id).where(Store.manager_id == manager_id)
+                )
+                store_ids = [row[0] for row in stores_result.all()]
+                stmt = stmt.where(DecisionLog.store_id.in_(store_ids))
 
-            decisions = query.order_by(DecisionLog.created_at.desc()).all()
-
-            return decisions
+            stmt = stmt.order_by(DecisionLog.created_at.desc())
+            result = await db.execute(stmt)
+            return result.scalars().all()
 
         except Exception as e:
             logger.error("get_pending_approvals_failed", error=str(e))
@@ -569,7 +579,7 @@ class ApprovalService:
         store_id: Optional[str] = None,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        db: Session = None
+        db: AsyncSession = None
     ) -> Dict[str, Any]:
         """
         获取决策统计数据
@@ -584,18 +594,17 @@ class ApprovalService:
             Dict: 统计数据
         """
         try:
-            query = db.query(DecisionLog)
+            stmt = select(DecisionLog)
 
             if store_id:
-                query = query.filter(DecisionLog.store_id == store_id)
-
+                stmt = stmt.where(DecisionLog.store_id == store_id)
             if start_date:
-                query = query.filter(DecisionLog.created_at >= start_date)
-
+                stmt = stmt.where(DecisionLog.created_at >= start_date)
             if end_date:
-                query = query.filter(DecisionLog.created_at <= end_date)
+                stmt = stmt.where(DecisionLog.created_at <= end_date)
 
-            decisions = query.all()
+            result = await db.execute(stmt)
+            decisions = result.scalars().all()
 
             # 统计数据
             total = len(decisions)
