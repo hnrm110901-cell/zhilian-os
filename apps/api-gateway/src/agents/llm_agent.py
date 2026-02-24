@@ -2,6 +2,7 @@
 增强的Agent基类 - 支持LLM集成
 """
 from typing import Dict, Any, Optional
+from dataclasses import dataclass, field
 import json
 import structlog
 
@@ -11,6 +12,48 @@ from ..core.config import settings
 from ..core.monitoring import error_monitor, ErrorSeverity, ErrorCategory
 
 logger = structlog.get_logger()
+
+
+@dataclass
+class AgentResult:
+    """
+    Agent 输出标准结构 — 每条决策必须可追溯
+
+    Attributes:
+        success:     是否成功
+        data:        业务数据
+        message:     人类可读消息
+        reasoning:   推理过程（必填）
+        confidence:  置信度 0.0-1.0（必填）
+        source_data: 原始输入数据快照（必填）
+    """
+    success: bool
+    data: Any
+    message: str = ""
+    reasoning: str = ""
+    confidence: float = 0.0
+    source_data: Dict[str, Any] = field(default_factory=dict)
+    recommendations: Optional[list] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        result = {
+            "success": self.success,
+            "data": self.data,
+            "message": self.message,
+            "reasoning": self.reasoning,
+            "confidence": self.confidence,
+            "source_data": self.source_data,
+        }
+        if self.recommendations is not None:
+            result["recommendations"] = self.recommendations
+        return result
+
+    # 保持向后兼容：支持 result["success"] 等字典访问
+    def __getitem__(self, key: str):
+        return self.to_dict()[key]
+
+    def get(self, key: str, default=None):
+        return self.to_dict().get(key, default)
 
 
 class LLMEnhancedAgent:
@@ -177,27 +220,29 @@ class LLMEnhancedAgent:
         success: bool,
         data: Any,
         message: str = "",
-        recommendations: Optional[list] = None
-    ) -> Dict[str, Any]:
+        recommendations: Optional[list] = None,
+        reasoning: str = "",
+        confidence: float = 0.0,
+        source_data: Optional[Dict[str, Any]] = None,
+    ) -> AgentResult:
         """
-        格式化Agent响应
+        格式化 Agent 响应，返回带可追溯字段的 AgentResult
 
         Args:
-            success: 是否成功
-            data: 数据
-            message: 消息
+            success:     是否成功
+            data:        业务数据
+            message:     消息
             recommendations: 建议列表
-
-        Returns:
-            格式化的响应
+            reasoning:   推理过程（应描述决策依据）
+            confidence:  置信度 0.0-1.0
+            source_data: 原始输入数据快照
         """
-        response = {
-            "success": success,
-            "data": data,
-            "message": message,
-        }
-
-        if recommendations:
-            response["recommendations"] = recommendations
-
-        return response
+        return AgentResult(
+            success=success,
+            data=data,
+            message=message,
+            reasoning=reasoning,
+            confidence=confidence,
+            source_data=source_data or {},
+            recommendations=recommendations,
+        )
