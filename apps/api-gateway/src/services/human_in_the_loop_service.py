@@ -421,32 +421,22 @@ AI推理: {request.reasoning}
         store_id: str
     ) -> TrustPhase:
         """
-        获取门店的信任阶段
+        获取门店的信任阶段（动态计算）
 
-        - 观察期（1-3个月）: AI只提建议，不执行
-        - 辅助期（3-6个月）: AI执行低风险操作，高风险需审批
-        - 自主期（6个月+）: AI自主执行大部分操作，仅极高风险需审批
+        Phase is determined by historical accuracy from DecisionLog, not just time elapsed.
+        - 观察期: insufficient data or low adoption rate
+        - 辅助期: moderate accuracy, building trust
+        - 自主期: high adoption + success rate over minimum observation window
         """
-        from src.core.database import get_db_session
-        from src.models.store import Store
+        from src.services.dynamic_trust_service import compute_dynamic_phase
 
-        async with get_db_session() as session:
-            result = await session.execute(
-                select(Store.created_at).where(Store.id == store_id)
-            )
-            created_at = result.scalar_one_or_none()
-
-        if created_at:
-            days_since_onboarding = (date.today() - created_at.date()).days
-        else:
-            days_since_onboarding = 0
-
-        if days_since_onboarding < int(os.getenv("HITL_OBSERVATION_DAYS", "90")):
-            return TrustPhase.OBSERVATION
-        elif days_since_onboarding < int(os.getenv("HITL_ASSISTANCE_DAYS", "180")):
-            return TrustPhase.ASSISTANCE
-        else:
-            return TrustPhase.AUTONOMOUS
+        result = await compute_dynamic_phase(store_id)
+        phase_map = {
+            "OBSERVATION": TrustPhase.OBSERVATION,
+            "ASSISTANCE": TrustPhase.ASSISTANCE,
+            "AUTONOMOUS": TrustPhase.AUTONOMOUS,
+        }
+        return phase_map.get(result["phase"], TrustPhase.OBSERVATION)
 
     async def log_audit(
         self,

@@ -164,6 +164,37 @@ async def get_trust_phase(
     }
 
 
+@router.get("/trust-metrics/{store_id}")
+async def get_trust_metrics(
+    store_id: str,
+    days: int = 30,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    获取门店动态信任指标
+
+    返回驱动信任阶段计算的原始指标:
+    - adoption_rate: AI建议采纳率
+    - success_rate: 已完成决策的成功率
+    - avg_confidence: 平均AI置信度
+    - escalation_rate: 升级人工审批比例
+    - phase: 当前动态信任阶段及原因
+    """
+    from src.services.dynamic_trust_service import compute_dynamic_phase, compute_trust_metrics
+
+    phase_result = await compute_dynamic_phase(store_id)
+    metrics = await compute_trust_metrics(store_id, days=days)
+
+    return {
+        "store_id": store_id,
+        "phase": phase_result["phase"],
+        "phase_reason": phase_result["reason"],
+        "days_since_onboarding": phase_result["days_since_onboarding"],
+        "metrics": metrics,
+    }
+
+
 @router.get("/statistics/{store_id}")
 async def get_approval_statistics(
     store_id: str,
