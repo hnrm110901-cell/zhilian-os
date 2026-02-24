@@ -151,7 +151,7 @@ async def get_financial_metrics(
 @router.get("/reports/export")
 async def export_report(
     report_type: str = Query(..., description="报表类型: income_statement, cash_flow, transactions"),
-    format: str = Query("csv", description="导出格式: csv, pdf"),
+    format: str = Query("csv", description="导出格式: csv, pdf, xlsx"),
     start_date: date = Query(...),
     end_date: date = Query(...),
     store_id: Optional[int] = Query(None),
@@ -169,6 +169,7 @@ async def export_report(
     支持的格式:
     - csv: CSV格式
     - pdf: PDF格式
+    - xlsx: Excel格式
     """
     try:
         from datetime import datetime
@@ -235,6 +236,20 @@ async def export_report(
                 headers={
                     "Content-Disposition": f"attachment; filename={filename}"
                 }
+            )
+        elif format == "xlsx":
+            content = await report_export_service.export_to_xlsx(
+                report_type=report_type,
+                start_date=start_datetime,
+                end_date=end_datetime,
+                store_id=store_id,
+                db=db
+            )
+            filename = f"{report_type}_{start_date}_{end_date}.xlsx"
+            return Response(
+                content=content,
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                headers={"Content-Disposition": f"attachment; filename={filename}"}
             )
         else:
             raise HTTPException(status_code=400, detail=f"不支持的导出格式: {format}")

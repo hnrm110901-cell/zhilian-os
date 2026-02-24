@@ -33,6 +33,10 @@ from .decision_log import DecisionLog, DecisionType, DecisionStatus, DecisionOut
 from .compliance import ComplianceLicense, LicenseType, LicenseStatus
 from .quality import QualityInspection, InspectionStatus
 from .neural_event_log import NeuralEventLog, EventProcessingStatus
+from .dish import DishCategory, Dish, DishIngredient
+from .ai_model import AIModel, ModelPurchaseRecord, DataContributionRecord, ModelType, ModelLevel, ModelStatus, PurchaseStatus
+from .federated_learning import FLTrainingRound, FLModelUpload, RoundStatus
+from .marketing_campaign import MarketingCampaign
 
 __all__ = [
     "Base",
@@ -88,4 +92,18 @@ __all__ = [
     "InspectionStatus",
     "NeuralEventLog",
     "EventProcessingStatus",
+    "DishCategory",
+    "Dish",
+    "DishIngredient",
+    "AIModel",
+    "ModelPurchaseRecord",
+    "DataContributionRecord",
+    "ModelType",
+    "ModelLevel",
+    "ModelStatus",
+    "PurchaseStatus",
+    "FLTrainingRound",
+    "FLModelUpload",
+    "RoundStatus",
+    "MarketingCampaign",
 ]

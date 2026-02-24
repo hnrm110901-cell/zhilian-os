@@ -9,6 +9,14 @@ import csv
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 
+try:
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+    XLSX_AVAILABLE = True
+except ImportError:
+    XLSX_AVAILABLE = False
+
 from src.models.finance import FinancialTransaction, FinancialReport
 from src.services.finance_service import FinanceService
 
@@ -202,6 +210,190 @@ class ReportExportService:
             }
             for t in transactions
         ]
+
+    async def export_to_xlsx(
+        self,
+        report_type: str,
+        start_date: datetime,
+        end_date: datetime,
+        store_id: Optional[int] = None,
+        db: Optional[AsyncSession] = None
+    ) -> bytes:
+        """
+        导出报表为 Excel (xlsx) 格式
+
+        Args:
+            report_type: 报表类型 (income_statement, cash_flow, transactions)
+            start_date: 开始日期
+            end_date: 结束日期
+            store_id: 门店ID
+            db: 数据库会话
+
+        Returns:
+            xlsx 文件字节流
+        """
+        if not XLSX_AVAILABLE:
+            raise ImportError("请安装 openpyxl 库以支持 Excel 导出: pip install openpyxl")
+
+        finance_service = FinanceService(db)
+        wb = openpyxl.Workbook()
+        ws = wb.active
+
+        # 通用样式
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="2F5496", end_color="2F5496", fill_type="solid")
+        section_font = Font(bold=True)
+        section_fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+        center_align = Alignment(horizontal="center")
+        right_align = Alignment(horizontal="right")
+
+        if report_type == "income_statement":
+            data = await finance_service.get_income_statement(start_date, end_date, store_id, db)
+            ws.title = "损益表"
+            self._write_income_statement_xlsx(ws, data, start_date, end_date,
+                                               header_font, header_fill, section_font, section_fill,
+                                               center_align, right_align)
+        elif report_type == "cash_flow":
+            data = await finance_service.get_cash_flow_statement(start_date, end_date, store_id, db)
+            ws.title = "现金流量表"
+            self._write_cash_flow_xlsx(ws, data, start_date, end_date,
+                                        header_font, header_fill, section_font, section_fill,
+                                        center_align, right_align)
+        elif report_type == "transactions":
+            data = await self._get_transactions(start_date, end_date, store_id, db)
+            ws.title = "交易明细"
+            self._write_transactions_xlsx(ws, data, header_font, header_fill, right_align)
+        else:
+            raise ValueError(f"不支持的报表类型: {report_type}")
+
+        output = io.BytesIO()
+        wb.save(output)
+        return output.getvalue()
+
+    def _write_income_statement_xlsx(self, ws, data, start_date, end_date,
+                                      header_font, header_fill, section_font, section_fill,
+                                      center_align, right_align):
+        """写入损益表到 Excel 工作表"""
+        ws.column_dimensions["A"].width = 20
+        ws.column_dimensions["B"].width = 18
+
+        # 标题行
+        ws.merge_cells("A1:B1")
+        ws["A1"] = "损益表"
+        ws["A1"].font = Font(bold=True, size=14)
+        ws["A1"].alignment = center_align
+
+        ws.merge_cells("A2:B2")
+        ws["A2"] = f"期间: {start_date.date()} 至 {end_date.date()}"
+        ws["A2"].alignment = center_align
+
+        rows = [
+            ("收入", None, True),
+            ("营业收入", data["revenue"], False),
+            ("其他收入", data.get("other_income", 0), False),
+            ("总收入", data["total_revenue"], False),
+            (None, None, False),
+            ("成本", None, True),
+            ("营业成本", data["cost_of_goods_sold"], False),
+            ("毛利润", data["gross_profit"], False),
+            ("毛利率", f"{data['gross_profit_margin']:.2f}%", False),
+            (None, None, False),
+            ("费用", None, True),
+            ("人工成本", data["labor_cost"], False),
+            ("租金", data["rent"], False),
+            ("水电费", data["utilities"], False),
+            ("营销费用", data["marketing"], False),
+            ("其他费用", data["other_expenses"], False),
+            ("总费用", data["total_expenses"], False),
+            (None, None, False),
+            ("利润", None, True),
+            ("营业利润", data["operating_profit"], False),
+            ("营业利润率", f"{data['operating_profit_margin']:.2f}%", False),
+            ("净利润", data["net_profit"], False),
+            ("净利润率", f"{data['net_profit_margin']:.2f}%", False),
+        ]
+
+        for i, (label, value, is_section) in enumerate(rows, start=4):
+            if label is None:
+                continue
+            cell_a = ws.cell(row=i, column=1, value=label)
+            if is_section:
+                cell_a.font = section_font
+                cell_a.fill = section_fill
+                ws.cell(row=i, column=2).fill = section_fill
+            if value is not None:
+                cell_b = ws.cell(row=i, column=2, value=f"¥{value:,.2f}" if isinstance(value, (int, float)) else value)
+                cell_b.alignment = right_align
+
+    def _write_cash_flow_xlsx(self, ws, data, start_date, end_date,
+                               header_font, header_fill, section_font, section_fill,
+                               center_align, right_align):
+        """写入现金流量表到 Excel 工作表"""
+        ws.column_dimensions["A"].width = 22
+        ws.column_dimensions["B"].width = 18
+
+        ws.merge_cells("A1:B1")
+        ws["A1"] = "现金流量表"
+        ws["A1"].font = Font(bold=True, size=14)
+        ws["A1"].alignment = center_align
+
+        ws.merge_cells("A2:B2")
+        ws["A2"] = f"期间: {start_date.date()} 至 {end_date.date()}"
+        ws["A2"].alignment = center_align
+
+        rows = [
+            ("经营活动现金流", None, True),
+            ("销售收入", data["cash_from_sales"], False),
+            ("采购支出", data["cash_for_purchases"], False),
+            ("工资支出", data["cash_for_salaries"], False),
+            ("其他经营支出", data["cash_for_operations"], False),
+            ("经营活动净现金流", data["operating_cash_flow"], False),
+            (None, None, False),
+            ("投资活动现金流", None, True),
+            ("设备采购", data["cash_for_investments"], False),
+            ("投资活动净现金流", data["investing_cash_flow"], False),
+            (None, None, False),
+            ("筹资活动现金流", None, True),
+            ("融资收入", data["cash_from_financing"], False),
+            ("筹资活动净现金流", data["financing_cash_flow"], False),
+            (None, None, False),
+            ("现金净变动", data["net_cash_flow"], False),
+            ("期初现金", data["beginning_cash"], False),
+            ("期末现金", data["ending_cash"], False),
+        ]
+
+        for i, (label, value, is_section) in enumerate(rows, start=4):
+            if label is None:
+                continue
+            cell_a = ws.cell(row=i, column=1, value=label)
+            if is_section:
+                cell_a.font = section_font
+                cell_a.fill = section_fill
+                ws.cell(row=i, column=2).fill = section_fill
+            if value is not None:
+                cell_b = ws.cell(row=i, column=2, value=f"¥{value:,.2f}")
+                cell_b.alignment = right_align
+
+    def _write_transactions_xlsx(self, ws, transactions, header_font, header_fill, right_align):
+        """写入交易明细到 Excel 工作表"""
+        headers = ["日期", "类型", "分类", "金额", "描述", "门店ID", "参考编号"]
+        col_widths = [20, 12, 15, 15, 30, 12, 18]
+
+        for col, (header, width) in enumerate(zip(headers, col_widths), start=1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            ws.column_dimensions[get_column_letter(col)].width = width
+
+        for row, trans in enumerate(transactions, start=2):
+            ws.cell(row=row, column=1, value=trans["transaction_date"].strftime("%Y-%m-%d %H:%M:%S"))
+            ws.cell(row=row, column=2, value=trans["transaction_type"])
+            ws.cell(row=row, column=3, value=trans["category"])
+            amount_cell = ws.cell(row=row, column=4, value=trans["amount"])
+            amount_cell.alignment = right_align
+            ws.cell(row=row, column=5, value=trans.get("description", ""))
+            ws.cell(row=row, column=6, value=str(trans.get("store_id", "")))
+            ws.cell(row=row, column=7, value=trans.get("reference_number", ""))
 
 
 # 全局实例

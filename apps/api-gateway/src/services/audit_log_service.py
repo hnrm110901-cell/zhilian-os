@@ -2,6 +2,8 @@
 审计日志服务
 记录和查询系统操作日志
 """
+import csv
+import io
 import os
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
@@ -387,6 +389,68 @@ class AuditLogService:
             logger.info(f"已删除 {count} 条旧审计日志", cutoff_date=cutoff_date.isoformat())
 
             return count
+
+    async def export_logs_csv(
+        self,
+        user_id: Optional[str] = None,
+        action: Optional[str] = None,
+        resource_type: Optional[str] = None,
+        status: Optional[str] = None,
+        store_id: Optional[str] = None,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        search_query: Optional[str] = None,
+    ) -> str:
+        """
+        导出审计日志为 CSV 格式
+
+        Returns:
+            CSV 字符串内容
+        """
+        # 不限制条数，最多导出 10000 条
+        logs, _ = await self.get_logs(
+            user_id=user_id,
+            action=action,
+            resource_type=resource_type,
+            status=status,
+            store_id=store_id,
+            start_date=start_date,
+            end_date=end_date,
+            search_query=search_query,
+            skip=0,
+            limit=10000,
+        )
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+
+        # 写入表头
+        writer.writerow([
+            "ID", "操作时间", "用户ID", "用户名", "用户角色",
+            "操作类型", "资源类型", "资源ID", "描述",
+            "IP地址", "请求方法", "请求路径", "状态", "错误信息", "门店ID"
+        ])
+
+        for log in logs:
+            writer.writerow([
+                str(log.id),
+                log.created_at.isoformat() if log.created_at else "",
+                str(log.user_id) if log.user_id else "",
+                log.username or "",
+                log.user_role or "",
+                log.action or "",
+                log.resource_type or "",
+                str(log.resource_id) if log.resource_id else "",
+                log.description or "",
+                log.ip_address or "",
+                log.request_method or "",
+                log.request_path or "",
+                log.status or "",
+                log.error_message or "",
+                str(log.store_id) if log.store_id else "",
+            ])
+
+        return output.getvalue()
 
 
 # 全局实例
