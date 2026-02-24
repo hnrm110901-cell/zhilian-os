@@ -25,6 +25,7 @@ import base64
 import os
 import json
 import logging
+import secrets
 
 logger = logging.getLogger(__name__)
 
@@ -73,11 +74,24 @@ class KMSService:
         Returns:
             Fernet实例
         """
+        # 从环境变量读取盐值；首次启动时随机生成并写回（仅限开发环境）
+        salt_hex = os.getenv("KMS_SALT")
+        if not salt_hex:
+            # 生产环境必须预先设置 KMS_SALT 环境变量
+            # 此处仅作为本地开发的安全回退，不应在生产中触发
+            logger.warning(
+                "KMS_SALT not set. Generating ephemeral salt. "
+                "Set KMS_SALT env var in production."
+            )
+            salt = secrets.token_bytes(32)
+        else:
+            salt = bytes.fromhex(salt_hex)
+
         # 使用PBKDF2派生密钥
         kdf = PBKDF2(
             algorithm=hashes.SHA256(),
             length=32,
-            salt=b'zhilian_os_salt',  # 生产环境应使用随机salt
+            salt=salt,
             iterations=int(os.getenv("KMS_PBKDF2_ITERATIONS", "100000")),
         )
 
