@@ -1354,3 +1354,173 @@ def async_export_data(self, job_id: str) -> Dict[str, Any]:
         return os.path.getsize(file_path)
 
     return asyncio.run(_run())
+
+
+# ---------------------------------------------------------------------------
+# 增量备份任务
+# ---------------------------------------------------------------------------
+
+@celery_app.task(
+    base=CallbackTask,
+    bind=True,
+    name="run_backup",
+    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
+    default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY", "60")),
+)
+def run_backup(self, job_id: str) -> Dict[str, Any]:
+    """
+    执行全量/增量备份任务
+    - 全量：导出所有指定表的数据为 JSON，打包成 tar.gz
+    - 增量：仅导出 since_timestamp 之后有变更的行（依赖 updated_at 字段）
+    """
+    import hashlib
+    import json
+    import tarfile
+    import tempfile
+    from datetime import datetime, timezone
+
+    async def _run():
+        from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+        from sqlalchemy.orm import sessionmaker
+        from sqlalchemy import text
+
+        db_url = os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost/zhilian")
+        backup_dir = os.getenv("BACKUP_TMP_DIR", "/tmp/backups")
+        os.makedirs(backup_dir, exist_ok=True)
+
+        engine = create_async_engine(db_url, echo=False)
+        async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+        async with async_session() as session:
+            # 读取 BackupJob
+            from src.models.backup_job import BackupJob, BackupStatus
+            result = await session.execute(
+                text("SELECT * FROM backup_jobs WHERE id = :id"),
+                {"id": job_id},
+            )
+            row = result.mappings().first()
+            if not row:
+                raise ValueError(f"BackupJob {job_id} 不存在")
+
+            backup_type = row["backup_type"]
+            since_ts = row["since_timestamp"]
+            tables_filter = row["tables"] or []
+
+            # 标记 RUNNING
+            await session.execute(
+                text("UPDATE backup_jobs SET status='running', celery_task_id=:tid, updated_at=NOW() WHERE id=:id"),
+                {"tid": self.request.id, "id": job_id},
+            )
+            await session.commit()
+
+        # 获取所有用户表
+        async with async_session() as session:
+            res = await session.execute(
+                text("SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename")
+            )
+            all_tables = [r[0] for r in res.fetchall()]
+
+        target_tables = [t for t in all_tables if not tables_filter or t in tables_filter]
+        # 排除备份相关表，避免递归
+        target_tables = [t for t in target_tables if t not in ("backup_jobs", "export_jobs")]
+
+        total = len(target_tables)
+        row_counts: Dict[str, int] = {}
+        tmp_dir = tempfile.mkdtemp(dir=backup_dir)
+
+        try:
+            for idx, table in enumerate(target_tables):
+                async with async_session() as session:
+                    if backup_type == "incremental" and since_ts:
+                        # 增量：只取 updated_at > since_timestamp 的行
+                        try:
+                            res = await session.execute(
+                                text(f"SELECT * FROM {table} WHERE updated_at > :ts"),
+                                {"ts": since_ts},
+                            )
+                        except Exception:
+                            # 表没有 updated_at 字段时跳过
+                            row_counts[table] = 0
+                            continue
+                    else:
+                        res = await session.execute(text(f"SELECT * FROM {table}"))
+
+                    cols = list(res.keys())
+                    rows_data = [dict(zip(cols, r)) for r in res.fetchall()]
+
+                    # 序列化（UUID/datetime 转字符串）
+                    def _serialize(v):
+                        if hasattr(v, "isoformat"):
+                            return v.isoformat()
+                        if hasattr(v, "__str__") and not isinstance(v, (int, float, bool, str, type(None))):
+                            return str(v)
+                        return v
+
+                    rows_data = [{k: _serialize(v) for k, v in r.items()} for r in rows_data]
+                    row_counts[table] = len(rows_data)
+
+                    table_file = os.path.join(tmp_dir, f"{table}.json")
+                    with open(table_file, "w", encoding="utf-8") as f:
+                        json.dump({"table": table, "rows": rows_data}, f, ensure_ascii=False, indent=2)
+
+                # 更新进度
+                progress = int((idx + 1) / total * 90)
+                async with async_session() as session:
+                    await session.execute(
+                        text("UPDATE backup_jobs SET progress=:p, updated_at=NOW() WHERE id=:id"),
+                        {"p": progress, "id": job_id},
+                    )
+                    await session.commit()
+
+            # 打包 tar.gz
+            ts_str = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            archive_name = f"backup_{backup_type}_{ts_str}_{job_id[:8]}.tar.gz"
+            archive_path = os.path.join(backup_dir, archive_name)
+            with tarfile.open(archive_path, "w:gz") as tar:
+                tar.add(tmp_dir, arcname="backup")
+
+            # 计算 SHA256
+            sha256 = hashlib.sha256()
+            with open(archive_path, "rb") as f:
+                for chunk in iter(lambda: f.read(65536), b""):
+                    sha256.update(chunk)
+            checksum = sha256.hexdigest()
+            file_size = os.path.getsize(archive_path)
+            completed_at = datetime.now(timezone.utc).isoformat()
+
+            async with async_session() as session:
+                await session.execute(
+                    text(
+                        "UPDATE backup_jobs SET status='completed', progress=100, "
+                        "file_path=:fp, file_size_bytes=:fs, checksum=:cs, "
+                        "row_counts=:rc, completed_at=:ca, updated_at=NOW() WHERE id=:id"
+                    ),
+                    {
+                        "fp": archive_path,
+                        "fs": file_size,
+                        "cs": checksum,
+                        "rc": json.dumps(row_counts),
+                        "ca": completed_at,
+                        "id": job_id,
+                    },
+                )
+                await session.commit()
+
+            logger.info("备份任务完成", job_id=job_id, archive=archive_path, checksum=checksum)
+            return {"job_id": job_id, "file_path": archive_path, "checksum": checksum}
+
+        except Exception as e:
+            logger.error("备份任务失败", job_id=job_id, error=str(e))
+            async with async_session() as session:
+                await session.execute(
+                    text("UPDATE backup_jobs SET status='failed', error_message=:err, updated_at=NOW() WHERE id=:id"),
+                    {"err": str(e)[:1000], "id": job_id},
+                )
+                await session.commit()
+            raise self.retry(exc=e)
+
+        finally:
+            import shutil
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+
+    return asyncio.run(_run())
