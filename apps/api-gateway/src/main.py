@@ -32,6 +32,7 @@ from src.api import forecast
 from src.api import cross_store_insights
 from src.api import report_templates
 from src.api import competitive_analysis
+from src.api import export_jobs
 from src.middleware.monitoring import MonitoringMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
 from src.middleware.audit_log import AuditLogMiddleware
@@ -468,6 +469,7 @@ app.include_router(forecast.router, tags=["forecast"])
 app.include_router(cross_store_insights.router, tags=["cross_store_insights"])
 app.include_router(report_templates.router, prefix="/api/v1", tags=["report_templates"])
 app.include_router(competitive_analysis.router)
+app.include_router(export_jobs.router)
 
 
 @app.on_event("startup")
