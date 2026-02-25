@@ -13,9 +13,17 @@ const AgentMemoryPage: React.FC = () => {
   const [memories, setMemories] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedStore, setSelectedStore] = useState('STORE001');
+  const [stores, setStores] = useState<any[]>([]);
   const [agentFilter, setAgentFilter] = useState('');
   const [lastN, setLastN] = useState(20);
   const [clearing, setClearing] = useState(false);
+
+  const loadStores = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/stores');
+      setStores(res.data?.stores || res.data || []);
+    } catch { /* ignore */ }
+  }, []);
 
   const loadMemories = useCallback(async () => {
     setLoading(true);
@@ -31,7 +39,7 @@ const AgentMemoryPage: React.FC = () => {
     }
   }, [selectedStore, agentFilter, lastN]);
 
-  useEffect(() => { loadMemories(); }, [loadMemories]);
+  useEffect(() => { loadStores(); loadMemories(); }, [loadStores, loadMemories]);
 
   const clearMemory = () => {
     Modal.confirm({
@@ -69,7 +77,9 @@ const AgentMemoryPage: React.FC = () => {
           <Space>
             <span>门店：</span>
             <Select value={selectedStore} onChange={setSelectedStore} style={{ width: 140 }}>
-              <Option value="STORE001">STORE001</Option>
+              {stores.length > 0 ? stores.map((s: any) => (
+                <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
+              )) : <Option value="STORE001">STORE001</Option>}
             </Select>
             <span>智能体：</span>
             <Select value={agentFilter} onChange={setAgentFilter} style={{ width: 120 }} allowClear placeholder="全部">

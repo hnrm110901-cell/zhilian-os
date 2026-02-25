@@ -37,6 +37,7 @@ interface PerformanceResult {
 const AgentCollaborationPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [storeId, setStoreId] = useState('STORE001');
+  const [stores, setStores] = useState<any[]>([]);
   const [status, setStatus] = useState<CollaborationStatus | null>(null);
   const [conflictResult, setConflictResult] = useState<ConflictResult | null>(null);
   const [performance, setPerformance] = useState<PerformanceResult | null>(null);
@@ -44,6 +45,13 @@ const AgentCollaborationPage: React.FC = () => {
   const [submitForm] = Form.useForm();
   const [conflictForm] = Form.useForm();
   const [perfForm] = Form.useForm();
+
+  const loadStores = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/stores');
+      setStores(res.data?.stores || res.data || []);
+    } catch { /* ignore */ }
+  }, []);
 
   const loadStatus = useCallback(async () => {
     setLoading(true);
@@ -53,6 +61,8 @@ const AgentCollaborationPage: React.FC = () => {
     } catch (err) { handleApiError(err); }
     finally { setLoading(false); }
   }, [storeId]);
+
+  useEffect(() => { loadStores(); }, [loadStores]);
 
   const handleCoordinate = async () => {
     setLoading(true);
@@ -111,9 +121,9 @@ const AgentCollaborationPage: React.FC = () => {
           <Title level={4} style={{ margin: 0 }}>Agent协作</Title>
           <Space>
             <Select value={storeId} onChange={setStoreId} style={{ width: 140 }}>
-              <Option value="STORE001">门店 001</Option>
-              <Option value="STORE002">门店 002</Option>
-              <Option value="STORE003">门店 003</Option>
+              {stores.length > 0 ? stores.map((s: any) => (
+                <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
+              )) : <Option value="STORE001">门店 001</Option>}
             </Select>
             <Button icon={<SyncOutlined />} onClick={loadStatus}>查询状态</Button>
           </Space>

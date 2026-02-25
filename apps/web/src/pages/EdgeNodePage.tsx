@@ -22,12 +22,20 @@ const modeLabel: Record<string, string> = { online: '在线', offline: '离线',
 const EdgeNodePage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [storeId, setStoreId] = useState('STORE001');
+  const [stores, setStores] = useState<any[]>([]);
   const [edgeMode, setEdgeMode] = useState<EdgeMode | null>(null);
   const [networkStatus, setNetworkStatus] = useState<NetworkStatus | null>(null);
   const [cacheInfo, setCacheInfo] = useState<CacheInfo | null>(null);
   const [syncLoading, setSyncLoading] = useState(false);
   const [offlineForm] = Form.useForm();
   const [offlineResult, setOfflineResult] = useState<Record<string, unknown> | null>(null);
+
+  const loadStores = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/stores');
+      setStores(res.data?.stores || res.data || []);
+    } catch { /* ignore */ }
+  }, []);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -42,7 +50,7 @@ const EdgeNodePage: React.FC = () => {
     finally { setLoading(false); }
   }, [storeId]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => { loadStores(); loadData(); }, [loadStores, loadData]);
 
   const handleSetMode = async (mode: string) => {
     try {
@@ -89,9 +97,9 @@ const EdgeNodePage: React.FC = () => {
           <Title level={4} style={{ margin: 0 }}>边缘节点管理</Title>
           <Space>
             <Select value={storeId} onChange={setStoreId} style={{ width: 160 }}>
-              <Option value="STORE001">门店 001</Option>
-              <Option value="STORE002">门店 002</Option>
-              <Option value="STORE003">门店 003</Option>
+              {stores.length > 0 ? stores.map((s: any) => (
+                <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
+              )) : <Option value="STORE001">门店 001</Option>}
             </Select>
             <Button icon={<SyncOutlined />} onClick={loadData}>刷新</Button>
           </Space>

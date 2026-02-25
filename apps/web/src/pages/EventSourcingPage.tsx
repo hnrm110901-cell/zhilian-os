@@ -14,12 +14,20 @@ const EventSourcingPage: React.FC = () => {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [selectedStore, setSelectedStore] = useState('STORE001');
+  const [stores, setStores] = useState<any[]>([]);
   const [eventType, setEventType] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [hours, setHours] = useState(24);
   const [chainVisible, setChainVisible] = useState(false);
   const [chainData, setChainData] = useState<any>(null);
   const [chainLoading, setChainLoading] = useState(false);
+
+  const loadStores = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/stores');
+      setStores(res.data?.stores || res.data || []);
+    } catch { /* ignore */ }
+  }, []);
 
   const loadEvents = useCallback(async () => {
     setLoading(true);
@@ -40,7 +48,7 @@ const EventSourcingPage: React.FC = () => {
     }
   }, [selectedStore, eventType, statusFilter, hours]);
 
-  useEffect(() => { loadEvents(); }, [loadEvents]);
+  useEffect(() => { loadStores(); loadEvents(); }, [loadStores, loadEvents]);
 
   const viewChain = async (record: any) => {
     setChainLoading(true);
@@ -84,7 +92,9 @@ const EventSourcingPage: React.FC = () => {
           <Space>
             <span>门店：</span>
             <Select value={selectedStore} onChange={setSelectedStore} style={{ width: 140 }}>
-              <Option value="STORE001">STORE001</Option>
+              {stores.length > 0 ? stores.map((s: any) => (
+                <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
+              )) : <Option value="STORE001">STORE001</Option>}
             </Select>
             <span>状态：</span>
             <Select value={statusFilter} onChange={setStatusFilter} style={{ width: 110 }} allowClear placeholder="全部">

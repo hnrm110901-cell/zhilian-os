@@ -18,10 +18,18 @@ const { TabPane } = Tabs;
 const AdvancedAnalytics: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [selectedStore, setSelectedStore] = useState('STORE001');
+  const [stores, setStores] = useState<any[]>([]);
   const [salesPrediction, setSalesPrediction] = useState<any>(null);
   const [anomalies, setAnomalies] = useState<any>(null);
   const [associations, setAssociations] = useState<any>(null);
   const [timePatterns, setTimePatterns] = useState<any>(null);
+
+  const loadStores = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/stores');
+      setStores(res.data?.stores || res.data || []);
+    } catch { /* ignore */ }
+  }, []);
 
   const loadSalesPrediction = useCallback(async () => {
     try {
@@ -84,6 +92,7 @@ const AdvancedAnalytics: React.FC = () => {
     const loadData = async () => {
       setLoading(true);
       await Promise.all([
+        loadStores(),
         loadSalesPrediction(),
         loadAnomalies(),
         loadAssociations(),
@@ -92,7 +101,7 @@ const AdvancedAnalytics: React.FC = () => {
       setLoading(false);
     };
     loadData();
-  }, [loadSalesPrediction, loadAnomalies, loadAssociations, loadTimePatterns]);
+  }, [loadStores, loadSalesPrediction, loadAnomalies, loadAssociations, loadTimePatterns]);
 
   // 销售预测图表
   const predictionChartOption = salesPrediction ? {
@@ -284,9 +293,9 @@ const AdvancedAnalytics: React.FC = () => {
           onChange={setSelectedStore}
           style={{ width: 200 }}
         >
-          <Option value="STORE001">智链餐厅-朝阳店</Option>
-          <Option value="STORE002">智链餐厅-海淀店</Option>
-          <Option value="STORE003">智链餐厅-浦东店</Option>
+          {stores.length > 0 ? stores.map((s: any) => (
+            <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
+          )) : <Option value="STORE001">智链餐厅-朝阳店</Option>}
         </Select>
       </Card>
 
