@@ -6,7 +6,9 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { lightTheme, darkTheme } from './config/theme';
 import ProtectedRoute from './components/ProtectedRoute';
+import ErrorBoundary from './components/ErrorBoundary';
 import MainLayout from './layouts/MainLayout';
+import NotFoundPage from './pages/NotFoundPage';
 import Dashboard from './pages/Dashboard';
 import SchedulePage from './pages/SchedulePage';
 import OrderPage from './pages/OrderPage';
@@ -59,19 +61,20 @@ const AppContent: React.FC = () => {
     <ConfigProvider locale={zhCN} theme={isDark ? darkTheme : lightTheme}>
       <AuthProvider>
         <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/unauthorized" element={<UnauthorizedPage />} />
-            <Route path="/mobile" element={
-              <ProtectedRoute>
-                <MobileApp />
-              </ProtectedRoute>
-            } />
-            <Route path="/" element={
-              <ProtectedRoute>
-                <MainLayout />
-              </ProtectedRoute>
-            }>
+          <ErrorBoundary>
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/unauthorized" element={<UnauthorizedPage />} />
+              <Route path="/mobile" element={
+                <ProtectedRoute>
+                  <MobileApp />
+                </ProtectedRoute>
+              } />
+              <Route path="/" element={
+                <ProtectedRoute>
+                  <MainLayout />
+                </ProtectedRoute>
+              }>
               <Route index element={<Dashboard />} />
               <Route path="schedule" element={<SchedulePage />} />
               <Route path="order" element={<OrderPage />} />
@@ -250,7 +253,9 @@ const AppContent: React.FC = () => {
                 </ProtectedRoute>
               } />
             </Route>
-          </Routes>
+              <Route path="*" element={<NotFoundPage />} />
+            </Routes>
+          </ErrorBoundary>
         </BrowserRouter>
       </AuthProvider>
     </ConfigProvider>
