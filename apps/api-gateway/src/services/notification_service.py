@@ -4,12 +4,15 @@ Notification Service
 """
 import os
 from typing import List, Optional
-from datetime import datetime
-from sqlalchemy import select, and_, or_
+from datetime import datetime, timedelta
+from sqlalchemy import select, and_, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 import uuid
 
-from ..models.notification import Notification, NotificationType, NotificationPriority
+from ..models.notification import (
+    Notification, NotificationType, NotificationPriority,
+    NotificationPreference, NotificationRule,
+)
 from ..core.database import get_db_session
 from ..core.websocket import manager
 import structlog
@@ -249,6 +252,222 @@ class NotificationService:
             user_id=user_id, role=role, store_id=store_id, is_read=False
         )
         return len(notifications)
+
+    # ------------------------------------------------------------------ #
+    # 通知偏好设置                                                          #
+    # ------------------------------------------------------------------ #
+
+    async def get_preferences(self, user_id: str) -> List[NotificationPreference]:
+        """获取用户所有通知偏好"""
+        async with get_db_session() as session:
+            stmt = select(NotificationPreference).where(
+                NotificationPreference.user_id == user_id
+            ).order_by(NotificationPreference.notification_type)
+            result = await session.execute(stmt)
+            return list(result.scalars().all())
+
+    async def upsert_preference(
+        self,
+        user_id: str,
+        notification_type: Optional[str],
+        channels: List[str],
+        is_enabled: bool = True,
+        quiet_hours_start: Optional[str] = None,
+        quiet_hours_end: Optional[str] = None,
+    ) -> NotificationPreference:
+        """创建或更新通知偏好（同一 user_id + notification_type 唯一）"""
+        async with get_db_session() as session:
+            stmt = select(NotificationPreference).where(
+                and_(
+                    NotificationPreference.user_id == user_id,
+                    NotificationPreference.notification_type == notification_type,
+                )
+            )
+            result = await session.execute(stmt)
+            pref = result.scalar_one_or_none()
+
+            if pref:
+                pref.channels = channels
+                pref.is_enabled = is_enabled
+                pref.quiet_hours_start = quiet_hours_start
+                pref.quiet_hours_end = quiet_hours_end
+            else:
+                pref = NotificationPreference(
+                    id=uuid.uuid4(),
+                    user_id=user_id,
+                    notification_type=notification_type,
+                    channels=channels,
+                    is_enabled=is_enabled,
+                    quiet_hours_start=quiet_hours_start,
+                    quiet_hours_end=quiet_hours_end,
+                )
+                session.add(pref)
+
+            await session.commit()
+            await session.refresh(pref)
+            logger.info("通知偏好已更新", user_id=user_id, notification_type=notification_type)
+            return pref
+
+    async def delete_preference(self, user_id: str, notification_type: Optional[str]) -> bool:
+        """删除通知偏好"""
+        async with get_db_session() as session:
+            stmt = select(NotificationPreference).where(
+                and_(
+                    NotificationPreference.user_id == user_id,
+                    NotificationPreference.notification_type == notification_type,
+                )
+            )
+            result = await session.execute(stmt)
+            pref = result.scalar_one_or_none()
+            if not pref:
+                return False
+            await session.delete(pref)
+            await session.commit()
+            return True
+
+    def _is_in_quiet_hours(self, pref: NotificationPreference) -> bool:
+        """判断当前时间是否在免打扰时段内"""
+        if not pref.quiet_hours_start or not pref.quiet_hours_end:
+            return False
+        now = datetime.utcnow().strftime("%H:%M")
+        start = pref.quiet_hours_start
+        end = pref.quiet_hours_end
+        # 跨午夜处理（如 22:00 - 08:00）
+        if start <= end:
+            return start <= now <= end
+        else:
+            return now >= start or now <= end
+
+    # ------------------------------------------------------------------ #
+    # 通知频率规则                                                          #
+    # ------------------------------------------------------------------ #
+
+    async def get_rules(self, user_id: Optional[str] = None) -> List[NotificationRule]:
+        """获取规则列表（用户级 + 全局）"""
+        async with get_db_session() as session:
+            conditions = [NotificationRule.is_active == True]
+            if user_id:
+                conditions.append(
+                    or_(
+                        NotificationRule.user_id == user_id,
+                        NotificationRule.user_id.is_(None),
+                    )
+                )
+            else:
+                conditions.append(NotificationRule.user_id.is_(None))
+
+            stmt = select(NotificationRule).where(and_(*conditions))
+            result = await session.execute(stmt)
+            return list(result.scalars().all())
+
+    async def upsert_rule(
+        self,
+        max_count: int,
+        time_window_minutes: int,
+        user_id: Optional[str] = None,
+        notification_type: Optional[str] = None,
+        description: Optional[str] = None,
+    ) -> NotificationRule:
+        """创建或更新频率规则"""
+        async with get_db_session() as session:
+            stmt = select(NotificationRule).where(
+                and_(
+                    NotificationRule.user_id == user_id,
+                    NotificationRule.notification_type == notification_type,
+                )
+            )
+            result = await session.execute(stmt)
+            rule = result.scalar_one_or_none()
+
+            if rule:
+                rule.max_count = max_count
+                rule.time_window_minutes = time_window_minutes
+                rule.is_active = True
+                if description is not None:
+                    rule.description = description
+            else:
+                rule = NotificationRule(
+                    id=uuid.uuid4(),
+                    user_id=user_id,
+                    notification_type=notification_type,
+                    max_count=max_count,
+                    time_window_minutes=time_window_minutes,
+                    is_active=True,
+                    description=description,
+                )
+                session.add(rule)
+
+            await session.commit()
+            await session.refresh(rule)
+            logger.info("通知规则已更新", user_id=user_id, notification_type=notification_type)
+            return rule
+
+    async def delete_rule(self, rule_id: str, user_id: Optional[str] = None) -> bool:
+        """删除规则（用户只能删除自己的规则，管理员可删全局规则）"""
+        async with get_db_session() as session:
+            stmt = select(NotificationRule).where(NotificationRule.id == rule_id)
+            result = await session.execute(stmt)
+            rule = result.scalar_one_or_none()
+            if not rule:
+                return False
+            # 非管理员只能删自己的规则
+            if user_id and rule.user_id and str(rule.user_id) != user_id:
+                return False
+            await session.delete(rule)
+            await session.commit()
+            return True
+
+    async def check_rate_limit(self, user_id: str, notification_type: str) -> bool:
+        """
+        检查是否超过频率限制。
+        返回 True 表示允许发送，False 表示已超限。
+        优先匹配用户级规则，其次全局规则，无规则则允许。
+        """
+        rules = await self.get_rules(user_id=user_id)
+
+        # 找最匹配的规则：用户级 + 精确类型 > 用户级 + 全局类型 > 全局 + 精确类型 > 全局
+        def rule_priority(r: NotificationRule) -> int:
+            score = 0
+            if r.user_id is not None:
+                score += 2
+            if r.notification_type == notification_type:
+                score += 1
+            return score
+
+        matched = [
+            r for r in rules
+            if r.notification_type in (notification_type, None)
+        ]
+        if not matched:
+            return True
+
+        best_rule = max(matched, key=rule_priority)
+
+        # 统计时间窗口内已发送数量
+        async with get_db_session() as session:
+            since = datetime.utcnow() - timedelta(minutes=best_rule.time_window_minutes)
+            conditions = [
+                Notification.created_at >= since,
+                Notification.type == notification_type,
+            ]
+            if user_id:
+                conditions.append(Notification.user_id == user_id)
+
+            count_stmt = select(func.count(Notification.id)).where(and_(*conditions))
+            result = await session.execute(count_stmt)
+            count = result.scalar() or 0
+
+        allowed = count < best_rule.max_count
+        if not allowed:
+            logger.warning(
+                "通知频率超限，已拦截",
+                user_id=user_id,
+                notification_type=notification_type,
+                count=count,
+                max_count=best_rule.max_count,
+                window_minutes=best_rule.time_window_minutes,
+            )
+        return allowed
 
 
 # 全局通知服务实例
