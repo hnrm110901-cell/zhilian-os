@@ -420,3 +420,198 @@ async def get_notification_templates(
         "templates": templates,
         "count": len(templates)
     }
+
+
+# ------------------------------------------------------------------ #
+# 通知偏好设置 API                                                      #
+# ------------------------------------------------------------------ #
+
+class PreferenceUpsertRequest(BaseModel):
+    notification_type: Optional[str] = None  # None 表示全局默认
+    channels: List[str]                       # ["system", "email", "sms", ...]
+    is_enabled: bool = True
+    quiet_hours_start: Optional[str] = None  # "22:00"
+    quiet_hours_end: Optional[str] = None    # "08:00"
+
+
+class PreferenceResponse(BaseModel):
+    id: str
+    user_id: str
+    notification_type: Optional[str]
+    channels: List[str]
+    is_enabled: bool
+    quiet_hours_start: Optional[str]
+    quiet_hours_end: Optional[str]
+    created_at: Optional[str]
+    updated_at: Optional[str]
+
+
+@router.get("/notifications/preferences", response_model=List[PreferenceResponse])
+async def get_preferences(
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    获取当前用户的通知偏好设置列表
+
+    每条记录对应一种通知类型的渠道偏好，notification_type 为 null 表示全局默认。
+    """
+    prefs = await notification_service.get_preferences(user_id=str(current_user.id))
+    return [PreferenceResponse(**p.to_dict()) for p in prefs]
+
+
+@router.put("/notifications/preferences", response_model=PreferenceResponse)
+async def upsert_preference(
+    request: PreferenceUpsertRequest,
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    创建或更新通知偏好设置
+
+    - notification_type 为 null 时更新全局默认偏好
+    - channels 支持: system, email, sms, wechat, app_push
+    - quiet_hours_start/end 格式: "HH:MM"（如 "22:00"），跨午夜时段也支持（如 22:00-08:00）
+    """
+    pref = await notification_service.upsert_preference(
+        user_id=str(current_user.id),
+        notification_type=request.notification_type,
+        channels=request.channels,
+        is_enabled=request.is_enabled,
+        quiet_hours_start=request.quiet_hours_start,
+        quiet_hours_end=request.quiet_hours_end,
+    )
+    return PreferenceResponse(**pref.to_dict())
+
+
+@router.delete("/notifications/preferences/{notification_type}")
+async def delete_preference(
+    notification_type: str,
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    删除指定类型的通知偏好设置
+
+    notification_type 传 "default" 表示删除全局默认偏好
+    """
+    nt = None if notification_type == "default" else notification_type
+    success = await notification_service.delete_preference(
+        user_id=str(current_user.id),
+        notification_type=nt,
+    )
+    if not success:
+        raise HTTPException(status_code=404, detail="偏好设置不存在")
+    return {"success": True, "message": "偏好设置已删除"}
+
+
+# ------------------------------------------------------------------ #
+# 通知频率规则 API                                                      #
+# ------------------------------------------------------------------ #
+
+class RuleUpsertRequest(BaseModel):
+    notification_type: Optional[str] = None  # None 表示适用所有类型
+    max_count: int                            # 时间窗口内最多发送条数
+    time_window_minutes: int                  # 时间窗口（分钟）
+    description: Optional[str] = None
+
+
+class RuleResponse(BaseModel):
+    id: str
+    user_id: Optional[str]
+    notification_type: Optional[str]
+    max_count: int
+    time_window_minutes: int
+    is_active: bool
+    description: Optional[str]
+    created_at: Optional[str]
+    updated_at: Optional[str]
+
+
+@router.get("/notifications/rules", response_model=List[RuleResponse])
+async def get_rules(
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    获取当前用户的通知频率规则（含全局规则）
+
+    规则优先级：用户级精确类型 > 用户级全局 > 全局精确类型 > 全局
+    """
+    rules = await notification_service.get_rules(user_id=str(current_user.id))
+    return [RuleResponse(**r.to_dict()) for r in rules]
+
+
+@router.put("/notifications/rules", response_model=RuleResponse)
+async def upsert_rule(
+    request: RuleUpsertRequest,
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    创建或更新通知频率规则
+
+    示例：每小时内同类型通知最多 5 条
+    ```json
+    {"notification_type": "warning", "max_count": 5, "time_window_minutes": 60}
+    ```
+    """
+    rule = await notification_service.upsert_rule(
+        user_id=str(current_user.id),
+        notification_type=request.notification_type,
+        max_count=request.max_count,
+        time_window_minutes=request.time_window_minutes,
+        description=request.description,
+    )
+    return RuleResponse(**rule.to_dict())
+
+
+@router.put("/notifications/rules/global", response_model=RuleResponse)
+async def upsert_global_rule(
+    request: RuleUpsertRequest,
+    current_user: User = Depends(require_role(UserRole.ADMIN)),
+):
+    """
+    创建或更新全局通知频率规则（仅管理员）
+
+    全局规则对所有用户生效，用户级规则优先于全局规则。
+    """
+    rule = await notification_service.upsert_rule(
+        user_id=None,
+        notification_type=request.notification_type,
+        max_count=request.max_count,
+        time_window_minutes=request.time_window_minutes,
+        description=request.description,
+    )
+    return RuleResponse(**rule.to_dict())
+
+
+@router.delete("/notifications/rules/{rule_id}")
+async def delete_rule(
+    rule_id: str,
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    删除通知频率规则
+
+    用户只能删除自己的规则；管理员可删除全局规则。
+    """
+    success = await notification_service.delete_rule(
+        rule_id=rule_id,
+        user_id=str(current_user.id),
+    )
+    if not success:
+        raise HTTPException(status_code=404, detail="规则不存在或无权限删除")
+    return {"success": True, "message": "规则已删除"}
+
+
+@router.get("/notifications/rate-limit/check")
+async def check_rate_limit(
+    notification_type: str = Query(..., description="通知类型"),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    检查当前用户对指定通知类型是否已超过频率限制
+
+    返回 allowed=true 表示可以发送，allowed=false 表示已超限。
+    """
+    allowed = await notification_service.check_rate_limit(
+        user_id=str(current_user.id),
+        notification_type=notification_type,
+    )
+    return {"allowed": allowed, "notification_type": notification_type}

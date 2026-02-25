@@ -1,7 +1,7 @@
 """
 Notification Model
 """
-from sqlalchemy import Column, String, Boolean, Text, JSON, ForeignKey
+from sqlalchemy import Column, String, Boolean, Text, JSON, ForeignKey, Integer, Time
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import uuid
@@ -72,4 +72,88 @@ class Notification(Base, TimestampMixin):
             "extra_data": self.extra_data,
             "source": self.source,
             "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class NotificationPreference(Base, TimestampMixin):
+    """
+    用户通知偏好设置
+    控制每种通知类型走哪些渠道，以及免打扰时段
+    """
+
+    __tablename__ = "notification_preferences"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+
+    # 通知类型（info/warning/error/success/alert），NULL 表示全局默认
+    notification_type = Column(String(20), nullable=True)
+
+    # 启用的渠道列表，如 ["system", "email", "sms"]
+    channels = Column(JSON, nullable=False, default=list)
+
+    # 是否启用该类型通知
+    is_enabled = Column(Boolean, default=True, nullable=False)
+
+    # 免打扰时段（HH:MM 格式字符串，存储为 String 以兼容各数据库）
+    quiet_hours_start = Column(String(5), nullable=True)  # e.g. "22:00"
+    quiet_hours_end = Column(String(5), nullable=True)    # e.g. "08:00"
+
+    # 关系
+    user = relationship("User")
+
+    def to_dict(self):
+        return {
+            "id": str(self.id),
+            "user_id": str(self.user_id),
+            "notification_type": self.notification_type,
+            "channels": self.channels,
+            "is_enabled": self.is_enabled,
+            "quiet_hours_start": self.quiet_hours_start,
+            "quiet_hours_end": self.quiet_hours_end,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class NotificationRule(Base, TimestampMixin):
+    """
+    通知频率控制规则
+    防止同类通知在短时间内刷屏
+    """
+
+    __tablename__ = "notification_rules"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    # 作用范围：user_id 不为空则为用户级规则，否则为全局规则
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True)
+
+    # 通知类型（NULL 表示适用所有类型）
+    notification_type = Column(String(20), nullable=True)
+
+    # 频率限制：time_window_minutes 分钟内最多发 max_count 条
+    max_count = Column(Integer, nullable=False, default=10)
+    time_window_minutes = Column(Integer, nullable=False, default=60)
+
+    # 是否启用
+    is_active = Column(Boolean, default=True, nullable=False)
+
+    # 描述
+    description = Column(String(200), nullable=True)
+
+    # 关系
+    user = relationship("User")
+
+    def to_dict(self):
+        return {
+            "id": str(self.id),
+            "user_id": str(self.user_id) if self.user_id else None,
+            "notification_type": self.notification_type,
+            "max_count": self.max_count,
+            "time_window_minutes": self.time_window_minutes,
+            "is_active": self.is_active,
+            "description": self.description,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

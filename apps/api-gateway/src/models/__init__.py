@@ -15,7 +15,7 @@ from .finance import FinancialTransaction, Budget, Invoice, FinancialReport
 from .task import Task, TaskStatus, TaskPriority
 from .daily_report import DailyReport
 from .reconciliation import ReconciliationRecord, ReconciliationStatus
-from .notification import Notification, NotificationType, NotificationPriority
+from .notification import Notification, NotificationType, NotificationPriority, NotificationPreference, NotificationRule
 from .audit_log import AuditLog, AuditAction, ResourceType
 from .queue import Queue, QueueStatus
 from .integration import (
@@ -67,6 +67,8 @@ __all__ = [
     "Notification",
     "NotificationType",
     "NotificationPriority",
+    "NotificationPreference",
+    "NotificationRule",
     "AuditLog",
     "AuditAction",
     "ResourceType",
