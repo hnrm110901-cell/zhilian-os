@@ -70,6 +70,9 @@ const NeuralSystemPage = lazy(() => import('./pages/NeuralSystemPage'));
 const EmbeddingPage = lazy(() => import('./pages/EmbeddingPage'));
 const SchedulerPage = lazy(() => import('./pages/SchedulerPage'));
 const BenchmarkPage = lazy(() => import('./pages/BenchmarkPage'));
+const ApprovalManagementPage = lazy(() => import('./pages/ApprovalManagementPage'));
+const StoreManagementPage = lazy(() => import('./pages/StoreManagementPage'));
+const ExportJobsPage = lazy(() => import('./pages/ExportJobsPage'));
 
 const PageLoader = (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
@@ -246,6 +249,15 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="benchmark" element={
                     <ProtectedRoute requiredRole="admin"><BenchmarkPage /></ProtectedRoute>
+                  } />
+                  <Route path="approval" element={
+                    <ProtectedRoute requiredRole="admin"><ApprovalManagementPage /></ProtectedRoute>
+                  } />
+                  <Route path="stores" element={
+                    <ProtectedRoute requiredRole="admin"><StoreManagementPage /></ProtectedRoute>
+                  } />
+                  <Route path="export-jobs" element={
+                    <ProtectedRoute requiredRole="admin"><ExportJobsPage /></ProtectedRoute>
                   } />
                 </Route>
                 <Route path="*" element={<NotFoundPage />} />
