@@ -32,6 +32,7 @@ import {
   TranslationOutlined,
   CheckCircleOutlined,
   BellOutlined,
+  SettingOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 
@@ -95,6 +96,23 @@ const searchData: SearchResult[] = [
   { id: '39', title: '决策验证', description: 'AI决策合规性验证', path: '/decision-validator', icon: <CheckCircleOutlined />, category: 'AI基础设施' },
   { id: '40', title: '联邦学习', description: '隐私保护的分布式模型训练', path: '/federated-learning', icon: <ExperimentOutlined />, category: 'AI基础设施' },
   { id: '41', title: 'Agent协作', description: '多Agent协调和冲突解决', path: '/agent-collaboration', icon: <ApartmentOutlined />, category: 'AI基础设施' },
+  // 业务管理（批次3）
+  { id: '42', title: '任务管理', description: '任务创建、分配和跟踪', path: '/tasks', icon: <FileTextOutlined />, category: '业务管理' },
+  { id: '43', title: '对账管理', description: '财务对账执行和差异确认', path: '/reconciliation', icon: <FileExcelOutlined />, category: '业务管理' },
+  { id: '44', title: '菜品管理', description: '菜品CRUD、分类和成本明细', path: '/dishes', icon: <ShoppingCartOutlined />, category: '业务管理' },
+  { id: '45', title: '员工管理', description: '员工信息和角色管理', path: '/employees', icon: <TeamOutlined />, category: '业务管理' },
+  // 系统管理（批次3）
+  { id: '46', title: 'RaaS定价', description: '效果付费套餐和账单明细', path: '/raas', icon: <DollarOutlined />, category: '系统管理' },
+  { id: '47', title: '模型市场', description: '购买AI模型和贡献训练数据', path: '/model-marketplace', icon: <AppstoreOutlined />, category: '系统管理' },
+  { id: '48', title: 'LLM配置', description: 'AI大模型配置和连接测试', path: '/llm-config', icon: <SettingOutlined />, category: '系统管理' },
+  { id: '49', title: '外部集成', description: 'POS/供应商/会员系统同步管理', path: '/integrations', icon: <ApiOutlined />, category: '系统管理' },
+  { id: '50', title: '调度管理', description: '定时任务计划和手动触发', path: '/scheduler', icon: <CalendarOutlined />, category: '系统管理' },
+  // AI基础设施（批次3/4）
+  { id: '51', title: '硬件管理', description: '树莓派边缘节点和Shokz设备', path: '/hardware', icon: <CloudOutlined />, category: 'AI基础设施' },
+  { id: '52', title: '神经系统', description: '语义搜索和神经网络状态', path: '/neural', icon: <ApartmentOutlined />, category: 'AI基础设施' },
+  { id: '53', title: '嵌入模型', description: '向量嵌入训练和相似度计算', path: '/embedding', icon: <ExperimentOutlined />, category: 'AI基础设施' },
+  // 智能分析（批次4）
+  { id: '54', title: '基准测试', description: '行业基准对比和综合评分', path: '/benchmark', icon: <BarChartOutlined />, category: '智能分析' },
 ];
 
 interface GlobalSearchProps {
