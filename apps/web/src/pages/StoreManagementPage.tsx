@@ -11,6 +11,8 @@ const StoreManagementPage: React.FC = () => {
   const [stores, setStores] = useState<any[]>([]);
   const [storeCount, setStoreCount] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [statsLoading, setStatsLoading] = useState(false);
   const [formVisible, setFormVisible] = useState(false);
   const [statsVisible, setStatsVisible] = useState(false);
   const [editingStore, setEditingStore] = useState<any>(null);
@@ -48,12 +50,15 @@ const StoreManagementPage: React.FC = () => {
   };
 
   const viewStats = async (record: any) => {
+    setStatsLoading(true);
     try {
       const res = await apiClient.get(`/stores/${record.store_id || record.id}/stats`);
       setStoreStats({ ...res.data, name: record.name });
       setStatsVisible(true);
     } catch (err: any) {
       handleApiError(err, '加载门店统计失败');
+    } finally {
+      setStatsLoading(false);
     }
   };
 
@@ -73,6 +78,7 @@ const StoreManagementPage: React.FC = () => {
   };
 
   const submitForm = async (values: any) => {
+    setSubmitting(true);
     try {
       if (editingStore) {
         await apiClient.put(`/stores/${editingStore.store_id || editingStore.id}`, values);
@@ -85,6 +91,8 @@ const StoreManagementPage: React.FC = () => {
       loadStores();
     } catch (err: any) {
       handleApiError(err, editingStore ? '更新失败' : '创建失败');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -98,7 +106,7 @@ const StoreManagementPage: React.FC = () => {
       title: '操作', key: 'actions',
       render: (_: any, record: any) => (
         <Space>
-          <Button size="small" icon={<BarChartOutlined />} onClick={() => viewStats(record)}>统计</Button>
+          <Button size="small" icon={<BarChartOutlined />} loading={statsLoading} onClick={() => viewStats(record)}>统计</Button>
           <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>编辑</Button>
           <Button size="small" danger icon={<DeleteOutlined />} onClick={() => deleteStore(record)}>删除</Button>
         </Space>
@@ -128,6 +136,7 @@ const StoreManagementPage: React.FC = () => {
         onCancel={() => setFormVisible(false)}
         onOk={() => form.submit()}
         okText="保存"
+        confirmLoading={submitting}
       >
         <Form form={form} layout="vertical" onFinish={submitForm}>
           <Form.Item name="store_id" label="门店ID" rules={[{ required: !editingStore }]}>

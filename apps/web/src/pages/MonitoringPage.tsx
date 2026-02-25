@@ -10,6 +10,7 @@ import {
 } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { apiClient } from '../services/api';
+import { handleApiError } from '../utils/message';
 
 const { Option } = Select;
 
@@ -61,7 +62,7 @@ const MonitoringPage: React.FC = () => {
       setErrorSummary(errors);
       setPerformanceSummary(performance);
     } catch (err: any) {
-      console.error('Failed to load monitoring data:', err);
+      handleApiError(err, '加载监控数据失败');
       setError(err.message || '加载监控数据失败');
     } finally {
       setLoading(false);

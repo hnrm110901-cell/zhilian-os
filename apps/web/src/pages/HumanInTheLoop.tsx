@@ -20,6 +20,7 @@ const HumanInTheLoop: React.FC = () => {
   const [trustMetrics, setTrustMetrics] = useState<any>(null);
   const [riskRules, setRiskRules] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [currentRequest, setCurrentRequest] = useState<any>(null);
   const [approving, setApproving] = useState(true);
@@ -78,6 +79,7 @@ const HumanInTheLoop: React.FC = () => {
   };
 
   const submitApproval = async () => {
+    setSubmitting(true);
     try {
       await apiClient.post('/human-in-the-loop/approve', {
         request_id: currentRequest?.request_id || currentRequest?.id,
@@ -89,6 +91,8 @@ const HumanInTheLoop: React.FC = () => {
       loadPending();
     } catch (err: any) {
       handleApiError(err, '操作失败');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -168,6 +172,7 @@ const HumanInTheLoop: React.FC = () => {
         onCancel={() => setModalVisible(false)}
         okText={approving ? '批准' : '拒绝'}
         okButtonProps={{ danger: !approving }}
+        confirmLoading={submitting}
       >
         <p>{currentRequest?.description}</p>
         <TextArea rows={3} placeholder="备注（可选）" value={comment} onChange={(e) => setComment(e.target.value)} />

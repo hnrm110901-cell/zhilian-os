@@ -15,6 +15,7 @@ const ApprovalManagementPage: React.FC = () => {
   const [approvals, setApprovals] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [modalType, setModalType] = useState<'approve' | 'reject' | 'modify'>('approve');
   const [currentItem, setCurrentItem] = useState<any>(null);
@@ -58,6 +59,7 @@ const ApprovalManagementPage: React.FC = () => {
 
   const submitAction = async () => {
     const id = currentItem?.decision_id || currentItem?.id;
+    setSubmitting(true);
     try {
       if (modalType === 'approve') {
         await apiClient.post(`/approvals/${id}/approve`, { reason });
@@ -74,6 +76,8 @@ const ApprovalManagementPage: React.FC = () => {
       loadStats();
     } catch (err: any) {
       handleApiError(err, '操作失败');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -139,7 +143,7 @@ const ApprovalManagementPage: React.FC = () => {
 
       <Card><Tabs items={tabItems} /></Card>
 
-      <Modal title={modalTitle} open={modalVisible} onCancel={() => setModalVisible(false)} onOk={submitAction} okText="确认">
+      <Modal title={modalTitle} open={modalVisible} onCancel={() => setModalVisible(false)} onOk={submitAction} okText="确认" confirmLoading={submitting}>
         <p>决策类型：{currentItem?.decision_type}</p>
         <p>描述：{currentItem?.description}</p>
         <div style={{ marginTop: 12 }}>
