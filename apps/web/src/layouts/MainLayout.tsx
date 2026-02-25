@@ -119,6 +119,8 @@ const MainLayout: React.FC = () => {
     '/human-in-the-loop': '人工审批',
     '/recommendations': '推荐引擎',
     '/private-domain': '私域运营',
+    '/members': '会员系统',
+    '/kpi-dashboard': 'KPI看板',
   };
 
   // 生成面包屑项
@@ -344,6 +346,16 @@ const MainLayout: React.FC = () => {
         key: '/private-domain',
         icon: <TeamOutlined />,
         label: '私域运营',
+      },
+      {
+        key: '/members',
+        icon: <UserOutlined />,
+        label: '会员系统',
+      },
+      {
+        key: '/kpi-dashboard',
+        icon: <BarChartOutlined />,
+        label: 'KPI看板',
       }
     ] : []),
   ];

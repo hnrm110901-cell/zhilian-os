@@ -35,6 +35,8 @@ import CrossStoreInsights from './pages/CrossStoreInsights';
 import HumanInTheLoop from './pages/HumanInTheLoop';
 import RecommendationsPage from './pages/RecommendationsPage';
 import PrivateDomainPage from './pages/PrivateDomainPage';
+import MemberSystemPage from './pages/MemberSystemPage';
+import KPIDashboardPage from './pages/KPIDashboardPage';
 import LoginPage from './pages/LoginPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 
@@ -163,6 +165,16 @@ const AppContent: React.FC = () => {
               <Route path="private-domain" element={
                 <ProtectedRoute requiredRole="admin">
                   <PrivateDomainPage />
+                </ProtectedRoute>
+              } />
+              <Route path="members" element={
+                <ProtectedRoute requiredRole="admin">
+                  <MemberSystemPage />
+                </ProtectedRoute>
+              } />
+              <Route path="kpi-dashboard" element={
+                <ProtectedRoute requiredRole="admin">
+                  <KPIDashboardPage />
                 </ProtectedRoute>
               } />
             </Route>
