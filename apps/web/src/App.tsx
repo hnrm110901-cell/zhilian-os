@@ -81,6 +81,9 @@ const MeituanQueuePage = lazy(() => import('./pages/MeituanQueuePage'));
 const VectorIndexPage = lazy(() => import('./pages/VectorIndexPage'));
 const AdaptersPage = lazy(() => import('./pages/AdaptersPage'));
 const VoiceDevicePage = lazy(() => import('./pages/VoiceDevicePage'));
+const SystemHealthPage = lazy(() => import('./pages/SystemHealthPage'));
+const UserProfilePage = lazy(() => import('./pages/UserProfilePage'));
+const VoiceWebSocketPage = lazy(() => import('./pages/VoiceWebSocketPage'));
 
 const PageLoader = (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
@@ -290,6 +293,15 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="voice-devices" element={
                     <ProtectedRoute requiredRole="admin"><VoiceDevicePage /></ProtectedRoute>
+                  } />
+                  <Route path="system-health" element={
+                    <ProtectedRoute requiredRole="admin"><SystemHealthPage /></ProtectedRoute>
+                  } />
+                  <Route path="profile" element={
+                    <ProtectedRoute><UserProfilePage /></ProtectedRoute>
+                  } />
+                  <Route path="voice-ws" element={
+                    <ProtectedRoute requiredRole="admin"><VoiceWebSocketPage /></ProtectedRoute>
                   } />
                 </Route>
                 <Route path="*" element={<NotFoundPage />} />

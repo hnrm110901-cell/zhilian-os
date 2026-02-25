@@ -127,6 +127,9 @@ const searchData: SearchResult[] = [
   { id: '63', title: '向量知识库', description: '向量索引管理和语义搜索', path: '/vector-index', icon: <SearchOutlined />, category: 'AI基础设施' },
   { id: '64', title: '适配器管理', description: '天才/美团/傲旗威/品智第三方平台适配器', path: '/adapters', icon: <ApiOutlined />, category: '系统管理' },
   { id: '65', title: '语音设备', description: 'Shokz骨传导耳机设备管理和广播通知', path: '/voice-devices', icon: <SoundOutlined />, category: '门店运营' },
+  { id: '66', title: '系统健康', description: '系统健康检查、Agent状态和外部系统监控', path: '/system-health', icon: <MonitorOutlined />, category: '系统管理' },
+  { id: '67', title: '个人信息', description: '查看和编辑个人资料、修改密码', path: '/profile', icon: <UserOutlined />, category: '导航' },
+  { id: '68', title: '语音WebSocket', description: 'STT/TTS/对话WebSocket实时测试', path: '/voice-ws', icon: <SoundOutlined />, category: 'AI基础设施' },
 ];
 
 interface GlobalSearchProps {
