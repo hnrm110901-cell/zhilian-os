@@ -20,6 +20,10 @@ const SupplyChainManagement: React.FC = () => {
   const [replenishmentSuggestions, setReplenishmentSuggestions] = useState<any[]>([]);
   const [supplierModalVisible, setSupplierModalVisible] = useState(false);
   const [orderModalVisible, setOrderModalVisible] = useState(false);
+  const [quotes, setQuotes] = useState<any[]>([]);
+  const [compareResult, setCompareResult] = useState<any>(null);
+  const [selectedQuoteIds, setSelectedQuoteIds] = useState<string[]>([]);
+  const [quoteForm] = Form.useForm();
   const [form] = Form.useForm();
   const [orderForm] = Form.useForm();
 
@@ -275,6 +279,42 @@ const SupplyChainManagement: React.FC = () => {
     },
   ];
 
+  const handleRequestQuotes = async (values: any) => {
+    setLoading(true);
+    try {
+      const res = await apiClient.post('/api/v1/supply-chain/quotes/request', values);
+      setQuotes(res.data.quotes || []);
+      setSelectedQuoteIds([]);
+      setCompareResult(null);
+    } catch (err: any) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCompareQuotes = async () => {
+    if (selectedQuoteIds.length < 2) return;
+    setLoading(true);
+    try {
+      const res = await apiClient.post('/api/v1/supply-chain/quotes/compare', { quote_ids: selectedQuoteIds });
+      setCompareResult(res.data);
+    } catch (err: any) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const quoteColumns = [
+    { title: '供应商', dataIndex: 'supplier_name', key: 'supplier_name' },
+    { title: '单价', dataIndex: 'unit_price', key: 'unit_price', render: (v: number) => `¥${v?.toFixed(2)}` },
+    { title: '总价', dataIndex: 'total_price', key: 'total_price', render: (v: number) => `¥${v?.toFixed(2)}` },
+    { title: '交货天数', dataIndex: 'delivery_days', key: 'delivery_days', render: (v: number) => `${v}天` },
+    { title: '评分', dataIndex: 'score', key: 'score', render: (v: number) => v?.toFixed(1) },
+    { title: '推荐', dataIndex: 'recommended', key: 'recommended', render: (v: boolean) => v ? <Tag color="green">推荐</Tag> : null },
+  ];
+
   return (
     <div style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
       <h1 style={{ marginBottom: '24px' }}>
@@ -371,6 +411,55 @@ const SupplyChainManagement: React.FC = () => {
               loading={loading}
               pagination={{ pageSize: 10 }}
             />
+          </TabPane>
+          <TabPane tab="报价管理" key="quotes">
+            <Row gutter={16}>
+              <Col span={10}>
+                <Card size="small" title="请求报价">
+                  <Form form={quoteForm} layout="vertical" onFinish={handleRequestQuotes}>
+                    <Form.Item name="material_id" label="物料ID" rules={[{ required: true }]}>
+                      <Input placeholder="例：MAT001" />
+                    </Form.Item>
+                    <Form.Item name="quantity" label="数量" rules={[{ required: true }]}>
+                      <InputNumber min={1} style={{ width: '100%' }} />
+                    </Form.Item>
+                    <Form.Item name="required_date" label="需求日期" rules={[{ required: true }]}>
+                      <Input type="date" />
+                    </Form.Item>
+                    <Button type="primary" htmlType="submit" loading={loading} block>获取报价</Button>
+                  </Form>
+                </Card>
+              </Col>
+              <Col span={14}>
+                {quotes.length > 0 && (
+                  <Space direction="vertical" style={{ width: '100%' }}>
+                    <Table
+                      columns={quoteColumns}
+                      dataSource={quotes}
+                      rowKey="quote_id"
+                      size="small"
+                      pagination={false}
+                      rowSelection={{
+                        selectedRowKeys: selectedQuoteIds,
+                        onChange: (keys) => setSelectedQuoteIds(keys as string[]),
+                      }}
+                    />
+                    <Button
+                      type="primary"
+                      disabled={selectedQuoteIds.length < 2}
+                      onClick={handleCompareQuotes}
+                    >
+                      比较选中报价（{selectedQuoteIds.length}）
+                    </Button>
+                    {compareResult && (
+                      <Card size="small" title="比较结果">
+                        <pre style={{ fontSize: 12, margin: 0 }}>{JSON.stringify(compareResult, null, 2)}</pre>
+                      </Card>
+                    )}
+                  </Space>
+                )}
+              </Col>
+            </Row>
           </TabPane>
         </Tabs>
       </Card>
