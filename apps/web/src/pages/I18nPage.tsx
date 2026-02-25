@@ -4,7 +4,8 @@ import {
   Spin, Typography, Descriptions, Tag, InputNumber, Table
 } from 'antd';
 import { GlobalOutlined, DollarOutlined, TranslationOutlined } from '@ant-design/icons';
-import { apiClient, handleApiError } from '../utils/api';
+import { apiClient } from '../services/api';
+import { handleApiError } from '../utils/message';
 
 const { Title, Text } = Typography;
 const { Option } = Select;

@@ -1,12 +1,13 @@
 import React, { useState, useCallback } from 'react';
 import {
-  Card, Row, Col, Statistic, Tabs, Table, Tag, Space, Button, Form,
-  Input, Select, Spin, Typography, Descriptions, InputNumber, Modal, Avatar
+  Card, Row, Col, Tabs, Table, Tag, Space, Button, Form,
+  Input, Select, Spin, Typography, Descriptions, InputNumber, Avatar
 } from 'antd';
 import {
-  AppstoreOutlined, UserAddOutlined, ShopOutlined, ApiOutlined, DollarOutlined
+  AppstoreOutlined, UserAddOutlined, ShopOutlined
 } from '@ant-design/icons';
-import { apiClient, handleApiError, showSuccess } from '../utils/api';
+import { apiClient } from '../services/api';
+import { handleApiError, showSuccess } from '../utils/message';
 
 const { Title, Text } = Typography;
 const { Option } = Select;

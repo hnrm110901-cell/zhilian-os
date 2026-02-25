@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Card, Row, Col, Statistic, Tabs, Table, Tag, Space, Select,
-  Button, Form, Input, InputNumber, Spin, Typography, Badge, Descriptions, Modal, message
+  Card, Row, Col, Tag, Space, Select,
+  Button, Form, Input, Spin, Typography, Badge, Descriptions,
 } from 'antd';
 import {
-  CloudOutlined, WifiOutlined, SyncOutlined, DatabaseOutlined, ThunderboltOutlined
+  SyncOutlined, ThunderboltOutlined
 } from '@ant-design/icons';
-import { apiClient, handleApiError, showSuccess } from '../utils/api';
+import { apiClient } from '../services/api';
+import { handleApiError, showSuccess } from '../utils/message';
 
 const { Title, Text } = Typography;
 const { Option } = Select;

@@ -5,7 +5,6 @@ import {
 } from 'antd';
 import { PlusOutlined, ReloadOutlined, ScanOutlined, WarningOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import dayjs from 'dayjs';
 import { apiClient } from '../services/api';
 import { handleApiError, showSuccess } from '../utils/message';
 

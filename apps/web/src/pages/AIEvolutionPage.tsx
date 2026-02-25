@@ -7,7 +7,8 @@ import {
   RobotOutlined, RiseOutlined, CheckCircleOutlined, ThunderboltOutlined
 } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
-import { apiClient, handleApiError } from '../utils/api';
+import { apiClient } from '../services/api';
+import { handleApiError } from '../utils/message';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
