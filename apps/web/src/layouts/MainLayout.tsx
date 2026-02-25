@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Layout, Menu, theme, Dropdown, Avatar, Space, Tag, Breadcrumb, Badge, Tooltip, Button } from 'antd';
 import type { MenuProps } from 'antd';
 import {
@@ -58,6 +58,35 @@ const MainLayout: React.FC = () => {
   const {
     token: { colorBgContainer, borderRadiusLG },
   } = theme.useToken();
+
+  // 根据当前路径计算应展开的子菜单
+  const routeToGroupKey: Record<string, string> = {
+    '/schedule': 'agents', '/order': 'agents', '/inventory': 'agents',
+    '/service': 'agents', '/training': 'agents', '/decision': 'agents', '/reservation': 'agents',
+    '/multi-store': 'business', '/supply-chain': 'business', '/finance': 'business',
+    '/data-visualization': 'analytics', '/analytics': 'analytics', '/monitoring': 'analytics',
+    '/users': 'admin-system', '/enterprise': 'admin-system', '/backup': 'admin-system',
+    '/audit': 'admin-system', '/data-import-export': 'admin-system',
+    '/open-platform': 'admin-system', '/industry-solutions': 'admin-system', '/i18n': 'admin-system',
+    '/forecast': 'admin-analytics', '/cross-store-insights': 'admin-analytics',
+    '/recommendations': 'admin-analytics', '/competitive-analysis': 'admin-analytics',
+    '/report-templates': 'admin-analytics', '/kpi-dashboard': 'admin-analytics',
+    '/private-domain': 'admin-crm', '/members': 'admin-crm', '/customer360': 'admin-crm',
+    '/pos': 'admin-store', '/quality': 'admin-store', '/compliance': 'admin-store',
+    '/human-in-the-loop': 'admin-store',
+    '/ai-evolution': 'admin-ai', '/edge-node': 'admin-ai', '/decision-validator': 'admin-ai',
+    '/federated-learning': 'admin-ai', '/agent-collaboration': 'admin-ai',
+  };
+  const activeGroupKey = routeToGroupKey[location.pathname];
+  const [openKeys, setOpenKeys] = useState<string[]>(activeGroupKey ? [activeGroupKey] : []);
+
+  // 路由变化时自动展开对应子菜单
+  useEffect(() => {
+    const groupKey = routeToGroupKey[location.pathname];
+    if (groupKey && !openKeys.includes(groupKey)) {
+      setOpenKeys(prev => [...prev, groupKey]);
+    }
+  }, [location.pathname]);
 
   // 全局快捷键
   useKeyboardShortcuts([
@@ -408,6 +437,8 @@ const MainLayout: React.FC = () => {
         <Menu
           theme="dark"
           selectedKeys={[location.pathname]}
+          openKeys={collapsed ? [] : openKeys}
+          onOpenChange={setOpenKeys}
           mode="inline"
           items={menuItems}
           onClick={handleMenuClick}
