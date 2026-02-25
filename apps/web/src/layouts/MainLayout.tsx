@@ -30,6 +30,8 @@ import {
   BulbFilled,
   SearchOutlined,
   RiseOutlined,
+  GlobalOutlined,
+  SafetyOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -112,6 +114,10 @@ const MainLayout: React.FC = () => {
     '/data-import-export': '数据导入导出',
     '/competitive-analysis': '竞争分析',
     '/report-templates': '报表模板',
+    '/forecast': '需求预测',
+    '/cross-store-insights': '跨门店洞察',
+    '/human-in-the-loop': '人工审批',
+    '/recommendations': '推荐引擎',
   };
 
   // 生成面包屑项
@@ -312,6 +318,26 @@ const MainLayout: React.FC = () => {
         key: '/report-templates',
         icon: <FileTextOutlined />,
         label: '报表模板',
+      },
+      {
+        key: '/forecast',
+        icon: <LineChartOutlined />,
+        label: '需求预测',
+      },
+      {
+        key: '/cross-store-insights',
+        icon: <GlobalOutlined />,
+        label: '跨门店洞察',
+      },
+      {
+        key: '/human-in-the-loop',
+        icon: <SafetyOutlined />,
+        label: '人工审批',
+      },
+      {
+        key: '/recommendations',
+        icon: <BulbOutlined />,
+        label: '推荐引擎',
       }
     ] : []),
   ];

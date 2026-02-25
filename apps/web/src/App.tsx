@@ -30,6 +30,10 @@ import AuditLogPage from './pages/AuditLogPage';
 import DataImportExportPage from './pages/DataImportExportPage';
 import CompetitiveAnalysis from './pages/CompetitiveAnalysis';
 import ReportTemplates from './pages/ReportTemplates';
+import ForecastPage from './pages/ForecastPage';
+import CrossStoreInsights from './pages/CrossStoreInsights';
+import HumanInTheLoop from './pages/HumanInTheLoop';
+import RecommendationsPage from './pages/RecommendationsPage';
 import LoginPage from './pages/LoginPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 
@@ -133,6 +137,26 @@ const AppContent: React.FC = () => {
               <Route path="report-templates" element={
                 <ProtectedRoute requiredRole="admin">
                   <ReportTemplates />
+                </ProtectedRoute>
+              } />
+              <Route path="forecast" element={
+                <ProtectedRoute requiredRole="admin">
+                  <ForecastPage />
+                </ProtectedRoute>
+              } />
+              <Route path="cross-store-insights" element={
+                <ProtectedRoute requiredRole="admin">
+                  <CrossStoreInsights />
+                </ProtectedRoute>
+              } />
+              <Route path="human-in-the-loop" element={
+                <ProtectedRoute requiredRole="admin">
+                  <HumanInTheLoop />
+                </ProtectedRoute>
+              } />
+              <Route path="recommendations" element={
+                <ProtectedRoute requiredRole="admin">
+                  <RecommendationsPage />
                 </ProtectedRoute>
               } />
             </Route>
