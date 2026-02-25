@@ -37,7 +37,7 @@ const Dashboard: React.FC = () => {
         clearInterval(intervalId);
       }
     };
-  }, [autoRefresh, refreshInterval]);
+  }, [autoRefresh, refreshInterval, loadDashboardData]);
 
   const loadDashboardData = useCallback(async () => {
     try {
