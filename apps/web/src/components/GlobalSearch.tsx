@@ -117,6 +117,9 @@ const searchData: SearchResult[] = [
   { id: '55', title: '审批管理', description: 'AI决策人工审批、拒绝和修改', path: '/approval', icon: <CheckCircleOutlined />, category: '系统管理' },
   { id: '56', title: '门店管理', description: '门店CRUD和统计数据查看', path: '/stores', icon: <ShopOutlined />, category: '系统管理' },
   { id: '57', title: '导出任务', description: '数据导出任务管理和文件下载', path: '/export-jobs', icon: <ExportOutlined />, category: '系统管理' },
+  { id: '58', title: '排队管理', description: '餐厅叫号排队和入座管理', path: '/queue', icon: <TeamOutlined />, category: '门店运营' },
+  { id: '59', title: '智能体记忆', description: 'AI智能体共享记忆流监控', path: '/agent-memory', icon: <DatabaseOutlined />, category: 'AI基础设施' },
+  { id: '60', title: '微信触发器', description: '微信推送触发规则管理', path: '/wechat-triggers', icon: <BellOutlined />, category: '系统管理' },
 ];
 
 interface GlobalSearchProps {

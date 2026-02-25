@@ -73,6 +73,9 @@ const BenchmarkPage = lazy(() => import('./pages/BenchmarkPage'));
 const ApprovalManagementPage = lazy(() => import('./pages/ApprovalManagementPage'));
 const StoreManagementPage = lazy(() => import('./pages/StoreManagementPage'));
 const ExportJobsPage = lazy(() => import('./pages/ExportJobsPage'));
+const QueueManagementPage = lazy(() => import('./pages/QueueManagementPage'));
+const AgentMemoryPage = lazy(() => import('./pages/AgentMemoryPage'));
+const WeChatTriggersPage = lazy(() => import('./pages/WeChatTriggersPage'));
 
 const PageLoader = (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
@@ -258,6 +261,15 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="export-jobs" element={
                     <ProtectedRoute requiredRole="admin"><ExportJobsPage /></ProtectedRoute>
+                  } />
+                  <Route path="queue" element={
+                    <ProtectedRoute requiredRole="admin"><QueueManagementPage /></ProtectedRoute>
+                  } />
+                  <Route path="agent-memory" element={
+                    <ProtectedRoute requiredRole="admin"><AgentMemoryPage /></ProtectedRoute>
+                  } />
+                  <Route path="wechat-triggers" element={
+                    <ProtectedRoute requiredRole="admin"><WeChatTriggersPage /></ProtectedRoute>
                   } />
                 </Route>
                 <Route path="*" element={<NotFoundPage />} />
