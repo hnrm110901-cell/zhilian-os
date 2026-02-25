@@ -9,6 +9,7 @@ import {
 } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { apiClient } from '../services/api';
+import { handleApiError } from '../utils/message';
 import { decisionAgentService, type DecisionReport } from '../services/decisionAgent';
 import { PageHeader, DataCard, LoadingSkeleton } from '../components';
 
@@ -54,7 +55,7 @@ const Dashboard: React.FC = () => {
       setDecisionReport(report);
       setLastRefreshTime(new Date());
     } catch (err: any) {
-      console.error('Dashboard data loading error:', err);
+      handleApiError(err, '加载仪表盘数据失败');
       setError(err.message || '无法加载数据');
     } finally {
       setLoading(false);
