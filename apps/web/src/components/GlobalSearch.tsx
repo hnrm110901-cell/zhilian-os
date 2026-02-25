@@ -33,6 +33,8 @@ import {
   CheckCircleOutlined,
   BellOutlined,
   SettingOutlined,
+  ExportOutlined,
+  SyncOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 
@@ -113,6 +115,15 @@ const searchData: SearchResult[] = [
   { id: '53', title: '嵌入模型', description: '向量嵌入训练和相似度计算', path: '/embedding', icon: <ExperimentOutlined />, category: 'AI基础设施' },
   // 智能分析（批次4）
   { id: '54', title: '基准测试', description: '行业基准对比和综合评分', path: '/benchmark', icon: <BarChartOutlined />, category: '智能分析' },
+  { id: '55', title: '审批管理', description: 'AI决策人工审批、拒绝和修改', path: '/approval', icon: <CheckCircleOutlined />, category: '系统管理' },
+  { id: '56', title: '门店管理', description: '门店CRUD和统计数据查看', path: '/stores', icon: <ShopOutlined />, category: '系统管理' },
+  { id: '57', title: '导出任务', description: '数据导出任务管理和文件下载', path: '/export-jobs', icon: <ExportOutlined />, category: '系统管理' },
+  { id: '58', title: '排队管理', description: '餐厅叫号排队和入座管理', path: '/queue', icon: <TeamOutlined />, category: '门店运营' },
+  { id: '59', title: '智能体记忆', description: 'AI智能体共享记忆流监控', path: '/agent-memory', icon: <DatabaseOutlined />, category: 'AI基础设施' },
+  { id: '60', title: '微信触发器', description: '微信推送触发规则管理', path: '/wechat-triggers', icon: <BellOutlined />, category: '系统管理' },
+  { id: '61', title: '事件溯源', description: '神经系统事件处理链监控', path: '/event-sourcing', icon: <FileTextOutlined />, category: 'AI基础设施' },
+  { id: '62', title: '美团排队', description: '美团/大众点评排队集成配置', path: '/meituan-queue', icon: <SyncOutlined />, category: '门店运营' },
+  { id: '63', title: '向量知识库', description: '向量索引管理和语义搜索', path: '/vector-index', icon: <SearchOutlined />, category: 'AI基础设施' },
 ];
 
 interface GlobalSearchProps {

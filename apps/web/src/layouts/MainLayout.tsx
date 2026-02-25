@@ -40,6 +40,7 @@ import {
   AppstoreOutlined,
   TranslationOutlined,
   ExportOutlined,
+  SyncOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -72,6 +73,8 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/integrations': 'admin-system', '/neural': 'admin-ai', '/embedding': 'admin-ai',
   '/scheduler': 'admin-system', '/benchmark': 'admin-analytics',
   '/approval': 'admin-system', '/stores': 'admin-system', '/export-jobs': 'admin-system',
+  '/queue': 'admin-store', '/agent-memory': 'admin-ai', '/wechat-triggers': 'admin-system',
+  '/event-sourcing': 'admin-ai', '/meituan-queue': 'admin-store', '/vector-index': 'admin-ai',
 };
 
 const MainLayout: React.FC = () => {
@@ -196,6 +199,12 @@ const MainLayout: React.FC = () => {
     '/approval': '审批管理',
     '/stores': '门店管理',
     '/export-jobs': '导出任务',
+    '/queue': '排队管理',
+    '/agent-memory': '智能体记忆',
+    '/wechat-triggers': '微信触发器',
+    '/event-sourcing': '事件溯源',
+    '/meituan-queue': '美团排队',
+    '/vector-index': '向量知识库',
   };
 
   // 生成面包屑项
@@ -386,6 +395,7 @@ const MainLayout: React.FC = () => {
           { key: '/approval', icon: <CheckCircleOutlined />, label: '审批管理' },
           { key: '/stores', icon: <ShopOutlined />, label: '门店管理' },
           { key: '/export-jobs', icon: <ExportOutlined />, label: '导出任务' },
+          { key: '/wechat-triggers', icon: <BellOutlined />, label: '微信触发器' },
         ],
       },
       {
@@ -421,6 +431,8 @@ const MainLayout: React.FC = () => {
           { key: '/quality', icon: <CheckCircleOutlined />, label: '质量管理' },
           { key: '/compliance', icon: <SafetyOutlined />, label: '合规管理' },
           { key: '/human-in-the-loop', icon: <SafetyOutlined />, label: '人工审批' },
+          { key: '/queue', icon: <TeamOutlined />, label: '排队管理' },
+          { key: '/meituan-queue', icon: <SyncOutlined />, label: '美团排队' },
         ],
       },
       {
@@ -437,6 +449,9 @@ const MainLayout: React.FC = () => {
           { key: '/hardware', icon: <CloudOutlined />, label: '硬件管理' },
           { key: '/neural', icon: <ApartmentOutlined />, label: '神经系统' },
           { key: '/embedding', icon: <ExperimentOutlined />, label: '嵌入模型' },
+          { key: '/agent-memory', icon: <DatabaseOutlined />, label: '智能体记忆' },
+          { key: '/event-sourcing', icon: <FileTextOutlined />, label: '事件溯源' },
+          { key: '/vector-index', icon: <SearchOutlined />, label: '向量知识库' },
         ],
       },
     ] : []),
