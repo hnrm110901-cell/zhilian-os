@@ -38,6 +38,7 @@ from .ai_model import AIModel, ModelPurchaseRecord, DataContributionRecord, Mode
 from .federated_learning import FLTrainingRound, FLModelUpload, RoundStatus
 from .marketing_campaign import MarketingCampaign
 from .report_template import ReportTemplate, ScheduledReport, ReportFormat, ScheduleFrequency
+from .competitor import CompetitorStore, CompetitorPrice
 
 __all__ = [
     "Base",
@@ -113,4 +114,6 @@ __all__ = [
     "ScheduledReport",
     "ReportFormat",
     "ScheduleFrequency",
+    "CompetitorStore",
+    "CompetitorPrice",
 ]
