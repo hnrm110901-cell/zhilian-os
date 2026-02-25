@@ -182,18 +182,30 @@ async def create_notification(
 @router.get("/notifications", response_model=List[NotificationResponse])
 async def get_notifications(
     is_read: Optional[bool] = None,
+    type: Optional[NotificationType] = Query(None, description="通知类型过滤"),
+    priority: Optional[NotificationPriority] = Query(None, description="优先级过滤"),
+    keyword: Optional[str] = Query(None, description="关键词搜索（标题或内容）"),
     limit: int = Query(50, le=100),
     offset: int = Query(0, ge=0),
     current_user: User = Depends(get_current_active_user),
 ):
     """
     获取当前用户的通知列表
+
+    支持过滤参数:
+    - is_read: 是否已读
+    - type: 通知类型 (info/warning/error/success/alert)
+    - priority: 优先级 (low/normal/high/urgent)
+    - keyword: 关键词搜索（匹配标题或内容）
     """
     notifications = await notification_service.get_user_notifications(
         user_id=str(current_user.id),
         role=current_user.role.value,
         store_id=current_user.store_id,
         is_read=is_read,
+        type_filter=type.value if type else None,
+        priority_filter=priority.value if priority else None,
+        keyword=keyword,
         limit=limit,
         offset=offset,
     )

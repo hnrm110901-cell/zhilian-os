@@ -113,6 +113,9 @@ class NotificationService:
         role: str,
         store_id: Optional[str] = None,
         is_read: Optional[bool] = None,
+        type_filter: Optional[str] = None,
+        priority_filter: Optional[str] = None,
+        keyword: Optional[str] = None,
         limit: int = int(os.getenv("NOTIFICATION_QUERY_LIMIT", "50")),
         offset: int = 0,
     ) -> List[Notification]:
@@ -160,6 +163,21 @@ class NotificationService:
             # 是否已读过滤
             if is_read is not None:
                 stmt = stmt.where(Notification.is_read == is_read)
+
+            # 类型过滤
+            if type_filter is not None:
+                stmt = stmt.where(Notification.type == type_filter)
+
+            # 优先级过滤
+            if priority_filter is not None:
+                stmt = stmt.where(Notification.priority == priority_filter)
+
+            # 关键词搜索（标题或内容）
+            if keyword is not None:
+                kw = f"%{keyword}%"
+                stmt = stmt.where(
+                    or_(Notification.title.ilike(kw), Notification.message.ilike(kw))
+                )
 
             # 排序和分页
             stmt = stmt.order_by(Notification.created_at.desc()).limit(limit).offset(offset)

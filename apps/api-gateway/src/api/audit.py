@@ -4,8 +4,10 @@
 from typing import Optional
 from datetime import datetime, date
 from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
+import io
 
 from src.core.database import get_db
 from src.core.dependencies import get_current_active_user, require_permission
@@ -187,3 +189,43 @@ async def get_available_resource_types(
         "resource_types": resource_types,
         "count": len(resource_types),
     }
+
+
+@router.get("/logs/export")
+async def export_audit_logs(
+    user_id: Optional[str] = Query(None),
+    action: Optional[str] = Query(None),
+    resource_type: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    store_id: Optional[str] = Query(None),
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+    search: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission(Permission.AUDIT_READ)),
+):
+    """
+    导出审计日志为 CSV 文件
+
+    需要AUDIT_READ权限，最多导出 10000 条记录
+    """
+    start_datetime = datetime.combine(start_date, datetime.min.time()) if start_date else None
+    end_datetime = datetime.combine(end_date, datetime.max.time()) if end_date else None
+
+    csv_content = await audit_log_service.export_logs_csv(
+        user_id=user_id,
+        action=action,
+        resource_type=resource_type,
+        status=status,
+        store_id=store_id,
+        start_date=start_datetime,
+        end_date=end_datetime,
+        search_query=search,
+    )
+
+    filename = f"audit_logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    return StreamingResponse(
+        io.StringIO(csv_content),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )

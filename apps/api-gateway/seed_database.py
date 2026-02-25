@@ -14,7 +14,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 from src.core.database import get_db_session
 from src.models import (
     User, Store, Employee, Order, OrderItem, InventoryItem, InventoryTransaction,
-    Schedule, Shift, Reservation, KPI, KPIRecord, Supplier, PurchaseOrder
+    Schedule, Shift, Reservation, KPI, KPIRecord, Supplier, PurchaseOrder,
+    FinancialTransaction, Budget, Invoice,
 )
 from src.models.user import UserRole
 from src.models.order import OrderStatus
@@ -361,6 +362,212 @@ async def seed_purchase_orders():
     return orders
 
 
+async def seed_financial_transactions():
+    """Create sample financial transactions (近30天)"""
+    today = date.today()
+    transactions = []
+
+    # 每天生成销售收入和主要支出
+    for days_ago in range(30, 0, -1):
+        tx_date = today - timedelta(days=days_ago)
+
+        # 销售收入（STORE001）
+        transactions.append(FinancialTransaction(
+            store_id="STORE001",
+            transaction_date=tx_date,
+            transaction_type="income",
+            category="sales",
+            subcategory="dine_in",
+            amount=int((28000 + days_ago * 200) * 100),  # 约2.8万元
+            description=f"{tx_date} 堂食销售收入",
+            payment_method="mixed",
+            created_by="system",
+        ))
+
+        # 外卖收入
+        transactions.append(FinancialTransaction(
+            store_id="STORE001",
+            transaction_date=tx_date,
+            transaction_type="income",
+            category="sales",
+            subcategory="delivery",
+            amount=int((8000 + days_ago * 50) * 100),  # 约8000元
+            description=f"{tx_date} 外卖销售收入",
+            payment_method="online",
+            created_by="system",
+        ))
+
+        # 食材成本（每3天采购一次）
+        if days_ago % 3 == 0:
+            transactions.append(FinancialTransaction(
+                store_id="STORE001",
+                transaction_date=tx_date,
+                transaction_type="expense",
+                category="food_cost",
+                subcategory="ingredients",
+                amount=int(12000 * 100),  # 1.2万元
+                description=f"{tx_date} 食材采购",
+                payment_method="bank_transfer",
+                created_by="manager",
+            ))
+
+        # 人工成本（每月1日）
+        if tx_date.day == 1:
+            transactions.append(FinancialTransaction(
+                store_id="STORE001",
+                transaction_date=tx_date,
+                transaction_type="expense",
+                category="labor_cost",
+                subcategory="salary",
+                amount=int(120000 * 100),  # 12万元
+                description=f"{tx_date.year}年{tx_date.month}月员工工资",
+                payment_method="bank_transfer",
+                created_by="admin",
+            ))
+
+        # 水电费（每月15日）
+        if tx_date.day == 15:
+            transactions.append(FinancialTransaction(
+                store_id="STORE001",
+                transaction_date=tx_date,
+                transaction_type="expense",
+                category="utilities",
+                subcategory="electricity",
+                amount=int(8000 * 100),  # 8000元
+                description=f"{tx_date.year}年{tx_date.month}月水电费",
+                payment_method="bank_transfer",
+                created_by="manager",
+            ))
+
+    return transactions
+
+
+async def seed_budgets():
+    """Create sample budgets (当月和上月)"""
+    today = date.today()
+    budgets = []
+
+    for month_offset in range(2):  # 当月和上月
+        if today.month - month_offset < 1:
+            year = today.year - 1
+            month = today.month - month_offset + 12
+        else:
+            year = today.year
+            month = today.month - month_offset
+
+        budget_items = [
+            ("revenue",    3600000 * 100, 3420000 * 100),   # 收入预算 36万
+            ("food_cost",  1080000 * 100, 1026000 * 100),   # 食材成本 10.8万
+            ("labor_cost",  720000 * 100,  720000 * 100),   # 人工成本 7.2万
+            ("rent",        300000 * 100,  300000 * 100),   # 租金 3万
+            ("utilities",    96000 * 100,   88000 * 100),   # 水电 9600元
+            ("marketing",    60000 * 100,   45000 * 100),   # 营销 6000元
+        ]
+
+        for category, budgeted, actual in budget_items:
+            variance = actual - budgeted
+            variance_pct = (variance / budgeted * 100) if budgeted else 0.0
+            budgets.append(Budget(
+                store_id="STORE001",
+                year=year,
+                month=month,
+                category=category,
+                budgeted_amount=budgeted,
+                actual_amount=actual,
+                variance=variance,
+                variance_percentage=round(variance_pct, 2),
+                notes=f"{year}年{month}月{category}预算",
+                created_by="admin",
+                approved_by="admin",
+                approved_at=datetime(year, month, 1),
+            ))
+
+    return budgets
+
+
+async def seed_invoices():
+    """Create sample invoices"""
+    today = date.today()
+    invoices = [
+        # 销售发票
+        Invoice(
+            invoice_number="INV-2024-001",
+            store_id="STORE001",
+            invoice_type="sales",
+            invoice_date=today - timedelta(days=20),
+            due_date=today - timedelta(days=10),
+            customer_name="北京科技有限公司",
+            tax_number="91110000123456789X",
+            total_amount=int(56500 * 100),
+            tax_amount=int(6500 * 100),
+            net_amount=int(50000 * 100),
+            status="paid",
+            items=[
+                {"name": "商务宴请套餐", "quantity": 10, "unit_price": 5000, "amount": 50000},
+            ],
+            notes="企业团餐",
+            created_by="manager",
+        ),
+        Invoice(
+            invoice_number="INV-2024-002",
+            store_id="STORE001",
+            invoice_type="sales",
+            invoice_date=today - timedelta(days=10),
+            due_date=today + timedelta(days=20),
+            customer_name="上海贸易集团",
+            tax_number="91310000987654321A",
+            total_amount=int(33900 * 100),
+            tax_amount=int(3900 * 100),
+            net_amount=int(30000 * 100),
+            status="pending",
+            items=[
+                {"name": "会议餐饮服务", "quantity": 6, "unit_price": 5000, "amount": 30000},
+            ],
+            notes="季度会议餐饮",
+            created_by="manager",
+        ),
+        # 采购发票
+        Invoice(
+            invoice_number="PUR-2024-001",
+            store_id="STORE001",
+            invoice_type="purchase",
+            invoice_date=today - timedelta(days=15),
+            due_date=today - timedelta(days=5),
+            supplier_id="SUP001",
+            total_amount=int(11300 * 100),
+            tax_amount=int(1300 * 100),
+            net_amount=int(10000 * 100),
+            status="paid",
+            items=[
+                {"name": "白菜", "quantity": 200, "unit": "kg", "unit_price": 30, "amount": 6000},
+                {"name": "土豆", "quantity": 100, "unit": "kg", "unit_price": 20, "amount": 2000},
+                {"name": "西红柿", "quantity": 80, "unit": "kg", "unit_price": 25, "amount": 2000},
+            ],
+            notes="蔬菜采购",
+            created_by="manager",
+        ),
+        Invoice(
+            invoice_number="PUR-2024-002",
+            store_id="STORE001",
+            invoice_type="purchase",
+            invoice_date=today - timedelta(days=5),
+            due_date=today + timedelta(days=25),
+            supplier_id="SUP002",
+            total_amount=int(22600 * 100),
+            tax_amount=int(2600 * 100),
+            net_amount=int(20000 * 100),
+            status="pending",
+            items=[
+                {"name": "猪肉", "quantity": 100, "unit": "kg", "unit_price": 120, "amount": 12000},
+                {"name": "牛肉", "quantity": 40, "unit": "kg", "unit_price": 200, "amount": 8000},
+            ],
+            notes="肉类采购",
+            created_by="manager",
+        ),
+    ]
+    return invoices
+
+
 async def main():
     """Main seed function"""
     print("🌱 Starting database seeding...")
@@ -416,6 +623,27 @@ async def main():
             await session.flush()
             print(f"✓ Created {len(purchase_orders)} purchase orders")
 
+            # Seed financial transactions
+            print("Creating financial transactions...")
+            financial_transactions = await seed_financial_transactions()
+            session.add_all(financial_transactions)
+            await session.flush()
+            print(f"✓ Created {len(financial_transactions)} financial transactions")
+
+            # Seed budgets
+            print("Creating budgets...")
+            budgets = await seed_budgets()
+            session.add_all(budgets)
+            await session.flush()
+            print(f"✓ Created {len(budgets)} budgets")
+
+            # Seed invoices
+            print("Creating invoices...")
+            invoices = await seed_invoices()
+            session.add_all(invoices)
+            await session.flush()
+            print(f"✓ Created {len(invoices)} invoices")
+
             # Create sample KPI records
             print("Creating KPI records...")
             today = date.today()
@@ -458,6 +686,9 @@ async def main():
             print(f"  - KPI Records: {len(kpi_records)}")
             print(f"  - Suppliers: {len(suppliers)}")
             print(f"  - Purchase Orders: {len(purchase_orders)}")
+            print(f"  - Financial Transactions: {len(financial_transactions)}")
+            print(f"  - Budgets: {len(budgets)}")
+            print(f"  - Invoices: {len(invoices)}")
 
         except Exception as e:
             await session.rollback()
