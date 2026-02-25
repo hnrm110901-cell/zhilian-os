@@ -37,6 +37,7 @@ import RecommendationsPage from './pages/RecommendationsPage';
 import PrivateDomainPage from './pages/PrivateDomainPage';
 import MemberSystemPage from './pages/MemberSystemPage';
 import KPIDashboardPage from './pages/KPIDashboardPage';
+import Customer360Page from './pages/Customer360Page';
 import LoginPage from './pages/LoginPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 
@@ -175,6 +176,11 @@ const AppContent: React.FC = () => {
               <Route path="kpi-dashboard" element={
                 <ProtectedRoute requiredRole="admin">
                   <KPIDashboardPage />
+                </ProtectedRoute>
+              } />
+              <Route path="customer360" element={
+                <ProtectedRoute requiredRole="admin">
+                  <Customer360Page />
                 </ProtectedRoute>
               } />
             </Route>
