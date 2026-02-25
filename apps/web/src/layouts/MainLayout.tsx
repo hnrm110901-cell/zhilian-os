@@ -39,6 +39,7 @@ import {
   ApartmentOutlined,
   AppstoreOutlined,
   TranslationOutlined,
+  ExportOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -70,6 +71,7 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/llm-config': 'admin-ai', '/hardware': 'admin-ai',
   '/integrations': 'admin-system', '/neural': 'admin-ai', '/embedding': 'admin-ai',
   '/scheduler': 'admin-system', '/benchmark': 'admin-analytics',
+  '/approval': 'admin-system', '/stores': 'admin-system', '/export-jobs': 'admin-system',
 };
 
 const MainLayout: React.FC = () => {
@@ -191,6 +193,9 @@ const MainLayout: React.FC = () => {
     '/embedding': '嵌入模型',
     '/scheduler': '调度管理',
     '/benchmark': '基准测试',
+    '/approval': '审批管理',
+    '/stores': '门店管理',
+    '/export-jobs': '导出任务',
   };
 
   // 生成面包屑项
@@ -378,6 +383,9 @@ const MainLayout: React.FC = () => {
           { key: '/model-marketplace', icon: <AppstoreOutlined />, label: '模型市场' },
           { key: '/integrations', icon: <ApiOutlined />, label: '外部集成' },
           { key: '/scheduler', icon: <CalendarOutlined />, label: '调度管理' },
+          { key: '/approval', icon: <CheckCircleOutlined />, label: '审批管理' },
+          { key: '/stores', icon: <ShopOutlined />, label: '门店管理' },
+          { key: '/export-jobs', icon: <ExportOutlined />, label: '导出任务' },
         ],
       },
       {
