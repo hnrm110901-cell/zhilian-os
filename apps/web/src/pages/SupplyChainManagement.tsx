@@ -8,6 +8,7 @@ import {
   WarningOutlined,
 } from '@ant-design/icons';
 import { apiClient } from '../services/api';
+import { handleApiError } from '../utils/message';
 
 const { Option } = Select;
 const { TabPane } = Tabs;
@@ -32,7 +33,7 @@ const SupplyChainManagement: React.FC = () => {
       const response = await apiClient.get('/supply-chain/suppliers');
       setSuppliers(response.data.suppliers || []);
     } catch (err: any) {
-      console.error('Load suppliers error:', err);
+      handleApiError(err, '加载供应商失败');
     }
   }, []);
 
@@ -41,7 +42,7 @@ const SupplyChainManagement: React.FC = () => {
       const response = await apiClient.get('/supply-chain/purchase-orders');
       setPurchaseOrders(response.data.orders || []);
     } catch (err: any) {
-      console.error('Load purchase orders error:', err);
+      handleApiError(err, '加载采购订单失败');
     }
   }, []);
 
@@ -50,7 +51,7 @@ const SupplyChainManagement: React.FC = () => {
       const response = await apiClient.get('/supply-chain/replenishment-suggestions');
       setReplenishmentSuggestions(response.data.suggestions || []);
     } catch (err: any) {
-      console.error('Load replenishment suggestions error:', err);
+      handleApiError(err, '加载补货建议失败');
     }
   }, []);
 
@@ -74,7 +75,7 @@ const SupplyChainManagement: React.FC = () => {
       form.resetFields();
       loadSuppliers();
     } catch (err: any) {
-      console.error('Create supplier error:', err);
+      handleApiError(err, '创建供应商失败');
     }
   };
 
@@ -85,7 +86,7 @@ const SupplyChainManagement: React.FC = () => {
       orderForm.resetFields();
       loadPurchaseOrders();
     } catch (err: any) {
-      console.error('Create order error:', err);
+      handleApiError(err, '创建订单失败');
     }
   };
 
@@ -94,7 +95,7 @@ const SupplyChainManagement: React.FC = () => {
       await apiClient.patch(`/supply-chain/purchase-orders/${orderId}/status`, { status });
       loadPurchaseOrders();
     } catch (err: any) {
-      console.error('Update order status error:', err);
+      handleApiError(err, '更新订单状态失败');
     }
   };
 
@@ -287,7 +288,7 @@ const SupplyChainManagement: React.FC = () => {
       setSelectedQuoteIds([]);
       setCompareResult(null);
     } catch (err: any) {
-      console.error(err);
+      handleApiError(err, '请求报价失败');
     } finally {
       setLoading(false);
     }
@@ -300,7 +301,7 @@ const SupplyChainManagement: React.FC = () => {
       const res = await apiClient.post('/api/v1/supply-chain/quotes/compare', { quote_ids: selectedQuoteIds });
       setCompareResult(res.data);
     } catch (err: any) {
-      console.error(err);
+      handleApiError(err, '比较报价失败');
     } finally {
       setLoading(false);
     }
