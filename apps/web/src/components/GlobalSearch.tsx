@@ -34,6 +34,7 @@ import {
   BellOutlined,
   SettingOutlined,
   ExportOutlined,
+  SyncOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 
@@ -120,6 +121,9 @@ const searchData: SearchResult[] = [
   { id: '58', title: '排队管理', description: '餐厅叫号排队和入座管理', path: '/queue', icon: <TeamOutlined />, category: '门店运营' },
   { id: '59', title: '智能体记忆', description: 'AI智能体共享记忆流监控', path: '/agent-memory', icon: <DatabaseOutlined />, category: 'AI基础设施' },
   { id: '60', title: '微信触发器', description: '微信推送触发规则管理', path: '/wechat-triggers', icon: <BellOutlined />, category: '系统管理' },
+  { id: '61', title: '事件溯源', description: '神经系统事件处理链监控', path: '/event-sourcing', icon: <FileTextOutlined />, category: 'AI基础设施' },
+  { id: '62', title: '美团排队', description: '美团/大众点评排队集成配置', path: '/meituan-queue', icon: <SyncOutlined />, category: '门店运营' },
+  { id: '63', title: '向量知识库', description: '向量索引管理和语义搜索', path: '/vector-index', icon: <SearchOutlined />, category: 'AI基础设施' },
 ];
 
 interface GlobalSearchProps {

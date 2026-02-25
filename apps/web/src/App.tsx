@@ -76,6 +76,9 @@ const ExportJobsPage = lazy(() => import('./pages/ExportJobsPage'));
 const QueueManagementPage = lazy(() => import('./pages/QueueManagementPage'));
 const AgentMemoryPage = lazy(() => import('./pages/AgentMemoryPage'));
 const WeChatTriggersPage = lazy(() => import('./pages/WeChatTriggersPage'));
+const EventSourcingPage = lazy(() => import('./pages/EventSourcingPage'));
+const MeituanQueuePage = lazy(() => import('./pages/MeituanQueuePage'));
+const VectorIndexPage = lazy(() => import('./pages/VectorIndexPage'));
 
 const PageLoader = (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
@@ -270,6 +273,15 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="wechat-triggers" element={
                     <ProtectedRoute requiredRole="admin"><WeChatTriggersPage /></ProtectedRoute>
+                  } />
+                  <Route path="event-sourcing" element={
+                    <ProtectedRoute requiredRole="admin"><EventSourcingPage /></ProtectedRoute>
+                  } />
+                  <Route path="meituan-queue" element={
+                    <ProtectedRoute requiredRole="admin"><MeituanQueuePage /></ProtectedRoute>
+                  } />
+                  <Route path="vector-index" element={
+                    <ProtectedRoute requiredRole="admin"><VectorIndexPage /></ProtectedRoute>
                   } />
                 </Route>
                 <Route path="*" element={<NotFoundPage />} />
