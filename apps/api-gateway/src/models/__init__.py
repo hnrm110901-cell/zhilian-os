@@ -37,6 +37,7 @@ from .dish import DishCategory, Dish, DishIngredient
 from .ai_model import AIModel, ModelPurchaseRecord, DataContributionRecord, ModelType, ModelLevel, ModelStatus, PurchaseStatus
 from .federated_learning import FLTrainingRound, FLModelUpload, RoundStatus
 from .marketing_campaign import MarketingCampaign
+from .report_template import ReportTemplate, ScheduledReport, ReportFormat, ScheduleFrequency
 
 __all__ = [
     "Base",
@@ -108,4 +109,8 @@ __all__ = [
     "FLModelUpload",
     "RoundStatus",
     "MarketingCampaign",
+    "ReportTemplate",
+    "ScheduledReport",
+    "ReportFormat",
+    "ScheduleFrequency",
 ]
