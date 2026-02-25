@@ -34,6 +34,9 @@ import {
   SafetyOutlined,
   CheckCircleOutlined,
   RobotOutlined,
+  CloudOutlined,
+  ExperimentOutlined,
+  ApartmentOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -128,6 +131,10 @@ const MainLayout: React.FC = () => {
     '/quality': '质量管理',
     '/compliance': '合规管理',
     '/ai-evolution': 'AI进化看板',
+    '/edge-node': '边缘节点',
+    '/decision-validator': '决策验证',
+    '/federated-learning': '联邦学习',
+    '/agent-collaboration': 'Agent协作',
   };
 
   // 生成面包屑项
@@ -388,6 +395,26 @@ const MainLayout: React.FC = () => {
         key: '/ai-evolution',
         icon: <RobotOutlined />,
         label: 'AI进化看板',
+      },
+      {
+        key: '/edge-node',
+        icon: <CloudOutlined />,
+        label: '边缘节点',
+      },
+      {
+        key: '/decision-validator',
+        icon: <CheckCircleOutlined />,
+        label: '决策验证',
+      },
+      {
+        key: '/federated-learning',
+        icon: <ExperimentOutlined />,
+        label: '联邦学习',
+      },
+      {
+        key: '/agent-collaboration',
+        icon: <ApartmentOutlined />,
+        label: 'Agent协作',
       },
     ] : []),
   ];

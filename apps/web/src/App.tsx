@@ -42,6 +42,10 @@ import POSPage from './pages/POSPage';
 import QualityManagementPage from './pages/QualityManagementPage';
 import CompliancePage from './pages/CompliancePage';
 import AIEvolutionPage from './pages/AIEvolutionPage';
+import EdgeNodePage from './pages/EdgeNodePage';
+import DecisionValidatorPage from './pages/DecisionValidatorPage';
+import FederatedLearningPage from './pages/FederatedLearningPage';
+import AgentCollaborationPage from './pages/AgentCollaborationPage';
 import LoginPage from './pages/LoginPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 
@@ -205,6 +209,26 @@ const AppContent: React.FC = () => {
               <Route path="ai-evolution" element={
                 <ProtectedRoute requiredRole="admin">
                   <AIEvolutionPage />
+                </ProtectedRoute>
+              } />
+              <Route path="edge-node" element={
+                <ProtectedRoute requiredRole="admin">
+                  <EdgeNodePage />
+                </ProtectedRoute>
+              } />
+              <Route path="decision-validator" element={
+                <ProtectedRoute requiredRole="admin">
+                  <DecisionValidatorPage />
+                </ProtectedRoute>
+              } />
+              <Route path="federated-learning" element={
+                <ProtectedRoute requiredRole="admin">
+                  <FederatedLearningPage />
+                </ProtectedRoute>
+              } />
+              <Route path="agent-collaboration" element={
+                <ProtectedRoute requiredRole="admin">
+                  <AgentCollaborationPage />
                 </ProtectedRoute>
               } />
             </Route>
