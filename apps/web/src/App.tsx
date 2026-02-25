@@ -38,6 +38,10 @@ import PrivateDomainPage from './pages/PrivateDomainPage';
 import MemberSystemPage from './pages/MemberSystemPage';
 import KPIDashboardPage from './pages/KPIDashboardPage';
 import Customer360Page from './pages/Customer360Page';
+import POSPage from './pages/POSPage';
+import QualityManagementPage from './pages/QualityManagementPage';
+import CompliancePage from './pages/CompliancePage';
+import AIEvolutionPage from './pages/AIEvolutionPage';
 import LoginPage from './pages/LoginPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 
@@ -181,6 +185,26 @@ const AppContent: React.FC = () => {
               <Route path="customer360" element={
                 <ProtectedRoute requiredRole="admin">
                   <Customer360Page />
+                </ProtectedRoute>
+              } />
+              <Route path="pos" element={
+                <ProtectedRoute requiredRole="admin">
+                  <POSPage />
+                </ProtectedRoute>
+              } />
+              <Route path="quality" element={
+                <ProtectedRoute requiredRole="admin">
+                  <QualityManagementPage />
+                </ProtectedRoute>
+              } />
+              <Route path="compliance" element={
+                <ProtectedRoute requiredRole="admin">
+                  <CompliancePage />
+                </ProtectedRoute>
+              } />
+              <Route path="ai-evolution" element={
+                <ProtectedRoute requiredRole="admin">
+                  <AIEvolutionPage />
                 </ProtectedRoute>
               } />
             </Route>
