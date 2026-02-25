@@ -34,6 +34,7 @@ import ForecastPage from './pages/ForecastPage';
 import CrossStoreInsights from './pages/CrossStoreInsights';
 import HumanInTheLoop from './pages/HumanInTheLoop';
 import RecommendationsPage from './pages/RecommendationsPage';
+import PrivateDomainPage from './pages/PrivateDomainPage';
 import LoginPage from './pages/LoginPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 
@@ -157,6 +158,11 @@ const AppContent: React.FC = () => {
               <Route path="recommendations" element={
                 <ProtectedRoute requiredRole="admin">
                   <RecommendationsPage />
+                </ProtectedRoute>
+              } />
+              <Route path="private-domain" element={
+                <ProtectedRoute requiredRole="admin">
+                  <PrivateDomainPage />
                 </ProtectedRoute>
               } />
             </Route>

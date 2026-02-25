@@ -118,6 +118,7 @@ const MainLayout: React.FC = () => {
     '/cross-store-insights': '跨门店洞察',
     '/human-in-the-loop': '人工审批',
     '/recommendations': '推荐引擎',
+    '/private-domain': '私域运营',
   };
 
   // 生成面包屑项
@@ -338,6 +339,11 @@ const MainLayout: React.FC = () => {
         key: '/recommendations',
         icon: <BulbOutlined />,
         label: '推荐引擎',
+      },
+      {
+        key: '/private-domain',
+        icon: <TeamOutlined />,
+        label: '私域运营',
       }
     ] : []),
   ];

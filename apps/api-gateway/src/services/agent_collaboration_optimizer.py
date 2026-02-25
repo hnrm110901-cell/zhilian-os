@@ -24,6 +24,7 @@ class AgentType(Enum):
     TRAINING = "training"  # 培训Agent
     DECISION = "decision"  # 决策Agent
     RESERVATION = "reservation"  # 预定Agent
+    PRIVATE_DOMAIN = "private_domain"  # 私域运营Agent
 
 
 class ConflictType(Enum):
@@ -116,7 +117,8 @@ class AgentCollaborationOptimizer:
             AgentType.SCHEDULE: 7,
             AgentType.RESERVATION: 6,
             AgentType.TRAINING: 5,
-            AgentType.DECISION: 4
+            AgentType.DECISION: 4,
+            AgentType.PRIVATE_DOMAIN: 8,  # 私域运营与库存同级，高于排班
         }
 
     def submit_decision(
