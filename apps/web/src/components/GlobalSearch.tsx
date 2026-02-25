@@ -105,7 +105,9 @@ interface GlobalSearchProps {
 export const GlobalSearch: React.FC<GlobalSearchProps> = ({ visible, onClose }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const inputRef = useRef<any>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -116,6 +118,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ visible, onClose }) 
     } else {
       setSearchQuery('');
       setResults([]);
+      setActiveIndex(-1);
     }
   }, [visible]);
 
@@ -132,7 +135,22 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ visible, onClose }) 
     } else {
       setResults(searchData.slice(0, 8));
     }
+    setActiveIndex(-1);
   }, [searchQuery]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (results.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIndex(prev => (prev + 1) % results.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIndex(prev => (prev <= 0 ? results.length - 1 : prev - 1));
+    } else if (e.key === 'Enter' && activeIndex >= 0) {
+      e.preventDefault();
+      handleSelect(results[activeIndex].path);
+    }
+  };
 
   const handleSelect = (path: string) => {
     navigate(path);
@@ -157,28 +175,25 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ visible, onClose }) 
           prefix={<SearchOutlined style={{ color: 'var(--text-tertiary)' }} />}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
+          onKeyDown={handleKeyDown}
           style={{ borderRadius: 'var(--radius-md)' }}
           allowClear
         />
       </div>
 
-      <div style={{ maxHeight: 400, overflowY: 'auto', padding: '8px 0' }}>
+      <div ref={listRef} style={{ maxHeight: 400, overflowY: 'auto', padding: '8px 0' }}>
         {results.length > 0 ? (
           <List
             dataSource={results}
-            renderItem={(item) => (
+            renderItem={(item, index) => (
               <List.Item
                 onClick={() => handleSelect(item.path)}
+                onMouseEnter={() => setActiveIndex(index)}
                 style={{
                   padding: '12px 16px',
                   cursor: 'pointer',
+                  background: index === activeIndex ? 'var(--bg-secondary)' : 'transparent',
                   transition: 'background var(--transition-fast)',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'var(--bg-secondary)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'transparent';
                 }}
               >
                 <List.Item.Meta
