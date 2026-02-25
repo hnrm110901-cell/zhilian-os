@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Card, Table, Button, Tag, Space, Statistic, Row, Col, Select, Tabs, Descriptions, Alert } from 'antd';
+import { Card, Table, Button, Tag, Statistic, Row, Col, Select, Tabs, Descriptions, Alert } from 'antd';
 import { ReloadOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { apiClient } from '../services/api';

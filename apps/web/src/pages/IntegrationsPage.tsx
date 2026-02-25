@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Card, Table, Button, Tag, Space, Tabs, Select, Modal, Form, Input, Descriptions, Alert } from 'antd';
+import { Card, Table, Button, Tag, Space, Tabs, Select, Modal, Form, Input, Alert } from 'antd';
 import { PlusOutlined, SyncOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { apiClient } from '../services/api';
