@@ -34,6 +34,7 @@ from src.api import report_templates
 from src.api import competitive_analysis
 from src.api import export_jobs
 from src.api import backups
+from src.api import private_domain
 from src.middleware.monitoring import MonitoringMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
 from src.middleware.audit_log import AuditLogMiddleware
@@ -472,6 +473,7 @@ app.include_router(report_templates.router, prefix="/api/v1", tags=["report_temp
 app.include_router(competitive_analysis.router)
 app.include_router(export_jobs.router)
 app.include_router(backups.router)
+app.include_router(private_domain.router, tags=["private_domain"])
 
 
 @app.on_event("startup")
