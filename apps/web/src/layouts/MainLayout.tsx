@@ -32,6 +32,8 @@ import {
   RiseOutlined,
   GlobalOutlined,
   SafetyOutlined,
+  CheckCircleOutlined,
+  RobotOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -122,6 +124,10 @@ const MainLayout: React.FC = () => {
     '/members': '会员系统',
     '/kpi-dashboard': 'KPI看板',
     '/customer360': '客户360',
+    '/pos': 'POS系统',
+    '/quality': '质量管理',
+    '/compliance': '合规管理',
+    '/ai-evolution': 'AI进化看板',
   };
 
   // 生成面包屑项
@@ -362,7 +368,27 @@ const MainLayout: React.FC = () => {
         key: '/customer360',
         icon: <UserOutlined />,
         label: '客户360',
-      }
+      },
+      {
+        key: '/pos',
+        icon: <ShoppingCartOutlined />,
+        label: 'POS系统',
+      },
+      {
+        key: '/quality',
+        icon: <CheckCircleOutlined />,
+        label: '质量管理',
+      },
+      {
+        key: '/compliance',
+        icon: <SafetyOutlined />,
+        label: '合规管理',
+      },
+      {
+        key: '/ai-evolution',
+        icon: <RobotOutlined />,
+        label: 'AI进化看板',
+      },
     ] : []),
   ];
 
