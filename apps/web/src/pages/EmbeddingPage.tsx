@@ -14,10 +14,18 @@ const EmbeddingPage: React.FC = () => {
   const [similarDishes, setSimilarDishes] = useState<any[]>([]);
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [similarityResult, setSimilarityResult] = useState<number | null>(null);
+  const [stores, setStores] = useState<any[]>([]);
   const [trainForm] = Form.useForm();
   const [simForm] = Form.useForm();
   const [dishForm] = Form.useForm();
   const [recForm] = Form.useForm();
+
+  const loadStores = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/stores');
+      setStores(res.data?.stores || res.data || []);
+    } catch { /* ignore */ }
+  }, []);
 
   const loadStatus = useCallback(async () => {
     setLoading(true);
@@ -31,7 +39,7 @@ const EmbeddingPage: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => { loadStatus(); }, [loadStatus]);
+  useEffect(() => { loadStores(); loadStatus(); }, [loadStores, loadStatus]);
 
   const trainModel = async (values: any) => {
     setTraining(true);
@@ -101,8 +109,9 @@ const EmbeddingPage: React.FC = () => {
             <Form form={trainForm} layout="inline" onFinish={trainModel}>
               <Form.Item name="store_id" label="门店" initialValue="STORE001">
                 <Select style={{ width: 120 }}>
-                  <Option value="STORE001">门店001</Option>
-                  <Option value="STORE002">门店002</Option>
+                  {stores.length > 0 ? stores.map((s: any) => (
+                    <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
+                  )) : <Option value="STORE001">门店001</Option>}
                 </Select>
               </Form.Item>
               <Form.Item name="epochs" label="训练轮数" initialValue={10}>
@@ -156,7 +165,11 @@ const EmbeddingPage: React.FC = () => {
           <Form form={recForm} layout="inline" onFinish={getRecommendations} style={{ marginBottom: 16 }}>
             <Form.Item name="customer_id" label="顾客ID" rules={[{ required: true }]}><Input placeholder="顾客ID" /></Form.Item>
             <Form.Item name="store_id" label="门店" initialValue="STORE001">
-              <Select style={{ width: 120 }}><Option value="STORE001">门店001</Option><Option value="STORE002">门店002</Option></Select>
+              <Select style={{ width: 120 }}>
+                {stores.length > 0 ? stores.map((s: any) => (
+                  <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
+                )) : <Option value="STORE001">门店001</Option>}
+              </Select>
             </Form.Item>
             <Form.Item name="top_k" label="数量" initialValue={5}><InputNumber min={1} max={20} /></Form.Item>
             <Form.Item><Button type="primary" htmlType="submit">获取推荐</Button></Form.Item>
