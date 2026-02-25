@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Card, Col, Row, Table, Statistic, Spin, Select, Tag, Space } from 'antd';
+import { Card, Col, Row, Table, Statistic, Spin, Select, Tag, Space, Empty } from 'antd';
 import {
   ShopOutlined,
   RiseOutlined,
@@ -7,6 +7,7 @@ import {
 } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { apiClient } from '../services/api';
+import { handleApiError } from '../utils/message';
 
 const { Option } = Select;
 
@@ -31,7 +32,7 @@ const MultiStoreManagement: React.FC = () => {
         ]);
       }
     } catch (err: any) {
-      console.error('Load stores error:', err);
+      handleApiError(err, '加载门店列表失败');
     }
   }, []);
 
@@ -46,7 +47,7 @@ const MultiStoreManagement: React.FC = () => {
       });
       setComparisonData(response.data);
     } catch (err: any) {
-      console.error('Load comparison data error:', err);
+      handleApiError(err, '加载对比数据失败');
     }
   }, [selectedStores]);
 
@@ -55,7 +56,7 @@ const MultiStoreManagement: React.FC = () => {
       const response = await apiClient.get('/multi-store/regional-summary');
       setRegionalSummary(response.data.regions || []);
     } catch (err: any) {
-      console.error('Load regional summary error:', err);
+      handleApiError(err, '加载区域汇总失败');
     }
   }, []);
 
@@ -64,7 +65,7 @@ const MultiStoreManagement: React.FC = () => {
       const response = await apiClient.get('/multi-store/performance-ranking?metric=revenue&limit=10');
       setPerformanceRanking(response.data.ranking || []);
     } catch (err: any) {
-      console.error('Load performance ranking error:', err);
+      handleApiError(err, '加载绩效排名失败');
     }
   }, []);
 
@@ -260,8 +261,12 @@ const MultiStoreManagement: React.FC = () => {
             ))}
           </Select>
         </Space>
-        {comparisonData && selectedStores.length >= 2 && (
+        {selectedStores.length < 2 ? (
+          <Empty description="请至少选择两个门店进行对比" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+        ) : comparisonData ? (
           <ReactECharts option={comparisonChartOption} style={{ height: '400px' }} />
+        ) : (
+          <Empty description="暂无对比数据" image={Empty.PRESENTED_IMAGE_SIMPLE} />
         )}
       </Card>
 
@@ -280,7 +285,7 @@ const MultiStoreManagement: React.FC = () => {
               columns={rankingColumns}
               dataSource={performanceRanking}
               rowKey="store_id"
-              pagination={false}
+              pagination={{ pageSize: 10, showSizeChanger: false }}
               size="small"
             />
           </Card>
