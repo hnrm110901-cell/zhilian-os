@@ -79,6 +79,8 @@ const WeChatTriggersPage = lazy(() => import('./pages/WeChatTriggersPage'));
 const EventSourcingPage = lazy(() => import('./pages/EventSourcingPage'));
 const MeituanQueuePage = lazy(() => import('./pages/MeituanQueuePage'));
 const VectorIndexPage = lazy(() => import('./pages/VectorIndexPage'));
+const AdaptersPage = lazy(() => import('./pages/AdaptersPage'));
+const VoiceDevicePage = lazy(() => import('./pages/VoiceDevicePage'));
 
 const PageLoader = (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
@@ -282,6 +284,12 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="vector-index" element={
                     <ProtectedRoute requiredRole="admin"><VectorIndexPage /></ProtectedRoute>
+                  } />
+                  <Route path="adapters" element={
+                    <ProtectedRoute requiredRole="admin"><AdaptersPage /></ProtectedRoute>
+                  } />
+                  <Route path="voice-devices" element={
+                    <ProtectedRoute requiredRole="admin"><VoiceDevicePage /></ProtectedRoute>
                   } />
                 </Route>
                 <Route path="*" element={<NotFoundPage />} />

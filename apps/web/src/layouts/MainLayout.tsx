@@ -41,6 +41,7 @@ import {
   TranslationOutlined,
   ExportOutlined,
   SyncOutlined,
+  SoundOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -75,6 +76,7 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/approval': 'admin-system', '/stores': 'admin-system', '/export-jobs': 'admin-system',
   '/queue': 'admin-store', '/agent-memory': 'admin-ai', '/wechat-triggers': 'admin-system',
   '/event-sourcing': 'admin-ai', '/meituan-queue': 'admin-store', '/vector-index': 'admin-ai',
+  '/adapters': 'admin-system', '/voice-devices': 'admin-store',
 };
 
 const MainLayout: React.FC = () => {
@@ -205,6 +207,8 @@ const MainLayout: React.FC = () => {
     '/event-sourcing': '事件溯源',
     '/meituan-queue': '美团排队',
     '/vector-index': '向量知识库',
+    '/adapters': '适配器管理',
+    '/voice-devices': '语音设备',
   };
 
   // 生成面包屑项
@@ -396,6 +400,7 @@ const MainLayout: React.FC = () => {
           { key: '/stores', icon: <ShopOutlined />, label: '门店管理' },
           { key: '/export-jobs', icon: <ExportOutlined />, label: '导出任务' },
           { key: '/wechat-triggers', icon: <BellOutlined />, label: '微信触发器' },
+          { key: '/adapters', icon: <ApiOutlined />, label: '适配器管理' },
         ],
       },
       {
@@ -433,6 +438,7 @@ const MainLayout: React.FC = () => {
           { key: '/human-in-the-loop', icon: <SafetyOutlined />, label: '人工审批' },
           { key: '/queue', icon: <TeamOutlined />, label: '排队管理' },
           { key: '/meituan-queue', icon: <SyncOutlined />, label: '美团排队' },
+          { key: '/voice-devices', icon: <SoundOutlined />, label: '语音设备' },
         ],
       },
       {
