@@ -29,6 +29,7 @@ import {
   BulbOutlined,
   BulbFilled,
   SearchOutlined,
+  RiseOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -109,6 +110,8 @@ const MainLayout: React.FC = () => {
     '/backup': '数据备份',
     '/audit': '审计日志',
     '/data-import-export': '数据导入导出',
+    '/competitive-analysis': '竞争分析',
+    '/report-templates': '报表模板',
   };
 
   // 生成面包屑项
@@ -299,6 +302,16 @@ const MainLayout: React.FC = () => {
         key: '/data-import-export',
         icon: <FileExcelOutlined />,
         label: '数据导入导出',
+      },
+      {
+        key: '/competitive-analysis',
+        icon: <RiseOutlined />,
+        label: '竞争分析',
+      },
+      {
+        key: '/report-templates',
+        icon: <FileTextOutlined />,
+        label: '报表模板',
       }
     ] : []),
   ];
