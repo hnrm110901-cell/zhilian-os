@@ -1,27 +1,54 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { Card, Table, Button, Modal, Space, Tag, Popconfirm } from 'antd';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  DatabaseOutlined,
-  PlusOutlined,
-  ReloadOutlined,
-  DeleteOutlined,
-  CheckCircleOutlined,
-  ExclamationCircleOutlined,
+  Card, Table, Button, Modal, Form, DatePicker, Space,
+  Popconfirm, Row, Col, Statistic, Tag, Progress,
+} from 'antd';
+import {
+  PlusOutlined, ReloadOutlined, DownloadOutlined, DeleteOutlined,
+  CloudUploadOutlined,
 } from '@ant-design/icons';
-import { apiClient } from '../services/api';
-import { showSuccess, showError, handleApiError, showLoading } from '../utils/message';
+import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
+import { apiClient } from '../services/api';
+import { showSuccess, handleApiError, showLoading } from '../utils/message';
+
+interface BackupJob {
+  job_id: string;
+  backup_type: 'full' | 'incremental';
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  progress?: number;
+  size?: number;
+  checksum?: string;
+  created_at?: string;
+  completed_at?: string;
+}
+
+const statusColorMap: Record<string, string> = {
+  pending: 'default',
+  running: 'processing',
+  completed: 'success',
+  failed: 'error',
+};
+
+const statusTextMap: Record<string, string> = {
+  pending: '等待中',
+  running: '进行中',
+  completed: '已完成',
+  failed: '失败',
+};
 
 const BackupManagement: React.FC = () => {
+  const [backups, setBackups] = useState<BackupJob[]>([]);
   const [loading, setLoading] = useState(false);
-  const [backups, setBackups] = useState<any[]>([]);
-  const [creating, setCreating] = useState(false);
+  const [incrementalModalVisible, setIncrementalModalVisible] = useState(false);
+  const [form] = Form.useForm();
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadBackups = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get('/backup/list');
-      setBackups(response.data.backups || []);
+      const res = await apiClient.get('/api/v1/backups/');
+      setBackups(res.data?.data || res.data || []);
     } catch (err: any) {
       handleApiError(err, '加载备份列表失败');
     } finally {
@@ -29,219 +56,188 @@ const BackupManagement: React.FC = () => {
     }
   }, []);
 
+  const pollRunningJobs = useCallback(async (currentBackups: BackupJob[]) => {
+    const running = currentBackups.filter(j => j.status === 'running' || j.status === 'pending');
+    if (running.length === 0) return;
+    const updated = await Promise.all(
+      running.map(async (j) => {
+        try {
+          const res = await apiClient.get(`/api/v1/backups/${j.job_id}`);
+          return res.data?.data || res.data;
+        } catch {
+          return j;
+        }
+      })
+    );
+    setBackups(prev => prev.map(b => {
+      const u = updated.find((u: any) => u?.job_id === b.job_id);
+      return u || b;
+    }));
+  }, []);
+
   useEffect(() => {
     loadBackups();
   }, [loadBackups]);
 
-  const handleCreateBackup = async () => {
-    const hide = showLoading('正在创建备份，请稍候...');
-    try {
-      setCreating(true);
-      await apiClient.post('/backup/create', {
-        backup_type: 'manual',
-      });
-      hide();
-      showSuccess('备份创建成功');
-      loadBackups();
-    } catch (err: any) {
-      hide();
-      handleApiError(err, '创建备份失败');
-    } finally {
-      setCreating(false);
+  useEffect(() => {
+    const hasRunning = backups.some(b => b.status === 'running' || b.status === 'pending');
+    if (hasRunning && !pollingRef.current) {
+      pollingRef.current = setInterval(() => pollRunningJobs(backups), 5000);
+    } else if (!hasRunning && pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
     }
-  };
-
-  const handleRestoreBackup = async (backupName: string) => {
-    Modal.confirm({
-      title: '确认恢复备份',
-      icon: <ExclamationCircleOutlined />,
-      content: (
-        <div>
-          <p>您确定要恢复此备份吗？</p>
-          <p style={{ color: '#ff4d4f', fontWeight: 'bold' }}>
-            警告：此操作将覆盖当前数据库中的所有数据！
-          </p>
-          <p>备份文件：{backupName}</p>
-        </div>
-      ),
-      okText: '确认恢复',
-      okType: 'danger',
-      cancelText: '取消',
-      onOk: async () => {
-        const hide = showLoading('正在恢复备份，请稍候...');
-        try {
-          await apiClient.post(`/backup/restore/${backupName}`);
-          hide();
-          showSuccess('备份恢复成功');
-          // 刷新页面以重新加载数据
-          setTimeout(() => {
-            window.location.reload();
-          }, 1500);
-        } catch (err: any) {
-          hide();
-          handleApiError(err, '恢复备份失败');
-        }
-      },
-    });
-  };
-
-  const handleDeleteBackup = async (backupName: string) => {
-    try {
-      await apiClient.delete(`/backup/${backupName}`);
-      showSuccess('备份删除成功');
-      loadBackups();
-    } catch (err: any) {
-      handleApiError(err, '删除备份失败');
-    }
-  };
-
-  const handleVerifyBackup = async (backupName: string) => {
-    const hide = showLoading('正在验证备份...');
-    try {
-      const response = await apiClient.get(`/backup/verify/${backupName}`);
-      hide();
-
-      if (response.data.valid) {
-        showSuccess('备份文件验证通过');
-      } else {
-        showError('备份文件验证失败：' + (response.data.error || '文件损坏'));
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
       }
+    };
+  }, [backups, pollRunningJobs]);
+
+  const triggerBackup = async (backup_type: 'full' | 'incremental', since_timestamp?: string) => {
+    const hide = showLoading(`触发${backup_type === 'full' ? '全量' : '增量'}备份中...`);
+    try {
+      const body: any = { backup_type };
+      if (since_timestamp) body.since_timestamp = since_timestamp;
+      await apiClient.post('/api/v1/backups/', body);
+      hide();
+      showSuccess('备份任务已提交');
+      loadBackups();
     } catch (err: any) {
       hide();
-      handleApiError(err, '验证备份失败');
+      handleApiError(err, '触发备份失败');
     }
   };
 
-  const columns = [
+  const handleIncrementalOk = async () => {
+    try {
+      const values = await form.validateFields();
+      const since = values.since_timestamp ? values.since_timestamp.toISOString() : undefined;
+      setIncrementalModalVisible(false);
+      form.resetFields();
+      await triggerBackup('incremental', since);
+    } catch (_) {}
+  };
+
+  const handleDownload = (job_id: string) => {
+    const link = document.createElement('a');
+    link.href = `/api/v1/backups/${job_id}/download`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
+  const handleDelete = async (job_id: string) => {
+    const hide = showLoading('删除中...');
+    try {
+      await apiClient.delete(`/api/v1/backups/${job_id}`);
+      hide();
+      showSuccess('删除成功');
+      loadBackups();
+    } catch (err: any) {
+      hide();
+      handleApiError(err, '删除失败');
+    }
+  };
+
+  const formatSize = (bytes?: number) => {
+    if (!bytes) return '-';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  };
+
+  const columns: ColumnsType<BackupJob> = [
     {
-      title: '备份名称',
-      dataIndex: 'name',
-      key: 'name',
-      width: 300,
+      title: '类型', dataIndex: 'backup_type', key: 'backup_type',
+      render: (v) => <Tag color={v === 'full' ? 'blue' : 'cyan'}>{v === 'full' ? '全量' : '增量'}</Tag>,
     },
     {
-      title: '类型',
-      dataIndex: 'type',
-      key: 'type',
-      width: 100,
-      render: (type: string) => {
-        const typeMap: any = {
-          manual: { color: 'blue', text: '手动' },
-          scheduled: { color: 'green', text: '定时' },
-        };
-        const t = typeMap[type] || { color: 'default', text: type };
-        return <Tag color={t.color}>{t.text}</Tag>;
-      },
+      title: '状态', dataIndex: 'status', key: 'status',
+      render: (v) => <Tag color={statusColorMap[v]}>{statusTextMap[v] || v}</Tag>,
     },
     {
-      title: '大小',
-      dataIndex: 'size_mb',
-      key: 'size_mb',
-      width: 100,
-      render: (size: number) => `${size.toFixed(2)} MB`,
+      title: '进度', dataIndex: 'progress', key: 'progress',
+      render: (v, record) => record.status === 'running'
+        ? <Progress percent={v ?? 0} size="small" style={{ width: 100 }} />
+        : record.status === 'completed' ? <Progress percent={100} size="small" style={{ width: 100 }} /> : '-',
+    },
+    { title: '大小', dataIndex: 'size', key: 'size', render: formatSize },
+    { title: '校验和', dataIndex: 'checksum', key: 'checksum', ellipsis: true, render: (v) => v || '-' },
+    {
+      title: '创建时间', dataIndex: 'created_at', key: 'created_at',
+      render: (v) => v ? dayjs(v).format('YYYY-MM-DD HH:mm:ss') : '-',
     },
     {
-      title: '创建时间',
-      dataIndex: 'created_at',
-      key: 'created_at',
-      width: 180,
-      render: (date: string) => dayjs(date).format('YYYY-MM-DD HH:mm:ss'),
-    },
-    {
-      title: '保存天数',
-      dataIndex: 'age_days',
-      key: 'age_days',
-      width: 100,
-      render: (days: number) => {
-        let color = 'green';
-        if (days > 30) color = 'orange';
-        if (days > 60) color = 'red';
-        return <Tag color={color}>{days} 天</Tag>;
-      },
-    },
-    {
-      title: '操作',
-      key: 'action',
-      width: 250,
-      render: (_: any, record: any) => (
+      title: '操作', key: 'action',
+      render: (_, record) => (
         <Space>
-          <Button
-            size="small"
-            type="link"
-            onClick={() => handleVerifyBackup(record.name)}
-          >
-            验证
-          </Button>
-          <Button
-            size="small"
-            type="link"
-            onClick={() => handleRestoreBackup(record.name)}
-            danger
-          >
-            恢复
-          </Button>
-          <Popconfirm
-            title="确定要删除此备份吗？"
-            onConfirm={() => handleDeleteBackup(record.name)}
-            okText="确定"
-            cancelText="取消"
-          >
-            <Button size="small" type="link" danger icon={<DeleteOutlined />}>
-              删除
-            </Button>
+          {record.status === 'completed' && (
+            <Button size="small" icon={<DownloadOutlined />} onClick={() => handleDownload(record.job_id)}>下载</Button>
+          )}
+          <Popconfirm title="确认删除？" onConfirm={() => handleDelete(record.job_id)}>
+            <Button size="small" danger icon={<DeleteOutlined />}>删除</Button>
           </Popconfirm>
         </Space>
       ),
     },
   ];
 
+  const completedBackups = backups.filter(b => b.status === 'completed');
+  const lastBackup = completedBackups.sort((a, b) =>
+    dayjs(b.completed_at || b.created_at || 0).diff(dayjs(a.completed_at || a.created_at || 0))
+  )[0];
+
   return (
-    <div style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
-      <h1 style={{ marginBottom: '24px' }}>
-        <DatabaseOutlined /> 数据备份管理
-      </h1>
+    <div>
+      <Row gutter={16} style={{ marginBottom: 24 }}>
+        <Col span={6}>
+          <Card>
+            <Statistic title="总备份数" value={backups.length} suffix="个" />
+          </Card>
+        </Col>
+        <Col span={8}>
+          <Card>
+            <Statistic
+              title="最近备份时间"
+              value={lastBackup?.completed_at
+                ? dayjs(lastBackup.completed_at).format('MM-DD HH:mm')
+                : '暂无'}
+            />
+          </Card>
+        </Col>
+      </Row>
 
       <Card>
-        <Space style={{ marginBottom: '16px' }}>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={handleCreateBackup}
-            loading={creating}
-          >
-            创建备份
-          </Button>
-          <Button
-            icon={<ReloadOutlined />}
-            onClick={loadBackups}
-            loading={loading}
-          >
-            刷新列表
-          </Button>
-        </Space>
-
-        <div style={{ marginBottom: '16px', padding: '12px', background: '#e6f7ff', border: '1px solid #91d5ff', borderRadius: '4px' }}>
-          <p style={{ margin: 0 }}>
-            <CheckCircleOutlined style={{ color: '#1890ff', marginRight: '8px' }} />
-            系统会在每天凌晨2点自动创建备份，最多保留30个备份文件。
-          </p>
-          <p style={{ margin: '8px 0 0 0' }}>
-            <ExclamationCircleOutlined style={{ color: '#faad14', marginRight: '8px' }} />
-            恢复备份将覆盖当前所有数据，请谨慎操作！
-          </p>
+        <div style={{ marginBottom: 16 }}>
+          <Space>
+            <Button type="primary" icon={<CloudUploadOutlined />} onClick={() => triggerBackup('full')}>
+              触发全量备份
+            </Button>
+            <Button icon={<PlusOutlined />} onClick={() => setIncrementalModalVisible(true)}>
+              触发增量备份
+            </Button>
+            <Button icon={<ReloadOutlined />} onClick={loadBackups}>刷新</Button>
+          </Space>
         </div>
-
-        <Table
-          columns={columns}
-          dataSource={backups}
-          rowKey="name"
-          loading={loading}
-          pagination={{
-            pageSize: 10,
-            showTotal: (total) => `共 ${total} 个备份`,
-          }}
-        />
+        <Table columns={columns} dataSource={backups} rowKey="job_id" loading={loading} />
       </Card>
+
+      <Modal
+        title="触发增量备份"
+        open={incrementalModalVisible}
+        onOk={handleIncrementalOk}
+        onCancel={() => { setIncrementalModalVisible(false); form.resetFields(); }}
+        destroyOnClose
+      >
+        <Form form={form} layout="vertical">
+          <Form.Item name="since_timestamp" label="起始时间（可选）"
+            extra="不填则从上次备份时间开始">
+            <DatePicker showTime style={{ width: '100%' }} />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };

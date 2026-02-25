@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Card,
   Button,
@@ -7,6 +7,13 @@ import {
   Space,
   Tabs,
   Alert,
+  Table,
+  Modal,
+  Form,
+  Select,
+  Tag,
+  Progress,
+  Popconfirm,
 } from 'antd';
 import {
   UploadOutlined,
@@ -14,16 +21,153 @@ import {
   FileExcelOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons';
 import type { UploadProps } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
 import { apiClient } from '../services/api';
-import { showSuccess, showError, handleApiError } from '../utils/message';
+import { showSuccess, showError, handleApiError, showLoading } from '../utils/message';
+
+interface ExportJob {
+  job_id: string;
+  job_type: string;
+  format: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  progress?: number;
+  file_size?: number;
+  created_at?: string;
+}
+
+const exportStatusColorMap: Record<string, string> = {
+  pending: 'default',
+  running: 'processing',
+  completed: 'success',
+  failed: 'error',
+};
+
+const exportStatusTextMap: Record<string, string> = {
+  pending: '等待中',
+  running: '进行中',
+  completed: '已完成',
+  failed: '失败',
+};
 
 const { TabPane } = Tabs;
 
 const DataImportExportPage: React.FC = () => {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<any>(null);
+  const [exportJobs, setExportJobs] = useState<ExportJob[]>([]);
+  const [exportJobsLoading, setExportJobsLoading] = useState(false);
+  const [exportModalVisible, setExportModalVisible] = useState(false);
+  const [exportForm] = Form.useForm();
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const loadExportJobs = useCallback(async () => {
+    try {
+      setExportJobsLoading(true);
+      const res = await apiClient.get('/api/v1/export-jobs/');
+      setExportJobs(res.data?.data || res.data || []);
+    } catch (err: any) {
+      handleApiError(err, '加载导出任务失败');
+    } finally {
+      setExportJobsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadExportJobs();
+  }, [loadExportJobs]);
+
+  useEffect(() => {
+    const hasRunning = exportJobs.some(j => j.status === 'running' || j.status === 'pending');
+    if (hasRunning && !pollingRef.current) {
+      pollingRef.current = setInterval(loadExportJobs, 5000);
+    } else if (!hasRunning && pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+    return () => {
+      if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
+    };
+  }, [exportJobs, loadExportJobs]);
+
+  const handleSubmitExportJob = async () => {
+    try {
+      const values = await exportForm.validateFields();
+      const hide = showLoading('提交导出任务中...');
+      try {
+        await apiClient.post('/api/v1/export-jobs/', values);
+        hide();
+        showSuccess('导出任务已提交');
+        setExportModalVisible(false);
+        exportForm.resetFields();
+        loadExportJobs();
+      } catch (err: any) {
+        hide();
+        handleApiError(err, '提交任务失败');
+      }
+    } catch (_) {}
+  };
+
+  const handleDownloadExportJob = (job_id: string) => {
+    const link = document.createElement('a');
+    link.href = `/api/v1/export-jobs/${job_id}/download`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
+  const handleDeleteExportJob = async (job_id: string) => {
+    const hide = showLoading('删除中...');
+    try {
+      await apiClient.delete(`/api/v1/export-jobs/${job_id}`);
+      hide();
+      showSuccess('删除成功');
+      loadExportJobs();
+    } catch (err: any) {
+      hide();
+      handleApiError(err, '删除失败');
+    }
+  };
+
+  const exportJobColumns: ColumnsType<ExportJob> = [
+    { title: '任务类型', dataIndex: 'job_type', key: 'job_type' },
+    { title: '格式', dataIndex: 'format', key: 'format', render: (v) => <Tag>{v?.toUpperCase()}</Tag> },
+    {
+      title: '状态', dataIndex: 'status', key: 'status',
+      render: (v) => <Tag color={exportStatusColorMap[v]}>{exportStatusTextMap[v] || v}</Tag>,
+    },
+    {
+      title: '进度', dataIndex: 'progress', key: 'progress',
+      render: (v, record) => record.status === 'running'
+        ? <Progress percent={v ?? 0} size="small" style={{ width: 100 }} />
+        : record.status === 'completed' ? <Progress percent={100} size="small" style={{ width: 100 }} /> : '-',
+    },
+    {
+      title: '文件大小', dataIndex: 'file_size', key: 'file_size',
+      render: (v) => {
+        if (!v) return '-';
+        if (v < 1024 * 1024) return `${(v / 1024).toFixed(1)} KB`;
+        return `${(v / 1024 / 1024).toFixed(1)} MB`;
+      },
+    },
+    {
+      title: '操作', key: 'action',
+      render: (_, record) => (
+        <Space>
+          {record.status === 'completed' && (
+            <Button size="small" icon={<DownloadOutlined />} onClick={() => handleDownloadExportJob(record.job_id)}>下载</Button>
+          )}
+          <Popconfirm title="确认删除？" onConfirm={() => handleDeleteExportJob(record.job_id)}>
+            <Button size="small" danger icon={<DeleteOutlined />}>删除</Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
 
   const handleExportUsers = async () => {
     try {
@@ -395,8 +539,49 @@ const DataImportExportPage: React.FC = () => {
               </Card>
             </Space>
           </TabPane>
+
+          <TabPane tab="异步导出任务" key="async-export">
+            <div style={{ marginBottom: 16 }}>
+              <Space>
+                <Button type="primary" icon={<PlusOutlined />} onClick={() => setExportModalVisible(true)}>
+                  提交导出任务
+                </Button>
+                <Button icon={<ReloadOutlined />} onClick={loadExportJobs}>刷新</Button>
+              </Space>
+            </div>
+            <Table
+              columns={exportJobColumns}
+              dataSource={exportJobs}
+              rowKey="job_id"
+              loading={exportJobsLoading}
+            />
+          </TabPane>
         </Tabs>
       </Card>
+
+      <Modal
+        title="提交异步导出任务"
+        open={exportModalVisible}
+        onOk={handleSubmitExportJob}
+        onCancel={() => { setExportModalVisible(false); exportForm.resetFields(); }}
+        destroyOnClose
+      >
+        <Form form={exportForm} layout="vertical">
+          <Form.Item name="job_type" label="任务类型" rules={[{ required: true, message: '请选择任务类型' }]}>
+            <Select options={[
+              { label: '交易记录', value: 'transactions' },
+              { label: '审计日志', value: 'audit_logs' },
+              { label: '订单数据', value: 'orders' },
+            ]} />
+          </Form.Item>
+          <Form.Item name="format" label="导出格式" rules={[{ required: true, message: '请选择格式' }]}>
+            <Select options={[
+              { label: 'CSV', value: 'csv' },
+              { label: 'Excel (xlsx)', value: 'xlsx' },
+            ]} />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };

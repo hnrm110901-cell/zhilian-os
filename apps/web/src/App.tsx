@@ -28,6 +28,8 @@ import AdvancedAnalytics from './pages/AdvancedAnalytics';
 import NotificationCenter from './pages/NotificationCenter';
 import AuditLogPage from './pages/AuditLogPage';
 import DataImportExportPage from './pages/DataImportExportPage';
+import CompetitiveAnalysis from './pages/CompetitiveAnalysis';
+import ReportTemplates from './pages/ReportTemplates';
 import LoginPage from './pages/LoginPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 
@@ -121,6 +123,16 @@ const AppContent: React.FC = () => {
               <Route path="data-import-export" element={
                 <ProtectedRoute requiredRole="admin">
                   <DataImportExportPage />
+                </ProtectedRoute>
+              } />
+              <Route path="competitive-analysis" element={
+                <ProtectedRoute requiredRole="admin">
+                  <CompetitiveAnalysis />
+                </ProtectedRoute>
+              } />
+              <Route path="report-templates" element={
+                <ProtectedRoute requiredRole="admin">
+                  <ReportTemplates />
                 </ProtectedRoute>
               } />
             </Route>
