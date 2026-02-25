@@ -39,6 +39,7 @@ from .federated_learning import FLTrainingRound, FLModelUpload, RoundStatus
 from .marketing_campaign import MarketingCampaign
 from .report_template import ReportTemplate, ScheduledReport, ReportFormat, ScheduleFrequency
 from .competitor import CompetitorStore, CompetitorPrice
+from .export_job import ExportJob, ExportStatus
 
 __all__ = [
     "Base",
@@ -116,4 +117,6 @@ __all__ = [
     "ScheduleFrequency",
     "CompetitorStore",
     "CompetitorPrice",
+    "ExportJob",
+    "ExportStatus",
 ]

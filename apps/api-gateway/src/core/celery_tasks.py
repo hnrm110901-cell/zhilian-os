@@ -1146,3 +1146,211 @@ def check_inventory_alert(
             raise self.retry(exc=e)
 
     return asyncio.run(_run())
+
+
+# ------------------------------------------------------------------ #
+# 大数据异步导出任务                                                    #
+# ------------------------------------------------------------------ #
+
+@celery_app.task(
+    base=CallbackTask,
+    bind=True,
+    name="async_export_data",
+    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
+    default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY", "60")),
+)
+def async_export_data(self, job_id: str) -> Dict[str, Any]:
+    """
+    异步大数据导出任务
+
+    从数据库分批读取数据，生成 CSV/Excel 文件，
+    并将结果写入临时目录，更新 ExportJob 状态。
+    """
+    import csv
+    import tempfile
+    from datetime import datetime, date
+
+    async def _run():
+        from src.core.database import AsyncSessionLocal
+        from src.models.export_job import ExportJob, ExportStatus
+        from sqlalchemy import select, and_
+
+        BATCH_SIZE = int(os.getenv("EXPORT_BATCH_SIZE", "1000"))
+
+        async with AsyncSessionLocal() as session:
+            job = await session.get(ExportJob, job_id)
+            if not job:
+                logger.error("导出任务不存在", job_id=job_id)
+                return {"success": False, "error": "job not found"}
+            job.status = ExportStatus.RUNNING
+            job.celery_task_id = self.request.id
+            await session.commit()
+            job_type = job.job_type
+            fmt = job.format
+            params = job.params or {}
+
+        try:
+            rows, headers = await _fetch_export_data(job_type, params)
+
+            total = len(rows)
+            tmp_dir = os.getenv("EXPORT_TMP_DIR", tempfile.gettempdir())
+            os.makedirs(tmp_dir, exist_ok=True)
+            filename = f"export_{job_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}.{fmt}"
+            file_path = os.path.join(tmp_dir, filename)
+
+            if fmt == "csv":
+                file_size = _write_csv(file_path, headers, rows)
+            elif fmt == "xlsx":
+                file_size = _write_xlsx(file_path, headers, rows)
+            else:
+                raise ValueError(f"不支持的格式: {fmt}")
+
+            async with AsyncSessionLocal() as session:
+                job = await session.get(ExportJob, job_id)
+                if job:
+                    job.status = ExportStatus.COMPLETED
+                    job.progress = 100
+                    job.total_rows = total
+                    job.processed_rows = total
+                    job.file_path = file_path
+                    job.file_size_bytes = file_size
+                    job.completed_at = datetime.utcnow().isoformat()
+                    await session.commit()
+
+            logger.info("导出任务完成", job_id=job_id, total_rows=total)
+            return {"success": True, "job_id": job_id, "total_rows": total}
+
+        except Exception as e:
+            logger.error("导出任务失败", job_id=job_id, error=str(e))
+            async with AsyncSessionLocal() as session:
+                job = await session.get(ExportJob, job_id)
+                if job:
+                    job.status = ExportStatus.FAILED
+                    job.error_message = str(e)
+                    await session.commit()
+            raise self.retry(exc=e)
+
+    async def _fetch_export_data(job_type: str, params: Dict):
+        from src.core.database import AsyncSessionLocal
+        from sqlalchemy import select, and_
+        from datetime import datetime, date
+
+        if job_type == "transactions":
+            from src.models.finance import FinancialTransaction
+            headers = ["日期", "类型", "分类", "子分类", "金额(元)", "描述", "支付方式", "门店ID"]
+            async with AsyncSessionLocal() as session:
+                conditions = []
+                if params.get("store_id"):
+                    conditions.append(FinancialTransaction.store_id == params["store_id"])
+                if params.get("transaction_type"):
+                    conditions.append(FinancialTransaction.transaction_type == params["transaction_type"])
+                if params.get("start_date"):
+                    conditions.append(FinancialTransaction.transaction_date >= date.fromisoformat(params["start_date"]))
+                if params.get("end_date"):
+                    conditions.append(FinancialTransaction.transaction_date <= date.fromisoformat(params["end_date"]))
+                stmt = select(FinancialTransaction)
+                if conditions:
+                    stmt = stmt.where(and_(*conditions))
+                stmt = stmt.order_by(FinancialTransaction.transaction_date.desc())
+                result = await session.execute(stmt)
+                rows = [
+                    [t.transaction_date.isoformat() if t.transaction_date else "",
+                     t.transaction_type or "", t.category or "", t.subcategory or "",
+                     round((t.amount or 0) / 100, 2), t.description or "",
+                     t.payment_method or "", t.store_id or ""]
+                    for t in result.scalars().all()
+                ]
+            return rows, headers
+
+        elif job_type == "audit_logs":
+            from src.models.audit_log import AuditLog
+            headers = ["时间", "用户ID", "用户名", "角色", "操作", "资源类型", "资源ID", "描述", "IP", "状态", "门店ID"]
+            async with AsyncSessionLocal() as session:
+                conditions = []
+                if params.get("user_id"):
+                    conditions.append(AuditLog.user_id == params["user_id"])
+                if params.get("action"):
+                    conditions.append(AuditLog.action == params["action"])
+                if params.get("store_id"):
+                    conditions.append(AuditLog.store_id == params["store_id"])
+                if params.get("start_date"):
+                    conditions.append(AuditLog.created_at >= datetime.fromisoformat(params["start_date"]))
+                if params.get("end_date"):
+                    conditions.append(AuditLog.created_at <= datetime.fromisoformat(params["end_date"]))
+                stmt = select(AuditLog)
+                if conditions:
+                    stmt = stmt.where(and_(*conditions))
+                stmt = stmt.order_by(AuditLog.created_at.desc())
+                result = await session.execute(stmt)
+                rows = [
+                    [log.created_at.isoformat() if log.created_at else "",
+                     str(log.user_id) if log.user_id else "", log.username or "",
+                     log.user_role or "", log.action or "", log.resource_type or "",
+                     str(log.resource_id) if log.resource_id else "", log.description or "",
+                     log.ip_address or "", log.status or "",
+                     str(log.store_id) if log.store_id else ""]
+                    for log in result.scalars().all()
+                ]
+            return rows, headers
+
+        elif job_type == "orders":
+            from src.models.order import Order
+            headers = ["订单号", "状态", "总金额(元)", "桌号", "门店ID", "下单时间"]
+            async with AsyncSessionLocal() as session:
+                conditions = []
+                if params.get("store_id"):
+                    conditions.append(Order.store_id == params["store_id"])
+                if params.get("status"):
+                    conditions.append(Order.status == params["status"])
+                if params.get("start_date"):
+                    conditions.append(Order.created_at >= datetime.fromisoformat(params["start_date"]))
+                if params.get("end_date"):
+                    conditions.append(Order.created_at <= datetime.fromisoformat(params["end_date"]))
+                stmt = select(Order)
+                if conditions:
+                    stmt = stmt.where(and_(*conditions))
+                stmt = stmt.order_by(Order.created_at.desc())
+                result = await session.execute(stmt)
+                rows = [
+                    [o.order_number or str(o.id),
+                     o.status.value if hasattr(o.status, "value") else str(o.status or ""),
+                     round((o.total_amount or 0) / 100, 2),
+                     o.table_number or "", o.store_id or "",
+                     o.created_at.isoformat() if o.created_at else ""]
+                    for o in result.scalars().all()
+                ]
+            return rows, headers
+
+        else:
+            raise ValueError(f"不支持的导出类型: {job_type}，可选: transactions/audit_logs/orders")
+
+    def _write_csv(file_path: str, headers: list, rows: list) -> int:
+        with open(file_path, "w", newline="", encoding="utf-8-sig") as f:
+            writer = csv.writer(f)
+            writer.writerow(headers)
+            writer.writerows(rows)
+        return os.path.getsize(file_path)
+
+    def _write_xlsx(file_path: str, headers: list, rows: list) -> int:
+        try:
+            import openpyxl
+            from openpyxl.styles import Font, PatternFill
+            from openpyxl.utils import get_column_letter
+        except ImportError:
+            raise ImportError("请安装 openpyxl: pip install openpyxl")
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        hf = Font(bold=True, color="FFFFFF")
+        hfill = PatternFill(start_color="2F5496", end_color="2F5496", fill_type="solid")
+        for ci, h in enumerate(headers, 1):
+            c = ws.cell(row=1, column=ci, value=h)
+            c.font = hf
+            c.fill = hfill
+            ws.column_dimensions[get_column_letter(ci)].width = 16
+        for ri, row in enumerate(rows, 2):
+            for ci, v in enumerate(row, 1):
+                ws.cell(row=ri, column=ci, value=v)
+        wb.save(file_path)
+        return os.path.getsize(file_path)
+
+    return asyncio.run(_run())
