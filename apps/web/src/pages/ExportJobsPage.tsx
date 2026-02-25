@@ -15,6 +15,7 @@ const ExportJobsPage: React.FC = () => {
   const [jobs, setJobs] = useState<any[]>([]);
   const [exportTypes, setExportTypes] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
   const [createVisible, setCreateVisible] = useState(false);
   const [form] = Form.useForm();
 
@@ -62,6 +63,8 @@ const ExportJobsPage: React.FC = () => {
   };
 
   const downloadJob = async (record: any) => {
+    const key = `dl-${record.job_id || record.id}`;
+    setActionLoading(prev => ({ ...prev, [key]: true }));
     try {
       const res = await apiClient.get(`/export-jobs/${record.job_id || record.id}/download`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([res.data]));
@@ -72,16 +75,22 @@ const ExportJobsPage: React.FC = () => {
       window.URL.revokeObjectURL(url);
     } catch (err: any) {
       handleApiError(err, '下载失败');
+    } finally {
+      setActionLoading(prev => ({ ...prev, [key]: false }));
     }
   };
 
   const deleteJob = async (record: any) => {
+    const key = `del-${record.job_id || record.id}`;
+    setActionLoading(prev => ({ ...prev, [key]: true }));
     try {
       await apiClient.delete(`/export-jobs/${record.job_id || record.id}`);
       showSuccess('已删除');
       loadJobs();
     } catch (err: any) {
       handleApiError(err, '删除失败');
+    } finally {
+      setActionLoading(prev => ({ ...prev, [key]: false }));
     }
   };
 
@@ -96,9 +105,9 @@ const ExportJobsPage: React.FC = () => {
       render: (_: any, record: any) => (
         <Space>
           {record.status === 'completed' && (
-            <Button size="small" type="primary" icon={<DownloadOutlined />} onClick={() => downloadJob(record)}>下载</Button>
+            <Button size="small" type="primary" icon={<DownloadOutlined />} loading={actionLoading[`dl-${record.job_id || record.id}`]} onClick={() => downloadJob(record)}>下载</Button>
           )}
-          <Button size="small" danger icon={<DeleteOutlined />} onClick={() => deleteJob(record)}>删除</Button>
+          <Button size="small" danger icon={<DeleteOutlined />} loading={actionLoading[`del-${record.job_id || record.id}`]} onClick={() => deleteJob(record)}>删除</Button>
         </Space>
       ),
     },
