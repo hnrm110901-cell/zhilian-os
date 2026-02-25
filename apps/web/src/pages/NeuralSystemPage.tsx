@@ -6,7 +6,6 @@ import { apiClient } from '../services/api';
 import { handleApiError } from '../utils/message';
 
 const { Option } = Select;
-const { TextArea } = Input;
 
 const NeuralSystemPage: React.FC = () => {
   const [status, setStatus] = useState<any>(null);
