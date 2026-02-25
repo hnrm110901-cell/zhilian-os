@@ -48,6 +48,25 @@ import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 
 const { Header, Content, Sider } = Layout;
 
+// 路由 → 所属子菜单 key 的映射（定义在组件外，避免每次渲染重建）
+const ROUTE_TO_GROUP: Record<string, string> = {
+  '/schedule': 'agents', '/order': 'agents', '/inventory': 'agents',
+  '/service': 'agents', '/training': 'agents', '/decision': 'agents', '/reservation': 'agents',
+  '/multi-store': 'business', '/supply-chain': 'business', '/finance': 'business',
+  '/data-visualization': 'analytics', '/analytics': 'analytics', '/monitoring': 'analytics',
+  '/users': 'admin-system', '/enterprise': 'admin-system', '/backup': 'admin-system',
+  '/audit': 'admin-system', '/data-import-export': 'admin-system',
+  '/open-platform': 'admin-system', '/industry-solutions': 'admin-system', '/i18n': 'admin-system',
+  '/forecast': 'admin-analytics', '/cross-store-insights': 'admin-analytics',
+  '/recommendations': 'admin-analytics', '/competitive-analysis': 'admin-analytics',
+  '/report-templates': 'admin-analytics', '/kpi-dashboard': 'admin-analytics',
+  '/private-domain': 'admin-crm', '/members': 'admin-crm', '/customer360': 'admin-crm',
+  '/pos': 'admin-store', '/quality': 'admin-store', '/compliance': 'admin-store',
+  '/human-in-the-loop': 'admin-store',
+  '/ai-evolution': 'admin-ai', '/edge-node': 'admin-ai', '/decision-validator': 'admin-ai',
+  '/federated-learning': 'admin-ai', '/agent-collaboration': 'admin-ai',
+};
+
 const MainLayout: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [searchVisible, setSearchVisible] = useState(false);
@@ -59,32 +78,17 @@ const MainLayout: React.FC = () => {
     token: { colorBgContainer, borderRadiusLG },
   } = theme.useToken();
 
-  // 根据当前路径计算应展开的子菜单
-  const routeToGroupKey: Record<string, string> = {
-    '/schedule': 'agents', '/order': 'agents', '/inventory': 'agents',
-    '/service': 'agents', '/training': 'agents', '/decision': 'agents', '/reservation': 'agents',
-    '/multi-store': 'business', '/supply-chain': 'business', '/finance': 'business',
-    '/data-visualization': 'analytics', '/analytics': 'analytics', '/monitoring': 'analytics',
-    '/users': 'admin-system', '/enterprise': 'admin-system', '/backup': 'admin-system',
-    '/audit': 'admin-system', '/data-import-export': 'admin-system',
-    '/open-platform': 'admin-system', '/industry-solutions': 'admin-system', '/i18n': 'admin-system',
-    '/forecast': 'admin-analytics', '/cross-store-insights': 'admin-analytics',
-    '/recommendations': 'admin-analytics', '/competitive-analysis': 'admin-analytics',
-    '/report-templates': 'admin-analytics', '/kpi-dashboard': 'admin-analytics',
-    '/private-domain': 'admin-crm', '/members': 'admin-crm', '/customer360': 'admin-crm',
-    '/pos': 'admin-store', '/quality': 'admin-store', '/compliance': 'admin-store',
-    '/human-in-the-loop': 'admin-store',
-    '/ai-evolution': 'admin-ai', '/edge-node': 'admin-ai', '/decision-validator': 'admin-ai',
-    '/federated-learning': 'admin-ai', '/agent-collaboration': 'admin-ai',
-  };
-  const activeGroupKey = routeToGroupKey[location.pathname];
-  const [openKeys, setOpenKeys] = useState<string[]>(activeGroupKey ? [activeGroupKey] : []);
+  // openKeys：始终保持当前路由所属分组展开，用户手动展开/折叠其他分组也保留
+  const [openKeys, setOpenKeys] = useState<string[]>(() => {
+    const g = ROUTE_TO_GROUP[window.location.pathname];
+    return g ? [g] : [];
+  });
 
-  // 路由变化时自动展开对应子菜单
+  // 路由变化时确保当前分组展开（不重复添加，不清除其他已展开分组）
   useEffect(() => {
-    const groupKey = routeToGroupKey[location.pathname];
-    if (groupKey && !openKeys.includes(groupKey)) {
-      setOpenKeys(prev => [...prev, groupKey]);
+    const groupKey = ROUTE_TO_GROUP[location.pathname];
+    if (groupKey) {
+      setOpenKeys(prev => prev.includes(groupKey) ? prev : [...prev, groupKey]);
     }
   }, [location.pathname]);
 

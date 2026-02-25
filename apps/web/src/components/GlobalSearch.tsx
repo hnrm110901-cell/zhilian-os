@@ -138,6 +138,14 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ visible, onClose }) 
     setActiveIndex(-1);
   }, [searchQuery]);
 
+  useEffect(() => {
+    if (activeIndex >= 0 && listRef.current) {
+      const items = listRef.current.querySelectorAll('.ant-list-item');
+      const activeItem = items[activeIndex] as HTMLElement;
+      if (activeItem) activeItem.scrollIntoView({ block: 'nearest' });
+    }
+  }, [activeIndex]);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (results.length === 0) return;
     if (e.key === 'ArrowDown') {
