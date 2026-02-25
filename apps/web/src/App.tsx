@@ -57,6 +57,14 @@ const AgentCollaborationPage = lazy(() => import('./pages/AgentCollaborationPage
 const OpenPlatformPage = lazy(() => import('./pages/OpenPlatformPage'));
 const IndustrySolutionsPage = lazy(() => import('./pages/IndustrySolutionsPage'));
 const I18nPage = lazy(() => import('./pages/I18nPage'));
+const TaskManagementPage = lazy(() => import('./pages/TaskManagementPage'));
+const ReconciliationPage = lazy(() => import('./pages/ReconciliationPage'));
+const DishManagementPage = lazy(() => import('./pages/DishManagementPage'));
+const EmployeeManagementPage = lazy(() => import('./pages/EmployeeManagementPage'));
+const RaaSPage = lazy(() => import('./pages/RaaSPage'));
+const ModelMarketplacePage = lazy(() => import('./pages/ModelMarketplacePage'));
+const LLMConfigPage = lazy(() => import('./pages/LLMConfigPage'));
+const HardwarePage = lazy(() => import('./pages/HardwarePage'));
 
 const PageLoader = (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
@@ -194,6 +202,30 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="i18n" element={
                     <ProtectedRoute requiredRole="admin"><I18nPage /></ProtectedRoute>
+                  } />
+                  <Route path="tasks" element={
+                    <ProtectedRoute requiredRole="admin"><TaskManagementPage /></ProtectedRoute>
+                  } />
+                  <Route path="reconciliation" element={
+                    <ProtectedRoute requiredRole="admin"><ReconciliationPage /></ProtectedRoute>
+                  } />
+                  <Route path="dishes" element={
+                    <ProtectedRoute requiredRole="admin"><DishManagementPage /></ProtectedRoute>
+                  } />
+                  <Route path="employees" element={
+                    <ProtectedRoute requiredRole="admin"><EmployeeManagementPage /></ProtectedRoute>
+                  } />
+                  <Route path="raas" element={
+                    <ProtectedRoute requiredRole="admin"><RaaSPage /></ProtectedRoute>
+                  } />
+                  <Route path="model-marketplace" element={
+                    <ProtectedRoute requiredRole="admin"><ModelMarketplacePage /></ProtectedRoute>
+                  } />
+                  <Route path="llm-config" element={
+                    <ProtectedRoute requiredRole="admin"><LLMConfigPage /></ProtectedRoute>
+                  } />
+                  <Route path="hardware" element={
+                    <ProtectedRoute requiredRole="admin"><HardwarePage /></ProtectedRoute>
                   } />
                 </Route>
                 <Route path="*" element={<NotFoundPage />} />

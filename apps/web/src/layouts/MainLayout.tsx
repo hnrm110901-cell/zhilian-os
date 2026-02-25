@@ -65,6 +65,9 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/human-in-the-loop': 'admin-store',
   '/ai-evolution': 'admin-ai', '/edge-node': 'admin-ai', '/decision-validator': 'admin-ai',
   '/federated-learning': 'admin-ai', '/agent-collaboration': 'admin-ai',
+  '/tasks': 'business', '/reconciliation': 'business', '/dishes': 'business', '/employees': 'business',
+  '/raas': 'admin-system', '/model-marketplace': 'admin-system',
+  '/llm-config': 'admin-ai', '/hardware': 'admin-ai',
 };
 
 const MainLayout: React.FC = () => {
@@ -173,6 +176,14 @@ const MainLayout: React.FC = () => {
     '/open-platform': '开放平台',
     '/industry-solutions': '行业解决方案',
     '/i18n': '国际化',
+    '/tasks': '任务管理',
+    '/reconciliation': '对账管理',
+    '/dishes': '菜品管理',
+    '/employees': '员工管理',
+    '/raas': 'RaaS定价',
+    '/model-marketplace': '模型市场',
+    '/llm-config': 'LLM配置',
+    '/hardware': '硬件管理',
   };
 
   // 生成面包屑项
@@ -304,6 +315,10 @@ const MainLayout: React.FC = () => {
           icon: <DollarOutlined />,
           label: '财务管理',
         },
+        { key: '/dishes', icon: <ShoppingOutlined />, label: '菜品管理' },
+        { key: '/employees', icon: <TeamOutlined />, label: '员工管理' },
+        { key: '/tasks', icon: <FileTextOutlined />, label: '任务管理' },
+        { key: '/reconciliation', icon: <FileExcelOutlined />, label: '对账管理' },
       ],
     },
     {
@@ -352,6 +367,8 @@ const MainLayout: React.FC = () => {
           { key: '/open-platform', icon: <AppstoreOutlined />, label: '开放平台' },
           { key: '/industry-solutions', icon: <GlobalOutlined />, label: '行业解决方案' },
           { key: '/i18n', icon: <TranslationOutlined />, label: '国际化' },
+          { key: '/raas', icon: <DollarOutlined />, label: 'RaaS定价' },
+          { key: '/model-marketplace', icon: <AppstoreOutlined />, label: '模型市场' },
         ],
       },
       {
@@ -398,6 +415,8 @@ const MainLayout: React.FC = () => {
           { key: '/decision-validator', icon: <CheckCircleOutlined />, label: '决策验证' },
           { key: '/federated-learning', icon: <ExperimentOutlined />, label: '联邦学习' },
           { key: '/agent-collaboration', icon: <ApartmentOutlined />, label: 'Agent协作' },
+          { key: '/llm-config', icon: <SettingOutlined />, label: 'LLM配置' },
+          { key: '/hardware', icon: <CloudOutlined />, label: '硬件管理' },
         ],
       },
     ] : []),
