@@ -10,6 +10,7 @@ import {
 } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { apiClient } from '../services/api';
+import { handleApiError } from '../utils/message';
 
 const DataVisualizationScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -34,7 +35,7 @@ const DataVisualizationScreen: React.FC = () => {
       setMemberStats(members.data);
       setRealtimeMetrics(realtime.data);
     } catch (err: any) {
-      console.error('Dashboard data loading error:', err);
+      handleApiError(err, '加载数据大屏失败');
     } finally {
       setLoading(false);
     }

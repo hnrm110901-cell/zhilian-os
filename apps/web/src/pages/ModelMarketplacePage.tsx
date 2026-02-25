@@ -16,8 +16,18 @@ const ModelMarketplacePage: React.FC = () => {
   const [purchaseVisible, setPurchaseVisible] = useState(false);
   const [contributeVisible, setContributeVisible] = useState(false);
   const [selectedModel, setSelectedModel] = useState<any>(null);
-  const [storeId] = useState('STORE001');
+  const [storeId, setStoreId] = useState('STORE001');
+  const [stores, setStores] = useState<any[]>([]);
   const [contributeForm] = Form.useForm();
+
+  const loadStores = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/stores');
+      setStores(res.data?.stores || res.data || []);
+    } catch {
+      // 静默失败，保留默认门店
+    }
+  }, []);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -37,7 +47,7 @@ const ModelMarketplacePage: React.FC = () => {
     }
   }, [storeId]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => { loadStores(); loadData(); }, [loadStores, loadData]);
 
   const purchaseModel = async () => {
     try {
@@ -120,7 +130,15 @@ const ModelMarketplacePage: React.FC = () => {
 
   return (
     <div>
-      <div style={{ marginBottom: 16, textAlign: 'right' }}>
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Space>
+          <span>门店：</span>
+          <Select value={storeId} onChange={setStoreId} style={{ width: 180 }}>
+            {stores.length > 0
+              ? stores.map((s: any) => <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>)
+              : <Option value="STORE001">STORE001</Option>}
+          </Select>
+        </Space>
         <Space>
           <Button icon={<DatabaseOutlined />} onClick={() => setContributeVisible(true)}>贡献数据</Button>
         </Space>
