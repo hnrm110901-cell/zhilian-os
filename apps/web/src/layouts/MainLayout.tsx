@@ -121,6 +121,7 @@ const MainLayout: React.FC = () => {
     '/private-domain': '私域运营',
     '/members': '会员系统',
     '/kpi-dashboard': 'KPI看板',
+    '/customer360': '客户360',
   };
 
   // 生成面包屑项
@@ -356,6 +357,11 @@ const MainLayout: React.FC = () => {
         key: '/kpi-dashboard',
         icon: <BarChartOutlined />,
         label: 'KPI看板',
+      },
+      {
+        key: '/customer360',
+        icon: <UserOutlined />,
+        label: '客户360',
       }
     ] : []),
   ];
