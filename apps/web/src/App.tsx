@@ -65,6 +65,11 @@ const RaaSPage = lazy(() => import('./pages/RaaSPage'));
 const ModelMarketplacePage = lazy(() => import('./pages/ModelMarketplacePage'));
 const LLMConfigPage = lazy(() => import('./pages/LLMConfigPage'));
 const HardwarePage = lazy(() => import('./pages/HardwarePage'));
+const IntegrationsPage = lazy(() => import('./pages/IntegrationsPage'));
+const NeuralSystemPage = lazy(() => import('./pages/NeuralSystemPage'));
+const EmbeddingPage = lazy(() => import('./pages/EmbeddingPage'));
+const SchedulerPage = lazy(() => import('./pages/SchedulerPage'));
+const BenchmarkPage = lazy(() => import('./pages/BenchmarkPage'));
 
 const PageLoader = (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
@@ -226,6 +231,21 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="hardware" element={
                     <ProtectedRoute requiredRole="admin"><HardwarePage /></ProtectedRoute>
+                  } />
+                  <Route path="integrations" element={
+                    <ProtectedRoute requiredRole="admin"><IntegrationsPage /></ProtectedRoute>
+                  } />
+                  <Route path="neural" element={
+                    <ProtectedRoute requiredRole="admin"><NeuralSystemPage /></ProtectedRoute>
+                  } />
+                  <Route path="embedding" element={
+                    <ProtectedRoute requiredRole="admin"><EmbeddingPage /></ProtectedRoute>
+                  } />
+                  <Route path="scheduler" element={
+                    <ProtectedRoute requiredRole="admin"><SchedulerPage /></ProtectedRoute>
+                  } />
+                  <Route path="benchmark" element={
+                    <ProtectedRoute requiredRole="admin"><BenchmarkPage /></ProtectedRoute>
                   } />
                 </Route>
                 <Route path="*" element={<NotFoundPage />} />
