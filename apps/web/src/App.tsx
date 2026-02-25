@@ -46,6 +46,9 @@ import EdgeNodePage from './pages/EdgeNodePage';
 import DecisionValidatorPage from './pages/DecisionValidatorPage';
 import FederatedLearningPage from './pages/FederatedLearningPage';
 import AgentCollaborationPage from './pages/AgentCollaborationPage';
+import OpenPlatformPage from './pages/OpenPlatformPage';
+import IndustrySolutionsPage from './pages/IndustrySolutionsPage';
+import I18nPage from './pages/I18nPage';
 import LoginPage from './pages/LoginPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 
@@ -229,6 +232,21 @@ const AppContent: React.FC = () => {
               <Route path="agent-collaboration" element={
                 <ProtectedRoute requiredRole="admin">
                   <AgentCollaborationPage />
+                </ProtectedRoute>
+              } />
+              <Route path="open-platform" element={
+                <ProtectedRoute requiredRole="admin">
+                  <OpenPlatformPage />
+                </ProtectedRoute>
+              } />
+              <Route path="industry-solutions" element={
+                <ProtectedRoute requiredRole="admin">
+                  <IndustrySolutionsPage />
+                </ProtectedRoute>
+              } />
+              <Route path="i18n" element={
+                <ProtectedRoute requiredRole="admin">
+                  <I18nPage />
                 </ProtectedRoute>
               } />
             </Route>

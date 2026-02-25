@@ -37,6 +37,8 @@ import {
   CloudOutlined,
   ExperimentOutlined,
   ApartmentOutlined,
+  AppstoreOutlined,
+  TranslationOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -135,6 +137,9 @@ const MainLayout: React.FC = () => {
     '/decision-validator': '决策验证',
     '/federated-learning': '联邦学习',
     '/agent-collaboration': 'Agent协作',
+    '/open-platform': '开放平台',
+    '/industry-solutions': '行业解决方案',
+    '/i18n': '国际化',
   };
 
   // 生成面包屑项
@@ -415,6 +420,21 @@ const MainLayout: React.FC = () => {
         key: '/agent-collaboration',
         icon: <ApartmentOutlined />,
         label: 'Agent协作',
+      },
+      {
+        key: '/open-platform',
+        icon: <AppstoreOutlined />,
+        label: '开放平台',
+      },
+      {
+        key: '/industry-solutions',
+        icon: <GlobalOutlined />,
+        label: '行业解决方案',
+      },
+      {
+        key: '/i18n',
+        icon: <TranslationOutlined />,
+        label: '国际化',
       },
     ] : []),
   ];
