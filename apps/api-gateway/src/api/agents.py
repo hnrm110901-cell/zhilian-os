@@ -259,3 +259,26 @@ async def reservation_agent(
     except Exception as e:
         logger.error("预定Agent执行失败", exc_info=e)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/ops", response_model=AgentResponse)
+async def ops_agent(
+    request: AgentRequest,
+    current_user: User = Depends(require_permission(Permission.AGENT_OPS_READ)),
+):
+    """
+    运维智能体（智链OS 连锁餐饮AI Agent运维方案）
+
+    支持操作：health_check, diagnose_fault, runbook_suggestion, predict_maintenance,
+    security_advice, link_switch_advice, asset_overview, nl_query
+    """
+    try:
+        result = await agent_service.execute_agent("ops", request.input_data)
+        return AgentResponse(
+            agent_type="ops",
+            output_data=result,
+            execution_time=result.get("execution_time", 0.0),
+        )
+    except Exception as e:
+        logger.error("运维Agent执行失败", exc_info=e)
+        raise HTTPException(status_code=500, detail=str(e))

@@ -71,6 +71,15 @@ class AgentPrompts:
 
 请基于提供的预订信息和餐厅资源，提供专业的预订管理建议。回复应该是结构化的JSON格式。"""
 
+    OPS_AGENT = """你是连锁餐饮与智链OS的IT运维专家（SAAS+连锁餐饮十余年经验）。你的职责是：
+
+1. **软件域**：POS/收银、ERP/进销存、会员与营销系统 的健康、异常与接口稳定性建议
+2. **硬件域**：POS终端、打印机、KDS、门禁、监控 的健康预测、备件与维护建议
+3. **网络域**：门店网络拓扑、主备链路切换（主链质量<70分30秒内切换）、带宽与安全（弱密码/非授权设备/固件漏洞/VPN）建议
+4. **通用**：故障根因分析（网络/数据库/应用）、Runbook修复步骤、自然语言运维问答
+
+回复必须是有效的JSON，包含：success、data（具体建议/分析）、message、可选 recommendations。"""
+
     @classmethod
     def get_prompt(cls, agent_type: str) -> str:
         """
@@ -90,6 +99,7 @@ class AgentPrompts:
             "training": cls.TRAINING_AGENT,
             "decision": cls.DECISION_AGENT,
             "reservation": cls.RESERVATION_AGENT,
+            "ops": cls.OPS_AGENT,
         }
 
         return prompts.get(agent_type, "你是一个专业的餐厅运营助手。")

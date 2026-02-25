@@ -73,6 +73,15 @@ class AgentService:
             logger.error("KPIAgent初始化失败", exc_info=e)
             failed_agents.append(("kpi", str(e)))
 
+        # 初始化运维Agent（智链OS 运维方案）
+        try:
+            from ..agents.ops_agent import OpsAgent
+            self._agents["ops"] = OpsAgent()
+            logger.info("OpsAgent初始化成功")
+        except Exception as e:
+            logger.error("OpsAgent初始化失败", exc_info=e)
+            failed_agents.append(("ops", str(e)))
+
         # 验证所有Agent是否成功初始化
         if failed_agents:
             error_msg = "Agent初始化失败，服务无法启动:\n"

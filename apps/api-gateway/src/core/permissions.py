@@ -35,6 +35,9 @@ class Permission(str, Enum):
     AGENT_RESERVATION_READ = "agent:reservation:read"
     AGENT_RESERVATION_WRITE = "agent:reservation:write"
 
+    AGENT_OPS_READ = "agent:ops:read"
+    AGENT_OPS_WRITE = "agent:ops:write"
+
     # 语音设备权限（Shokz耳机）
     VOICE_DEVICE_READ = "voice:device:read"
     VOICE_DEVICE_WRITE = "voice:device:write"
@@ -82,6 +85,8 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
         Permission.AGENT_DECISION_WRITE,
         Permission.AGENT_RESERVATION_READ,
         Permission.AGENT_RESERVATION_WRITE,
+        Permission.AGENT_OPS_READ,
+        Permission.AGENT_OPS_WRITE,
         Permission.VOICE_DEVICE_READ,
         Permission.VOICE_DEVICE_WRITE,
         Permission.VOICE_DEVICE_DELETE,
@@ -107,6 +112,7 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
         Permission.AGENT_DECISION_READ,
         Permission.AGENT_RESERVATION_READ,
         Permission.AGENT_RESERVATION_WRITE,
+        Permission.AGENT_OPS_READ,
         Permission.VOICE_DEVICE_READ,
         Permission.VOICE_DEVICE_WRITE,
         Permission.VOICE_COMMAND,
