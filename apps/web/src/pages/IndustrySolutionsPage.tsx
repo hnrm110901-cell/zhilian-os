@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import {
-  Card, Row, Col, Statistic, Space, Button, Form, Select,
-  Spin, Typography, Descriptions, Tag, Alert, InputNumber, Input
+  Card, Row, Col, Statistic, Space, Button,
+  Select, Spin, Typography, Alert
 } from 'antd';
 import { GlobalOutlined, CheckCircleOutlined, AppstoreAddOutlined } from '@ant-design/icons';
-import { apiClient, handleApiError, showSuccess } from '../utils/api';
+import { apiClient } from '../services/api';
+import { handleApiError, showSuccess } from '../utils/message';
 
-const { Title, Text } = Typography;
+const { Title } = Typography;
 const { Option } = Select;
 
 interface Solution {

@@ -1,10 +1,11 @@
 import React, { useState, useCallback } from 'react';
 import {
-  Card, Row, Col, Statistic, Tabs, Table, Tag, Space, Button, Form,
-  Select, Spin, Typography, Descriptions, InputNumber, Alert, Progress, Input
+  Card, Row, Col, Statistic, Tabs, Space, Button, Form,
+  Select, Spin, Typography, Descriptions, InputNumber, Progress, Input
 } from 'antd';
 import { ApartmentOutlined, SyncOutlined, WarningOutlined, BarChartOutlined } from '@ant-design/icons';
-import { apiClient, handleApiError, showSuccess } from '../utils/api';
+import { apiClient } from '../services/api';
+import { handleApiError, showSuccess } from '../utils/message';
 
 const { Title } = Typography;
 const { Option } = Select;

@@ -4,9 +4,10 @@ import {
   Select, Spin, Typography, Alert, Progress, Descriptions, InputNumber, Statistic
 } from 'antd';
 import { CheckCircleOutlined, CloseCircleOutlined, WarningOutlined, BulbOutlined } from '@ant-design/icons';
-import { apiClient, handleApiError } from '../utils/api';
+import { apiClient } from '../services/api';
+import { handleApiError } from '../utils/message';
 
-const { Title, Text } = Typography;
+const { Title } = Typography;
 const { Option } = Select;
 
 interface ValidationResult {

@@ -1,9 +1,9 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   Card, Col, Row, Select, DatePicker, Tabs, Statistic, Table, Tag,
-  Button, Space, Badge, Descriptions, Progress, Alert,
+  Button, Space, Badge, Descriptions,
 } from 'antd';
-import { ReloadOutlined, SyncOutlined, CheckCircleOutlined, WarningOutlined } from '@ant-design/icons';
+import { ReloadOutlined, SyncOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { apiClient } from '../services/api';
@@ -188,7 +188,7 @@ const POSPage: React.FC = () => {
               { title: '状态', dataIndex: 'status', key: 'status', render: (v: string) => <Tag>{v}</Tag> },
             ]}
             dataSource={queueData.queues || []}
-            rowKey={(r, i) => `${r.queue_number || i}`}
+            rowKey={(_r, i) => String(i)}
             size="small"
           />
         </div>

@@ -1,12 +1,13 @@
 import React, { useState, useCallback } from 'react';
 import {
-  Card, Row, Col, Statistic, Tabs, Table, Tag, Space, Button, Form,
+  Card, Row, Col, Statistic, Tabs, Space, Button, Form,
   Select, Spin, Typography, Progress, Descriptions, InputNumber, Alert
 } from 'antd';
 import { CloudSyncOutlined, ExperimentOutlined, TrophyOutlined } from '@ant-design/icons';
-import { apiClient, handleApiError, showSuccess } from '../utils/api';
+import { apiClient } from '../services/api';
+import { handleApiError, showSuccess } from '../utils/message';
 
-const { Title, Text } = Typography;
+const { Title } = Typography;
 const { Option } = Select;
 
 interface ModelStatus {
