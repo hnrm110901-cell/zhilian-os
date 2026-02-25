@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Card, Col, Row, Table, Tabs, Statistic, Button, Modal, Input, Tag, Progress, Space } from 'antd';
+import { Card, Col, Row, Table, Tabs, Statistic, Button, Modal, Input, Tag, Progress, Space, Select } from 'antd';
 import { CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { apiClient } from '../services/api';
@@ -10,8 +10,11 @@ const { TextArea } = Input;
 const riskColor: Record<string, string> = { high: 'red', medium: 'orange', low: 'green' };
 const riskLabel: Record<string, string> = { high: '高', medium: '中', low: '低' };
 
+const { Option } = Select;
+
 const HumanInTheLoop: React.FC = () => {
-  const [selectedStore] = useState('STORE001');
+  const [selectedStore, setSelectedStore] = useState('STORE001');
+  const [stores, setStores] = useState<any[]>([]);
   const [pending, setPending] = useState<any[]>([]);
   const [trustPhase, setTrustPhase] = useState<any>(null);
   const [trustMetrics, setTrustMetrics] = useState<any>(null);
@@ -22,6 +25,15 @@ const HumanInTheLoop: React.FC = () => {
   const [approving, setApproving] = useState(true);
   const [comment, setComment] = useState('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const loadStores = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/stores');
+      setStores(res.data?.stores || res.data || []);
+    } catch {
+      // 静默失败，保留默认门店
+    }
+  }, []);
 
   const loadPending = useCallback(async () => {
     try {
@@ -51,11 +63,12 @@ const HumanInTheLoop: React.FC = () => {
   }, [selectedStore]);
 
   useEffect(() => {
+    loadStores();
     loadPending();
     loadTrustData();
     intervalRef.current = setInterval(loadPending, 30000);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [loadPending, loadTrustData]);
+  }, [loadStores, loadPending, loadTrustData]);
 
   const openApproveModal = (record: any, approve: boolean) => {
     setCurrentRequest(record);
@@ -129,6 +142,16 @@ const HumanInTheLoop: React.FC = () => {
 
   return (
     <div>
+      <div style={{ marginBottom: 16 }}>
+        <Space>
+          <span>门店：</span>
+          <Select value={selectedStore} onChange={setSelectedStore} style={{ width: 180 }}>
+            {stores.length > 0
+              ? stores.map((s: any) => <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>)
+              : <Option value="STORE001">STORE001</Option>}
+          </Select>
+        </Space>
+      </div>
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col span={6}><Card><Statistic title="待审批数" value={pending.length} /></Card></Col>
         <Col span={6}><Card><Statistic title="信任阶段" value={trustPhase?.phase ?? '--'} /></Card></Col>
