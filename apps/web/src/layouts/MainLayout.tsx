@@ -68,6 +68,8 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/tasks': 'business', '/reconciliation': 'business', '/dishes': 'business', '/employees': 'business',
   '/raas': 'admin-system', '/model-marketplace': 'admin-system',
   '/llm-config': 'admin-ai', '/hardware': 'admin-ai',
+  '/integrations': 'admin-system', '/neural': 'admin-ai', '/embedding': 'admin-ai',
+  '/scheduler': 'admin-system', '/benchmark': 'admin-analytics',
 };
 
 const MainLayout: React.FC = () => {
@@ -184,6 +186,11 @@ const MainLayout: React.FC = () => {
     '/model-marketplace': '模型市场',
     '/llm-config': 'LLM配置',
     '/hardware': '硬件管理',
+    '/integrations': '外部集成',
+    '/neural': '神经系统',
+    '/embedding': '嵌入模型',
+    '/scheduler': '调度管理',
+    '/benchmark': '基准测试',
   };
 
   // 生成面包屑项
@@ -369,6 +376,8 @@ const MainLayout: React.FC = () => {
           { key: '/i18n', icon: <TranslationOutlined />, label: '国际化' },
           { key: '/raas', icon: <DollarOutlined />, label: 'RaaS定价' },
           { key: '/model-marketplace', icon: <AppstoreOutlined />, label: '模型市场' },
+          { key: '/integrations', icon: <ApiOutlined />, label: '外部集成' },
+          { key: '/scheduler', icon: <CalendarOutlined />, label: '调度管理' },
         ],
       },
       {
@@ -382,6 +391,7 @@ const MainLayout: React.FC = () => {
           { key: '/competitive-analysis', icon: <RiseOutlined />, label: '竞争分析' },
           { key: '/report-templates', icon: <FileTextOutlined />, label: '报表模板' },
           { key: '/kpi-dashboard', icon: <BarChartOutlined />, label: 'KPI看板' },
+          { key: '/benchmark', icon: <BarChartOutlined />, label: '基准测试' },
         ],
       },
       {
@@ -417,6 +427,8 @@ const MainLayout: React.FC = () => {
           { key: '/agent-collaboration', icon: <ApartmentOutlined />, label: 'Agent协作' },
           { key: '/llm-config', icon: <SettingOutlined />, label: 'LLM配置' },
           { key: '/hardware', icon: <CloudOutlined />, label: '硬件管理' },
+          { key: '/neural', icon: <ApartmentOutlined />, label: '神经系统' },
+          { key: '/embedding', icon: <ExperimentOutlined />, label: '嵌入模型' },
         ],
       },
     ] : []),
