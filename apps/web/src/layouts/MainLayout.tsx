@@ -77,6 +77,8 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/queue': 'admin-store', '/agent-memory': 'admin-ai', '/wechat-triggers': 'admin-system',
   '/event-sourcing': 'admin-ai', '/meituan-queue': 'admin-store', '/vector-index': 'admin-ai',
   '/adapters': 'admin-system', '/voice-devices': 'admin-store',
+  '/system-health': 'admin-system', '/voice-ws': 'admin-ai',
+  '/profile': '',
 };
 
 const MainLayout: React.FC = () => {
@@ -209,6 +211,9 @@ const MainLayout: React.FC = () => {
     '/vector-index': '向量知识库',
     '/adapters': '适配器管理',
     '/voice-devices': '语音设备',
+    '/system-health': '系统健康',
+    '/profile': '个人信息',
+    '/voice-ws': '语音WebSocket',
   };
 
   // 生成面包屑项
@@ -266,7 +271,7 @@ const MainLayout: React.FC = () => {
       logout();
       navigate('/login');
     } else if (key === 'profile') {
-      // Navigate to profile page
+      navigate('/profile');
     } else if (key === 'settings') {
       // Navigate to settings page
     }
@@ -401,6 +406,7 @@ const MainLayout: React.FC = () => {
           { key: '/export-jobs', icon: <ExportOutlined />, label: '导出任务' },
           { key: '/wechat-triggers', icon: <BellOutlined />, label: '微信触发器' },
           { key: '/adapters', icon: <ApiOutlined />, label: '适配器管理' },
+          { key: '/system-health', icon: <MonitorOutlined />, label: '系统健康' },
         ],
       },
       {
@@ -458,6 +464,7 @@ const MainLayout: React.FC = () => {
           { key: '/agent-memory', icon: <DatabaseOutlined />, label: '智能体记忆' },
           { key: '/event-sourcing', icon: <FileTextOutlined />, label: '事件溯源' },
           { key: '/vector-index', icon: <SearchOutlined />, label: '向量知识库' },
+          { key: '/voice-ws', icon: <SoundOutlined />, label: '语音WebSocket' },
         ],
       },
     ] : []),
