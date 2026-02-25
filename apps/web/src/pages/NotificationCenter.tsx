@@ -70,7 +70,7 @@ const NotificationCenter: React.FC = () => {
       const response = await apiClient.get('/notifications/unread-count');
       setUnreadCount(response.data.unread_count || 0);
     } catch (err: any) {
-      console.error('加载未读数量失败', err);
+      handleApiError(err, '加载未读数量失败');
     }
   };
 

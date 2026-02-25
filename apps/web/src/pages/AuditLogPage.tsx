@@ -98,7 +98,7 @@ const AuditLogPage: React.FC = () => {
       const response = await apiClient.get('/audit/logs/actions');
       setActions(response.data.actions || []);
     } catch (err: any) {
-      console.error('加载操作类型失败', err);
+      handleApiError(err, '加载操作类型失败');
     }
   };
 
@@ -107,7 +107,7 @@ const AuditLogPage: React.FC = () => {
       const response = await apiClient.get('/audit/logs/resource-types');
       setResourceTypes(response.data.resource_types || []);
     } catch (err: any) {
-      console.error('加载资源类型失败', err);
+      handleApiError(err, '加载资源类型失败');
     }
   };
 

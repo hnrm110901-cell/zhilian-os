@@ -10,6 +10,7 @@ import {
   LogoutOutlined,
 } from '@ant-design/icons';
 import { apiClient } from '../services/api';
+import { handleApiError } from '../utils/message';
 import { DataCard, LoadingSkeleton, EmptyState } from '../components';
 
 const MobileApp: React.FC = () => {
@@ -25,7 +26,7 @@ const MobileApp: React.FC = () => {
       const response = await apiClient.get('/mobile/dashboard');
       setDashboard(response.data);
     } catch (err: any) {
-      console.error('Dashboard loading error:', err);
+      handleApiError(err, '加载仪表盘失败');
     } finally {
       setRefreshing(false);
       setLoading(false);
@@ -37,7 +38,7 @@ const MobileApp: React.FC = () => {
       const response = await apiClient.get('/mobile/orders/today');
       setTodayOrders(response.data);
     } catch (err: any) {
-      console.error('Orders loading error:', err);
+      handleApiError(err, '加载今日订单失败');
     }
   }, []);
 
