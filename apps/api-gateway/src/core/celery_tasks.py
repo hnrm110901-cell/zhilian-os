@@ -191,8 +191,8 @@ def process_neural_event(
                         db_log.error_message = str(e)
                         db_log.retry_count = self.request.retries + 1
                         await session.commit()
-            except Exception:
-                pass
+            except Exception as db_err:
+                logger.warning("celery_tasks.status_update_failed", error=str(db_err))
             raise self.retry(exc=e)
 
     return asyncio.run(_run())
