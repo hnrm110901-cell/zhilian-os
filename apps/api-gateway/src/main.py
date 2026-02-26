@@ -19,7 +19,7 @@ from src.api import dashboard, analytics, audit, multi_store, finance, customer3
 from src.api import members
 from src.api import edge_node, decision_validator, recommendations, agent_collaboration
 # Phase 1: CRUD API
-from src.api import employees, inventory, schedules, reservations, kpis
+from src.api import employees, inventory, schedules, reservations, kpis, orders
 from src.api import ai_evolution_dashboard
 from src.api import compliance
 from src.api import quality
@@ -460,6 +460,7 @@ app.include_router(inventory.router, prefix="/api/v1", tags=["inventory"])
 app.include_router(schedules.router, prefix="/api/v1", tags=["schedules"])
 app.include_router(reservations.router, prefix="/api/v1", tags=["reservations"])
 app.include_router(kpis.router, prefix="/api/v1", tags=["kpis"])
+app.include_router(orders.router, prefix="/api/v1", tags=["orders"])
 app.include_router(ai_evolution_dashboard.router, tags=["ai_evolution"])
 app.include_router(compliance.router)
 app.include_router(quality.router)
