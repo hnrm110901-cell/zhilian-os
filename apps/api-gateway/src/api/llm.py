@@ -9,6 +9,7 @@ from ..core.dependencies import require_permission
 from ..core.permissions import Permission
 from ..core.config import settings
 from ..core.llm import get_llm_client, set_llm_client, LLMFactory, LLMProvider
+from ..core.prompt_injection_guard import prompt_injection_guard, InputSource, SanitizationLevel, PromptInjectionException
 from ..models.user import User
 
 router = APIRouter()
@@ -175,11 +176,21 @@ async def test_llm(
             detail="LLM未启用，请先在配置中启用LLM"
         )
 
+    # Prompt注入防护
+    try:
+        sanitized_prompt = prompt_injection_guard.sanitize_input(
+            request.prompt,
+            source=InputSource.USER_INPUT,
+            level=SanitizationLevel.MODERATE,
+        )
+    except PromptInjectionException as e:
+        raise HTTPException(status_code=400, detail=f"输入包含非法内容: {e}")
+
     try:
         llm_client = get_llm_client()
 
         response = await llm_client.generate(
-            prompt=request.prompt,
+            prompt=sanitized_prompt,
             system_prompt=request.system_prompt,
             temperature=settings.LLM_TEMPERATURE,
             max_tokens=settings.LLM_MAX_TOKENS,

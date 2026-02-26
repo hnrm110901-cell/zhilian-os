@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from ..core.dependencies import require_permission
 from ..core.permissions import Permission
 from ..models.user import User
+from ..core.prompt_injection_guard import prompt_injection_guard, InputSource, SanitizationLevel, PromptInjectionException
 
 router = APIRouter()
 
@@ -161,10 +162,19 @@ async def nl_query(
     current_user: User = Depends(require_permission(Permission.AGENT_OPS_READ)),
 ):
     """自然语言运维问答（如「3号店今天网络为什么慢」）"""
+    try:
+        sanitized_question = prompt_injection_guard.sanitize_input(
+            body.question,
+            source=InputSource.USER_INPUT,
+            level=SanitizationLevel.MODERATE,
+        )
+    except PromptInjectionException as e:
+        raise HTTPException(status_code=400, detail=f"输入包含非法内容: {e}")
+
     agent = _get_ops_agent()
     result = await agent.execute("nl_query", {
         "store_id": body.store_id,
-        "question": body.question,
+        "question": sanitized_question,
     })
     if not result.success:
         raise HTTPException(status_code=500, detail=result.error)

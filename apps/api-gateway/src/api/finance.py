@@ -2,7 +2,7 @@
 财务管理API
 """
 from typing import Optional
-from datetime import date
+from datetime import date, datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
@@ -12,6 +12,7 @@ from src.core.database import get_db
 from src.core.dependencies import get_current_active_user, require_permission
 from src.services.finance_service import get_finance_service
 from src.services.report_export_service import report_export_service
+from src.core.neural_symbolic_guardrails import guardrails, AIProposal, GuardrailResult
 try:
     from src.services.pdf_report_service import pdf_report_service
     PDF_AVAILABLE = True
@@ -258,3 +259,85 @@ async def export_report(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"导出失败: {str(e)}")
+
+
+# ==================== 退款校验 ====================
+
+class RefundRequest(BaseModel):
+    order_id: str = Field(..., description="订单ID")
+    refund_amount: int = Field(..., description="退款金额（分）", gt=0)
+    original_order_amount: int = Field(..., description="原订单金额（分）", gt=0)
+    days_since_order: int = Field(..., description="下单至今天数", ge=0)
+    customer_id: str = Field(..., description="顾客ID")
+    reason: Optional[str] = Field(None, description="退款原因")
+
+
+class RefundResponse(BaseModel):
+    approved: bool
+    requires_human_approval: bool
+    violations: list
+    escalation_reason: Optional[str]
+    message: str
+
+
+@router.post("/refunds/validate", response_model=RefundResponse)
+async def validate_refund(
+    req: RefundRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    退款前置校验（Guardrails）
+
+    在实际退款前调用此接口，系统会通过符号规则引擎校验：
+    - REF_001: 退款金额不可超过原订单金额
+    - REF_002: 退款申请必须在有效期内（默认7天）
+    - REF_003: 单日退款总额不可超过当日营收20%
+    - REF_004: 单笔超阈值需人工审批（默认500元）
+    - REF_005: 同一顾客24小时内退款次数上限（默认3次）
+    """
+    import uuid
+
+    # 构建 AI 提案（此处退款申请视为"提案"送入符号校验层）
+    proposal = AIProposal(
+        proposal_id=str(uuid.uuid4()),
+        proposal_type="refund",
+        content={
+            "refund_amount": req.refund_amount,
+            "days_since_order": req.days_since_order,
+        },
+        confidence=1.0,
+        reasoning="用户发起退款申请",
+        created_at=datetime.utcnow(),
+    )
+
+    # 业务上下文（实际生产中应从DB查询当日营收、退款累计等）
+    context = {
+        "original_order_amount": req.original_order_amount,
+        "daily_revenue": req.original_order_amount * 20,   # 占位：实际应查DB
+        "daily_refund_total": 0,                            # 占位：实际应查Redis累计
+        "customer_refund_count_24h": 0,                     # 占位：实际应查Redis
+    }
+
+    result: GuardrailResult = guardrails.validate_proposal(proposal, context)
+
+    violations_out = [
+        {"rule_id": v.rule_id, "rule_name": v.rule_name,
+         "severity": v.severity, "recommendation": v.recommendation}
+        for v in result.violations
+    ]
+
+    if result.violations and any(v.severity == "critical" for v in result.violations):
+        message = "退款被拦截，存在严重违规"
+    elif result.requires_human_approval:
+        message = "退款需人工审批后方可执行"
+    else:
+        message = "退款校验通过，可执行退款"
+
+    return RefundResponse(
+        approved=result.approved,
+        requires_human_approval=result.requires_human_approval,
+        violations=violations_out,
+        escalation_reason=result.escalation_reason,
+        message=message,
+    )

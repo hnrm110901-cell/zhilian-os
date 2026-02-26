@@ -12,11 +12,36 @@ from ..core.dependencies import get_current_active_user, require_role
 from ..models.inventory import InventoryItem, InventoryStatus, TransactionType, InventoryTransaction
 from ..models.user import User, UserRole
 from ..repositories import InventoryRepository
+from ..services.redis_cache_service import RedisCacheService
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 logger = structlog.get_logger()
 router = APIRouter()
+
+# Redis Lua 原子扣减脚本
+# KEYS[1] = 库存锁定key (inventory:lock:{item_id})
+# KEYS[2] = 库存数量key (inventory:qty:{item_id})
+# ARGV[1] = 扣减数量
+# 返回: 扣减后数量，或 -1 表示库存不足，或 -2 表示key不存在（回退到DB）
+_LUA_DEDUCT_STOCK = """
+local lock_key = KEYS[1]
+local qty_key = KEYS[2]
+local deduct = tonumber(ARGV[1])
+local current = redis.call('GET', qty_key)
+if current == false then
+    return -2
+end
+current = tonumber(current)
+if current < deduct then
+    return -1
+end
+local new_qty = current - deduct
+redis.call('SET', qty_key, new_qty)
+return new_qty
+"""
+
+_redis_svc = RedisCacheService()
 
 
 class CreateInventoryItemRequest(BaseModel):
@@ -161,14 +186,46 @@ async def record_transaction(
     if not item:
         raise HTTPException(status_code=404, detail="库存项不存在")
 
-    # 更新库存数量
     quantity_before = item.current_quantity
+
     if req.transaction_type in (TransactionType.PURCHASE,):
+        # 入库：直接更新DB，无并发竞争风险
         item.current_quantity += req.quantity
     else:
-        if item.current_quantity < req.quantity:
-            raise HTTPException(status_code=400, detail="库存不足")
-        item.current_quantity -= req.quantity
+        # 出库/损耗：使用 Redis Lua 原子扣减防止超卖
+        qty_key = f"inventory:qty:{item_id}"
+        lock_key = f"inventory:lock:{item_id}"
+        new_qty = None
+
+        try:
+            await _redis_svc.initialize()
+            r = _redis_svc._redis
+            if r:
+                # 若 Redis 中无缓存，先写入当前 DB 值
+                if not await r.exists(qty_key):
+                    await r.set(qty_key, item.current_quantity)
+
+                result_lua = await r.eval(
+                    _LUA_DEDUCT_STOCK, 2, lock_key, qty_key, req.quantity
+                )
+                if result_lua == -1:
+                    raise HTTPException(status_code=400, detail="库存不足")
+                if result_lua >= 0:
+                    new_qty = float(result_lua)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.warning("Redis Lua扣减失败，回退到DB校验", error=str(e))
+
+        # 回退或同步 DB
+        if new_qty is None:
+            # Redis 不可用，回退到 DB 校验
+            if item.current_quantity < req.quantity:
+                raise HTTPException(status_code=400, detail="库存不足")
+            item.current_quantity -= req.quantity
+        else:
+            item.current_quantity = new_qty
+
     quantity_after = item.current_quantity
 
     txn = InventoryTransaction(
