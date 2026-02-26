@@ -9,6 +9,7 @@ import structlog
 import uuid
 import os
 
+from src.core.clock import now_local, today_local
 from src.core.database import get_db_session
 from src.models.reconciliation import ReconciliationRecord, ReconciliationStatus
 from src.models.order import Order, OrderStatus
@@ -44,7 +45,7 @@ class ReconcileService:
         try:
             if reconciliation_date is None:
                 # 默认对账昨天的数据
-                reconciliation_date = date.today() - timedelta(days=1)
+                reconciliation_date = today_local() - timedelta(days=1)
 
             if threshold is None:
                 threshold = await self._get_store_threshold(store_id)
@@ -124,7 +125,7 @@ class ReconcileService:
                 if record.status == ReconciliationStatus.MISMATCHED and record.alert_sent == "false":
                     await self._trigger_alert(record, threshold)
                     record.alert_sent = "true"
-                    record.alert_sent_at = datetime.now().isoformat()
+                    record.alert_sent_at = now_local().isoformat()
                     await session.commit()
 
                 logger.info(
@@ -406,10 +407,10 @@ class ReconcileService:
                 if record:
                     record.status = ReconciliationStatus.CONFIRMED
                     record.confirmed_by = user_id
-                    record.confirmed_at = datetime.now().isoformat()
+                    record.confirmed_at = now_local().isoformat()
                     if resolution:
                         record.resolution = resolution
-                    record.updated_at = datetime.now()
+                    record.updated_at = now_local()
 
                     await session.commit()
 

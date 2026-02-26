@@ -11,6 +11,7 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
+from ..core.clock import now_utc, utcnow_naive
 from ..models.decision_log import DecisionLog, DecisionType, DecisionStatus, DecisionOutcome
 from ..models.store import Store
 from ..models.user import User
@@ -73,7 +74,7 @@ class ApprovalService:
                 decision_status=DecisionStatus.PENDING,
                 context_data=context_data,
                 rag_context=rag_context,
-                created_at=datetime.utcnow()
+                created_at=utcnow_naive()
             )
 
             # 保存到数据库
@@ -209,14 +210,14 @@ class ApprovalService:
             decision_log.manager_id = manager_id
             decision_log.manager_decision = decision_log.ai_suggestion  # 采纳AI建议
             decision_log.manager_feedback = manager_feedback
-            decision_log.approved_at = datetime.utcnow()
+            decision_log.approved_at = utcnow_naive()
 
             # 更新审批链
             approval_chain = decision_log.approval_chain or []
             approval_chain.append({
                 "action": "approved",
                 "manager_id": manager_id,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": now_utc().isoformat(),
                 "feedback": manager_feedback
             })
             decision_log.approval_chain = approval_chain
@@ -270,14 +271,14 @@ class ApprovalService:
             decision_log.decision_status = DecisionStatus.REJECTED
             decision_log.manager_id = manager_id
             decision_log.manager_feedback = manager_feedback
-            decision_log.approved_at = datetime.utcnow()
+            decision_log.approved_at = utcnow_naive()
 
             # 更新审批链
             approval_chain = decision_log.approval_chain or []
             approval_chain.append({
                 "action": "rejected",
                 "manager_id": manager_id,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": now_utc().isoformat(),
                 "feedback": manager_feedback
             })
             decision_log.approval_chain = approval_chain
@@ -335,14 +336,14 @@ class ApprovalService:
             decision_log.manager_id = manager_id
             decision_log.manager_decision = modified_decision
             decision_log.manager_feedback = manager_feedback
-            decision_log.approved_at = datetime.utcnow()
+            decision_log.approved_at = utcnow_naive()
 
             # 更新审批链
             approval_chain = decision_log.approval_chain or []
             approval_chain.append({
                 "action": "modified",
                 "manager_id": manager_id,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": now_utc().isoformat(),
                 "original": decision_log.ai_suggestion,
                 "modified": modified_decision,
                 "feedback": manager_feedback
@@ -416,7 +417,7 @@ class ApprovalService:
                 db.add(notif)
 
             decision_log.decision_status = DecisionStatus.EXECUTED
-            decision_log.executed_at = datetime.utcnow()
+            decision_log.executed_at = utcnow_naive()
             await db.commit()
 
             logger.info(

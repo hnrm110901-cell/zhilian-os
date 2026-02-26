@@ -26,11 +26,11 @@ Usage:
 """
 import json
 import os
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import structlog
 
+from ..core.clock import now_utc
 from ..core.config import settings
 
 logger = structlog.get_logger()
@@ -84,7 +84,7 @@ class AgentMemoryBus:
                 "summary": summary,
                 "confidence": str(round(confidence, 4)),
                 "data": json.dumps(data or {}, ensure_ascii=False),
-                "ts": datetime.utcnow().isoformat(),
+                "ts": now_utc().isoformat(),
             }
 
             entry_id = await r.xadd(key, entry, maxlen=STREAM_MAX_LEN, approximate=True)
