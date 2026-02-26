@@ -1,12 +1,11 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Card, Table, Button, Tag, Space, Statistic, Row, Col, Modal, Input, Tabs, Select } from 'antd';
+import { Card, Table, Button, Tag, Space, Statistic, Row, Col, Modal, Input, Tabs } from 'antd';
 import { CheckOutlined, CloseOutlined, EditOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { apiClient } from '../services/api';
 import { handleApiError, showSuccess } from '../utils/message';
 
 const { TextArea } = Input;
-const { Option } = Select;
 
 const statusColor: Record<string, string> = { pending: 'orange', approved: 'green', rejected: 'red', modified: 'blue' };
 const statusLabel: Record<string, string> = { pending: '待审批', approved: '已批准', rejected: '已拒绝', modified: '已修改' };

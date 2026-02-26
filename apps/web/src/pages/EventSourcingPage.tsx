@@ -15,7 +15,7 @@ const EventSourcingPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [selectedStore, setSelectedStore] = useState('STORE001');
   const [stores, setStores] = useState<any[]>([]);
-  const [eventType, setEventType] = useState('');
+  const [eventType] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [hours, setHours] = useState(24);
   const [chainVisible, setChainVisible] = useState(false);
@@ -128,7 +128,7 @@ const EventSourcingPage: React.FC = () => {
             <Table
               size="small"
               dataSource={chainData.processing_chain || []}
-              rowKey={(r, i) => String(i)}
+              rowKey={(_r, i) => String(i)}
               columns={[
                 { title: '步骤', dataIndex: 'step', key: 'step' },
                 { title: '处理器', dataIndex: 'processor', key: 'processor' },

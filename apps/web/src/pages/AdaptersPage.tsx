@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Card, Table, Button, Tag, Space, Tabs, Form, Input, Select, Modal, Alert } from 'antd';
+import { Card, Table, Button, Tag, Space, Form, Input, Select, Modal, Alert } from 'antd';
 import { PlusOutlined, SyncOutlined, ReloadOutlined } from '@ant-design/icons';
 import { apiClient } from '../services/api';
 import { handleApiError, showSuccess } from '../utils/message';
@@ -14,7 +14,7 @@ const AdaptersPage: React.FC = () => {
   const [adapters, setAdapters] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [registerVisible, setRegisterVisible] = useState(false);
-  const [syncLoading, setSyncLoading] = useState<Record<string, boolean>>({});
+  const [, setSyncLoading] = useState<Record<string, boolean>>({});
   const [submitting, setSubmitting] = useState(false);
   const [syncSubmitting, setSyncSubmitting] = useState(false);
   const [registerForm] = Form.useForm();

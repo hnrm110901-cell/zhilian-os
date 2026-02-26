@@ -22,24 +22,6 @@ const Dashboard: React.FC = () => {
   const [refreshInterval] = useState(30000); // 30秒
   const [lastRefreshTime, setLastRefreshTime] = useState<Date>(new Date());
 
-  useEffect(() => {
-    loadDashboardData();
-
-    // 设置自动刷新
-    let intervalId: number | undefined;
-    if (autoRefresh) {
-      intervalId = window.setInterval(() => {
-        loadDashboardData();
-      }, refreshInterval);
-    }
-
-    return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-    };
-  }, [autoRefresh, refreshInterval, loadDashboardData]);
-
   const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
@@ -61,6 +43,24 @@ const Dashboard: React.FC = () => {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    loadDashboardData();
+
+    // 设置自动刷新
+    let intervalId: number | undefined;
+    if (autoRefresh) {
+      intervalId = window.setInterval(() => {
+        loadDashboardData();
+      }, refreshInterval);
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [autoRefresh, refreshInterval, loadDashboardData]);
 
   // 手动刷新
   const handleManualRefresh = useCallback(() => {
