@@ -20,7 +20,7 @@ const DailyHubPage: React.FC = () => {
 
   const loadStores = useCallback(async () => {
     try {
-      const res = await apiClient.get('/stores');
+      const res = await apiClient.get('/api/v1/stores');
       setStores(res.data?.stores || res.data || []);
     } catch (err: any) {
       handleApiError(err, '加载门店列表失败');
@@ -30,7 +30,7 @@ const DailyHubPage: React.FC = () => {
   const loadBoard = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get(`/daily-hub/${selectedStore}`);
+      const res = await apiClient.get(`/api/v1/daily-hub/${selectedStore}`);
       setBoard(res.data);
     } catch (err: any) {
       handleApiError(err, '加载备战板失败');
@@ -46,7 +46,7 @@ const DailyHubPage: React.FC = () => {
     if (!board) return;
     setApproving(true);
     try {
-      const res = await apiClient.post(`/daily-hub/${selectedStore}/approve`, {
+      const res = await apiClient.post(`/api/v1/daily-hub/${selectedStore}/approve`, {
         target_date: board.target_date,
       });
       setBoard(res.data);
