@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Card, Table, Button, Tag, Space, Form, Input, Select, Modal, Alert } from 'antd';
+import { Card, Table, Button, Tag, Space, Form, Input, Select, Modal, Alert, InputNumber } from 'antd';
 import { PlusOutlined, SyncOutlined, ReloadOutlined } from '@ant-design/icons';
 import { apiClient } from '../services/api';
 import { handleApiError, showSuccess } from '../utils/message';
@@ -21,6 +21,7 @@ const AdaptersPage: React.FC = () => {
   const [syncForm] = Form.useForm();
   const [syncVisible, setSyncVisible] = useState(false);
   const [syncType, setSyncType] = useState<'order' | 'dishes' | 'inventory' | 'all'>('all');
+  const [selectedAdapter, setSelectedAdapter] = useState<string>('');
 
   const loadAdapters = useCallback(async () => {
     setLoading(true);
@@ -40,11 +41,22 @@ const AdaptersPage: React.FC = () => {
     setSubmitting(true);
     try {
       let config: any = {};
-      try { config = JSON.parse(values.config || '{}'); } catch { config = {}; }
+      if (values.adapter_name === 'pinzhi') {
+        config = {
+          base_url: values.base_url,
+          token: values.token,
+          timeout: values.timeout ?? 30,
+          retry_times: values.retry_times ?? 3,
+          ...(values.ognid ? { ognid: values.ognid } : {}),
+        };
+      } else {
+        try { config = JSON.parse(values.config || '{}'); } catch { config = {}; }
+      }
       await apiClient.post('/adapters/register', { adapter_name: values.adapter_name, config });
       showSuccess('适配器注册成功');
       setRegisterVisible(false);
       registerForm.resetFields();
+      setSelectedAdapter('');
       loadAdapters();
     } catch (err: any) {
       handleApiError(err, '注册失败');
@@ -109,14 +121,36 @@ const AdaptersPage: React.FC = () => {
         <Table columns={columns} dataSource={adapters} rowKey={(r, i) => r.adapter_name || String(i)} loading={loading} />
       </Card>
 
-      <Modal title="注册适配器" open={registerVisible} onCancel={() => setRegisterVisible(false)} onOk={() => registerForm.submit()} okText="注册" confirmLoading={submitting}>
+      <Modal title="注册适配器" open={registerVisible} onCancel={() => { setRegisterVisible(false); setSelectedAdapter(''); registerForm.resetFields(); }} onOk={() => registerForm.submit()} okText="注册" confirmLoading={submitting}>
         <Form form={registerForm} layout="vertical" onFinish={registerAdapter}>
           <Form.Item name="adapter_name" label="适配器" rules={[{ required: true }]}>
-            <Select>{SYSTEMS.map(s => <Option key={s} value={s}>{systemLabel[s]}</Option>)}</Select>
+            <Select onChange={v => setSelectedAdapter(v as string)}>
+              {SYSTEMS.map(s => <Option key={s} value={s}>{systemLabel[s]}</Option>)}
+            </Select>
           </Form.Item>
-          <Form.Item name="config" label="配置（JSON）" initialValue="{}">
-            <TextArea rows={4} placeholder='{"api_key": "xxx", "store_id": "yyy"}' />
-          </Form.Item>
+          {selectedAdapter === 'pinzhi' ? (
+            <>
+              <Form.Item name="base_url" label="API地址" rules={[{ required: true }]}>
+                <Input placeholder="http://ip:port/pzcatering-gateway" />
+              </Form.Item>
+              <Form.Item name="token" label="商户Token" rules={[{ required: true }]}>
+                <Input.Password placeholder="品智客户运维系统申请的Token" />
+              </Form.Item>
+              <Form.Item name="ognid" label="门店omsID（留空则对接所有门店）">
+                <Input placeholder="如：12345" />
+              </Form.Item>
+              <Form.Item name="timeout" label="超时（秒）" initialValue={30}>
+                <InputNumber min={5} max={120} style={{ width: '100%' }} />
+              </Form.Item>
+              <Form.Item name="retry_times" label="重试次数" initialValue={3}>
+                <InputNumber min={1} max={10} style={{ width: '100%' }} />
+              </Form.Item>
+            </>
+          ) : (
+            <Form.Item name="config" label="配置（JSON）" initialValue="{}">
+              <TextArea rows={4} placeholder='{"api_key": "xxx", "store_id": "yyy"}' />
+            </Form.Item>
+          )}
         </Form>
       </Modal>
 
