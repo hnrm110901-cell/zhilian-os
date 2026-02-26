@@ -106,6 +106,10 @@ celery_app.conf.update(
             "queue": "default",
             "routing_key": "default",
         },
+        "src.core.celery_tasks.generate_daily_hub": {
+            "queue": "default",
+            "routing_key": "default",
+        },
     },
 
     # Celery Beat定时任务调度
@@ -158,6 +162,16 @@ celery_app.conf.update(
             "options": {
                 "queue": "default",
                 "priority": 5,
+            },
+        },
+        # 每日22:30生成 T+1 备战板
+        "generate-daily-hub": {
+            "task": "src.core.celery_tasks.generate_daily_hub",
+            "schedule": crontab(hour=22, minute=30),
+            "args": (),
+            "options": {
+                "queue": "default",
+                "priority": 6,
             },
         },
     },

@@ -56,6 +56,7 @@ const { Header, Content, Sider } = Layout;
 const ROUTE_TO_GROUP: Record<string, string> = {
   '/schedule': 'agents', '/order': 'agents', '/inventory': 'agents',
   '/service': 'agents', '/training': 'agents', '/decision': 'agents', '/reservation': 'agents',
+  '/daily-hub': 'agents',
   '/multi-store': 'business', '/supply-chain': 'business', '/finance': 'business',
   '/data-visualization': 'analytics', '/analytics': 'analytics', '/monitoring': 'analytics',
   '/users': 'admin-system', '/enterprise': 'admin-system', '/backup': 'admin-system',
@@ -155,6 +156,7 @@ const MainLayout: React.FC = () => {
     '/training': '培训辅导',
     '/decision': '决策支持',
     '/reservation': '预定宴会',
+    '/daily-hub': '明日备战板',
     '/multi-store': '多门店管理',
     '/supply-chain': '供应链管理',
     '/finance': '财务管理',
@@ -291,6 +293,11 @@ const MainLayout: React.FC = () => {
       icon: <ApiOutlined />,
       label: 'Agent系统',
       children: [
+        {
+          key: '/daily-hub',
+          icon: <RiseOutlined />,
+          label: '明日备战板',
+        },
         {
           key: '/schedule',
           icon: <ScheduleOutlined />,

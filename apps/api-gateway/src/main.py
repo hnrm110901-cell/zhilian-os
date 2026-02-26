@@ -36,6 +36,7 @@ from src.api import export_jobs
 from src.api import backups
 from src.api import private_domain
 from src.api import ops
+from src.api import daily_hub
 from src.middleware.monitoring import MonitoringMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
 from src.middleware.audit_log import AuditLogMiddleware
@@ -477,6 +478,12 @@ app.include_router(export_jobs.router)
 app.include_router(backups.router)
 app.include_router(private_domain.router, tags=["private_domain"])
 app.include_router(ops.router, prefix="/api/v1/ops", tags=["ops"])
+app.include_router(daily_hub.router, tags=["daily_hub"])
+
+# 业财税资金一体化扩展（FCT）- 可选挂载
+if getattr(settings, "FCT_ENABLED", False):
+    from src.api import fct
+    app.include_router(fct.router, prefix="/api/v1/fct", tags=["fct"])
 
 
 @app.on_event("startup")

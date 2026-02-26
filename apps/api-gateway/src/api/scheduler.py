@@ -20,6 +20,7 @@ ALLOWED_TASKS = {
     "check_inventory_alert": "src.core.celery_tasks.check_inventory_alert",
     "generate_and_send_daily_report": "src.core.celery_tasks.generate_and_send_daily_report",
     "perform_daily_reconciliation": "src.core.celery_tasks.perform_daily_reconciliation",
+    "generate_daily_hub": "src.core.celery_tasks.generate_daily_hub",
 }
 
 

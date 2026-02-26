@@ -1524,3 +1524,61 @@ def run_backup(self, job_id: str) -> Dict[str, Any]:
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
     return asyncio.run(_run())
+
+
+@celery_app.task(
+    base=CallbackTask,
+    bind=True,
+    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
+    default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY_LONG", "300")),
+)
+def generate_daily_hub(
+    self,
+    store_id: str = None,
+) -> Dict[str, Any]:
+    """
+    生成 T+1 经营统筹备战板
+
+    Args:
+        store_id: 门店ID (None 表示为所有活跃门店生成)
+
+    Returns:
+        生成结果
+    """
+    async def _run():
+        from datetime import date, timedelta
+        from ..services.daily_hub_service import daily_hub_service
+        from ..models.store import Store
+        from ..core.database import get_db_session
+        from sqlalchemy import select
+
+        target_date = date.today() + timedelta(days=1)
+
+        async with get_db_session() as session:
+            if store_id:
+                result = await session.execute(
+                    select(Store).where(Store.id == store_id, Store.is_active == True)
+                )
+            else:
+                result = await session.execute(
+                    select(Store).where(Store.is_active == True)
+                )
+            stores = result.scalars().all()
+
+        generated = 0
+        for store in stores:
+            try:
+                await daily_hub_service.generate_battle_board(
+                    store_id=str(store.id), target_date=target_date
+                )
+                generated += 1
+                logger.info("备战板生成成功", store_id=str(store.id), target_date=str(target_date))
+            except Exception as e:
+                logger.error("备战板生成失败", store_id=str(store.id), error=str(e))
+
+        return {"success": True, "generated": generated, "target_date": str(target_date)}
+
+    try:
+        return asyncio.run(_run())
+    except Exception as e:
+        raise self.retry(exc=e)

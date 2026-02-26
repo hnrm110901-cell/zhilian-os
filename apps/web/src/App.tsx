@@ -85,6 +85,7 @@ const SystemHealthPage = lazy(() => import('./pages/SystemHealthPage'));
 const UserProfilePage = lazy(() => import('./pages/UserProfilePage'));
 const VoiceWebSocketPage = lazy(() => import('./pages/VoiceWebSocketPage'));
 const OpsAgentPage = lazy(() => import('./pages/OpsAgentPage'));
+const DailyHubPage = lazy(() => import('./pages/DailyHubPage'));
 
 const PageLoader = (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
@@ -306,6 +307,9 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="ops-agent" element={
                     <ProtectedRoute requiredRole="admin"><OpsAgentPage /></ProtectedRoute>
+                  } />
+                  <Route path="daily-hub" element={
+                    <ProtectedRoute><DailyHubPage /></ProtectedRoute>
                   } />
                 </Route>
                 <Route path="*" element={<NotFoundPage />} />
