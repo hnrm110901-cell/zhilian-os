@@ -3,7 +3,9 @@ Database Configuration and Connection
 """
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import NullPool
+from sqlalchemy.exc import OperationalError, IntegrityError
 from contextlib import asynccontextmanager
+import asyncio
 import structlog
 import os
 
@@ -88,6 +90,18 @@ async def get_db_session(enable_tenant_isolation: bool = True):
 
             yield session
             await session.commit()
+        except asyncio.TimeoutError as e:
+            await session.rollback()
+            logger.error("Database operation timed out", error=str(e))
+            raise
+        except OperationalError as e:
+            await session.rollback()
+            logger.error("Database connection error", error=str(e))
+            raise
+        except IntegrityError as e:
+            await session.rollback()
+            logger.error("Database integrity constraint violated", error=str(e))
+            raise
         except Exception as e:
             await session.rollback()
             logger.error("Database session error", error=str(e))
@@ -174,6 +188,20 @@ async def health_check():
             "status": "healthy",
             "database": "connected",
             "pool": pool_status,
+        }
+    except asyncio.TimeoutError as e:
+        logger.error("Database health check timed out", error=str(e))
+        return {
+            "status": "unhealthy",
+            "database": "timeout",
+            "error": "连接超时",
+        }
+    except OperationalError as e:
+        logger.error("Database health check: connection failed", error=str(e))
+        return {
+            "status": "unhealthy",
+            "database": "disconnected",
+            "error": str(e),
         }
     except Exception as e:
         logger.error("Database health check failed", error=str(e))
