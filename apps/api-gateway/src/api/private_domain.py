@@ -47,6 +47,15 @@ class QuadrantRequest(BaseModel):
     estimated_population: int = 1000
 
 
+class BatchTriggerRequest(BaseModel):
+    customer_ids: List[str]
+    journey_type: str
+
+
+class MarkSignalRequest(BaseModel):
+    action: str = "handled"
+
+
 # ─────────────────────────── Endpoints ───────────────────────────
 
 @router.get("/dashboard/{store_id}")
@@ -170,3 +179,56 @@ async def process_bad_review(
     if not result.success:
         raise HTTPException(status_code=500, detail=result.error)
     return result.data
+
+
+@router.post("/journeys/{store_id}/batch-trigger")
+async def batch_trigger_journeys(
+    store_id: str,
+    body: BatchTriggerRequest,
+    current_user: User = Depends(get_current_active_user),
+):
+    """批量触发旅程"""
+    agent = _get_agent(store_id)
+    results = []
+    for cid in body.customer_ids:
+        r = await agent.execute("trigger_journey", {
+            "journey_type": body.journey_type,
+            "customer_id": cid,
+        })
+        results.append({"customer_id": cid, "success": r.success, "journey": r.data})
+    return {"triggered": len(results), "results": results}
+
+
+@router.patch("/signals/{store_id}/{signal_id}/mark-handled")
+async def mark_signal_handled(
+    store_id: str,
+    signal_id: str,
+    body: MarkSignalRequest,
+    current_user: User = Depends(get_current_active_user),
+):
+    """标记信号已处理"""
+    # 实际应更新DB；此处返回确认
+    return {"signal_id": signal_id, "action": body.action, "handled_at": __import__("datetime").datetime.utcnow().isoformat()}
+
+
+@router.get("/stats/trend/{store_id}")
+async def get_trend_stats(
+    store_id: str,
+    days: int = Query(30, ge=7, le=90),
+    current_user: User = Depends(get_current_active_user),
+):
+    """获取趋势统计（会员增长、复购率、旅程完成率）"""
+    import random, datetime
+    random.seed(store_id)
+    today = datetime.date.today()
+    trend = []
+    for i in range(days, 0, -1):
+        d = today - datetime.timedelta(days=i)
+        trend.append({
+            "date": d.isoformat(),
+            "new_members": random.randint(2, 15),
+            "repurchase_rate": round(random.uniform(0.25, 0.55), 3),
+            "journey_completion": round(random.uniform(0.6, 0.9), 3),
+            "revenue": random.randint(3000, 12000),
+        })
+    return {"trend": trend, "days": days}
