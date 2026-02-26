@@ -174,8 +174,7 @@ async def update_inventory_item(
 
 
 @router.post("/inventory/{item_id}/transaction", status_code=201)
-async def record_transaction(
-    item_id: str,
+async def record_transaction(    item_id: str,
     req: InventoryTransactionRequest,
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -242,3 +241,112 @@ async def record_transaction(
     await session.commit()
     logger.info("inventory_transaction_recorded", item_id=item_id, type=req.transaction_type.value)
     return {"success": True, "new_quantity": item.current_quantity}
+
+
+@router.get("/inventory/{item_id}/transactions")
+async def get_item_transactions(
+    item_id: str,
+    limit: int = Query(50, ge=1, le=200),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """获取库存物品流水记录"""
+    from sqlalchemy import desc
+    result = await session.execute(
+        select(InventoryTransaction)
+        .where(InventoryTransaction.item_id == item_id)
+        .order_by(desc(InventoryTransaction.transaction_time))
+        .limit(limit)
+    )
+    txns = result.scalars().all()
+    return [
+        {
+            "id": str(t.id),
+            "transaction_type": t.transaction_type.value,
+            "quantity": t.quantity,
+            "quantity_before": t.quantity_before,
+            "quantity_after": t.quantity_after,
+            "notes": t.notes,
+            "performed_by": t.performed_by,
+            "transaction_time": t.transaction_time.isoformat() if t.transaction_time else None,
+        }
+        for t in txns
+    ]
+
+
+@router.get("/inventory-stats")
+async def get_inventory_stats(
+    store_id: str = Query(...),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """库存统计：总价值、分类分布、预警汇总"""
+    items = await InventoryRepository.get_by_store(session, store_id)
+    total_value = sum((i.current_quantity * (i.unit_cost or 0)) for i in items)
+    category_dist: dict = {}
+    status_dist: dict = {"normal": 0, "low": 0, "critical": 0, "out_of_stock": 0}
+    for i in items:
+        cat = i.category or "其他"
+        category_dist[cat] = category_dist.get(cat, 0) + 1
+        s = i.status.value if i.status else "normal"
+        status_dist[s] = status_dist.get(s, 0) + 1
+    return {
+        "total_items": len(items),
+        "total_value": total_value,  # 分
+        "category_distribution": category_dist,
+        "status_distribution": status_dist,
+        "alert_items": [
+            {"id": i.id, "name": i.name, "status": i.status.value if i.status else "normal",
+             "current_quantity": i.current_quantity, "min_quantity": i.min_quantity, "unit": i.unit}
+            for i in items if i.status and i.status.value != "normal"
+        ],
+    }
+
+
+class BatchRestockRequest(BaseModel):
+    item_ids: Optional[List[str]] = None  # None = 所有低库存品
+
+
+@router.post("/inventory/batch-restock", status_code=201)
+async def batch_restock(
+    req: BatchRestockRequest,
+    store_id: str = Query(...),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """批量补货：将低库存品补至 max_quantity（或 min*3）"""
+    if req.item_ids:
+        from sqlalchemy import and_
+        result = await session.execute(
+            select(InventoryItem).where(
+                and_(InventoryItem.store_id == store_id, InventoryItem.id.in_(req.item_ids))
+            )
+        )
+        items = result.scalars().all()
+    else:
+        items = await InventoryRepository.get_low_stock(session, store_id)
+
+    restocked = []
+    for item in items:
+        target = item.max_quantity or item.min_quantity * 3
+        if item.current_quantity >= target:
+            continue
+        restock_qty = target - item.current_quantity
+        qty_before = item.current_quantity
+        item.current_quantity = target
+        txn = InventoryTransaction(
+            item_id=item.id,
+            store_id=item.store_id,
+            transaction_type=TransactionType.PURCHASE,
+            quantity=restock_qty,
+            quantity_before=qty_before,
+            quantity_after=target,
+            notes="批量补货",
+            performed_by=str(current_user.id),
+        )
+        session.add(txn)
+        restocked.append({"id": item.id, "name": item.name, "restocked_qty": restock_qty, "new_qty": target})
+
+    await session.commit()
+    logger.info("batch_restock_completed", store_id=store_id, count=len(restocked))
+    return {"restocked": len(restocked), "items": restocked}
