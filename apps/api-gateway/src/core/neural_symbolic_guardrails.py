@@ -208,6 +208,59 @@ class NeuralSymbolicGuardrails:
                 ),
                 "threshold_key": "cost_breakdown_required"
             },
+
+            # 退款规则
+            "REF_001": {
+                "name": "退款金额不可超过原订单金额",
+                "category": RuleCategory.FINANCIAL,
+                "severity": ViolationSeverity.CRITICAL,
+                "check": lambda proposal, context: (
+                    proposal.get("refund_amount", 0) <=
+                    context.get("original_order_amount", float("inf"))
+                ),
+                "threshold_key": "original_order_amount",
+            },
+            "REF_002": {
+                "name": "退款申请必须在有效期内",
+                "category": RuleCategory.BUSINESS,
+                "severity": ViolationSeverity.HIGH,
+                "check": lambda proposal, context: (
+                    proposal.get("days_since_order", 0) <=
+                    int(os.getenv("GUARDRAIL_REFUND_WINDOW_DAYS", "7"))
+                ),
+                "threshold_key": "refund_window_days",
+            },
+            "REF_003": {
+                "name": "单日退款总额不可超过当日营收的比例上限",
+                "category": RuleCategory.FINANCIAL,
+                "severity": ViolationSeverity.HIGH,
+                "check": lambda proposal, context: (
+                    context.get("daily_refund_total", 0) + proposal.get("refund_amount", 0) <=
+                    context.get("daily_revenue", 0) *
+                    float(os.getenv("GUARDRAIL_REFUND_DAILY_RATIO_MAX", "0.20"))
+                ),
+                "threshold_key": "daily_revenue",
+            },
+            "REF_004": {
+                "name": "单笔退款超过阈值需人工审批",
+                "category": RuleCategory.FINANCIAL,
+                "severity": ViolationSeverity.HIGH,
+                "check": lambda proposal, context: (
+                    proposal.get("refund_amount", 0) <=
+                    int(os.getenv("GUARDRAIL_REFUND_SINGLE_LIMIT", "50000"))  # 单位：分
+                ),
+                "threshold_key": "refund_single_limit",
+            },
+            "REF_005": {
+                "name": "同一顾客24小时内退款次数不可超过上限",
+                "category": RuleCategory.BUSINESS,
+                "severity": ViolationSeverity.MEDIUM,
+                "check": lambda proposal, context: (
+                    context.get("customer_refund_count_24h", 0) <
+                    int(os.getenv("GUARDRAIL_REFUND_CUSTOMER_FREQ_LIMIT", "3"))
+                ),
+                "threshold_key": "customer_refund_count_24h",
+            },
         }
 
     def validate_proposal(
@@ -331,6 +384,11 @@ class NeuralSymbolicGuardrails:
             "COMP_002": "建议调整价格至市场价±30%范围内",
             "BIZ_001": "建议提高折扣价格至成本价以上",
             "BIZ_002": "建议完成成本核算后再上架新菜品",
+            "REF_001": "退款金额不可超过原订单金额，请核实退款金额后重新提交",
+            "REF_002": f"退款申请已超过{os.getenv('GUARDRAIL_REFUND_WINDOW_DAYS', '7')}天有效期，建议转人工处理",
+            "REF_003": "当日退款总额已接近营收上限，建议人工审核后批量处理",
+            "REF_004": f"单笔退款超过{int(os.getenv('GUARDRAIL_REFUND_SINGLE_LIMIT', '50000')) // 100}元阈值，需提交人工审批",
+            "REF_005": f"该顾客24小时内退款次数已达上限{os.getenv('GUARDRAIL_REFUND_CUSTOMER_FREQ_LIMIT', '3')}次，建议人工核查",
         }
 
         return recommendations.get(
@@ -375,6 +433,9 @@ class NeuralSymbolicGuardrails:
             elif violation.rule_id == "BIZ_001":
                 # 自动调整折扣价至成本价
                 modified["discounted_price"] = context.get("cost_price", 0)
+            elif violation.rule_id == "REF_001":
+                # 自动将退款金额截断至原订单金额（不可超额退款）
+                modified["refund_amount"] = context.get("original_order_amount", 0)
 
         logger.info(f"Auto-fixed proposal {ai_proposal.proposal_id}")
         return modified
