@@ -24,6 +24,13 @@ def upgrade():
     op.drop_table('shifts')
     op.drop_table('schedules')
     op.drop_table('inventory_transactions')
+    # dish_ingredients 外键依赖 inventory_items，先删
+    conn = op.get_bind()
+    di_exists = conn.execute(
+        sa.text("SELECT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='dish_ingredients')")
+    ).scalar()
+    if di_exists:
+        op.drop_table('dish_ingredients')
     op.drop_table('inventory_items')
     op.drop_table('employees')
     op.drop_table('reservations')
