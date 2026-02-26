@@ -9,10 +9,14 @@ Coordinates decisions across multiple agents and resolves conflicts
 from typing import Dict, List, Optional, Any, Set
 from datetime import datetime
 from enum import Enum
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from collections import deque
 from sqlalchemy.ext.asyncio import AsyncSession
 import numpy as np
 import os
+import structlog
+
+logger = structlog.get_logger()
 
 
 class AgentType(Enum):
@@ -120,6 +124,8 @@ class AgentCollaborationOptimizer:
             AgentType.DECISION: 4,
             AgentType.PRIVATE_DOMAIN: 8,  # 私域运营与库存同级，高于排班
         }
+        # Agent execution dependency DAG
+        self.dag = AgentDependencyGraph()
 
     def submit_decision(
         self,
@@ -149,6 +155,34 @@ class AgentCollaborationOptimizer:
             "conflicts_detected": len(conflicts),
             "status": "pending_review" if conflicts else "approved"
         }
+
+    def register_dependency(
+        self,
+        agent: AgentType,
+        depends_on: AgentType,
+    ) -> Dict[str, Any]:
+        """
+        注册 Agent 执行依赖（写入 DAG）。
+
+        Args:
+            agent:      需要等待的 Agent
+            depends_on: 必须先完成的 Agent
+
+        Returns:
+            DAG 验证报告
+
+        Raises:
+            ValueError: 如果该依赖会引入环路
+        """
+        self.dag.add_dependency(agent, depends_on)
+        report = self.dag.validate()
+        logger.info(
+            "agent_dependency_registered",
+            agent=agent.value,
+            depends_on=depends_on.value,
+            dag_valid=report["valid"],
+        )
+        return report
 
     def coordinate_decisions(
         self,
@@ -183,6 +217,22 @@ class AgentCollaborationOptimizer:
                 "success": True,
                 "message": "No pending decisions to coordinate",
                 "decisions": []
+            }
+
+        # Guard: reject coordination if DAG has a cycle
+        dag_report = self.dag.validate()
+        if not dag_report["valid"]:
+            cycle_str = " → ".join(dag_report["cycle"] or [])
+            logger.error(
+                "agent_dag_cycle_detected",
+                cycle=cycle_str,
+                store_id=store_id,
+            )
+            return {
+                "success": False,
+                "error": "agent_dependency_cycle",
+                "cycle": dag_report["cycle"],
+                "message": f"Agent dependency cycle detected: {cycle_str}",
             }
 
         # Detect all conflicts
@@ -596,3 +646,160 @@ class AgentCollaborationOptimizer:
 
         resolved = len(self.resolutions)
         return resolved / total_conflicts
+
+
+# ---------------------------------------------------------------------------
+# Agent 执行依赖 DAG + 环检测
+# ---------------------------------------------------------------------------
+
+class AgentDependencyGraph:
+    """
+    Agent 执行依赖有向无环图（DAG）
+
+    用于管理 Agent 之间的执行顺序依赖，并在注册依赖时检测循环依赖（死锁风险）。
+
+    示例：
+        dag = AgentDependencyGraph()
+        # 库存 Agent 必须等订单 Agent 完成后才能做采购决策
+        dag.add_dependency(AgentType.INVENTORY, depends_on=AgentType.ORDER)
+        # 决策 Agent 依赖库存和排班
+        dag.add_dependency(AgentType.DECISION, depends_on=AgentType.INVENTORY)
+        dag.add_dependency(AgentType.DECISION, depends_on=AgentType.SCHEDULE)
+
+        order = dag.topological_order()  # [ORDER, SCHEDULE, INVENTORY, DECISION, ...]
+    """
+
+    def __init__(self) -> None:
+        # _deps[agent] = set of agents that must execute BEFORE agent
+        self._deps: Dict[AgentType, Set[AgentType]] = {
+            a: set() for a in AgentType
+        }
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def add_dependency(self, agent: AgentType, depends_on: AgentType) -> None:
+        """
+        注册依赖：agent 必须在 depends_on 完成后才能执行。
+
+        Raises:
+            ValueError: 如果该依赖会引入环路。
+        """
+        if agent == depends_on:
+            raise ValueError(f"Agent cannot depend on itself: {agent.value}")
+
+        self._deps[agent].add(depends_on)
+
+        # 立即检测是否引入了环
+        cycle = self.find_cycle()
+        if cycle:
+            # 回滚
+            self._deps[agent].discard(depends_on)
+            cycle_str = " → ".join(a.value for a in cycle)
+            raise ValueError(
+                f"Adding dependency {agent.value} → {depends_on.value} "
+                f"would create a cycle: {cycle_str}"
+            )
+
+        logger.debug(
+            "agent_dependency_added",
+            agent=agent.value,
+            depends_on=depends_on.value,
+        )
+
+    def remove_dependency(self, agent: AgentType, depends_on: AgentType) -> None:
+        """移除依赖"""
+        self._deps[agent].discard(depends_on)
+
+    def has_cycle(self) -> bool:
+        """检测 DAG 中是否存在环（DFS 着色法，O(V+E)）"""
+        return self.find_cycle() is not None
+
+    def find_cycle(self) -> Optional[List[AgentType]]:
+        """
+        返回第一个检测到的环路径（含起点重复），无环则返回 None。
+
+        算法：DFS + 路径栈，检测回边（back edge）。
+        """
+        WHITE, GRAY, BLACK = 0, 1, 2
+        color: Dict[AgentType, int] = {a: WHITE for a in AgentType}
+        path: List[AgentType] = []
+
+        def dfs(node: AgentType) -> Optional[List[AgentType]]:
+            color[node] = GRAY
+            path.append(node)
+            for dep in self._deps[node]:
+                if color[dep] == GRAY:
+                    # 找到回边 → 提取环
+                    cycle_start = path.index(dep)
+                    return path[cycle_start:] + [dep]
+                if color[dep] == WHITE:
+                    result = dfs(dep)
+                    if result:
+                        return result
+            path.pop()
+            color[node] = BLACK
+            return None
+
+        for agent in AgentType:
+            if color[agent] == WHITE:
+                result = dfs(agent)
+                if result:
+                    return result
+        return None
+
+    def topological_order(self) -> List[AgentType]:
+        """
+        返回拓扑排序后的执行顺序（依赖先执行）。
+
+        使用 Kahn 算法（BFS），O(V+E)。
+
+        Raises:
+            ValueError: 如果存在环。
+        """
+        cycle = self.find_cycle()
+        if cycle:
+            cycle_str = " → ".join(a.value for a in cycle)
+            raise ValueError(f"Agent dependency cycle detected: {cycle_str}")
+
+        # in_degree[agent] = 该 agent 还有多少未满足的前置依赖
+        in_degree: Dict[AgentType, int] = {
+            a: len(self._deps[a]) for a in AgentType
+        }
+        # reverse[dep] = 依赖 dep 的 agent 集合
+        reverse: Dict[AgentType, Set[AgentType]] = {a: set() for a in AgentType}
+        for agent in AgentType:
+            for dep in self._deps[agent]:
+                reverse[dep].add(agent)
+
+        queue: deque = deque(a for a in AgentType if in_degree[a] == 0)
+        order: List[AgentType] = []
+
+        while queue:
+            node = queue.popleft()
+            order.append(node)
+            for dependent in reverse[node]:
+                in_degree[dependent] -= 1
+                if in_degree[dependent] == 0:
+                    queue.append(dependent)
+
+        return order
+
+    def validate(self) -> Dict[str, Any]:
+        """验证 DAG 合法性，返回验证报告"""
+        cycle = self.find_cycle()
+        dep_count = sum(len(deps) for deps in self._deps.values())
+        report: Dict[str, Any] = {
+            "valid": cycle is None,
+            "cycle": [a.value for a in cycle] if cycle else None,
+            "dependency_count": dep_count,
+        }
+        if not cycle:
+            try:
+                report["execution_order"] = [
+                    a.value for a in self.topological_order()
+                ]
+            except ValueError:
+                pass
+        return report
