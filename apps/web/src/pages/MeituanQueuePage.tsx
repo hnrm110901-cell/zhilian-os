@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Card, Button, Space, Statistic, Row, Col, Form, Input, InputNumber, Table, Alert } from 'antd';
+import { Card, Button, Statistic, Row, Col, Form, Input, Table, Alert } from 'antd';
 import { SyncOutlined, SettingOutlined } from '@ant-design/icons';
 import { apiClient } from '../services/api';
 import { handleApiError, showSuccess } from '../utils/message';
@@ -98,7 +98,7 @@ const MeituanQueuePage: React.FC = () => {
               <Table
                 size="small"
                 dataSource={config.table_types}
-                rowKey={(r, i) => r.id || String(i)}
+                rowKey={(r: any, i) => (r as any).id || String(i)}
                 columns={[
                   { title: '桌型ID', dataIndex: 'id', key: 'id' },
                   { title: '名称', dataIndex: 'name', key: 'name' },
