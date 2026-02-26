@@ -14,8 +14,10 @@ from pathlib import Path
 # packages/ 目录位于仓库根（相对于此文件向上 5 级）
 _repo_root = Path(__file__).resolve().parents[4]
 agent_path = _repo_root / "packages" / "agents" / "private_domain" / "src"
-if str(agent_path) not in sys.path:
-    sys.path.insert(0, str(agent_path))
+_core_path = Path(__file__).resolve().parents[1] / "core"  # src/core（base_agent 所在目录）
+for _p in (agent_path, _core_path):
+    if str(_p) not in sys.path:
+        sys.path.insert(0, str(_p))
 from agent import PrivateDomainAgent
 
 router = APIRouter(prefix="/api/v1/private-domain", tags=["private_domain"])
