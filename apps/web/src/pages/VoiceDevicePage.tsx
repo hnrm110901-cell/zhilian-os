@@ -18,6 +18,7 @@ const VoiceDevicePage: React.FC = () => {
   const [notifyVisible, setNotifyVisible] = useState(false);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
   const [registerForm] = Form.useForm();
+  const [registerSubmitting, setRegisterSubmitting] = useState(false);
   const [notifyForm] = Form.useForm();
   const [notifySubmitting, setNotifySubmitting] = useState(false);
 
@@ -36,6 +37,7 @@ const VoiceDevicePage: React.FC = () => {
   useEffect(() => { loadDevices(); }, [loadDevices]);
 
   const registerDevice = async (values: any) => {
+    setRegisterSubmitting(true);
     try {
       await apiClient.post('/voice/devices/register', values);
       showSuccess('设备注册成功');
@@ -44,6 +46,8 @@ const VoiceDevicePage: React.FC = () => {
       loadDevices();
     } catch (err: any) {
       handleApiError(err, '注册失败');
+    } finally {
+      setRegisterSubmitting(false);
     }
   };
 
@@ -135,7 +139,7 @@ const VoiceDevicePage: React.FC = () => {
         <Table columns={columns} dataSource={devices} rowKey={(r) => r.device_id} loading={loading} />
       </Card>
 
-      <Modal title="注册设备" open={registerVisible} onCancel={() => setRegisterVisible(false)} onOk={() => registerForm.submit()} okText="注册">
+      <Modal title="注册设备" open={registerVisible} onCancel={() => setRegisterVisible(false)} onOk={() => registerForm.submit()} okText="注册" confirmLoading={registerSubmitting}>
         <Form form={registerForm} layout="vertical" onFinish={registerDevice}>
           <Form.Item name="device_id" label="设备ID" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="device_type" label="型号" rules={[{ required: true }]}>

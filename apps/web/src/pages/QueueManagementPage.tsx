@@ -19,6 +19,7 @@ const QueueManagementPage: React.FC = () => {
   const [callLoading, setCallLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
   const [statusFilter, setStatusFilter] = useState('waiting');
+  const [addSubmitting, setAddSubmitting] = useState(false);
   const [form] = Form.useForm();
 
   const loadQueue = useCallback(async () => {
@@ -40,6 +41,7 @@ const QueueManagementPage: React.FC = () => {
   useEffect(() => { loadQueue(); }, [loadQueue]);
 
   const addToQueue = async (values: any) => {
+    setAddSubmitting(true);
     try {
       await apiClient.post('/queue/add', values);
       showSuccess('已加入排队');
@@ -48,6 +50,8 @@ const QueueManagementPage: React.FC = () => {
       loadQueue();
     } catch (err: any) {
       handleApiError(err, '加入排队失败');
+    } finally {
+      setAddSubmitting(false);
     }
   };
 
@@ -142,7 +146,7 @@ const QueueManagementPage: React.FC = () => {
         <Table columns={columns} dataSource={queue} rowKey={(r) => r.queue_id || r.id} loading={loading} />
       </Card>
 
-      <Modal title="加入排队" open={addVisible} onCancel={() => { setAddVisible(false); form.resetFields(); }} onOk={() => form.submit()} okText="确认">
+      <Modal title="加入排队" open={addVisible} onCancel={() => { setAddVisible(false); form.resetFields(); }} onOk={() => form.submit()} okText="确认" confirmLoading={addSubmitting}>
         <Form form={form} layout="vertical" onFinish={addToQueue}>
           <Form.Item name="customer_name" label="顾客姓名" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="customer_phone" label="手机号" rules={[{ required: true }]}><Input /></Form.Item>

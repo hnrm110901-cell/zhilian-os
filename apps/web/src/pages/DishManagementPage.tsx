@@ -17,6 +17,7 @@ const DishManagementPage: React.FC = () => {
   const [editingDish, setEditingDish] = useState<any>(null);
   const [costDetail, setCostDetail] = useState<any>(null);
   const [costVisible, setCostVisible] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [dishForm] = Form.useForm();
   const [catForm] = Form.useForm();
 
@@ -45,6 +46,7 @@ const DishManagementPage: React.FC = () => {
   };
 
   const saveDish = async (values: any) => {
+    setSubmitting(true);
     try {
       if (editingDish) {
         await apiClient.put(`/dishes/${editingDish.dish_id || editingDish.id}`, values);
@@ -58,6 +60,8 @@ const DishManagementPage: React.FC = () => {
       loadData();
     } catch (err: any) {
       handleApiError(err, '保存失败');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -82,6 +86,7 @@ const DishManagementPage: React.FC = () => {
   };
 
   const createCategory = async (values: any) => {
+    setSubmitting(true);
     try {
       await apiClient.post('/dishes/categories', values);
       showSuccess('分类创建成功');
@@ -90,6 +95,8 @@ const DishManagementPage: React.FC = () => {
       loadData();
     } catch (err: any) {
       handleApiError(err, '创建分类失败');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -143,7 +150,7 @@ const DishManagementPage: React.FC = () => {
     <div>
       <Tabs items={tabItems} />
 
-      <Modal title={editingDish ? '编辑菜品' : '新增菜品'} open={dishModal} onCancel={() => { setDishModal(false); dishForm.resetFields(); }} onOk={() => dishForm.submit()} okText="保存">
+      <Modal title={editingDish ? '编辑菜品' : '新增菜品'} open={dishModal} onCancel={() => { setDishModal(false); dishForm.resetFields(); }} onOk={() => dishForm.submit()} okText="保存" confirmLoading={submitting}>
         <Form form={dishForm} layout="vertical" onFinish={saveDish}>
           <Form.Item name="name" label="菜品名称" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="category" label="分类">
@@ -160,7 +167,7 @@ const DishManagementPage: React.FC = () => {
         </Form>
       </Modal>
 
-      <Modal title="新增分类" open={catModal} onCancel={() => { setCatModal(false); catForm.resetFields(); }} onOk={() => catForm.submit()} okText="创建">
+      <Modal title="新增分类" open={catModal} onCancel={() => { setCatModal(false); catForm.resetFields(); }} onOk={() => catForm.submit()} okText="创建" confirmLoading={submitting}>
         <Form form={catForm} layout="vertical" onFinish={createCategory}>
           <Form.Item name="name" label="分类名称" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="description" label="描述"><Input /></Form.Item>

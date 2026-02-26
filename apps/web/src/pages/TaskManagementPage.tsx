@@ -20,6 +20,8 @@ const TaskManagementPage: React.FC = () => {
   const [currentTask, setCurrentTask] = useState<any>(null);
   const [assignee, setAssignee] = useState('');
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [assignSubmitting, setAssignSubmitting] = useState(false);
   const [form] = Form.useForm();
 
   const loadTasks = useCallback(async () => {
@@ -37,6 +39,7 @@ const TaskManagementPage: React.FC = () => {
   useEffect(() => { loadTasks(); }, [loadTasks]);
 
   const createTask = async (values: any) => {
+    setSubmitting(true);
     try {
       await apiClient.post('/tasks', values);
       showSuccess('任务创建成功');
@@ -45,10 +48,13 @@ const TaskManagementPage: React.FC = () => {
       loadTasks();
     } catch (err: any) {
       handleApiError(err, '创建任务失败');
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const assignTask = async () => {
+    setAssignSubmitting(true);
     try {
       await apiClient.put(`/tasks/${currentTask.task_id || currentTask.id}/assign`, { assignee });
       showSuccess('任务分配成功');
@@ -56,6 +62,8 @@ const TaskManagementPage: React.FC = () => {
       loadTasks();
     } catch (err: any) {
       handleApiError(err, '分配任务失败');
+    } finally {
+      setAssignSubmitting(false);
     }
   };
 
@@ -133,7 +141,7 @@ const TaskManagementPage: React.FC = () => {
         <Table columns={columns} dataSource={tasks} rowKey={(r, i) => r.task_id || r.id || String(i)} loading={loading} />
       </Card>
 
-      <Modal title="新建任务" open={createVisible} onCancel={() => { setCreateVisible(false); form.resetFields(); }} onOk={() => form.submit()} okText="创建">
+      <Modal title="新建任务" open={createVisible} onCancel={() => { setCreateVisible(false); form.resetFields(); }} onOk={() => form.submit()} okText="创建" confirmLoading={submitting}>
         <Form form={form} layout="vertical" onFinish={createTask}>
           <Form.Item name="title" label="任务标题" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="description" label="描述"><TextArea rows={3} /></Form.Item>
@@ -148,7 +156,7 @@ const TaskManagementPage: React.FC = () => {
         </Form>
       </Modal>
 
-      <Modal title="分配任务" open={assignVisible} onCancel={() => setAssignVisible(false)} onOk={assignTask} okText="确认分配">
+      <Modal title="分配任务" open={assignVisible} onCancel={() => setAssignVisible(false)} onOk={assignTask} okText="确认分配" confirmLoading={assignSubmitting}>
         <p>任务：{currentTask?.title}</p>
         <Input placeholder="输入负责人" value={assignee} onChange={e => setAssignee(e.target.value)} />
       </Modal>

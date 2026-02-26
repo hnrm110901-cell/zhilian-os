@@ -12,8 +12,10 @@ import {
 import { apiClient } from '../services/api';
 import { handleApiError } from '../utils/message';
 import { DataCard, LoadingSkeleton, EmptyState } from '../components';
+import { useNavigate } from 'react-router-dom';
 
 const MobileApp: React.FC = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [dashboard, setDashboard] = useState<any>(null);
   const [todayOrders, setTodayOrders] = useState<any>(null);
@@ -130,7 +132,7 @@ const MobileApp: React.FC = () => {
                   fontWeight: 500,
                 }}
                 onClick={() => {
-                  console.log('Quick action:', action);
+                  // quick action handler
                 }}
               >
                 {action.label}
@@ -263,7 +265,7 @@ const MobileApp: React.FC = () => {
             description="今天还没有新的订单"
             action={{
               text: '新建订单',
-              onClick: () => console.log('Create order'),
+              onClick: () => navigate('/order'),
             }}
           />
         )}
@@ -279,7 +281,7 @@ const MobileApp: React.FC = () => {
           <Button
             size="small"
             onClick={() => {
-              console.log('Mark all as read');
+              // mark all as read
             }}
           >
             全部已读
@@ -292,7 +294,7 @@ const MobileApp: React.FC = () => {
             renderItem={(item: any) => (
               <List.Item
                 onClick={() => {
-                  console.log('Notification clicked:', item);
+                  // notification click handler
                 }}
                 style={{
                   cursor: 'pointer',

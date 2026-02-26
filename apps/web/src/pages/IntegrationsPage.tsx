@@ -16,6 +16,7 @@ const IntegrationsPage: React.FC = () => {
   const [syncLogs, setSyncLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [registerVisible, setRegisterVisible] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
 
   const loadData = useCallback(async () => {
@@ -37,6 +38,7 @@ const IntegrationsPage: React.FC = () => {
   useEffect(() => { loadData(); }, [loadData]);
 
   const registerSystem = async (values: any) => {
+    setSubmitting(true);
     try {
       await apiClient.post('/integrations/systems', values);
       showSuccess('系统注册成功');
@@ -45,6 +47,8 @@ const IntegrationsPage: React.FC = () => {
       loadData();
     } catch (err: any) {
       handleApiError(err, '注册失败');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -128,7 +132,7 @@ const IntegrationsPage: React.FC = () => {
       <Alert message="此页面管理与外部系统（POS、供应商、会员、预订）的数据同步集成，与企业集成配置页面互补" type="info" style={{ marginBottom: 16 }} />
       <Tabs items={tabItems} />
 
-      <Modal title="注册外部系统" open={registerVisible} onCancel={() => { setRegisterVisible(false); form.resetFields(); }} onOk={() => form.submit()} okText="注册">
+      <Modal title="注册外部系统" open={registerVisible} onCancel={() => { setRegisterVisible(false); form.resetFields(); }} onOk={() => form.submit()} okText="注册" confirmLoading={submitting}>
         <Form form={form} layout="vertical" onFinish={registerSystem}>
           <Form.Item name="name" label="系统名称" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="type" label="系统类型" rules={[{ required: true }]}>
