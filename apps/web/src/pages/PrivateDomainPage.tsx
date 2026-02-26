@@ -55,7 +55,7 @@ const PrivateDomainPage: React.FC = () => {
 
   const loadStores = useCallback(async () => {
     try {
-      const res = await apiClient.get('/stores');
+      const res = await apiClient.get('/api/v1/stores');
       setStores(res.data?.stores || res.data || []);
     } catch (err: any) { handleApiError(err, '加载门店失败'); }
   }, []);
@@ -64,11 +64,11 @@ const PrivateDomainPage: React.FC = () => {
     setLoading(true);
     try {
       const [dash, rfm, sig, jrn, churn] = await Promise.allSettled([
-        apiClient.get(`/private-domain/dashboard/${selectedStore}`),
-        apiClient.get(`/private-domain/rfm/${selectedStore}`),
-        apiClient.get(`/private-domain/signals/${selectedStore}`, { params: { limit: 30 } }),
-        apiClient.get(`/private-domain/journeys/${selectedStore}`),
-        apiClient.get(`/private-domain/churn-risks/${selectedStore}`),
+        apiClient.get(`/api/v1/private-domain/dashboard/${selectedStore}`),
+        apiClient.get(`/api/v1/private-domain/rfm/${selectedStore}`),
+        apiClient.get(`/api/v1/private-domain/signals/${selectedStore}`, { params: { limit: 30 } }),
+        apiClient.get(`/api/v1/private-domain/journeys/${selectedStore}`),
+        apiClient.get(`/api/v1/private-domain/churn-risks/${selectedStore}`),
       ]);
       if (dash.status === 'fulfilled') setDashboard(dash.value.data);
       if (rfm.status === 'fulfilled') setRfmData(rfm.value.data?.segments || []);
@@ -88,7 +88,7 @@ const PrivateDomainPage: React.FC = () => {
 
   const triggerJourney = async (values: any) => {
     try {
-      await apiClient.post(`/private-domain/journeys/${selectedStore}/trigger`, values);
+      await apiClient.post(`/api/v1/private-domain/journeys/${selectedStore}/trigger`, values);
       showSuccess('旅程已触发');
       setJourneyModal(false);
       loadAll();
@@ -97,7 +97,7 @@ const PrivateDomainPage: React.FC = () => {
 
   const processReview = async (values: any) => {
     try {
-      await apiClient.post(`/private-domain/reviews/${selectedStore}/process`, values);
+      await apiClient.post(`/api/v1/private-domain/reviews/${selectedStore}/process`, values);
       showSuccess('差评修复旅程已启动');
       setReviewModal(false);
       loadAll();

@@ -26,7 +26,7 @@ const ApprovalManagementPage: React.FC = () => {
     try {
       const params: any = { status: 'pending' };
       if (storeFilter) params.store_id = storeFilter;
-      const res = await apiClient.get('/approvals', { params });
+      const res = await apiClient.get('/api/v1/approvals', { params });
       setApprovals(res.data?.approvals || res.data || []);
     } catch (err: any) {
       handleApiError(err, '加载审批列表失败');
@@ -37,7 +37,7 @@ const ApprovalManagementPage: React.FC = () => {
 
   const loadStats = useCallback(async () => {
     try {
-      const res = await apiClient.get('/approvals/statistics');
+      const res = await apiClient.get('/api/v1/approvals/statistics');
       setStats(res.data);
     } catch (err: any) {
       handleApiError(err, '加载统计数据失败');
@@ -61,13 +61,13 @@ const ApprovalManagementPage: React.FC = () => {
     setSubmitting(true);
     try {
       if (modalType === 'approve') {
-        await apiClient.post(`/approvals/${id}/approve`, { reason });
+        await apiClient.post(`/api/v1/approvals/${id}/approve`, { reason });
         showSuccess('已批准');
       } else if (modalType === 'reject') {
-        await apiClient.post(`/approvals/${id}/reject`, { reason });
+        await apiClient.post(`/api/v1/approvals/${id}/reject`, { reason });
         showSuccess('已拒绝');
       } else {
-        await apiClient.post(`/approvals/${id}/modify`, { modified_decision: reason });
+        await apiClient.post(`/api/v1/approvals/${id}/modify`, { modified_decision: reason });
         showSuccess('已修改');
       }
       setModalVisible(false);

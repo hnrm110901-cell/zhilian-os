@@ -38,7 +38,7 @@ const Customer360Page: React.FC = () => {
     if (!searchQuery.trim()) return;
     setSearching(true);
     try {
-      const res = await apiClient.get('/customer360/search', {
+      const res = await apiClient.get('/api/v1/customer360/search', {
         params: { query: searchQuery, store_id: storeId || undefined, limit: 20 },
       });
       setSearchResults(res.data?.data?.results || []);
@@ -50,7 +50,7 @@ const Customer360Page: React.FC = () => {
     setLoading(true);
     setProfile(null);
     try {
-      const res = await apiClient.get('/customer360/profile', {
+      const res = await apiClient.get('/api/v1/customer360/profile', {
         params: { customer_identifier: identifier, identifier_type: type, store_id: storeId || undefined },
       });
       setProfile(res.data?.data || res.data);

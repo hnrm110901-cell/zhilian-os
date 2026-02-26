@@ -21,7 +21,7 @@ const RecommendationsPage: React.FC = () => {
 
   const loadStores = useCallback(async () => {
     try {
-      const res = await apiClient.get('/stores');
+      const res = await apiClient.get('/api/v1/stores');
       setStores(res.data?.stores || res.data || []);
     } catch (err: any) {
       handleApiError(err, '加载门店列表失败');
@@ -33,7 +33,7 @@ const RecommendationsPage: React.FC = () => {
   const submitDish = async (values: any) => {
     setLoadingDish(true);
     try {
-      const res = await apiClient.post('/recommendations/dishes', { ...values, store_id: selectedStore });
+      const res = await apiClient.post('/api/v1/recommendations/dishes', { ...values, store_id: selectedStore });
       setDishResult(res.data?.recommendations || res.data || []);
     } catch (err: any) {
       handleApiError(err, '获取菜品推荐失败');
@@ -45,7 +45,7 @@ const RecommendationsPage: React.FC = () => {
   const submitPricing = async (values: any) => {
     setLoadingPrice(true);
     try {
-      const res = await apiClient.post('/recommendations/pricing/optimize', { ...values, store_id: selectedStore });
+      const res = await apiClient.post('/api/v1/recommendations/pricing/optimize', { ...values, store_id: selectedStore });
       setPricingResult(res.data);
     } catch (err: any) {
       handleApiError(err, '获取定价建议失败');
@@ -57,7 +57,7 @@ const RecommendationsPage: React.FC = () => {
   const submitCampaign = async (values: any) => {
     setLoadingCampaign(true);
     try {
-      const res = await apiClient.post('/recommendations/marketing/campaign', { ...values, store_id: selectedStore });
+      const res = await apiClient.post('/api/v1/recommendations/marketing/campaign', { ...values, store_id: selectedStore });
       setCampaignResult(res.data);
     } catch (err: any) {
       handleApiError(err, '获取营销方案失败');
@@ -70,7 +70,7 @@ const RecommendationsPage: React.FC = () => {
     setLoadingPerf(true);
     try {
       const [start, end] = values.date_range || [];
-      const res = await apiClient.post('/recommendations/performance', {
+      const res = await apiClient.post('/api/v1/recommendations/performance', {
         store_id: selectedStore,
         start_date: start?.format('YYYY-MM-DD'),
         end_date: end?.format('YYYY-MM-DD'),

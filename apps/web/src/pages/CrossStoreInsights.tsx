@@ -22,10 +22,10 @@ const CrossStoreInsights: React.FC = () => {
     setLoading(true);
     try {
       const [a, b, c, s] = await Promise.allSettled([
-        apiClient.get('/insights/anomalies', { params: { metric, target_date: targetDate, threshold: 2.0 } }),
-        apiClient.get('/insights/best-practices', { params: { metric, top_n: 3 } }),
-        apiClient.get('/insights/period-comparison', { params: { metric, period } }),
-        apiClient.get('/insights/summary', { params: { metric } }),
+        apiClient.get('/api/v1/insights/anomalies', { params: { metric, target_date: targetDate, threshold: 2.0 } }),
+        apiClient.get('/api/v1/insights/best-practices', { params: { metric, top_n: 3 } }),
+        apiClient.get('/api/v1/insights/period-comparison', { params: { metric, period } }),
+        apiClient.get('/api/v1/insights/summary', { params: { metric } }),
       ]);
       if (a.status === 'fulfilled') setAnomalies(a.value.data);
       if (b.status === 'fulfilled') setBestPractices(b.value.data);

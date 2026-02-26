@@ -30,7 +30,7 @@ const MemberSystemPage: React.FC = () => {
 
   const testConnection = async () => {
     try {
-      const res = await apiClient.get('/members/test-connection');
+      const res = await apiClient.get('/api/v1/members/test-connection');
       setConnectionStatus(res.data);
       if (res.data.success) showSuccess('连接正常');
       else message.error(res.data.error || '连接失败');
@@ -44,14 +44,14 @@ const MemberSystemPage: React.FC = () => {
     setRecharges([]);
     setCoupons([]);
     try {
-      const res = await apiClient.get('/members/query', { params: values });
+      const res = await apiClient.get('/api/v1/members/query', { params: values });
       setMember(res.data);
       // 同时加载交易/充值/优惠券
       const cardNo = res.data.cardNo;
       const [t, r, c] = await Promise.allSettled([
-        apiClient.get('/members/trade/query', { params: { card_no: cardNo } }),
-        apiClient.get('/members/recharge/query', { params: { card_no: cardNo } }),
-        apiClient.get('/members/coupon/list', { params: { card_no: cardNo } }),
+        apiClient.get('/api/v1/members/trade/query', { params: { card_no: cardNo } }),
+        apiClient.get('/api/v1/members/recharge/query', { params: { card_no: cardNo } }),
+        apiClient.get('/api/v1/members/coupon/list', { params: { card_no: cardNo } }),
       ]);
       if (t.status === 'fulfilled') setTrades(t.value.data?.trades || t.value.data || []);
       if (r.status === 'fulfilled') setRecharges(r.value.data?.records || r.value.data || []);
@@ -62,7 +62,7 @@ const MemberSystemPage: React.FC = () => {
 
   const addMember = async (values: any) => {
     try {
-      await apiClient.post('/members/add', values);
+      await apiClient.post('/api/v1/members/add', values);
       showSuccess('会员添加成功');
       setAddModal(false);
       addForm.resetFields();
@@ -72,7 +72,7 @@ const MemberSystemPage: React.FC = () => {
   const updateMember = async (values: any) => {
     if (!member?.cardNo) return;
     try {
-      await apiClient.put(`/members/${member.cardNo}`, values);
+      await apiClient.put(`/api/v1/members/${member.cardNo}`, values);
       showSuccess('会员信息已更新');
       setEditModal(false);
       queryMember({ card_no: member.cardNo });
@@ -82,7 +82,7 @@ const MemberSystemPage: React.FC = () => {
   const submitRecharge = async (values: any) => {
     if (!member?.cardNo) return;
     try {
-      await apiClient.post('/members/recharge/submit', {
+      await apiClient.post('/api/v1/members/recharge/submit', {
         ...values,
         card_no: member.cardNo,
         amount: Math.round(values.amount * 100),
@@ -95,7 +95,7 @@ const MemberSystemPage: React.FC = () => {
 
   const useCoupon = async (values: any) => {
     try {
-      await apiClient.post('/members/coupon/use', {
+      await apiClient.post('/api/v1/members/coupon/use', {
         ...values,
         amount: Math.round(values.amount * 100),
       });

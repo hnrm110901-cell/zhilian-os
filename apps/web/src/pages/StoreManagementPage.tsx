@@ -23,8 +23,8 @@ const StoreManagementPage: React.FC = () => {
     setLoading(true);
     try {
       const [storesRes, countRes] = await Promise.allSettled([
-        apiClient.get('/stores'),
-        apiClient.get('/stores-count'),
+        apiClient.get('/api/v1/stores'),
+        apiClient.get('/api/v1/stores-count'),
       ]);
       if (storesRes.status === 'fulfilled') setStores(storesRes.value.data?.stores || storesRes.value.data || []);
       if (countRes.status === 'fulfilled') setStoreCount(countRes.value.data);
@@ -52,7 +52,7 @@ const StoreManagementPage: React.FC = () => {
   const viewStats = async (record: any) => {
     setStatsLoading(true);
     try {
-      const res = await apiClient.get(`/stores/${record.store_id || record.id}/stats`);
+      const res = await apiClient.get(`/api/v1/stores/${record.store_id || record.id}/stats`);
       setStoreStats({ ...res.data, name: record.name });
       setStatsVisible(true);
     } catch (err: any) {
@@ -67,7 +67,7 @@ const StoreManagementPage: React.FC = () => {
       title: `确认删除门店「${record.name}」？`,
       onOk: async () => {
         try {
-          await apiClient.delete(`/stores/${record.store_id || record.id}`);
+          await apiClient.delete(`/api/v1/stores/${record.store_id || record.id}`);
           showSuccess('删除成功');
           loadStores();
         } catch (err: any) {
@@ -81,10 +81,10 @@ const StoreManagementPage: React.FC = () => {
     setSubmitting(true);
     try {
       if (editingStore) {
-        await apiClient.put(`/stores/${editingStore.store_id || editingStore.id}`, values);
+        await apiClient.put(`/api/v1/stores/${editingStore.store_id || editingStore.id}`, values);
         showSuccess('更新成功');
       } else {
-        await apiClient.post('/stores', values);
+        await apiClient.post('/api/v1/stores', values);
         showSuccess('创建成功');
       }
       setFormVisible(false);

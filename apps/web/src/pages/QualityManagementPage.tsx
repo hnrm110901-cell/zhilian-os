@@ -23,7 +23,7 @@ const QualityManagementPage: React.FC = () => {
 
   const loadStores = useCallback(async () => {
     try {
-      const res = await apiClient.get('/stores');
+      const res = await apiClient.get('/api/v1/stores');
       setStores(res.data?.stores || res.data || []);
     } catch (err: any) { handleApiError(err, '加载门店失败'); }
   }, []);
@@ -32,8 +32,8 @@ const QualityManagementPage: React.FC = () => {
     setLoading(true);
     try {
       const [insp, sum] = await Promise.allSettled([
-        apiClient.get(`/quality/inspections/${selectedStore}`, { params: { limit: 50 } }),
-        apiClient.get(`/quality/summary/${selectedStore}`),
+        apiClient.get(`/api/v1/quality/inspections/${selectedStore}`, { params: { limit: 50 } }),
+        apiClient.get(`/api/v1/quality/summary/${selectedStore}`),
       ]);
       if (insp.status === 'fulfilled') setInspections(insp.value.data || []);
       if (sum.status === 'fulfilled') setSummary(sum.value.data);
@@ -48,7 +48,7 @@ const QualityManagementPage: React.FC = () => {
     if (!imageB64) { message.warning('请上传菜品图片'); return; }
     setInspecting(true);
     try {
-      const res = await apiClient.post('/quality/inspect', {
+      const res = await apiClient.post('/api/v1/quality/inspect', {
         store_id: selectedStore,
         dish_name: values.dish_name,
         dish_id: values.dish_id,

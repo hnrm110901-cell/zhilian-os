@@ -37,7 +37,7 @@ const CompliancePage: React.FC = () => {
 
   const loadStores = useCallback(async () => {
     try {
-      const res = await apiClient.get('/stores');
+      const res = await apiClient.get('/api/v1/stores');
       setStores(res.data?.stores || res.data || []);
     } catch (err: any) { handleApiError(err, '加载门店失败'); }
   }, []);
@@ -48,8 +48,8 @@ const CompliancePage: React.FC = () => {
       const params: any = {};
       if (selectedStore) params.store_id = selectedStore;
       const [lic, sum] = await Promise.allSettled([
-        apiClient.get('/compliance/licenses', { params }),
-        apiClient.get('/compliance/summary', { params }),
+        apiClient.get('/api/v1/compliance/licenses', { params }),
+        apiClient.get('/api/v1/compliance/summary', { params }),
       ]);
       if (lic.status === 'fulfilled') setLicenses(lic.value.data || []);
       if (sum.status === 'fulfilled') setSummary(sum.value.data);
@@ -64,8 +64,8 @@ const CompliancePage: React.FC = () => {
     setScanning(true);
     try {
       const res = selectedStore
-        ? await apiClient.post(`/compliance/scan/${selectedStore}`)
-        : await apiClient.post('/compliance/scan-all');
+        ? await apiClient.post(`/api/v1/compliance/scan/${selectedStore}`)
+        : await apiClient.post('/api/v1/compliance/scan-all');
       const expiring = res.data?.expiring?.length || 0;
       const expired = res.data?.expired?.length || 0;
       showSuccess(`扫描完成：${expiring} 个即将到期，${expired} 个已过期`);
@@ -76,7 +76,7 @@ const CompliancePage: React.FC = () => {
 
   const addLicense = async (values: any) => {
     try {
-      await apiClient.post('/compliance/licenses', {
+      await apiClient.post('/api/v1/compliance/licenses', {
         ...values,
         store_id: selectedStore || values.store_id,
         expiry_date: values.expiry_date?.format('YYYY-MM-DD'),
@@ -92,7 +92,7 @@ const CompliancePage: React.FC = () => {
 
   const deleteLicense = async (id: string) => {
     try {
-      await apiClient.delete(`/compliance/licenses/${id}`);
+      await apiClient.delete(`/api/v1/compliance/licenses/${id}`);
       showSuccess('已删除');
       loadData();
     } catch (err: any) { handleApiError(err, '删除失败'); }
