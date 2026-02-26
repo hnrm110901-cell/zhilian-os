@@ -159,7 +159,7 @@ const LoginPage: React.FC = () => {
             🍜
           </div>
           <Title level={2} style={{ marginBottom: 8, color: '#667eea' }}>
-            智链OS
+            屯象OS
           </Title>
           <Text type="secondary" style={{ fontSize: 16 }}>
             <RocketOutlined /> 餐饮行业智能管理系统

@@ -426,7 +426,7 @@ const MobileApp: React.FC = () => {
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>智链OS 移动端</h1>
+            <h1 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>屯象OS 移动端</h1>
             <p style={{ margin: '4px 0 0', fontSize: 12, opacity: 0.9 }}>
               {new Date().toLocaleDateString('zh-CN')} {new Date().toLocaleTimeString('zh-CN')}
             </p>

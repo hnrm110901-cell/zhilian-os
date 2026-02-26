@@ -271,7 +271,7 @@ const DataVisualizationScreen: React.FC = () => {
       {/* 标题栏 */}
       <div style={{ marginBottom: 24, textAlign: 'center' }}>
         <h1 style={{ fontSize: 32, fontWeight: 'bold', margin: 0 }}>
-          智链OS 数据可视化大屏
+          屯象OS 数据可视化大屏
         </h1>
         <p style={{ color: '#666', marginTop: 8 }}>
           实时更新 | 最后更新: {new Date().toLocaleTimeString('zh-CN')}

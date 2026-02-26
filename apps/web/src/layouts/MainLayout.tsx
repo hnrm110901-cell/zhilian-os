@@ -507,7 +507,7 @@ const MainLayout: React.FC = () => {
             transition: 'all 0.2s',
           }}
         >
-          {collapsed ? '智链' : '🍜 智链OS'}
+          {collapsed ? '屯象' : '🍜 屯象OS'}
         </div>
         <Menu
           theme="dark"
@@ -599,7 +599,7 @@ const MainLayout: React.FC = () => {
           </div>
         </Content>
         <Layout.Footer style={{ textAlign: 'center', color: '#999' }}>
-          智链OS ©{new Date().getFullYear()} - 让餐饮管理更智能
+          屯象OS ©{new Date().getFullYear()} - 让餐饮管理更智能
         </Layout.Footer>
       </Layout>
     </Layout>
