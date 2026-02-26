@@ -15,7 +15,15 @@ const EmployeeManagementPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<any>(null);
+  const [stores, setStores] = useState<any[]>([]);
   const [form] = Form.useForm();
+
+  const loadStores = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/stores');
+      setStores(res.data?.stores || res.data || []);
+    } catch { /* ignore */ }
+  }, []);
 
   const loadEmployees = useCallback(async () => {
     setLoading(true);
@@ -29,7 +37,7 @@ const EmployeeManagementPage: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => { loadEmployees(); }, [loadEmployees]);
+  useEffect(() => { loadStores(); loadEmployees(); }, [loadStores, loadEmployees]);
 
   const openModal = (employee?: any) => {
     setEditingEmployee(employee || null);
@@ -127,8 +135,9 @@ const EmployeeManagementPage: React.FC = () => {
           </Form.Item>
           <Form.Item name="store_id" label="门店">
             <Select>
-              <Option value="STORE001">门店001</Option>
-              <Option value="STORE002">门店002</Option>
+              {stores.length > 0 ? stores.map((s: any) => (
+                <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
+              )) : <Option value="STORE001">门店001</Option>}
             </Select>
           </Form.Item>
           <Form.Item name="phone" label="联系方式"><Input /></Form.Item>

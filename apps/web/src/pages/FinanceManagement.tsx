@@ -28,10 +28,19 @@ const FinanceManagement: React.FC = () => {
   const [budgetModalVisible, setBudgetModalVisible] = useState(false);
   const [form] = Form.useForm();
   const [budgetForm] = Form.useForm();
+  const [storeId, setStoreId] = useState('STORE001');
+  const [stores, setStores] = useState<any[]>([]);
   const [dateRange, setDateRange] = useState<any>([
     dayjs().startOf('month'),
     dayjs().endOf('month'),
   ]);
+
+  const loadStores = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/stores');
+      setStores(res.data?.stores || res.data || []);
+    } catch { /* ignore */ }
+  }, []);
 
   const loadTransactions = useCallback(async () => {
     try {
@@ -51,7 +60,7 @@ const FinanceManagement: React.FC = () => {
     try {
       const response = await apiClient.get('/finance/reports/income-statement', {
         params: {
-          store_id: 'STORE001',
+          store_id: storeId,
           start_date: dateRange[0].format('YYYY-MM-DD'),
           end_date: dateRange[1].format('YYYY-MM-DD'),
         },
@@ -66,7 +75,7 @@ const FinanceManagement: React.FC = () => {
     try {
       const response = await apiClient.get('/finance/reports/cash-flow', {
         params: {
-          store_id: 'STORE001',
+          store_id: storeId,
           start_date: dateRange[0].format('YYYY-MM-DD'),
           end_date: dateRange[1].format('YYYY-MM-DD'),
         },
@@ -82,7 +91,7 @@ const FinanceManagement: React.FC = () => {
       const now = dayjs();
       const response = await apiClient.get('/finance/budgets/analysis', {
         params: {
-          store_id: 'STORE001',
+          store_id: storeId,
           year: now.year(),
           month: now.month() + 1,
         },
@@ -97,7 +106,7 @@ const FinanceManagement: React.FC = () => {
     try {
       const response = await apiClient.get('/finance/metrics', {
         params: {
-          store_id: 'STORE001',
+          store_id: storeId,
           start_date: dateRange[0].format('YYYY-MM-DD'),
           end_date: dateRange[1].format('YYYY-MM-DD'),
         },
@@ -112,6 +121,7 @@ const FinanceManagement: React.FC = () => {
     const loadData = async () => {
       setLoading(true);
       await Promise.all([
+        loadStores(),
         loadTransactions(),
         loadIncomeStatement(),
         loadCashFlow(),
@@ -121,7 +131,7 @@ const FinanceManagement: React.FC = () => {
       setLoading(false);
     };
     loadData();
-  }, [loadTransactions, loadIncomeStatement, loadCashFlow, loadBudgetAnalysis, loadFinancialMetrics]);
+  }, [loadStores, loadTransactions, loadIncomeStatement, loadCashFlow, loadBudgetAnalysis, loadFinancialMetrics]);
 
   const handleCreateTransaction = async (values: any) => {
     try {
@@ -344,6 +354,12 @@ const FinanceManagement: React.FC = () => {
       {/* 日期选择 */}
       <Card style={{ marginBottom: '24px' }}>
         <Space>
+          <span>门店:</span>
+          <Select value={storeId} onChange={setStoreId} style={{ width: 160 }}>
+            {stores.length > 0 ? stores.map((s: any) => (
+              <Select.Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Select.Option>
+            )) : <Select.Option value="STORE001">STORE001</Select.Option>}
+          </Select>
           <span>选择日期范围:</span>
           <RangePicker
             value={dateRange}
@@ -533,8 +549,12 @@ const FinanceManagement: React.FC = () => {
         onOk={() => form.submit()}
       >
         <Form form={form} layout="vertical" onFinish={handleCreateTransaction}>
-          <Form.Item name="store_id" label="门店ID" initialValue="STORE001" rules={[{ required: true }]}>
-            <Input />
+          <Form.Item name="store_id" label="门店ID" initialValue={storeId} rules={[{ required: true }]}>
+            <Select>
+              {stores.length > 0 ? stores.map((s: any) => (
+                <option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</option>
+              )) : <option value="STORE001">STORE001</option>}
+            </Select>
           </Form.Item>
           <Form.Item name="transaction_date" label="交易日期" rules={[{ required: true }]}>
             <DatePicker style={{ width: '100%' }} />
@@ -581,8 +601,12 @@ const FinanceManagement: React.FC = () => {
         onOk={() => budgetForm.submit()}
       >
         <Form form={budgetForm} layout="vertical" onFinish={handleCreateBudget}>
-          <Form.Item name="store_id" label="门店ID" initialValue="STORE001" rules={[{ required: true }]}>
-            <Input />
+          <Form.Item name="store_id" label="门店ID" initialValue={storeId} rules={[{ required: true }]}>
+            <Select>
+              {stores.length > 0 ? stores.map((s: any) => (
+                <option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</option>
+              )) : <option value="STORE001">STORE001</option>}
+            </Select>
           </Form.Item>
           <Form.Item name="year" label="年份" initialValue={dayjs().year()} rules={[{ required: true }]}>
             <InputNumber min={2020} max={2030} style={{ width: '100%' }} />

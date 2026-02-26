@@ -24,6 +24,7 @@ const SupplyChainManagement: React.FC = () => {
   const [quotes, setQuotes] = useState<any[]>([]);
   const [compareResult, setCompareResult] = useState<any>(null);
   const [selectedQuoteIds, setSelectedQuoteIds] = useState<string[]>([]);
+  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
   const [quoteForm] = Form.useForm();
   const [form] = Form.useForm();
   const [orderForm] = Form.useForm();
@@ -91,11 +92,15 @@ const SupplyChainManagement: React.FC = () => {
   };
 
   const handleUpdateOrderStatus = async (orderId: string, status: string) => {
+    const key = `order-${orderId}-${status}`;
+    setActionLoading(prev => ({ ...prev, [key]: true }));
     try {
       await apiClient.patch(`/supply-chain/purchase-orders/${orderId}/status`, { status });
       loadPurchaseOrders();
     } catch (err: any) {
       handleApiError(err, '更新订单状态失败');
+    } finally {
+      setActionLoading(prev => ({ ...prev, [key]: false }));
     }
   };
 
@@ -214,17 +219,17 @@ const SupplyChainManagement: React.FC = () => {
       render: (_: any, record: any) => (
         <Space>
           {record.status === 'pending' && (
-            <Button size="small" type="link" onClick={() => handleUpdateOrderStatus(record.id, 'approved')}>
+            <Button size="small" type="link" loading={actionLoading[`order-${record.id}-approved`]} onClick={() => handleUpdateOrderStatus(record.id, 'approved')}>
               审批
             </Button>
           )}
           {record.status === 'approved' && (
-            <Button size="small" type="link" onClick={() => handleUpdateOrderStatus(record.id, 'ordered')}>
+            <Button size="small" type="link" loading={actionLoading[`order-${record.id}-ordered`]} onClick={() => handleUpdateOrderStatus(record.id, 'ordered')}>
               下单
             </Button>
           )}
           {record.status === 'ordered' && (
-            <Button size="small" type="link" onClick={() => handleUpdateOrderStatus(record.id, 'shipped')}>
+            <Button size="small" type="link" loading={actionLoading[`order-${record.id}-shipped`]} onClick={() => handleUpdateOrderStatus(record.id, 'shipped')}>
               标记发货
             </Button>
           )}

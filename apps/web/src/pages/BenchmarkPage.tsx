@@ -12,6 +12,14 @@ const BenchmarkPage: React.FC = () => {
   const [summary, setSummary] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [storeId, setStoreId] = useState('STORE001');
+  const [stores, setStores] = useState<any[]>([]);
+
+  const loadStores = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/stores');
+      setStores(res.data?.stores || res.data || []);
+    } catch { /* ignore */ }
+  }, []);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -31,7 +39,7 @@ const BenchmarkPage: React.FC = () => {
     }
   }, [storeId]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => { loadStores(); loadData(); }, [loadStores, loadData]);
 
   const rankColor = (rank: string) => {
     if (rank === 'top') return 'green';
@@ -122,8 +130,9 @@ const BenchmarkPage: React.FC = () => {
     <div>
       <div style={{ marginBottom: 16 }}>
         <Select value={storeId} onChange={setStoreId} style={{ width: 160 }}>
-          <Option value="STORE001">门店001</Option>
-          <Option value="STORE002">门店002</Option>
+          {stores.length > 0 ? stores.map((s: any) => (
+            <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
+          )) : <Option value="STORE001">门店001</Option>}
         </Select>
       </div>
       <Tabs items={tabItems} />

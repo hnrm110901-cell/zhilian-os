@@ -19,6 +19,7 @@ const TaskManagementPage: React.FC = () => {
   const [assignVisible, setAssignVisible] = useState(false);
   const [currentTask, setCurrentTask] = useState<any>(null);
   const [assignee, setAssignee] = useState('');
+  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
   const [form] = Form.useForm();
 
   const loadTasks = useCallback(async () => {
@@ -59,22 +60,30 @@ const TaskManagementPage: React.FC = () => {
   };
 
   const completeTask = async (task: any) => {
+    const key = `complete-${task.task_id || task.id}`;
+    setActionLoading(prev => ({ ...prev, [key]: true }));
     try {
       await apiClient.put(`/tasks/${task.task_id || task.id}/complete`);
       showSuccess('任务已完成');
       loadTasks();
     } catch (err: any) {
       handleApiError(err, '操作失败');
+    } finally {
+      setActionLoading(prev => ({ ...prev, [key]: false }));
     }
   };
 
   const deleteTask = async (task: any) => {
+    const key = `delete-${task.task_id || task.id}`;
+    setActionLoading(prev => ({ ...prev, [key]: true }));
     try {
       await apiClient.delete(`/tasks/${task.task_id || task.id}`);
       showSuccess('任务已删除');
       loadTasks();
     } catch (err: any) {
       handleApiError(err, '删除失败');
+    } finally {
+      setActionLoading(prev => ({ ...prev, [key]: false }));
     }
   };
 
@@ -101,9 +110,9 @@ const TaskManagementPage: React.FC = () => {
         <Space>
           <Button size="small" icon={<UserAddOutlined />} onClick={() => { setCurrentTask(record); setAssignee(''); setAssignVisible(true); }}>分配</Button>
           {record.status !== 'completed' && (
-            <Button size="small" type="primary" icon={<CheckOutlined />} onClick={() => completeTask(record)}>完成</Button>
+            <Button size="small" type="primary" icon={<CheckOutlined />} loading={actionLoading[`complete-${record.task_id || record.id}`]} onClick={() => completeTask(record)}>完成</Button>
           )}
-          <Button size="small" danger onClick={() => deleteTask(record)}>删除</Button>
+          <Button size="small" danger loading={actionLoading[`delete-${record.task_id || record.id}`]} onClick={() => deleteTask(record)}>删除</Button>
         </Space>
       ),
     },

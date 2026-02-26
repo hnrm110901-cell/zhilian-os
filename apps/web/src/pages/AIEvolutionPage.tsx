@@ -62,6 +62,14 @@ const AIEvolutionPage: React.FC = () => {
   const [agentPerformance, setAgentPerformance] = useState<AgentPerformance[]>([]);
   const [hitlEscalations, setHitlEscalations] = useState<HitlEscalation[]>([]);
   const [storeId, setStoreId] = useState('STORE001');
+  const [stores, setStores] = useState<any[]>([]);
+
+  const loadStores = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/stores');
+      setStores(res.data?.stores || res.data || []);
+    } catch { /* ignore */ }
+  }, []);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -85,7 +93,7 @@ const AIEvolutionPage: React.FC = () => {
     }
   }, [storeId]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => { loadStores(); loadData(); }, [loadStores, loadData]);
 
   const trendChartOption = {
     tooltip: { trigger: 'axis' },
@@ -166,9 +174,9 @@ const AIEvolutionPage: React.FC = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Title level={4} style={{ margin: 0 }}>AI进化看板</Title>
           <Select value={storeId} onChange={setStoreId} style={{ width: 160 }}>
-            <Option value="STORE001">门店 001</Option>
-            <Option value="STORE002">门店 002</Option>
-            <Option value="STORE003">门店 003</Option>
+            {stores.length > 0 ? stores.map((s: any) => (
+              <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
+            )) : <Option value="STORE001">门店 001</Option>}
           </Select>
         </div>
 

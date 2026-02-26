@@ -20,6 +20,14 @@ const ReconciliationPage: React.FC = () => {
   const [currentRecord, setCurrentRecord] = useState<any>(null);
   const [selectedDate, setSelectedDate] = useState(dayjs().format('YYYY-MM-DD'));
   const [storeId, setStoreId] = useState('STORE001');
+  const [stores, setStores] = useState<any[]>([]);
+
+  const loadStores = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/stores');
+      setStores(res.data?.stores || res.data || []);
+    } catch { /* ignore */ }
+  }, []);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -37,7 +45,7 @@ const ReconciliationPage: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => { loadStores(); loadData(); }, [loadStores, loadData]);
 
   const performReconciliation = async () => {
     setPerforming(true);
@@ -99,8 +107,9 @@ const ReconciliationPage: React.FC = () => {
         extra={
           <Space>
             <Select value={storeId} onChange={setStoreId} style={{ width: 120 }}>
-              <Option value="STORE001">门店001</Option>
-              <Option value="STORE002">门店002</Option>
+              {stores.length > 0 ? stores.map((s: any) => (
+                <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
+              )) : <Option value="STORE001">门店001</Option>}
             </Select>
             <DatePicker value={dayjs(selectedDate)} onChange={d => d && setSelectedDate(d.format('YYYY-MM-DD'))} />
             <Button type="primary" icon={<ReloadOutlined />} loading={performing} onClick={performReconciliation}>执行对账</Button>

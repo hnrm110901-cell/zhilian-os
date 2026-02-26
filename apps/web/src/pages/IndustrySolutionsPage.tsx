@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   Card, Row, Col, Statistic, Space, Button,
   Select, Spin, Typography, Alert
@@ -34,6 +34,16 @@ const IndustrySolutionsPage: React.FC = () => {
   const [applyResult, setApplyResult] = useState<Record<string, unknown> | null>(null);
   const [industryType, setIndustryType] = useState('chinese_restaurant');
   const [storeId, setStoreId] = useState('STORE001');
+  const [stores, setStores] = useState<any[]>([]);
+
+  const loadStores = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/stores');
+      setStores(res.data?.stores || res.data || []);
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => { loadStores(); }, [loadStores]);
 
   const handleGetSolution = async () => {
     setLoading(true);
@@ -61,9 +71,9 @@ const IndustrySolutionsPage: React.FC = () => {
           <Title level={4} style={{ margin: 0 }}>行业解决方案</Title>
           <Space>
             <Select value={storeId} onChange={setStoreId} style={{ width: 140 }}>
-              <Option value="STORE001">门店 001</Option>
-              <Option value="STORE002">门店 002</Option>
-              <Option value="STORE003">门店 003</Option>
+              {stores.length > 0 ? stores.map((s: any) => (
+                <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
+              )) : <Option value="STORE001">门店 001</Option>}
             </Select>
             <Select value={industryType} onChange={setIndustryType} style={{ width: 160 }}>
               {Object.entries(industryLabel).map(([k, v]) => (
