@@ -9,11 +9,14 @@ RaaS定价服务 (Result-as-a-Service Pricing Service)
 """
 import os
 from datetime import datetime, timedelta
+from decimal import Decimal
 from typing import Dict, List, Optional
 from enum import Enum
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
+
+from src.core.money import D, mul_rate
 
 logger = structlog.get_logger()
 
@@ -85,8 +88,8 @@ class RaaSPricingService:
     """RaaS定价服务"""
 
     # 分成比例（支持环境变量覆盖）
-    COST_SAVING_COMMISSION = float(os.getenv("RAAS_COST_SAVING_COMMISSION", "0.20"))
-    REVENUE_GROWTH_COMMISSION = float(os.getenv("RAAS_REVENUE_GROWTH_COMMISSION", "0.15"))
+    COST_SAVING_COMMISSION: Decimal = D(os.getenv("RAAS_COST_SAVING_COMMISSION", "0.20"))
+    REVENUE_GROWTH_COMMISSION: Decimal = D(os.getenv("RAAS_REVENUE_GROWTH_COMMISSION", "0.15"))
 
     # 免费试用期（支持环境变量覆盖）
     FREE_TRIAL_DAYS = int(os.getenv("RAAS_FREE_TRIAL_DAYS", "90"))
@@ -331,9 +334,9 @@ class RaaSPricingService:
 
         total_revenue_growth = max(0, current_total_revenue - baseline_total_revenue)
 
-        # 计算计费金额
-        cost_saving_fee = total_cost_saved * self.COST_SAVING_COMMISSION
-        revenue_growth_fee = total_revenue_growth * self.REVENUE_GROWTH_COMMISSION
+        # 计算计费金额（使用 Decimal 避免 float 精度问题）
+        cost_saving_fee = float(mul_rate(total_cost_saved, self.COST_SAVING_COMMISSION))
+        revenue_growth_fee = float(mul_rate(total_revenue_growth, self.REVENUE_GROWTH_COMMISSION))
         total_fee = cost_saving_fee + revenue_growth_fee
 
         metrics = EffectMetrics(
