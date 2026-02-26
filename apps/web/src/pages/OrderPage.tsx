@@ -1,160 +1,116 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Card,
-  Form,
-  Input,
-  Button,
-  Table,
-  message,
-  Space,
-  Tag,
-  Tabs,
-  Modal,
-  InputNumber,
-  Row,
-  Col,
-  Statistic,
-  Select,
+  Card, Form, Input, Button, Table, Space, Tag, Tabs, Modal,
+  InputNumber, Row, Col, Statistic, Select,
 } from 'antd';
 import {
-  ShoppingCartOutlined,
-  ClockCircleOutlined,
-  CheckCircleOutlined,
-  CloseCircleOutlined,
-  ReloadOutlined,
-  SearchOutlined,
+  ShoppingCartOutlined, ClockCircleOutlined, CheckCircleOutlined,
+  CloseCircleOutlined, ReloadOutlined, SearchOutlined,
 } from '@ant-design/icons';
-import { orderDataService, type Order } from '../services/orderData';
+import apiClient from '../services/api';
+import { handleApiError, showSuccess } from '../utils/message';
 
 const { TabPane } = Tabs;
+const { Option } = Select;
+
+interface OrderItem {
+  item_id: string;
+  name: string;
+  quantity: number;
+  price: number;
+}
+
+interface Order {
+  order_id: string;
+  store_id: string;
+  table_number: string;
+  status: 'pending' | 'processing' | 'completed' | 'cancelled';
+  items: OrderItem[];
+  total_amount: number;
+  created_at: string;
+  updated_at: string;
+}
 
 const OrderPage: React.FC = () => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [storeId, setStoreId] = useState('STORE001');
+  const [stores, setStores] = useState<any[]>([]);
 
-  // 初始加载订单数据
-  useEffect(() => {
-    // 初始化示例数据（仅在首次加载时）
-    orderDataService.initializeSampleData();
-    loadOrders();
+  const loadStores = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/api/v1/stores');
+      setStores(res.data?.stores || res.data || []);
+    } catch { /* ignore */ }
   }, []);
 
-  // 加载订单列表
-  const loadOrders = async () => {
+  const loadOrders = useCallback(async () => {
     try {
       setLoading(true);
-      // 从本地存储加载订单
-      const loadedOrders = orderDataService.getAll();
-      setOrders(loadedOrders);
-
-      // 未来可以替换为API调用:
-      // const response = await apiClient.callAgent('order', { action: 'list' });
-      // setOrders(response.output_data.orders || []);
+      const res = await apiClient.get(`/api/v1/pos/orders?store_id=${storeId}`);
+      setOrders(res.data || []);
     } catch (error: any) {
-      message.error(error.message || '加载订单失败');
+      handleApiError(error, '加载订单失败');
     } finally {
       setLoading(false);
     }
-  };
+  }, [storeId]);
 
-  // 处理订单
+  useEffect(() => {
+    loadStores();
+    loadOrders();
+  }, [loadStores, loadOrders]);
+
   const handleProcessOrder = async (values: any) => {
     try {
-      setLoading(true);
-
-      // 创建订单并保存到本地存储
-      orderDataService.create({
-        store_id: values.store_id,
+      setSubmitting(true);
+      await apiClient.callAgent('order', {
+        action: 'process',
+        store_id: storeId,
         table_number: values.table_number,
-        status: 'pending',
-        items: [
-          {
-            item_id: `item_${Date.now()}`,
-            name: values.dish_name,
-            quantity: values.quantity,
-            price: values.price,
-          },
-        ],
+        items: [{ name: values.dish_name, quantity: values.quantity, price: values.price }],
         total_amount: values.price * values.quantity,
       });
-
-      message.success('订单创建成功');
+      showSuccess('订单创建成功');
       form.resetFields();
-
-      // 刷新订单列表
       loadOrders();
-
-      // 未来可以调用API:
-      // const request = {
-      //   action: 'process',
-      //   order_data: { ... }
-      // };
-      // const response = await apiClient.callAgent('order', request);
     } catch (error: any) {
-      message.error(error.message || '订单创建失败');
+      handleApiError(error, '订单创建失败');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
-  // 查看订单详情
   const handleViewDetails = (record: Order) => {
     setSelectedOrder(record);
     setModalVisible(true);
   };
 
-  // 更新订单状态
   const handleUpdateStatus = async (orderId: string, newStatus: string) => {
     try {
-      // 更新本地存储中的订单状态
-      const updatedOrder = orderDataService.updateStatus(
-        orderId,
-        newStatus as Order['status']
-      );
-
-      if (updatedOrder) {
-        message.success('订单状态已更新');
-        // 刷新订单列表
-        loadOrders();
-      } else {
-        message.error('订单不存在');
-      }
-
-      // 未来可以调用API:
-      // const request = {
-      //   action: 'update_status',
-      //   order_id: orderId,
-      //   status: newStatus,
-      // };
-      // const response = await apiClient.callAgent('order', request);
+      await apiClient.callAgent('order', {
+        action: 'update_status',
+        order_id: orderId,
+        status: newStatus,
+        store_id: storeId,
+      });
+      showSuccess('订单状态已更新');
+      loadOrders();
     } catch (error: any) {
-      message.error(error.message || '状态更新失败');
+      handleApiError(error, '状态更新失败');
     }
   };
 
   const columns = [
-    {
-      title: '订单ID',
-      dataIndex: 'order_id',
-      key: 'order_id',
-      width: 180,
-    },
-    {
-      title: '门店ID',
-      dataIndex: 'store_id',
-      key: 'store_id',
-    },
-    {
-      title: '桌号',
-      dataIndex: 'table_number',
-      key: 'table_number',
-      width: 100,
-    },
+    { title: '订单ID', dataIndex: 'order_id', key: 'order_id', width: 180 },
+    { title: '门店ID', dataIndex: 'store_id', key: 'store_id' },
+    { title: '桌号', dataIndex: 'table_number', key: 'table_number', width: 100 },
     {
       title: '订单金额',
       dataIndex: 'total_amount',
@@ -175,11 +131,7 @@ const OrderPage: React.FC = () => {
           cancelled: { color: 'red', text: '已取消', icon: <CloseCircleOutlined /> },
         };
         const config = statusConfig[status] || statusConfig.pending;
-        return (
-          <Tag color={config.color} icon={config.icon}>
-            {config.text}
-          </Tag>
-        );
+        return <Tag color={config.color} icon={config.icon}>{config.text}</Tag>;
       },
     },
     {
@@ -195,34 +147,19 @@ const OrderPage: React.FC = () => {
       width: 250,
       render: (_: any, record: Order) => (
         <Space>
-          <Button type="link" size="small" onClick={() => handleViewDetails(record)}>
-            详情
-          </Button>
+          <Button type="link" size="small" onClick={() => handleViewDetails(record)}>详情</Button>
           {record.status === 'pending' && (
-            <Button
-              type="link"
-              size="small"
-              onClick={() => handleUpdateStatus(record.order_id, 'processing')}
-            >
+            <Button type="link" size="small" onClick={() => handleUpdateStatus(record.order_id, 'processing')}>
               开始处理
             </Button>
           )}
           {record.status === 'processing' && (
-            <Button
-              type="link"
-              size="small"
-              onClick={() => handleUpdateStatus(record.order_id, 'completed')}
-            >
+            <Button type="link" size="small" onClick={() => handleUpdateStatus(record.order_id, 'completed')}>
               完成
             </Button>
           )}
           {(record.status === 'pending' || record.status === 'processing') && (
-            <Button
-              type="link"
-              danger
-              size="small"
-              onClick={() => handleUpdateStatus(record.order_id, 'cancelled')}
-            >
+            <Button type="link" danger size="small" onClick={() => handleUpdateStatus(record.order_id, 'cancelled')}>
               取消
             </Button>
           )}
@@ -231,7 +168,6 @@ const OrderPage: React.FC = () => {
     },
   ];
 
-  // 统计数据
   const stats = {
     total: orders.length,
     pending: orders.filter((o) => o.status === 'pending').length,
@@ -239,16 +175,13 @@ const OrderPage: React.FC = () => {
     completed: orders.filter((o) => o.status === 'completed').length,
   };
 
-  // 过滤订单
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
       searchText === '' ||
       order.order_id.toLowerCase().includes(searchText.toLowerCase()) ||
       order.store_id.toLowerCase().includes(searchText.toLowerCase()) ||
       order.table_number.toLowerCase().includes(searchText.toLowerCase());
-
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
-
     return matchesSearch && matchesStatus;
   });
 
@@ -256,55 +189,28 @@ const OrderPage: React.FC = () => {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <h1 style={{ margin: 0 }}>订单协同Agent</h1>
-        <Button
-          icon={<ReloadOutlined />}
-          onClick={loadOrders}
-          loading={loading}
-        >
-          刷新
-        </Button>
+        <Space>
+          <Select value={storeId} onChange={(v) => setStoreId(v)} style={{ width: 160 }}>
+            {stores.length > 0 ? stores.map((s: any) => (
+              <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
+            )) : <Option value="STORE001">STORE001</Option>}
+          </Select>
+          <Button icon={<ReloadOutlined />} onClick={loadOrders} loading={loading}>刷新</Button>
+        </Space>
       </div>
 
-      {/* 统计卡片 */}
       <Row gutter={16} style={{ marginBottom: 24 }}>
         <Col span={6}>
-          <Card>
-            <Statistic
-              title="总订单数"
-              value={stats.total}
-              prefix={<ShoppingCartOutlined />}
-            />
-          </Card>
+          <Card><Statistic title="总订单数" value={stats.total} prefix={<ShoppingCartOutlined />} /></Card>
         </Col>
         <Col span={6}>
-          <Card>
-            <Statistic
-              title="待处理"
-              value={stats.pending}
-              valueStyle={{ color: '#faad14' }}
-              prefix={<ClockCircleOutlined />}
-            />
-          </Card>
+          <Card><Statistic title="待处理" value={stats.pending} valueStyle={{ color: '#faad14' }} prefix={<ClockCircleOutlined />} /></Card>
         </Col>
         <Col span={6}>
-          <Card>
-            <Statistic
-              title="处理中"
-              value={stats.processing}
-              valueStyle={{ color: '#1890ff' }}
-              prefix={<ShoppingCartOutlined />}
-            />
-          </Card>
+          <Card><Statistic title="处理中" value={stats.processing} valueStyle={{ color: '#1890ff' }} prefix={<ShoppingCartOutlined />} /></Card>
         </Col>
         <Col span={6}>
-          <Card>
-            <Statistic
-              title="已完成"
-              value={stats.completed}
-              valueStyle={{ color: '#52c41a' }}
-              prefix={<CheckCircleOutlined />}
-            />
-          </Card>
+          <Card><Statistic title="已完成" value={stats.completed} valueStyle={{ color: '#52c41a' }} prefix={<CheckCircleOutlined />} /></Card>
         </Col>
       </Row>
 
@@ -312,58 +218,30 @@ const OrderPage: React.FC = () => {
         <TabPane tab="创建订单" key="create">
           <Card>
             <Form form={form} layout="vertical" onFinish={handleProcessOrder}>
-              <Form.Item
-                label="门店ID"
-                name="store_id"
-                rules={[{ required: true, message: '请输入门店ID' }]}
-              >
-                <Input placeholder="例如: store_001" />
-              </Form.Item>
-
-              <Form.Item
-                label="桌号"
-                name="table_number"
-                rules={[{ required: true, message: '请输入桌号' }]}
-              >
+              <Form.Item label="桌号" name="table_number" rules={[{ required: true, message: '请输入桌号' }]}>
                 <Input placeholder="例如: A01" />
               </Form.Item>
-
-              <Form.Item
-                label="菜品名称"
-                name="dish_name"
-                rules={[{ required: true, message: '请输入菜品名称' }]}
-              >
+              <Form.Item label="菜品名称" name="dish_name" rules={[{ required: true, message: '请输入菜品名称' }]}>
                 <Input placeholder="请输入菜品名称" />
               </Form.Item>
-
               <Form.Item
                 label="数量"
                 name="quantity"
-                rules={[
-                  { required: true, message: '请输入数量' },
-                  { type: 'number', min: 1, max: 99, message: '数量必须在1-99之间' }
-                ]}
+                rules={[{ required: true, message: '请输入数量' }, { type: 'number', min: 1, max: 99, message: '数量必须在1-99之间' }]}
               >
                 <InputNumber min={1} max={99} style={{ width: '100%' }} placeholder="请输入数量" />
               </Form.Item>
-
               <Form.Item
                 label="单价(分)"
                 name="price"
-                rules={[
-                  { required: true, message: '请输入单价' },
-                  { type: 'number', min: 1, message: '单价必须大于0' }
-                ]}
+                rules={[{ required: true, message: '请输入单价' }, { type: 'number', min: 1, message: '单价必须大于0' }]}
                 tooltip="请输入以分为单位的价格，例如：3000表示30元"
               >
                 <InputNumber min={1} style={{ width: '100%' }} placeholder="例如: 3000 (30元)" />
               </Form.Item>
-
               <Form.Item>
                 <Space>
-                  <Button type="primary" htmlType="submit" loading={loading}>
-                    创建订单
-                  </Button>
+                  <Button type="primary" htmlType="submit" loading={submitting}>创建订单</Button>
                   <Button onClick={() => form.resetFields()}>重置</Button>
                 </Space>
               </Form.Item>
@@ -383,11 +261,7 @@ const OrderPage: React.FC = () => {
                   style={{ width: 300 }}
                   allowClear
                 />
-                <Select
-                  value={statusFilter}
-                  onChange={setStatusFilter}
-                  style={{ width: 120 }}
-                >
+                <Select value={statusFilter} onChange={setStatusFilter} style={{ width: 120 }}>
                   <Select.Option value="all">全部状态</Select.Option>
                   <Select.Option value="pending">待处理</Select.Option>
                   <Select.Option value="processing">处理中</Select.Option>
@@ -395,86 +269,47 @@ const OrderPage: React.FC = () => {
                   <Select.Option value="cancelled">已取消</Select.Option>
                 </Select>
               </Space>
-              <span style={{ color: '#999' }}>
-                共 {filteredOrders.length} 条记录
-              </span>
+              <span style={{ color: '#999' }}>共 {filteredOrders.length} 条记录</span>
             </Space>
             <Table
               dataSource={filteredOrders}
               columns={columns}
               rowKey="order_id"
               pagination={{ pageSize: 10 }}
-              locale={{
-                emptyText: orders.length === 0
-                  ? '暂无订单记录，请先创建订单'
-                  : '没有符合条件的订单'
-              }}
+              locale={{ emptyText: orders.length === 0 ? '暂无订单记录' : '没有符合条件的订单' }}
               loading={loading}
             />
           </Card>
         </TabPane>
       </Tabs>
 
-      {/* 订单详情Modal */}
       <Modal
         title="订单详情"
         open={modalVisible}
         onCancel={() => setModalVisible(false)}
-        footer={[
-          <Button key="close" onClick={() => setModalVisible(false)}>
-            关闭
-          </Button>,
-        ]}
+        footer={[<Button key="close" onClick={() => setModalVisible(false)}>关闭</Button>]}
         width={600}
       >
         {selectedOrder && (
           <div>
-            <p>
-              <strong>订单ID:</strong> {selectedOrder.order_id}
-            </p>
-            <p>
-              <strong>门店ID:</strong> {selectedOrder.store_id}
-            </p>
-            <p>
-              <strong>桌号:</strong> {selectedOrder.table_number}
-            </p>
+            <p><strong>订单ID:</strong> {selectedOrder.order_id}</p>
+            <p><strong>门店ID:</strong> {selectedOrder.store_id}</p>
+            <p><strong>桌号:</strong> {selectedOrder.table_number}</p>
             <p>
               <strong>状态:</strong>{' '}
-              <Tag
-                color={
-                  selectedOrder.status === 'completed'
-                    ? 'green'
-                    : selectedOrder.status === 'pending'
-                    ? 'orange'
-                    : selectedOrder.status === 'processing'
-                    ? 'blue'
-                    : 'red'
-                }
-              >
+              <Tag color={selectedOrder.status === 'completed' ? 'green' : selectedOrder.status === 'pending' ? 'orange' : selectedOrder.status === 'processing' ? 'blue' : 'red'}>
                 {selectedOrder.status}
               </Tag>
             </p>
-            <p>
-              <strong>订单金额:</strong> ¥{(selectedOrder.total_amount / 100).toFixed(2)}
-            </p>
-            <p>
-              <strong>菜品列表:</strong>
-            </p>
+            <p><strong>订单金额:</strong> ¥{(selectedOrder.total_amount / 100).toFixed(2)}</p>
+            <p><strong>菜品列表:</strong></p>
             <ul>
               {selectedOrder.items.map((item: any, index: number) => (
-                <li key={index}>
-                  {item.name} × {item.quantity} - ¥{(item.price / 100).toFixed(2)}
-                </li>
+                <li key={index}>{item.name} × {item.quantity} - ¥{(item.price / 100).toFixed(2)}</li>
               ))}
             </ul>
-            <p>
-              <strong>创建时间:</strong>{' '}
-              {new Date(selectedOrder.created_at).toLocaleString('zh-CN')}
-            </p>
-            <p>
-              <strong>更新时间:</strong>{' '}
-              {new Date(selectedOrder.updated_at).toLocaleString('zh-CN')}
-            </p>
+            <p><strong>创建时间:</strong> {new Date(selectedOrder.created_at).toLocaleString('zh-CN')}</p>
+            <p><strong>更新时间:</strong> {new Date(selectedOrder.updated_at).toLocaleString('zh-CN')}</p>
           </div>
         )}
       </Modal>
