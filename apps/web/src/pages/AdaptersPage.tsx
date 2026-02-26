@@ -8,7 +8,7 @@ const { Option } = Select;
 const { TextArea } = Input;
 
 const SYSTEMS = ['tiancai', 'meituan', 'aoqiwei', 'pinzhi'];
-const systemLabel: Record<string, string> = { tiancai: '天才', meituan: '美团', aoqiwei: '傲旗威', pinzhi: '品智' };
+const systemLabel: Record<string, string> = { tiancai: '天财商龙', meituan: '美团', aoqiwei: '奥琦玮', pinzhi: '品智' };
 
 const AdaptersPage: React.FC = () => {
   const [adapters, setAdapters] = useState<any[]>([]);
@@ -48,6 +48,32 @@ const AdaptersPage: React.FC = () => {
           timeout: values.timeout ?? 30,
           retry_times: values.retry_times ?? 3,
           ...(values.ognid ? { ognid: values.ognid } : {}),
+        };
+      } else if (values.adapter_name === 'tiancai') {
+        config = {
+          app_id: values.app_id,
+          app_secret: values.app_secret,
+          timeout: values.timeout ?? 30,
+          retry_times: values.retry_times ?? 3,
+          ...(values.base_url ? { base_url: values.base_url } : {}),
+          ...(values.store_id ? { store_id: values.store_id } : {}),
+        };
+      } else if (values.adapter_name === 'meituan') {
+        config = {
+          app_key: values.app_key,
+          app_secret: values.app_secret,
+          timeout: values.timeout ?? 30,
+          retry_times: values.retry_times ?? 3,
+          ...(values.base_url ? { base_url: values.base_url } : {}),
+          ...(values.poi_id ? { poi_id: values.poi_id } : {}),
+        };
+      } else if (values.adapter_name === 'aoqiwei') {
+        config = {
+          app_key: values.app_key,
+          app_secret: values.app_secret,
+          timeout: values.timeout ?? 30,
+          retry_times: values.retry_times ?? 3,
+          ...(values.base_url ? { base_url: values.base_url } : {}),
         };
       } else {
         try { config = JSON.parse(values.config || '{}'); } catch { config = {}; }
@@ -117,7 +143,7 @@ const AdaptersPage: React.FC = () => {
           </Space>
         }
       >
-        <Alert message="支持天才、美团、傲旗威、品智等第三方 POS/外卖平台数据同步" type="info" style={{ marginBottom: 12 }} />
+        <Alert message="支持天财商龙、美团、奥琦玮、品智等第三方 POS/外卖平台数据同步" type="info" style={{ marginBottom: 12 }} />
         <Table columns={columns} dataSource={adapters} rowKey={(r, i) => r.adapter_name || String(i)} loading={loading} />
       </Card>
 
@@ -128,7 +154,70 @@ const AdaptersPage: React.FC = () => {
               {SYSTEMS.map(s => <Option key={s} value={s}>{systemLabel[s]}</Option>)}
             </Select>
           </Form.Item>
-          {selectedAdapter === 'pinzhi' ? (
+          {selectedAdapter === 'tiancai' && (
+            <>
+              <Form.Item name="app_id" label="应用ID（AppID）" rules={[{ required: true }]}>
+                <Input placeholder="天财商龙开放平台申请的AppID" />
+              </Form.Item>
+              <Form.Item name="app_secret" label="应用密钥（AppSecret）" rules={[{ required: true }]}>
+                <Input.Password placeholder="天财商龙开放平台申请的AppSecret" />
+              </Form.Item>
+              <Form.Item name="store_id" label="门店ID（留空则对接所有门店）">
+                <Input placeholder="如：STORE001" />
+              </Form.Item>
+              <Form.Item name="base_url" label="API地址（选填）">
+                <Input placeholder="默认：https://api.tiancai.com" />
+              </Form.Item>
+              <Form.Item name="timeout" label="超时（秒）" initialValue={30}>
+                <InputNumber min={5} max={120} style={{ width: '100%' }} />
+              </Form.Item>
+              <Form.Item name="retry_times" label="重试次数" initialValue={3}>
+                <InputNumber min={1} max={10} style={{ width: '100%' }} />
+              </Form.Item>
+            </>
+          )}
+          {selectedAdapter === 'meituan' && (
+            <>
+              <Form.Item name="app_key" label="AppKey" rules={[{ required: true }]}>
+                <Input placeholder="美团开放平台申请的AppKey" />
+              </Form.Item>
+              <Form.Item name="app_secret" label="AppSecret" rules={[{ required: true }]}>
+                <Input.Password placeholder="美团开放平台申请的AppSecret" />
+              </Form.Item>
+              <Form.Item name="poi_id" label="门店POI ID（留空则对接所有门店）">
+                <Input placeholder="美团门店唯一标识" />
+              </Form.Item>
+              <Form.Item name="base_url" label="API地址（选填）">
+                <Input placeholder="默认：https://waimaiopen.meituan.com" />
+              </Form.Item>
+              <Form.Item name="timeout" label="超时（秒）" initialValue={30}>
+                <InputNumber min={5} max={120} style={{ width: '100%' }} />
+              </Form.Item>
+              <Form.Item name="retry_times" label="重试次数" initialValue={3}>
+                <InputNumber min={1} max={10} style={{ width: '100%' }} />
+              </Form.Item>
+            </>
+          )}
+          {selectedAdapter === 'aoqiwei' && (
+            <>
+              <Form.Item name="app_key" label="AppKey" rules={[{ required: true }]}>
+                <Input placeholder="奥琦玮开放平台申请的AppKey" />
+              </Form.Item>
+              <Form.Item name="app_secret" label="AppSecret" rules={[{ required: true }]}>
+                <Input.Password placeholder="奥琦玮开放平台申请的AppSecret" />
+              </Form.Item>
+              <Form.Item name="base_url" label="API地址（选填）">
+                <Input placeholder="默认：https://openapi.acescm.cn" />
+              </Form.Item>
+              <Form.Item name="timeout" label="超时（秒）" initialValue={30}>
+                <InputNumber min={5} max={120} style={{ width: '100%' }} />
+              </Form.Item>
+              <Form.Item name="retry_times" label="重试次数" initialValue={3}>
+                <InputNumber min={1} max={10} style={{ width: '100%' }} />
+              </Form.Item>
+            </>
+          )}
+          {selectedAdapter === 'pinzhi' && (
             <>
               <Form.Item name="base_url" label="API地址" rules={[{ required: true }]}>
                 <Input placeholder="http://ip:port/pzcatering-gateway" />
@@ -146,10 +235,6 @@ const AdaptersPage: React.FC = () => {
                 <InputNumber min={1} max={10} style={{ width: '100%' }} />
               </Form.Item>
             </>
-          ) : (
-            <Form.Item name="config" label="配置（JSON）" initialValue="{}">
-              <TextArea rows={4} placeholder='{"api_key": "xxx", "store_id": "yyy"}' />
-            </Form.Item>
           )}
         </Form>
       </Modal>
@@ -157,7 +242,7 @@ const AdaptersPage: React.FC = () => {
       <Modal title={syncTitle[syncType]} open={syncVisible} onCancel={() => setSyncVisible(false)} onOk={() => syncForm.submit()} okText="同步" confirmLoading={syncSubmitting}>
         <Form form={syncForm} layout="vertical" onFinish={submitSync}>
           <Form.Item name="source_system" label={syncType === 'inventory' ? '目标系统' : '来源系统'} rules={[{ required: true }]}>
-            <Select>{['tiancai', 'meituan'].map(s => <Option key={s} value={s}>{systemLabel[s]}</Option>)}</Select>
+            <Select>{SYSTEMS.map(s => <Option key={s} value={s}>{systemLabel[s]}</Option>)}</Select>
           </Form.Item>
           <Form.Item name="store_id" label="门店ID" rules={[{ required: syncType !== 'inventory' }]}><Input /></Form.Item>
           {syncType === 'order' && <Form.Item name="order_id" label="订单ID" rules={[{ required: true }]}><Input /></Form.Item>}
