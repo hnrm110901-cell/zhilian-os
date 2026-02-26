@@ -342,10 +342,12 @@ class ReservationAgent(BaseAgent):
 
         try:
             # 验证预定参数
+            is_banquet = reservation_type == ReservationType.BANQUET
             self._validate_reservation_params(
                 reservation_date,
                 reservation_time,
-                party_size
+                party_size,
+                is_banquet=is_banquet
             )
 
             # 检查可用性
@@ -411,7 +413,8 @@ class ReservationAgent(BaseAgent):
         self,
         reservation_date: str,
         reservation_time: str,
-        party_size: int
+        party_size: int,
+        is_banquet: bool = False
     ):
         """验证预定参数"""
         # 验证日期
@@ -423,11 +426,11 @@ class ReservationAgent(BaseAgent):
         if res_date > max_advance:
             raise ValueError(f"只能提前{self.config['advance_booking_days']}天预定")
 
-        # 验证人数
+        # 验证人数（宴会类型跳过上限检查）
         if party_size < self.config["min_party_size"]:
             raise ValueError(f"人数不能少于{self.config['min_party_size']}人")
 
-        if party_size > self.config["max_party_size"]:
+        if not is_banquet and party_size > self.config["max_party_size"]:
             raise ValueError(f"人数不能超过{self.config['max_party_size']}人,请联系宴会部")
 
     async def _check_availability(
@@ -893,7 +896,18 @@ class ReservationAgent(BaseAgent):
             reservations = await self._get_reservations_by_period(start_date, end_date)
 
             if not reservations:
-                raise ValueError("该时段没有预定数据")
+                return {
+                    "store_id": self.store_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "total_reservations": 0,
+                    "confirmation_rate": 0.0,
+                    "cancellation_rate": 0.0,
+                    "no_show_rate": 0.0,
+                    "average_party_size": 0.0,
+                    "peak_hours": [],
+                    "revenue_from_reservations": 0,
+                }
 
             # 统计各状态数量
             total = len(reservations)
@@ -1059,6 +1073,8 @@ class ReservationAgent(BaseAgent):
             {"table_number": "M001", "table_type": "medium", "capacity": 4},
             {"table_number": "L001", "table_type": "large", "capacity": 6},
             {"table_number": "R001", "table_type": "round", "capacity": 10},
+            {"table_number": "B001", "table_type": "banquet", "capacity": 50},
+            {"table_number": "B002", "table_type": "banquet", "capacity": 200},
         ]
 
     async def _get_reservations_by_period(

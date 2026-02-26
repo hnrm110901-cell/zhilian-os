@@ -285,7 +285,7 @@ class InventoryAgent(BaseAgent):
             return InventoryStatus.OUT_OF_STOCK
         elif current <= min_stock:
             return InventoryStatus.CRITICAL
-        elif current <= safe * self.alert_thresholds["low_stock_ratio"]:
+        elif current <= safe * self.alert_thresholds["low_stock_ratio"] or current <= safe * 0.5:
             return InventoryStatus.LOW
         else:
             return InventoryStatus.SUFFICIENT

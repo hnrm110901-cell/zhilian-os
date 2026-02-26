@@ -389,7 +389,8 @@ class DecisionAgent(BaseAgent):
 
         # 成本率
         cost_ratio = total_cost / total_revenue if total_revenue > 0 else 0
-        previous_cost_ratio = previous_cost / revenue_data.get("previous_revenue", 1)
+        prev_rev = revenue_data.get("previous_revenue", 0)
+        previous_cost_ratio = previous_cost / prev_rev if prev_rev > 0 else 0
         target_cost_ratio = self.kpi_targets.get("cost_ratio", 0.35)
 
         kpi: KPIMetric = {

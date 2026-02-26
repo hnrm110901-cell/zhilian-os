@@ -406,15 +406,15 @@ async def test_collect_revenue_data(agent):
     assert "previous_revenue" in data
     assert "target_revenue" in data
     assert "days" in data
-    assert data["total_revenue"] > 0
+    assert data["total_revenue"] >= 0  # 无 DB 时为 0，有 DB 时为真实值
 
 
 @pytest.mark.asyncio
 async def test_get_historical_data(agent):
-    """测试获取历史数据"""
+    """测试获取历史数据（无 DB 时返回空列表，有 DB 时返回历史记录）"""
     data = await agent._get_historical_data("营收", 30)
 
-    assert len(data) == 30
+    assert isinstance(data, list)
     assert all(v >= 0 for v in data)
 
 

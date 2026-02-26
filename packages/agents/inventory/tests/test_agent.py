@@ -84,7 +84,7 @@ async def test_analyze_inventory_status_low(agent):
         "item_name": "测试物料",
         "category": "test",
         "unit": "kg",
-        "current_stock": 10.0,  # 低于安全库存的30%
+        "current_stock": 22.0,  # 高于最低库存(20)，但低于安全库存50%=25
         "safe_stock": 50.0,
         "min_stock": 20.0,
         "max_stock": 150.0,

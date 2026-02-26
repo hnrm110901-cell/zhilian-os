@@ -78,15 +78,14 @@ class TestQueue:
         assert "queue_number" in result["queue_info"]
         assert "estimated_wait_minutes" in result["queue_info"]
 
-    @pytest.mark.asyncio
-    async def test_estimate_wait_time_by_party_size(self, agent):
+    def test_estimate_wait_time_by_party_size(self, agent):
         """测试根据人数预估等待时间"""
         # 2人
-        wait_time_2 = await agent._estimate_wait_time("STORE001", 2)
+        wait_time_2 = agent._estimate_wait_time("STORE001", 2, [])
         # 4人
-        wait_time_4 = await agent._estimate_wait_time("STORE001", 4)
+        wait_time_4 = agent._estimate_wait_time("STORE001", 4, [])
         # 6人
-        wait_time_6 = await agent._estimate_wait_time("STORE001", 6)
+        wait_time_6 = agent._estimate_wait_time("STORE001", 6, [])
 
         # 人数越多，等待时间应该越长
         assert wait_time_2 <= wait_time_4 <= wait_time_6
@@ -94,7 +93,8 @@ class TestQueue:
     @pytest.mark.asyncio
     async def test_get_queue_status(self, agent):
         """测试查询排队状态"""
-        result = await agent.get_queue_status("Q123456")
+        mock_queue = {"queue_id": "Q123456", "status": "waiting", "queue_number": "A001"}
+        result = await agent.get_queue_status("Q123456", queue=mock_queue)
 
         assert result["success"] is True
         assert "status" in result
@@ -165,7 +165,8 @@ class TestPayment:
     @pytest.mark.asyncio
     async def test_calculate_bill_without_discount(self, agent):
         """测试计算账单（无折扣）"""
-        result = await agent.calculate_bill(order_id="ORD001")
+        mock_order = {"order_id": "ORD001", "total_amount": 200.0}
+        result = await agent.calculate_bill(order_id="ORD001", order=mock_order)
 
         assert result["success"] is True
         assert "bill" in result
@@ -175,8 +176,10 @@ class TestPayment:
     @pytest.mark.asyncio
     async def test_calculate_bill_with_member_discount(self, agent):
         """测试计算账单（会员折扣）"""
+        mock_order = {"order_id": "ORD001", "total_amount": 200.0}
         result = await agent.calculate_bill(
             order_id="ORD001",
+            order=mock_order,
             member_id="M001",
         )
 
@@ -188,8 +191,10 @@ class TestPayment:
     @pytest.mark.asyncio
     async def test_calculate_bill_with_coupon(self, agent):
         """测试计算账单（优惠券）"""
+        mock_order = {"order_id": "ORD001", "total_amount": 200.0}
         result = await agent.calculate_bill(
             order_id="ORD001",
+            order=mock_order,
             coupon_codes=["COUPON001"],
         )
 
@@ -231,7 +236,8 @@ class TestOrderManagement:
     @pytest.mark.asyncio
     async def test_get_order(self, agent):
         """测试查询订单"""
-        result = await agent.get_order("ORD001")
+        mock_order = {"order_id": "ORD001", "status": "ordering", "dishes": [], "total_amount": 0}
+        result = await agent.get_order("ORD001", order=mock_order)
 
         assert result["success"] is True
         assert "order" in result
@@ -240,9 +246,11 @@ class TestOrderManagement:
     @pytest.mark.asyncio
     async def test_update_order_status(self, agent):
         """测试更新订单状态"""
+        mock_order = {"order_id": "ORD001", "status": OrderStatus.ORDERED.value}
         result = await agent.update_order_status(
             order_id="ORD001",
             new_status=OrderStatus.COOKING.value,
+            order=mock_order,
         )
 
         assert result["success"] is True
@@ -251,8 +259,10 @@ class TestOrderManagement:
     @pytest.mark.asyncio
     async def test_cancel_order(self, agent):
         """测试取消订单"""
+        mock_order = {"order_id": "ORD001", "status": OrderStatus.ORDERING.value}
         result = await agent.cancel_order(
             order_id="ORD001",
+            order=mock_order,
             reason="客户要求取消",
         )
 
@@ -315,6 +325,7 @@ class TestWorkflow:
         )
         assert order["success"] is True
         order_id = order["order"]["order_id"]
+        order_data = order["order"]
 
         # 3. 添加菜品
         dish1 = await agent.add_dish(
@@ -325,9 +336,12 @@ class TestWorkflow:
             quantity=1,
         )
         assert dish1["success"] is True
+        # 模拟调用方将菜品追加到订单并更新金额
+        order_data["dishes"].append(dish1["dish_item"])
+        order_data["total_amount"] = dish1["dish_item"]["subtotal"]
 
-        # 4. 计算账单
-        bill = await agent.calculate_bill(order_id=order_id)
+        # 4. 计算账单（传入订单数据）
+        bill = await agent.calculate_bill(order_id=order_id, order=order_data)
         assert bill["success"] is True
 
         # 5. 处理支付
@@ -350,8 +364,9 @@ class TestWorkflow:
         )
         assert queue["success"] is True
 
-        # 2. 查询排队状态
-        status = await agent.get_queue_status(queue["queue_info"]["queue_id"])
+        # 2. 查询排队状态（需传入 queue 记录）
+        queue_record = queue["queue_info"]
+        status = await agent.get_queue_status(queue_record["queue_id"], queue=queue_record)
         assert status["success"] is True
 
         # 3. 入座后创建订单

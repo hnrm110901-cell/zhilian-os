@@ -27,6 +27,7 @@ core_path = Path(__file__).parent.parent.parent.parent.parent / "src" / "core"
 sys.path.insert(0, str(core_path))
 
 from base_agent import BaseAgent, AgentResponse
+from growth_handlers import run_growth_action, GROWTH_ACTIONS
 
 logger = structlog.get_logger()
 
@@ -160,6 +161,18 @@ class PrivateDomainAgent(BaseAgent):
         self.competition_threshold = int(os.getenv("PD_COMPETITION_THRESHOLD", "5"))
         self.bad_review_threshold = int(os.getenv("PD_BAD_REVIEW_THRESHOLD", "3"))
 
+    def _get_db_engine(self):
+        """获取数据库引擎（延迟初始化）"""
+        if self._db_engine is None:
+            db_url = os.getenv("DATABASE_URL")
+            if db_url:
+                try:
+                    from sqlalchemy import create_engine
+                    self._db_engine = create_engine(db_url, pool_pre_ping=True)
+                except Exception as e:
+                    self.logger.warning("db_engine_init_failed", error=str(e))
+        return self._db_engine
+
     def get_supported_actions(self) -> List[str]:
         return [
             "get_dashboard",
@@ -172,11 +185,29 @@ class PrivateDomainAgent(BaseAgent):
             "segment_users",
             "get_churn_risks",
             "process_bad_review",
-        ]
+        ] + list(GROWTH_ACTIONS)
 
     async def execute(self, action: str, params: Dict[str, Any]) -> AgentResponse:
         self.logger.info("executing_action", action=action, params=params)
         try:
+            # 用户增长侧 18 个 action（与 chain-restaurant-user-growth Skill 对齐）
+            if action in GROWTH_ACTIONS:
+                result = await run_growth_action(action, params, self.store_id)
+                if result.get("error"):
+                    return AgentResponse(
+                        success=False,
+                        data=result,
+                        error=result.get("error"),
+                        execution_time=0.0,
+                        metadata=None,
+                    )
+                return AgentResponse(
+                    success=True,
+                    data=result,
+                    error=None,
+                    execution_time=0.0,
+                    metadata=None,
+                )
             if action == "get_dashboard":
                 result = await self.get_dashboard()
             elif action == "analyze_rfm":
@@ -277,10 +308,11 @@ class PrivateDomainAgent(BaseAgent):
         S5: 流失（>90天无消费）
         """
         self.logger.info("analyzing_rfm", days=days)
-        # 模拟数据（实际应从DB查询 orders 表）
-        mock_customers = self._generate_mock_customers(50)
+        customers = await self._fetch_customers_from_db(days)
+        if not customers:
+            customers = self._generate_mock_customers(50)
         segments = []
-        for c in mock_customers:
+        for c in customers:
             rfm_level = self._classify_rfm(c["recency_days"], c["frequency"], c["monetary"])
             risk_score = self._calculate_churn_risk(c["recency_days"], c["frequency"])
             dynamic_tags = self._infer_dynamic_tags(c)
@@ -296,6 +328,44 @@ class PrivateDomainAgent(BaseAgent):
                 risk_score=risk_score,
             ))
         return segments
+
+    async def _fetch_customers_from_db(self, days: int) -> List[Dict[str, Any]]:
+        """从 orders 表聚合 RFM 数据，无 DB 时返回空列表"""
+        engine = self._get_db_engine()
+        if not engine:
+            return []
+        try:
+            from sqlalchemy import text
+            query = text("""
+                SELECT
+                    customer_id,
+                    EXTRACT(DAY FROM NOW() - MAX(created_at))::int AS recency_days,
+                    COUNT(*)::int AS frequency,
+                    COALESCE(SUM(total_amount), 0)::int AS monetary,
+                    MAX(created_at)::date::text AS last_visit
+                FROM orders
+                WHERE store_id = :store_id
+                  AND created_at >= NOW() - INTERVAL ':days days'
+                  AND customer_id IS NOT NULL
+                GROUP BY customer_id
+            """)
+            with engine.connect() as conn:
+                rows = conn.execute(query, {"store_id": self.store_id, "days": days * 3}).fetchall()
+            customers = []
+            for row in rows:
+                customers.append({
+                    "customer_id": str(row[0]),
+                    "recency_days": int(row[1]) if row[1] is not None else 999,
+                    "frequency": int(row[2]),
+                    "monetary": int(row[3]),
+                    "last_visit": str(row[4]) if row[4] else datetime.utcnow().strftime("%Y-%m-%d"),
+                    "avg_order_time": 12,
+                })
+            self.logger.info("rfm_db_fetch_success", count=len(customers))
+            return customers
+        except Exception as e:
+            self.logger.warning("rfm_db_fetch_failed", error=str(e))
+            return []
 
     async def detect_signals(self) -> List[SignalEvent]:
         """检测6类信号"""

@@ -56,8 +56,62 @@ class ScheduleAgent(BaseAgent):
         self.min_shift_hours = config.get("min_shift_hours", int(os.getenv("SCHEDULE_MIN_SHIFT_HOURS", "4")))
         self.max_shift_hours = config.get("max_shift_hours", int(os.getenv("SCHEDULE_MAX_SHIFT_HOURS", "8")))
         self.max_weekly_hours = config.get("max_weekly_hours", int(os.getenv("SCHEDULE_MAX_WEEKLY_HOURS", "40")))
+        self._db_engine = None
         # 不持有任何内存状态
         logger.info("智能排班Agent初始化", store_id=config.get("store_id"))
+
+    def _get_db_engine(self):
+        """获取数据库引擎（延迟初始化）"""
+        if self._db_engine is None:
+            db_url = os.getenv("DATABASE_URL")
+            if db_url:
+                try:
+                    from sqlalchemy import create_engine
+                    self._db_engine = create_engine(db_url, pool_pre_ping=True)
+                except Exception as e:
+                    logger.warning("schedule_db_engine_init_failed", error=str(e))
+        return self._db_engine
+
+    async def _fetch_historical_traffic(
+        self, store_id: str, date: str, lookback_weeks: int = 4
+    ) -> Optional[Dict[str, int]]:
+        """
+        从 orders 表查询历史同星期客流均值，用于替代固定系数预测。
+        返回 {"morning": N, "afternoon": N, "evening": N} 或 None（无 DB 时）。
+        """
+        engine = self._get_db_engine()
+        if not engine:
+            return None
+        try:
+            from sqlalchemy import text
+            query = text("""
+                SELECT
+                    SUM(CASE WHEN EXTRACT(HOUR FROM created_at) BETWEEN 6 AND 13 THEN 1 ELSE 0 END) AS morning,
+                    SUM(CASE WHEN EXTRACT(HOUR FROM created_at) BETWEEN 14 AND 17 THEN 1 ELSE 0 END) AS afternoon,
+                    SUM(CASE WHEN EXTRACT(HOUR FROM created_at) BETWEEN 18 AND 23 THEN 1 ELSE 0 END) AS evening,
+                    COUNT(DISTINCT DATE(created_at)) AS day_count
+                FROM orders
+                WHERE store_id = :store_id
+                  AND EXTRACT(DOW FROM created_at) = EXTRACT(DOW FROM :target_date::date)
+                  AND created_at >= :target_date::date - INTERVAL ':weeks weeks'
+                  AND created_at < :target_date::date
+            """)
+            with engine.connect() as conn:
+                row = conn.execute(query, {
+                    "store_id": store_id,
+                    "target_date": date,
+                    "weeks": lookback_weeks,
+                }).fetchone()
+            if row and row[3] and int(row[3]) > 0:
+                day_count = int(row[3])
+                return {
+                    "morning": max(1, int((row[0] or 0) / day_count)),
+                    "afternoon": max(1, int((row[1] or 0) / day_count)),
+                    "evening": max(1, int((row[2] or 0) / day_count)),
+                }
+        except Exception as e:
+            logger.warning("schedule_traffic_db_failed", error=str(e))
+        return None
 
     def get_supported_actions(self) -> List[str]:
         return ["run", "adjust_schedule", "get_schedule"]
@@ -95,7 +149,7 @@ class ScheduleAgent(BaseAgent):
             return AgentResponse(success=False, data=None, error=str(e))
 
     async def analyze_traffic(self, state: ScheduleState) -> ScheduleState:
-        """分析客流数据"""
+        """分析客流数据（优先使用历史订单均值，无 DB 时回退到固定系数）"""
         store_id = state["store_id"]
         date = state["date"]
         logger.info("分析客流", store_id=store_id, date=date)
@@ -104,20 +158,34 @@ class ScheduleAgent(BaseAgent):
             weekday = datetime.strptime(date, "%Y-%m-%d").weekday()  # 0=周一
         except ValueError:
             weekday = 0
-        weekend_factor = float(os.getenv("SCHEDULE_WEEKEND_TRAFFIC_FACTOR", "1.4")) if weekday >= 5 else 1.0
-        base_morning = int(os.getenv("SCHEDULE_BASE_MORNING_CUSTOMERS", "50"))
-        base_afternoon = int(os.getenv("SCHEDULE_BASE_AFTERNOON_CUSTOMERS", "80"))
-        base_evening = int(os.getenv("SCHEDULE_BASE_EVENING_CUSTOMERS", "120"))
+        is_weekend = weekday >= 5
 
-        state["traffic_data"] = {
-            "predicted_customers": {
+        # 优先从历史订单数据预测
+        historical = await self._fetch_historical_traffic(store_id, date)
+        if historical:
+            predicted = historical
+            confidence = 0.85 if not is_weekend else 0.80
+            source = "historical_orders"
+        else:
+            # Fallback：固定系数
+            weekend_factor = float(os.getenv("SCHEDULE_WEEKEND_TRAFFIC_FACTOR", "1.4")) if is_weekend else 1.0
+            base_morning = int(os.getenv("SCHEDULE_BASE_MORNING_CUSTOMERS", "50"))
+            base_afternoon = int(os.getenv("SCHEDULE_BASE_AFTERNOON_CUSTOMERS", "80"))
+            base_evening = int(os.getenv("SCHEDULE_BASE_EVENING_CUSTOMERS", "120"))
+            predicted = {
                 "morning": int(base_morning * weekend_factor),
                 "afternoon": int(base_afternoon * weekend_factor),
                 "evening": int(base_evening * weekend_factor),
-            },
+            }
+            confidence = 0.75 if not is_weekend else 0.65
+            source = "default_coefficients"
+
+        state["traffic_data"] = {
+            "predicted_customers": predicted,
             "peak_hours": ["12:00-13:00", "18:00-20:00"],
-            "confidence": 0.75 if weekday < 5 else 0.65,
-            "weekend": weekday >= 5,
+            "confidence": confidence,
+            "weekend": is_weekend,
+            "source": source,
         }
         logger.info("客流分析完成", traffic_data=state["traffic_data"])
         return state

@@ -631,7 +631,18 @@ class TrainingAgent(BaseAgent):
                 records = [r for r in records if r["course_id"] == course_id]
 
             if not records:
-                raise ValueError("No training records found for evaluation")
+                # 无记录时返回空评估结构，而非抛出异常
+                return {
+                    "course_id": course_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "total_participants": 0,
+                    "completion_rate": 0.0,
+                    "pass_rate": 0.0,
+                    "average_score": 0.0,
+                    "effectiveness_rating": "needs_improvement",
+                    "improvement_suggestions": ["暂无培训记录，请先录入培训数据"],
+                }
 
             # 计算指标
             total_participants = len(records)
@@ -1104,21 +1115,38 @@ class TrainingAgent(BaseAgent):
         staff_id: Optional[str] = None,
         position: Optional[str] = None
     ) -> List[Dict[str, Any]]:
-        """获取员工列表"""
-        mock_staff = [
+        """获取员工列表（优先从 DB 查询，无 DB 时使用内置样本数据）"""
+        engine = self._get_db_engine()
+        if engine:
+            try:
+                from sqlalchemy import text
+                query = "SELECT id, name, position FROM employees WHERE store_id = :store_id AND is_active = true"
+                params: Dict[str, Any] = {"store_id": self.store_id}
+                if staff_id:
+                    query += " AND id = :staff_id"
+                    params["staff_id"] = staff_id
+                if position:
+                    query += " AND position = :position"
+                    params["position"] = position
+                with engine.connect() as conn:
+                    rows = conn.execute(text(query), params).fetchall()
+                if rows:
+                    return [{"staff_id": str(r[0]), "staff_name": r[1], "position": r[2]} for r in rows]
+            except Exception as e:
+                self.logger.warning("get_staff_list_db_failed", error=str(e))
+
+        # Fallback: 内置样本数据
+        sample_staff = [
             {"staff_id": "STAFF001", "staff_name": "张三", "position": "服务员"},
             {"staff_id": "STAFF002", "staff_name": "李四", "position": "厨师"},
             {"staff_id": "STAFF003", "staff_name": "王五", "position": "收银员"},
             {"staff_id": "STAFF004", "staff_name": "赵六", "position": "店长"},
         ]
-
         if staff_id:
-            return [s for s in mock_staff if s["staff_id"] == staff_id]
-
+            return [s for s in sample_staff if s["staff_id"] == staff_id]
         if position:
-            return [s for s in mock_staff if s["position"] == position]
-
-        return mock_staff
+            return [s for s in sample_staff if s["position"] == position]
+        return sample_staff
 
     async def _get_staff_performance(self, staff_id: str) -> Dict[str, Any]:
         """获取员工表现"""
