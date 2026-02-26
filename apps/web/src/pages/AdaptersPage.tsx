@@ -15,6 +15,8 @@ const AdaptersPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [registerVisible, setRegisterVisible] = useState(false);
   const [syncLoading, setSyncLoading] = useState<Record<string, boolean>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [syncSubmitting, setSyncSubmitting] = useState(false);
   const [registerForm] = Form.useForm();
   const [syncForm] = Form.useForm();
   const [syncVisible, setSyncVisible] = useState(false);
@@ -35,6 +37,7 @@ const AdaptersPage: React.FC = () => {
   useEffect(() => { loadAdapters(); }, [loadAdapters]);
 
   const registerAdapter = async (values: any) => {
+    setSubmitting(true);
     try {
       let config: any = {};
       try { config = JSON.parse(values.config || '{}'); } catch { config = {}; }
@@ -45,6 +48,8 @@ const AdaptersPage: React.FC = () => {
       loadAdapters();
     } catch (err: any) {
       handleApiError(err, '注册失败');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -57,6 +62,7 @@ const AdaptersPage: React.FC = () => {
   const submitSync = async (values: any) => {
     const key = `${syncType}-${values.source_system}`;
     setSyncLoading(prev => ({ ...prev, [key]: true }));
+    setSyncSubmitting(true);
     try {
       if (syncType === 'all') {
         await apiClient.post(`/adapters/sync/all/${values.source_system}/${values.store_id}`);
@@ -73,6 +79,7 @@ const AdaptersPage: React.FC = () => {
       handleApiError(err, '同步失败');
     } finally {
       setSyncLoading(prev => ({ ...prev, [key]: false }));
+      setSyncSubmitting(false);
     }
   };
 
@@ -102,7 +109,7 @@ const AdaptersPage: React.FC = () => {
         <Table columns={columns} dataSource={adapters} rowKey={(r, i) => r.adapter_name || String(i)} loading={loading} />
       </Card>
 
-      <Modal title="注册适配器" open={registerVisible} onCancel={() => setRegisterVisible(false)} onOk={() => registerForm.submit()} okText="注册">
+      <Modal title="注册适配器" open={registerVisible} onCancel={() => setRegisterVisible(false)} onOk={() => registerForm.submit()} okText="注册" confirmLoading={submitting}>
         <Form form={registerForm} layout="vertical" onFinish={registerAdapter}>
           <Form.Item name="adapter_name" label="适配器" rules={[{ required: true }]}>
             <Select>{SYSTEMS.map(s => <Option key={s} value={s}>{systemLabel[s]}</Option>)}</Select>
@@ -113,7 +120,7 @@ const AdaptersPage: React.FC = () => {
         </Form>
       </Modal>
 
-      <Modal title={syncTitle[syncType]} open={syncVisible} onCancel={() => setSyncVisible(false)} onOk={() => syncForm.submit()} okText="同步">
+      <Modal title={syncTitle[syncType]} open={syncVisible} onCancel={() => setSyncVisible(false)} onOk={() => syncForm.submit()} okText="同步" confirmLoading={syncSubmitting}>
         <Form form={syncForm} layout="vertical" onFinish={submitSync}>
           <Form.Item name="source_system" label={syncType === 'inventory' ? '目标系统' : '来源系统'} rules={[{ required: true }]}>
             <Select>{['tiancai', 'meituan'].map(s => <Option key={s} value={s}>{systemLabel[s]}</Option>)}</Select>
