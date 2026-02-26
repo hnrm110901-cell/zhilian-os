@@ -31,7 +31,7 @@ const SupplyChainManagement: React.FC = () => {
 
   const loadSuppliers = useCallback(async () => {
     try {
-      const response = await apiClient.get('/supply-chain/suppliers');
+      const response = await apiClient.get('/api/v1/supply-chain/suppliers');
       setSuppliers(response.data.suppliers || []);
     } catch (err: any) {
       handleApiError(err, '加载供应商失败');
@@ -40,7 +40,7 @@ const SupplyChainManagement: React.FC = () => {
 
   const loadPurchaseOrders = useCallback(async () => {
     try {
-      const response = await apiClient.get('/supply-chain/purchase-orders');
+      const response = await apiClient.get('/api/v1/supply-chain/orders');
       setPurchaseOrders(response.data.orders || []);
     } catch (err: any) {
       handleApiError(err, '加载采购订单失败');
@@ -49,7 +49,7 @@ const SupplyChainManagement: React.FC = () => {
 
   const loadReplenishmentSuggestions = useCallback(async () => {
     try {
-      const response = await apiClient.get('/supply-chain/replenishment-suggestions');
+      const response = await apiClient.get('/inventory/replenishment-suggestions');
       setReplenishmentSuggestions(response.data.suggestions || []);
     } catch (err: any) {
       handleApiError(err, '加载补货建议失败');
@@ -71,7 +71,7 @@ const SupplyChainManagement: React.FC = () => {
 
   const handleCreateSupplier = async (values: any) => {
     try {
-      await apiClient.post('/supply-chain/suppliers', values);
+      await apiClient.post('/api/v1/supply-chain/suppliers', values);
       setSupplierModalVisible(false);
       form.resetFields();
       loadSuppliers();
@@ -82,7 +82,16 @@ const SupplyChainManagement: React.FC = () => {
 
   const handleCreateOrder = async (values: any) => {
     try {
-      await apiClient.post('/supply-chain/purchase-orders', values);
+      const payload = {
+        store_id: values.store_id,
+        supplier_id: values.supplier_id,
+        items: [{ name: '采购商品', quantity: 1, unit_price: values.total_amount, total_price: values.total_amount }],
+        expected_delivery: values.expected_delivery
+          ? new Date(values.expected_delivery).toISOString()
+          : new Date().toISOString(),
+        notes: values.notes,
+      };
+      await apiClient.post('/api/v1/supply-chain/orders', payload);
       setOrderModalVisible(false);
       orderForm.resetFields();
       loadPurchaseOrders();
@@ -95,7 +104,7 @@ const SupplyChainManagement: React.FC = () => {
     const key = `order-${orderId}-${status}`;
     setActionLoading(prev => ({ ...prev, [key]: true }));
     try {
-      await apiClient.patch(`/supply-chain/purchase-orders/${orderId}/status`, { status });
+      await apiClient.patch(`/api/v1/supply-chain/orders/${orderId}/status`, { status });
       loadPurchaseOrders();
     } catch (err: any) {
       handleApiError(err, '更新订单状态失败');
@@ -303,7 +312,8 @@ const SupplyChainManagement: React.FC = () => {
     if (selectedQuoteIds.length < 2) return;
     setLoading(true);
     try {
-      const res = await apiClient.post('/api/v1/supply-chain/quotes/compare', { quote_ids: selectedQuoteIds });
+      const selectedQuotes = quotes.filter(q => selectedQuoteIds.includes(q.quote_id));
+      const res = await apiClient.post('/api/v1/supply-chain/quotes/compare', { quotes: selectedQuotes });
       setCompareResult(res.data);
     } catch (err: any) {
       handleApiError(err, '比较报价失败');

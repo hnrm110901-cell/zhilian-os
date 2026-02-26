@@ -245,6 +245,18 @@ class CompareQuotesRequest(BaseModel):
     quotes: List[dict]
 
 
+class RegisterSupplierRequest(BaseModel):
+    name: str
+    category: str = "food"
+    contact_person: str = ""
+    phone: str = ""
+    email: Optional[str] = None
+    address: Optional[str] = None
+    payment_terms: str = "net30"
+    delivery_time: int = 3
+    notes: Optional[str] = None
+
+
 class CreateOrderRequest(BaseModel):
     store_id: str
     supplier_id: str
@@ -252,6 +264,10 @@ class CreateOrderRequest(BaseModel):
     expected_delivery: datetime
     created_by: Optional[str] = None
     notes: Optional[str] = None
+
+
+class UpdateOrderStatusRequest(BaseModel):
+    status: str
 
 
 @supply_chain_router.get("/suppliers")
@@ -276,6 +292,30 @@ async def list_suppliers(
                 for s in suppliers
             ],
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@supply_chain_router.post("/suppliers")
+async def register_supplier(
+    request: RegisterSupplierRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """注册供应商"""
+    try:
+        service = SupplyChainIntegration(db)
+        supplier = await service.register_supplier(
+            name=request.name,
+            category=request.category,
+            contact_person=request.contact_person,
+            phone=request.phone,
+            email=request.email,
+            address=request.address,
+            payment_terms=request.payment_terms,
+            delivery_time=request.delivery_time,
+            notes=request.notes,
+        )
+        return {"success": True, "supplier_id": supplier.id, "code": supplier.code}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -358,6 +398,23 @@ async def list_orders(
                 for o in orders
             ],
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@supply_chain_router.patch("/orders/{order_id}/status")
+async def update_order_status(
+    order_id: str,
+    request: UpdateOrderStatusRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """更新订单状态"""
+    try:
+        service = SupplyChainIntegration(db)
+        order = await service.update_order_status(order_id=order_id, status=request.status)
+        return {"success": True, "order_id": order.id, "status": order.status}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
