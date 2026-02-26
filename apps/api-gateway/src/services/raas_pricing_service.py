@@ -398,7 +398,7 @@ class RaaSPricingService:
             try:
                 return PricingTier(tier_str)
             except ValueError:
-                pass
+                logger.warning("raas_pricing.invalid_tier", tier_str=tier_str, fallback="COST_SAVING")
         return PricingTier.COST_SAVING
 
     async def generate_monthly_bill(

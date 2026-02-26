@@ -206,8 +206,8 @@ async def delete_export_job(
         if job.file_path and os.path.exists(job.file_path):
             try:
                 os.remove(job.file_path)
-            except OSError:
-                pass
+            except OSError as e:
+                logger.warning("export_jobs.file_cleanup_failed", file_path=job.file_path, error=str(e))
         await session.delete(job)
         await session.commit()
     return {"success": True, "message": "任务已删除"}

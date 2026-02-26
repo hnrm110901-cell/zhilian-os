@@ -99,8 +99,8 @@ class QualityService:
             if match:
                 try:
                     return json.loads(match.group())
-                except json.JSONDecodeError:
-                    pass
+                except json.JSONDecodeError as e:
+                    logger.debug("quality_service.json_extract_failed", error=str(e), raw_snippet=raw[:200])
         # 降级：返回中等分数，标记需人工复核
         logger.warning("quality_service.parse_failed", raw_snippet=raw[:200])
         return {

@@ -51,7 +51,7 @@ class TaskScheduler:
             try:
                 await self.task
             except asyncio.CancelledError:
-                pass
+                logger.debug("scheduler_task_cancelled")
 
         logger.info("scheduler_stopped")
 

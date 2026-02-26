@@ -77,8 +77,8 @@ async def stt_stream(
         logger.error("STT WebSocket 异常", error=str(e))
         try:
             await websocket.send_text(json.dumps({"type": "error", "message": str(e)}))
-        except Exception:
-            pass
+        except Exception as send_err:
+            logger.debug("STT WebSocket 错误通知发送失败", error=str(send_err))
 
 
 @router.websocket("/tts/{store_id}")
@@ -133,8 +133,8 @@ async def tts_stream(
         logger.error("TTS WebSocket 异常", error=str(e))
         try:
             await websocket.send_text(json.dumps({"type": "error", "message": str(e)}))
-        except Exception:
-            pass
+        except Exception as send_err:
+            logger.debug("TTS WebSocket 错误通知发送失败", error=str(send_err))
 
 
 @router.websocket("/dialog/{store_id}")
@@ -221,5 +221,5 @@ async def dialog_stream(
         logger.error("Dialog WebSocket 异常", error=str(e))
         try:
             await websocket.send_text(json.dumps({"type": "error", "message": str(e)}))
-        except Exception:
-            pass
+        except Exception as send_err:
+            logger.debug("Dialog WebSocket 错误通知发送失败", error=str(send_err))
