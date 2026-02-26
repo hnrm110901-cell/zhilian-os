@@ -84,6 +84,7 @@ const VoiceDevicePage = lazy(() => import('./pages/VoiceDevicePage'));
 const SystemHealthPage = lazy(() => import('./pages/SystemHealthPage'));
 const UserProfilePage = lazy(() => import('./pages/UserProfilePage'));
 const VoiceWebSocketPage = lazy(() => import('./pages/VoiceWebSocketPage'));
+const OpsAgentPage = lazy(() => import('./pages/OpsAgentPage'));
 
 const PageLoader = (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
@@ -302,6 +303,9 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="voice-ws" element={
                     <ProtectedRoute requiredRole="admin"><VoiceWebSocketPage /></ProtectedRoute>
+                  } />
+                  <Route path="ops-agent" element={
+                    <ProtectedRoute requiredRole="admin"><OpsAgentPage /></ProtectedRoute>
                   } />
                 </Route>
                 <Route path="*" element={<NotFoundPage />} />

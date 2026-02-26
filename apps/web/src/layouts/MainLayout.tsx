@@ -42,6 +42,7 @@ import {
   ExportOutlined,
   SyncOutlined,
   SoundOutlined,
+  ToolOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -78,6 +79,7 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/event-sourcing': 'admin-ai', '/meituan-queue': 'admin-store', '/vector-index': 'admin-ai',
   '/adapters': 'admin-system', '/voice-devices': 'admin-store',
   '/system-health': 'admin-system', '/voice-ws': 'admin-ai',
+  '/ops-agent': 'admin-store',
   '/profile': '',
 };
 
@@ -214,6 +216,7 @@ const MainLayout: React.FC = () => {
     '/system-health': '系统健康',
     '/profile': '个人信息',
     '/voice-ws': '语音WebSocket',
+    '/ops-agent': 'IT运维Agent',
   };
 
   // 生成面包屑项
@@ -445,6 +448,7 @@ const MainLayout: React.FC = () => {
           { key: '/queue', icon: <TeamOutlined />, label: '排队管理' },
           { key: '/meituan-queue', icon: <SyncOutlined />, label: '美团排队' },
           { key: '/voice-devices', icon: <SoundOutlined />, label: '语音设备' },
+          { key: '/ops-agent', icon: <ToolOutlined />, label: 'IT运维Agent' },
         ],
       },
       {
