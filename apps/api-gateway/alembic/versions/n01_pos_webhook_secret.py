@@ -15,6 +15,12 @@ depends_on = None
 
 
 def upgrade():
+    conn = op.get_bind()
+    exists = conn.execute(
+        sa.text("SELECT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='external_systems')")
+    ).scalar()
+    if not exists:
+        return
     op.add_column(
         'external_systems',
         sa.Column('webhook_secret', sa.String(500), nullable=True, comment='Webhook签名密钥(HMAC-SHA256)')
@@ -22,4 +28,10 @@ def upgrade():
 
 
 def downgrade():
+    conn = op.get_bind()
+    exists = conn.execute(
+        sa.text("SELECT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='external_systems')")
+    ).scalar()
+    if not exists:
+        return
     op.drop_column('external_systems', 'webhook_secret')
