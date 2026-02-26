@@ -1,8 +1,12 @@
 """
 私域运营 API
 Private Domain Operations API
+
+原有能力：看板、RFM、信号、四象限、旅程、差评处理等。
+扩展能力（用户增长）：user_portrait、funnel_optimize、realtime_metrics、personalized_recommend 等 18 个 action，
+见 POST /execute 与 GET /actions。
 """
-from typing import List, Optional
+from typing import List, Optional, Any, Dict
 from fastapi import APIRouter, Depends, Query, HTTPException
 from pydantic import BaseModel
 
@@ -19,6 +23,7 @@ for _p in (agent_path, _core_path):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 from agent import PrivateDomainAgent
+from growth_handlers import GROWTH_ACTIONS
 
 router = APIRouter(prefix="/api/v1/private-domain", tags=["private_domain"])
 
@@ -56,7 +61,59 @@ class MarkSignalRequest(BaseModel):
     action: str = "handled"
 
 
+class ExecuteRequest(BaseModel):
+    """统一执行请求：action + params（兼容 input_data 包裹格式由调用方展平后传入）"""
+    action: str
+    params: Optional[Dict[str, Any]] = None
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {"action": "user_portrait", "params": {"segment_id": "default", "time_range": "last_30d"}},
+                {"action": "nl_query", "params": {"query": "今日数据怎么样"}},
+                {"action": "personalized_recommend", "params": {"user_id": "U001", "limit": 5}},
+                {"action": "realtime_metrics", "params": {"store_ids": ["S001"], "metrics": ["dau", "traffic"]}},
+            ]
+        }
+    }
+
+
 # ─────────────────────────── Endpoints ───────────────────────────
+
+@router.post(
+    "/execute",
+    summary="统一执行 action",
+    response_description="success、data、execution_time；失败时 4xx/5xx 与 detail",
+)
+async def execute_action(
+    body: ExecuteRequest,
+    store_id: Optional[str] = Query(None, description="门店ID，可选；部分 action 会带入 params"),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    私域运营 Agent 统一执行入口。
+
+    - **原有 10 个 action**：get_dashboard、analyze_rfm、detect_signals、calculate_store_quadrant、trigger_journey、get_journeys、get_signals、segment_users、get_churn_risks、process_bad_review。
+    - **用户增长 18 个 action**：user_portrait、funnel_optimize、ab_test_suggest、realtime_metrics、demand_forecast、anomaly_alert、personalized_recommend、social_content_draft、feedback_analysis、store_location_advice、inventory_plan、staff_schedule_advice、food_safety_alert、privacy_compliance_check、crisis_response_plan、product_idea、integration_advice、nl_query。
+    - **nl_query** 必填 params.query；**personalized_recommend** 的 limit 为 1～50。
+    - 可选在 params 中传 **context** 预填数据以丰富返回（见 packages/agents/private_domain/README.md）。
+    """
+    agent = _get_agent(store_id or "default")
+    params = body.params or {}
+    result = await agent.execute(body.action, params)
+    if not result.success:
+        raise HTTPException(status_code=400 if "不支持" in (result.error or "") else 500, detail=result.error)
+    return {"success": True, "data": result.data, "execution_time": result.execution_time}
+
+
+@router.get("/actions")
+async def list_actions(current_user: User = Depends(get_current_active_user)):
+    """列出私域运营 Agent 支持的所有 action（含原有能力与用户增长 18 项）。"""
+    agent = _get_agent("default")
+    return {"actions": agent.get_supported_actions(), "growth_actions": GROWTH_ACTIONS}
+
+
+# ─────────────────────────── 原有 Endpoints ───────────────────────────
 
 @router.get("/dashboard/{store_id}")
 async def get_dashboard(

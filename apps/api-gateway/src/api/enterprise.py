@@ -183,16 +183,68 @@ async def wechat_webhook(
         if not message_data:
             raise HTTPException(status_code=400, detail="消息解析失败")
 
+        from_user = message_data.get("FromUserName") or ""
+        msg_type = message_data.get("MsgType") or ""
+
         logger.info(
             "收到企业微信消息",
-            msg_type=message_data.get("MsgType"),
-            from_user=message_data.get("FromUserName")
+            msg_type=msg_type,
+            from_user=from_user
         )
 
-        # 处理消息
-        # Current generic handling is sufficient for MVP
-        # Future Enhancement: Add message type-specific handlers if needed
-        # response_content = await wechat_service.handle_message(message_data)
+        # 私域运营 Agent 对话入口（P0）：文本消息 → nl_query → 企微回复
+        if msg_type == "text" and from_user:
+            content = (message_data.get("Content") or "").strip()
+            if content and wechat_service.is_configured():
+                try:
+                    import sys
+                    from pathlib import Path
+                    from sqlalchemy import select
+
+                    # 私域 Agent 与 base_agent 路径（与 private_domain 路由一致）
+                    _api_dir = Path(__file__).resolve().parent
+                    _src_dir = _api_dir.parent
+                    _core_dir = _src_dir / "core"
+                    _agent_src = _src_dir.parent.parent.parent / "packages" / "agents" / "private_domain" / "src"
+                    for _p in (_core_dir, _agent_src):
+                        if _p.exists() and str(_p) not in sys.path:
+                            sys.path.insert(0, str(_p))
+
+                    from agent import PrivateDomainAgent
+
+                    # P1：可选从 User 表解析 store_id（企微 UserId → 智链OS User.store_id）
+                    store_id = "default"
+                    try:
+                        from src.core.database import get_db_session
+                        from src.models.user import User as UserModel
+                        async with get_db_session(enable_tenant_isolation=False) as session:
+                            r = await session.execute(
+                                select(UserModel).where(UserModel.wechat_user_id == from_user).limit(1)
+                            )
+                            u = r.scalar_one_or_none()
+                            if u and getattr(u, "store_id", None):
+                                store_id = u.store_id or "default"
+                    except Exception as db_e:
+                        logger.debug("wechat_user store_id lookup skipped", from_user=from_user, error=str(db_e))
+
+                    agent = PrivateDomainAgent(store_id=store_id)
+                    result = await agent.execute("nl_query", {"query": content, "store_id": store_id})
+
+                    if result.success and result.data:
+                        answer = (
+                            result.data.get("answer")
+                            or result.data.get("summary")
+                            or "已收到，请稍后再试。"
+                        )
+                        # 企微文本消息长度限制，截断并避免截断中文
+                        reply_text = (answer[:2000] + "…") if len(answer) > 2000 else answer
+                        await wechat_service.send_text_message(content=reply_text, touser=from_user)
+                        logger.info("私域Agent回复已发送", from_user=from_user, reply_len=len(reply_text))
+                    else:
+                        fallback = "请稍后再试或联系管理员。"
+                        await wechat_service.send_text_message(content=fallback, touser=from_user)
+                except Exception as agent_e:
+                    logger.warning("私域Agent回复失败，已忽略", from_user=from_user, error=str(agent_e))
 
         # 返回成功响应（企业微信要求返回"success"或加密的XML）
         return "success"
