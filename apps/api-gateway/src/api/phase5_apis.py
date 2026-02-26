@@ -28,7 +28,6 @@ from src.services.industry_solutions import (
 )
 from src.services.supply_chain_integration import (
     SupplyChainIntegration,
-    SupplierType
 )
 from src.services.internationalization import (
     InternationalizationService,
