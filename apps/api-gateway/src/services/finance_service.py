@@ -10,6 +10,8 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func, extract
 
+from src.core.money import D, mul_rate
+
 from src.models import (
     FinancialTransaction, Budget, Invoice, FinancialReport,
     Store, Supplier
@@ -154,7 +156,7 @@ class FinanceService:
                 tax_rate = float(cfg.get("tax_rate", os.getenv("FINANCE_DEFAULT_TAX_RATE", "0.06")))
         except Exception as e:
             logger.warning("tax_rate_fetch_failed", store_id=store_id, error=str(e))
-        tax_amount = int(operating_profit * tax_rate) if operating_profit > 0 else 0
+        tax_amount = int(mul_rate(operating_profit, tax_rate)) if operating_profit > 0 else 0
         net_profit = operating_profit - tax_amount
 
         # 计算比率

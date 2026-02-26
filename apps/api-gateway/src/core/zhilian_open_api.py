@@ -21,6 +21,8 @@ from enum import Enum
 import logging
 import os
 
+from src.core.money import yuan_to_fen
+
 logger = logging.getLogger(__name__)
 
 
@@ -152,18 +154,18 @@ class ZhilianOpenAPI:
 
                     if existing:
                         existing.status = status
-                        existing.total_amount = int(order.total_amount * 100)
-                        existing.discount_amount = int(order.discount_amount * 100)
-                        existing.final_amount = int(order.actual_amount * 100)
+                        existing.total_amount = yuan_to_fen(order.total_amount)
+                        existing.discount_amount = yuan_to_fen(order.discount_amount)
+                        existing.final_amount = yuan_to_fen(order.actual_amount)
                     else:
                         session.add(Order(
                             id=order.order_id,
                             store_id=order.store_id,
                             table_number=order.table_number,
                             status=status,
-                            total_amount=int(order.total_amount * 100),
-                            discount_amount=int(order.discount_amount * 100),
-                            final_amount=int(order.actual_amount * 100),
+                            total_amount=yuan_to_fen(order.total_amount),
+                            discount_amount=yuan_to_fen(order.discount_amount),
+                            final_amount=yuan_to_fen(order.actual_amount),
                             order_time=order.order_time,
                             order_metadata={
                                 "payment_method": order.payment_method,
