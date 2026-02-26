@@ -48,7 +48,7 @@ class InventorySyncRequest(BaseModel):
 class AdapterRegisterRequest(BaseModel):
     """适配器注册请求"""
 
-    adapter_name: str  # tiancai, meituan, aoqiwei, pinzhi
+    adapter_name: str  # tiancai, meituan, aoqiwei, pinzhi, yiding
     config: Dict[str, Any]
 
 
@@ -97,6 +97,10 @@ async def register_adapter(request: AdapterRegisterRequest):
             from packages.api_adapters.pinzhi.src import PinzhiAdapter
 
             adapter = PinzhiAdapter(request.config)
+        elif adapter_name == "yiding":
+            from packages.api_adapters.yiding.src import YiDingAdapter
+
+            adapter = YiDingAdapter(request.config)
         else:
             raise HTTPException(status_code=400, detail=f"不支持的适配器: {adapter_name}")
 

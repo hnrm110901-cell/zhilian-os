@@ -7,8 +7,8 @@ import { handleApiError, showSuccess } from '../utils/message';
 const { Option } = Select;
 const { TextArea } = Input;
 
-const SYSTEMS = ['tiancai', 'meituan', 'aoqiwei', 'pinzhi'];
-const systemLabel: Record<string, string> = { tiancai: '天财商龙', meituan: '美团', aoqiwei: '奥琦玮', pinzhi: '品智' };
+const SYSTEMS = ['tiancai', 'meituan', 'aoqiwei', 'pinzhi', 'yiding'];
+const systemLabel: Record<string, string> = { tiancai: '天财商龙', meituan: '美团', aoqiwei: '奥琦玮', pinzhi: '品智', yiding: '易订' };
 
 const AdaptersPage: React.FC = () => {
   const [adapters, setAdapters] = useState<any[]>([]);
@@ -74,6 +74,15 @@ const AdaptersPage: React.FC = () => {
           timeout: values.timeout ?? 30,
           retry_times: values.retry_times ?? 3,
           ...(values.base_url ? { base_url: values.base_url } : {}),
+        };
+      } else if (values.adapter_name === 'yiding') {
+        config = {
+          base_url: values.base_url,
+          app_id: values.app_id,
+          app_secret: values.app_secret,
+          timeout: values.timeout ?? 30,
+          max_retries: values.retry_times ?? 3,
+          ...(values.cache_ttl ? { cache_ttl: values.cache_ttl } : {}),
         };
       } else {
         try { config = JSON.parse(values.config || '{}'); } catch { config = {}; }
@@ -143,7 +152,7 @@ const AdaptersPage: React.FC = () => {
           </Space>
         }
       >
-        <Alert message="支持天财商龙、美团、奥琦玮、品智等第三方 POS/外卖平台数据同步" type="info" style={{ marginBottom: 12 }} />
+        <Alert message="支持天财商龙、美团、奥琦玮、品智、易订等第三方 POS/外卖/预订平台数据同步" type="info" style={{ marginBottom: 12 }} />
         <Table columns={columns} dataSource={adapters} rowKey={(r, i) => r.adapter_name || String(i)} loading={loading} />
       </Card>
 
@@ -233,6 +242,28 @@ const AdaptersPage: React.FC = () => {
               </Form.Item>
               <Form.Item name="retry_times" label="重试次数" initialValue={3}>
                 <InputNumber min={1} max={10} style={{ width: '100%' }} />
+              </Form.Item>
+            </>
+          )}
+          {selectedAdapter === 'yiding' && (
+            <>
+              <Form.Item name="base_url" label="API地址" rules={[{ required: true }]}>
+                <Input placeholder="https://api.yiding.com" />
+              </Form.Item>
+              <Form.Item name="app_id" label="AppID" rules={[{ required: true }]}>
+                <Input placeholder="易订开放平台申请的AppID" />
+              </Form.Item>
+              <Form.Item name="app_secret" label="AppSecret" rules={[{ required: true }]}>
+                <Input.Password placeholder="易订开放平台申请的AppSecret" />
+              </Form.Item>
+              <Form.Item name="timeout" label="超时（秒）" initialValue={30}>
+                <InputNumber min={5} max={120} style={{ width: '100%' }} />
+              </Form.Item>
+              <Form.Item name="retry_times" label="重试次数" initialValue={3}>
+                <InputNumber min={1} max={10} style={{ width: '100%' }} />
+              </Form.Item>
+              <Form.Item name="cache_ttl" label="缓存时间（秒，选填）">
+                <InputNumber min={60} max={3600} style={{ width: '100%' }} placeholder="默认300" />
               </Form.Item>
             </>
           )}
