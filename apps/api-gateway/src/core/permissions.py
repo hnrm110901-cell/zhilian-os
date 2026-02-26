@@ -40,6 +40,8 @@ class Permission(str, Enum):
 
     AGENT_PRIVATE_DOMAIN_READ = "agent:private_domain:read"
     AGENT_PRIVATE_DOMAIN_WRITE = "agent:private_domain:write"
+    AGENT_PERFORMANCE_READ = "agent:performance:read"
+    AGENT_PERFORMANCE_WRITE = "agent:performance:write"
 
     # 语音设备权限（Shokz耳机）
     VOICE_DEVICE_READ = "voice:device:read"
@@ -92,6 +94,8 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
         Permission.AGENT_OPS_WRITE,
         Permission.AGENT_PRIVATE_DOMAIN_READ,
         Permission.AGENT_PRIVATE_DOMAIN_WRITE,
+        Permission.AGENT_PERFORMANCE_READ,
+        Permission.AGENT_PERFORMANCE_WRITE,
         Permission.VOICE_DEVICE_READ,
         Permission.VOICE_DEVICE_WRITE,
         Permission.VOICE_DEVICE_DELETE,
@@ -119,6 +123,8 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
         Permission.AGENT_RESERVATION_WRITE,
         Permission.AGENT_OPS_READ,
         Permission.AGENT_PRIVATE_DOMAIN_READ,
+        Permission.AGENT_PERFORMANCE_READ,
+        Permission.AGENT_PERFORMANCE_WRITE,
         Permission.VOICE_DEVICE_READ,
         Permission.VOICE_DEVICE_WRITE,
         Permission.VOICE_COMMAND,
@@ -223,6 +229,8 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
         Permission.AGENT_ORDER_READ,
         Permission.AGENT_INVENTORY_READ,
         Permission.AGENT_DECISION_READ,
+        Permission.AGENT_PERFORMANCE_READ,
+        Permission.AGENT_PERFORMANCE_WRITE,
         Permission.STORE_READ,
         Permission.SYSTEM_LOGS,
         Permission.AUDIT_READ,

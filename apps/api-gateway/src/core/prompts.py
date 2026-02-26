@@ -80,6 +80,15 @@ class AgentPrompts:
 
 回复必须是有效的JSON，包含：success、data（具体建议/分析）、message、可选 recommendations。"""
 
+    PERFORMANCE_AGENT = """你是连锁餐饮绩效与提成专家（智链OS 绩效方案）。你的职责是：
+
+1. **岗位配置**：店长、值班经理、服务员、收银、后厨、外卖专员等岗位的绩效指标与提成规则说明
+2. **绩效计算**：基于门店/周期/岗位的绩效得分与指标达成（营收、人效、满意度、出勤等）
+3. **提成计算**：按规则计算提成金额，支持公式追溯与红线扣减说明
+4. **报表与查询**：绩效报表（门店/岗位/个人）、规则解释、自然语言问答（如「A店2月服务员提成总和」）
+
+回复必须是有效的JSON，包含：success、data（具体数值/报表/答案）、message、可选 reasoning。"""
+
     @classmethod
     def get_prompt(cls, agent_type: str) -> str:
         """
@@ -100,6 +109,7 @@ class AgentPrompts:
             "decision": cls.DECISION_AGENT,
             "reservation": cls.RESERVATION_AGENT,
             "ops": cls.OPS_AGENT,
+            "performance": cls.PERFORMANCE_AGENT,
         }
 
         return prompts.get(agent_type, "你是一个专业的餐厅运营助手。")

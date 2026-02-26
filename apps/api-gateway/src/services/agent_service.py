@@ -82,6 +82,15 @@ class AgentService:
             logger.error("OpsAgent初始化失败", exc_info=e)
             failed_agents.append(("ops", str(e)))
 
+        # 初始化绩效Agent（智链OS 绩效方案）
+        try:
+            from ..agents.performance_agent import PerformanceAgent
+            self._agents["performance"] = PerformanceAgent()
+            logger.info("PerformanceAgent初始化成功")
+        except Exception as e:
+            logger.error("PerformanceAgent初始化失败", exc_info=e)
+            failed_agents.append(("performance", str(e)))
+
         # 验证所有Agent是否成功初始化
         if failed_agents:
             error_msg = "Agent初始化失败，服务无法启动:\n"

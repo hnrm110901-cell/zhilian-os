@@ -282,3 +282,26 @@ async def ops_agent(
     except Exception as e:
         logger.error("运维Agent执行失败", exc_info=e)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/performance", response_model=AgentResponse)
+async def performance_agent(
+    request: AgentRequest,
+    current_user: User = Depends(require_permission(Permission.AGENT_PERFORMANCE_READ)),
+):
+    """
+    绩效智能体（智链OS 连锁餐饮绩效方案）
+
+    支持操作：get_role_config, calculate_performance, calculate_commission,
+    get_performance_report, explain_rule, nl_query
+    """
+    try:
+        result = await agent_service.execute_agent("performance", request.input_data)
+        return AgentResponse(
+            agent_type="performance",
+            output_data=result,
+            execution_time=result.get("execution_time", 0.0),
+        )
+    except Exception as e:
+        logger.error("绩效Agent执行失败", exc_info=e)
+        raise HTTPException(status_code=500, detail=str(e))
