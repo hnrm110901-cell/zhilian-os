@@ -241,52 +241,122 @@ class RequestQuotesRequest(BaseModel):
     supplier_ids: Optional[List[str]] = None
 
 
+class CompareQuotesRequest(BaseModel):
+    quotes: List[dict]
+
+
+class CreateOrderRequest(BaseModel):
+    store_id: str
+    supplier_id: str
+    items: List[dict]
+    expected_delivery: datetime
+    created_by: Optional[str] = None
+    notes: Optional[str] = None
+
+
+@supply_chain_router.get("/suppliers")
+async def list_suppliers(
+    category: Optional[str] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    """获取供应商列表"""
+    try:
+        service = SupplyChainIntegration(db)
+        suppliers = await service.get_suppliers(category=category)
+        return {
+            "success": True,
+            "suppliers": [
+                {
+                    "id": s.id, "name": s.name, "code": s.code,
+                    "category": s.category, "contact_person": s.contact_person,
+                    "phone": s.phone, "rating": s.rating,
+                    "payment_terms": s.payment_terms, "delivery_time": s.delivery_time,
+                    "status": s.status,
+                }
+                for s in suppliers
+            ],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @supply_chain_router.post("/quotes/request")
 async def request_quotes(
     request: RequestQuotesRequest,
     db: AsyncSession = Depends(get_db)
 ):
-    """Request quotes from suppliers"""
+    """向供应商询价"""
     try:
         service = SupplyChainIntegration(db)
-        quotes = service.request_quotes(
+        quotes = await service.request_quotes(
             material_id=request.material_id,
             quantity=request.quantity,
             required_date=request.required_date,
-            supplier_ids=request.supplier_ids
+            supplier_ids=request.supplier_ids,
         )
-
-        return {
-            "success": True,
-            "total_quotes": len(quotes),
-            "quotes": [
-                {
-                    "quote_id": q.quote_id,
-                    "supplier_id": q.supplier_id,
-                    "unit_price": q.unit_price,
-                    "total_price": q.total_price,
-                    "delivery_date": q.delivery_date.isoformat()
-                }
-                for q in quotes
-            ]
-        }
+        return {"success": True, "total_quotes": len(quotes), "quotes": quotes}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @supply_chain_router.post("/quotes/compare")
 async def compare_quotes(
-    quote_ids: List[str],
+    request: CompareQuotesRequest,
     db: AsyncSession = Depends(get_db)
 ):
-    """Compare quotes"""
+    """比较报价"""
     try:
         service = SupplyChainIntegration(db)
-        comparison = service.compare_quotes(quote_ids)
+        comparison = service.compare_quotes(request.quotes)
+        return {"success": True, **comparison}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
+
+@supply_chain_router.post("/orders")
+async def create_order(
+    request: CreateOrderRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """创建采购订单"""
+    try:
+        service = SupplyChainIntegration(db)
+        order = await service.create_purchase_order(
+            store_id=request.store_id,
+            supplier_id=request.supplier_id,
+            items=request.items,
+            expected_delivery=request.expected_delivery,
+            created_by=request.created_by,
+            notes=request.notes,
+        )
+        return {"success": True, "order_id": order.id, "order_number": order.order_number, "status": order.status}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@supply_chain_router.get("/orders")
+async def list_orders(
+    store_id: Optional[str] = None,
+    supplier_id: Optional[str] = None,
+    status: Optional[str] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    """查询采购订单"""
+    try:
+        service = SupplyChainIntegration(db)
+        orders = await service.get_purchase_orders(store_id=store_id, supplier_id=supplier_id, status=status)
         return {
             "success": True,
-            **comparison
+            "orders": [
+                {
+                    "id": o.id, "order_number": o.order_number,
+                    "supplier_id": o.supplier_id, "store_id": o.store_id,
+                    "status": o.status, "total_amount": o.total_amount / 100,
+                    "expected_delivery": o.expected_delivery.isoformat() if o.expected_delivery else None,
+                    "created_at": o.created_at.isoformat(),
+                }
+                for o in orders
+            ],
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
