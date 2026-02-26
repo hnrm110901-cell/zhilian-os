@@ -38,6 +38,12 @@ class RedisCacheService:
             await self._redis.ping()
             self._initialized = True
             logger.info("Redis缓存服务初始化成功")
+        except redis.AuthenticationError as e:
+            logger.error("Redis认证失败，请检查密码配置", error=str(e))
+            raise
+        except redis.ConnectionError as e:
+            logger.error("Redis连接失败，请检查地址和端口", error=str(e))
+            raise
         except Exception as e:
             logger.error("Redis缓存服务初始化失败", error=str(e))
             raise
@@ -73,6 +79,9 @@ class RedisCacheService:
             except (json.JSONDecodeError, TypeError):
                 return value
 
+        except (redis.ConnectionError, redis.TimeoutError) as e:
+            logger.warning("Redis连接/超时，缓存读取降级", key=key, error=str(e))
+            return None
         except Exception as e:
             logger.error("获取缓存失败", key=key, error=str(e))
             return None
@@ -115,6 +124,9 @@ class RedisCacheService:
 
             return True
 
+        except (redis.ConnectionError, redis.TimeoutError) as e:
+            logger.warning("Redis连接/超时，缓存写入降级", key=key, error=str(e))
+            return False
         except Exception as e:
             logger.error("设置缓存失败", key=key, error=str(e))
             return False
