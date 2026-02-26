@@ -47,7 +47,7 @@ class DecisionLog(Base):
     id = Column(String(36), primary_key=True)
 
     # 决策基本信息
-    decision_type = Column(SQLEnum(DecisionType), nullable=False, index=True, comment="决策类型")
+    decision_type = Column(SQLEnum(DecisionType, values_callable=lambda x: [e.value for e in x]), nullable=False, index=True, comment="决策类型")
     agent_type = Column(String(50), nullable=False, index=True, comment="Agent类型")
     agent_method = Column(String(100), nullable=False, comment="Agent方法名")
 
@@ -65,7 +65,7 @@ class DecisionLog(Base):
     manager_id = Column(String(36), ForeignKey("users.id"), index=True, comment="店长ID")
     manager_decision = Column(JSON, comment="店长实际决策")
     manager_feedback = Column(Text, comment="店长反馈意见")
-    decision_status = Column(SQLEnum(DecisionStatus), default=DecisionStatus.PENDING, index=True, comment="决策状态")
+    decision_status = Column(SQLEnum(DecisionStatus, values_callable=lambda x: [e.value for e in x]), default=DecisionStatus.PENDING, index=True, comment="决策状态")
 
     # 决策时间
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, comment="创建时间")
@@ -73,7 +73,7 @@ class DecisionLog(Base):
     executed_at = Column(DateTime, comment="执行时间")
 
     # 执行结果
-    outcome = Column(SQLEnum(DecisionOutcome), comment="决策结果")
+    outcome = Column(SQLEnum(DecisionOutcome, values_callable=lambda x: [e.value for e in x]), comment="决策结果")
     actual_result = Column(JSON, comment="实际结果数据")
     expected_result = Column(JSON, comment="预期结果数据")
     result_deviation = Column(Float, comment="结果偏差 (%)")

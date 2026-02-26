@@ -675,7 +675,7 @@ class IntelligentRecommendationEngine:
     ) -> float:
         """Estimate revenue change"""
         # Simplified calculation
-        price_effect = (new_price - current_price) / current_price
+        price_effect = (new_price - current_price) / current_price if current_price else 0.0
         total_effect = price_effect + demand_change
         return total_effect
 
