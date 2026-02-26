@@ -70,6 +70,10 @@ class DomainVectorService:
             url=self.qdrant_url,
             api_key=self.qdrant_api_key or None,
         )
+        rag_enabled = os.getenv("RAG_ENABLED", "true").lower() not in ("false", "0", "no")
+        if not rag_enabled:
+            logger.info("RAG_ENABLED=false，跳过嵌入模型加载，使用哈希向量")
+            return
         try:
             from sentence_transformers import SentenceTransformer
             model_name = os.getenv("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2")

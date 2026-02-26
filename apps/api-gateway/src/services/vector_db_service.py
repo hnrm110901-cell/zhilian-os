@@ -42,14 +42,18 @@ class VectorDatabaseService:
             )
 
             # 初始化嵌入模型（使用sentence-transformers，可通过EMBEDDING_MODEL环境变量替换）
-            try:
-                from sentence_transformers import SentenceTransformer
-                model_name = os.getenv("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2")
-                self.embedding_model = SentenceTransformer(model_name)
-                logger.info("嵌入模型加载成功", model=model_name)
-            except Exception as e:
-                logger.warning("嵌入模型加载失败，将使用模拟嵌入", error=str(e))
-                self.embedding_model = None
+            rag_enabled = os.getenv("RAG_ENABLED", "true").lower() not in ("false", "0", "no")
+            if rag_enabled:
+                try:
+                    from sentence_transformers import SentenceTransformer
+                    model_name = os.getenv("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2")
+                    self.embedding_model = SentenceTransformer(model_name)
+                    logger.info("嵌入模型加载成功", model=model_name)
+                except Exception as e:
+                    logger.warning("嵌入模型加载失败，将使用模拟嵌入", error=str(e))
+                    self.embedding_model = None
+            else:
+                logger.info("RAG_ENABLED=false，跳过嵌入模型加载")
 
             # 创建集合（如果不存在）
             await self._ensure_collections()
