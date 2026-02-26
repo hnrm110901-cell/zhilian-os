@@ -224,7 +224,7 @@ class IntelligentRecommendationEngine:
             recommended_price = self._competitor_based_pricing(dish, context)
 
         # Calculate expected impact
-        price_change_pct = (recommended_price - current_price) / current_price
+        price_change_pct = (recommended_price - current_price) / current_price if current_price else 0.0
         expected_demand_change = self._estimate_demand_change(
             dish_id, price_change_pct
         )

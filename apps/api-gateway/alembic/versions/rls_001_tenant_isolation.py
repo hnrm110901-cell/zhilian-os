@@ -40,12 +40,25 @@ TENANT_TABLES = [
 ]
 
 
+def _table_exists(table_name: str) -> bool:
+    conn = op.get_bind()
+    result = conn.execute(
+        sa.text(
+            "SELECT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename=:t)"
+        ),
+        {"t": table_name},
+    )
+    return result.scalar()
+
+
 def upgrade() -> None:
     """
     启用Row-Level Security策略
     """
-    # 为每个租户表启用RLS
+    # 为每个租户表启用RLS（跳过尚未创建的表）
     for table_name in TENANT_TABLES:
+        if not _table_exists(table_name):
+            continue
         # 启用RLS
         op.execute(f'ALTER TABLE {table_name} ENABLE ROW LEVEL SECURITY;')
 
@@ -128,6 +141,8 @@ def downgrade() -> None:
 
     # 为每个租户表移除RLS
     for table_name in TENANT_TABLES:
+        if not _table_exists(table_name):
+            continue
         policy_name = f'{table_name}_tenant_isolation_policy'
 
         # 删除所有策略
