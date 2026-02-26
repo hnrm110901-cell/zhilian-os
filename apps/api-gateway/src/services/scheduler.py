@@ -9,10 +9,12 @@
 - 每天03:00 → perform_daily_reconciliation（POS对账）
 """
 import asyncio
-from datetime import datetime, date
+from datetime import date
 from typing import Optional, Dict
 import os
 import structlog
+
+from src.core.clock import now_local
 
 logger = structlog.get_logger()
 
@@ -59,7 +61,7 @@ class TaskScheduler:
         """运行调度器主循环"""
         while self.running:
             try:
-                now = datetime.now()
+                now = now_local()
                 today = now.date()
 
                 # 每15分钟：营收异常检测
