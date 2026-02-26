@@ -15,6 +15,8 @@ const ModelMarketplacePage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [purchaseVisible, setPurchaseVisible] = useState(false);
   const [contributeVisible, setContributeVisible] = useState(false);
+  const [purchaseSubmitting, setPurchaseSubmitting] = useState(false);
+  const [contributeSubmitting, setContributeSubmitting] = useState(false);
   const [selectedModel, setSelectedModel] = useState<any>(null);
   const [storeId, setStoreId] = useState('STORE001');
   const [stores, setStores] = useState<any[]>([]);
@@ -50,6 +52,7 @@ const ModelMarketplacePage: React.FC = () => {
   useEffect(() => { loadStores(); loadData(); }, [loadStores, loadData]);
 
   const purchaseModel = async () => {
+    setPurchaseSubmitting(true);
     try {
       await apiClient.post('/model-marketplace/purchase', { store_id: storeId, model_id: selectedModel?.model_id || selectedModel?.id });
       showSuccess('购买成功');
@@ -57,10 +60,13 @@ const ModelMarketplacePage: React.FC = () => {
       loadData();
     } catch (err: any) {
       handleApiError(err, '购买失败');
+    } finally {
+      setPurchaseSubmitting(false);
     }
   };
 
   const contributeData = async (values: any) => {
+    setContributeSubmitting(true);
     try {
       await apiClient.post('/model-marketplace/contribute-data', { store_id: storeId, ...values });
       showSuccess('数据贡献成功');
@@ -68,6 +74,8 @@ const ModelMarketplacePage: React.FC = () => {
       contributeForm.resetFields();
     } catch (err: any) {
       handleApiError(err, '贡献失败');
+    } finally {
+      setContributeSubmitting(false);
     }
   };
 
@@ -145,12 +153,12 @@ const ModelMarketplacePage: React.FC = () => {
       </div>
       <Tabs items={tabItems} />
 
-      <Modal title={`购买模型：${selectedModel?.name}`} open={purchaseVisible} onCancel={() => setPurchaseVisible(false)} onOk={purchaseModel} okText="确认购买">
+      <Modal title={`购买模型：${selectedModel?.name}`} open={purchaseVisible} onCancel={() => setPurchaseVisible(false)} onOk={purchaseModel} okText="确认购买" confirmLoading={purchaseSubmitting}>
         <p>价格：{selectedModel?.price === 0 ? '免费' : `¥${(selectedModel?.price || 0).toFixed(2)}`}</p>
         <p>{selectedModel?.description}</p>
       </Modal>
 
-      <Modal title="贡献数据" open={contributeVisible} onCancel={() => { setContributeVisible(false); contributeForm.resetFields(); }} onOk={() => contributeForm.submit()} okText="提交">
+      <Modal title="贡献数据" open={contributeVisible} onCancel={() => { setContributeVisible(false); contributeForm.resetFields(); }} onOk={() => contributeForm.submit()} okText="提交" confirmLoading={contributeSubmitting}>
         <Form form={contributeForm} layout="vertical" onFinish={contributeData}>
           <Form.Item name="data_type" label="数据类型" rules={[{ required: true }]}>
             <Select>
