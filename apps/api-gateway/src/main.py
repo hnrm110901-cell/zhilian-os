@@ -24,6 +24,8 @@ from src.api import employees, inventory, schedules, reservations, kpis, orders
 from src.api import bom
 # Phase 2 本体层 API — 推理层 / 企微 Action FSM / 自然语言查询
 from src.api import ontology, wechat_actions
+# Phase 3 — 数据主权 / 连锁扩展 / 推理规则库
+from src.api import data_security, chain_expansion, knowledge_rules
 from src.api import ai_evolution_dashboard
 from src.api import compliance
 from src.api import quality
@@ -476,6 +478,10 @@ app.include_router(bom.router, tags=["bom"])
 # Phase 2 本体层 — 推理层 / 企微 Action FSM / 自然语言查询
 app.include_router(ontology.router, tags=["ontology"])
 app.include_router(wechat_actions.router, tags=["wechat_actions"])
+# Phase 3 — 数据主权 / 连锁扩展 / 推理规则库
+app.include_router(data_security.router, tags=["data_security"])
+app.include_router(chain_expansion.router, tags=["chain_expansion"])
+app.include_router(knowledge_rules.router)
 app.include_router(ai_evolution_dashboard.router, tags=["ai_evolution"])
 app.include_router(compliance.router)
 app.include_router(quality.router)
@@ -542,6 +548,24 @@ async def startup_event():
         logger.info("定时任务调度器启动成功")
     except Exception as e:
         logger.error("定时任务调度器启动失败", error=str(e))
+
+    # 初始化推理规则库种子数据（Phase 3 M3.3）
+    try:
+        from src.core.database import get_db as _get_db
+        from src.services.knowledge_rule_service import KnowledgeRuleService
+        async for db in _get_db():
+            svc = KnowledgeRuleService(db)
+            rules_result = await svc.seed_rules()
+            bench_result = await svc.seed_benchmarks()
+            await db.commit()
+            logger.info(
+                "推理规则库初始化完成",
+                rules_created=rules_result.get("created", 0),
+                benchmarks_created=bench_result.get("created", 0),
+            )
+            break
+    except Exception as e:
+        logger.warning("推理规则库初始化失败（非致命）", error=str(e))
 
     # 注册 PostgreSQL→Neo4j 本体同步管道（Phase 1 M1.3）
     try:
