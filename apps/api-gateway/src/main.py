@@ -24,8 +24,8 @@ from src.api import employees, inventory, schedules, reservations, kpis, orders
 from src.api import bom
 # Phase 2 本体层 API — 推理层 / 企微 Action FSM / 自然语言查询
 from src.api import ontology, wechat_actions
-# Phase 3 — 数据主权 / 连锁扩展 / 推理规则库
-from src.api import data_security, chain_expansion, knowledge_rules
+# Phase 3 — 数据主权 / 连锁扩展 / 推理规则库 / 损耗事件
+from src.api import data_security, chain_expansion, knowledge_rules, waste_events
 from src.api import ai_evolution_dashboard
 from src.api import compliance
 from src.api import quality
@@ -482,6 +482,8 @@ app.include_router(wechat_actions.router, tags=["wechat_actions"])
 app.include_router(data_security.router, tags=["data_security"])
 app.include_router(chain_expansion.router, tags=["chain_expansion"])
 app.include_router(knowledge_rules.router)
+# Phase 3 — 损耗事件 CRUD（PostgreSQL + Neo4j 双写）
+app.include_router(waste_events.router, tags=["waste_events"])
 app.include_router(ai_evolution_dashboard.router, tags=["ai_evolution"])
 app.include_router(compliance.router)
 app.include_router(quality.router)
