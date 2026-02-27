@@ -2,11 +2,13 @@
 领域分割向量索引 API
 提供按领域的语义搜索和索引管理接口
 """
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 
 from ..services.domain_vector_service import domain_vector_service, DOMAINS
+from ..core.dependencies import get_current_user
+from ..models.user import User
 
 router = APIRouter(prefix="/api/v1/vector", tags=["vector_index"])
 
@@ -20,7 +22,10 @@ class IndexRequest(BaseModel):
 
 
 @router.post("/index")
-async def index_document(req: IndexRequest):
+async def index_document(
+    req: IndexRequest,
+    current_user: User = Depends(get_current_user),
+):
     """手动写入一条文档到指定领域索引"""
     if req.domain not in DOMAINS:
         raise HTTPException(status_code=400, detail=f"未知领域: {req.domain}，支持: {list(DOMAINS)}")
@@ -35,6 +40,7 @@ async def search(
     domain: str = Query("events", description=f"领域: {list(DOMAINS.keys())}"),
     top_k: int = Query(5, ge=1, le=20),
     score_threshold: float = Query(0.0, ge=0.0, le=1.0),
+    current_user: User = Depends(get_current_user),
 ):
     """在指定领域内语义搜索"""
     if domain not in DOMAINS:
@@ -55,6 +61,7 @@ async def search_multi(
     query: str = Query(...),
     domains: str = Query("revenue,inventory,menu,events", description="逗号分隔的领域列表"),
     top_k_per_domain: int = Query(3, ge=1, le=10),
+    current_user: User = Depends(get_current_user),
 ):
     """跨多领域并行搜索"""
     domain_list = [d.strip() for d in domains.split(",") if d.strip() in DOMAINS]
@@ -70,7 +77,10 @@ async def search_multi(
 
 
 @router.get("/collections/{store_id}")
-async def list_collections(store_id: str):
+async def list_collections(
+    store_id: str,
+    current_user: User = Depends(get_current_user),
+):
     """列出门店已有的领域 collection"""
     cols = await domain_vector_service.list_store_collections(store_id)
     return {"store_id": store_id, "collections": cols, "total": len(cols)}

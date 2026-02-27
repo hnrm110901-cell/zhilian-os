@@ -11,7 +11,7 @@ import time
 
 from src.core.config import settings
 # 核心模块
-from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation, approval, federated_learning, embedding, raas, model_marketplace, human_in_the_loop, hardware_integration, pos, dishes, benchmark
+from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation, approval, embedding, raas, model_marketplace, human_in_the_loop, hardware_integration, pos, dishes, benchmark
 from src.api.phase5_apis import platform_router, industry_router, supply_chain_router, i18n_router
 # 逐步启用的模块
 from src.api import dashboard, analytics, audit, multi_store, finance, customer360, wechat_triggers, queue, meituan_queue
@@ -305,7 +305,7 @@ app = FastAPI(
 # 配置CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS + ["null"],  # 允许本地文件访问
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -431,7 +431,8 @@ app.include_router(edge_node.router, tags=["edge_node"])
 app.include_router(decision_validator.router, tags=["decision_validator"])
 
 # Phase 4: 智能优化期 (Intelligence Optimization Period)
-app.include_router(federated_learning.router, tags=["federated_learning"])
+# ⚠️ 联邦学习已冻结（战略 Phase 0 决策）：暂不对外暴露路由，待 Neo4j 本体层稳定后重新评估
+# app.include_router(federated_learning.router, tags=["federated_learning"])
 app.include_router(recommendations.router, tags=["recommendations"])
 app.include_router(agent_collaboration.router, tags=["agent_collaboration"])
 
@@ -489,9 +490,13 @@ app.include_router(hq_dashboard.router, prefix="/api/v1", tags=["hq_dashboard"])
 app.include_router(ai_accuracy.router, prefix="/api/v1", tags=["ai_accuracy"])
 
 # 业财税资金一体化扩展（FCT）- 可选挂载
+# 注意：fct.py 尚未实现，FCT_ENABLED 默认为 False，请勿在生产中启用
 if getattr(settings, "FCT_ENABLED", False):
-    from src.api import fct
-    app.include_router(fct.router, prefix="/api/v1/fct", tags=["fct"])
+    try:
+        from src.api import fct
+        app.include_router(fct.router, prefix="/api/v1/fct", tags=["fct"])
+    except ImportError:
+        logger.warning("FCT_ENABLED=True 但 src/api/fct.py 不存在，FCT 模块未加载")
 
 
 @app.on_event("startup")

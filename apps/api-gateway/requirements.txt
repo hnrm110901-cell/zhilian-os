@@ -32,6 +32,9 @@ numpy==1.26.3
 pandas>=2.0.0
 openpyxl>=3.1.0
 
+# Graph Database (本体层 / 推理层)
+neo4j>=5.17.0
+
 # Time Series Forecasting
 prophet>=1.1.5
 

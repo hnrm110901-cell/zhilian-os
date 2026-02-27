@@ -119,6 +119,22 @@ class DecisionAgent(LLMEnhancedAgent):
 
             return formatted
 
+        except Exception as e:
+            logger.error(
+                "Revenue anomaly analysis failed",
+                store_id=store_id,
+                error=str(e),
+                exc_info=e
+            )
+            return self.format_response(
+                success=False,
+                data=None,
+                message=f"分析失败: {str(e)}",
+                reasoning=f"分析过程中发生异常: {str(e)}",
+                confidence=0.0,
+                source_data={"store_id": store_id},
+            )
+
     async def analyze_order_trend(
         self,
         store_id: str,
