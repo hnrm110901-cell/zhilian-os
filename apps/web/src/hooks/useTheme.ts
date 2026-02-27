@@ -12,55 +12,56 @@ const getSystemTheme = (): 'light' | 'dark' => {
 
 // 获取实际应用的主题
 const getAppliedTheme = (theme: Theme): 'light' | 'dark' => {
-  if (theme === 'auto') {
-    return getSystemTheme();
-  }
-  return theme;
+  return theme === 'auto' ? getSystemTheme() : theme;
 };
 
-// 应用主题到DOM
+// 应用主题到DOM，同步更新 theme-color meta
 const applyTheme = (theme: 'light' | 'dark') => {
-  const root = document.documentElement;
-  root.setAttribute('data-theme', theme);
+  document.documentElement.setAttribute('data-theme', theme);
+  const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+  if (metaThemeColor) {
+    metaThemeColor.setAttribute('content', theme === 'dark' ? '#1f1f1f' : '#667eea');
+  }
 };
 
 export const useTheme = () => {
-  // 从localStorage读取保存的主题，默认为auto
   const [theme, setThemeState] = useState<Theme>(() => {
     const saved = localStorage.getItem(THEME_STORAGE_KEY);
     return (saved as Theme) || 'auto';
   });
 
-  // 计算实际应用的主题
-  const appliedTheme = getAppliedTheme(theme);
+  // 实时跟踪系统主题，auto 模式下驱动重渲染
+  const [systemTheme, setSystemTheme] = useState<'light' | 'dark'>(getSystemTheme);
 
-  // 设置主题
+  const appliedTheme = theme === 'auto' ? systemTheme : theme;
+
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);
     localStorage.setItem(THEME_STORAGE_KEY, newTheme);
     applyTheme(getAppliedTheme(newTheme));
   };
 
-  // 切换主题
   const toggleTheme = () => {
-    const newTheme = appliedTheme === 'light' ? 'dark' : 'light';
-    setTheme(newTheme);
+    // auto 模式下切换到与当前系统主题相反的固定主题
+    const next = appliedTheme === 'light' ? 'dark' : 'light';
+    setTheme(next);
   };
 
-  // 监听系统主题变化
+  // 始终监听系统主题变化，auto 模式下同步到 state 触发重渲染
   useEffect(() => {
-    if (theme !== 'auto') return;
-
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = () => {
-      applyTheme(getSystemTheme());
+    const handleChange = (e: MediaQueryListEvent) => {
+      const next: 'light' | 'dark' = e.matches ? 'dark' : 'light';
+      setSystemTheme(next);
+      if (theme === 'auto') {
+        applyTheme(next);
+      }
     };
-
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, [theme]);
 
-  // 初始化时应用主题
+  // 主题变化时同步 DOM
   useEffect(() => {
     applyTheme(appliedTheme);
   }, [appliedTheme]);

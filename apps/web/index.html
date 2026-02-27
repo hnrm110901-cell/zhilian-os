@@ -6,6 +6,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="description" content="智链OS - 智能餐饮管理系统" />
     <meta name="theme-color" content="#667eea" />
+    <script>
+      (function () {
+        var stored = localStorage.getItem('zhilian-theme');
+        var isDark =
+          stored === 'dark' ||
+          (stored !== 'light' &&
+            window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.setAttribute(
+          'data-theme',
+          isDark ? 'dark' : 'light'
+        );
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', isDark ? '#1f1f1f' : '#667eea');
+      })();
+    </script>
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="智链OS" />

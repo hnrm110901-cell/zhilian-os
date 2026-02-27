@@ -1,3 +1,4 @@
+import { theme as antdTheme } from 'antd';
 import type { ThemeConfig } from 'antd';
 
 // 亮色主题配置
@@ -80,5 +81,5 @@ export const darkTheme: ThemeConfig = {
       borderRadius: 8,
     },
   },
-  algorithm: undefined, // 使用默认算法，通过token控制
+  algorithm: antdTheme.darkAlgorithm,
 };
