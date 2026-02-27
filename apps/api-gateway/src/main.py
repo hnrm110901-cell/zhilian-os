@@ -20,6 +20,10 @@ from src.api import members
 from src.api import edge_node, decision_validator, recommendations, agent_collaboration
 # Phase 1: CRUD API
 from src.api import employees, inventory, schedules, reservations, kpis, orders
+# Phase 1 本体层 — BOM 版本化配方管理
+from src.api import bom
+# Phase 2 本体层 API — 推理层 / 企微 Action FSM / 自然语言查询
+from src.api import ontology, wechat_actions
 from src.api import ai_evolution_dashboard
 from src.api import compliance
 from src.api import quality
@@ -467,6 +471,11 @@ app.include_router(schedules.router, prefix="/api/v1", tags=["schedules"])
 app.include_router(reservations.router, prefix="/api/v1", tags=["reservations"])
 app.include_router(kpis.router, prefix="/api/v1", tags=["kpis"])
 app.include_router(orders.router, prefix="/api/v1", tags=["orders"])
+# Phase 1 本体层 — BOM 版本化配方管理
+app.include_router(bom.router, tags=["bom"])
+# Phase 2 本体层 — 推理层 / 企微 Action FSM / 自然语言查询
+app.include_router(ontology.router, tags=["ontology"])
+app.include_router(wechat_actions.router, tags=["wechat_actions"])
 app.include_router(ai_evolution_dashboard.router, tags=["ai_evolution"])
 app.include_router(compliance.router)
 app.include_router(quality.router)
@@ -506,6 +515,15 @@ async def startup_event():
     logger.info(f"环境: {settings.APP_ENV}")
     logger.info(f"调试模式: {settings.APP_DEBUG}")
 
+    # 启动企微 Action 升级巡检（Phase 2 M2.2）
+    try:
+        from src.services.wechat_action_fsm import get_wechat_fsm
+        fsm = get_wechat_fsm()
+        await fsm.start_escalation_monitor(interval_seconds=60)
+        logger.info("企微 Action 升级巡检已启动")
+    except Exception as e:
+        logger.warning("企微 Action 升级巡检启动失败（非致命）", error=str(e))
+
     # Initialize database
     try:
         from src.core.database import init_db
@@ -524,6 +542,15 @@ async def startup_event():
         logger.info("定时任务调度器启动成功")
     except Exception as e:
         logger.error("定时任务调度器启动失败", error=str(e))
+
+    # 注册 PostgreSQL→Neo4j 本体同步管道（Phase 1 M1.3）
+    try:
+        from src.core.database import async_session_factory
+        from src.services.ontology_sync_pipeline import register_sync_listeners
+        register_sync_listeners(async_session_factory)
+        logger.info("Neo4j 本体同步管道注册成功")
+    except Exception as e:
+        logger.warning("Neo4j 本体同步管道注册失败（非致命）", error=str(e))
 
     # Initialize Redis cache
     try:
