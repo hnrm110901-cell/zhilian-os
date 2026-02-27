@@ -232,6 +232,76 @@ async def get_cost_breakdown(
     return breakdown
 
 
+@router.get("/cost-analysis")
+async def get_cost_analysis(
+    store_id: str = Query(..., description="门店ID"),
+    limit: int = Query(20, ge=5, le=100),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    菜品成本分析：利润率排名、成本分布、高/低利润 Top N
+    """
+    from src.core.database import AsyncSessionLocal
+    from src.models.dish import Dish as DishModel
+    from sqlalchemy import select as _select
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            _select(DishModel).where(
+                DishModel.store_id == store_id,
+                DishModel.is_available == True,
+                DishModel.cost.isnot(None),
+                DishModel.price.isnot(None),
+            ).limit(limit)
+        )
+        dishes = result.scalars().all()
+
+    if not dishes:
+        return {"store_id": store_id, "total": 0, "items": [], "category_summary": []}
+
+    items = []
+    category_map: dict = {}
+    for d in dishes:
+        price = float(d.price)
+        cost = float(d.cost)
+        margin = round((price - cost) / price * 100, 1) if price > 0 else 0
+        items.append({
+            "dish_id": str(d.id),
+            "name": d.name,
+            "price": price,
+            "cost": cost,
+            "profit_margin": margin,
+            "total_sales": d.total_sales or 0,
+            "total_revenue": float(d.total_revenue or 0),
+        })
+        cat = str(d.category_id) if d.category_id else "未分类"
+        if cat not in category_map:
+            category_map[cat] = {"count": 0, "margins": []}
+        category_map[cat]["count"] += 1
+        category_map[cat]["margins"].append(margin)
+
+    items.sort(key=lambda x: x["profit_margin"], reverse=True)
+    category_summary = [
+        {
+            "category_id": k,
+            "count": v["count"],
+            "avg_margin": round(sum(v["margins"]) / len(v["margins"]), 1),
+        }
+        for k, v in category_map.items()
+    ]
+    overall_avg = round(sum(i["profit_margin"] for i in items) / len(items), 1)
+
+    return {
+        "store_id": store_id,
+        "total": len(items),
+        "overall_avg_margin": overall_avg,
+        "top_profit": items[:5],
+        "low_profit": items[-5:],
+        "items": items,
+        "category_summary": category_summary,
+    }
+
+
 @router.get("/popular/top")
 async def get_popular_dishes(
     limit: int = Query(10, ge=1, le=50),

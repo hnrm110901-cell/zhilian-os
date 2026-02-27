@@ -314,7 +314,120 @@ async def register_supplier(
             delivery_time=request.delivery_time,
             notes=request.notes,
         )
-        return {"success": True, "supplier_id": supplier.id, "code": supplier.code}
+        return {\"success\": True, \"supplier_id\": supplier.id, \"code\": supplier.code}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class UpdateSupplierRequest(BaseModel):
+    name: Optional[str] = None
+    contact_person: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
+    payment_terms: Optional[str] = None
+    delivery_time: Optional[int] = None
+    notes: Optional[str] = None
+
+
+class EvaluateSupplierRequest(BaseModel):
+    quality_score: float = Field(..., ge=0, le=5, description="质量评分 0-5")
+    delivery_score: float = Field(..., ge=0, le=5, description="准时交货评分 0-5")
+    price_score: float = Field(..., ge=0, le=5, description="价格竞争力评分 0-5")
+    comment: Optional[str] = None
+
+
+@supply_chain_router.patch("/suppliers/{supplier_id}")
+async def update_supplier(
+    supplier_id: str,
+    request: UpdateSupplierRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """更新供应商信息"""
+    from src.models.supply_chain import Supplier
+    from sqlalchemy import select
+    try:
+        result = await db.execute(select(Supplier).where(Supplier.id == supplier_id))
+        supplier = result.scalar_one_or_none()
+        if not supplier:
+            raise HTTPException(status_code=404, detail="供应商不存在")
+        for field, value in request.model_dump(exclude_none=True).items():
+            setattr(supplier, field, value)
+        await db.commit()
+        await db.refresh(supplier)
+        return {"success": True, "supplier_id": supplier.id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@supply_chain_router.delete("/suppliers/{supplier_id}")
+async def deactivate_supplier(
+    supplier_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """停用供应商（软删除）"""
+    from src.models.supply_chain import Supplier
+    from sqlalchemy import select
+    try:
+        result = await db.execute(select(Supplier).where(Supplier.id == supplier_id))
+        supplier = result.scalar_one_or_none()
+        if not supplier:
+            raise HTTPException(status_code=404, detail="供应商不存在")
+        supplier.status = "inactive"
+        await db.commit()
+        return {"success": True, "message": "供应商已停用"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@supply_chain_router.post("/suppliers/{supplier_id}/evaluate")
+async def evaluate_supplier(
+    supplier_id: str,
+    request: EvaluateSupplierRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """评价供应商，更新综合评分"""
+    from src.models.supply_chain import Supplier
+    from sqlalchemy import select
+    try:
+        result = await db.execute(select(Supplier).where(Supplier.id == supplier_id))
+        supplier = result.scalar_one_or_none()
+        if not supplier:
+            raise HTTPException(status_code=404, detail="供应商不存在")
+        # 综合评分：三项加权平均
+        new_rating = round((request.quality_score + request.delivery_score + request.price_score) / 3, 2)
+        # 与历史评分做滑动平均（若已有评分）
+        if supplier.rating:
+            supplier.rating = round((float(supplier.rating) + new_rating) / 2, 2)
+        else:
+            supplier.rating = new_rating
+        await db.commit()
+        return {
+            "success": True,
+            "supplier_id": supplier_id,
+            "new_rating": new_rating,
+            "overall_rating": float(supplier.rating),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@supply_chain_router.get("/suppliers/{supplier_id}/performance")
+async def get_supplier_performance_api(
+    supplier_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """获取供应商历史绩效"""
+    try:
+        service = SupplyChainIntegration(db)
+        perf = await service.get_supplier_performance(supplier_id)
+        return {"success": True, "performance": perf}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -98,7 +98,37 @@ async def get_kpi(
     )
 
 
-@router.post("/kpis/records", response_model=KPIRecordResponse, status_code=201)
+class UpdateKPIThresholdsRequest(BaseModel):
+    target_value: Optional[float] = None
+    warning_threshold: Optional[float] = None
+    critical_threshold: Optional[float] = None
+
+
+@router.patch("/kpis/{kpi_id}/thresholds", response_model=KPIResponse)
+async def update_kpi_thresholds(
+    kpi_id: str,
+    req: UpdateKPIThresholdsRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.STORE_MANAGER)),
+):
+    """更新 KPI 预警阈值（店长及以上可操作）"""
+    result = await session.execute(select(KPI).where(KPI.id == kpi_id))
+    kpi = result.scalar_one_or_none()
+    if not kpi:
+        raise HTTPException(status_code=404, detail="KPI不存在")
+    for field, value in req.model_dump(exclude_none=True).items():
+        setattr(kpi, field, value)
+    await session.commit()
+    await session.refresh(kpi)
+    logger.info("kpi_thresholds_updated", kpi_id=kpi_id, user_id=str(current_user.id))
+    return KPIResponse(
+        id=kpi.id, name=kpi.name, category=kpi.category, description=kpi.description,
+        unit=kpi.unit, target_value=kpi.target_value, warning_threshold=kpi.warning_threshold,
+        critical_threshold=kpi.critical_threshold, is_active=kpi.is_active or "true"
+    )
+
+
+
 async def create_kpi_record(
     req: CreateKPIRecordRequest,
     session: AsyncSession = Depends(get_db),

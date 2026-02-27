@@ -90,6 +90,8 @@ const BulkImportPage = lazy(() => import('./pages/BulkImportPage'));
 const MySchedulePage = lazy(() => import('./pages/MySchedulePage'));
 const HQDashboardPage = lazy(() => import('./pages/HQDashboardPage'));
 const AIAccuracyPage = lazy(() => import('./pages/AIAccuracyPage'));
+const DishCostPage = lazy(() => import('./pages/DishCostPage'));
+const EmployeePerformancePage = lazy(() => import('./pages/EmployeePerformancePage'));
 
 const PageLoader = (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
@@ -326,6 +328,12 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="ai-accuracy" element={
                     <ProtectedRoute requiredRole="admin"><AIAccuracyPage /></ProtectedRoute>
+                  } />
+                  <Route path="dish-cost" element={
+                    <ProtectedRoute requiredRole="store_manager"><DishCostPage /></ProtectedRoute>
+                  } />
+                  <Route path="employee-performance" element={
+                    <ProtectedRoute requiredRole="store_manager"><EmployeePerformancePage /></ProtectedRoute>
                   } />
                 </Route>
                 <Route path="*" element={<NotFoundPage />} />

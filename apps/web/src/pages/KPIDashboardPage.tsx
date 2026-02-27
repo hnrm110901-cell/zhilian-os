@@ -3,7 +3,7 @@ import {
   Card, Col, Row, Select, DatePicker, Tabs, Statistic, Table, Tag,
   Button, Form, InputNumber, Input, Space, Modal, Progress,
 } from 'antd';
-import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import { PlusOutlined, ReloadOutlined, EditOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import ReactECharts from 'echarts-for-react';
 import dayjs from 'dayjs';
@@ -39,6 +39,9 @@ const KPIDashboardPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [addModal, setAddModal] = useState(false);
   const [addForm] = Form.useForm();
+  const [editThresholdModal, setEditThresholdModal] = useState(false);
+  const [editingKpi, setEditingKpi] = useState<any>(null);
+  const [thresholdForm] = Form.useForm();
 
   const loadStores = useCallback(async () => {
     try {
@@ -81,6 +84,25 @@ const KPIDashboardPage: React.FC = () => {
       addForm.resetFields();
       loadRecords();
     } catch (err: any) { handleApiError(err, '录入失败'); }
+  };
+
+  const openEditThreshold = (kpi: any) => {
+    setEditingKpi(kpi);
+    thresholdForm.setFieldsValue({
+      target_value: kpi.target_value,
+      warning_threshold: kpi.warning_threshold,
+      critical_threshold: kpi.critical_threshold,
+    });
+    setEditThresholdModal(true);
+  };
+
+  const saveThresholds = async (values: any) => {
+    try {
+      await apiClient.patch(`/kpis/${editingKpi.id}/thresholds`, values);
+      showSuccess('阈值已更新');
+      setEditThresholdModal(false);
+      loadKpis();
+    } catch (err: any) { handleApiError(err, '更新失败'); }
   };
 
   // 按 KPI 分组记录，构建折线图
@@ -131,6 +153,12 @@ const KPIDashboardPage: React.FC = () => {
     { title: '目标值', dataIndex: 'target_value', key: 'target_value', render: (v: number) => v ?? '-' },
     { title: '预警阈值', dataIndex: 'warning_threshold', key: 'warning_threshold', render: (v: number) => v ?? '-' },
     { title: '状态', dataIndex: 'is_active', key: 'is_active', render: (v: string) => <Tag color={v === 'true' ? 'green' : 'default'}>{v === 'true' ? '启用' : '停用'}</Tag> },
+    {
+      title: '操作', key: 'action',
+      render: (_: any, record: any) => (
+        <Button size="small" icon={<EditOutlined />} onClick={() => openEditThreshold(record)}>编辑阈值</Button>
+      ),
+    },
   ];
 
   const recordColumns: ColumnsType<any> = [
@@ -206,14 +234,14 @@ const KPIDashboardPage: React.FC = () => {
 
       <Card><Tabs items={tabItems} /></Card>
 
-      <Modal title="录入KPI数据" open={addModal} onCancel={() => setAddModal(false)} footer={null}>
-        <Form form={addForm} layout="vertical" onFinish={addRecord}>
-          <Form.Item name="kpi_id" label="KPI指标" rules={[{ required: true }]}>
-            <Select placeholder="选择KPI">
+      <Modal title=\"录入KPI数据\" open={addModal} onCancel={() => setAddModal(false)} footer={null}>
+        <Form form={addForm} layout=\"vertical\" onFinish={addRecord}>
+          <Form.Item name=\"kpi_id\" label=\"KPI指标\" rules={[{ required: true }]}>
+            <Select placeholder=\"选择KPI\">
               {kpis.map(k => <Option key={k.id} value={k.id}>{k.name}</Option>)}
             </Select>
           </Form.Item>
-          <Form.Item name="record_date" label="日期" rules={[{ required: true }]}>
+          <Form.Item name=\"record_date\" label=\"日期\" rules={[{ required: true }]}>
             <DatePicker style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="value" label="实际值" rules={[{ required: true }]}>
@@ -221,6 +249,26 @@ const KPIDashboardPage: React.FC = () => {
           </Form.Item>
           <Form.Item name="notes" label="备注"><Input.TextArea rows={2} /></Form.Item>
           <Form.Item><Button type="primary" htmlType="submit" block>录入</Button></Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={`编辑阈值 — ${editingKpi?.name || ''}`}
+        open={editThresholdModal}
+        onCancel={() => setEditThresholdModal(false)}
+        footer={null}
+      >
+        <Form form={thresholdForm} layout="vertical" onFinish={saveThresholds}>
+          <Form.Item name="target_value" label="目标值">
+            <InputNumber style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="warning_threshold" label="预警阈值（低于此值触发黄色预警）">
+            <InputNumber style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="critical_threshold" label="严重阈值（低于此值触发红色告警）">
+            <InputNumber style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item><Button type="primary" htmlType="submit" block>保存</Button></Form.Item>
         </Form>
       </Modal>
     </div>

@@ -137,7 +137,84 @@ async def update_employee(
     )
 
 
-@router.delete("/employees/{employee_id}", status_code=204)
+class RecordPerformanceRequest(BaseModel):
+    period: str  # e.g. "2026-02" or "2026-W08"
+    attendance_rate: Optional[float] = None   # 出勤率 0-100
+    customer_rating: Optional[float] = None  # 顾客评分 1-5
+    efficiency_score: Optional[float] = None # 效率评分 0-100
+    sales_amount: Optional[float] = None     # 销售额（元）
+    notes: Optional[str] = None
+
+
+@router.post("/employees/{employee_id}/performance", status_code=201)
+async def record_performance(
+    employee_id: str,
+    req: RecordPerformanceRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.STORE_MANAGER)),
+):
+    """录入员工绩效数据，并更新 performance_score 综合评分"""
+    emp = await EmployeeRepository.get_by_id(session, employee_id)
+    if not emp:
+        raise HTTPException(status_code=404, detail="员工不存在")
+
+    # 综合评分：各维度加权平均
+    scores = []
+    if req.attendance_rate is not None:
+        scores.append(req.attendance_rate)
+    if req.customer_rating is not None:
+        scores.append(req.customer_rating * 20)  # 1-5 → 20-100
+    if req.efficiency_score is not None:
+        scores.append(req.efficiency_score)
+    composite = round(sum(scores) / len(scores), 1) if scores else None
+
+    if composite is not None:
+        emp.performance_score = str(composite)
+    await session.commit()
+
+    logger.info("performance_recorded", employee_id=employee_id, period=req.period, score=composite)
+    return {
+        "employee_id": employee_id,
+        "period": req.period,
+        "attendance_rate": req.attendance_rate,
+        "customer_rating": req.customer_rating,
+        "efficiency_score": req.efficiency_score,
+        "sales_amount": req.sales_amount,
+        "composite_score": composite,
+        "notes": req.notes,
+    }
+
+
+@router.get("/employees/performance/leaderboard")
+async def get_performance_leaderboard(
+    store_id: str = Query(..., description="门店ID"),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """员工绩效排行榜（按 performance_score 降序）"""
+    employees = await EmployeeRepository.get_by_store(session, store_id)
+    ranked = sorted(
+        [e for e in employees if e.is_active and e.performance_score],
+        key=lambda e: float(e.performance_score or 0),
+        reverse=True,
+    )
+    return {
+        "store_id": store_id,
+        "total": len(ranked),
+        "leaderboard": [
+            {
+                "rank": idx + 1,
+                "employee_id": e.id,
+                "name": e.name,
+                "position": e.position,
+                "performance_score": float(e.performance_score),
+            }
+            for idx, e in enumerate(ranked)
+        ],
+    }
+
+
+
 async def deactivate_employee(
     employee_id: str,
     session: AsyncSession = Depends(get_db),
