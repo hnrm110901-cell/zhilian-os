@@ -264,7 +264,52 @@ async def confirm_shift(
     )
 
 
-@router.get("/schedules/week-view")
+@router.get("/schedules/my-schedule")
+async def get_my_schedule(
+    week_start: date = Query(..., description="周一日期"),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """员工查看自己本周班次（按 employee_id = current_user.id 过滤）"""
+    from datetime import timedelta
+
+    week_end = week_start + timedelta(days=6)
+    result = await session.execute(
+        select(Schedule).options(selectinload(Schedule.shifts)).where(
+            and_(
+                Schedule.schedule_date >= week_start,
+                Schedule.schedule_date <= week_end,
+                Schedule.is_published == True,
+            )
+        ).order_by(Schedule.schedule_date)
+    )
+    schedules = result.scalars().all()
+
+    my_shifts = []
+    for sched in schedules:
+        for sh in sched.shifts:
+            if sh.employee_id == str(current_user.id):
+                my_shifts.append({
+                    "date": sched.schedule_date.isoformat(),
+                    "store_id": sched.store_id,
+                    "shift_id": str(sh.id),
+                    "shift_type": sh.shift_type,
+                    "start_time": sh.start_time.strftime("%H:%M"),
+                    "end_time": sh.end_time.strftime("%H:%M"),
+                    "position": sh.position,
+                    "is_confirmed": sh.is_confirmed or False,
+                })
+
+    return {
+        "week_start": week_start.isoformat(),
+        "week_end": week_end.isoformat(),
+        "employee_id": str(current_user.id),
+        "shifts": my_shifts,
+        "total_shifts": len(my_shifts),
+    }
+
+
+
 async def get_week_view(
     store_id: str = Query(...),
     week_start: date = Query(..., description="周一日期"),

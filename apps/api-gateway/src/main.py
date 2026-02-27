@@ -39,6 +39,8 @@ from src.api import ops
 from src.api import daily_hub
 from src.api import pos_webhook
 from src.api import bulk_import
+from src.api import hq_dashboard
+from src.api import ai_accuracy
 from src.middleware.monitoring import MonitoringMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
 from src.middleware.audit_log import AuditLogMiddleware
@@ -483,6 +485,8 @@ app.include_router(ops.router, prefix="/api/v1/ops", tags=["ops"])
 app.include_router(daily_hub.router, tags=["daily_hub"])
 app.include_router(pos_webhook.router, tags=["pos_webhook"])
 app.include_router(bulk_import.router, tags=["bulk_import"])
+app.include_router(hq_dashboard.router, prefix="/api/v1", tags=["hq_dashboard"])
+app.include_router(ai_accuracy.router, prefix="/api/v1", tags=["ai_accuracy"])
 
 # 业财税资金一体化扩展（FCT）- 可选挂载
 if getattr(settings, "FCT_ENABLED", False):

@@ -303,6 +303,74 @@ async def get_inventory_stats(
     }
 
 
+class PurchaseRequestBody(BaseModel):
+    item_ids: Optional[List[str]] = None  # None = 所有低库存品
+
+
+@router.post("/inventory/purchase-request", status_code=201)
+async def create_purchase_request(
+    req: PurchaseRequestBody,
+    store_id: str = Query(...),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """生成采购审批请求（不直接执行，需店长审批后才补货）"""
+    from ..services.approval_service import approval_service
+    from ..models.decision_log import DecisionType
+
+    if req.item_ids:
+        from sqlalchemy import and_
+        result = await session.execute(
+            select(InventoryItem).where(
+                and_(InventoryItem.store_id == store_id, InventoryItem.id.in_(req.item_ids))
+            )
+        )
+        items = result.scalars().all()
+    else:
+        items = await InventoryRepository.get_low_stock(session, store_id)
+
+    if not items:
+        return {"message": "无需补货的库存项", "items": []}
+
+    suggestions = []
+    for item in items:
+        target = item.max_quantity or item.min_quantity * 3
+        if item.current_quantity >= target:
+            continue
+        restock_qty = target - item.current_quantity
+        suggestions.append({
+            "item_id": item.id,
+            "item_name": item.name,
+            "current_quantity": item.current_quantity,
+            "target_quantity": target,
+            "restock_quantity": restock_qty,
+            "unit": item.unit,
+            "estimated_cost": int(restock_qty * (item.unit_cost or 0)),
+        })
+
+    if not suggestions:
+        return {"message": "所有库存充足，无需补货", "items": []}
+
+    total_cost = sum(s["estimated_cost"] for s in suggestions)
+    decision_log = await approval_service.create_approval_request(
+        decision_type=DecisionType.PURCHASE_SUGGESTION,
+        agent_type="inventory_agent",
+        agent_method="generate_purchase_request",
+        store_id=store_id,
+        ai_suggestion={"items": suggestions, "total_estimated_cost": total_cost},
+        ai_confidence=0.85,
+        ai_reasoning=f"检测到 {len(suggestions)} 个库存项低于安全库存，建议补货至目标数量",
+        db=session,
+    )
+    logger.info("purchase_request_created", store_id=store_id, items=len(suggestions))
+    return {
+        "decision_id": decision_log.id,
+        "status": "pending_approval",
+        "items": suggestions,
+        "total_estimated_cost": total_cost,
+    }
+
+
 class BatchRestockRequest(BaseModel):
     item_ids: Optional[List[str]] = None  # None = 所有低库存品
 

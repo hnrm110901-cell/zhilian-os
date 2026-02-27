@@ -87,6 +87,9 @@ const VoiceWebSocketPage = lazy(() => import('./pages/VoiceWebSocketPage'));
 const OpsAgentPage = lazy(() => import('./pages/OpsAgentPage'));
 const DailyHubPage = lazy(() => import('./pages/DailyHubPage'));
 const BulkImportPage = lazy(() => import('./pages/BulkImportPage'));
+const MySchedulePage = lazy(() => import('./pages/MySchedulePage'));
+const HQDashboardPage = lazy(() => import('./pages/HQDashboardPage'));
+const AIAccuracyPage = lazy(() => import('./pages/AIAccuracyPage'));
 
 const PageLoader = (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
@@ -314,6 +317,15 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="bulk-import" element={
                     <ProtectedRoute requiredRole="admin"><BulkImportPage /></ProtectedRoute>
+                  } />
+                  <Route path="my-schedule" element={
+                    <ProtectedRoute><MySchedulePage /></ProtectedRoute>
+                  } />
+                  <Route path="hq-dashboard" element={
+                    <ProtectedRoute requiredRole="admin"><HQDashboardPage /></ProtectedRoute>
+                  } />
+                  <Route path="ai-accuracy" element={
+                    <ProtectedRoute requiredRole="admin"><AIAccuracyPage /></ProtectedRoute>
                   } />
                 </Route>
                 <Route path="*" element={<NotFoundPage />} />
