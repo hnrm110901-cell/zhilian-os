@@ -37,6 +37,8 @@ from src.api import backups
 from src.api import private_domain
 from src.api import ops
 from src.api import daily_hub
+from src.api import pos_webhook
+from src.api import bulk_import
 from src.middleware.monitoring import MonitoringMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
 from src.middleware.audit_log import AuditLogMiddleware
@@ -479,6 +481,8 @@ app.include_router(backups.router)
 app.include_router(private_domain.router, tags=["private_domain"])
 app.include_router(ops.router, prefix="/api/v1/ops", tags=["ops"])
 app.include_router(daily_hub.router, tags=["daily_hub"])
+app.include_router(pos_webhook.router, tags=["pos_webhook"])
+app.include_router(bulk_import.router, tags=["bulk_import"])
 
 # 业财税资金一体化扩展（FCT）- 可选挂载
 if getattr(settings, "FCT_ENABLED", False):

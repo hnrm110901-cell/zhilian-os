@@ -30,7 +30,10 @@ services:
       - APP_ENV=production
       - DEBUG=False
       - DATABASE_URL=postgresql+asyncpg://zhilian:zhilian@postgres:5432/zhilian_os
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-zhilian}@redis:6379/0
+      - REDIS_SENTINEL_HOSTS=redis-sentinel-1:26379,redis-sentinel-2:26379,redis-sentinel-3:26379
+      - REDIS_SENTINEL_MASTER=mymaster
+      - REDIS_SENTINEL_PASSWORD=${REDIS_PASSWORD:-zhilian}
       - QDRANT_HOST=qdrant
       - QDRANT_PORT=6333
       - PYTHONPATH=/app:/app/packages
@@ -44,7 +47,7 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
       qdrant:
         condition: service_started
     healthcheck:
@@ -76,7 +79,7 @@ services:
   # Redis (可选 - 用于缓存)
   redis:
     image: redis:7-alpine
-    container_name: zhilian-redis
+    container_name: zhilian-redis-master
     restart: always
     ports:
       - "6380:6379"
@@ -84,7 +87,71 @@ services:
       - redis-data:/data
     networks:
       - zhilian-network
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --requirepass "${REDIS_PASSWORD:-zhilian}"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-zhilian}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis-replica:
+    image: redis:7-alpine
+    container_name: zhilian-redis-replica
+    restart: always
+    networks:
+      - zhilian-network
+    command: >
+      redis-server --appendonly yes
+      --requirepass "${REDIS_PASSWORD:-zhilian}"
+      --replicaof redis 6379
+      --masterauth "${REDIS_PASSWORD:-zhilian}"
+    volumes:
+      - redis-replica-data:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  redis-sentinel-1:
+    image: redis:7-alpine
+    container_name: zhilian-sentinel-1
+    restart: always
+    networks:
+      - zhilian-network
+    ports:
+      - "26379:26379"
+    command: >
+      sh -c "printf 'port 26379\nsentinel monitor mymaster redis 6379 2\nsentinel auth-pass mymaster ${REDIS_PASSWORD:-zhilian}\nsentinel down-after-milliseconds mymaster 5000\nsentinel failover-timeout mymaster 10000\nsentinel parallel-syncs mymaster 1\n' > /tmp/sentinel.conf && redis-sentinel /tmp/sentinel.conf"
+    depends_on:
+      - redis
+      - redis-replica
+
+  redis-sentinel-2:
+    image: redis:7-alpine
+    container_name: zhilian-sentinel-2
+    restart: always
+    networks:
+      - zhilian-network
+    ports:
+      - "26380:26379"
+    command: >
+      sh -c "printf 'port 26379\nsentinel monitor mymaster redis 6379 2\nsentinel auth-pass mymaster ${REDIS_PASSWORD:-zhilian}\nsentinel down-after-milliseconds mymaster 5000\nsentinel failover-timeout mymaster 10000\nsentinel parallel-syncs mymaster 1\n' > /tmp/sentinel.conf && redis-sentinel /tmp/sentinel.conf"
+    depends_on:
+      - redis
+      - redis-replica
+
+  redis-sentinel-3:
+    image: redis:7-alpine
+    container_name: zhilian-sentinel-3
+    restart: always
+    networks:
+      - zhilian-network
+    ports:
+      - "26381:26379"
+    command: >
+      sh -c "printf 'port 26379\nsentinel monitor mymaster redis 6379 2\nsentinel auth-pass mymaster ${REDIS_PASSWORD:-zhilian}\nsentinel down-after-milliseconds mymaster 5000\nsentinel failover-timeout mymaster 10000\nsentinel parallel-syncs mymaster 1\n' > /tmp/sentinel.conf && redis-sentinel /tmp/sentinel.conf"
+    depends_on:
+      - redis
+      - redis-replica
 
   # Qdrant向量数据库 (用于神经系统语义搜索)
   qdrant:
@@ -128,6 +195,8 @@ networks:
 
 volumes:
   redis-data:
+    driver: local
+  redis-replica-data:
     driver: local
   postgres-data:
     driver: local

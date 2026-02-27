@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     REDIS_URL: str
 
+    # Redis Sentinel 配置（生产 HA 模式，留空则使用 REDIS_URL 直连）
+    REDIS_SENTINEL_HOSTS: str = ""   # 逗号分隔，如 "sentinel1:26379,sentinel2:26379"
+    REDIS_SENTINEL_MASTER: str = "mymaster"
+    REDIS_SENTINEL_PASSWORD: str = ""
+    REDIS_SENTINEL_DB: int = 0
+
     # AI/LLM配置
     LLM_PROVIDER: str = "deepseek"  # openai, anthropic, azure_openai, deepseek
     LLM_MODEL: str = "deepseek-chat"
@@ -136,6 +142,14 @@ class Settings(BaseSettings):
 
     # CORS配置
     CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173"]
+
+    # 业财税资金一体化扩展（FCT）
+    FCT_ENABLED: bool = False
+    FCT_MODE: str = "embedded"  # embedded | remote
+    FCT_BASE_URL: str = ""  # mode=remote 时填独立服务 base_url
+    FCT_EVENT_TARGET: str = "internal"  # internal | http | queue
+    FCT_EVENT_HTTP_URL: str = ""  # event_target=http 时填写
+    FCT_API_KEY: str = ""  # 独立部署时 API Key 认证，请求头 X-API-Key；空则独立服务不校验（仅建议内网使用）
 
 
 # 创建全局配置实例

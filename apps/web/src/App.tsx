@@ -86,6 +86,7 @@ const UserProfilePage = lazy(() => import('./pages/UserProfilePage'));
 const VoiceWebSocketPage = lazy(() => import('./pages/VoiceWebSocketPage'));
 const OpsAgentPage = lazy(() => import('./pages/OpsAgentPage'));
 const DailyHubPage = lazy(() => import('./pages/DailyHubPage'));
+const BulkImportPage = lazy(() => import('./pages/BulkImportPage'));
 
 const PageLoader = (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
@@ -310,6 +311,9 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="daily-hub" element={
                     <ProtectedRoute><DailyHubPage /></ProtectedRoute>
+                  } />
+                  <Route path="bulk-import" element={
+                    <ProtectedRoute requiredRole="admin"><BulkImportPage /></ProtectedRoute>
                   } />
                 </Route>
                 <Route path="*" element={<NotFoundPage />} />

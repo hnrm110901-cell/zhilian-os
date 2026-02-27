@@ -43,6 +43,7 @@ import {
   SyncOutlined,
   SoundOutlined,
   ToolOutlined,
+  UploadOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -71,6 +72,7 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/ai-evolution': 'admin-ai', '/edge-node': 'admin-ai', '/decision-validator': 'admin-ai',
   '/federated-learning': 'admin-ai', '/agent-collaboration': 'admin-ai',
   '/tasks': 'business', '/reconciliation': 'business', '/dishes': 'business', '/employees': 'business',
+  '/bulk-import': 'business',
   '/raas': 'admin-system', '/model-marketplace': 'admin-system',
   '/llm-config': 'admin-ai', '/hardware': 'admin-ai',
   '/integrations': 'admin-system', '/neural': 'admin-ai', '/embedding': 'admin-ai',
@@ -193,6 +195,7 @@ const MainLayout: React.FC = () => {
     '/i18n': '国际化',
     '/tasks': '任务管理',
     '/reconciliation': '对账管理',
+    '/bulk-import': '数据导入',
     '/dishes': '菜品管理',
     '/employees': '员工管理',
     '/raas': 'RaaS定价',
@@ -359,6 +362,7 @@ const MainLayout: React.FC = () => {
         { key: '/employees', icon: <TeamOutlined />, label: '员工管理' },
         { key: '/tasks', icon: <FileTextOutlined />, label: '任务管理' },
         { key: '/reconciliation', icon: <FileExcelOutlined />, label: '对账管理' },
+        { key: '/bulk-import', icon: <UploadOutlined />, label: '数据导入' },
       ],
     },
     {

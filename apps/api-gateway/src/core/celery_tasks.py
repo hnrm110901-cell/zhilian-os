@@ -496,6 +496,7 @@ def generate_and_send_daily_report(
 
                     # 2. 构建推送消息
                     message = f"""【营业日报】{target_date.strftime('%Y年%m月%d日')}
+门店：{store.name}（{store.id}）
 
 {report.summary}
 

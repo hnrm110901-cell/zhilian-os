@@ -23,18 +23,44 @@ class RedisCacheService:
         self._initialized = False
 
     async def initialize(self):
-        """初始化Redis连接"""
+        """初始化Redis连接（支持 Sentinel HA 模式）"""
         if self._initialized:
             return
 
         try:
-            self._redis = await redis.from_url(
-                settings.REDIS_URL,
-                encoding="utf-8",
-                decode_responses=True,
-                max_connections=int(os.getenv("REDIS_MAX_CONNECTIONS", "50"))
-            )
-            # 测试连接
+            sentinel_hosts_raw = settings.REDIS_SENTINEL_HOSTS.strip()
+            if sentinel_hosts_raw:
+                # Sentinel 模式
+                from redis.asyncio.sentinel import Sentinel
+                sentinels = [
+                    (h.split(":")[0], int(h.split(":")[1]))
+                    for h in sentinel_hosts_raw.split(",")
+                    if ":" in h
+                ]
+                sentinel_kwargs = {}
+                if settings.REDIS_SENTINEL_PASSWORD:
+                    sentinel_kwargs["password"] = settings.REDIS_SENTINEL_PASSWORD
+                sentinel = Sentinel(
+                    sentinels,
+                    sentinel_kwargs=sentinel_kwargs,
+                    socket_timeout=5,
+                )
+                self._redis = sentinel.master_for(
+                    settings.REDIS_SENTINEL_MASTER,
+                    db=settings.REDIS_SENTINEL_DB,
+                    decode_responses=True,
+                )
+                logger.info("Redis Sentinel 模式初始化", master=settings.REDIS_SENTINEL_MASTER)
+            else:
+                # 直连模式（开发/单机）
+                self._redis = await redis.from_url(
+                    settings.REDIS_URL,
+                    encoding="utf-8",
+                    decode_responses=True,
+                    max_connections=int(os.getenv("REDIS_MAX_CONNECTIONS", "50"))
+                )
+                logger.info("Redis 直连模式初始化", url=settings.REDIS_URL)
+
             await self._redis.ping()
             self._initialized = True
             logger.info("Redis缓存服务初始化成功")
