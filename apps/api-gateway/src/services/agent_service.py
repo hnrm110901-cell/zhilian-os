@@ -99,6 +99,16 @@ class AgentService:
             logger.critical(error_msg)
             raise RuntimeError(error_msg)
 
+        # 业财税资金 Agent（可选，仅 FCT_ENABLED 时加载）
+        try:
+            from ..core.config import settings
+            if getattr(settings, "FCT_ENABLED", False):
+                from ..agents.fct_agent import FctAgent
+                self._agents["fct"] = FctAgent()
+                logger.info("FctAgent初始化成功")
+        except Exception as e:
+            logger.warning("FctAgent未加载（可选）", error=str(e))
+
         logger.info(f"所有Agent初始化成功，共{len(self._agents)}个Agent")
 
     def get_agents_status(self) -> Dict[str, Any]:

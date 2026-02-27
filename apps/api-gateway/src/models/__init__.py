@@ -41,6 +41,25 @@ from .report_template import ReportTemplate, ScheduledReport, ReportFormat, Sche
 from .competitor import CompetitorStore, CompetitorPrice
 from .export_job import ExportJob, ExportStatus
 from .backup_job import BackupJob, BackupType, BackupStatus
+from .fct import (
+    FctEvent,
+    FctVoucher,
+    FctVoucherLine,
+    FctVoucherStatus,
+    FctMaster,
+    FctMasterType,
+    FctCashTransaction,
+    FctTaxInvoice,
+    FctTaxDeclaration,
+    FctPlan,
+    FctPeriod,
+    FctPettyCashType,
+    FctPettyCash,
+    FctPettyCashRecord,
+    FctBudget,
+    FctBudgetControl,
+    FctApprovalRecord,
+)
 
 __all__ = [
     "Base",
@@ -123,4 +142,21 @@ __all__ = [
     "BackupJob",
     "BackupType",
     "BackupStatus",
+    "FctEvent",
+    "FctVoucher",
+    "FctVoucherLine",
+    "FctVoucherStatus",
+    "FctMaster",
+    "FctMasterType",
+    "FctCashTransaction",
+    "FctTaxInvoice",
+    "FctTaxDeclaration",
+    "FctPlan",
+    "FctPeriod",
+    "FctPettyCashType",
+    "FctPettyCash",
+    "FctPettyCashRecord",
+    "FctBudget",
+    "FctBudgetControl",
+    "FctApprovalRecord",
 ]

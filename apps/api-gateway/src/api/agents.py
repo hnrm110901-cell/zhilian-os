@@ -305,3 +305,26 @@ async def performance_agent(
     except Exception as e:
         logger.error("绩效Agent执行失败", exc_info=e)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/fct", response_model=AgentResponse)
+async def fct_agent(
+    request: AgentRequest,
+    current_user: User = Depends(require_permission(Permission.FCT_READ)),
+):
+    """
+    业财税资金智能体（FCT）
+
+    支持操作：get_report（期间汇总）, explain_voucher（凭证说明）, reconciliation_status（对账状态）
+    需 FCT_ENABLED=true 时才会加载该 Agent。
+    """
+    try:
+        result = await agent_service.execute_agent("fct", request.input_data)
+        return AgentResponse(
+            agent_type="fct",
+            output_data=result,
+            execution_time=result.get("execution_time", 0.0),
+        )
+    except Exception as e:
+        logger.error("FCT Agent执行失败", exc_info=e)
+        raise HTTPException(status_code=500, detail=str(e))

@@ -96,10 +96,28 @@ async def perform_reconciliation(
             threshold=request.threshold
         )
 
+        # 业财税资金一体化：对账完成后推送门店日结事件（若启用）
+        fct_result = None
+        try:
+            from src.core.config import settings
+            if getattr(settings, "FCT_ENABLED", False):
+                from src.services.fct_integration import push_store_daily_settlement_event
+                sales = record.actual_total_amount or record.pos_total_amount or 0
+                fct_result = await push_store_daily_settlement_event(
+                    entity_id=record.store_id,
+                    biz_date=record.reconciliation_date,
+                    total_sales=sales,
+                    total_sales_tax=0,
+                    source_id=f"reconcile_{record.store_id}_{record.reconciliation_date.isoformat()}",
+                )
+        except Exception as fct_err:
+            logger.warning("FCT 日结事件推送失败，对账结果已保存", error=str(fct_err))
+
         return {
             "success": True,
             "data": ReconciliationRecordResponse.model_validate(record).model_dump(),
-            "message": "对账完成"
+            "message": "对账完成",
+            "fct_event": fct_result,
         }
 
     except Exception as e:

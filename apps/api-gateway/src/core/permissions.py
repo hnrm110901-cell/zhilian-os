@@ -68,6 +68,10 @@ class Permission(str, Enum):
     AUDIT_READ = "audit:read"
     AUDIT_DELETE = "audit:delete"
 
+    # 业财税资金一体化（FCT）
+    FCT_READ = "fct:read"
+    FCT_WRITE = "fct:write"
+
 
 # 角色权限映射
 ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
@@ -106,6 +110,7 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
         Permission.STORE_READ,
         Permission.SYSTEM_LOGS,
         Permission.AUDIT_READ,
+        Permission.FCT_READ,
     },
 
     # 店长助理 - 协助店长管理
@@ -131,6 +136,7 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
         Permission.VOICE_NOTIFICATION,
         Permission.USER_READ,
         Permission.STORE_READ,
+        Permission.FCT_READ,
     },
 
     # 楼面经理 - 前厅运营管理
