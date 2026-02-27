@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any
 import structlog
 from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
 
@@ -378,7 +379,7 @@ class FinanceRuleEngine:
         store_id: str,
         start_date: datetime,
         end_date: datetime,
-        db: Session = None
+        db: AsyncSession = None
     ) -> Dict[str, Any]:
         """
         分析菜品盈利能力
@@ -387,7 +388,7 @@ class FinanceRuleEngine:
             store_id: 门店ID
             start_date: 开始日期
             end_date: 结束日期
-            db: 数据库会话
+            db: 异步数据库会话
 
         Returns:
             Dict: 菜品盈利分析
@@ -401,26 +402,27 @@ class FinanceRuleEngine:
                     "error": "no_db_session"
                 }
 
-            from sqlalchemy import func
+            from sqlalchemy import select, func
             from ..models.order import Order, OrderItem
 
-            rows = (
-                db.query(
+            stmt = (
+                select(
                     OrderItem.item_id,
                     OrderItem.item_name,
                     func.sum(OrderItem.quantity).label("sales_count"),
                     func.sum(OrderItem.subtotal).label("revenue_cents"),
                 )
                 .join(Order, OrderItem.order_id == Order.id)
-                .filter(
+                .where(
                     Order.store_id == store_id,
                     Order.order_time >= start_date,
                     Order.order_time <= end_date,
                     Order.status == "completed",
                 )
                 .group_by(OrderItem.item_id, OrderItem.item_name)
-                .all()
             )
+            result = await db.execute(stmt)
+            rows = result.all()
 
             food_cost_rate = float(os.getenv("DEFAULT_FOOD_COST_RATE", "0.30"))
             overhead_rate = float(os.getenv("DEFAULT_OVERHEAD_RATE", "0.30"))
