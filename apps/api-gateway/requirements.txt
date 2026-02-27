@@ -21,6 +21,8 @@ langchain==0.1.4
 langchain-openai==0.0.5
 langgraph==0.0.20
 llama-index==0.9.48
+# Anthropic Claude SDK — Tool Use + 流式输出
+anthropic>=0.40.0
 
 # Vector Database & Embeddings
 qdrant-client==1.7.3
