@@ -30,6 +30,8 @@ from src.api import data_security, chain_expansion, knowledge_rules, waste_event
 from src.api import fusion
 # Phase 5 — L3 跨店知识聚合（同伴组 + 物化指标 + 图同步）
 from src.api import l3_knowledge
+# Phase 6 — L4 推理层（全维度规则推理 + 因果图谱 + 健康诊断）
+from src.api import l4_reasoning
 from src.api import ai_evolution_dashboard
 from src.api import compliance
 from src.api import quality
@@ -492,6 +494,8 @@ app.include_router(waste_events.router, tags=["waste_events"])
 app.include_router(fusion.router, tags=["fusion"])
 # Phase 5 — L3 跨店知识聚合（同伴组 + 物化指标 + 图同步）
 app.include_router(l3_knowledge.router, tags=["l3_knowledge"])
+# Phase 6 — L4 推理层（全维度规则推理 + 因果图谱 + 健康诊断）
+app.include_router(l4_reasoning.router, tags=["l4_reasoning"])
 app.include_router(ai_evolution_dashboard.router, tags=["ai_evolution"])
 app.include_router(compliance.router)
 app.include_router(quality.router)

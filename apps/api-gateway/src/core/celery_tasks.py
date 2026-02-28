@@ -2066,3 +2066,220 @@ def daily_ontology_sync(
         return asyncio.run(_run())
     except Exception as e:
         raise self.retry(exc=e)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# L4 — 全平台推理扫描夜间任务（凌晨 3:30 触发）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@celery_app.task(
+    base=CallbackTask,
+    bind=True,
+    name="tasks.nightly_reasoning_scan",
+    max_retries=2,
+    default_retry_delay=300,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=1800,
+    retry_jitter=False,
+)
+def nightly_reasoning_scan(
+    self,
+    store_ids: list = None,
+) -> Dict[str, Any]:
+    """
+    L4 全平台推理扫描夜间任务（建议凌晨 3:30 触发，在 L3 nightly_cross_store_sync 之后）
+
+    执行步骤：
+      1. 从 PostgreSQL 拉取所有活跃门店最近 24h KPI 快照
+      2. 调用 DiagnosisService.run_full_diagnosis() 全维度推理
+      3. 结论写入 reasoning_reports（upsert，幂等）
+      4. 对 P1/P2 报告同步写入 Neo4j ReasoningReport 节点
+      5. 置信度 ≥ 0.70 的 P1/P2 告警自动推送企微
+
+    Args:
+        store_ids: 指定门店列表（None = 全部活跃门店）
+
+    Returns:
+        {
+          "stores_scanned":  N,
+          "p1_alerts":       N,
+          "p2_alerts":       N,
+          "wechat_sent":     N,
+          "errors":          [...]
+        }
+    """
+    async def _run():
+        from ..core.database import get_db_session
+        from ..models.store import Store
+        from ..services.diagnosis_service import DiagnosisService
+        from ..services.reasoning_engine import ALL_DIMENSIONS
+        from ..models.reasoning import ReasoningReport
+        from sqlalchemy import select, and_, func
+
+        errors = []
+        stores_scanned = 0
+        p1_count = 0
+        p2_count = 0
+        wechat_sent = 0
+
+        async with get_db_session() as session:
+            # 拉取活跃门店列表
+            if store_ids:
+                stmt = select(Store).where(
+                    and_(Store.id.in_(store_ids), Store.is_active.is_(True))
+                )
+            else:
+                stmt = select(Store).where(Store.is_active.is_(True))
+            stores = (await session.execute(stmt)).scalars().all()
+
+            svc = DiagnosisService(session)
+
+            for store in stores:
+                sid = str(store.id)
+                try:
+                    # 构造门店 KPI 快照（从近 30 天 cross_store_metrics 物化数据）
+                    kpi_context = await _build_kpi_context(session, sid)
+                    if not kpi_context:
+                        logger.debug("门店无 KPI 数据，跳过推理", store_id=sid)
+                        continue
+
+                    # 全维度诊断
+                    report = await svc.run_full_diagnosis(
+                        store_id=sid,
+                        kpi_context=kpi_context,
+                    )
+                    stores_scanned += 1
+
+                    # 统计 P1/P2
+                    for dim, c in report.dimensions.items():
+                        if c.severity == "P1":
+                            p1_count += 1
+                        elif c.severity == "P2":
+                            p2_count += 1
+
+                    # P1/P2 → 同步 Neo4j + 企微推送
+                    for dim, c in report.dimensions.items():
+                        if c.severity in ("P1", "P2") and c.confidence >= 0.70:
+                            # Neo4j 同步
+                            try:
+                                from ..ontology.data_sync import OntologyDataSync
+                                import uuid as _uuid
+                                # 查找刚写入的 reasoning_report id
+                                from ..models.reasoning import ReasoningReport as RR
+                                from datetime import date
+                                rr_stmt = select(RR).where(
+                                    and_(
+                                        RR.store_id    == sid,
+                                        RR.report_date == date.today(),
+                                        RR.dimension   == dim,
+                                    )
+                                ).limit(1)
+                                rr = (await session.execute(rr_stmt)).scalar_one_or_none()
+                                if rr:
+                                    with OntologyDataSync() as sync:
+                                        sync.upsert_reasoning_report(
+                                            report_id=str(rr.id),
+                                            store_id=sid,
+                                            report_date=rr.report_date.isoformat(),
+                                            dimension=dim,
+                                            severity=c.severity,
+                                            root_cause=c.root_cause,
+                                            confidence=c.confidence,
+                                            triggered_rules=c.triggered_rules,
+                                        )
+                            except Exception as neo4j_err:
+                                logger.warning(
+                                    "Neo4j ReasoningReport 同步失败",
+                                    store_id=sid,
+                                    error=str(neo4j_err),
+                                )
+
+                            # 企微推送
+                            try:
+                                from ..services.wechat_action_fsm import (
+                                    ActionCategory,
+                                    ActionPriority,
+                                    get_wechat_fsm,
+                                )
+                                fsm      = get_wechat_fsm()
+                                priority = (
+                                    ActionPriority.P1
+                                    if c.severity == "P1"
+                                    else ActionPriority.P2
+                                )
+                                action_text = (
+                                    c.recommended_actions[0]
+                                    if c.recommended_actions
+                                    else "请查看推理报告并采取行动"
+                                )
+                                await fsm.create_action(
+                                    store_id=sid,
+                                    category=ActionCategory.KPI_ALERT,
+                                    priority=priority,
+                                    title=f"L4推理告警：{dim} 维度 {c.severity}",
+                                    content=(
+                                        f"**{dim}** 维度异常\n"
+                                        f"根因: {c.root_cause or '待分析'}\n"
+                                        f"置信度: {c.confidence:.0%}\n"
+                                        f"建议: {action_text}"
+                                    ),
+                                    receiver_user_id="store_manager",
+                                    source_event_id=f"L4-{sid}-{dim}",
+                                    evidence={"dimension": dim, "severity": c.severity},
+                                )
+                                wechat_sent += 1
+                            except Exception as wx_err:
+                                logger.warning(
+                                    "L4 企微告警推送失败",
+                                    store_id=sid,
+                                    dim=dim,
+                                    error=str(wx_err),
+                                )
+
+                except Exception as e:
+                    errors.append({"store_id": sid, "error": str(e)})
+                    logger.error("门店推理扫描失败", store_id=sid, error=str(e))
+
+            await session.commit()
+
+        logger.info(
+            "L4 夜间推理扫描完成",
+            stores_scanned=stores_scanned,
+            p1_alerts=p1_count,
+            p2_alerts=p2_count,
+            wechat_sent=wechat_sent,
+            errors=len(errors),
+        )
+        return {
+            "success":       len(errors) == 0,
+            "stores_scanned": stores_scanned,
+            "p1_alerts":     p1_count,
+            "p2_alerts":     p2_count,
+            "wechat_sent":   wechat_sent,
+            "errors":        errors,
+        }
+
+    async def _build_kpi_context(session, store_id: str) -> Dict[str, Any]:
+        """从 cross_store_metrics 物化表拉取近期 KPI 值"""
+        from ..models.cross_store import CrossStoreMetric
+        from datetime import date, timedelta
+        from sqlalchemy import select, and_
+
+        yesterday = date.today() - timedelta(days=1)
+        stmt = select(
+            CrossStoreMetric.metric_name,
+            CrossStoreMetric.value,
+        ).where(
+            and_(
+                CrossStoreMetric.store_id    == store_id,
+                CrossStoreMetric.metric_date == yesterday,
+            )
+        )
+        rows = (await session.execute(stmt)).all()
+        return {r[0]: r[1] for r in rows}
+
+    try:
+        return asyncio.run(_run())
+    except Exception as e:
+        raise self.retry(exc=e)

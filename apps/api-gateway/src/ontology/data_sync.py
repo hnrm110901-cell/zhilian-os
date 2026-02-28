@@ -689,6 +689,70 @@ class OntologyDataSync:
     # CREATE INDEX ON :IngredientMapping(fusion_confidence);
     # CREATE INDEX ON :IngredientMapping(conflict_flag);
 
+    # ── L4 推理层本体（ReasoningReport 节点）────────────────────────────────
+
+    def upsert_reasoning_report(
+        self,
+        report_id:    str,
+        store_id:     str,
+        report_date:  str,           # ISO date string "2026-02-28"
+        dimension:    str,
+        severity:     str,           # P1/P2/P3/OK
+        root_cause:   Optional[str],
+        confidence:   float,
+        triggered_rules: list,       # List[str] rule_codes
+    ) -> None:
+        """
+        在 Neo4j 中写入 ReasoningReport 节点，并创建 Store→HAS_REPORT→ReasoningReport 边。
+
+        节点: ReasoningReport {report_id, store_id, report_date, dimension,
+                               severity, root_cause, confidence, triggered_rules}
+
+        推理结论图可查询：
+          MATCH (s:Store)-[:HAS_REPORT]->(r:ReasoningReport)
+          WHERE r.severity = 'P1' RETURN s.store_id, r.dimension ORDER BY r.report_date DESC
+        """
+        with self.driver.session() as session:
+            session.run(
+                """
+                MERGE (r:ReasoningReport {report_id: $report_id})
+                SET   r.store_id       = $store_id,
+                      r.report_date    = $report_date,
+                      r.dimension      = $dimension,
+                      r.severity       = $severity,
+                      r.root_cause     = $root_cause,
+                      r.confidence     = $confidence,
+                      r.triggered_rules = $triggered_rules,
+                      r.updated_at     = $ts
+
+                WITH r
+                MATCH (s:Store {store_id: $store_id})
+                MERGE (s)-[:HAS_REPORT]->(r)
+                """,
+                report_id=report_id,
+                store_id=store_id,
+                report_date=report_date,
+                dimension=dimension,
+                severity=severity,
+                root_cause=root_cause or "",
+                confidence=float(confidence),
+                triggered_rules=triggered_rules,
+                ts=datetime.utcnow().isoformat(),
+            )
+        logger.info(
+            "ReasoningReport 节点已写入",
+            report_id=report_id,
+            store_id=store_id,
+            dimension=dimension,
+            severity=severity,
+        )
+
+    # ── 约束 & 索引建议（L4 追加）────────────────────────────────────────────
+    # CREATE CONSTRAINT ON (r:ReasoningReport) ASSERT r.report_id IS UNIQUE;
+    # CREATE INDEX ON :ReasoningReport(store_id);
+    # CREATE INDEX ON :ReasoningReport(severity);
+    # CREATE INDEX ON :ReasoningReport(report_date);
+
     def __enter__(self):
         return self
 
