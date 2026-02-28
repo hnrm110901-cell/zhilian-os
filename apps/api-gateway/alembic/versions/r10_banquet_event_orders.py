@@ -61,7 +61,7 @@ def upgrade() -> None:
                   comment="BEO 状态（draft/confirmed/executed/archived/cancelled）"),
 
         # ── BEO 内容（完整快照）
-        sa.Column("content", JSONB(), nullable=False, server_default="'{}'::jsonb",
+        sa.Column("content", JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb"),
                   comment="BEO 完整内容快照（JSON）"),
 
         # ── 宴会关键信息（冗余存储，支持快速查询）
