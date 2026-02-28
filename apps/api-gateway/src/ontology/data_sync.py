@@ -243,6 +243,189 @@ class OntologyDataSync:
 
         return snapshot_id
 
+    # ── L2 融合层节点 ────────────────────────────────────────────────────────
+
+    def upsert_ingredient_mapping(
+        self,
+        canonical_id:     str,
+        canonical_name:   str,
+        category:         str,
+        unit:             str,
+        external_ids:     dict,
+        fusion_confidence: float,
+        fusion_method:    str,
+        conflict_flag:    bool = False,
+        canonical_cost_fen: int = 0,
+    ) -> None:
+        """
+        MERGE IngredientMapping 节点（规范ID注册中心）并与 Ingredient 节点关联。
+
+        Cypher 本体：
+          (IngredientMapping)-[:RESOLVES_TO]->(Ingredient)
+          每个 ExternalSource 代表一个原始系统食材条目
+        """
+        with self.driver.session() as session:
+            session.run(
+                """
+                MERGE (m:IngredientMapping {canonical_id: $canonical_id})
+                ON CREATE SET
+                    m.canonical_name    = $canonical_name,
+                    m.category          = $category,
+                    m.unit              = $unit,
+                    m.fusion_confidence = $fusion_confidence,
+                    m.fusion_method     = $fusion_method,
+                    m.conflict_flag     = $conflict_flag,
+                    m.canonical_cost_fen= $canonical_cost_fen,
+                    m.external_ids      = $external_ids_str,
+                    m.created_at        = timestamp()
+                ON MATCH SET
+                    m.canonical_name    = $canonical_name,
+                    m.fusion_confidence = $fusion_confidence,
+                    m.fusion_method     = $fusion_method,
+                    m.conflict_flag     = $conflict_flag,
+                    m.canonical_cost_fen= $canonical_cost_fen,
+                    m.external_ids      = $external_ids_str,
+                    m.updated_at        = timestamp()
+                WITH m
+                MERGE (i:Ingredient {ing_id: $canonical_id})
+                ON CREATE SET
+                    i.name     = $canonical_name,
+                    i.category = $category,
+                    i.unit_type= $unit
+                MERGE (m)-[:RESOLVES_TO]->(i)
+                """,
+                canonical_id=canonical_id,
+                canonical_name=canonical_name,
+                category=category or "",
+                unit=unit or "",
+                fusion_confidence=fusion_confidence,
+                fusion_method=fusion_method or "",
+                conflict_flag=conflict_flag,
+                canonical_cost_fen=canonical_cost_fen or 0,
+                external_ids_str=str(external_ids),
+            )
+            logger.debug(
+                "IngredientMapping 节点同步",
+                canonical_id=canonical_id,
+                method=fusion_method,
+                confidence=fusion_confidence,
+            )
+
+    def link_external_source(
+        self,
+        canonical_id:  str,
+        source_system: str,
+        external_id:   str,
+        confidence:    float,
+        method:        str,
+    ) -> None:
+        """
+        将外部系统食材节点链接到规范 IngredientMapping：
+          (ExternalSource {source_key: "pinzhi::12345"})-[:MAPPED_TO {confidence}]->(IngredientMapping)
+
+        source_key 格式："{source_system}::{external_id}"
+        """
+        source_key = f"{source_system}::{external_id}"
+        with self.driver.session() as session:
+            session.run(
+                """
+                MERGE (s:ExternalSource {source_key: $source_key})
+                ON CREATE SET
+                    s.source_system = $source_system,
+                    s.external_id   = $external_id,
+                    s.created_at    = timestamp()
+                WITH s
+                MATCH (m:IngredientMapping {canonical_id: $canonical_id})
+                MERGE (s)-[r:MAPPED_TO]->(m)
+                ON CREATE SET
+                    r.confidence = $confidence,
+                    r.method     = $method,
+                    r.created_at = timestamp()
+                ON MATCH SET
+                    r.confidence = $confidence,
+                    r.method     = $method
+                """,
+                source_key=source_key,
+                source_system=source_system,
+                external_id=external_id,
+                canonical_id=canonical_id,
+                confidence=confidence,
+                method=method or "",
+            )
+            logger.debug(
+                "ExternalSource 链接",
+                source_key=source_key,
+                canonical_id=canonical_id,
+                confidence=confidence,
+            )
+
+    def mark_source_conflict(
+        self,
+        canonical_id_a: str,
+        canonical_id_b: str,
+        reason:         str,
+        confidence:     float,
+    ) -> None:
+        """
+        在两个 IngredientMapping 间建立 SOURCE_CONFLICT 关系
+        （供 L4 推理层检测跨源成本异常）
+
+        (IngredientMapping_A)-[:SOURCE_CONFLICT {reason, confidence}]->(IngredientMapping_B)
+        """
+        with self.driver.session() as session:
+            session.run(
+                """
+                MATCH (a:IngredientMapping {canonical_id: $id_a})
+                MATCH (b:IngredientMapping {canonical_id: $id_b})
+                MERGE (a)-[r:SOURCE_CONFLICT]->(b)
+                ON CREATE SET
+                    r.reason     = $reason,
+                    r.confidence = $confidence,
+                    r.created_at = timestamp()
+                ON MATCH SET
+                    r.reason     = $reason,
+                    r.confidence = $confidence
+                """,
+                id_a=canonical_id_a,
+                id_b=canonical_id_b,
+                reason=reason,
+                confidence=confidence,
+            )
+            logger.warning(
+                "来源冲突关系建立",
+                id_a=canonical_id_a,
+                id_b=canonical_id_b,
+                reason=reason,
+            )
+
+    def upsert_store_external_ids(
+        self, store_id: str, external_ids: dict
+    ) -> None:
+        """
+        将门店的多源外部 ID 写入 Store 节点属性。
+        external_ids = {"meituan_poi": "12345678", "tiancai": "TC-BJ-001",
+                        "pinzhi_ognid": "XJ-01", "yiding": "YD-888"}
+        """
+        with self.driver.session() as session:
+            session.run(
+                """
+                MERGE (s:Store {store_id: $store_id})
+                ON MATCH SET s.external_ids = $external_ids_str
+                ON CREATE SET
+                    s.external_ids = $external_ids_str,
+                    s.created_at   = timestamp()
+                """,
+                store_id=store_id,
+                external_ids_str=str(external_ids),
+            )
+
+    # ── 约束 & 索引建议（在 Neo4j Browser 中手动执行一次）────────────────────
+    # CREATE CONSTRAINT ON (m:IngredientMapping) ASSERT m.canonical_id IS UNIQUE;
+    # CREATE CONSTRAINT ON (s:ExternalSource)    ASSERT s.source_key   IS UNIQUE;
+    # CREATE INDEX ON :IngredientMapping(category);
+    # CREATE INDEX ON :IngredientMapping(fusion_confidence);
+    # CREATE INDEX ON :IngredientMapping(conflict_flag);
+
     def __enter__(self):
         return self
 

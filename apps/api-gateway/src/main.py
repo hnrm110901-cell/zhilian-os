@@ -26,6 +26,8 @@ from src.api import bom
 from src.api import ontology, wechat_actions
 # Phase 3 — 数据主权 / 连锁扩展 / 推理规则库 / 损耗事件
 from src.api import data_security, chain_expansion, knowledge_rules, waste_events
+# Phase 4 — L2 融合层（多源食材ID规范化）
+from src.api import fusion
 from src.api import ai_evolution_dashboard
 from src.api import compliance
 from src.api import quality
@@ -484,6 +486,8 @@ app.include_router(chain_expansion.router, tags=["chain_expansion"])
 app.include_router(knowledge_rules.router)
 # Phase 3 — 损耗事件 CRUD（PostgreSQL + Neo4j 双写）
 app.include_router(waste_events.router, tags=["waste_events"])
+# Phase 4 — L2 融合层（多源食材 ID 规范化 + 置信度加权）
+app.include_router(fusion.router, tags=["fusion"])
 app.include_router(ai_evolution_dashboard.router, tags=["ai_evolution"])
 app.include_router(compliance.router)
 app.include_router(quality.router)
