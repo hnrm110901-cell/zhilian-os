@@ -195,38 +195,8 @@ class TiancaiShanglongAdapter:
 
         logger.info("查询订单", data=data)
 
-        try:
-            response = await self._request("POST", "/api/order/query", data=data)
-            return response.get("data", {})
-        except Exception as e:
-            logger.warning("查询订单失败，返回模拟数据", error=str(e))
-            return {
-                "order_id": order_id or "ORD20240001",
-                "order_no": order_no or "NO20240001",
-                "store_id": self.store_id,
-                "table_no": "A01",
-                "order_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "total_amount": 15800,  # 单位：分
-                "discount_amount": 1000,
-                "real_amount": 14800,
-                "status": 2,  # 1-待支付 2-已支付 3-已取消
-                "dishes": [
-                    {
-                        "dish_id": "D001",
-                        "dish_name": "宫保鸡丁",
-                        "price": 4800,
-                        "quantity": 2,
-                        "amount": 9600,
-                    },
-                    {
-                        "dish_id": "D002",
-                        "dish_name": "鱼香肉丝",
-                        "price": 3800,
-                        "quantity": 1,
-                        "amount": 3800,
-                    },
-                ],
-            }
+        response = await self._request("POST", "/api/order/query", data=data)
+        return response.get("data", {})
 
     async def create_order(
         self,
@@ -255,17 +225,8 @@ class TiancaiShanglongAdapter:
 
         logger.info("创建订单", table_no=table_no, dishes_count=len(dishes))
 
-        try:
-            response = await self._request("POST", "/api/order/create", data=data)
-            return response.get("data", {})
-        except Exception as e:
-            logger.warning("创建订单失败，返回模拟数据", error=str(e))
-            return {
-                "order_id": f"ORD{datetime.now().strftime('%Y%m%d%H%M%S')}",
-                "order_no": f"NO{datetime.now().strftime('%Y%m%d%H%M%S')}",
-                "status": 1,
-                "message": "订单创建成功",
-            }
+        response = await self._request("POST", "/api/order/create", data=data)
+        return response.get("data", {})
 
     async def update_order_status(
         self,
@@ -298,12 +259,8 @@ class TiancaiShanglongAdapter:
 
         logger.info("更新订单状态", order_id=order_id, status=status)
 
-        try:
-            response = await self._request("POST", "/api/order/update_status", data=data)
-            return response.get("data", {})
-        except Exception as e:
-            logger.warning("更新订单状态失败，返回模拟数据", error=str(e))
-            return {"message": "订单状态更新成功"}
+        response = await self._request("POST", "/api/order/update_status", data=data)
+        return response.get("data", {})
 
     # ==================== 菜品管理接口 ====================
 
@@ -334,31 +291,8 @@ class TiancaiShanglongAdapter:
 
         logger.info("查询菜品", data=data)
 
-        try:
-            response = await self._request("POST", "/api/dish/query", data=data)
-            return response.get("data", [])
-        except Exception as e:
-            logger.warning("查询菜品失败，返回模拟数据", error=str(e))
-            return [
-                {
-                    "dish_id": "D001",
-                    "dish_name": "宫保鸡丁",
-                    "category_id": "C001",
-                    "category_name": "热菜",
-                    "price": 4800,
-                    "unit": "份",
-                    "status": 1,  # 1-在售 0-停售
-                },
-                {
-                    "dish_id": "D002",
-                    "dish_name": "鱼香肉丝",
-                    "category_id": "C001",
-                    "category_name": "热菜",
-                    "price": 3800,
-                    "unit": "份",
-                    "status": 1,
-                },
-            ]
+        response = await self._request("POST", "/api/dish/query", data=data)
+        return response.get("data", [])
 
     async def update_dish_status(
         self,
@@ -383,12 +317,8 @@ class TiancaiShanglongAdapter:
 
         logger.info("更新菜品状态", dish_id=dish_id, status=status)
 
-        try:
-            response = await self._request("POST", "/api/dish/update_status", data=data)
-            return response.get("data", {})
-        except Exception as e:
-            logger.warning("更新菜品状态失败，返回模拟数据", error=str(e))
-            return {"message": "菜品状态更新成功"}
+        response = await self._request("POST", "/api/dish/update_status", data=data)
+        return response.get("data", {})
 
     # ==================== 会员管理接口 ====================
 
@@ -422,21 +352,8 @@ class TiancaiShanglongAdapter:
 
         logger.info("查询会员", data=data)
 
-        try:
-            response = await self._request("POST", "/api/member/query", data=data)
-            return response.get("data", {})
-        except Exception as e:
-            logger.warning("查询会员失败，返回模拟数据", error=str(e))
-            return {
-                "member_id": member_id or "M20240001",
-                "card_no": card_no or "C20240001",
-                "mobile": mobile or "13800138000",
-                "name": "张三",
-                "level": 2,
-                "points": 1500,
-                "balance": 50000,  # 单位：分
-                "status": 1,  # 1-正常 0-冻结
-            }
+        response = await self._request("POST", "/api/member/query", data=data)
+        return response.get("data", {})
 
     async def add_member(
         self,
@@ -465,18 +382,8 @@ class TiancaiShanglongAdapter:
 
         logger.info("新增会员", mobile=mobile, name=name)
 
-        try:
-            response = await self._request("POST", "/api/member/add", data=data)
-            return response.get("data", {})
-        except Exception as e:
-            logger.warning("新增会员失败，返回模拟数据", error=str(e))
-            return {
-                "member_id": f"M{datetime.now().strftime('%Y%m%d%H%M%S')}",
-                "card_no": card_no or f"C{datetime.now().strftime('%Y%m%d%H%M%S')}",
-                "mobile": mobile,
-                "name": name,
-                "message": "会员创建成功",
-            }
+        response = await self._request("POST", "/api/member/add", data=data)
+        return response.get("data", {})
 
     async def member_recharge(
         self,
@@ -504,16 +411,8 @@ class TiancaiShanglongAdapter:
 
         logger.info("会员充值", member_id=member_id, amount=amount)
 
-        try:
-            response = await self._request("POST", "/api/member/recharge", data=data)
-            return response.get("data", {})
-        except Exception as e:
-            logger.warning("会员充值失败，返回模拟数据", error=str(e))
-            return {
-                "recharge_id": f"R{datetime.now().strftime('%Y%m%d%H%M%S')}",
-                "balance": amount,
-                "message": "充值成功",
-            }
+        response = await self._request("POST", "/api/member/recharge", data=data)
+        return response.get("data", {})
 
     # ==================== 库存管理接口 ====================
 
@@ -540,21 +439,8 @@ class TiancaiShanglongAdapter:
 
         logger.info("查询库存", data=data)
 
-        try:
-            response = await self._request("POST", "/api/inventory/query", data=data)
-            return response.get("data", [])
-        except Exception as e:
-            logger.warning("查询库存失败，返回模拟数据", error=str(e))
-            return [
-                {
-                    "material_id": "M001",
-                    "material_name": "鸡肉",
-                    "unit": "kg",
-                    "quantity": 50.5,
-                    "alert_quantity": 10.0,
-                    "status": 1,  # 1-正常 2-预警 3-缺货
-                },
-            ]
+        response = await self._request("POST", "/api/inventory/query", data=data)
+        return response.get("data", [])
 
     async def update_inventory(
         self,
@@ -582,12 +468,8 @@ class TiancaiShanglongAdapter:
 
         logger.info("更新库存", material_id=material_id, quantity=quantity)
 
-        try:
-            response = await self._request("POST", "/api/inventory/update", data=data)
-            return response.get("data", {})
-        except Exception as e:
-            logger.warning("更新库存失败，返回模拟数据", error=str(e))
-            return {"message": "库存更新成功"}
+        response = await self._request("POST", "/api/inventory/update", data=data)
+        return response.get("data", {})
 
     async def close(self):
         """关闭适配器，释放资源"""
