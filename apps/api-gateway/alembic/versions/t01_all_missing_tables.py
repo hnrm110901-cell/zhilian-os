@@ -29,6 +29,7 @@ Covers all ORM models that had no migration, in dependency order:
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.dialects import postgresql
 
 revision: str = 't01_all_missing_tables'
@@ -38,6 +39,8 @@ depends_on = None
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    existing_tables = set(sa_inspect(bind).get_table_names())
 
     # ── 1. audit_logs ─────────────────────────────────────────────────────────
     op.create_table(
@@ -210,43 +213,44 @@ def upgrade() -> None:
     op.create_index('idx_quality_status',   'quality_inspections', ['status'])
 
     # ── 8. decision_logs ─────────────────────────────────────────────────────
-    op.create_table(
-        'decision_logs',
-        sa.Column('id',               sa.String(36),   primary_key=True),
-        sa.Column('decision_type',    sa.String(50),   nullable=False),
-        sa.Column('agent_type',       sa.String(50),   nullable=False),
-        sa.Column('agent_method',     sa.String(100),  nullable=False),
-        sa.Column('store_id',         sa.String(36),   sa.ForeignKey('stores.id'), nullable=False),
-        sa.Column('ai_suggestion',    sa.JSON(),       nullable=False),
-        sa.Column('ai_confidence',    sa.Float()),
-        sa.Column('ai_reasoning',     sa.Text()),
-        sa.Column('ai_alternatives',  sa.JSON()),
-        sa.Column('manager_id',       sa.String(36),   sa.ForeignKey('users.id')),
-        sa.Column('manager_decision', sa.JSON()),
-        sa.Column('manager_feedback', sa.Text()),
-        sa.Column('decision_status',  sa.String(20),   server_default='pending'),
-        sa.Column('created_at',       sa.DateTime(),   nullable=False, server_default=sa.func.now()),
-        sa.Column('approved_at',      sa.DateTime()),
-        sa.Column('executed_at',      sa.DateTime()),
-        sa.Column('outcome',          sa.String(20)),
-        sa.Column('actual_result',    sa.JSON()),
-        sa.Column('expected_result',  sa.JSON()),
-        sa.Column('result_deviation', sa.Float()),
-        sa.Column('business_impact',  sa.JSON()),
-        sa.Column('cost_impact',      sa.Numeric(12, 2)),
-        sa.Column('revenue_impact',   sa.Numeric(12, 2)),
-        sa.Column('is_training_data', sa.Integer(),    server_default='0'),
-        sa.Column('trust_score',      sa.Float()),
-        sa.Column('context_data',     sa.JSON()),
-        sa.Column('rag_context',      sa.JSON()),
-        sa.Column('approval_chain',   sa.JSON()),
-        sa.Column('notes',            sa.Text()),
-    )
-    op.create_index('idx_decision_logs_decision_type',   'decision_logs', ['decision_type'])
-    op.create_index('idx_decision_logs_agent_type',      'decision_logs', ['agent_type'])
-    op.create_index('idx_decision_logs_store_id',        'decision_logs', ['store_id'])
-    op.create_index('idx_decision_logs_manager_id',      'decision_logs', ['manager_id'])
-    op.create_index('idx_decision_logs_decision_status', 'decision_logs', ['decision_status'])
+    if 'decision_logs' not in existing_tables:
+        op.create_table(
+            'decision_logs',
+            sa.Column('id',               sa.String(36),   primary_key=True),
+            sa.Column('decision_type',    sa.String(50),   nullable=False),
+            sa.Column('agent_type',       sa.String(50),   nullable=False),
+            sa.Column('agent_method',     sa.String(100),  nullable=False),
+            sa.Column('store_id',         sa.String(36),   sa.ForeignKey('stores.id'), nullable=False),
+            sa.Column('ai_suggestion',    sa.JSON(),       nullable=False),
+            sa.Column('ai_confidence',    sa.Float()),
+            sa.Column('ai_reasoning',     sa.Text()),
+            sa.Column('ai_alternatives',  sa.JSON()),
+            sa.Column('manager_id',       sa.String(36),   sa.ForeignKey('users.id')),
+            sa.Column('manager_decision', sa.JSON()),
+            sa.Column('manager_feedback', sa.Text()),
+            sa.Column('decision_status',  sa.String(20),   server_default='pending'),
+            sa.Column('created_at',       sa.DateTime(),   nullable=False, server_default=sa.func.now()),
+            sa.Column('approved_at',      sa.DateTime()),
+            sa.Column('executed_at',      sa.DateTime()),
+            sa.Column('outcome',          sa.String(20)),
+            sa.Column('actual_result',    sa.JSON()),
+            sa.Column('expected_result',  sa.JSON()),
+            sa.Column('result_deviation', sa.Float()),
+            sa.Column('business_impact',  sa.JSON()),
+            sa.Column('cost_impact',      sa.Numeric(12, 2)),
+            sa.Column('revenue_impact',   sa.Numeric(12, 2)),
+            sa.Column('is_training_data', sa.Integer(),    server_default='0'),
+            sa.Column('trust_score',      sa.Float()),
+            sa.Column('context_data',     sa.JSON()),
+            sa.Column('rag_context',      sa.JSON()),
+            sa.Column('approval_chain',   sa.JSON()),
+            sa.Column('notes',            sa.Text()),
+        )
+        op.create_index('idx_decision_logs_decision_type',   'decision_logs', ['decision_type'])
+        op.create_index('idx_decision_logs_agent_type',      'decision_logs', ['agent_type'])
+        op.create_index('idx_decision_logs_store_id',        'decision_logs', ['store_id'])
+        op.create_index('idx_decision_logs_manager_id',      'decision_logs', ['manager_id'])
+        op.create_index('idx_decision_logs_decision_status', 'decision_logs', ['decision_status'])
 
     # ── 9. compliance_licenses ────────────────────────────────────────────────
     op.create_table(
