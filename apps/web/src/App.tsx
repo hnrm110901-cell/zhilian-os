@@ -92,6 +92,7 @@ const HQDashboardPage = lazy(() => import('./pages/HQDashboardPage'));
 const AIAccuracyPage = lazy(() => import('./pages/AIAccuracyPage'));
 const DishCostPage = lazy(() => import('./pages/DishCostPage'));
 const EmployeePerformancePage = lazy(() => import('./pages/EmployeePerformancePage'));
+const BOMManagementPage = lazy(() => import('./pages/BOMManagementPage'));
 
 const PageLoader = (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
@@ -334,6 +335,9 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="employee-performance" element={
                     <ProtectedRoute requiredRole="store_manager"><EmployeePerformancePage /></ProtectedRoute>
+                  } />
+                  <Route path="bom-management" element={
+                    <ProtectedRoute requiredRole="store_manager"><BOMManagementPage /></ProtectedRoute>
                   } />
                 </Route>
                 <Route path="*" element={<NotFoundPage />} />
