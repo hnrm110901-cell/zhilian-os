@@ -378,6 +378,220 @@ class WorkflowEngine:
         )
         return phase
 
+    # ── 超时检查 & Human-in-the-Loop 审批 ────────────────────────────────────
+
+    async def check_expired_phases(self) -> List[WorkflowPhase]:
+        """
+        扫描所有已超过 deadline 的阶段并自动锁定。
+
+        由 Celery Beat 定时任务调用（每 15 分钟一次）。
+
+        Returns:
+            本次被自动锁定的 WorkflowPhase 列表
+        """
+        now = datetime.utcnow()
+        stmt = (
+            select(WorkflowPhase)
+            .where(
+                and_(
+                    WorkflowPhase.status.in_([
+                        PhaseStatus.RUNNING.value,
+                        PhaseStatus.REVIEWING.value,
+                    ]),
+                    WorkflowPhase.deadline < now,
+                )
+            )
+        )
+        expired_phases = (await self.db.execute(stmt)).scalars().all()
+
+        locked: List[WorkflowPhase] = []
+        for phase in expired_phases:
+            try:
+                result = await self.lock_phase(phase.id, locked_by="auto_expired")
+                locked.append(result)
+                logger.warning(
+                    "阶段超时自动锁定",
+                    phase_name=phase.phase_name,
+                    phase_id=str(phase.id),
+                    deadline=str(phase.deadline),
+                )
+            except Exception as exc:
+                logger.error(
+                    "自动锁定失败",
+                    phase_id=str(phase.id),
+                    error=str(exc),
+                )
+
+        return locked
+
+    async def request_approval(
+        self,
+        phase_id:        uuid.UUID,
+        approver_id:     Optional[str] = None,
+        timeout_minutes: int = 120,
+    ) -> Dict[str, Any]:
+        """
+        为阶段决策发起人工审批请求，向企业微信推送审批通知。
+
+        通常在 submit_decision() 之后、phase 非 is_auto 时调用。
+        推送失败不阻断流程（降级为日志记录）。
+
+        Args:
+            phase_id:        WorkflowPhase.id
+            approver_id:     指定审批人（None 则广播给门店所有店长）
+            timeout_minutes: 审批超时分钟数，超时后 check_expired_phases 自动锁定
+
+        Returns:
+            {"request_id", "phase_id", "phase_name", "phase_label", "expires_at", "approver_id"}
+        """
+        phase = await self._get_phase(phase_id)
+        if phase.status not in (PhaseStatus.REVIEWING.value, PhaseStatus.RUNNING.value):
+            raise ValueError(
+                f"阶段 {phase.phase_name} 当前状态 {phase.status} 不支持发起审批"
+            )
+
+        cfg       = PHASE_CONFIG.get(phase.phase_name, {})
+        label     = cfg.get("label", phase.phase_name)
+        expires   = datetime.utcnow() + timedelta(minutes=timeout_minutes)
+        request_id = f"wf_approval_{phase_id}_{int(datetime.utcnow().timestamp())}"
+
+        # 获取最新版本内容
+        content_summary: Dict = {}
+        store_id = ""
+        if phase.current_version_id:
+            ver_stmt = select(DecisionVersion).where(
+                DecisionVersion.id == phase.current_version_id
+            )
+            ver = (await self.db.execute(ver_stmt)).scalar_one_or_none()
+            if ver:
+                content_summary = ver.content or {}
+                store_id = ver.store_id or ""
+
+        # 非阻塞推送企微通知
+        try:
+            from .wechat_work_message_service import WeChatWorkMessageService
+            wechat   = WeChatWorkMessageService()
+            message  = self._build_approval_message(label, content_summary, expires, request_id)
+            target   = approver_id or "@all"
+            await wechat.send_text_message(target, message)
+        except Exception as exc:
+            logger.warning(
+                "企微审批通知失败（已降级）",
+                phase_name=phase.phase_name,
+                error=str(exc),
+            )
+
+        logger.info(
+            "工作流审批请求已创建",
+            phase_name=phase.phase_name,
+            request_id=request_id,
+            expires_at=str(expires),
+            approver_id=approver_id,
+        )
+        return {
+            "request_id":  request_id,
+            "phase_id":    str(phase_id),
+            "phase_name":  phase.phase_name,
+            "phase_label": label,
+            "expires_at":  expires.isoformat(),
+            "approver_id": approver_id,
+        }
+
+    async def approve_phase(
+        self,
+        phase_id:    uuid.UUID,
+        approver_id: str,
+        comment:     str = "",
+    ) -> WorkflowPhase:
+        """
+        店长批准阶段决策，触发阶段锁定并推进到下一阶段。
+
+        Args:
+            phase_id:    WorkflowPhase.id
+            approver_id: 审批人 user_id
+            comment:     审批意见（记录到日志）
+
+        Returns:
+            已锁定的 WorkflowPhase
+        """
+        phase = await self._get_phase(phase_id)
+        if phase.status == PhaseStatus.LOCKED.value:
+            return phase  # 幂等
+
+        if phase.status not in (PhaseStatus.REVIEWING.value, PhaseStatus.RUNNING.value):
+            raise ValueError(
+                f"阶段 {phase.phase_name} 状态 {phase.status} 不支持审批"
+            )
+
+        logger.info(
+            "工作流阶段人工批准",
+            phase_name=phase.phase_name,
+            approver_id=approver_id,
+            comment=comment,
+        )
+        return await self.lock_phase(phase_id, locked_by=approver_id)
+
+    async def reject_phase(
+        self,
+        phase_id:    uuid.UUID,
+        approver_id: str,
+        reason:      str,
+    ) -> WorkflowPhase:
+        """
+        店长拒绝阶段决策，阶段回退至 RUNNING（允许重新 submit_decision）。
+
+        拒绝原因写入当前版本的 change_reason 字段，作为审计记录。
+
+        Args:
+            phase_id:    WorkflowPhase.id
+            approver_id: 拒绝人 user_id
+            reason:      拒绝原因
+
+        Returns:
+            回退到 RUNNING 状态的 WorkflowPhase
+        """
+        phase = await self._get_phase(phase_id)
+        if phase.status == PhaseStatus.LOCKED.value:
+            raise ValueError(f"阶段 {phase.phase_name} 已锁定，无法拒绝")
+
+        phase.status = PhaseStatus.RUNNING.value
+
+        # 在版本记录上追加拒绝原因
+        if phase.current_version_id:
+            ver_stmt = select(DecisionVersion).where(
+                DecisionVersion.id == phase.current_version_id
+            )
+            ver = (await self.db.execute(ver_stmt)).scalar_one_or_none()
+            if ver:
+                ver.change_reason = f"[拒绝] {reason}"
+
+        logger.info(
+            "工作流阶段人工拒绝",
+            phase_name=phase.phase_name,
+            approver_id=approver_id,
+            reason=reason,
+        )
+        return phase
+
+    def _build_approval_message(
+        self,
+        label:      str,
+        content:    Dict[str, Any],
+        expires_at: datetime,
+        request_id: str,
+    ) -> str:
+        """构建企微审批通知文本（截断超长内容）"""
+        import json
+        summary      = json.dumps(content, ensure_ascii=False)[:400]
+        deadline_str = expires_at.strftime("%m-%d %H:%M")
+        return (
+            f"【智链OS · 工作流审批】\n\n"
+            f"阶段: {label}\n"
+            f"内容摘要:\n{summary}\n\n"
+            f"请在 {deadline_str} 前批准或拒绝。\n"
+            f"审批ID: {request_id}"
+        )
+
     # ── 版本查询 ──────────────────────────────────────────────────────────────
 
     async def get_phase_versions(
