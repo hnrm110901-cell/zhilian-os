@@ -9,7 +9,8 @@ DailyHubService - T+1 经营统筹控制台核心编排器
 
 数据来源优先级（procurement/staffing）：
   1. WorkflowEngine DecisionVersion（阶段已锁定）
-  2. InventoryService / ScheduleService（兜底）
+  2. BanquetPlanningEngine 加成（宴会熔断触发时叠加）
+  3. InventoryService / ScheduleService（兜底）
 """
 
 from __future__ import annotations
@@ -23,6 +24,8 @@ import structlog
 from src.services.redis_cache_service import redis_cache
 from src.services.weather_adapter import weather_adapter
 from src.services.forecast_features import ChineseHolidays, WeatherImpact
+from src.services.auspicious_date_service import AuspiciousDateService
+from src.services.banquet_planning_engine import banquet_planning_engine, BANQUET_CIRCUIT_THRESHOLD
 
 logger = structlog.get_logger()
 
@@ -248,6 +251,11 @@ class DailyHubService:
         purchase_order = await self._build_purchase_order(store_id)
         staffing_plan  = await self._get_staffing_plan(store_id, target_date)
 
+        # 宴会熔断：将各宴会的采购加成合并到采购清单
+        circuit_breaker_addons = banquet_track.pop("circuit_breaker_addons", [])
+        for addon in circuit_breaker_addons:
+            purchase_order = purchase_order + addon.get("procurement_addon", [])
+
         data_sources   = {
             "purchase_order": "agent:inventory",
             "staffing_plan":  "agent:schedule",
@@ -273,6 +281,7 @@ class DailyHubService:
             "tomorrow_forecast": {
                 "weather":                weather_factors.get("weather"),
                 "holiday":                weather_factors.get("holiday"),
+                "auspicious":             weather_factors.get("auspicious"),
                 "banquet_track":          banquet_track,
                 "regular_track":          regular_track,
                 "total_predicted_revenue": total_predicted,
@@ -403,8 +412,12 @@ class DailyHubService:
                 "alerts":        [],
             }
 
-    async def _get_weather_factors(self, target_date: date) -> Dict[str, Any]:
-        result: Dict[str, Any] = {"weather": None, "holiday": None}
+    async def _get_weather_factors(
+        self,
+        target_date: date,
+        store_config: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        result: Dict[str, Any] = {"weather": None, "holiday": None, "auspicious": None}
 
         # 天气影响
         weather = await weather_adapter.get_tomorrow_weather()
@@ -424,6 +437,19 @@ class DailyHubService:
                 "impact_factor": ChineseHolidays.get_holiday_impact_score(target_date),
             }
 
+        # 吉日感知（宴会好日子需求倍增因子）
+        try:
+            auspicious_svc = AuspiciousDateService(store_config=store_config)
+            auspicious_info = auspicious_svc.get_info(target_date)
+            if auspicious_info.is_auspicious:
+                result["auspicious"] = {
+                    "label":         auspicious_info.label,
+                    "demand_factor": auspicious_info.demand_factor,
+                    "sources":       auspicious_info.sources,
+                }
+        except Exception as e:
+            logger.warning("吉日感知失败（非致命）", error=str(e))
+
         return result
 
     async def _get_banquet_variables(
@@ -434,9 +460,13 @@ class DailyHubService:
 
         宴会收入 = 确认宴会 × 人均预算（确定性，不走概率模型）。
         这正是"宴会熔断"的核心：将宴会从散客预测轨道中分离出去。
+
+        对 party_size ≥ BANQUET_CIRCUIT_THRESHOLD 的宴会额外触发熔断引擎，
+        生成 BEO 单 + 采购加成 + 排班加成，写入 banquet["circuit_breaker"] 字段。
         """
         banquets:              List[Dict[str, Any]] = []
         deterministic_revenue: float                = 0
+        circuit_breaker_addons: List[Dict[str, Any]] = []   # 熔断宴会的 BEO / 加成汇总
 
         try:
             from src.services.reservation_service import ReservationService
@@ -455,21 +485,49 @@ class DailyHubService:
                     (r.get("party_size") or 0) * BANQUET_AVG_SPEND_PER_HEAD
                 )
                 deterministic_revenue += budget
-                banquets.append({
+
+                banquet_entry = {
                     "reservation_id":   r.get("reservation_id"),
                     "customer_name":    r.get("customer_name"),
                     "party_size":       r.get("party_size"),
                     "estimated_budget": budget,
                     "reservation_time": r.get("reservation_time"),
-                })
+                }
+
+                # 宴会熔断：大宴会（≥ 阈值）触发确定性规划路径
+                cb = banquet_planning_engine.check_circuit_breaker(
+                    banquet=r,
+                    store_id=store_id,
+                    plan_date=target_date,
+                )
+                if cb.triggered:
+                    banquet_entry["circuit_breaker"] = {
+                        "triggered":    True,
+                        "beo_id":       cb.beo.get("beo_id") if cb.beo else None,
+                        "addon_staff":  cb.staffing_addon.get("total_addon_staff", 0),
+                        "addon_items":  len(cb.procurement_addon),
+                    }
+                    circuit_breaker_addons.append({
+                        "reservation_id":    r.get("reservation_id"),
+                        "procurement_addon": cb.procurement_addon,
+                        "staffing_addon":    cb.staffing_addon,
+                        "beo":               cb.beo,
+                    })
+
+                banquets.append(banquet_entry)
+
         except Exception as e:
             logger.warning("获取宴会变量失败", error=str(e))
 
-        return {
+        result = {
             "active":                len(banquets) > 0,
             "banquets":              banquets,
             "deterministic_revenue": deterministic_revenue,
         }
+        if circuit_breaker_addons:
+            result["circuit_breaker_addons"] = circuit_breaker_addons
+
+        return result
 
     async def _compute_regular_forecast(
         self,
