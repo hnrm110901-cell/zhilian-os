@@ -966,31 +966,54 @@ class ReservationAgent(BaseAgent):
 
     # Helper methods
 
-    async def _get_reservation(self, reservation_id: str) -> Reservation:
-        """获取预定信息"""
-        # 模拟数据
-        return {
-            "reservation_id": reservation_id,
-            "customer_id": "CUST001",
-            "customer_name": "张三",
-            "customer_phone": "13800138000",
-            "store_id": self.store_id,
-            "reservation_type": ReservationType.REGULAR,
-            "reservation_date": datetime.now().date().isoformat(),
-            "reservation_time": "18:00",
-            "party_size": 4,
-            "table_type": TableType.MEDIUM,
-            "table_number": "M001",
-            "special_requests": None,
-            "status": ReservationStatus.PENDING,
-            "deposit_amount": 10000,
-            "estimated_amount": 32000,
-            "created_at": datetime.now().isoformat(),
-            "updated_at": datetime.now().isoformat(),
-            "confirmed_at": None,
-            "seated_at": None,
-            "completed_at": None
-        }
+    async def _get_reservation(self, reservation_id: str) -> "Reservation":
+        """从 reservations 表查询预定信息"""
+        engine = self._get_db_engine()
+        if engine:
+            try:
+                from sqlalchemy import text
+                with engine.connect() as conn:
+                    row = conn.execute(text("""
+                        SELECT id, customer_name, customer_phone, store_id,
+                               reservation_type, reservation_date, reservation_time,
+                               party_size, table_number, status, special_requests,
+                               estimated_budget, created_at, updated_at
+                        FROM reservations
+                        WHERE id = :reservation_id AND store_id = :store_id
+                    """), {
+                        "reservation_id": reservation_id,
+                        "store_id": self.store_id,
+                    }).fetchone()
+                if row:
+                    return {
+                        "reservation_id": str(row[0]),
+                        "customer_id": None,
+                        "customer_name": str(row[1]),
+                        "customer_phone": str(row[2]),
+                        "store_id": str(row[3]),
+                        "reservation_type": row[4] or ReservationType.REGULAR,
+                        "reservation_date": str(row[5]),
+                        "reservation_time": str(row[6]),
+                        "party_size": int(row[7]),
+                        "table_type": TableType.MEDIUM,
+                        "table_number": str(row[8]) if row[8] else None,
+                        "special_requests": row[10],
+                        "status": row[9] or ReservationStatus.PENDING,
+                        "deposit_amount": int(row[11]) if row[11] else 0,
+                        "estimated_amount": int(row[11]) if row[11] else 0,
+                        "created_at": str(row[12]) if row[12] else datetime.now().isoformat(),
+                        "updated_at": str(row[13]) if row[13] else datetime.now().isoformat(),
+                        "confirmed_at": None,
+                        "seated_at": None,
+                        "completed_at": None,
+                    }
+            except Exception as e:
+                self.logger.warning(
+                    "get_reservation_db_failed",
+                    reservation_id=reservation_id,
+                    error=str(e),
+                )
+        raise ValueError(f"预定不存在: {reservation_id}")
 
     async def _get_reservations_by_time(
         self,

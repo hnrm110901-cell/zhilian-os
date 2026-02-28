@@ -310,7 +310,8 @@ class PrivateDomainAgent(BaseAgent):
         self.logger.info("analyzing_rfm", days=days)
         customers = await self._fetch_customers_from_db(days)
         if not customers:
-            customers = self._generate_mock_customers(50)
+            self.logger.info("analyze_rfm_no_data", store_id=self.store_id)
+            return []
         segments = []
         for c in customers:
             rfm_level = self._classify_rfm(c["recency_days"], c["frequency"], c["monetary"])
@@ -373,9 +374,13 @@ class PrivateDomainAgent(BaseAgent):
         signals = []
         now = datetime.utcnow().isoformat()
 
-        # 模拟信号检测（实际应查询DB + 外部API）
-        mock_customers = self._generate_mock_customers(50)
-        for c in mock_customers:
+        # 从 DB 查询活跃及近期沉睡客户（lookback = churn_threshold_days × 3）
+        lookback_days = max(30, self.churn_threshold_days)
+        customers = await self._fetch_customers_from_db(lookback_days)
+        if not customers:
+            self.logger.info("detect_signals_no_data", store_id=self.store_id)
+            return []
+        for c in customers:
             # 流失预警信号
             if c["recency_days"] >= self.churn_threshold_days:
                 signals.append(SignalEvent(

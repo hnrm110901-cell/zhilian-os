@@ -600,47 +600,111 @@ class DecisionAgent(BaseAgent):
         return insight
 
     async def _analyze_service_patterns(self) -> List[BusinessInsight]:
-        """分析服务模式"""
+        """分析服务模式 - 基于 kpi_records 中 quality/customer 类指标"""
         insights = []
-
-        # 模拟服务数据分析
-        insight: BusinessInsight = {
-            "insight_id": f"INSIGHT_SERVICE_{datetime.now().strftime('%Y%m%d%H%M%S')}",
-            "title": "午餐时段投诉率偏高",
-            "description": "数据显示午餐时段(11:00-14:00)的客户投诉率比其他时段高30%,主要原因是等待时间过长",
-            "category": "service",
-            "impact_level": "high",
-            "data_points": [
-                {"label": "午餐投诉率", "value": 0.08},
-                {"label": "其他时段投诉率", "value": 0.05},
-                {"label": "差异", "value": 0.03}
-            ],
-            "discovered_at": datetime.now().isoformat()
-        }
-        insights.append(insight)
-
+        engine = self._get_db_engine()
+        if not engine:
+            self.logger.info("analyze_service_patterns_no_db", store_id=self.store_id)
+            return insights
+        try:
+            from sqlalchemy import text
+            threshold = float(os.getenv("DECISION_KPI_INSIGHT_THRESHOLD", "0.90"))
+            with engine.connect() as conn:
+                rows = conn.execute(text("""
+                    SELECT kr.kpi_id, k.name, k.unit,
+                           AVG(kr.value)            AS avg_value,
+                           AVG(kr.target_value)     AS avg_target,
+                           AVG(kr.achievement_rate) AS avg_achievement
+                    FROM kpi_records kr
+                    JOIN kpis k ON kr.kpi_id = k.id
+                    WHERE kr.store_id = :store_id
+                      AND k.category IN ('quality', 'customer')
+                      AND kr.record_date >= CURRENT_DATE - INTERVAL '30 days'
+                    GROUP BY kr.kpi_id, k.name, k.unit
+                    HAVING AVG(kr.achievement_rate) < :threshold
+                    ORDER BY AVG(kr.achievement_rate) ASC
+                    LIMIT 5
+                """), {"store_id": self.store_id, "threshold": threshold}).fetchall()
+            for row in rows:
+                kpi_id, name, unit, avg_val, avg_target, avg_achv = row
+                avg_achv = float(avg_achv) if avg_achv is not None else 0.0
+                insights.append(BusinessInsight(
+                    insight_id=f"INSIGHT_SERVICE_{kpi_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}",
+                    title=f"服务指标「{name}」未达标",
+                    description=(
+                        f"{name} 近30天平均达成率 {avg_achv:.1%}，"
+                        f"低于目标值 {float(avg_target or 0):.2f}{unit or ''}"
+                    ),
+                    category="service",
+                    impact_level="high" if avg_achv < 0.80 else "medium",
+                    data_points=[
+                        {"label": "近30天均值", "value": round(float(avg_val or 0), 2)},
+                        {"label": "目标值",     "value": round(float(avg_target or 0), 2)},
+                        {"label": "达成率",     "value": round(avg_achv, 3)},
+                    ],
+                    discovered_at=datetime.now().isoformat(),
+                ))
+            self.logger.info("analyze_service_patterns_done", count=len(insights))
+        except Exception as e:
+            self.logger.warning("analyze_service_patterns_db_failed", error=str(e))
         return insights
 
     async def _analyze_inventory_patterns(self) -> List[BusinessInsight]:
-        """分析库存模式"""
+        """分析库存模式 - 基于 waste_events 的周末/平日损耗对比"""
         insights = []
-
-        # 模拟库存数据分析
-        insight: BusinessInsight = {
-            "insight_id": f"INSIGHT_INVENTORY_{datetime.now().strftime('%Y%m%d%H%M%S')}",
-            "title": "周末食材浪费率较高",
-            "description": "周末食材浪费率达12%,高于平日的7%,建议优化周末采购计划",
-            "category": "inventory",
-            "impact_level": "medium",
-            "data_points": [
-                {"label": "周末浪费率", "value": 0.12},
-                {"label": "平日浪费率", "value": 0.07},
-                {"label": "潜在节省", "value": 5000}
-            ],
-            "discovered_at": datetime.now().isoformat()
-        }
-        insights.append(insight)
-
+        engine = self._get_db_engine()
+        if not engine:
+            self.logger.info("analyze_inventory_patterns_no_db", store_id=self.store_id)
+            return insights
+        try:
+            from sqlalchemy import text
+            with engine.connect() as conn:
+                rows = conn.execute(text("""
+                    SELECT
+                        EXTRACT(DOW FROM occurred_at) IN (0, 6) AS is_weekend,
+                        AVG(COALESCE(variance_pct, 0))           AS avg_waste_pct,
+                        COUNT(*)                                  AS event_count
+                    FROM waste_events
+                    WHERE store_id = :store_id
+                      AND occurred_at >= NOW() - INTERVAL '30 days'
+                    GROUP BY is_weekend
+                """), {"store_id": self.store_id}).fetchall()
+            weekend_rate: Optional[float] = None
+            weekday_rate: Optional[float] = None
+            for row in rows:
+                is_weekend, avg_pct, _count = row
+                rate = float(avg_pct) if avg_pct is not None else 0.0
+                if is_weekend:
+                    weekend_rate = rate
+                else:
+                    weekday_rate = rate
+            if (
+                weekend_rate is not None
+                and weekday_rate is not None
+                and weekend_rate > weekday_rate * 1.2
+            ):
+                insights.append(BusinessInsight(
+                    insight_id=f"INSIGHT_INVENTORY_{datetime.now().strftime('%Y%m%d%H%M%S')}",
+                    title="周末食材损耗率偏高",
+                    description=(
+                        f"周末平均损耗率 {weekend_rate:.1%}，高于平日 {weekday_rate:.1%}"
+                        f"（超出 {(weekend_rate - weekday_rate) / max(weekday_rate, 1e-9):.0%}），"
+                        "建议优化周末采购与备餐计划"
+                    ),
+                    category="inventory",
+                    impact_level="high" if weekend_rate > weekday_rate * 1.5 else "medium",
+                    data_points=[
+                        {"label": "周末损耗率", "value": round(weekend_rate, 4)},
+                        {"label": "平日损耗率", "value": round(weekday_rate, 4)},
+                        {"label": "超出比例",   "value": round(
+                            (weekend_rate - weekday_rate) / max(weekday_rate, 1e-9), 3
+                        )},
+                    ],
+                    discovered_at=datetime.now().isoformat(),
+                ))
+            self.logger.info("analyze_inventory_patterns_done", count=len(insights))
+        except Exception as e:
+            self.logger.warning("analyze_inventory_patterns_db_failed", error=str(e))
         return insights
 
     async def generate_recommendations(
