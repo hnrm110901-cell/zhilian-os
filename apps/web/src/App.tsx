@@ -97,6 +97,7 @@ const WasteEventPage = lazy(() => import('./pages/WasteEventPage'));
 const KnowledgeRulesPage = lazy(() => import('./pages/KnowledgeRulesPage'));
 const DataSecurityPage = lazy(() => import('./pages/DataSecurityPage'));
 const BanquetLifecyclePage = lazy(() => import('./pages/BanquetLifecyclePage'));
+const MarketingCampaignPage = lazy(() => import('./pages/MarketingCampaignPage'));
 
 const PageLoader = (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
@@ -354,6 +355,9 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="banquet-lifecycle" element={
                     <ProtectedRoute requiredRole="store_manager"><BanquetLifecyclePage /></ProtectedRoute>
+                  } />
+                  <Route path="marketing" element={
+                    <ProtectedRoute requiredRole="store_manager"><MarketingCampaignPage /></ProtectedRoute>
                   } />
                 </Route>
                 <Route path="*" element={<NotFoundPage />} />

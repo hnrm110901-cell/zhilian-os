@@ -535,8 +535,11 @@ app.include_router(bulk_import.router, tags=["bulk_import"])
 app.include_router(hq_dashboard.router, prefix="/api/v1", tags=["hq_dashboard"])
 app.include_router(ai_accuracy.router, prefix="/api/v1", tags=["ai_accuracy"])
 
-# 业财税资金一体化扩展（FCT）- 可选挂载
-# 注意：fct.py 尚未实现，FCT_ENABLED 默认为 False，请勿在生产中启用
+# 营销 Agent — 顾客画像 / 发券策略 / 活动管理
+from src.api import marketing_agent
+app.include_router(marketing_agent.router, tags=["marketing_agent"])
+
+# 业财税资金一体化（FCT）
 if getattr(settings, "FCT_ENABLED", False):
     try:
         from src.api import fct
