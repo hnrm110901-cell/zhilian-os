@@ -245,7 +245,7 @@ class DailyHubService:
 
         yesterday_review = await self._get_yesterday_review(store_id, yesterday)
         weather_factors  = await self._get_weather_factors(target_date)
-        banquet_track    = await self._get_banquet_variables(store_id, target_date)
+        banquet_track    = await self._get_banquet_variables(store_id, target_date, db=db)
         regular_track    = await self._compute_regular_forecast(store_id, target_date, weather_factors)
         total_predicted, total_lower, total_upper = self._merge_tracks(banquet_track, regular_track)
 
@@ -443,7 +443,7 @@ class DailyHubService:
             return {"weather": None, "holiday": None, "auspicious": None, "composite_factor": 1.0}
 
     async def _get_banquet_variables(
-        self, store_id: str, target_date: date
+        self, store_id: str, target_date: date, db: Optional[Any] = None
     ) -> Dict[str, Any]:
         """
         获取明日宴会数据（确定性收入轨道）。
@@ -453,6 +453,7 @@ class DailyHubService:
 
         对 party_size ≥ BANQUET_CIRCUIT_THRESHOLD 的宴会额外触发熔断引擎，
         生成 BEO 单 + 采购加成 + 排班加成，写入 banquet["circuit_breaker"] 字段。
+        若 db 已传入，自动将 BEO 持久化到数据库（版本化，非致命）。
         """
         banquets:              List[Dict[str, Any]] = []
         deterministic_revenue: float                = 0
@@ -491,9 +492,18 @@ class DailyHubService:
                     plan_date=target_date,
                 )
                 if cb.triggered:
+                    # 持久化 BEO（若 db 可用）
+                    db_beo_id = cb.beo.get("beo_id") if cb.beo else None
+                    if db and cb.beo:
+                        saved = await banquet_planning_engine.save_beo(
+                            beo=cb.beo, banquet=r, db=db, operator="daily_hub"
+                        )
+                        if saved:
+                            db_beo_id = str(saved.id)
+
                     banquet_entry["circuit_breaker"] = {
                         "triggered":    True,
-                        "beo_id":       cb.beo.get("beo_id") if cb.beo else None,
+                        "beo_id":       db_beo_id,
                         "addon_staff":  cb.staffing_addon.get("total_addon_staff", 0),
                         "addon_items":  len(cb.procurement_addon),
                     }

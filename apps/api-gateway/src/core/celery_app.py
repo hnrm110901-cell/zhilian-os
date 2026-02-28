@@ -110,6 +110,10 @@ celery_app.conf.update(
             "queue": "default",
             "routing_key": "default",
         },
+        "tasks.release_expired_room_locks": {
+            "queue": "default",
+            "routing_key": "default",
+        },
     },
 
     # Celery Beat定时任务调度
@@ -192,6 +196,16 @@ celery_app.conf.update(
             "options": {
                 "queue": "default",
                 "priority": 8,
+            },
+        },
+        # 每日凌晨1点释放超时锁台（room_lock 超过 ROOM_LOCK_TIMEOUT_DAYS 未签约则回退到 intent）
+        "release-expired-room-locks": {
+            "task": "tasks.release_expired_room_locks",
+            "schedule": crontab(hour=1, minute=0),
+            "args": (),
+            "options": {
+                "queue": "default",
+                "priority": 5,
             },
         },
     },

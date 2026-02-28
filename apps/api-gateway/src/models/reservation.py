@@ -61,6 +61,13 @@ class Reservation(Base, TimestampMixin):
     banquet_details = Column(JSON, default=dict)  # Menu, budget, decorations, etc.
     estimated_budget = Column(Integer)  # Budget in cents
 
+    # Banquet lifecycle stage (r11 migration)
+    banquet_stage            = Column(String(20), nullable=True, index=True)
+    banquet_stage_updated_at = Column(DateTime(timezone=False), nullable=True)
+    room_locked_at           = Column(DateTime(timezone=False), nullable=True)
+    signed_at                = Column(DateTime(timezone=False), nullable=True)
+    deposit_paid             = Column(Integer, nullable=True)  # cents
+
     # Notes
     notes = Column(String(500))
 

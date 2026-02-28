@@ -54,6 +54,8 @@ from src.api import private_domain
 from src.api import ops
 from src.api import daily_hub
 from src.api import banquet
+from src.api import banquet_lifecycle
+from src.api import external_factors
 from src.api import pos_webhook
 from src.api import bulk_import
 from src.api import hq_dashboard
@@ -524,6 +526,10 @@ app.include_router(ops.router, prefix="/api/v1/ops", tags=["ops"])
 app.include_router(daily_hub.router, tags=["daily_hub"])
 # Phase 9 — 宴会熔断引擎（吉日感知 + BEO 单 + 采购/排班加成 + 资源冲突检测）
 app.include_router(banquet.router, tags=["banquet"])
+# Banquet Lifecycle — 7 阶段销售漏斗 + 锁台冲突 + 销控日历
+app.include_router(banquet_lifecycle.router, tags=["banquet_lifecycle"])
+# External Factors — 统一外部因子查询（天气/节假日/吉日/商圈事件）
+app.include_router(external_factors.router, tags=["external_factors"])
 app.include_router(pos_webhook.router, tags=["pos_webhook"])
 app.include_router(bulk_import.router, tags=["bulk_import"])
 app.include_router(hq_dashboard.router, prefix="/api/v1", tags=["hq_dashboard"])

@@ -2523,3 +2523,42 @@ def check_workflow_deadlines(self) -> Dict[str, Any]:
         return asyncio.run(_run())
     except Exception as e:
         raise self.retry(exc=e)
+
+
+@celery_app.task(
+    base=CallbackTask, bind=True,
+    name="tasks.release_expired_room_locks",
+    max_retries=2, default_retry_delay=60,
+    autoretry_for=(Exception,), retry_backoff=True,
+)
+def release_expired_room_locks(self) -> Dict[str, Any]:
+    """
+    每天凌晨 01:00 扫描全平台超时锁台预约并自动释放。
+
+    锁台（room_lock）超过 ROOM_LOCK_TIMEOUT_DAYS（默认 7 天）未签约，
+    自动回退到意向（intent）阶段，释放场地资源。
+
+    调度建议：beat_schedule 中设置 crontab(hour=1, minute=0)
+
+    Returns:
+        {success, released_count, released_ids}
+    """
+    async def _run():
+        from src.core.database import async_session_factory
+        from src.services.banquet_lifecycle_service import BanquetLifecycleService
+
+        async with async_session_factory() as session:
+            svc      = BanquetLifecycleService(session)
+            released = await svc.release_expired_locks()
+            await session.commit()
+
+        return {
+            "success":        True,
+            "released_count": len(released),
+            "released_ids":   released,
+        }
+
+    try:
+        return asyncio.run(_run())
+    except Exception as e:
+        raise self.retry(exc=e)
