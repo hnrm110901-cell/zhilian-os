@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_db
 from src.core.dependencies import get_current_user
 from src.models.user import User
-from src.models.waste_event import WasteEventStatus, WasteEventType
+from src.models.waste_event import WasteEventStatus, WasteEventType, WasteEvent
 from src.services.waste_event_service import WasteEventService
 
 router = APIRouter(prefix="/api/v1/waste-events", tags=["waste_events"])

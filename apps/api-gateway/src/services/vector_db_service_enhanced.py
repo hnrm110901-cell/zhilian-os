@@ -157,7 +157,7 @@ class VectorDatabaseServiceEnhanced:
             logger.info("嵌入模型加载成功", model=model_name)
 
         except Exception as e:
-            logger.warning(f"嵌入模型加载失败，将使用模拟嵌入: {str(e)}")
+            logger.warning(f"嵌入模型加载失败，将降级到 API 模式: {str(e)}")
             self.embedding_model = None
 
     async def _ensure_collections(self):
@@ -220,21 +220,78 @@ class VectorDatabaseServiceEnhanced:
         Returns:
             嵌入向量
         """
-        if not text or not text.strip():
-            # 空文本返回零向量
-            return [0.0] * 384
+        dim = int(os.getenv("VECTOR_EMBEDDING_DIM", "384"))
 
+        if not text or not text.strip():
+            return [0.0] * dim
+
+        # 优先：本地 sentence-transformers 模型
         if self.embedding_model:
             try:
-                # 使用实际的嵌入模型
                 embedding = self.embedding_model.encode(text, convert_to_numpy=True)
                 return embedding.tolist()
             except Exception as e:
-                logger.error(f"嵌入生成失败，使用模拟嵌入: {str(e)}")
-                return self._generate_mock_embedding(text)
-        else:
-            # 模拟嵌入
-            return self._generate_mock_embedding(text)
+                logger.warning(f"本地嵌入生成失败，尝试 API 降级: {str(e)}")
+
+        # 降级：OpenAI-compatible embedding API
+        api_result = self._embed_via_api(text, dim)
+        if api_result is not None:
+            return api_result
+
+        # 最终降级：零向量（语义无意义，明确记录错误）
+        logger.error(
+            "所有嵌入方法均失败，返回零向量",
+            hint="请配置 OPENAI_API_KEY 或确保 sentence-transformers 可用",
+        )
+        return [0.0] * dim
+
+    def _embed_via_api(self, text: str, dim: int) -> Optional[List[float]]:
+        """
+        通过 OpenAI-compatible embedding API 获取向量（本地模型不可用时的降级）
+
+        需要环境变量：
+          OPENAI_API_KEY   — API 密钥（必填）
+          OPENAI_API_BASE  — 自定义端点（默认 https://api.openai.com/v1）
+          EMBEDDING_API_MODEL — 嵌入模型名（默认 text-embedding-3-small）
+        """
+        import json
+        import urllib.request
+        import urllib.error
+
+        api_key = os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY")
+        if not api_key:
+            return None
+
+        base_url = os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1").rstrip("/")
+        model = os.getenv("EMBEDDING_API_MODEL", "text-embedding-3-small")
+        timeout = float(os.getenv("EMBEDDING_API_TIMEOUT", "10.0"))
+
+        payload = json.dumps({
+            "input": text[:8191],
+            "model": model,
+            "dimensions": dim,
+        }).encode("utf-8")
+
+        req = urllib.request.Request(
+            f"{base_url}/embeddings",
+            data=payload,
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                result = json.loads(resp.read())
+            embedding = result["data"][0]["embedding"]
+            logger.info("embedding_via_api_success", model=model, dim=len(embedding))
+            return embedding
+        except urllib.error.HTTPError as e:
+            logger.warning(f"嵌入 API 请求失败: HTTP {e.code}", model=model)
+            return None
+        except Exception as e:
+            logger.warning(f"嵌入 API 调用异常: {str(e)}")
+            return None
 
     def _generate_mock_embedding(self, text: str) -> List[float]:
         """生成确定性哈希向量（嵌入模型不可用时的fallback，语义无意义）"""

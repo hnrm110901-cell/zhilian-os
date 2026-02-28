@@ -70,6 +70,16 @@ ALL_PHASES = [
     PHASE_MARKETING,
 ]
 
+# 阶段配置：deadline偏移（相对规划触发时刻，单位分钟）及描述
+PHASE_CONFIG: dict = {
+    PHASE_INITIAL_PLAN: {"deadline_offset": 30,  "label": "初始规划"},
+    PHASE_PROCUREMENT:  {"deadline_offset": 120, "label": "采购下单"},
+    PHASE_SCHEDULING:   {"deadline_offset": 180, "label": "排班确认"},
+    PHASE_MENU:         {"deadline_offset": 240, "label": "菜单定稿"},
+    PHASE_MENU_SYNC:    {"deadline_offset": 300, "label": "菜单同步"},
+    PHASE_MARKETING:    {"deadline_offset": 360, "label": "营销发布"},
+}
+
 
 # ── ORM 模型 ──────────────────────────────────────────────────────────────────
 

@@ -106,7 +106,7 @@ class LLMCypherService:
     """
 
     def __init__(self):
-        self.api_key = os.getenv("OPENAI_API_KEY", "")
+        self.api_key = os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY", "")
         self.base_url = os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")
         self.model = os.getenv("MODEL_NAME", "gpt-4-turbo-preview")
 
@@ -166,12 +166,12 @@ class LLMCypherService:
         if store_id:
             user_msg += f"\n（门店 ID：{store_id}）"
 
-        # 尝试 OpenAI API
-        if self.api_key and not self.api_key.startswith("sk-placeholder"):
+        # 尝试 LLM API（有 key 时优先使用）
+        if self.api_key:
             try:
                 return await self._call_openai(user_msg)
             except Exception as e:
-                logger.warning("OpenAI 调用失败，降级到规则引擎", error=str(e))
+                logger.warning("LLM API 调用失败，降级到规则引擎", error=str(e))
 
         # 降级：规则引擎
         return self._rule_based_translation(question, store_id)
