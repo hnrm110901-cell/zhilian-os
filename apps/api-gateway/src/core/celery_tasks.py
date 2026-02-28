@@ -2562,3 +2562,82 @@ def release_expired_room_locks(self) -> Dict[str, Any]:
         return asyncio.run(_run())
     except Exception as e:
         raise self.retry(exc=e)
+
+
+@celery_app.task(
+    base=CallbackTask,
+    bind=True,
+    name="tasks.monthly_save_fct_tax",
+    max_retries=2,
+    default_retry_delay=300,
+)
+def monthly_save_fct_tax(self, year: int = 0, month: int = 0) -> Dict[str, Any]:
+    """
+    月度税务记录自动保存（FCT 业财税一体化）
+
+    每月1日凌晨 01:00 自动运行：
+      - 遍历所有门店
+      - 调用 FCTService.estimate_monthly_tax() 估算上月税务
+      - 将结果持久化到 fct_tax_records 表
+
+    Args:
+        year:  被保存的年份（默认 0 表示自动推断上个月所在年）
+        month: 被保存的月份（默认 0 表示自动推断上个月）
+    """
+    from datetime import date, timedelta
+
+    async def _run():
+        from src.core.database import async_session_factory
+        from src.models.store import Store
+        from src.services.fct_service import FCTService
+        from sqlalchemy import select
+
+        # 自动推断上个月
+        today = date.today()
+        if year == 0 or month == 0:
+            first_of_this_month = today.replace(day=1)
+            last_month_end = first_of_this_month - timedelta(days=1)
+            _year  = last_month_end.year
+            _month = last_month_end.month
+        else:
+            _year, _month = year, month
+
+        saved, failed = 0, 0
+
+        async with async_session_factory() as session:
+            stores_result = await session.execute(select(Store.id))
+            store_ids = [row[0] for row in stores_result.all()]
+
+        for store_id in store_ids:
+            try:
+                async with async_session_factory() as session:
+                    svc = FCTService(session)
+                    await svc.estimate_monthly_tax(
+                        store_id=store_id,
+                        year=_year,
+                        month=_month,
+                        save=True,
+                    )
+                    await session.commit()
+                    saved += 1
+            except Exception as exc:
+                logger.warning(
+                    "月度税务保存失败",
+                    store_id=store_id,
+                    year=_year,
+                    month=_month,
+                    error=str(exc),
+                )
+                failed += 1
+
+        logger.info(
+            "月度税务批量保存完成",
+            year=_year, month=_month,
+            saved=saved, failed=failed,
+        )
+        return {"year": _year, "month": _month, "saved": saved, "failed": failed}
+
+    try:
+        return asyncio.run(_run())
+    except Exception as e:
+        raise self.retry(exc=e)

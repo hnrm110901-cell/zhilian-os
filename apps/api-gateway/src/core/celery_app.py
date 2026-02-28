@@ -114,6 +114,10 @@ celery_app.conf.update(
             "queue": "default",
             "routing_key": "default",
         },
+        "tasks.monthly_save_fct_tax": {
+            "queue": "default",
+            "routing_key": "default",
+        },
     },
 
     # Celery Beat定时任务调度
@@ -202,6 +206,16 @@ celery_app.conf.update(
         "release-expired-room-locks": {
             "task": "tasks.release_expired_room_locks",
             "schedule": crontab(hour=1, minute=0),
+            "args": (),
+            "options": {
+                "queue": "default",
+                "priority": 5,
+            },
+        },
+        # 每月1日凌晨1:00 自动保存上月税务记录（FCT 业财税一体化）
+        "monthly-save-fct-tax": {
+            "task": "tasks.monthly_save_fct_tax",
+            "schedule": crontab(hour=1, minute=0, day_of_month=1),
             "args": (),
             "options": {
                 "queue": "default",

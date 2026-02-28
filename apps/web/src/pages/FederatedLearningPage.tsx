@@ -82,6 +82,13 @@ const FederatedLearningPage: React.FC = () => {
   return (
     <Spin spinning={loading}>
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        <Alert
+          type="warning"
+          message="功能即将上线"
+          description="联邦学习功能正在开发中，当前 API 服务尚未启用。以下界面为预览版本，部分操作可能无法正常使用。"
+          banner
+          style={{ marginBottom: 8 }}
+        />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Title level={4} style={{ margin: 0 }}>联邦学习</Title>
           <Space>
