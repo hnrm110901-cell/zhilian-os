@@ -97,6 +97,65 @@ jobs:
           flags: backend
           name: backend-coverage
 
+  test-agents:
+    name: Test Agent Packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          cd apps/api-gateway
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio pytest-cov
+
+      # Run each agent suite individually to avoid sys.path conflicts.
+      # --import-mode=importlib prevents cross-package module shadowing.
+      - name: Test inventory agent
+        run: |
+          cd packages/agents/inventory
+          pytest tests/ -v --import-mode=importlib
+
+      - name: Test private_domain agent
+        run: |
+          cd packages/agents/private_domain
+          pytest tests/ -v --import-mode=importlib
+
+      - name: Test decision agent
+        run: |
+          cd packages/agents/decision
+          pytest tests/ -v --import-mode=importlib
+
+      - name: Test reservation agent
+        run: |
+          cd packages/agents/reservation
+          pytest tests/ -v --import-mode=importlib
+
+      - name: Test training agent
+        run: |
+          cd packages/agents/training
+          pytest tests/ -v --import-mode=importlib
+
+      - name: Test order agent
+        run: |
+          cd packages/agents/order
+          pytest tests/ -v --import-mode=importlib
+
+      - name: Test schedule agent
+        run: |
+          cd packages/agents/schedule
+          pytest tests/ -v --import-mode=importlib
+
+      - name: Test service agent
+        run: |
+          cd packages/agents/service
+          pytest tests/ -v --import-mode=importlib
+
   lint-frontend:
     name: Lint Frontend
     runs-on: ubuntu-latest
@@ -160,7 +219,7 @@ jobs:
   build:
     name: Build Docker Images
     runs-on: ubuntu-latest
-    needs: [test-backend, test-frontend]
+    needs: [test-backend, test-agents, test-frontend]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
