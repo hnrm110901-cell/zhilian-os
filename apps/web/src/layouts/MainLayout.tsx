@@ -81,7 +81,6 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/hq-dashboard': 'admin-system',
   '/ai-accuracy': 'admin-ai',
   '/dish-cost': 'business', '/employee-performance': 'business', '/bom-management': 'business',
-  '/employee-performance': 'business',
   '/waste-events': 'business', '/knowledge-rules': 'business',
   '/data-security': 'admin-system',
   '/raas': 'admin-system', '/model-marketplace': 'admin-system',

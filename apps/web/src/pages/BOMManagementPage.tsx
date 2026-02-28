@@ -691,7 +691,7 @@ const BOMManagementPage: React.FC = () => {
                   step={0.01}
                   style={{ width: '100%' }}
                   formatter={(v) => `${((v as number) * 100).toFixed(0)}%`}
-                  parser={(v) => parseFloat((v || '100').replace('%', '')) / 100}
+                  parser={(v) => parseFloat((v || '100').replace('%', '')) / 100 as unknown as 1}
                 />
               </Form.Item>
             </Col>
