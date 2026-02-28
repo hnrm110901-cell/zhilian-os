@@ -2373,3 +2373,153 @@ def nightly_action_dispatch(
         return asyncio.run(_run())
     except Exception as e:
         raise self.retry(exc=e)
+
+
+# ── 多阶段工作流 Celery 任务 ──────────────────────────────────────────────────
+
+@celery_app.task(
+    base=CallbackTask, bind=True,
+    name="tasks.start_evening_planning_all_stores",
+    max_retries=2, default_retry_delay=120,
+    autoretry_for=(Exception,), retry_backoff=True,
+    retry_backoff_max=600, retry_jitter=True,
+)
+def start_evening_planning_all_stores(
+    self,
+    store_ids: list = None,
+) -> Dict[str, Any]:
+    """
+    每日 17:00 触发：为全平台所有活跃门店启动 Day N+1 规划工作流，
+    并立即触发 initial_plan 阶段的快速规划（Fast Mode，<30s）。
+
+    调度建议：beat_schedule 中设置 crontab(hour=17, minute=0)
+
+    Args:
+        store_ids: 指定门店列表（None = 全平台活跃门店）
+
+    Returns:
+        {success, stores_started, fast_plan_ok, fast_plan_failed, errors}
+    """
+    async def _run():
+        from datetime import date, timedelta
+        from src.core.database import async_session_factory
+        from src.services.workflow_engine import WorkflowEngine
+        from src.services.fast_planning_service import FastPlanningService
+
+        plan_date      = date.today() + timedelta(days=1)
+        started        = 0
+        fast_plan_ok   = 0
+        fast_plan_fail = 0
+        errors         = 0
+
+        async with async_session_factory() as session:
+            # 确定目标门店
+            if store_ids:
+                target_stores = store_ids
+            else:
+                from src.models.store import Store
+                from sqlalchemy import select
+                rows = (await session.execute(
+                    select(Store.id).where(Store.is_active == True)  # noqa: E712
+                )).all()
+                target_stores = [str(r[0]) for r in rows]
+
+            engine   = WorkflowEngine(session)
+            fast_svc = FastPlanningService(session)
+
+            for sid in target_stores:
+                try:
+                    # 1. 启动工作流（幂等）
+                    wf = await engine.start_daily_workflow(
+                        store_id=sid,
+                        plan_date=plan_date,
+                    )
+                    started += 1
+
+                    # 2. 获取 initial_plan 阶段，触发快速规划
+                    try:
+                        init_phase = await engine.get_phase(wf.id, "initial_plan")
+                        if init_phase:
+                            content = await fast_svc.generate_initial_plan(sid, plan_date)
+                            await engine.submit_decision(
+                                phase_id=init_phase.id,
+                                content=content,
+                                submitted_by="system",
+                                mode="fast",
+                                data_completeness=content.get("data_completeness", 0.7),
+                                confidence=content.get("confidence", 0.75),
+                                change_reason="系统 17:00 快速规划自动生成",
+                            )
+                            fast_plan_ok += 1
+                    except Exception as fp_err:
+                        fast_plan_fail += 1
+                        logger.warning(
+                            "快速规划触发失败（非致命）",
+                            store_id=sid,
+                            error=str(fp_err),
+                        )
+
+                except Exception as e:
+                    errors += 1
+                    logger.error("启动工作流失败", store_id=sid, error=str(e))
+
+            await session.commit()
+
+        logger.info(
+            "晚间规划工作流批量启动完成",
+            plan_date=str(plan_date),
+            stores_started=started,
+            fast_plan_ok=fast_plan_ok,
+            fast_plan_failed=fast_plan_fail,
+            errors=errors,
+        )
+        return {
+            "success":          errors == 0,
+            "plan_date":        str(plan_date),
+            "stores_started":   started,
+            "fast_plan_ok":     fast_plan_ok,
+            "fast_plan_failed": fast_plan_fail,
+            "errors":           errors,
+        }
+
+    try:
+        return asyncio.run(_run())
+    except Exception as e:
+        raise self.retry(exc=e)
+
+
+@celery_app.task(
+    base=CallbackTask, bind=True,
+    name="tasks.check_workflow_deadlines",
+    max_retries=1, default_retry_delay=30,
+)
+def check_workflow_deadlines(self) -> Dict[str, Any]:
+    """
+    每 5 分钟扫描全平台所有 running/reviewing 工作流阶段：
+      - 距 deadline ≤ 10 分钟 → 发送企微预警
+      - 已过 deadline          → 自动锁定阶段并推进到下一阶段
+
+    调度建议：beat_schedule 中设置 crontab(minute="*/5")
+
+    Returns:
+        {success, auto_locked, locked_phases}
+    """
+    async def _run():
+        from src.core.database import async_session_factory
+        from src.services.timing_service import TimingService
+
+        async with async_session_factory() as session:
+            timing = TimingService(session)
+            locked = await timing.check_and_auto_lock_all()
+            await session.commit()
+
+        return {
+            "success":       True,
+            "auto_locked":   len(locked),
+            "locked_phases": locked,
+        }
+
+    try:
+        return asyncio.run(_run())
+    except Exception as e:
+        raise self.retry(exc=e)

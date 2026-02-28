@@ -34,6 +34,8 @@ from src.api import l3_knowledge
 from src.api import l4_reasoning
 # Phase 7 — L5 行动层（行动派发 + WeChat FSM + 任务创建 + 反馈闭环）
 from src.api import l5_action
+# Phase 8 — 多阶段工作流引擎（Day N 晚上 17:00-22:00 规划 Day N+1）
+from src.api import workflow
 from src.api import ai_evolution_dashboard
 from src.api import compliance
 from src.api import quality
@@ -500,6 +502,8 @@ app.include_router(l3_knowledge.router, tags=["l3_knowledge"])
 app.include_router(l4_reasoning.router, tags=["l4_reasoning"])
 # Phase 7 — L5 行动层（行动派发 + WeChat FSM + 任务创建 + 反馈闭环）
 app.include_router(l5_action.router, tags=["l5_action"])
+# Phase 8 — 多阶段工作流引擎（6 阶段规划 + 快速初版 + 版本链 + deadline 管理）
+app.include_router(workflow.router, tags=["workflow"])
 app.include_router(ai_evolution_dashboard.router, tags=["ai_evolution"])
 app.include_router(compliance.router)
 app.include_router(quality.router)
