@@ -1,7 +1,7 @@
 """add_latitude_longitude_to_stores
 
 Revision ID: e48b5dd51f6d
-Revises: 
+Revises: b2c3d4e5f6g7
 Create Date: 2026-02-20 10:41:15.399662
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'e48b5dd51f6d'
-down_revision: Union[str, None] = None
+down_revision: Union[str, None] = 'b2c3d4e5f6g7'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
