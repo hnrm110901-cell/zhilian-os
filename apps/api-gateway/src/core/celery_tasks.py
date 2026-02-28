@@ -1583,3 +1583,372 @@ def generate_daily_hub(
         return asyncio.run(_run())
     except Exception as e:
         raise self.retry(exc=e)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Phase 3 — 损耗推理 / 规则评估 / 本体日同步
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@celery_app.task(
+    base=CallbackTask,
+    bind=True,
+    name="tasks.process_waste_event",
+    max_retries=3,
+    default_retry_delay=30,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=300,
+    retry_jitter=True,
+)
+def process_waste_event(
+    self,
+    event_id: str,
+) -> Dict[str, Any]:
+    """
+    损耗事件五步推理（异步，由 WasteEventService._enqueue_analysis 投递）
+
+    步骤：
+      1. 从 PostgreSQL 加载 WasteEvent
+      2. 调用 WasteReasoningEngine.infer_root_cause(event_id)
+      3. 将根因 / 置信度 / 证据链回写 PostgreSQL
+      4. 同步推理结论到 Neo4j
+
+    Args:
+        event_id: WasteEvent.event_id（格式 WE-XXXXXXXX）
+
+    Returns:
+        {"success": True, "event_id": ..., "root_cause": ..., "confidence": ...}
+    """
+    async def _run():
+        from ..core.database import get_db_session
+        from ..services.waste_event_service import WasteEventService
+
+        async with get_db_session() as session:
+            svc = WasteEventService(session)
+
+            # 标记推理中
+            from sqlalchemy import update as _update
+            from ..models.waste_event import WasteEvent, WasteEventStatus
+            await session.execute(
+                _update(WasteEvent)
+                .where(WasteEvent.event_id == event_id)
+                .values(status=WasteEventStatus.ANALYZING)
+            )
+            await session.commit()
+
+        # 调用推理引擎（同步驱动，独立 session）
+        try:
+            from ..ontology.reasoning import WasteReasoningEngine
+            engine = WasteReasoningEngine()
+            result = engine.infer_root_cause(event_id)
+        except Exception as e:
+            logger.warning("推理引擎调用失败", event_id=event_id, error=str(e))
+            return {"success": False, "event_id": event_id, "error": str(e)}
+
+        if not result.get("success"):
+            return {"success": False, "event_id": event_id, "error": result.get("error")}
+
+        # 写回分析结论
+        async with get_db_session() as session:
+            svc = WasteEventService(session)
+            await svc.write_back_analysis(
+                event_id=event_id,
+                root_cause=result.get("root_cause", "unknown"),
+                confidence=result.get("confidence", 0.0),
+                evidence=result.get("evidence_chain", {}),
+                scores=result.get("scores", {}),
+            )
+            # 同步到 Neo4j
+            ev = await svc.get_event(event_id)
+            if ev:
+                await svc._sync_analysis_to_neo4j(ev)
+            await session.commit()
+
+        logger.info(
+            "损耗推理任务完成",
+            event_id=event_id,
+            root_cause=result.get("root_cause"),
+            confidence=result.get("confidence"),
+        )
+        return {
+            "success": True,
+            "event_id": event_id,
+            "root_cause": result.get("root_cause"),
+            "confidence": result.get("confidence"),
+        }
+
+    try:
+        return asyncio.run(_run())
+    except Exception as e:
+        raise self.retry(exc=e)
+
+
+@celery_app.task(
+    base=CallbackTask,
+    bind=True,
+    name="tasks.evaluate_store_rules",
+    max_retries=2,
+    default_retry_delay=60,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+)
+def evaluate_store_rules(
+    self,
+    store_id: str,
+    kpi_context: Dict[str, Any],
+    industry_type: str = "general",
+) -> Dict[str, Any]:
+    """
+    对门店 KPI 上下文运行推理规则库，匹配触发规则并自动推送企微告警
+
+    工作流程：
+      1. 从规则库加载 ACTIVE 规则
+      2. 对 kpi_context 执行规则匹配，获取 Top-10 匹配规则
+      3. 对命中规则写入 RuleExecution 日志
+      4. 置信度 >= 0.70 时，自动创建企微 P1/P2 Action
+      5. 行业基准对比（若 industry_type 非 "general"）
+
+    Args:
+        store_id: 门店ID
+        kpi_context: 当前 KPI 指标字典，如
+            {"waste_rate": 0.18, "labor_cost_ratio": 0.36, ...}
+        industry_type: 行业类型（seafood / hotpot / fastfood / general）
+
+    Returns:
+        {"matched": [...], "actions_created": N, "store_id": ...}
+    """
+    async def _run():
+        from ..core.database import get_db_session
+        from ..services.knowledge_rule_service import KnowledgeRuleService
+
+        matched_rules = []
+        actions_created = 0
+
+        async with get_db_session() as session:
+            rule_svc = KnowledgeRuleService(session)
+
+            # 规则匹配（全品类）
+            matched = await rule_svc.match_rules(kpi_context)
+
+            for hit in matched:
+                matched_rules.append(hit)
+
+                # 写入执行日志
+                rule_obj = await rule_svc.get_by_code(hit["rule_code"])
+                if rule_obj:
+                    await rule_svc.log_execution(
+                        rule=rule_obj,
+                        store_id=store_id,
+                        event_id=None,
+                        condition_values=kpi_context,
+                        conclusion_output=hit.get("conclusion", {}),
+                        confidence_score=hit["confidence"],
+                    )
+
+                # 置信度 ≥ 0.70 → 推送企微告警
+                if hit["confidence"] >= 0.70:
+                    try:
+                        from ..services.wechat_action_fsm import (
+                            ActionCategory,
+                            ActionPriority,
+                            get_wechat_fsm,
+                        )
+                        fsm = get_wechat_fsm()
+                        priority = (
+                            ActionPriority.P1 if hit["confidence"] >= 0.80
+                            else ActionPriority.P2
+                        )
+                        conclusion = hit.get("conclusion", {})
+                        action_text = (
+                            conclusion.get("action") or
+                            conclusion.get("conclusion", "请检查相关指标")
+                        )
+                        await fsm.create_action(
+                            store_id=store_id,
+                            category=ActionCategory.KPI_ALERT,
+                            priority=priority,
+                            title=f"规则告警：{hit['rule_code']}",
+                            content=(
+                                f"**{hit['name']}**\n"
+                                f"置信度：{hit['confidence']:.0%}\n"
+                                f"建议：{action_text}"
+                            ),
+                            receiver_user_id="store_manager",
+                            source_event_id=f"RULE-{hit['rule_code']}-{store_id}",
+                            evidence={"kpi_context": kpi_context, "rule_code": hit["rule_code"]},
+                        )
+                        actions_created += 1
+                    except Exception as e:
+                        logger.warning(
+                            "规则触发企微告警失败",
+                            store_id=store_id,
+                            rule_code=hit["rule_code"],
+                            error=str(e),
+                        )
+
+            # 行业基准对比（非 general 时）
+            benchmark_summary = []
+            if industry_type != "general":
+                benchmark_results = await rule_svc.compare_to_benchmark(
+                    industry_type, kpi_context
+                )
+                for br in benchmark_results:
+                    if br["percentile_band"] == "bottom_25":
+                        benchmark_summary.append(br)
+
+            await session.commit()
+
+        logger.info(
+            "门店规则评估完成",
+            store_id=store_id,
+            matched=len(matched_rules),
+            actions_created=actions_created,
+        )
+        return {
+            "success": True,
+            "store_id": store_id,
+            "matched": matched_rules,
+            "actions_created": actions_created,
+            "bottom_25_benchmarks": benchmark_summary,
+        }
+
+    try:
+        return asyncio.run(_run())
+    except Exception as e:
+        raise self.retry(exc=e)
+
+
+@celery_app.task(
+    base=CallbackTask,
+    bind=True,
+    name="tasks.daily_ontology_sync",
+    max_retries=2,
+    default_retry_delay=300,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=1800,
+    retry_jitter=False,
+)
+def daily_ontology_sync(
+    self,
+    store_id: str = None,
+) -> Dict[str, Any]:
+    """
+    每日全量 PostgreSQL → Neo4j 本体同步（建议凌晨 3:00 触发）
+
+    范围：
+      - 活跃 BOMTemplate 及明细行 → BOM 节点 + HAS_INGREDIENT 边
+      - WasteEvent（最近 30 天）→ WasteEvent 节点 + WASTE_OF 边
+
+    Args:
+        store_id: 指定门店（None = 全部活跃门店）
+
+    Returns:
+        {"synced_stores": N, "nodes_upserted": N, "errors": [...]}
+    """
+    async def _run():
+        from ..core.database import get_db_session
+        from ..models.store import Store
+        from ..models.bom import BOMTemplate
+        from ..models.waste_event import WasteEvent
+        from sqlalchemy import select, and_
+        from datetime import datetime, timedelta
+
+        synced_stores = 0
+        nodes_upserted = 0
+        errors = []
+
+        async with get_db_session() as session:
+            # 确定要同步的门店
+            if store_id:
+                stmt = select(Store).where(Store.id == store_id, Store.is_active.is_(True))
+            else:
+                stmt = select(Store).where(Store.is_active.is_(True))
+            result = await session.execute(stmt)
+            stores = result.scalars().all()
+
+            for store in stores:
+                sid = str(store.id)
+                try:
+                    # 1. 同步活跃 BOM
+                    bom_stmt = (
+                        select(BOMTemplate)
+                        .where(
+                            and_(BOMTemplate.store_id == sid, BOMTemplate.is_active.is_(True))
+                        )
+                    )
+                    bom_result = await session.execute(bom_stmt)
+                    active_boms = bom_result.scalars().all()
+
+                    try:
+                        from ..ontology.data_sync import OntologyDataSync
+                        with OntologyDataSync() as sync:
+                            for bom in active_boms:
+                                dish_id_str = f"DISH-{bom.dish_id}"
+                                sync.upsert_bom(
+                                    dish_id=dish_id_str,
+                                    version=bom.version,
+                                    effective_date=bom.effective_date,
+                                    yield_rate=float(bom.yield_rate),
+                                    expiry_date=bom.expiry_date,
+                                    notes=bom.notes,
+                                )
+                                nodes_upserted += 1
+                    except Exception as neo4j_err:
+                        logger.warning("Neo4j BOM 同步失败", store_id=sid, error=str(neo4j_err))
+
+                    # 2. 同步近 30 天 WasteEvent
+                    since = datetime.utcnow() - timedelta(days=30)
+                    we_stmt = select(WasteEvent).where(
+                        and_(
+                            WasteEvent.store_id == sid,
+                            WasteEvent.occurred_at >= since,
+                        )
+                    )
+                    we_result = await session.execute(we_stmt)
+                    events = we_result.scalars().all()
+
+                    from ..services.waste_event_service import WasteEventService
+                    svc = WasteEventService(session)
+                    for ev in events:
+                        try:
+                            await svc._sync_to_neo4j(ev)
+                            nodes_upserted += 1
+                        except Exception as e:
+                            logger.warning(
+                                "WasteEvent Neo4j 同步失败",
+                                event_id=ev.event_id,
+                                error=str(e),
+                            )
+
+                    synced_stores += 1
+                    logger.info(
+                        "门店本体同步完成",
+                        store_id=sid,
+                        boms=len(active_boms),
+                        waste_events=len(events),
+                    )
+
+                except Exception as e:
+                    errors.append({"store_id": sid, "error": str(e)})
+                    logger.error("门店本体同步失败", store_id=sid, error=str(e))
+
+        logger.info(
+            "日常本体同步完成",
+            synced_stores=synced_stores,
+            nodes_upserted=nodes_upserted,
+            errors=len(errors),
+        )
+        return {
+            "success": True,
+            "synced_stores": synced_stores,
+            "nodes_upserted": nodes_upserted,
+            "errors": errors,
+        }
+
+    try:
+        return asyncio.run(_run())
+    except Exception as e:
+        raise self.retry(exc=e)
