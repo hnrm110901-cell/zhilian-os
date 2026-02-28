@@ -93,6 +93,9 @@ const AIAccuracyPage = lazy(() => import('./pages/AIAccuracyPage'));
 const DishCostPage = lazy(() => import('./pages/DishCostPage'));
 const EmployeePerformancePage = lazy(() => import('./pages/EmployeePerformancePage'));
 const BOMManagementPage = lazy(() => import('./pages/BOMManagementPage'));
+const WasteEventPage = lazy(() => import('./pages/WasteEventPage'));
+const KnowledgeRulesPage = lazy(() => import('./pages/KnowledgeRulesPage'));
+const DataSecurityPage = lazy(() => import('./pages/DataSecurityPage'));
 
 const PageLoader = (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
@@ -338,6 +341,15 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="bom-management" element={
                     <ProtectedRoute requiredRole="store_manager"><BOMManagementPage /></ProtectedRoute>
+                  } />
+                  <Route path="waste-events" element={
+                    <ProtectedRoute requiredRole="store_manager"><WasteEventPage /></ProtectedRoute>
+                  } />
+                  <Route path="knowledge-rules" element={
+                    <ProtectedRoute requiredRole="store_manager"><KnowledgeRulesPage /></ProtectedRoute>
+                  } />
+                  <Route path="data-security" element={
+                    <ProtectedRoute requiredRole="admin"><DataSecurityPage /></ProtectedRoute>
                   } />
                 </Route>
                 <Route path="*" element={<NotFoundPage />} />

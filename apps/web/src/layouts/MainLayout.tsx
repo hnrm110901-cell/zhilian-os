@@ -45,6 +45,7 @@ import {
   ToolOutlined,
   UploadOutlined,
   TrophyOutlined,
+  WarningOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -79,6 +80,8 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/ai-accuracy': 'admin-ai',
   '/dish-cost': 'business', '/employee-performance': 'business', '/bom-management': 'business',
   '/employee-performance': 'business',
+  '/waste-events': 'business', '/knowledge-rules': 'business',
+  '/data-security': 'admin-system',
   '/raas': 'admin-system', '/model-marketplace': 'admin-system',
   '/llm-config': 'admin-ai', '/hardware': 'admin-ai',
   '/integrations': 'admin-system', '/neural': 'admin-ai', '/embedding': 'admin-ai',
@@ -208,6 +211,9 @@ const MainLayout: React.FC = () => {
     '/dish-cost': '菜品成本分析',
     '/employee-performance': '员工绩效看板',
     '/bom-management': 'BOM 配方管理',
+    '/waste-events': '损耗事件管理',
+    '/knowledge-rules': '知识规则库',
+    '/data-security': '数据安全管理',
     '/dishes': '菜品管理',
     '/employees': '员工管理',
     '/raas': 'RaaS定价',
@@ -383,6 +389,8 @@ const MainLayout: React.FC = () => {
         { key: '/dish-cost', icon: <DollarOutlined />, label: '菜品成本分析' },
         { key: '/employee-performance', icon: <TrophyOutlined />, label: '员工绩效看板' },
         { key: '/bom-management', icon: <ReadOutlined />, label: 'BOM 配方管理' },
+        { key: '/waste-events', icon: <WarningOutlined />, label: '损耗事件管理' },
+        { key: '/knowledge-rules', icon: <DatabaseOutlined />, label: '知识规则库' },
       ],
     },
     {
@@ -442,6 +450,7 @@ const MainLayout: React.FC = () => {
           { key: '/adapters', icon: <ApiOutlined />, label: '适配器管理' },
           { key: '/system-health', icon: <MonitorOutlined />, label: '系统健康' },
           { key: '/hq-dashboard', icon: <ShopOutlined />, label: '总部看板' },
+          { key: '/data-security', icon: <SafetyOutlined />, label: '数据安全管理' },
         ],
       },
       {
