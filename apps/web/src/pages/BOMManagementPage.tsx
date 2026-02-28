@@ -122,7 +122,7 @@ const BOMManagementPage: React.FC = () => {
   const viewHistory = useCallback(async (dishId: string) => {
     setHistoryDishId(dishId);
     try {
-      const res = await apiClient.get(`/api/v1/bom/history/${dishId}`);
+      const res = await apiClient.get(`/api/v1/bom/dish/${dishId}/history`);
       setHistoryBoms(res.data || []);
       setHistoryVisible(true);
     } catch (err: any) {

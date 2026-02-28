@@ -227,6 +227,27 @@ async def approve_bom(
     return _serialize_bom(bom)
 
 
+@router.post("/{bom_id}/activate", response_model=BOMOut)
+async def activate_bom(
+    bom_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    激活指定 BOM 版本（同菜品旧激活版本自动停用）
+
+    适用场景：
+      - 回滚到历史版本
+      - 将草稿版本正式上线
+    """
+    svc = BOMService(db)
+    bom = await svc.activate_bom(bom_id)
+    if not bom:
+        raise HTTPException(status_code=404, detail="BOM 不存在")
+    await db.commit()
+    return _serialize_bom(bom)
+
+
 @router.post("/{bom_id}/deactivate")
 async def deactivate_bom(
     bom_id: str,

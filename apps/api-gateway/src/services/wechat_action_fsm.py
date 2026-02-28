@@ -60,6 +60,7 @@ class ActionCategory(str, Enum):
     TASK_ASSIGN = "task_assign"       # 任务指派
     APPROVAL = "approval"             # 审批请求
     SYSTEM = "system"                 # 系统通知
+    KPI_ALERT = "kpi_alert"           # KPI 规则告警（Phase 3）
 
 
 # ── 数据结构 ──────────────────────────────────────────────────────────────────

@@ -153,6 +153,44 @@ class BOMService:
         )
         return True
 
+    async def activate_bom(self, bom_id: str) -> Optional[BOMTemplate]:
+        """
+        激活指定 BOM 版本。
+
+        步骤：
+          1. 查询目标 BOM，确认存在
+          2. 停用同菜品的其他所有激活版本（清除 expiry_date 标记的当前版本）
+          3. 将目标 BOM 的 is_active 设为 True，清空 expiry_date
+        """
+        stmt = select(BOMTemplate).where(BOMTemplate.id == uuid.UUID(bom_id))
+        result = await self.db.execute(stmt)
+        bom = result.scalar_one_or_none()
+        if not bom:
+            return None
+
+        dish_id = str(bom.dish_id)
+
+        # 停用同菜品其他激活版本
+        await self.db.execute(
+            update(BOMTemplate)
+            .where(
+                and_(
+                    BOMTemplate.dish_id == bom.dish_id,
+                    BOMTemplate.is_active.is_(True),
+                    BOMTemplate.id != bom.id,
+                )
+            )
+            .values(is_active=False, expiry_date=datetime.utcnow())
+        )
+
+        # 激活目标版本
+        bom.is_active = True
+        bom.expiry_date = None
+        await self.db.flush()
+
+        logger.info("BOM 版本已激活", bom_id=bom_id, dish_id=dish_id, version=bom.version)
+        return bom
+
     async def delete_bom(self, bom_id: str) -> bool:
         """删除 BOM（仅允许删除未审核版本）"""
         stmt = select(BOMTemplate).where(BOMTemplate.id == uuid.UUID(bom_id))
