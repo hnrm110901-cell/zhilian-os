@@ -46,6 +46,12 @@ class HolidayInfo(BaseModel):
     impact_factor: float
 
 
+class AuspiciousInfo(BaseModel):
+    label:         str
+    demand_factor: float
+    sources:       List[str] = []
+
+
 class BanquetItem(BaseModel):
     reservation_id:   Optional[str]   = None
     customer_name:    Optional[str]   = None
@@ -67,8 +73,9 @@ class RegularTrack(BaseModel):
 
 
 class TomorrowForecast(BaseModel):
-    weather:                 Optional[WeatherInfo] = None
-    holiday:                 Optional[HolidayInfo] = None
+    weather:                 Optional[WeatherInfo]    = None
+    holiday:                 Optional[HolidayInfo]    = None
+    auspicious:              Optional[AuspiciousInfo] = None   # 好日子感知
     banquet_track:           BanquetTrack
     regular_track:           RegularTrack
     total_predicted_revenue: float

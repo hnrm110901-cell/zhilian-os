@@ -620,6 +620,111 @@ class BanquetPlanningEngine:
             total += qty * price
         return round(total, 2)
 
+    # ── BEO 持久化 ────────────────────────────────────────────────────────────
+
+    async def save_beo(
+        self,
+        beo:          Dict[str, Any],
+        banquet:      Dict[str, Any],
+        db:           Any,
+        operator:     str = "system",
+    ) -> Optional[Any]:
+        """
+        将 BEO 单写入数据库（versioned）。
+
+        如果该 reservation_id 已存在 BEO 记录，将旧记录的 is_latest 置为 False，
+        然后创建新版本（version + 1）。
+
+        Args:
+            beo:      BanquetPlanningEngine.generate_beo() 的输出 dict
+            banquet:  原始宴会预约数据（用于提取冗余字段）
+            db:       AsyncSession
+            operator: 操作人
+
+        Returns:
+            新创建的 BanquetEventOrder ORM 对象，或 None（失败时非致命）
+        """
+        try:
+            from sqlalchemy import select, update
+            from src.models.banquet_event_order import BanquetEventOrder, BEOStatus
+
+            reservation_id = banquet.get("reservation_id", "")
+            store_id       = beo.get("store_id", "")
+            event_date_raw = beo.get("event", {}).get("event_date")
+
+            # 解析 event_date
+            from datetime import date as _date
+            if isinstance(event_date_raw, str):
+                try:
+                    event_date_val = _date.fromisoformat(event_date_raw)
+                except ValueError:
+                    event_date_val = _date.today()
+            elif isinstance(event_date_raw, _date):
+                event_date_val = event_date_raw
+            else:
+                event_date_val = _date.today()
+
+            # 查找当前最新版本号
+            stmt = (
+                select(BanquetEventOrder.version)
+                .where(
+                    BanquetEventOrder.store_id       == store_id,
+                    BanquetEventOrder.reservation_id == reservation_id,
+                    BanquetEventOrder.is_latest      == True,  # noqa: E712
+                )
+                .order_by(BanquetEventOrder.version.desc())
+                .limit(1)
+            )
+            row = (await db.execute(stmt)).scalar_one_or_none()
+            new_version = (row + 1) if row else 1
+
+            # 将旧版本 is_latest → False
+            if row:
+                await db.execute(
+                    update(BanquetEventOrder)
+                    .where(
+                        BanquetEventOrder.store_id       == store_id,
+                        BanquetEventOrder.reservation_id == reservation_id,
+                        BanquetEventOrder.is_latest      == True,  # noqa: E712
+                    )
+                    .values(is_latest=False)
+                )
+
+            # 预算从元 → 分（避免浮点精度问题）
+            budget_cents = int(
+                float(banquet.get("estimated_budget") or 0) * 100
+            )
+
+            new_beo = BanquetEventOrder(
+                store_id=store_id,
+                reservation_id=reservation_id,
+                event_date=event_date_val,
+                version=new_version,
+                is_latest=True,
+                status=BEOStatus.DRAFT.value,
+                content=beo,
+                party_size=int(banquet.get("party_size") or 0),
+                estimated_budget=budget_cents,
+                circuit_triggered=beo.get("circuit_breaker", {}).get("triggered", False),
+                generated_by=operator,
+                change_summary=f"v{new_version} 自动生成（熔断引擎）",
+            )
+            db.add(new_beo)
+            await db.flush()  # 获取 id，但不 commit（由调用方控制事务）
+
+            logger.info(
+                "BEO 已写入数据库",
+                beo_id=str(new_beo.id),
+                reservation_id=reservation_id,
+                version=new_version,
+                store_id=store_id,
+            )
+            return new_beo
+
+        except Exception as e:
+            logger.warning("BEO 持久化失败（非致命）", error=str(e))
+            return None
+
 
 # ── 全局单例 ──────────────────────────────────────────────────────────────────
 banquet_planning_engine = BanquetPlanningEngine()

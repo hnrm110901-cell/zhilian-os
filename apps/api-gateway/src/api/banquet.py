@@ -277,6 +277,137 @@ async def check_conflicts(
     }
 
 
+@router.get(
+    "/{store_id}/beo/{reservation_id}",
+    summary="查询宴会 BEO 单（已持久化版本）",
+)
+async def get_beo(
+    store_id:       str,
+    reservation_id: str,
+    version:        Optional[int] = Query(None, description="指定版本号；不传则返回最新版本"),
+    db:             AsyncSession  = Depends(get_db),
+    _:              User          = Depends(get_current_user),
+):
+    """
+    查询宴会 BEO 单：
+
+    - 不传 version → 返回最新版本（is_latest=True）
+    - 传入 version → 返回指定历史版本（用于 diff 对比）
+    - 不存在则返回 404
+
+    BEO 在备战板生成或手动调用 POST /{store_id}/beo 时自动持久化。
+    """
+    try:
+        from sqlalchemy import select
+        from src.models.banquet_event_order import BanquetEventOrder
+
+        stmt = select(BanquetEventOrder).where(
+            BanquetEventOrder.store_id       == store_id,
+            BanquetEventOrder.reservation_id == reservation_id,
+        )
+        if version is not None:
+            stmt = stmt.where(BanquetEventOrder.version == version)
+        else:
+            stmt = stmt.where(BanquetEventOrder.is_latest == True)  # noqa: E712
+
+        beo_record = (await db.execute(stmt)).scalar_one_or_none()
+        if not beo_record:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"BEO 单不存在：store={store_id} reservation={reservation_id}"
+                       + (f" v{version}" if version else "（最新版本）"),
+            )
+
+        return {
+            "id":              str(beo_record.id),
+            "store_id":        beo_record.store_id,
+            "reservation_id":  beo_record.reservation_id,
+            "event_date":      beo_record.event_date.isoformat() if beo_record.event_date else None,
+            "version":         beo_record.version,
+            "is_latest":       beo_record.is_latest,
+            "status":          beo_record.status,
+            "party_size":      beo_record.party_size,
+            "circuit_triggered": beo_record.circuit_triggered,
+            "generated_by":    beo_record.generated_by,
+            "approved_by":     beo_record.approved_by,
+            "approved_at":     beo_record.approved_at.isoformat() if beo_record.approved_at else None,
+            "change_summary":  beo_record.change_summary,
+            "content":         beo_record.content,
+            "created_at":      beo_record.created_at.isoformat() if beo_record.created_at else None,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"查询 BEO 失败: {str(e)}",
+        )
+
+
+@router.get(
+    "/{store_id}/beo/{reservation_id}/history",
+    summary="查询 BEO 版本历史列表",
+)
+async def get_beo_history(
+    store_id:       str,
+    reservation_id: str,
+    db:             AsyncSession = Depends(get_db),
+    _:              User         = Depends(get_current_user),
+):
+    """
+    查询该预约的所有 BEO 版本（从旧到新排列）。
+
+    用于前端展示变更历史，支持版本对比。
+    """
+    try:
+        from sqlalchemy import select
+        from src.models.banquet_event_order import BanquetEventOrder
+
+        stmt = (
+            select(
+                BanquetEventOrder.id,
+                BanquetEventOrder.version,
+                BanquetEventOrder.is_latest,
+                BanquetEventOrder.status,
+                BanquetEventOrder.generated_by,
+                BanquetEventOrder.approved_by,
+                BanquetEventOrder.approved_at,
+                BanquetEventOrder.change_summary,
+                BanquetEventOrder.created_at,
+            )
+            .where(
+                BanquetEventOrder.store_id       == store_id,
+                BanquetEventOrder.reservation_id == reservation_id,
+            )
+            .order_by(BanquetEventOrder.version.asc())
+        )
+        rows = (await db.execute(stmt)).all()
+        return {
+            "store_id":       store_id,
+            "reservation_id": reservation_id,
+            "version_count":  len(rows),
+            "versions": [
+                {
+                    "id":             str(r.id),
+                    "version":        r.version,
+                    "is_latest":      r.is_latest,
+                    "status":         r.status,
+                    "generated_by":   r.generated_by,
+                    "approved_by":    r.approved_by,
+                    "approved_at":    r.approved_at.isoformat() if r.approved_at else None,
+                    "change_summary": r.change_summary,
+                    "created_at":     r.created_at.isoformat() if r.created_at else None,
+                }
+                for r in rows
+            ],
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"查询 BEO 历史失败: {str(e)}",
+        )
+
+
 # ── 内部工具 ──────────────────────────────────────────────────────────────────
 
 def _parse_date(raw: str) -> date:

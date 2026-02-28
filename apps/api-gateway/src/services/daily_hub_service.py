@@ -26,6 +26,7 @@ from src.services.weather_adapter import weather_adapter
 from src.services.forecast_features import ChineseHolidays, WeatherImpact
 from src.services.auspicious_date_service import AuspiciousDateService
 from src.services.banquet_planning_engine import banquet_planning_engine, BANQUET_CIRCUIT_THRESHOLD
+from src.services.external_factors_adapter import ExternalFactorsAdapter
 
 logger = structlog.get_logger()
 
@@ -417,40 +418,29 @@ class DailyHubService:
         target_date: date,
         store_config: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        result: Dict[str, Any] = {"weather": None, "holiday": None, "auspicious": None}
+        """
+        通过 ExternalFactorsAdapter 获取统一外部因子（天气+节假日+吉日）。
 
-        # 天气影响
-        weather = await weather_adapter.get_tomorrow_weather()
-        if weather:
-            impact_factor = WeatherImpact.WEATHER_IMPACT.get(weather["weather"], 1.0)
-            result["weather"] = {
-                "temperature":  weather["temperature"],
-                "condition":    weather["weather"],
-                "impact_factor": impact_factor,
-            }
-
-        # 节假日影响
-        holiday_info = ChineseHolidays.get_holiday_info(target_date)
-        if holiday_info:
-            result["holiday"] = {
-                "name":          holiday_info.get("name", ""),
-                "impact_factor": ChineseHolidays.get_holiday_impact_score(target_date),
-            }
-
-        # 吉日感知（宴会好日子需求倍增因子）
+        返回 dict 格式与 daily_hub Pydantic schema 对齐：
+          weather    → WeatherInfo
+          holiday    → HolidayInfo
+          auspicious → AuspiciousInfo（新增）
+        """
         try:
-            auspicious_svc = AuspiciousDateService(store_config=store_config)
-            auspicious_info = auspicious_svc.get_info(target_date)
-            if auspicious_info.is_auspicious:
-                result["auspicious"] = {
-                    "label":         auspicious_info.label,
-                    "demand_factor": auspicious_info.demand_factor,
-                    "sources":       auspicious_info.sources,
-                }
+            adapter = ExternalFactorsAdapter(
+                store_config=store_config,
+                restaurant_type="正餐",
+            )
+            result = await adapter.get_factors(target_date, strategy="smart")
+            return {
+                "weather":    result.weather,
+                "holiday":    result.holiday,
+                "auspicious": result.auspicious,
+                "composite_factor": result.composite_factor,
+            }
         except Exception as e:
-            logger.warning("吉日感知失败（非致命）", error=str(e))
-
-        return result
+            logger.warning("ExternalFactorsAdapter 失败，降级为空因子", error=str(e))
+            return {"weather": None, "holiday": None, "auspicious": None, "composite_factor": 1.0}
 
     async def _get_banquet_variables(
         self, store_id: str, target_date: date

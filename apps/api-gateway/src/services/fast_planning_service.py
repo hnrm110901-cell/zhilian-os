@@ -140,6 +140,7 @@ class FastPlanningService:
         store_id:          str,
         plan_date:         date,
         forecast_footfall: int,
+        banquet_addons:    Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
         """
         基于客流预测生成采购建议。
@@ -149,29 +150,58 @@ class FastPlanningService:
           2. 乘以预测客流 → 需采购量
           3. 减去当前库存水位 → 实际缺口
           4. 若无历史数据，用默认品类系数估算
+          5. 若有 banquet_addons（宴会熔断输出），追加到清单末尾
+
+        Args:
+            banquet_addons: BanquetPlanningEngine.generate_procurement_addon() 输出列表，
+                            格式 [{item_name, recommended_quantity, unit, alert_level, ...}]
+                            会被追加到常规采购清单，并标记 source="banquet_circuit_breaker"
 
         Returns:
-            {items: [{ingredient, qty, unit, estimated_cost, urgency}],
-             total_cost, data_completeness}
+            {items: [{ingredient, qty, unit, estimated_cost, urgency, source}],
+             total_cost, banquet_addon_cost, data_completeness}
         """
         import time
         t0 = time.time()
 
         items = await self._estimate_procurement_items(store_id, forecast_footfall)
-        total = sum(i.get("estimated_cost", 0) for i in items)
+        regular_total = sum(i.get("estimated_cost", 0) for i in items)
+
+        # 追加宴会熔断采购加成
+        banquet_addon_cost = 0.0
+        if banquet_addons:
+            for addon in banquet_addons:
+                # 转换 addon 格式（BanquetPlanningEngine → FastPlanning 统一格式）
+                item = {
+                    "ingredient":     addon.get("item_name", addon.get("category", "宴会物料")),
+                    "qty":            float(addon.get("recommended_quantity") or 0),
+                    "unit":           addon.get("unit", "kg"),
+                    "estimated_cost": self._estimate_addon_item_cost(addon),
+                    "urgency":        addon.get("alert_level", "normal"),
+                    "source":         "banquet_circuit_breaker",
+                    "party_size_basis": addon.get("party_size_basis"),
+                }
+                banquet_addon_cost += item["estimated_cost"]
+                items.append(item)
+
+        total = regular_total + banquet_addon_cost
 
         logger.info(
             "采购建议生成",
             store_id=store_id,
             items_count=len(items),
+            regular_cost=round(regular_total, 1),
+            banquet_addon_cost=round(banquet_addon_cost, 1),
             total_cost=round(total, 1),
             elapsed=round(time.time() - t0, 2),
         )
         return {
-            "items":            items,
-            "total_cost":       round(total, 1),
-            "forecast_footfall": forecast_footfall,
-            "data_completeness": 0.65 if items else 0.2,
+            "items":              items,
+            "total_cost":         round(total, 1),
+            "regular_cost":       round(regular_total, 1),
+            "banquet_addon_cost": round(banquet_addon_cost, 1),
+            "forecast_footfall":  forecast_footfall,
+            "data_completeness":  0.65 if items else 0.2,
             "note": "基于历史人均消耗 × 预测客流估算，请店长核实库存后确认",
         }
 
@@ -484,6 +514,29 @@ class FastPlanningService:
                 "urgency":         "normal",
             })
         return items
+
+    @staticmethod
+    def _estimate_addon_item_cost(addon: Dict[str, Any]) -> float:
+        """
+        粗略估算宴会加成食材成本（元）。
+
+        基于食材类别映射单价（元/kg 或 元/L），
+        实际价格应由 SupplierService 更新。
+        """
+        _UNIT_PRICE: Dict[str, float] = {
+            "premium_meat":  80.0,
+            "seafood":       120.0,
+            "poultry":       35.0,
+            "vegetables":    8.0,
+            "rice_staples":  5.0,
+            "condiments":    20.0,
+            "beverages":     15.0,
+            "desserts":      30.0,
+        }
+        cat   = addon.get("category", "")
+        qty   = float(addon.get("recommended_quantity") or 0)
+        price = _UNIT_PRICE.get(cat, 20.0)
+        return round(qty * price, 2)
 
     async def _get_l4_actions(self, store_id: str, dimension: str) -> List[str]:
         """取 L4 某维度最新推理报告的 recommended_actions"""
