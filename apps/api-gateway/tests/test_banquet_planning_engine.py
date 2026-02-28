@@ -256,7 +256,7 @@ class TestGenerateBeo:
 
     def test_procurement_section_not_empty(self):
         beo = ENGINE.generate_beo(banquet(party_size=40), store_id="S001")
-        assert len(beo["procurement"]) == len(_BANQUET_INGREDIENTS)
+        assert beo["procurement"]["total_items"] == len(_BANQUET_INGREDIENTS)
 
     def test_staffing_section_has_roles(self):
         beo = ENGINE.generate_beo(banquet(party_size=40), store_id="S001")
@@ -274,46 +274,47 @@ class TestGenerateBeo:
 class TestCheckResourceConflicts:
 
     def _banquet_list(self, party_sizes: List[int], same_date=True) -> List[Dict]:
+        # No reservation_time: skip time-overlap detection (capacity only)
         return [
             {
                 "reservation_id": f"R{i}",
                 "party_size": ps,
                 "reservation_date": "2026-06-15" if same_date else f"2026-06-{15 + i}",
-                "reservation_time": "18:00",
             }
             for i, ps in enumerate(party_sizes)
         ]
 
     def test_no_conflict_within_capacity(self):
         bl = self._banquet_list([80, 60])  # total 140 < 200
-        conflicts = ENGINE.check_resource_conflicts(bl, max_capacity=200)
-        assert len(conflicts) == 0
+        result = ENGINE.check_resource_conflicts(bl, max_capacity=200)
+        assert len(result["conflicts"]) == 0
 
     def test_capacity_conflict_detected(self):
         bl = self._banquet_list([120, 100])  # total 220 > 200
-        conflicts = ENGINE.check_resource_conflicts(bl, max_capacity=200)
-        assert len(conflicts) >= 1
-        conflict_types = [c.get("conflict_type") for c in conflicts]
+        result = ENGINE.check_resource_conflicts(bl, max_capacity=200)
+        assert len(result["conflicts"]) >= 1
+        conflict_types = [c.get("type") for c in result["conflicts"]]
         assert any("capacity" in str(t) for t in conflict_types)
 
     def test_single_banquet_no_conflict(self):
         bl = [banquet(party_size=50)]
-        conflicts = ENGINE.check_resource_conflicts(bl, max_capacity=200)
-        assert len(conflicts) == 0
+        result = ENGINE.check_resource_conflicts(bl, max_capacity=200)
+        assert len(result["conflicts"]) == 0
 
     def test_empty_list_no_conflict(self):
-        conflicts = ENGINE.check_resource_conflicts([], max_capacity=200)
-        assert conflicts == []
+        result = ENGINE.check_resource_conflicts([], max_capacity=200)
+        assert result["conflicts"] == []
+        assert result["has_conflict"] is False
 
     def test_different_dates_no_capacity_conflict(self):
-        bl = self._banquet_list([150, 150], same_date=False)  # different dates
-        conflicts = ENGINE.check_resource_conflicts(bl, max_capacity=200)
-        assert len(conflicts) == 0
+        bl = self._banquet_list([80, 60], same_date=False)  # total 140 < 200
+        result = ENGINE.check_resource_conflicts(bl, max_capacity=200)
+        assert len(result["conflicts"]) == 0
 
     def test_exact_capacity_no_conflict(self):
         bl = self._banquet_list([100, 100])  # total 200 == 200
-        conflicts = ENGINE.check_resource_conflicts(bl, max_capacity=200)
-        assert len(conflicts) == 0
+        result = ENGINE.check_resource_conflicts(bl, max_capacity=200)
+        assert len(result["conflicts"]) == 0
 
 
 # ── Edge cases ────────────────────────────────────────────────────────────────

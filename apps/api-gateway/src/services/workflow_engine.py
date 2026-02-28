@@ -234,10 +234,19 @@ class WorkflowEngine:
             (i for i, p in enumerate(phases) if p.status == PhaseStatus.RUNNING.value),
             None,
         )
-        if running_idx is None or running_idx + 1 >= len(phases):
+        # If no running phase, fall back to the last locked phase
+        if running_idx is None:
+            locked_indices = [i for i, p in enumerate(phases) if p.status == PhaseStatus.LOCKED.value]
+            if not locked_indices:
+                return None
+            running_idx = locked_indices[-1]
+
+        if running_idx + 1 >= len(phases):
             return None
 
-        next_phase            = phases[running_idx + 1]
+        next_phase = phases[running_idx + 1]
+        if next_phase.status != PhaseStatus.PENDING.value:
+            return None
         next_phase.status     = PhaseStatus.RUNNING.value
         next_phase.started_at = datetime.utcnow()
 

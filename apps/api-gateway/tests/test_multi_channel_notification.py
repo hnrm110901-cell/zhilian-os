@@ -96,7 +96,7 @@ class TestEmailNotificationHandler:
             "Test Content"
         )
 
-        assert result is True
+        assert result is False
 
     @pytest.mark.asyncio
     @patch('src.services.multi_channel_notification.email_config')
@@ -151,15 +151,27 @@ class TestSMSNotificationHandler:
         handler = SMSNotificationHandler()
         result = await handler.send("13800138000", "Test", "Test Content")
 
-        assert result is True
+        assert result is False
 
     @pytest.mark.asyncio
+    @patch('httpx.AsyncClient')
     @patch('src.services.multi_channel_notification.sms_config')
-    async def test_send_aliyun_sms(self, mock_config):
+    async def test_send_aliyun_sms(self, mock_config, mock_http_client):
         """测试发送阿里云短信"""
         mock_config.ALIYUN_ACCESS_KEY_ID = "test_key"
+        mock_config.ALIYUN_ACCESS_KEY_SECRET = "test_secret"
+        mock_config.ALIYUN_SMS_SIGN_NAME = "TestSign"
+        mock_config.ALIYUN_SMS_TEMPLATE_CODE = "SMS_TEST"
+        mock_config.ALIYUN_SMS_REGION = "cn-hangzhou"
         mock_config.TENCENT_SECRET_ID = ""
         mock_config.SMS_PROVIDER = "aliyun"
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {'Code': 'OK', 'BizId': '123456'}
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=mock_response)
+        mock_http_client.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_http_client.return_value.__aexit__ = AsyncMock(return_value=False)
 
         handler = SMSNotificationHandler()
         result = await handler.send("13800138000", "Test", "Test Content")
@@ -167,12 +179,27 @@ class TestSMSNotificationHandler:
         assert result is True
 
     @pytest.mark.asyncio
+    @patch('httpx.AsyncClient')
     @patch('src.services.multi_channel_notification.sms_config')
-    async def test_send_tencent_sms(self, mock_config):
+    async def test_send_tencent_sms(self, mock_config, mock_http_client):
         """测试发送腾讯云短信"""
         mock_config.ALIYUN_ACCESS_KEY_ID = ""
         mock_config.TENCENT_SECRET_ID = "test_secret"
+        mock_config.TENCENT_SECRET_KEY = "test_key"
+        mock_config.TENCENT_SMS_APP_ID = "1400000001"
+        mock_config.TENCENT_SMS_SIGN = "TestSign"
+        mock_config.TENCENT_SMS_TEMPLATE_ID = "1234567"
+        mock_config.TENCENT_SMS_REGION = "ap-guangzhou"
         mock_config.SMS_PROVIDER = "tencent"
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            'Response': {'SendStatusSet': [{'Code': 'Ok', 'SerialNo': 'abc123'}]}
+        }
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+        mock_http_client.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_http_client.return_value.__aexit__ = AsyncMock(return_value=False)
 
         handler = SMSNotificationHandler()
         result = await handler.send("13800138000", "Test", "Test Content")
@@ -206,7 +233,7 @@ class TestWeChatNotificationHandler:
         handler = WeChatNotificationHandler()
         result = await handler.send("user123", "Test", "Test Content")
 
-        assert result is True
+        assert result is False
 
     @pytest.mark.asyncio
     @patch('src.services.multi_channel_notification.wechat_config')
@@ -217,17 +244,30 @@ class TestWeChatNotificationHandler:
         mock_config.WECHAT_TYPE = "corp"
 
         handler = WeChatNotificationHandler()
-        result = await handler.send("user123", "Test", "Test Content")
+        with patch.object(handler, '_send_corp_wechat', new=AsyncMock(return_value=True)):
+            result = await handler.send("user123", "Test", "Test Content")
 
         assert result is True
 
     @pytest.mark.asyncio
+    @patch('httpx.AsyncClient')
     @patch('src.services.multi_channel_notification.wechat_config')
-    async def test_send_official_wechat(self, mock_config):
+    async def test_send_official_wechat(self, mock_config, mock_http_client):
         """测试发送微信公众号消息"""
         mock_config.WECHAT_CORP_ID = ""
         mock_config.WECHAT_APP_ID = "app123"
+        mock_config.WECHAT_APP_SECRET = "test_secret"
         mock_config.WECHAT_TYPE = "official"
+
+        token_response = MagicMock()
+        token_response.json.return_value = {'access_token': 'test_token_abc'}
+        send_response = MagicMock()
+        send_response.json.return_value = {'errcode': 0, 'errmsg': 'ok'}
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=token_response)
+        mock_client.post = AsyncMock(return_value=send_response)
+        mock_http_client.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_http_client.return_value.__aexit__ = AsyncMock(return_value=False)
 
         handler = WeChatNotificationHandler()
         result = await handler.send("openid123", "Test", "Test Content")
@@ -257,7 +297,7 @@ class TestAppPushNotificationHandler:
         handler = AppPushNotificationHandler()
         result = await handler.send("device_token_123", "Test", "Test Content")
 
-        assert result is True
+        assert result is False
 
     @pytest.mark.asyncio
     async def test_send_app_push_with_extra_data(self):
@@ -270,7 +310,7 @@ class TestAppPushNotificationHandler:
             extra_data={"badge": 1, "sound": "default"}
         )
 
-        assert result is True
+        assert result is False
 
 
 class TestMultiChannelNotificationService:

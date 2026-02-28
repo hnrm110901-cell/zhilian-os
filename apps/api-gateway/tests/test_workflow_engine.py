@@ -415,19 +415,19 @@ class TestVersionDiff:
         old = {"a": 1, "b": 2}
         new = {"a": 1, "b": 3}
         diff = _simple_diff(old, new)
-        assert "b" in diff
+        assert "b" in diff["modified"]
 
     def test_diff_detects_added_keys(self):
         from src.services.workflow_engine import _simple_diff
         diff = _simple_diff({"a": 1}, {"a": 1, "c": 3})
-        assert "c" in diff
+        assert "c" in diff["added"]
 
     def test_diff_detects_removed_keys(self):
         from src.services.workflow_engine import _simple_diff
         diff = _simple_diff({"a": 1, "b": 2}, {"a": 1})
-        assert "b" in diff
+        assert "b" in diff["removed"]
 
     def test_identical_dicts_empty_diff(self):
         from src.services.workflow_engine import _simple_diff
         diff = _simple_diff({"a": 1}, {"a": 1})
-        assert diff == {}
+        assert not any(diff.values())

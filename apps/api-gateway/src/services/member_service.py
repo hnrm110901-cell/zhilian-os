@@ -39,7 +39,7 @@ class MemberService:
         if self._adapter is None:
             config = {
                 "base_url": settings.AOQIWEI_BASE_URL,
-                "api_key": settings.AOQIWEI_API_KEY,
+                "api_key": settings.AOQIWEI_APP_KEY,
                 "timeout": settings.AOQIWEI_TIMEOUT,
                 "retry_times": settings.AOQIWEI_RETRY_TIMES,
             }
