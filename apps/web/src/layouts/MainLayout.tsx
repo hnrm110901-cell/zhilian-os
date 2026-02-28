@@ -46,6 +46,8 @@ import {
   UploadOutlined,
   TrophyOutlined,
   WarningOutlined,
+  PieChartOutlined,
+  UnorderedListOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -86,7 +88,8 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/llm-config': 'admin-ai', '/hardware': 'admin-ai',
   '/integrations': 'admin-system', '/neural': 'admin-ai', '/embedding': 'admin-ai',
   '/scheduler': 'admin-system', '/benchmark': 'admin-analytics',
-  '/approval': 'admin-system', '/stores': 'admin-system', '/export-jobs': 'admin-system',
+  '/approval': 'admin-system', '/approval-list': 'admin-system', '/decision-stats': 'admin-analytics',
+  '/stores': 'admin-system', '/export-jobs': 'admin-system',
   '/queue': 'admin-store', '/agent-memory': 'admin-ai', '/wechat-triggers': 'admin-system',
   '/event-sourcing': 'admin-ai', '/meituan-queue': 'admin-store', '/vector-index': 'admin-ai',
   '/adapters': 'admin-system', '/voice-devices': 'admin-store',
@@ -226,6 +229,8 @@ const MainLayout: React.FC = () => {
     '/scheduler': '调度管理',
     '/benchmark': '基准测试',
     '/approval': '审批管理',
+    '/approval-list': '审批列表',
+    '/decision-stats': '决策统计',
     '/stores': '门店管理',
     '/export-jobs': '导出任务',
     '/queue': '排队管理',
@@ -444,6 +449,7 @@ const MainLayout: React.FC = () => {
           { key: '/integrations', icon: <ApiOutlined />, label: '外部集成' },
           { key: '/scheduler', icon: <CalendarOutlined />, label: '调度管理' },
           { key: '/approval', icon: <CheckCircleOutlined />, label: '审批管理' },
+          { key: '/approval-list', icon: <UnorderedListOutlined />, label: '审批列表' },
           { key: '/stores', icon: <ShopOutlined />, label: '门店管理' },
           { key: '/export-jobs', icon: <ExportOutlined />, label: '导出任务' },
           { key: '/wechat-triggers', icon: <BellOutlined />, label: '微信触发器' },
@@ -465,6 +471,7 @@ const MainLayout: React.FC = () => {
           { key: '/report-templates', icon: <FileTextOutlined />, label: '报表模板' },
           { key: '/kpi-dashboard', icon: <BarChartOutlined />, label: 'KPI看板' },
           { key: '/benchmark', icon: <BarChartOutlined />, label: '基准测试' },
+          { key: '/decision-stats', icon: <PieChartOutlined />, label: '决策统计' },
         ],
       },
       {
