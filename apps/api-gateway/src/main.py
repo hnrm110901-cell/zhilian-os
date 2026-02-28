@@ -32,6 +32,8 @@ from src.api import fusion
 from src.api import l3_knowledge
 # Phase 6 — L4 推理层（全维度规则推理 + 因果图谱 + 健康诊断）
 from src.api import l4_reasoning
+# Phase 7 — L5 行动层（行动派发 + WeChat FSM + 任务创建 + 反馈闭环）
+from src.api import l5_action
 from src.api import ai_evolution_dashboard
 from src.api import compliance
 from src.api import quality
@@ -496,6 +498,8 @@ app.include_router(fusion.router, tags=["fusion"])
 app.include_router(l3_knowledge.router, tags=["l3_knowledge"])
 # Phase 6 — L4 推理层（全维度规则推理 + 因果图谱 + 健康诊断）
 app.include_router(l4_reasoning.router, tags=["l4_reasoning"])
+# Phase 7 — L5 行动层（行动派发 + WeChat FSM + 任务创建 + 反馈闭环）
+app.include_router(l5_action.router, tags=["l5_action"])
 app.include_router(ai_evolution_dashboard.router, tags=["ai_evolution"])
 app.include_router(compliance.router)
 app.include_router(quality.router)

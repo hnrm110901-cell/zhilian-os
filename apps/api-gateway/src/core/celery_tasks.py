@@ -2283,3 +2283,93 @@ def nightly_reasoning_scan(
         return asyncio.run(_run())
     except Exception as e:
         raise self.retry(exc=e)
+
+
+# ── L5 夜间行动派发任务 ───────────────────────────────────────────────────────
+
+@celery_app.task(
+    base=CallbackTask, bind=True,
+    name="tasks.nightly_action_dispatch",
+    max_retries=2, default_retry_delay=300,
+    autoretry_for=(Exception,), retry_backoff=True,
+    retry_backoff_max=1800, retry_jitter=False,
+)
+def nightly_action_dispatch(
+    self,
+    store_ids: list = None,
+    days_back: int  = 1,
+) -> Dict[str, Any]:
+    """
+    L5 夜间行动批量派发任务（建议调度时间: 04:30，L4 nightly_reasoning_scan 完成后执行）
+
+    执行步骤：
+      1. 查询近 days_back 天内所有未派发行动的 P1/P2 推理报告
+      2. 按 severity 优先级（P1 优先）逐一触发 ActionDispatchService.dispatch_from_report()
+      3. 汇总派发统计并返回
+
+    Args:
+        store_ids: 指定门店列表（None = 全平台）
+        days_back: 回溯天数（默认 1 = 仅处理昨日和今日报告）
+
+    Returns:
+        {success, stores_covered, plans_created, dispatched, partial, skipped, errors}
+    """
+    import asyncio
+    from typing import Dict, Any
+
+    async def _run():
+        from src.core.database import async_session_factory
+        from src.services.action_dispatch_service import ActionDispatchService
+        from src.models.reasoning import ReasoningReport
+        from src.models.action_plan import ActionPlan
+        from datetime import date, timedelta
+        from sqlalchemy import select, and_
+
+        total_stats = {
+            "plans_created": 0, "dispatched": 0,
+            "partial": 0, "skipped": 0, "errors": 0,
+        }
+        stores_covered: set = set()
+
+        async with async_session_factory() as session:
+            # 确定目标门店
+            if store_ids:
+                target_stores = store_ids
+            else:
+                from src.models.store import Store
+                rows  = (await session.execute(
+                    select(Store.id).where(Store.is_active == True)  # noqa: E712
+                )).all()
+                target_stores = [r[0] for r in rows]
+
+            svc = ActionDispatchService(session)
+            for sid in target_stores:
+                try:
+                    stats = await svc.dispatch_pending_alerts(
+                        store_id=sid, days_back=days_back
+                    )
+                    if stats["plans_created"] > 0 or stats["dispatched"] > 0:
+                        stores_covered.add(sid)
+                    for k in ("plans_created", "dispatched", "partial", "skipped", "errors"):
+                        total_stats[k] += stats.get(k, 0)
+                except Exception as e:
+                    total_stats["errors"] += 1
+                    logger.error("L5 门店行动派发失败", store_id=sid, error=str(e))
+
+            await session.commit()
+
+        logger.info(
+            "L5 夜间行动派发完成",
+            stores_covered=len(stores_covered),
+            **total_stats,
+        )
+        return {
+            "success":         total_stats["errors"] == 0,
+            "stores_covered":  len(stores_covered),
+            **total_stats,
+        }
+
+    try:
+        return asyncio.run(_run())
+    except Exception as e:
+        raise self.retry(exc=e)
