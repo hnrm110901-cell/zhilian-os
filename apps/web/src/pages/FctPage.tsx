@@ -335,7 +335,7 @@ const CashFlowTab: React.FC = () => {
           rowKey="date"
           size="small"
           pagination={{ pageSize: 14 }}
-          rowClassName={r => r.is_alert ? 'ant-table-row-warning' : ''}
+          rowClassName={(r: any) => r.is_alert ? 'ant-table-row-warning' : ''}
         />
       )}
     </div>
