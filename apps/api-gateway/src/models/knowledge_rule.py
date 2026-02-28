@@ -35,6 +35,7 @@ class RuleCategory(str, enum.Enum):
     INVENTORY   = "inventory"    # 库存规则
     COMPLIANCE  = "compliance"   # 合规规则
     BENCHMARK   = "benchmark"    # 行业基准
+    CROSS_STORE = "cross_store"  # 跨店知识聚合规则（L3）
 
 
 class RuleType(str, enum.Enum):

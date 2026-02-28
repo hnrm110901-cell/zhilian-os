@@ -28,6 +28,8 @@ from src.api import ontology, wechat_actions
 from src.api import data_security, chain_expansion, knowledge_rules, waste_events
 # Phase 4 — L2 融合层（多源食材ID规范化）
 from src.api import fusion
+# Phase 5 — L3 跨店知识聚合（同伴组 + 物化指标 + 图同步）
+from src.api import l3_knowledge
 from src.api import ai_evolution_dashboard
 from src.api import compliance
 from src.api import quality
@@ -488,6 +490,8 @@ app.include_router(knowledge_rules.router)
 app.include_router(waste_events.router, tags=["waste_events"])
 # Phase 4 — L2 融合层（多源食材 ID 规范化 + 置信度加权）
 app.include_router(fusion.router, tags=["fusion"])
+# Phase 5 — L3 跨店知识聚合（同伴组 + 物化指标 + 图同步）
+app.include_router(l3_knowledge.router, tags=["l3_knowledge"])
 app.include_router(ai_evolution_dashboard.router, tags=["ai_evolution"])
 app.include_router(compliance.router)
 app.include_router(quality.router)
@@ -563,11 +567,13 @@ async def startup_event():
             svc = KnowledgeRuleService(db)
             rules_result = await svc.seed_rules()
             bench_result = await svc.seed_benchmarks()
+            cross_result = await svc.seed_cross_store_rules()
             await db.commit()
             logger.info(
                 "推理规则库初始化完成",
                 rules_created=rules_result.get("created", 0),
                 benchmarks_created=bench_result.get("created", 0),
+                cross_store_created=cross_result.get("created", 0),
             )
             break
     except Exception as e:

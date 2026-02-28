@@ -1683,6 +1683,120 @@ def process_waste_event(
         raise self.retry(exc=e)
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# L3 — 跨店知识聚合夜间物化（凌晨 2:30 触发）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@celery_app.task(
+    base=CallbackTask,
+    bind=True,
+    name="tasks.nightly_cross_store_sync",
+    max_retries=2,
+    default_retry_delay=300,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=1800,
+    retry_jitter=False,
+)
+def nightly_cross_store_sync(
+    self,
+    store_ids: list = None,
+) -> Dict[str, Any]:
+    """
+    L3 跨店知识聚合夜间物化任务（建议凌晨 2:30 触发）
+
+    执行步骤：
+      1. 计算两两门店相似度矩阵，写入 store_similarity_cache
+      2. 重建同伴组 store_peer_groups（tier + region 分组）
+      3. 物化昨日 cross_store_metrics（6 项指标 × 全门店）
+      4. 同步 Neo4j 图（Store 节点 + SIMILAR_TO / BENCHMARK_OF / SHARES_RECIPE 边）
+
+    Args:
+        store_ids: 指定门店列表（None = 全部活跃门店）
+
+    Returns:
+        {
+          "similarity_pairs":  N,
+          "peer_groups":       N,
+          "metrics_upserted":  N,
+          "graph_synced":      bool,
+          "errors":            [...]
+        }
+    """
+    async def _run():
+        from ..core.database import get_db_session
+        from ..services.cross_store_knowledge_service import CrossStoreKnowledgeService
+
+        errors = []
+
+        async with get_db_session() as session:
+            svc = CrossStoreKnowledgeService(session)
+
+            # Step 1: 相似度矩阵
+            try:
+                sim_result = await svc.compute_pairwise_similarity(store_ids=store_ids)
+                similarity_pairs = sim_result.get("pairs_computed", 0)
+                logger.info("跨店相似度矩阵已计算", pairs=similarity_pairs)
+            except Exception as e:
+                errors.append({"step": "similarity", "error": str(e)})
+                similarity_pairs = 0
+                logger.error("相似度矩阵计算失败", error=str(e))
+
+            # Step 2: 同伴组重建
+            try:
+                pg_result = await svc.build_peer_groups(store_ids=store_ids)
+                peer_groups = pg_result.get("groups_built", 0)
+                logger.info("同伴组重建完成", groups=peer_groups)
+            except Exception as e:
+                errors.append({"step": "peer_groups", "error": str(e)})
+                peer_groups = 0
+                logger.error("同伴组重建失败", error=str(e))
+
+            # Step 3: 日维度指标物化
+            try:
+                mat_result = await svc.materialize_metrics(store_ids=store_ids)
+                metrics_upserted = mat_result.get("upserted", 0)
+                logger.info("跨店指标物化完成", upserted=metrics_upserted)
+            except Exception as e:
+                errors.append({"step": "materialize", "error": str(e)})
+                metrics_upserted = 0
+                logger.error("指标物化失败", error=str(e))
+
+            await session.commit()
+
+            # Step 4: Neo4j 图同步（独立异常处理，不影响前序结果）
+            graph_synced = False
+            try:
+                graph_result = await svc.sync_store_graph(store_ids=store_ids)
+                graph_synced = not graph_result.get("skipped", False)
+                logger.info("Neo4j 跨店图同步完成", result=graph_result)
+            except Exception as e:
+                errors.append({"step": "graph_sync", "error": str(e)})
+                logger.error("Neo4j 跨店图同步失败", error=str(e))
+
+        logger.info(
+            "L3 跨店知识聚合夜间任务完成",
+            similarity_pairs=similarity_pairs,
+            peer_groups=peer_groups,
+            metrics_upserted=metrics_upserted,
+            graph_synced=graph_synced,
+            errors=len(errors),
+        )
+        return {
+            "success":          len(errors) == 0,
+            "similarity_pairs": similarity_pairs,
+            "peer_groups":      peer_groups,
+            "metrics_upserted": metrics_upserted,
+            "graph_synced":     graph_synced,
+            "errors":           errors,
+        }
+
+    try:
+        return asyncio.run(_run())
+    except Exception as nightly_e:
+        raise self.retry(exc=nightly_e)
+
+
 @celery_app.task(
     base=CallbackTask,
     bind=True,

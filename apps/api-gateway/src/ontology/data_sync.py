@@ -52,6 +52,269 @@ class OntologyDataSync:
     def close(self) -> None:
         self.driver.close()
 
+    # ── L3 门店本体（完整 Store 节点）────────────────────────────────────────
+
+    def upsert_store(
+        self,
+        store_id:           str,
+        name:               str,
+        region:             str,
+        city:               str,
+        tier:               str,
+        seats:              int   = 0,
+        area:               float = 0.0,
+        status:             str   = "active",
+        opening_date:       str   = "",
+        peer_group:         str   = "",
+        waste_rate_p30d:    Optional[float] = None,
+        menu_coverage_p30d: Optional[float] = None,
+    ) -> None:
+        """
+        MERGE 全属性 Store 节点（L3 跨店知识骨架）。
+
+        Cypher 本体：
+          (:Store {store_id, name, region, city, tier, seats, area,
+                   status, opening_date, peer_group,
+                   waste_rate_p30d, menu_coverage_p30d})
+        """
+        with self.driver.session() as session:
+            session.run(
+                """
+                MERGE (s:Store {store_id: $store_id})
+                ON CREATE SET
+                    s.name               = $name,
+                    s.region             = $region,
+                    s.city               = $city,
+                    s.tier               = $tier,
+                    s.seats              = $seats,
+                    s.area               = $area,
+                    s.status             = $status,
+                    s.opening_date       = $opening_date,
+                    s.peer_group         = $peer_group,
+                    s.waste_rate_p30d    = $waste_rate_p30d,
+                    s.menu_coverage_p30d = $menu_coverage_p30d,
+                    s.created_at         = timestamp()
+                ON MATCH SET
+                    s.name               = $name,
+                    s.region             = $region,
+                    s.city               = $city,
+                    s.tier               = $tier,
+                    s.seats              = $seats,
+                    s.area               = $area,
+                    s.status             = $status,
+                    s.peer_group         = $peer_group,
+                    s.waste_rate_p30d    = $waste_rate_p30d,
+                    s.menu_coverage_p30d = $menu_coverage_p30d,
+                    s.updated_at         = timestamp()
+                """,
+                store_id=store_id,
+                name=name,
+                region=region,
+                city=city,
+                tier=tier,
+                seats=seats,
+                area=area,
+                status=status,
+                opening_date=opening_date,
+                peer_group=peer_group,
+                waste_rate_p30d=waste_rate_p30d,
+                menu_coverage_p30d=menu_coverage_p30d,
+            )
+            logger.debug("Store 节点同步", store_id=store_id, tier=tier, region=region)
+
+    # ── L3 跨店关系边 ─────────────────────────────────────────────────────────
+
+    def create_similar_to_edge(
+        self,
+        store_a_id:      str,
+        store_b_id:      str,
+        similarity_score: float,
+        menu_overlap:    float  = 0.0,
+        tier_match:      bool   = False,
+        region_match:    bool   = False,
+    ) -> None:
+        """
+        建立双向相似门店边（无方向语义，MERGE 两条有方向边）：
+          (A)-[:SIMILAR_TO {score, menu_overlap, tier_match, region_match}]->(B)
+          (B)-[:SIMILAR_TO {...}]->(A)
+
+        Cypher 查询示例：
+          MATCH (me:Store {store_id: $id})-[:SIMILAR_TO]->(peer)
+          WHERE peer.waste_rate_p30d < me.waste_rate_p30d
+          RETURN peer ORDER BY peer.waste_rate_p30d LIMIT 3
+        """
+        props = {
+            "similarity_score": similarity_score,
+            "menu_overlap":     menu_overlap,
+            "tier_match":       tier_match,
+            "region_match":     region_match,
+            "computed_at":      int(__import__("time").time() * 1000),
+        }
+        with self.driver.session() as session:
+            for a, b in [(store_a_id, store_b_id), (store_b_id, store_a_id)]:
+                session.run(
+                    """
+                    MATCH (sa:Store {store_id: $a})
+                    MATCH (sb:Store {store_id: $b})
+                    MERGE (sa)-[r:SIMILAR_TO]->(sb)
+                    ON CREATE SET
+                        r.similarity_score = $score,
+                        r.menu_overlap     = $menu_overlap,
+                        r.tier_match       = $tier_match,
+                        r.region_match     = $region_match,
+                        r.computed_at      = $computed_at
+                    ON MATCH SET
+                        r.similarity_score = $score,
+                        r.menu_overlap     = $menu_overlap,
+                        r.computed_at      = $computed_at
+                    """,
+                    a=a, b=b,
+                    score=similarity_score,
+                    menu_overlap=menu_overlap,
+                    tier_match=tier_match,
+                    region_match=region_match,
+                    computed_at=props["computed_at"],
+                )
+        logger.debug(
+            "SIMILAR_TO 边建立",
+            a=store_a_id, b=store_b_id,
+            score=similarity_score,
+        )
+
+    def create_benchmark_of_edge(
+        self,
+        store_id:    str,
+        metric_name: str,
+        percentile:  float,
+        value:       float,
+        peer_group:  str,
+        peer_p50:    float,
+    ) -> None:
+        """
+        建立门店→基准快照边，保留每日多版本（不 MERGE，直接 CREATE）：
+          (Store)-[:BENCHMARK_OF {metric, percentile, value, peer_group, date}]
+          →(BenchmarkSnapshot)
+
+        因为 BenchmarkSnapshot 按日追加，用时间戳作为节点 ID 的一部分。
+        """
+        import time
+        snap_id = f"BENCH-{store_id}-{metric_name}-{int(time.time() // 86400)}"
+        with self.driver.session() as session:
+            session.run(
+                """
+                MERGE (snap:BenchmarkSnapshot {snap_id: $snap_id})
+                ON CREATE SET
+                    snap.store_id    = $store_id,
+                    snap.metric_name = $metric_name,
+                    snap.value       = $value,
+                    snap.peer_group  = $peer_group,
+                    snap.peer_p50    = $peer_p50,
+                    snap.created_at  = timestamp()
+                ON MATCH SET
+                    snap.value       = $value,
+                    snap.peer_group  = $peer_group,
+                    snap.peer_p50    = $peer_p50
+                WITH snap
+                MATCH (s:Store {store_id: $store_id})
+                MERGE (s)-[r:BENCHMARK_OF]->(snap)
+                ON CREATE SET
+                    r.metric_name = $metric_name,
+                    r.percentile  = $percentile,
+                    r.value       = $value,
+                    r.peer_group  = $peer_group
+                ON MATCH SET
+                    r.percentile  = $percentile,
+                    r.value       = $value
+                """,
+                snap_id=snap_id,
+                store_id=store_id,
+                metric_name=metric_name,
+                value=value,
+                peer_group=peer_group,
+                peer_p50=peer_p50,
+                percentile=percentile,
+            )
+        logger.debug(
+            "BENCHMARK_OF 边建立",
+            store_id=store_id, metric=metric_name, percentile=percentile,
+        )
+
+    def create_shares_recipe_edge(
+        self,
+        store_a_id:    str,
+        store_b_id:    str,
+        dish_id:       str,
+        ingredient_id: str,
+        variance_pct:  float,
+        mean_qty:      float,
+    ) -> None:
+        """
+        建立两门店间同菜品食材用量差异边：
+          (StoreA)-[:SHARES_RECIPE {dish_id, ingredient_id, variance_pct,
+                                    mean_qty, detected_at}]->(StoreB)
+
+        variance_pct > 0.10 表示存在配方标准化风险。
+
+        Cypher 查询示例（找配方漂移 Top 5）：
+          MATCH (s:Store)-[r:SHARES_RECIPE]->(peer:Store)
+          WHERE r.variance_pct > 0.15
+          RETURN s.name, peer.name, r.dish_id, r.variance_pct
+          ORDER BY r.variance_pct DESC LIMIT 5
+        """
+        with self.driver.session() as session:
+            session.run(
+                """
+                MATCH (sa:Store {store_id: $a})
+                MATCH (sb:Store {store_id: $b})
+                MERGE (sa)-[r:SHARES_RECIPE {
+                    dish_id:       $dish_id,
+                    ingredient_id: $ingredient_id
+                }]->(sb)
+                ON CREATE SET
+                    r.variance_pct = $variance_pct,
+                    r.mean_qty     = $mean_qty,
+                    r.detected_at  = timestamp()
+                ON MATCH SET
+                    r.variance_pct = $variance_pct,
+                    r.mean_qty     = $mean_qty
+                """,
+                a=store_a_id, b=store_b_id,
+                dish_id=dish_id,
+                ingredient_id=ingredient_id,
+                variance_pct=variance_pct,
+                mean_qty=mean_qty,
+            )
+
+    def link_waste_to_store(
+        self,
+        event_id: str,
+        store_id: str,
+    ) -> None:
+        """
+        建立 WasteEvent→Store 归属边（补充 L3 缺失关系）：
+          (WasteEvent {event_id})-[:OCCURRED_IN]->(Store {store_id})
+
+        补充后可直接在 Neo4j 中聚合门店维度损耗，无需 PostgreSQL JOIN。
+        """
+        with self.driver.session() as session:
+            session.run(
+                """
+                MATCH (w:WasteEvent {event_id: $event_id})
+                MATCH (s:Store {store_id: $store_id})
+                MERGE (w)-[:OCCURRED_IN]->(s)
+                """,
+                event_id=event_id,
+                store_id=store_id,
+            )
+
+    # ── Neo4j 约束 & 索引建议（运维执行一次）────────────────────────────────
+    # CREATE CONSTRAINT ON (s:Store) ASSERT s.store_id IS UNIQUE;
+    # CREATE INDEX ON :Store(region);
+    # CREATE INDEX ON :Store(tier);
+    # CREATE INDEX ON :Store(city);
+    # CREATE INDEX FOR ()-[r:SIMILAR_TO]-() ON (r.similarity_score);
+    # CREATE INDEX FOR ()-[r:SHARES_RECIPE]-() ON (r.variance_pct);
+
     # ── 菜品 ────────────────────────────────────────────────────────────────
 
     def upsert_dish(
