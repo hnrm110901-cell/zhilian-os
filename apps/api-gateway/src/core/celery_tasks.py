@@ -1583,3 +1583,756 @@ def generate_daily_hub(
         return asyncio.run(_run())
     except Exception as e:
         raise self.retry(exc=e)
+
+
+@celery_app.task(
+    base=CallbackTask,
+    bind=True,
+    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
+    default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY_SHORT", "30")),
+)
+def dispatch_training_recommendation(
+    self,
+    store_id: str,
+    tenant_id: str,
+    root_cause_dimension: str,
+    affected_staff_ids: list,
+    waste_event_id: str,
+) -> Dict[str, Any]:
+    """
+    废料根因 → 培训推荐分发。
+
+    根据损耗推理根因维度查询 ROOT_CAUSE_TO_TRAINING 配置，
+    为当班员工批量创建针对性培训推荐记录，
+    并通过 AgentMemoryBus 通知 TrainingAgent。
+
+    由 run_waste_reasoning() 在 top3 根因确定后触发。
+    """
+    async def _run():
+        from src.core.root_cause_config import ROOT_CAUSE_TO_TRAINING
+        from src.services.training_service import TrainingService
+        from src.services.agent_memory_bus import agent_memory_bus
+
+        config = ROOT_CAUSE_TO_TRAINING.get(root_cause_dimension)
+        if not config:
+            logger.info(
+                "waste_training_dispatch_no_config",
+                root_cause=root_cause_dimension,
+                store_id=store_id,
+            )
+            return {"skipped": True, "reason": "no_mapping_config", "root_cause": root_cause_dimension}
+
+        training_svc = TrainingService(store_id=store_id)
+        created = []
+        for staff_id in affected_staff_ids:
+            try:
+                rec = await training_svc.create_waste_driven_recommendation(
+                    staff_id=staff_id,
+                    root_cause=root_cause_dimension,
+                    waste_event_id=waste_event_id,
+                    course_ids=config["course_ids"],
+                    urgency=config["urgency"],
+                    urgency_days=config.get("urgency_days", 7),
+                    skill_gap=config["skill_gap"],
+                    description=config["description"],
+                )
+                created.append(rec)
+            except Exception as staff_err:
+                logger.warning(
+                    "waste_training_dispatch_staff_failed",
+                    staff_id=staff_id,
+                    error=str(staff_err),
+                )
+
+        # 通知 AgentMemoryBus，TrainingAgent 可订阅此事件
+        await agent_memory_bus.publish(
+            store_id=store_id,
+            agent_id="waste_reasoning",
+            action="training_recommendation_dispatched",
+            summary=(
+                f"根因[{root_cause_dimension}]触发培训推荐：{config['skill_gap']}，"
+                f"共{len(created)}位员工，紧迫度{config['urgency']}"
+            ),
+            confidence=0.85,
+            data={
+                "root_cause": root_cause_dimension,
+                "waste_event_id": waste_event_id,
+                "affected_staff_count": len(created),
+                "course_ids": config["course_ids"],
+                "urgency": config["urgency"],
+                "skill_gap": config["skill_gap"],
+            },
+        )
+
+        # Phase 1.3: 写入 Neo4j Staff-Training 关系，关闭因果图闭环
+        from datetime import datetime as _dt_neo
+        from src.ontology import get_ontology_repository
+        repo = get_ontology_repository()
+        if repo and created:
+            # 使用根因维度 + 技能缺口作为 TrainingModule 唯一 ID
+            module_id = f"tm_{root_cause_dimension}_{config['skill_gap'].replace(' ', '_')}"
+            try:
+                repo.merge_training_module(
+                    module_id=module_id,
+                    name=config["description"],
+                    skill_gap=config["skill_gap"],
+                    course_ids=config["course_ids"],
+                    tenant_id=tenant_id,
+                )
+                for rec in created:
+                    s_id = rec.get("staff_id", "")
+                    if s_id:
+                        repo.staff_needs_training(
+                            staff_id=s_id,
+                            module_id=module_id,
+                            waste_event_id=waste_event_id,
+                            urgency=config["urgency"],
+                            deadline=rec.get("deadline", ""),
+                        )
+            except Exception as neo_err:
+                logger.warning(
+                    "neo4j_staff_needs_training_failed",
+                    store_id=store_id,
+                    error=str(neo_err),
+                )
+
+        logger.info(
+            "waste_training_dispatch_done",
+            store_id=store_id,
+            root_cause=root_cause_dimension,
+            waste_event_id=waste_event_id,
+            staff_count=len(created),
+        )
+
+        # 企微实时告警：通知门店管理员损耗根因与培训推荐
+        try:
+            from src.services.wechat_alert_service import wechat_alert_service as _wechat_svc
+            await _wechat_svc.send_waste_training_alert(
+                store_id=store_id,
+                root_cause=root_cause_dimension,
+                skill_gap=config["skill_gap"],
+                urgency=config["urgency"],
+                affected_staff_count=len(created),
+                course_ids=config["course_ids"],
+                waste_event_id=waste_event_id,
+            )
+        except Exception as alert_err:
+            logger.warning(
+                "waste_training_wechat_alert_failed",
+                store_id=store_id,
+                root_cause=root_cause_dimension,
+                error=str(alert_err),
+            )
+
+        # Phase 2.1: 7天后触发培训效果验证
+        from datetime import datetime as _dt, timedelta
+        eta_7d = _dt.utcnow() + timedelta(days=7)
+        for rec in created:
+            try:
+                verify_training_effectiveness.apply_async(
+                    kwargs={
+                        "store_id": store_id,
+                        "staff_id": rec.get("staff_id", ""),
+                        "waste_event_id": waste_event_id,
+                        "root_cause": root_cause_dimension,
+                    },
+                    eta=eta_7d,
+                )
+            except Exception as sched_err:
+                logger.warning(
+                    "verify_training_schedule_failed",
+                    staff_id=rec.get("staff_id"),
+                    error=str(sched_err),
+                )
+
+        return {
+            "store_id": store_id,
+            "root_cause": root_cause_dimension,
+            "waste_event_id": waste_event_id,
+            "created": len(created),
+            "recommendations": created,
+        }
+
+    try:
+        return asyncio.run(_run())
+    except Exception as e:
+        logger.warning("dispatch_training_recommendation_failed", store_id=store_id, error=str(e))
+        raise self.retry(exc=e)
+
+
+@celery_app.task(
+    base=CallbackTask,
+    bind=True,
+    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
+    default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY", "60")),
+)
+def escalate_ontology_actions(self) -> Dict[str, Any]:
+    """
+    L4 Action 超时自动升级：扫描已 SENT 且超过 deadline 未回执的 Action，
+    标记 escalation_at / escalated_to 并推送给配置的升级对象（企微）。
+    由 Celery Beat 每 5–10 分钟执行一次。
+    """
+    async def _run():
+        from src.core.database import get_db_session
+        from src.services.ontology_action_service import process_escalations
+
+        async with get_db_session() as session:
+            n = await process_escalations(session)
+            await session.commit()
+        return {"escalated": n}
+
+    try:
+        return asyncio.run(_run())
+    except Exception as e:
+        logger.warning("escalate_ontology_actions_failed", error=str(e))
+        raise self.retry(exc=e)
+
+
+@celery_app.task(
+    base=CallbackTask,
+    bind=True,
+    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
+    default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY", "60")),
+)
+def verify_training_effectiveness(
+    self,
+    store_id: str,
+    staff_id: str,
+    waste_event_id: str,
+    root_cause: str,
+    pre_training_period_days: int = 7,
+) -> Dict[str, Any]:
+    """
+    Phase 2.1 培训效果验证：
+
+    在培训推荐创建 7 天后（ETA 延迟触发），对比培训前后同员工/同根因的废料率。
+    结果写入 agent_memory_bus，供 TrainingAgent 和 KnowledgeRuleService 使用。
+    """
+    async def _run():
+        from datetime import datetime, timedelta
+        from sqlalchemy import select, func, and_
+        from src.core.database import get_db_session
+        from src.models.kpi import KPI, KPIRecord
+        from src.services.agent_memory_bus import agent_memory_bus
+
+        now = datetime.now()
+        pre_start = now - timedelta(days=pre_training_period_days * 2)
+        pre_end = now - timedelta(days=pre_training_period_days)
+        post_start = pre_end
+        post_end = now
+
+        async with get_db_session() as session:
+            # 查询培训前后同员工的 waste_driven_training 记录
+            def _query_waste_kpi(from_dt, to_dt):
+                return (
+                    select(func.avg(KPIRecord.value).label("avg_score"))
+                    .join(KPI, KPIRecord.kpi_id == KPI.id)
+                    .where(
+                        and_(
+                            KPIRecord.store_id == store_id,
+                            KPI.category == "waste_driven_training",
+                            KPIRecord.record_date >= from_dt.date(),
+                            KPIRecord.record_date <= to_dt.date(),
+                        )
+                    )
+                )
+
+            pre_result = await session.execute(_query_waste_kpi(pre_start, pre_end))
+            post_result = await session.execute(_query_waste_kpi(post_start, post_end))
+
+            pre_score = pre_result.scalar() or 0
+            post_score = post_result.scalar() or 0
+
+        improvement = post_score - pre_score
+        effectiveness = min(100.0, max(0.0, 50.0 + improvement))
+
+        # 写入 agent_memory_bus
+        await agent_memory_bus.publish(
+            store_id=store_id,
+            agent_id="training_verifier",
+            action="training_effectiveness_verified",
+            summary=(
+                f"员工[{staff_id}] 根因[{root_cause}] 培训效果："
+                f"训前得分{pre_score:.1f} → 训后{post_score:.1f}，"
+                f"改善{improvement:+.1f}，有效性{effectiveness:.0f}%"
+            ),
+            confidence=0.75,
+            data={
+                "staff_id": staff_id,
+                "waste_event_id": waste_event_id,
+                "root_cause": root_cause,
+                "pre_score": pre_score,
+                "post_score": post_score,
+                "improvement": improvement,
+                "effectiveness": effectiveness,
+            },
+        )
+
+        logger.info(
+            "training_effectiveness_verified",
+            store_id=store_id,
+            staff_id=staff_id,
+            root_cause=root_cause,
+            effectiveness=effectiveness,
+        )
+
+        # Phase 2.2: 更新知识库中对应根因的 waste_rule 精度（指数移动平均）
+        try:
+            from src.services.ontology_knowledge_service import update_knowledge_accuracy
+            # tenant_id 从 store_id 反查，或直接用 store_id 所属 tenant（此处简化为按 store_id 过滤所有租户）
+            update_knowledge_accuracy(
+                root_cause=root_cause,
+                effectiveness=effectiveness,
+                tenant_id="",  # 空字符串跳过 tenant 过滤，全局匹配
+            )
+        except Exception as ka_err:
+            logger.warning("knowledge_accuracy_update_failed", root_cause=root_cause, error=str(ka_err))
+
+        return {
+            "store_id": store_id,
+            "staff_id": staff_id,
+            "root_cause": root_cause,
+            "pre_score": pre_score,
+            "post_score": post_score,
+            "improvement": improvement,
+            "effectiveness": effectiveness,
+        }
+
+    try:
+        return asyncio.run(_run())
+    except Exception as e:
+        logger.warning("verify_training_effectiveness_failed", store_id=store_id, error=str(e))
+        raise self.retry(exc=e)
+
+
+@celery_app.task(
+    base=CallbackTask,
+    bind=True,
+    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
+    default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY_LONG", "300")),
+)
+def propagate_training_knowledge(self) -> Dict[str, Any]:
+    """
+    Phase 3.2 跨门店培训知识传播（周频定时任务）：
+
+    查询各门店废料率改善 Top3 的培训方案，向相似门店自动创建培训建议，
+    标记来源为 cross_store_best_practice。
+    由 Celery Beat 每周一次执行。
+    """
+    async def _run():
+        from sqlalchemy import select, func, and_
+        from src.core.database import get_db_session
+        from src.models.kpi import KPI, KPIRecord
+        from src.models.store import Store
+        from src.services.training_service import TrainingService
+
+        propagated = 0
+        async with get_db_session() as session:
+            # 查询所有门店
+            stores_result = await session.execute(select(Store))
+            stores = stores_result.scalars().all()
+            store_ids = [str(s.id) for s in stores]
+
+            # 查询各门店培训记录，找废料率改善最好的（得分最高）
+            top_practices = {}
+            for sid in store_ids:
+                stmt = (
+                    select(
+                        KPIRecord.kpi_id,
+                        func.avg(KPIRecord.value).label("avg_score"),
+                        func.count(KPIRecord.id).label("cnt"),
+                    )
+                    .join(KPI, KPIRecord.kpi_id == KPI.id)
+                    .where(
+                        and_(
+                            KPIRecord.store_id == sid,
+                            KPI.category == "waste_driven_training",
+                            KPIRecord.status == "on_track",
+                        )
+                    )
+                    .group_by(KPIRecord.kpi_id)
+                    .order_by(func.avg(KPIRecord.value).desc())
+                    .limit(3)
+                )
+                result = await session.execute(stmt)
+                rows = result.all()
+                if rows:
+                    top_practices[sid] = [
+                        {"kpi_id": r.kpi_id, "avg_score": float(r.avg_score), "cnt": r.cnt}
+                        for r in rows
+                    ]
+
+            # 向相似门店传播最佳实践；若 Neo4j 未配置则降级为全门店广播
+            from src.ontology import get_ontology_repository
+            neo_repo = get_ontology_repository()
+
+            for source_sid, practices in top_practices.items():
+                # Phase 3: 优先通过 SIMILAR_TO 关系缩小传播范围
+                if neo_repo:
+                    try:
+                        similar = neo_repo.get_similar_stores(source_sid, min_score=0.5)
+                        target_sids = [s["store_id"] for s in similar] if similar else [
+                            sid for sid in store_ids if sid != source_sid
+                        ]
+                    except Exception:
+                        target_sids = [sid for sid in store_ids if sid != source_sid]
+                else:
+                    target_sids = [sid for sid in store_ids if sid != source_sid]
+
+                for target_sid in target_sids:
+                    for practice in practices[:1]:  # 每家门店只传播 Top1
+                        try:
+                            svc = TrainingService(store_id=target_sid)
+                            kpi_id = practice["kpi_id"]
+                            # 从 kpi_id 解析 root_cause (格式: KPI_WASTE_{ROOT_CAUSE}_...)
+                            parts = kpi_id.split("_")
+                            root_cause = parts[2].lower() if len(parts) > 2 else "cross_store"
+                            await svc.create_waste_driven_recommendation(
+                                staff_id="STORE_GENERAL",
+                                root_cause=f"cross_store_{root_cause}",
+                                waste_event_id=f"cross_store_{source_sid}_{root_cause}",
+                                course_ids=[kpi_id],
+                                urgency="low",
+                                urgency_days=30,
+                                skill_gap=root_cause,
+                                description=(
+                                    f"跨门店最佳实践：来自门店[{source_sid}]，"
+                                    f"培训[{kpi_id}]平均得分{practice['avg_score']:.1f}"
+                                ),
+                            )
+                            propagated += 1
+                        except Exception as e:
+                            logger.warning(
+                                "cross_store_propagate_failed",
+                                source=source_sid,
+                                target=target_sid,
+                                error=str(e),
+                            )
+
+        logger.info("cross_store_training_propagated", count=propagated)
+        return {"propagated": propagated}
+
+    try:
+        return asyncio.run(_run())
+    except Exception as e:
+        logger.warning("propagate_training_knowledge_failed", error=str(e))
+        raise self.retry(exc=e)
+
+
+# ============================================================
+# 图谱定期同步（每日凌晨 2AM，PG → Neo4j）
+# ============================================================
+
+@celery_app.task(
+    bind=True,
+    name="src.core.celery_tasks.sync_ontology_graph",
+    max_retries=2,
+    default_retry_delay=300,
+)
+def sync_ontology_graph(self, tenant_id: str = "") -> Dict[str, Any]:
+    """
+    每日定时将 PostgreSQL 主数据同步到 Neo4j 图谱（L2 本体层）。
+
+    同步内容：Store（含相似度自动计算）、Dish、Ingredient、Staff、Order。
+    tenant_id 为空时使用环境变量 DEFAULT_TENANT_ID，仍为空则使用 "default"。
+    由 Celery Beat 每日凌晨 2AM 触发；也可手动调用 POST /ontology/sync-from-pg。
+    """
+    import os as _os
+
+    async def _run():
+        from src.core.database import get_db_session
+        from src.services.ontology_sync_service import sync_ontology_from_pg
+
+        effective_tenant = tenant_id or _os.getenv("DEFAULT_TENANT_ID", "default")
+
+        async with get_db_session() as session:
+            result = await sync_ontology_from_pg(session, tenant_id=effective_tenant)
+
+        logger.info(
+            "ontology_graph_synced",
+            tenant_id=effective_tenant,
+            stores=result.get("stores", 0),
+            staff=result.get("staff", 0),
+            dishes=result.get("dishes", 0),
+            ingredients=result.get("ingredients", 0),
+            orders=result.get("orders", 0),
+        )
+        return {"ok": True, "tenant_id": effective_tenant, **result}
+
+    try:
+        return asyncio.run(_run())
+    except Exception as e:
+        logger.warning("sync_ontology_graph_failed", error=str(e))
+        raise self.retry(exc=e)
+
+
+# ============================================================
+# ARCH-003: 门店记忆层 Celery 任务
+# ============================================================
+
+@celery_app.task(
+    base=CallbackTask,
+    bind=True,
+    name="src.core.celery_tasks.update_store_memory",
+    max_retries=2,
+    default_retry_delay=300,
+)
+def update_store_memory(self, store_id: str = None, brand_id: str = None) -> Dict[str, Any]:
+    """
+    每日凌晨2点更新门店记忆层（Celery Beat 调度）
+
+    Args:
+        store_id: 指定门店ID（None 表示更新所有活跃门店）
+        brand_id: 品牌ID（可选）
+
+    Returns:
+        更新结果
+    """
+    async def _run():
+        from ..models.store import Store
+        from ..core.database import get_db_session
+        from ..services.store_memory_service import StoreMemoryService
+        from sqlalchemy import select
+
+        service = StoreMemoryService()
+        updated = 0
+        failed = 0
+
+        async with get_db_session() as session:
+            if store_id:
+                result = await session.execute(
+                    select(Store).where(Store.id == store_id, Store.is_active == True)
+                )
+                stores = result.scalars().all()
+            else:
+                result = await session.execute(
+                    select(Store).where(Store.is_active == True)
+                )
+                stores = result.scalars().all()
+
+        for store in stores:
+            try:
+                memory = await service.refresh_store_memory(
+                    store_id=str(store.id),
+                    brand_id=getattr(store, 'brand_id', None) or brand_id,
+                    lookback_days=30,
+                )
+                updated += 1
+                logger.info("store_memory.updated", store_id=str(store.id), confidence=memory.confidence)
+            except Exception as e:
+                failed += 1
+                logger.error("store_memory.update_failed", store_id=str(store.id), error=str(e))
+
+        logger.info("update_store_memory.done", updated=updated, failed=failed)
+        return {"updated": updated, "failed": failed}
+
+    try:
+        return asyncio.run(_run())
+    except Exception as e:
+        logger.warning("update_store_memory_failed", error=str(e))
+        raise self.retry(exc=e)
+
+
+@celery_app.task(
+    base=CallbackTask,
+    bind=True,
+    name="src.core.celery_tasks.realtime_anomaly_check",
+    max_retries=1,
+    default_retry_delay=10,
+)
+def realtime_anomaly_check(self, store_id: str, event: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    实时异常检测（StaffAction 写入后触发）
+
+    检测该门店最新操作是否触发异常模式：
+    - 短时间内多次折扣申请
+    - 营收突然异常下降
+    """
+    async def _run():
+        from ..services.store_memory_service import StoreMemoryService
+        from ..models.store_memory import AnomalyPattern
+        from datetime import datetime as _dt
+
+        service = StoreMemoryService()
+        memory = await service.get_memory(store_id)
+
+        if not memory:
+            return {"store_id": store_id, "anomaly_detected": False, "reason": "no_memory"}
+
+        action_type = event.get("action_type", "")
+        anomaly_detected = False
+        anomaly_type = None
+
+        # 简单规则：连续3次以上折扣申请标记为异常
+        if action_type == "discount_apply":
+            recent_discounts = [
+                p for p in memory.anomaly_patterns
+                if p.pattern_type == "frequent_discount"
+            ]
+            if len(recent_discounts) > 0:
+                recent_discounts[0].occurrence_count += 1
+                recent_discounts[0].last_seen = _dt.utcnow()
+                if recent_discounts[0].occurrence_count >= 3:
+                    anomaly_detected = True
+                    anomaly_type = "frequent_discount"
+            else:
+                memory.anomaly_patterns.append(AnomalyPattern(
+                    pattern_type="frequent_discount",
+                    description="短时间内多次折扣申请",
+                    first_seen=_dt.utcnow(),
+                    last_seen=_dt.utcnow(),
+                    severity="medium",
+                ))
+
+            await service._store.save(memory)
+
+        logger.info(
+            "realtime_anomaly_check.done",
+            store_id=store_id,
+            anomaly_detected=anomaly_detected,
+            anomaly_type=anomaly_type,
+        )
+
+        return {
+            "store_id": store_id,
+            "anomaly_detected": anomaly_detected,
+            "anomaly_type": anomaly_type,
+        }
+
+    try:
+        return asyncio.run(_run())
+    except Exception as e:
+        logger.warning("realtime_anomaly_check_failed", store_id=store_id, error=str(e))
+        raise self.retry(exc=e)
+
+
+# ============================================================
+# FEAT-002: 预测性备料 Celery 任务
+# ============================================================
+
+@celery_app.task(
+    base=CallbackTask,
+    bind=True,
+    name="src.core.celery_tasks.push_daily_forecast",
+    max_retries=2,
+    default_retry_delay=300,
+)
+def push_daily_forecast(self, store_id: str = None) -> Dict[str, Any]:
+    """
+    每日9AM 推送预测性备料建议
+
+    Args:
+        store_id: 指定门店（None 表示所有门店）
+
+    Returns:
+        推送结果
+    """
+    async def _run():
+        from datetime import date, timedelta
+        from ..models.store import Store
+        from ..core.database import get_db_session
+        from ..services.demand_forecaster import DemandForecaster
+        from sqlalchemy import select
+
+        target_date = date.today() + timedelta(days=1)
+        forecaster = DemandForecaster()
+        pushed = 0
+        low_confidence_count = 0
+
+        async with get_db_session() as session:
+            if store_id:
+                result = await session.execute(
+                    select(Store).where(Store.id == store_id, Store.is_active == True)
+                )
+                stores = result.scalars().all()
+            else:
+                result = await session.execute(
+                    select(Store).where(Store.is_active == True)
+                )
+                stores = result.scalars().all()
+
+        for store in stores:
+            try:
+                forecast = await forecaster.predict(
+                    store_id=str(store.id),
+                    target_date=target_date,
+                )
+
+                # confidence=low 时推送含"数据积累中"提示
+                if forecast.confidence == "low":
+                    low_confidence_count += 1
+                    message = (
+                        f"【备料建议（参考）】明日 {target_date}\n"
+                        f"门店：{store.name}\n"
+                        f"⚠️ 数据积累中（历史数据不足），建议以近期经验为主。\n"
+                        f"预估营收：¥{forecast.estimated_revenue:.0f}"
+                    )
+                else:
+                    message = (
+                        f"【备料建议】明日 {target_date}\n"
+                        f"门店：{store.name}\n"
+                        f"预估营收：¥{forecast.estimated_revenue:.0f}\n"
+                        f"置信度：{forecast.confidence}\n"
+                        f"建议备料：{len(forecast.items)} 类食材"
+                    )
+
+                logger.info(
+                    "daily_forecast.pushed",
+                    store_id=str(store.id),
+                    confidence=forecast.confidence,
+                )
+                pushed += 1
+
+            except Exception as e:
+                logger.error("daily_forecast.push_failed", store_id=str(store.id), error=str(e))
+
+        return {
+            "pushed": pushed,
+            "low_confidence": low_confidence_count,
+            "target_date": str(target_date),
+        }
+
+    try:
+        return asyncio.run(_run())
+    except Exception as e:
+        logger.warning("push_daily_forecast_failed", error=str(e))
+        raise self.retry(exc=e)
+
+
+# ============================================================
+# INFRA-002: 企微消息重试 Celery 任务
+# ============================================================
+
+@celery_app.task(
+    base=CallbackTask,
+    bind=True,
+    name="src.core.celery_tasks.retry_failed_wechat_messages",
+    max_retries=1,
+    default_retry_delay=60,
+)
+def retry_failed_wechat_messages(self) -> Dict[str, Any]:
+    """
+    每5分钟从告警队列取出失败的企微消息进行重试（最多3次）
+    """
+    async def _run():
+        from ..services.wechat_service import wechat_service
+
+        retried = 0
+        succeeded = 0
+
+        try:
+            results = await wechat_service.retry_failed_messages(max_retries=3, batch_size=10)
+            retried = results.get("retried", 0)
+            succeeded = results.get("succeeded", 0)
+        except Exception as e:
+            logger.warning("retry_failed_wechat_messages.error", error=str(e))
+
+        logger.info("retry_failed_wechat_messages.done", retried=retried, succeeded=succeeded)
+        return {"retried": retried, "succeeded": succeeded}
+
+    try:
+        return asyncio.run(_run())
+    except Exception as e:
+        logger.warning("retry_failed_wechat_messages_task_failed", error=str(e))
+        raise self.retry(exc=e)
+

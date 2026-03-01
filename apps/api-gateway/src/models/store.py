@@ -39,6 +39,9 @@ class Store(Base, TimestampMixin):
     latitude = Column(Float)  # 纬度
     longitude = Column(Float)  # 经度
 
+    # 品牌归属（多品牌隔离）
+    brand_id = Column(String(50), index=True)  # 品牌ID，null 表示未分配品牌
+
     # 管理信息
     manager_id = Column(UUID(as_uuid=True))  # 店长ID
     region = Column(String(50))  # 所属区域(华东、华南等)
@@ -79,6 +82,7 @@ class Store(Base, TimestampMixin):
             "email": self.email,
             "latitude": self.latitude,
             "longitude": self.longitude,
+            "brand_id": self.brand_id,
             "manager_id": str(self.manager_id) if self.manager_id else None,
             "region": self.region,
             "status": self.status,

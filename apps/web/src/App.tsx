@@ -35,6 +35,7 @@ const BackupManagement = lazy(() => import('./pages/BackupManagement'));
 const AdvancedAnalytics = lazy(() => import('./pages/AdvancedAnalytics'));
 const NotificationCenter = lazy(() => import('./pages/NotificationCenter'));
 const AuditLogPage = lazy(() => import('./pages/AuditLogPage'));
+const DataSovereigntyPage = lazy(() => import('./pages/DataSovereigntyPage'));
 const DataImportExportPage = lazy(() => import('./pages/DataImportExportPage'));
 const CompetitiveAnalysis = lazy(() => import('./pages/CompetitiveAnalysis'));
 const ReportTemplates = lazy(() => import('./pages/ReportTemplates'));
@@ -92,6 +93,16 @@ const HQDashboardPage = lazy(() => import('./pages/HQDashboardPage'));
 const AIAccuracyPage = lazy(() => import('./pages/AIAccuracyPage'));
 const DishCostPage = lazy(() => import('./pages/DishCostPage'));
 const EmployeePerformancePage = lazy(() => import('./pages/EmployeePerformancePage'));
+const OrderAnalyticsPage = lazy(() => import('./pages/OrderAnalyticsPage'));
+const DashboardPreferencesPage = lazy(() => import('./pages/DashboardPreferencesPage'));
+const NotificationPreferencesPage = lazy(() => import('./pages/NotificationPreferencesPage'));
+const NLQueryPage = lazy(() => import('./pages/NLQueryPage'));
+const MenuRecommendationPage = lazy(() => import('./pages/MenuRecommendationPage'));
+const WasteReasoningPage = lazy(() => import('./pages/WasteReasoningPage'));
+const OntologyGraphPage = lazy(() => import('./pages/OntologyGraphPage'));
+const KnowledgeRulePage = lazy(() => import('./pages/KnowledgeRulePage'));
+const OntologyAdminPage = lazy(() => import('./pages/OntologyAdminPage'));
+const BOMManagementPage = lazy(() => import('./pages/BOMManagementPage'));
 
 const PageLoader = (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
@@ -163,6 +174,9 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="audit" element={
                     <ProtectedRoute requiredRole="admin"><AuditLogPage /></ProtectedRoute>
+                  } />
+                  <Route path="data-sovereignty" element={
+                    <ProtectedRoute requiredRole="admin"><DataSovereigntyPage /></ProtectedRoute>
                   } />
                   <Route path="data-import-export" element={
                     <ProtectedRoute requiredRole="admin"><DataImportExportPage /></ProtectedRoute>
@@ -334,6 +348,36 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="employee-performance" element={
                     <ProtectedRoute requiredRole="store_manager"><EmployeePerformancePage /></ProtectedRoute>
+                  } />
+                  <Route path="order-analytics" element={
+                    <ProtectedRoute><OrderAnalyticsPage /></ProtectedRoute>
+                  } />
+                  <Route path="dashboard-preferences" element={
+                    <ProtectedRoute><DashboardPreferencesPage /></ProtectedRoute>
+                  } />
+                  <Route path="notification-preferences" element={
+                    <ProtectedRoute><NotificationPreferencesPage /></ProtectedRoute>
+                  } />
+                  <Route path="nl-query" element={
+                    <ProtectedRoute requiredRole="admin"><NLQueryPage /></ProtectedRoute>
+                  } />
+                  <Route path="menu-recommendations" element={
+                    <ProtectedRoute><MenuRecommendationPage /></ProtectedRoute>
+                  } />
+                  <Route path="waste-reasoning" element={
+                    <ProtectedRoute requiredRole="admin"><WasteReasoningPage /></ProtectedRoute>
+                  } />
+                  <Route path="ontology-graph" element={
+                    <ProtectedRoute requiredRole="admin"><OntologyGraphPage /></ProtectedRoute>
+                  } />
+                  <Route path="knowledge-rules" element={
+                    <ProtectedRoute requiredRole="admin"><KnowledgeRulePage /></ProtectedRoute>
+                  } />
+                  <Route path="ontology-admin" element={
+                    <ProtectedRoute requiredRole="admin"><OntologyAdminPage /></ProtectedRoute>
+                  } />
+                  <Route path="bom-management" element={
+                    <ProtectedRoute requiredRole="admin"><BOMManagementPage /></ProtectedRoute>
                   } />
                 </Route>
                 <Route path="*" element={<NotFoundPage />} />

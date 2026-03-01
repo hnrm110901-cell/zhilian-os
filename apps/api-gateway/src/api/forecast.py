@@ -124,3 +124,61 @@ async def invalidate_forecast_cache(
     """清除门店预测模型缓存（数据更新后调用）"""
     await prophet_forecast_service.invalidate_model(store_id, metric)
     return {"success": True, "store_id": store_id, "metric": metric}
+
+
+# ==================== FEAT-002: 预测性备料建议 ====================
+
+@router.get("/daily-suggestion")
+async def get_daily_forecast_suggestion(
+    store_id: str = Query(..., description="门店ID"),
+    target_date: Optional[str] = Query(None, description="目标日期 YYYY-MM-DD（不传则默认明日）"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    获取指定门店指定日期的预测性备料建议
+
+    三档降级策略：
+    - < 14天历史 → rule_based（低置信度，附"数据积累中"提示）
+    - < 60天历史 → statistical（中置信度，移动加权平均）
+    - ≥ 60天历史 → ML Prophet（高置信度）
+
+    Args:
+        store_id: 门店ID
+        target_date: 目标日期（默认明日）
+    """
+    from ..services.demand_forecaster import DemandForecaster
+    from datetime import date as _date
+
+    if target_date:
+        try:
+            t_date = _date.fromisoformat(target_date)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail={"message": f"日期格式错误，请使用 YYYY-MM-DD，实际值: {target_date}"}
+            )
+    else:
+        t_date = _date.today() + timedelta(days=1)
+
+    forecaster = DemandForecaster(db_session=db)
+    result = await forecaster.predict(store_id=store_id, target_date=t_date)
+
+    return {
+        "store_id": result.store_id,
+        "target_date": str(result.target_date),
+        "estimated_revenue": result.estimated_revenue,
+        "confidence": result.confidence,
+        "basis": result.basis,
+        "note": result.note,
+        "items": [
+            {
+                "sku_id": item.sku_id,
+                "name": item.name,
+                "unit": item.unit,
+                "suggested_quantity": item.suggested_quantity,
+                "unit_price": item.unit_price,
+                "reason": item.reason,
+            }
+            for item in result.items
+        ],
+    }

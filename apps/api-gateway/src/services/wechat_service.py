@@ -1,8 +1,17 @@
 """
 企业微信服务
 Enterprise WeChat Service for message sending and user management
+
+INFRA-002 增强：
+- TEMPLATES 字典：标准化消息模板（discount_approval, anomaly_alert, shift_report, daily_forecast）
+- send_templated_message()：统一发送方法，支持消息去重
+- Redis SET 去重（TTL 24h）：防止重复发送
+- 发送失败写入告警队列（Redis List）
+- retry_failed_messages()：从告警队列批量重试
 """
 from typing import Dict, Any, List, Optional
+import json
+import hashlib
 import httpx
 import os
 import structlog
@@ -12,17 +21,70 @@ from ..core.config import settings
 
 logger = structlog.get_logger()
 
+# ==================== 消息模板 ====================
+# 格式：template_name → Callable(data) → str
+# data 为业务数据字典，返回格式化的消息文本
+
+TEMPLATES: Dict[str, Any] = {
+    "discount_approval": lambda data: (
+        f"【折扣审批请求】\n"
+        f"门店：{data.get('store_name', data.get('store_id', ''))}\n"
+        f"申请人：{data.get('operator_name', data.get('operator_id', ''))}\n"
+        f"折扣金额：¥{data.get('amount', 0):.2f}\n"
+        f"原因：{data.get('reason', '-')}\n"
+        f"订单号：{data.get('order_id', '-')}\n"
+        f"申请时间：{data.get('created_at', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))}\n"
+        f"---\n请尽快审批处理"
+    ),
+
+    "anomaly_alert": lambda data: (
+        f"【异常告警】\n"
+        f"门店：{data.get('store_name', data.get('store_id', ''))}\n"
+        f"异常类型：{data.get('anomaly_type', '未知')}\n"
+        f"描述：{data.get('description', '-')}\n"
+        f"严重级别：{data.get('severity', 'medium')}\n"
+        f"发生时间：{data.get('occurred_at', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))}\n"
+        f"---\n请及时处理"
+    ),
+
+    "shift_report": lambda data: (
+        f"【班次报表】\n"
+        f"门店：{data.get('store_name', data.get('store_id', ''))}\n"
+        f"班次：{data.get('shift_name', data.get('date', '今日'))}\n"
+        f"营收：¥{data.get('revenue', 0):.2f}\n"
+        f"订单数：{data.get('order_count', 0)}\n"
+        f"客流量：{data.get('customer_count', 0)}\n"
+        f"平均客单价：¥{data.get('avg_order_value', 0):.2f}\n"
+        f"---\n班次已结束，数据已汇总"
+    ),
+
+    "daily_forecast": lambda data: (
+        f"【备料建议】明日 {data.get('target_date', '')}\n"
+        f"门店：{data.get('store_name', data.get('store_id', ''))}\n"
+        + (f"⚠️ {data.get('note', '')}\n" if data.get('note') else "")
+        + f"预估营收：¥{data.get('estimated_revenue', 0):.0f}\n"
+        f"置信度：{data.get('confidence', 'low')}\n"
+        f"预测依据：{data.get('basis', 'rule_based')}\n"
+        f"---\n建议提前备料"
+    ),
+}
+
+# Redis Keys
+DEDUP_KEY_PREFIX = "wechat_dedup:"
+FAILED_MSG_QUEUE_KEY = "wechat_failed_messages"
+
 
 class WeChatService:
     """企业微信服务"""
 
-    def __init__(self):
+    def __init__(self, redis_client=None):
         self.corp_id = settings.WECHAT_CORP_ID
         self.corp_secret = settings.WECHAT_CORP_SECRET
         self.agent_id = settings.WECHAT_AGENT_ID
         self.access_token: Optional[str] = None
         self.token_expire_time: Optional[datetime] = None
         self.base_url = "https://qyapi.weixin.qq.com/cgi-bin"
+        self._redis = redis_client
 
     async def get_access_token(self) -> str:
         """获取企业微信access_token"""
@@ -354,6 +416,189 @@ class WeChatService:
     def is_configured(self) -> bool:
         """检查是否已配置"""
         return bool(self.corp_id and self.corp_secret and self.agent_id)
+
+    # ==================== INFRA-002: 标准化消息接口 ====================
+
+    async def send_templated_message(
+        self,
+        template: str,
+        data: Dict[str, Any],
+        to_user_id: str,
+        message_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        使用模板发送标准化企微消息
+
+        Args:
+            template: 模板名称（discount_approval/anomaly_alert/shift_report/daily_forecast）
+            data: 业务数据字典
+            to_user_id: 接收人 user_id
+            message_id: 消息去重ID（None 时自动生成）
+
+        Returns:
+            发送结果字典
+        """
+        if template not in TEMPLATES:
+            raise ValueError(
+                f"未知模板: '{template}'。可用模板: {list(TEMPLATES.keys())}"
+            )
+
+        # 生成去重 ID
+        if not message_id:
+            message_id = hashlib.md5(
+                f"{template}:{to_user_id}:{json.dumps(data, sort_keys=True, default=str)}".encode()
+            ).hexdigest()
+
+        # Redis 去重检查（TTL 24h）
+        if await self._is_duplicate(message_id):
+            logger.info(
+                "wechat.send_templated.duplicate_skipped",
+                template=template,
+                message_id=message_id,
+                to_user_id=to_user_id,
+            )
+            return {"status": "skipped", "reason": "duplicate", "message_id": message_id}
+
+        # 渲染消息内容
+        content = TEMPLATES[template](data)
+
+        try:
+            result = await self.send_text_message(content=content, touser=to_user_id)
+            # 记录去重标记
+            await self._mark_sent(message_id)
+            logger.info(
+                "wechat.send_templated.success",
+                template=template,
+                to_user_id=to_user_id,
+                message_id=message_id,
+            )
+            return {"status": "sent", "message_id": message_id, "result": result}
+
+        except Exception as e:
+            logger.error(
+                "wechat.send_templated.failed",
+                template=template,
+                to_user_id=to_user_id,
+                error=str(e),
+            )
+            # 发送失败写入告警队列（Redis List）
+            await self._enqueue_failed_message(
+                template=template,
+                data=data,
+                to_user_id=to_user_id,
+                message_id=message_id,
+                error=str(e),
+            )
+            return {"status": "failed", "message_id": message_id, "error": str(e)}
+
+    async def retry_failed_messages(
+        self,
+        max_retries: int = 3,
+        batch_size: int = 10,
+    ) -> Dict[str, int]:
+        """
+        从告警队列批量重试失败的消息
+
+        Args:
+            max_retries: 每条消息最大重试次数
+            batch_size: 单次处理批量大小
+
+        Returns:
+            {"retried": int, "succeeded": int}
+        """
+        if not self._redis:
+            return {"retried": 0, "succeeded": 0}
+
+        retried = 0
+        succeeded = 0
+
+        for _ in range(batch_size):
+            try:
+                raw = await self._redis.lpop(FAILED_MSG_QUEUE_KEY)
+                if not raw:
+                    break
+
+                msg = json.loads(raw)
+                retry_count = msg.get("retry_count", 0)
+
+                if retry_count >= max_retries:
+                    logger.warning(
+                        "wechat.retry.max_retries_exceeded",
+                        message_id=msg.get("message_id"),
+                    )
+                    continue
+
+                retried += 1
+                msg["retry_count"] = retry_count + 1
+
+                try:
+                    result = await self.send_templated_message(
+                        template=msg["template"],
+                        data=msg["data"],
+                        to_user_id=msg["to_user_id"],
+                        message_id=msg["message_id"],
+                    )
+                    if result.get("status") in ("sent", "skipped"):
+                        succeeded += 1
+                    else:
+                        # 仍然失败，重新入队
+                        await self._redis.rpush(FAILED_MSG_QUEUE_KEY, json.dumps(msg, default=str))
+                except Exception as e:
+                    logger.error("wechat.retry.failed", error=str(e))
+                    await self._redis.rpush(FAILED_MSG_QUEUE_KEY, json.dumps(msg, default=str))
+
+            except Exception as e:
+                logger.warning("wechat.retry.queue_error", error=str(e))
+                break
+
+        logger.info("wechat.retry.done", retried=retried, succeeded=succeeded)
+        return {"retried": retried, "succeeded": succeeded}
+
+    async def _is_duplicate(self, message_id: str) -> bool:
+        """检查消息是否已发送（Redis SET 去重）"""
+        if not self._redis:
+            return False
+        try:
+            key = f"{DEDUP_KEY_PREFIX}{message_id}"
+            return bool(await self._redis.exists(key))
+        except Exception:
+            return False
+
+    async def _mark_sent(self, message_id: str, ttl: int = 86400) -> None:
+        """标记消息已发送（TTL 24h）"""
+        if not self._redis:
+            return
+        try:
+            key = f"{DEDUP_KEY_PREFIX}{message_id}"
+            await self._redis.set(key, "1", ex=ttl)
+        except Exception as e:
+            logger.warning("wechat.mark_sent.failed", message_id=message_id, error=str(e))
+
+    async def _enqueue_failed_message(
+        self,
+        template: str,
+        data: Dict[str, Any],
+        to_user_id: str,
+        message_id: str,
+        error: str,
+    ) -> None:
+        """将失败消息写入告警队列"""
+        if not self._redis:
+            return
+        try:
+            msg = {
+                "template": template,
+                "data": data,
+                "to_user_id": to_user_id,
+                "message_id": message_id,
+                "error": error,
+                "retry_count": 0,
+                "enqueued_at": datetime.utcnow().isoformat(),
+            }
+            await self._redis.rpush(FAILED_MSG_QUEUE_KEY, json.dumps(msg, default=str))
+            logger.info("wechat.failed_message_enqueued", message_id=message_id)
+        except Exception as e:
+            logger.error("wechat.enqueue_failed.error", error=str(e))
 
 
 # 创建全局实例

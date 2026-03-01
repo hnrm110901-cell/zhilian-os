@@ -8,6 +8,8 @@ import hashlib
 import os
 import re
 import time
+from datetime import datetime
+from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -60,9 +62,117 @@ class AoqiweiAdapter:
 
         logger.info("奥琦玮供应链适配器初始化", base_url=self.base_url)
 
+    # ==================== 标准化数据总线接口 ====================
+
+    def to_order(self, raw: Dict[str, Any], store_id: str, brand_id: str):
+        """
+        将奥琦玮原始订单字段映射到标准 OrderSchema
+
+        奥琦玮 POS 订单字段参考：
+          orderNo, shopCode, orderDate, orderStatus, totalAmount,
+          discountAmount, items (list of goodCode, goodName, qty, price)
+        """
+        import sys
+        import os as _os
+        _repo_root = _os.path.abspath(_os.path.join(_os.path.dirname(__file__), "../../../../.."))
+        if _repo_root not in sys.path:
+            sys.path.insert(0, _repo_root)
+
+        from apps.api_gateway.src.schemas.restaurant_standard_schema import (
+            OrderSchema, OrderStatus, OrderType, OrderItemSchema, DishCategory
+        )
+
+        # 状态映射
+        _STATUS_MAP = {
+            "0": OrderStatus.PENDING,
+            "1": OrderStatus.CONFIRMED,
+            "2": OrderStatus.COMPLETED,
+            "3": OrderStatus.CANCELLED,
+        }
+        raw_status = str(raw.get("orderStatus", "0"))
+        order_status = _STATUS_MAP.get(raw_status, OrderStatus.PENDING)
+
+        # 订单项映射
+        items = []
+        for idx, item in enumerate(raw.get("items", []), start=1):
+            unit_price = Decimal(str(item.get("price", 0))) / 100  # 分 → 元
+            qty = int(item.get("qty", item.get("quantity", 1)))
+            items.append(OrderItemSchema(
+                item_id=str(item.get("orderItemNo", f"{raw.get('orderNo', '')}_{idx}")),
+                dish_id=str(item.get("goodCode", item.get("goodId", ""))),
+                dish_name=str(item.get("goodName", "")),
+                dish_category=DishCategory.MAIN_COURSE,
+                quantity=qty,
+                unit_price=unit_price,
+                subtotal=unit_price * qty,
+                special_requirements=item.get("remark"),
+            ))
+
+        total = Decimal(str(raw.get("totalAmount", raw.get("realAmount", 0)))) / 100
+        discount = Decimal(str(raw.get("discountAmount", raw.get("specialOfferPrice", 0)))) / 100
+        subtotal = total + discount
+
+        order_date_raw = raw.get("orderDate", raw.get("orderTime", ""))
+        try:
+            created_at = datetime.fromisoformat(str(order_date_raw).replace("T", " "))
+        except (ValueError, TypeError):
+            created_at = datetime.utcnow()
+
+        return OrderSchema(
+            order_id=str(raw.get("orderId", raw.get("id", ""))),
+            order_number=str(raw.get("orderNo", "")),
+            order_type=OrderType.DINE_IN,
+            order_status=order_status,
+            store_id=store_id,
+            brand_id=brand_id,
+            table_number=raw.get("tableNo"),
+            customer_id=raw.get("memberId"),
+            items=items,
+            subtotal=subtotal,
+            discount=discount,
+            service_charge=Decimal("0"),
+            total=total,
+            created_at=created_at,
+            waiter_id=raw.get("waiterId"),
+            notes=raw.get("remark"),
+        )
+
+    def to_staff_action(self, raw: Dict[str, Any], store_id: str, brand_id: str):
+        """
+        将奥琦玮原始操作数据映射为标准 StaffAction
+
+        原始字段参考（POS 操作日志）：
+          actionType, operatorId, amount, reason, approvedBy, actionTime
+        """
+        import sys
+        import os as _os
+        _repo_root = _os.path.abspath(_os.path.join(_os.path.dirname(__file__), "../../../../.."))
+        if _repo_root not in sys.path:
+            sys.path.insert(0, _repo_root)
+
+        from apps.api_gateway.src.schemas.restaurant_standard_schema import StaffAction
+
+        action_time_raw = raw.get("actionTime", raw.get("createdAt", ""))
+        try:
+            created_at = datetime.fromisoformat(str(action_time_raw).replace("T", " "))
+        except (ValueError, TypeError):
+            created_at = datetime.utcnow()
+
+        amount_raw = raw.get("amount", raw.get("discountAmount"))
+        amount = Decimal(str(amount_raw)) / 100 if amount_raw is not None else None
+
+        return StaffAction(
+            action_type=str(raw.get("actionType", "unknown")),
+            brand_id=brand_id,
+            store_id=store_id,
+            operator_id=str(raw.get("operatorId", raw.get("staffId", ""))),
+            amount=amount,
+            reason=raw.get("reason"),
+            approved_by=raw.get("approvedBy"),
+            created_at=created_at,
+        )
+
     async def aclose(self) -> None:
-        """释放 HTTP 连接池"""
-        await self._client.aclose()
 
     async def __aenter__(self):
         return self

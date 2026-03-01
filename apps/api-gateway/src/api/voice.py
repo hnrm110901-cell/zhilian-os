@@ -391,9 +391,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class SimpleVoiceCommandRequest(BaseModel):
-    """简单语音指令请求"""
+    """简单语音指令请求（有状态版本）"""
     voice_text: str = Field(..., description="语音识别文本")
     store_id: str = Field(..., description="门店ID")
+    session_id: Optional[str] = Field(None, description="会话ID（复用已有会话；不传则创建新会话）")
 
 
 class MeituanQueueBroadcastRequest(BaseModel):
@@ -433,7 +434,9 @@ async def handle_simple_voice_command(
             voice_text=request.voice_text,
             store_id=request.store_id,
             user_id=current_user.id,
-            db=db
+            db=db,
+            session_id=request.session_id,
+            actor_role=getattr(current_user, "role", ""),
         )
 
         logger.info(

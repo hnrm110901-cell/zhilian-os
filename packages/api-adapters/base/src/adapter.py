@@ -143,6 +143,36 @@ class BaseAdapter(ABC):
         """
         pass
 
+    @abstractmethod
+    def to_order(self, raw: Dict[str, Any], store_id: str, brand_id: str) -> "OrderSchema":
+        """
+        将 POS 原始订单数据映射为标准 OrderSchema
+
+        Args:
+            raw: POS 系统原始订单字典
+            store_id: 门店ID
+            brand_id: 品牌ID
+
+        Returns:
+            标准 OrderSchema 实例
+        """
+        pass
+
+    @abstractmethod
+    def to_staff_action(self, raw: Dict[str, Any], store_id: str, brand_id: str) -> "StaffAction":
+        """
+        将 POS 原始操作数据映射为标准 StaffAction
+
+        Args:
+            raw: POS 系统原始操作字典
+            store_id: 门店ID
+            brand_id: 品牌ID
+
+        Returns:
+            标准 StaffAction 实例
+        """
+        pass
+
     async def close(self):
         """关闭HTTP客户端"""
         await self.client.aclose()
@@ -154,3 +184,4 @@ class BaseAdapter(ABC):
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """异步上下文管理器出口"""
         await self.close()
+

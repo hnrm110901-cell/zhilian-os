@@ -110,6 +110,18 @@ celery_app.conf.update(
             "queue": "default",
             "routing_key": "default",
         },
+        "src.core.celery_tasks.dispatch_training_recommendation": {
+            "queue": "default",
+            "routing_key": "default",
+        },
+        "src.core.celery_tasks.verify_training_effectiveness": {
+            "queue": "low_priority",
+            "routing_key": "low_priority",
+        },
+        "src.core.celery_tasks.propagate_training_knowledge": {
+            "queue": "low_priority",
+            "routing_key": "low_priority",
+        },
     },
 
     # Celery Beat定时任务调度
@@ -172,6 +184,73 @@ celery_app.conf.update(
             "options": {
                 "queue": "default",
                 "priority": 6,
+            },
+        },
+        # 每10分钟执行 L4 Action 超时升级（P0 30min / P1 2h 等）
+        "escalate-ontology-actions": {
+            "task": "src.core.celery_tasks.escalate_ontology_actions",
+            "schedule": crontab(minute=f"*/{os.getenv('CELERY_ESCALATION_INTERVAL', '10')}"),
+            "args": (),
+            "options": {
+                "queue": "default",
+                "priority": 7,
+            },
+        },
+        # Phase 3.2: 每周一 3AM 跨门店培训知识传播
+        "propagate-training-knowledge": {
+            "task": "src.core.celery_tasks.propagate_training_knowledge",
+            "schedule": crontab(
+                hour=int(os.getenv("CELERY_CROSS_STORE_TRAINING_HOUR", "3")),
+                minute=0,
+                day_of_week=1,  # 周一
+            ),
+            "args": (),
+            "options": {
+                "queue": "low_priority",
+                "priority": 2,
+            },
+        },
+        # 每日凌晨 2AM 同步 PG 主数据 → Neo4j 图谱
+        "sync-ontology-graph": {
+            "task": "src.core.celery_tasks.sync_ontology_graph",
+            "schedule": crontab(
+                hour=int(os.getenv("CELERY_ONTOLOGY_SYNC_HOUR", "2")),
+                minute=0,
+            ),
+            "args": (),
+            "options": {
+                "queue": "low_priority",
+                "priority": 3,
+            },
+        },
+        # ARCH-003: 每日凌晨 2AM 更新门店记忆层
+        "update-store-memory": {
+            "task": "src.core.celery_tasks.update_store_memory",
+            "schedule": crontab(hour=2, minute=0),
+            "args": (),
+            "options": {
+                "queue": "low_priority",
+                "priority": 3,
+            },
+        },
+        # FEAT-002: 每日9AM 推送预测性备料建议
+        "push-daily-forecast": {
+            "task": "src.core.celery_tasks.push_daily_forecast",
+            "schedule": crontab(hour=9, minute=0),
+            "args": (),
+            "options": {
+                "queue": "default",
+                "priority": 5,
+            },
+        },
+        # INFRA-002: 每5分钟重试失败的企微消息
+        "retry-failed-wechat-messages": {
+            "task": "src.core.celery_tasks.retry_failed_wechat_messages",
+            "schedule": crontab(minute="*/5"),
+            "args": (),
+            "options": {
+                "queue": "high_priority",
+                "priority": 8,
             },
         },
     },

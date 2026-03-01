@@ -48,6 +48,7 @@ class User(Base, TimestampMixin):
     role = Column(Enum(UserRole, values_callable=lambda x: [e.value for e in x]), default=UserRole.WAITER, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     store_id = Column(String(50), index=True)  # Associated store
+    brand_id = Column(String(50), index=True)  # Associated brand (multi-brand isolation)
     wechat_user_id = Column(String(100), index=True)  # WeChat Work user ID for push notifications
 
     def __repr__(self):

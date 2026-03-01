@@ -1,6 +1,6 @@
 """
 Store ID Validation Middleware
-门店ID归属校验中间件 - 防止跨店铺数据访问
+门店ID归属校验中间件 - 防止跨店铺/跨品牌数据访问
 """
 from fastapi import Request, HTTPException, status
 from fastapi.responses import JSONResponse
@@ -15,10 +15,10 @@ logger = structlog.get_logger()
 
 class StoreAccessMiddleware(BaseHTTPMiddleware):
     """
-    门店访问权限校验中间件
+    门店访问权限校验中间件（双层隔离：store_id + brand_id）
 
-    验证用户是否有权访问指定的store_id
-    防止跨店铺数据泄露
+    验证用户是否有权访问指定的 store_id，同时检查 brand_id 跨品牌访问。
+    防止跨店铺、跨品牌数据泄露。
     """
 
     # 不需要校验的路径
@@ -32,7 +32,7 @@ class StoreAccessMiddleware(BaseHTTPMiddleware):
         "/auth/register",
     ]
 
-    # 超级管理员角色（可以访问所有门店）
+    # 超级管理员角色（可以访问所有门店/品牌）
     SUPER_ADMIN_ROLES = ["super_admin", "system_admin"]
 
     async def dispatch(self, request: Request, call_next):
@@ -42,10 +42,10 @@ class StoreAccessMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         try:
-            # 从请求中提取store_id
+            # 从请求中提取 store_id
             store_id = await self._extract_store_id(request)
 
-            # 如果没有提取到store_id，尝试从用户信息获取
+            # 如果没有提取到 store_id，尝试从用户信息获取
             if not store_id:
                 user = getattr(request.state, "user", None)
                 if user:
@@ -70,22 +70,56 @@ class StoreAccessMiddleware(BaseHTTPMiddleware):
                         },
                     )
 
-                # 设置租户上下文
+                # 设置门店租户上下文
                 TenantContext.set_current_tenant(store_id)
                 logger.debug("Tenant context set in middleware", store_id=store_id)
+
+            # 从 JWT 提取 brand_id 并设置品牌上下文
+            user = getattr(request.state, "user", None)
+            if user:
+                brand_id = user.get("brand_id")
+                user_role = user.get("role", "")
+
+                if brand_id and user_role not in self.SUPER_ADMIN_ROLES:
+                    # 检查跨品牌访问
+                    request_brand_id = await self._extract_brand_id(request, user)
+                    if request_brand_id and request_brand_id != brand_id:
+                        logger.warning(
+                            "Cross-brand access attempt",
+                            path=request.url.path,
+                            user_brand_id=brand_id,
+                            request_brand_id=request_brand_id,
+                        )
+                        return JSONResponse(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            content={
+                                "detail": "您没有权限访问该品牌的数据",
+                                "error_code": "BRAND_ACCESS_DENIED",
+                                "brand_id": request_brand_id,
+                            },
+                        )
+
+                    if brand_id:
+                        try:
+                            TenantContext.set_current_brand(brand_id)
+                            logger.debug("Brand context set in middleware", brand_id=brand_id)
+                        except ValueError:
+                            pass
 
             # 继续处理请求
             response = await call_next(request)
 
-            # 清除租户上下文
+            # 清除上下文
             TenantContext.clear_current_tenant()
+            TenantContext.clear_current_brand()
 
             return response
 
         except Exception as e:
             logger.error("Store access middleware error", error=str(e))
-            # 确保清除租户上下文
+            # 确保清除上下文
             TenantContext.clear_current_tenant()
+            TenantContext.clear_current_brand()
             # 出错时允许请求继续，避免阻塞正常流程
             return await call_next(request)
 
@@ -98,7 +132,7 @@ class StoreAccessMiddleware(BaseHTTPMiddleware):
 
     async def _extract_store_id(self, request: Request) -> Optional[str]:
         """
-        从请求中提取store_id
+        从请求中提取 store_id
 
         支持多种方式：
         1. Query参数: ?store_id=xxx
@@ -118,8 +152,6 @@ class StoreAccessMiddleware(BaseHTTPMiddleware):
         # 3. 从request body获取（仅POST/PUT/PATCH请求）
         if request.method in ["POST", "PUT", "PATCH"]:
             try:
-                # 注意：这里需要小心处理，避免消耗request body
-                # 实际使用时可能需要更复杂的处理
                 body = await request.body()
                 if body:
                     import json
@@ -132,6 +164,34 @@ class StoreAccessMiddleware(BaseHTTPMiddleware):
                         logger.debug("request_body_not_json", path=str(request.url.path))
             except Exception as e:
                 logger.warning("request_body_parse_failed", error=str(e))
+
+    async def _extract_brand_id(self, request: Request, user: dict) -> Optional[str]:
+        """从请求中提取 brand_id（用于跨品牌访问检测）"""
+        # 1. 从query参数获取
+        brand_id = request.query_params.get("brand_id")
+        if brand_id:
+            return brand_id
+
+        # 2. 从path参数获取
+        if "brand_id" in request.path_params:
+            return request.path_params["brand_id"]
+
+        # 3. 从request body获取
+        if request.method in ["POST", "PUT", "PATCH"]:
+            try:
+                body = await request.body()
+                if body:
+                    import json
+                    try:
+                        data = json.loads(body)
+                        if isinstance(data, dict) and "brand_id" in data:
+                            return data["brand_id"]
+                    except json.JSONDecodeError:
+                        pass
+            except Exception:
+                pass
+
+        return None
 
     async def _validate_store_access(
         self, request: Request, store_id: str
@@ -160,7 +220,7 @@ class StoreAccessMiddleware(BaseHTTPMiddleware):
 
         # 检查用户的门店权限列表
         user_stores = user.get("stores", [])
-        if isinstance(user_stores, list):
+        if isinstance(user_stores, list) and user_stores:
             return store_id in user_stores
 
         # 检查用户的主门店
@@ -189,7 +249,7 @@ def get_user_accessible_stores(user: dict) -> List[str]:
 
     # 获取用户的门店权限列表
     stores = user.get("stores", [])
-    if isinstance(stores, list):
+    if isinstance(stores, list) and stores:
         return stores
 
     # 获取用户的主门店

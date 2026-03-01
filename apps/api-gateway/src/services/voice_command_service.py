@@ -1,7 +1,7 @@
 """
-语音指令服务 (轻量级MVP)
+语音指令服务 (有状态版本)
 支持Shokz骨传导耳机的基础语音交互
-本地意图识别，无需云端LLM
+本地意图识别 + 有状态会话上下文（最近3轮对话记忆）
 """
 import uuid
 from datetime import datetime, timedelta
@@ -16,6 +16,8 @@ from ..models.store import Store
 from ..models.order import Order
 from ..models.inventory import InventoryItem
 from ..core.database import get_db
+from ..models.conversation import ConversationContext, ConversationStore
+from ..services.intent_router import IntentRouter
 
 logger = structlog.get_logger()
 
@@ -30,10 +32,13 @@ class VoiceIntent:
 
 
 class VoiceCommandService:
-    """语音指令服务 (轻量级MVP)"""
+    """语音指令服务（有状态版本）"""
 
-    def __init__(self):
-        # 意图识别规则（基于关键词匹配，无需LLM）
+    def __init__(self, redis_client=None):
+        self._conv_store = ConversationStore(redis_client=redis_client)
+        self._intent_router = IntentRouter()
+
+        # 保留原有无状态意图模式（向后兼容）
         self.intent_patterns = {
             VoiceIntent.QUEUE_STATUS: [
                 r"(当前|现在|目前).*(排队|等位|等待)",
@@ -61,6 +66,51 @@ class VoiceCommandService:
                 r"(忙不过来|太忙)"
             ]
         }
+
+    async def handle_stateful_command(
+        self,
+        voice_text: str,
+        store_id: str,
+        user_id: str,
+        actor_role: str = "",
+        session_id: Optional[str] = None,
+        db: AsyncSession = None,
+    ) -> Dict[str, Any]:
+        """
+        处理语音指令（有状态版本）
+
+        Args:
+            voice_text: 语音识别文本
+            store_id: 门店ID
+            user_id: 用户ID
+            actor_role: 操作人角色
+            session_id: 会话ID（None 时创建新会话）
+            db: 数据库会话
+
+        Returns:
+            Dict: 响应结果（含 session_id 供后续请求复用）
+        """
+        # 加载或创建会话上下文
+        context = await self._conv_store.get_or_create(
+            session_id=session_id,
+            store_id=store_id,
+            user_id=user_id,
+        )
+
+        # 通过 IntentRouter 处理（携带最近3轮上下文）
+        result = await self._intent_router.route(
+            text=voice_text,
+            context=context,
+            actor_role=actor_role,
+            db=db,
+        )
+
+        # 保存更新后的上下文
+        await self._conv_store.save(context)
+
+        # 确保 session_id 在返回结果中
+        result["session_id"] = context.session_id
+        return result
 
     def recognize_intent(self, voice_text: str) -> Optional[str]:
         """
@@ -99,61 +149,32 @@ class VoiceCommandService:
         voice_text: str,
         store_id: str,
         user_id: str,
-        db: AsyncSession = None
+        db: AsyncSession = None,
+        session_id: Optional[str] = None,
+        actor_role: str = "",
     ) -> Dict[str, Any]:
         """
-        处理语音指令
+        处理语音指令（兼容旧接口，内部使用有状态版本）
 
         Args:
             voice_text: 语音识别文本
             store_id: 门店ID
             user_id: 用户ID
             db: 数据库会话
+            session_id: 会话ID（None 时创建新会话）
+            actor_role: 操作人角色
 
         Returns:
-            Dict: 响应结果
+            Dict: 响应结果（含 session_id 供后续请求复用）
         """
-        try:
-            # 识别意图
-            intent = self.recognize_intent(voice_text)
-
-            if not intent:
-                return {
-                    "success": False,
-                    "message": "抱歉，我没有理解您的指令",
-                    "voice_response": "抱歉，我没有理解您的指令，请重新说一遍"
-                }
-
-            # 根据意图处理
-            if intent == VoiceIntent.QUEUE_STATUS:
-                return await self._handle_queue_status(store_id, db)
-
-            elif intent == VoiceIntent.ORDER_REMINDER:
-                return await self._handle_order_reminder(store_id, db)
-
-            elif intent == VoiceIntent.INVENTORY_QUERY:
-                return await self._handle_inventory_query(store_id, voice_text, db)
-
-            elif intent == VoiceIntent.REVENUE_TODAY:
-                return await self._handle_revenue_today(store_id, db)
-
-            elif intent == VoiceIntent.CALL_SUPPORT:
-                return await self._handle_call_support(store_id, user_id, db)
-
-            else:
-                return {
-                    "success": False,
-                    "message": "未知的指令类型",
-                    "voice_response": "抱歉，暂不支持该指令"
-                }
-
-        except Exception as e:
-            logger.error("handle_command_failed", error=str(e))
-            return {
-                "success": False,
-                "message": f"处理指令失败: {str(e)}",
-                "voice_response": "抱歉，处理指令时出现错误"
-            }
+        return await self.handle_stateful_command(
+            voice_text=voice_text,
+            store_id=store_id,
+            user_id=user_id,
+            actor_role=actor_role,
+            session_id=session_id,
+            db=db,
+        )
 
     async def _handle_queue_status(self, store_id: str, db: AsyncSession) -> Dict[str, Any]:
         """处理排队状态查询"""

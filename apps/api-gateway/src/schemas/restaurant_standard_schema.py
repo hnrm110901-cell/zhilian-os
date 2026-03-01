@@ -103,6 +103,7 @@ class OrderSchema(BaseModel):
 
     # 关联信息
     store_id: str = Field(..., description="门店ID")
+    brand_id: Optional[str] = Field(None, description="品牌ID（多品牌隔离）")
     table_number: Optional[str] = Field(None, description="桌号")
     customer_id: Optional[str] = Field(None, description="客户ID")
 
@@ -357,6 +358,27 @@ class FinancialSummarySchema(BaseModel):
 
     # 关联信息
     store_id: str = Field(..., description="门店ID")
+
+    class Config:
+        json_encoders = {
+            Decimal: lambda v: float(v),
+            datetime: lambda v: v.isoformat()
+        }
+
+
+# ==================== 员工操作 (StaffAction) ====================
+
+
+class StaffAction(BaseModel):
+    """员工操作记录标准Schema（用于可信执行层审计）"""
+    action_type: str = Field(..., description="操作类型（如 discount_apply, shift_report, stock_alert）")
+    brand_id: str = Field(..., description="品牌ID")
+    store_id: str = Field(..., description="门店ID")
+    operator_id: str = Field(..., description="操作人员ID")
+    amount: Optional[Decimal] = Field(None, ge=0, description="涉及金额（如折扣金额）")
+    reason: Optional[str] = Field(None, description="操作原因")
+    approved_by: Optional[str] = Field(None, description="审批人员ID")
+    created_at: datetime = Field(..., description="操作时间")
 
     class Config:
         json_encoders = {

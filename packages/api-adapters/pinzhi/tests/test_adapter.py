@@ -2,6 +2,8 @@
 品智适配器单元测试
 """
 import pytest
+from decimal import Decimal
+from datetime import datetime
 from src.adapter import PinzhiAdapter
 from src.signature import generate_sign, verify_sign
 
@@ -326,3 +328,112 @@ class TestErrorHandling:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+# ---------------------------------------------------------------------------
+# ARCH-001: to_order() / to_staff_action() 标准数据总线接口测试
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def raw_pinzhi_order():
+    """品智原始订单数据（queryOrderListV2.do 返回格式）"""
+    return {
+        "billId": "uuid-pz-001",
+        "billNo": "B202401010001",
+        "orderSource": 1,        # 1=堂食
+        "tableNo": "0001",
+        "openOrderUser": "服务员001",
+        "cashiers": "收银员001",
+        "openTime": "2024-01-01 12:00:00",
+        "payTime": "2024-01-01 13:00:00",
+        "payDate": "2024-01-01",
+        "vipCard": "M20240001",
+        "dishPriceTotal": 20000,     # 分
+        "teaPrice": 400,             # 分
+        "specialOfferPrice": 2000,   # 分
+        "realPrice": 18400,          # 分
+        "billStatus": 1,             # 已结账
+        "dishList": [
+            {"dishId": "D001", "dishName": "红烧肉", "dishNum": 1, "dishPrice": 8800},
+            {"dishId": "D002", "dishName": "蒸鸡蛋", "dishNum": 2, "dishPrice": 2400},
+        ],
+    }
+
+
+@pytest.fixture
+def raw_pinzhi_staff_action():
+    return {
+        "actionType": "discount_apply",
+        "staffId": "STAFF_PZ_001",
+        "amount": 2000,
+        "reason": "员工优惠",
+        "approvedBy": "MGR_PZ_001",
+        "createdAt": "2024-01-01 12:10:00",
+    }
+
+
+class TestPinzhiToOrderMapsCorrectly:
+    def test_order_id(self, adapter, raw_pinzhi_order):
+        order = adapter.to_order(raw_pinzhi_order, store_id="STORE_P1", brand_id="BRAND_P")
+        assert order.order_id == "uuid-pz-001"
+
+    def test_order_number(self, adapter, raw_pinzhi_order):
+        order = adapter.to_order(raw_pinzhi_order, store_id="STORE_P1", brand_id="BRAND_P")
+        assert order.order_number == "B202401010001"
+
+    def test_store_id_injected(self, adapter, raw_pinzhi_order):
+        order = adapter.to_order(raw_pinzhi_order, store_id="STORE_P1", brand_id="BRAND_P")
+        assert order.store_id == "STORE_P1"
+
+    def test_brand_id_injected(self, adapter, raw_pinzhi_order):
+        order = adapter.to_order(raw_pinzhi_order, store_id="STORE_P1", brand_id="BRAND_P")
+        assert order.brand_id == "BRAND_P"
+
+    def test_total_converted(self, adapter, raw_pinzhi_order):
+        order = adapter.to_order(raw_pinzhi_order, store_id="STORE_P1", brand_id="BRAND_P")
+        assert order.total == Decimal("184.00")
+
+    def test_discount_converted(self, adapter, raw_pinzhi_order):
+        order = adapter.to_order(raw_pinzhi_order, store_id="STORE_P1", brand_id="BRAND_P")
+        assert order.discount == Decimal("20.00")
+
+    def test_service_charge(self, adapter, raw_pinzhi_order):
+        order = adapter.to_order(raw_pinzhi_order, store_id="STORE_P1", brand_id="BRAND_P")
+        assert order.service_charge == Decimal("4.00")  # teaPrice
+
+    def test_items_count(self, adapter, raw_pinzhi_order):
+        order = adapter.to_order(raw_pinzhi_order, store_id="STORE_P1", brand_id="BRAND_P")
+        assert len(order.items) == 2
+
+    def test_item_name(self, adapter, raw_pinzhi_order):
+        order = adapter.to_order(raw_pinzhi_order, store_id="STORE_P1", brand_id="BRAND_P")
+        assert order.items[0].dish_name == "红烧肉"
+
+    def test_waiter_id(self, adapter, raw_pinzhi_order):
+        order = adapter.to_order(raw_pinzhi_order, store_id="STORE_P1", brand_id="BRAND_P")
+        assert order.waiter_id == "服务员001"
+
+    def test_status_completed(self, adapter, raw_pinzhi_order):
+        from apps.api_gateway.src.schemas.restaurant_standard_schema import OrderStatus
+        order = adapter.to_order(raw_pinzhi_order, store_id="STORE_P1", brand_id="BRAND_P")
+        assert order.order_status == OrderStatus.COMPLETED
+
+
+class TestPinzhiToStaffActionMapsCorrectly:
+    def test_action_type(self, adapter, raw_pinzhi_staff_action):
+        action = adapter.to_staff_action(raw_pinzhi_staff_action, store_id="STORE_P1", brand_id="BRAND_P")
+        assert action.action_type == "discount_apply"
+
+    def test_operator_id(self, adapter, raw_pinzhi_staff_action):
+        action = adapter.to_staff_action(raw_pinzhi_staff_action, store_id="STORE_P1", brand_id="BRAND_P")
+        assert action.operator_id == "STAFF_PZ_001"
+
+    def test_amount_converted(self, adapter, raw_pinzhi_staff_action):
+        action = adapter.to_staff_action(raw_pinzhi_staff_action, store_id="STORE_P1", brand_id="BRAND_P")
+        assert action.amount == Decimal("20.00")
+
+    def test_brand_store_injected(self, adapter, raw_pinzhi_staff_action):
+        action = adapter.to_staff_action(raw_pinzhi_staff_action, store_id="STORE_P1", brand_id="BRAND_P")
+        assert action.brand_id == "BRAND_P"
+        assert action.store_id == "STORE_P1"
+
