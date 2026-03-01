@@ -3,7 +3,7 @@
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from uuid import UUID
 
 from src.services.dish_service import DishService, DishCategoryService
@@ -30,8 +30,7 @@ class DishCategoryResponse(BaseModel):
     sort_order: int
     is_active: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DishCreate(BaseModel):
@@ -79,8 +78,7 @@ class DishResponse(BaseModel):
     total_sales: int
     rating: Optional[float]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DishIngredientAdd(BaseModel):

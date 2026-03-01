@@ -3,7 +3,7 @@ Reconciliation API
 对账管理API
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import Optional, Any
 from datetime import date, datetime
 import structlog
@@ -59,8 +59,7 @@ class ReconciliationRecordResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
     @field_validator("id", "confirmed_by", mode="before")
     @classmethod

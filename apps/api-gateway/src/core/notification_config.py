@@ -2,7 +2,7 @@
 Multi-Channel Notification Configuration
 多渠道通知配置管理
 """
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
 
@@ -16,8 +16,7 @@ class EmailConfig(BaseSettings):
     SMTP_USE_TLS: bool = True
     SMTP_TIMEOUT: int = 30
 
-    class Config:
-        env_prefix = "EMAIL_"
+    model_config = SettingsConfigDict(env_prefix="EMAIL_")
 
 
 class SMSConfig(BaseSettings):
@@ -37,8 +36,7 @@ class SMSConfig(BaseSettings):
     # 使用的SMS提供商: aliyun, tencent
     SMS_PROVIDER: str = "aliyun"
 
-    class Config:
-        env_prefix = "SMS_"
+    model_config = SettingsConfigDict(env_prefix="SMS_")
 
 
 class WeChatConfig(BaseSettings):
@@ -55,8 +53,7 @@ class WeChatConfig(BaseSettings):
     # 使用的微信类型: corp, official
     WECHAT_TYPE: str = "corp"
 
-    class Config:
-        env_prefix = "WECHAT_"
+    model_config = SettingsConfigDict(env_prefix="WECHAT_")
 
 
 class FeishuConfig(BaseSettings):
@@ -65,8 +62,7 @@ class FeishuConfig(BaseSettings):
     FEISHU_APP_SECRET: str = ""
     FEISHU_WEBHOOK_URL: Optional[str] = None
 
-    class Config:
-        env_prefix = "FEISHU_"
+    model_config = SettingsConfigDict(env_prefix="FEISHU_")
 
 
 class PushConfig(BaseSettings):
@@ -82,8 +78,7 @@ class PushConfig(BaseSettings):
     # 使用的推送提供商: jpush, firebase
     PUSH_PROVIDER: str = "jpush"
 
-    class Config:
-        env_prefix = "PUSH_"
+    model_config = SettingsConfigDict(env_prefix="PUSH_")
 
 
 class NotificationConfig(BaseSettings):
@@ -102,8 +97,7 @@ class NotificationConfig(BaseSettings):
     ENABLE_FALLBACK: bool = True
     FALLBACK_CHANNEL: str = "email"
 
-    class Config:
-        env_prefix = "NOTIFICATION_"
+    model_config = SettingsConfigDict(env_prefix="NOTIFICATION_")
 
     def get_enabled_channels(self) -> list:
         """获取启用的渠道列表"""

@@ -5,7 +5,7 @@ from typing import Optional
 from datetime import datetime, date
 from fastapi import APIRouter, Depends, Query, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 import io
 
@@ -36,8 +36,7 @@ class AuditLogResponse(BaseModel):
     store_id: Optional[str]
     created_at: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 @router.get("/logs")

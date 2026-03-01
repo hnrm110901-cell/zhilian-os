@@ -4,7 +4,7 @@ Notification API endpoints
 """
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, Query, HTTPException
 from typing import Optional, List
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from ..models.user import User, UserRole
 from ..models.notification import NotificationType, NotificationPriority
@@ -50,8 +50,7 @@ class NotificationResponse(BaseModel):
     source: Optional[str]
     created_at: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 @router.websocket("/ws")

@@ -5,7 +5,7 @@ Approval Workflow API
 提供Human-in-the-loop决策审批接口
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import structlog
@@ -85,8 +85,7 @@ class DecisionLogResponse(BaseModel):
     outcome: Optional[str]
     trust_score: Optional[float]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DecisionStatisticsResponse(BaseModel):
