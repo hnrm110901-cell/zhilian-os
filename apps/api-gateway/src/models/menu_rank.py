@@ -4,8 +4,10 @@ FEAT-004: 动态菜单权重引擎 — 数据模型
 5因子评分：趋势30%、毛利25%、库存20%、时段匹配15%、低退单10%
 """
 from decimal import Decimal
-from typing import Optional
-from pydantic import BaseModel, Field
+from typing import Annotated, Optional
+from pydantic import BaseModel, Field, PlainSerializer
+
+JsonDecimal = Annotated[Decimal, PlainSerializer(float, return_type=float, when_used="json")]
 
 
 class DishScore(BaseModel):
@@ -43,9 +45,6 @@ class RankedDish(BaseModel):
     dish_name: str
     category: Optional[str] = None
     image_url: Optional[str] = None
-    price: Optional[Decimal] = None
+    price: Optional[JsonDecimal] = None
     score: DishScore
     highlight: Optional[str] = None    # 推荐理由（如"今日销量上升20%"）
-
-    class Config:
-        json_encoders = {Decimal: float}

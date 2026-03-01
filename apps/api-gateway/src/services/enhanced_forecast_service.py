@@ -186,7 +186,6 @@ class EnhancedForecastService(BaseService):
             except Exception as e:
                 logger.warning(
                     "enhanced_forecast.auspicious_factor_failed",
-                    store_id=store_id,
                     target_date=str(target_date),
                     error=str(e),
                 )

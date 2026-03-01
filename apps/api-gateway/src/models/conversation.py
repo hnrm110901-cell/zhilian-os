@@ -25,9 +25,6 @@ class ConversationTurn(BaseModel):
     data: Dict[str, Any] = Field(default_factory=dict)
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
-    class Config:
-        json_encoders = {datetime: lambda v: v.isoformat()}
-
 
 class ConversationContext(BaseModel):
     """会话上下文（有状态，最近3轮）"""
@@ -65,9 +62,6 @@ class ConversationContext(BaseModel):
             lines.append(f"用户: {turn.user_input}")
             lines.append(f"系统: {turn.response[:100]}")
         return "\n".join(lines)
-
-    class Config:
-        json_encoders = {datetime: lambda v: v.isoformat()}
 
 
 class ConversationStore:
