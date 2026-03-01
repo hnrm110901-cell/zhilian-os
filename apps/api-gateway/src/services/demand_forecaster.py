@@ -121,7 +121,7 @@ class DemandForecaster:
         base_revenue = 3000.0
         estimated = base_revenue * (1.3 if is_weekend else 1.0)
 
-        items = self._mock_items(estimated)
+        items = await self._fetch_bom_items(store_id, estimated)
 
         return ForecastResult(
             store_id=store_id,
@@ -183,7 +183,7 @@ class DemandForecaster:
                 for row, w in zip(rows, weights)
             ) / total_weight
 
-            items = self._mock_items(weighted_revenue)
+            items = await self._fetch_bom_items(store_id, weighted_revenue)
 
             return ForecastResult(
                 store_id=store_id,
@@ -248,7 +248,7 @@ class DemandForecaster:
                 return await self._statistical(store_id, target_date, history_days)
 
             estimated = max(0.0, float(row["yhat"].iloc[0]))
-            items = self._mock_items(estimated)
+            items = await self._fetch_bom_items(store_id, estimated)
 
             return ForecastResult(
                 store_id=store_id,
@@ -266,11 +266,94 @@ class DemandForecaster:
             logger.warning("ml_prophet.failed", store_id=store_id, error=str(e))
             return await self._statistical(store_id, target_date, history_days)
 
-    def _mock_items(self, estimated_revenue: float) -> List[ForecastItem]:
-        """根据预估营收生成示例备料建议（实际项目需基于 BOM 计算）"""
-        factor = estimated_revenue / 3000.0
-        return [
-            ForecastItem(sku_id="SKU_001", name="猪肉", unit="kg", suggested_quantity=round(5 * factor, 1), reason="基于历史用量"),
-            ForecastItem(sku_id="SKU_002", name="鸡肉", unit="kg", suggested_quantity=round(3 * factor, 1), reason="基于历史用量"),
-            ForecastItem(sku_id="SKU_003", name="蔬菜", unit="kg", suggested_quantity=round(8 * factor, 1), reason="基于历史用量"),
-        ]
+    async def _fetch_bom_items(
+        self, store_id: str, estimated_revenue: float
+    ) -> List[ForecastItem]:
+        """从 BOM 查询活跃配方，按预估营收缩放后返回备料建议。
+
+        算法：
+          1. 查询门店所有 is_active BOM 模板及对应菜品售价
+          2. 均匀分配预估营收 → 每道菜份数 = estimated_revenue / avg_price / num_dishes
+          3. 汇总各食材需求量（含 waste_factor 损耗）
+          4. 按需求量降序返回
+
+        无 DB、无 BOM 数据或发生异常时均返回空列表。
+        """
+        if not self._db:
+            return []
+
+        try:
+            from collections import defaultdict
+            from sqlalchemy import select
+            from ..models.bom import BOMTemplate, BOMItem
+            from ..models.inventory import InventoryItem
+            from ..models.dish import Dish
+
+            # 1. 活跃 BOM 模板 + 菜品售价
+            bom_stmt = (
+                select(BOMTemplate.id, Dish.price)
+                .join(Dish, BOMTemplate.dish_id == Dish.id)
+                .where(
+                    BOMTemplate.store_id == store_id,
+                    BOMTemplate.is_active.is_(True),
+                )
+            )
+            bom_rows = (await self._db.execute(bom_stmt)).all()
+            if not bom_rows:
+                return []
+
+            # 2. 估算每道菜份数（均匀分配）
+            num_dishes = len(bom_rows)
+            avg_price_fen = sum(int(r.price or 0) for r in bom_rows) / num_dishes
+            avg_price_yuan = avg_price_fen / 100.0 if avg_price_fen > 0 else 50.0
+            portions_per_dish = (estimated_revenue / avg_price_yuan) / num_dishes
+
+            # 3. BOM 明细 + 食材名称/单位
+            bom_ids = [str(r.id) for r in bom_rows]
+            items_stmt = (
+                select(
+                    BOMItem.ingredient_id,
+                    BOMItem.standard_qty,
+                    BOMItem.unit,
+                    BOMItem.waste_factor,
+                    InventoryItem.name,
+                )
+                .join(InventoryItem, BOMItem.ingredient_id == InventoryItem.id)
+                .where(BOMItem.bom_id.in_(bom_ids))
+            )
+            item_rows = (await self._db.execute(items_stmt)).all()
+
+            # 4. 按食材汇总需求量（含损耗系数）
+            totals: Dict[str, Dict] = defaultdict(
+                lambda: {"name": "", "unit": "", "qty": 0.0}
+            )
+            for r in item_rows:
+                waste = float(r.waste_factor or 0)
+                qty = float(r.standard_qty or 0) * (1.0 + waste) * portions_per_dish
+                totals[r.ingredient_id]["name"] = r.name
+                totals[r.ingredient_id]["unit"] = r.unit or "kg"
+                totals[r.ingredient_id]["qty"] += qty
+
+            return sorted(
+                [
+                    ForecastItem(
+                        sku_id=iid,
+                        name=d["name"],
+                        unit=d["unit"],
+                        suggested_quantity=round(d["qty"], 2),
+                        reason="基于BOM配方及预估营收",
+                    )
+                    for iid, d in totals.items()
+                    if d["qty"] > 0
+                ],
+                key=lambda x: x.suggested_quantity,
+                reverse=True,
+            )
+
+        except Exception as e:
+            logger.warning(
+                "demand_forecaster.fetch_bom_items_failed",
+                store_id=store_id,
+                error=str(e),
+            )
+            return []
