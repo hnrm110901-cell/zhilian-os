@@ -7,7 +7,7 @@ ConversationTurn + ConversationContext 使语音交互具有状态（记忆最�
 import json
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, ClassVar, Dict, List, Optional
 from pydantic import BaseModel, Field
 import structlog
 
@@ -43,7 +43,7 @@ class ConversationContext(BaseModel):
     current_order_id: Optional[str] = None  # 当前订单ID
     pending_intent: Optional[str] = None    # 待确认意图（多步操作用）
 
-    MAX_TURNS = 3  # 保留最近3轮
+    MAX_TURNS: ClassVar[int] = 3  # 保留最近3轮
 
     def add_turn(self, turn: ConversationTurn) -> None:
         """添加对话轮次，超过 MAX_TURNS 时移除最旧的"""

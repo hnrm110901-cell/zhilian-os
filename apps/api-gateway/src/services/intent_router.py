@@ -7,6 +7,7 @@ IntentRouter 负责：
 3. 执行对应 Handler
 4. 更新 ConversationContext
 """
+import re
 from typing import Any, Callable, Dict, Optional
 import structlog
 
@@ -20,35 +21,325 @@ logger = structlog.get_logger()
 HandlerFn = Callable[[str, str, ConversationContext, Optional[Any]], Any]
 
 
-# ==================== 内置 Handler 占位实现 ====================
+# ==================== 内置 Handler 实现 ====================
 
 class QueryRevenueHandler:
-    async def handle(self, text: str, store_id: str, context: ConversationContext, db=None) -> Dict[str, Any]:
-        return {"intent": "query_revenue", "message": "正在查询今日营收...", "voice_response": "正在查询今日营收"}
+    """查询今日营收：SUM(final_amount) for completed orders today"""
+
+    async def handle(
+        self,
+        text: str,
+        store_id: str,
+        context: ConversationContext,
+        db=None,
+        actor_role: str = "",
+    ) -> Dict[str, Any]:
+        if not db:
+            return {
+                "intent": "query_revenue",
+                "message": "当前无法获取营收数据，请查看管理后台",
+                "voice_response": "当前无法获取营收数据",
+            }
+
+        try:
+            from datetime import date
+            from sqlalchemy import select, func
+            from ..models.order import Order, OrderStatus
+
+            today = date.today()
+            stmt = (
+                select(func.coalesce(func.sum(Order.final_amount), 0))
+                .where(
+                    Order.store_id == store_id,
+                    func.date(Order.order_time) == today,
+                    Order.status.in_([OrderStatus.COMPLETED, OrderStatus.SERVED]),
+                )
+            )
+            result = await db.execute(stmt)
+            total_fen = int(result.scalar() or 0)
+            total_yuan = total_fen / 100
+
+            msg = f"今日营收 ¥{total_yuan:,.2f} 元"
+            return {
+                "intent": "query_revenue",
+                "message": msg,
+                "voice_response": msg,
+                "data": {"total_yuan": total_yuan, "date": str(today)},
+            }
+
+        except Exception as e:
+            logger.error("query_revenue.failed", store_id=store_id, error=str(e))
+            return {
+                "intent": "query_revenue",
+                "message": "营收查询失败，请稍后重试",
+                "voice_response": "营收查询失败，请稍后重试",
+            }
 
 
 class ApplyDiscountHandler:
-    async def handle(self, text: str, store_id: str, context: ConversationContext, db=None) -> Dict[str, Any]:
-        return {
-            "intent": "apply_discount",
-            "message": "折扣申请需要审批，已提交给店长",
-            "voice_response": "折扣申请已提交给店长审批",
+    """解析折扣金额并通过 TrustedExecutor 提交申请"""
+
+    _PATTERNS = [
+        # "打九折" / "打9折" → compute discount from rate
+        (re.compile(r'打(\d+(?:\.\d+)?)折'), "rate"),
+        # "减20元" / "优惠20元" / "减免20元"
+        (re.compile(r'(?:减|优惠|减免|打折|抹掉)(\d+(?:\.\d+)?)元'), "yuan"),
+    ]
+
+    def _parse_amount_fen(self, text: str) -> Optional[int]:
+        """从语音文本解析折扣金额（单位：分），无法解析时返回 None"""
+        for pattern, kind in self._PATTERNS:
+            m = pattern.search(text)
+            if m:
+                val = float(m.group(1))
+                if kind == "rate":
+                    # "打X折" → 折扣率=(1 - X/10)，以100元订单为基准估算折扣额
+                    rate = 1.0 - val / 10.0
+                    return round(10000 * rate)  # 基准100元 × 折扣率 → 分
+                else:
+                    return int(val * 100)
+        # 抹零 → 固定5元
+        if "抹零" in text:
+            return 500
+        return None
+
+    async def handle(
+        self,
+        text: str,
+        store_id: str,
+        context: ConversationContext,
+        db=None,
+        actor_role: str = "",
+    ) -> Dict[str, Any]:
+        amount_fen = self._parse_amount_fen(text)
+        if amount_fen is None:
+            context.pending_intent = "apply_discount"
+            return {
+                "intent": "apply_discount",
+                "message": "请说明折扣金额，例如：'减20元'或'打九折'",
+                "voice_response": "请问需要优惠多少？",
+            }
+
+        actor = {
+            "user_id": context.user_id,
+            "role": actor_role or "floor_manager",
+            "store_id": store_id,
+            "brand_id": "",
         }
+
+        try:
+            from ..core.trusted_executor import TrustedExecutor
+            executor = TrustedExecutor(db_session=db)
+            result = await executor.execute(
+                command_type="discount_apply",
+                payload={
+                    "store_id": store_id,
+                    "amount": amount_fen,
+                    "reason": text,
+                    "table": context.current_table or "",
+                    "order_id": context.current_order_id or "",
+                },
+                actor=actor,
+            )
+            amount_yuan = amount_fen / 100
+            msg = f"折扣 ¥{amount_yuan:.0f} 元申请已提交"
+            return {
+                "intent": "apply_discount",
+                "message": msg,
+                "voice_response": msg,
+                "execution_result": result,
+            }
+
+        except Exception as e:
+            logger.warning("apply_discount.failed", store_id=store_id, error=str(e))
+            amount_yuan = amount_fen / 100
+            msg = f"折扣 ¥{amount_yuan:.0f} 元申请已记录，等待审批"
+            return {
+                "intent": "apply_discount",
+                "message": msg,
+                "voice_response": msg,
+            }
 
 
 class QueryQueueHandler:
-    async def handle(self, text: str, store_id: str, context: ConversationContext, db=None) -> Dict[str, Any]:
-        return {"intent": "query_queue", "message": "正在查询排队状态...", "voice_response": "正在查询排队状态"}
+    """查询当前排队状态：COUNT(WAITING) + SUM(party_size)"""
+
+    async def handle(
+        self,
+        text: str,
+        store_id: str,
+        context: ConversationContext,
+        db=None,
+        actor_role: str = "",
+    ) -> Dict[str, Any]:
+        if not db:
+            return {
+                "intent": "query_queue",
+                "message": "当前无法查询排队状态",
+                "voice_response": "当前无法查询排队状态",
+            }
+
+        try:
+            from sqlalchemy import select, func
+            from ..models.queue import Queue, QueueStatus
+
+            stmt = (
+                select(
+                    func.count(Queue.queue_id).label("waiting_tables"),
+                    func.coalesce(func.sum(Queue.party_size), 0).label("waiting_people"),
+                )
+                .where(
+                    Queue.store_id == store_id,
+                    Queue.status == QueueStatus.WAITING,
+                )
+            )
+            result = await db.execute(stmt)
+            row = result.one()
+            tables = int(row.waiting_tables or 0)
+            people = int(row.waiting_people or 0)
+
+            msg = (
+                "当前没有客人在排队等候"
+                if tables == 0
+                else f"当前有 {tables} 桌、共 {people} 人在排队等候"
+            )
+            return {
+                "intent": "query_queue",
+                "message": msg,
+                "voice_response": msg,
+                "data": {"waiting_tables": tables, "waiting_people": people},
+            }
+
+        except Exception as e:
+            logger.error("query_queue.failed", store_id=store_id, error=str(e))
+            return {
+                "intent": "query_queue",
+                "message": "排队查询失败，请稍后重试",
+                "voice_response": "排队查询失败，请稍后重试",
+            }
 
 
 class InventoryQueryHandler:
-    async def handle(self, text: str, store_id: str, context: ConversationContext, db=None) -> Dict[str, Any]:
-        return {"intent": "inventory_query", "message": "正在查询库存...", "voice_response": "正在查询库存"}
+    """查询库存不足食材：status IN (low, critical, out_of_stock)"""
+
+    async def handle(
+        self,
+        text: str,
+        store_id: str,
+        context: ConversationContext,
+        db=None,
+        actor_role: str = "",
+    ) -> Dict[str, Any]:
+        if not db:
+            return {
+                "intent": "inventory_query",
+                "message": "当前无法查询库存数据",
+                "voice_response": "当前无法查询库存数据",
+            }
+
+        try:
+            from sqlalchemy import select
+            from ..models.inventory import InventoryItem, InventoryStatus
+
+            stmt = (
+                select(
+                    InventoryItem.name,
+                    InventoryItem.current_quantity,
+                    InventoryItem.unit,
+                    InventoryItem.status,
+                )
+                .where(
+                    InventoryItem.store_id == store_id,
+                    InventoryItem.status.in_([
+                        InventoryStatus.LOW,
+                        InventoryStatus.CRITICAL,
+                        InventoryStatus.OUT_OF_STOCK,
+                    ]),
+                )
+                .order_by(InventoryItem.status)
+                .limit(5)
+            )
+            result = await db.execute(stmt)
+            rows = result.all()
+
+            if not rows:
+                msg = "当前所有食材库存充足"
+            else:
+                items = "、".join(
+                    f"{r.name}（{r.current_quantity:.1f}{r.unit or ''}）"
+                    for r in rows
+                )
+                msg = f"以下食材库存不足：{items}"
+
+            return {
+                "intent": "inventory_query",
+                "message": msg,
+                "voice_response": msg,
+                "data": {
+                    "low_stock_items": [
+                        {
+                            "name": r.name,
+                            "quantity": r.current_quantity,
+                            "unit": r.unit,
+                            "status": r.status.value,
+                        }
+                        for r in rows
+                    ]
+                },
+            }
+
+        except Exception as e:
+            logger.error("inventory_query.failed", store_id=store_id, error=str(e))
+            return {
+                "intent": "inventory_query",
+                "message": "库存查询失败，请稍后重试",
+                "voice_response": "库存查询失败，请稍后重试",
+            }
 
 
 class CallSupportHandler:
-    async def handle(self, text: str, store_id: str, context: ConversationContext, db=None) -> Dict[str, Any]:
-        return {"intent": "call_support", "message": "支援请求已发送", "voice_response": "支援请求已发送，同事正在赶来"}
+    """请求支援：记录日志 + 尝试企微通知"""
+
+    async def handle(
+        self,
+        text: str,
+        store_id: str,
+        context: ConversationContext,
+        db=None,
+        actor_role: str = "",
+    ) -> Dict[str, Any]:
+        user_id = context.user_id
+        logger.info(
+            "call_support.requested",
+            store_id=store_id,
+            user_id=user_id,
+            text=text,
+        )
+
+        # 尝试企微通知（失败不阻断主流程）
+        try:
+            from ..services.wechat_service import wechat_service
+            await wechat_service.send_templated_message(
+                template="anomaly_alert",
+                data={
+                    "store_id": store_id,
+                    "pattern_type": "staff_support",
+                    "description": f"员工 {user_id} 请求支援",
+                    "severity": "medium",
+                    "action_required": "请立即前往支援",
+                },
+                to_user_id="store_manager",
+            )
+        except Exception:
+            pass
+
+        msg = "支援请求已发送，同事正在赶来"
+        return {
+            "intent": "call_support",
+            "message": msg,
+            "voice_response": msg,
+            "data": {"requested_by": user_id, "store_id": store_id},
+        }
 
 
 # ==================== 意图路由表 ====================
@@ -187,10 +478,10 @@ class IntentRouter:
                 "session_id": context.session_id,
             }
 
-        # 3. 执行 Handler
+        # 3. 执行 Handler（传入 actor_role 供折扣等需要权限上下文的操作使用）
         handler = self._intent_map[intent]["handler"]
         try:
-            result = await handler.handle(text, store_id, context, db)
+            result = await handler.handle(text, store_id, context, db, actor_role=actor_role)
         except Exception as e:
             logger.error("intent_handler_failed", intent=intent, error=str(e))
             result = {
