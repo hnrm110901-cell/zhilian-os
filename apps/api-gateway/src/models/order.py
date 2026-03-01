@@ -44,6 +44,9 @@ class Order(Base, TimestampMixin):
     confirmed_at = Column(DateTime)
     completed_at = Column(DateTime)
 
+    # Staff tracking
+    waiter_id = Column(String(50), index=True)   # 服务员ID（用于员工绩效基线计算）
+
     # Metadata
     notes = Column(String(500))
     order_metadata = Column(JSON, default=dict)  # Renamed from metadata to avoid SQLAlchemy conflict
@@ -56,6 +59,7 @@ class Order(Base, TimestampMixin):
         Index('idx_order_store_status', 'store_id', 'status'),
         Index('idx_order_store_time', 'store_id', 'order_time'),
         Index('idx_order_status_time', 'status', 'order_time'),
+        Index('idx_order_store_waiter', 'store_id', 'waiter_id'),
     )
 
     def __repr__(self):

@@ -135,39 +135,143 @@ class MenuRanker:
             return self._mock_ranking()
 
     async def _fetch_dish_data(self, store_id: str) -> List[Dict[str, Any]]:
-        """从数据库获取菜品相关数据"""
-        from sqlalchemy import select, func, text
+        """从数据库批量获取菜品及销售统计数据
+
+        使用3条聚合查询替代逐菜品 N+1 查询：
+          1. 各菜品近7天 / 前7天销量（趋势因子）
+          2. 各菜品午市 / 晚市销量占比（时段因子）
+          3. 各菜品近7天取消/退单量（低退单因子）
+        """
+        from sqlalchemy import select, func, case, extract
         from ..models.dish import Dish
+        from ..models.order import Order, OrderItem, OrderStatus
 
         # 获取所有活跃菜品
         stmt = select(Dish).where(Dish.store_id == store_id, Dish.is_available == True)
         result = await self._db.execute(stmt)
         dishes = result.scalars().all()
+        if not dishes:
+            return []
+
+        dish_ids = [str(d.id) for d in dishes]
 
         now = datetime.utcnow()
         week_ago = now - timedelta(days=7)
         two_weeks_ago = now - timedelta(days=14)
 
+        completed_statuses = [OrderStatus.COMPLETED.value, OrderStatus.SERVED.value]
+
+        # ── Query 1: 近7天 & 前7天销量（一次查询，用 CASE 分组）──────────────────
+        sales_stmt = (
+            select(
+                OrderItem.item_id,
+                func.sum(
+                    case(
+                        (Order.order_time >= week_ago, OrderItem.quantity),
+                        else_=0,
+                    )
+                ).label("recent_qty"),
+                func.sum(
+                    case(
+                        (
+                            (Order.order_time >= two_weeks_ago)
+                            & (Order.order_time < week_ago),
+                            OrderItem.quantity,
+                        ),
+                        else_=0,
+                    )
+                ).label("prev_qty"),
+            )
+            .join(Order, OrderItem.order_id == Order.id)
+            .where(
+                Order.store_id == store_id,
+                Order.order_time >= two_weeks_ago,
+                Order.status.in_(completed_statuses),
+                OrderItem.item_id.in_(dish_ids),
+            )
+            .group_by(OrderItem.item_id)
+        )
+        sales_rows = (await self._db.execute(sales_stmt)).all()
+        sales_map = {r.item_id: (int(r.recent_qty or 0), int(r.prev_qty or 0)) for r in sales_rows}
+
+        # ── Query 2: 时段销量（午市10-14点 / 晚市17-21点）──────────────────────
+        slot_stmt = (
+            select(
+                OrderItem.item_id,
+                func.sum(OrderItem.quantity).label("total_qty"),
+                func.sum(
+                    case(
+                        (extract("hour", Order.order_time).between(10, 13), OrderItem.quantity),
+                        else_=0,
+                    )
+                ).label("lunch_qty"),
+                func.sum(
+                    case(
+                        (extract("hour", Order.order_time).between(17, 20), OrderItem.quantity),
+                        else_=0,
+                    )
+                ).label("dinner_qty"),
+            )
+            .join(Order, OrderItem.order_id == Order.id)
+            .where(
+                Order.store_id == store_id,
+                Order.order_time >= week_ago,
+                Order.status.in_(completed_statuses),
+                OrderItem.item_id.in_(dish_ids),
+            )
+            .group_by(OrderItem.item_id)
+        )
+        slot_rows = (await self._db.execute(slot_stmt)).all()
+        slot_map: Dict[str, Dict] = {}
+        for r in slot_rows:
+            total = int(r.total_qty or 0)
+            slot_map[r.item_id] = {
+                "lunch_pct": (int(r.lunch_qty or 0) / total) if total > 0 else 0.5,
+                "dinner_pct": (int(r.dinner_qty or 0) / total) if total > 0 else 0.5,
+            }
+
+        # ── Query 3: 近7天取消订单量（退单率因子）──────────────────────────────
+        cancel_stmt = (
+            select(
+                OrderItem.item_id,
+                func.sum(OrderItem.quantity).label("cancelled_qty"),
+            )
+            .join(Order, OrderItem.order_id == Order.id)
+            .where(
+                Order.store_id == store_id,
+                Order.order_time >= week_ago,
+                Order.status == OrderStatus.CANCELLED.value,
+                OrderItem.item_id.in_(dish_ids),
+            )
+            .group_by(OrderItem.item_id)
+        )
+        cancel_rows = (await self._db.execute(cancel_stmt)).all()
+        cancel_map = {r.item_id: int(r.cancelled_qty or 0) for r in cancel_rows}
+
+        # ── 组装 dish_data ──────────────────────────────────────────────────────
         dish_data = []
         for dish in dishes:
-            data = {
-                "dish_id": str(dish.id),
+            did = str(dish.id)
+            recent_sales, prev_sales = sales_map.get(did, (0, 0))
+            slot = slot_map.get(did, {"lunch_pct": 0.5, "dinner_pct": 0.5})
+            cancelled = cancel_map.get(did, 0)
+            total_recent = recent_sales or 1
+            refund_rate = min(1.0, cancelled / total_recent)
+
+            dish_data.append({
+                "dish_id": did,
                 "dish_name": dish.name,
                 "category": dish.category,
                 "price": dish.price,
                 "cost": getattr(dish, "cost", 0) or 0,
                 "current_stock": getattr(dish, "current_stock", 999),
                 "min_stock": getattr(dish, "min_stock", 10),
-            }
-
-            # 简化：使用默认值（实际需要联查订单）
-            data["recent_sales"] = 0
-            data["prev_sales"] = 0
-            data["refund_rate"] = 0.0
-            data["lunch_sales_pct"] = 0.5
-            data["dinner_sales_pct"] = 0.5
-
-            dish_data.append(data)
+                "recent_sales": recent_sales,
+                "prev_sales": prev_sales,
+                "refund_rate": refund_rate,
+                "lunch_sales_pct": slot["lunch_pct"],
+                "dinner_sales_pct": slot["dinner_pct"],
+            })
 
         return dish_data
 
