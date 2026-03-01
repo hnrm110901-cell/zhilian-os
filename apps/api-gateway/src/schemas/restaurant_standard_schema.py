@@ -5,11 +5,14 @@ Restaurant Business Standard Schema
 覆盖订单、菜品、人员、时间、金额五个核心维度
 智链OS作为餐饮门店的神经系统，统一数据标准
 """
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from pydantic import BaseModel, Field, PlainSerializer
+from typing import Optional, List, Dict, Any, Annotated
 from datetime import datetime
 from enum import Enum
 from decimal import Decimal
+
+# Decimal that serializes to float in JSON (Pydantic v2 PlainSerializer pattern)
+JsonDecimal = Annotated[Decimal, PlainSerializer(float, return_type=float, when_used="json")]
 
 
 # ==================== 核心维度枚举 ====================
@@ -82,15 +85,10 @@ class OrderItemSchema(BaseModel):
     dish_name: str = Field(..., description="菜品名称")
     dish_category: DishCategory = Field(..., description="菜品分类")
     quantity: int = Field(..., ge=1, description="数量")
-    unit_price: Decimal = Field(..., ge=0, description="单价")
-    subtotal: Decimal = Field(..., ge=0, description="小计")
+    unit_price: JsonDecimal = Field(..., ge=0, description="单价")
+    subtotal: JsonDecimal = Field(..., ge=0, description="小计")
     special_requirements: Optional[str] = Field(None, description="特殊要求")
     preparation_time: Optional[int] = Field(None, description="预计制作时间（分钟）")
-
-    class Config:
-        json_encoders = {
-            Decimal: lambda v: float(v)
-        }
 
 
 class OrderSchema(BaseModel):
@@ -111,10 +109,10 @@ class OrderSchema(BaseModel):
     items: List[OrderItemSchema] = Field(..., description="订单项列表")
 
     # 金额信息
-    subtotal: Decimal = Field(..., ge=0, description="小计")
-    discount: Decimal = Field(0, ge=0, description="折扣金额")
-    service_charge: Decimal = Field(0, ge=0, description="服务费")
-    total: Decimal = Field(..., ge=0, description="总金额")
+    subtotal: JsonDecimal = Field(..., ge=0, description="小计")
+    discount: JsonDecimal = Field(0, ge=0, description="折扣金额")
+    service_charge: JsonDecimal = Field(0, ge=0, description="服务费")
+    total: JsonDecimal = Field(..., ge=0, description="总金额")
 
     # 时间信息
     created_at: datetime = Field(..., description="创建时间")
@@ -128,12 +126,6 @@ class OrderSchema(BaseModel):
 
     # 备注
     notes: Optional[str] = Field(None, description="备注")
-
-    class Config:
-        json_encoders = {
-            Decimal: lambda v: float(v),
-            datetime: lambda v: v.isoformat()
-        }
 
 
 # ==================== 维度2: 菜品 (Dish) ====================
@@ -153,12 +145,7 @@ class IngredientSchema(BaseModel):
     name: str = Field(..., description="食材名称")
     quantity: float = Field(..., ge=0, description="用量")
     unit: str = Field(..., description="单位")
-    cost: Decimal = Field(..., ge=0, description="成本")
-
-    class Config:
-        json_encoders = {
-            Decimal: lambda v: float(v)
-        }
+    cost: JsonDecimal = Field(..., ge=0, description="成本")
 
 
 class DishSchema(BaseModel):
@@ -175,8 +162,8 @@ class DishSchema(BaseModel):
     tags: List[str] = Field(default_factory=list, description="标签")
 
     # 价格信息
-    price: Decimal = Field(..., ge=0, description="售价")
-    cost: Decimal = Field(..., ge=0, description="成本")
+    price: JsonDecimal = Field(..., ge=0, description="售价")
+    cost: JsonDecimal = Field(..., ge=0, description="成本")
     profit_margin: float = Field(..., ge=0, le=1, description="利润率")
 
     # 制作信息
@@ -195,11 +182,6 @@ class DishSchema(BaseModel):
     # 关联信息
     store_id: str = Field(..., description="门店ID")
 
-    class Config:
-        json_encoders = {
-            Decimal: lambda v: float(v)
-        }
-
 
 # ==================== 维度3: 人员 (Staff) ====================
 
@@ -211,11 +193,6 @@ class ShiftSchema(BaseModel):
     start_time: datetime = Field(..., description="开始时间")
     end_time: datetime = Field(..., description="结束时间")
     break_duration: int = Field(0, ge=0, description="休息时长（分钟）")
-
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
 
 
 class StaffSchema(BaseModel):
@@ -246,11 +223,6 @@ class StaffSchema(BaseModel):
     # 状态信息
     is_active: bool = Field(True, description="是否在职")
 
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
-
 
 # ==================== 维度4: 时间 (Time) ====================
 
@@ -270,11 +242,6 @@ class TimeSlotSchema(BaseModel):
 
     # 关联信息
     store_id: str = Field(..., description="门店ID")
-
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
 
 
 class BusinessHoursSchema(BaseModel):
@@ -299,7 +266,7 @@ class TransactionSchema(BaseModel):
     transaction_type: str = Field(..., description="交易类型")
 
     # 金额信息
-    amount: Decimal = Field(..., description="金额")
+    amount: JsonDecimal = Field(..., description="金额")
     currency: str = Field("CNY", description="货币")
 
     # 支付信息
@@ -321,12 +288,6 @@ class TransactionSchema(BaseModel):
     # 备注
     notes: Optional[str] = Field(None, description="备注")
 
-    class Config:
-        json_encoders = {
-            Decimal: lambda v: float(v),
-            datetime: lambda v: v.isoformat()
-        }
-
 
 class FinancialSummarySchema(BaseModel):
     """财务汇总标准Schema"""
@@ -335,35 +296,29 @@ class FinancialSummarySchema(BaseModel):
     period_end: datetime = Field(..., description="结束时间")
 
     # 收入
-    total_revenue: Decimal = Field(..., ge=0, description="总收入")
-    dine_in_revenue: Decimal = Field(0, ge=0, description="堂食收入")
-    takeout_revenue: Decimal = Field(0, ge=0, description="外带收入")
-    delivery_revenue: Decimal = Field(0, ge=0, description="外卖收入")
+    total_revenue: JsonDecimal = Field(..., ge=0, description="总收入")
+    dine_in_revenue: JsonDecimal = Field(0, ge=0, description="堂食收入")
+    takeout_revenue: JsonDecimal = Field(0, ge=0, description="外带收入")
+    delivery_revenue: JsonDecimal = Field(0, ge=0, description="外卖收入")
 
     # 成本
-    total_cost: Decimal = Field(..., ge=0, description="总成本")
-    food_cost: Decimal = Field(0, ge=0, description="食材成本")
-    labor_cost: Decimal = Field(0, ge=0, description="人工成本")
-    overhead_cost: Decimal = Field(0, ge=0, description="运营成本")
+    total_cost: JsonDecimal = Field(..., ge=0, description="总成本")
+    food_cost: JsonDecimal = Field(0, ge=0, description="食材成本")
+    labor_cost: JsonDecimal = Field(0, ge=0, description="人工成本")
+    overhead_cost: JsonDecimal = Field(0, ge=0, description="运营成本")
 
     # 利润
-    gross_profit: Decimal = Field(..., description="毛利润")
-    net_profit: Decimal = Field(..., description="净利润")
+    gross_profit: JsonDecimal = Field(..., description="毛利润")
+    net_profit: JsonDecimal = Field(..., description="净利润")
     profit_margin: float = Field(..., ge=-1, le=1, description="利润率")
 
     # 统计
     order_count: int = Field(..., ge=0, description="订单数")
     customer_count: int = Field(..., ge=0, description="客户数")
-    average_order_value: Decimal = Field(..., ge=0, description="客单价")
+    average_order_value: JsonDecimal = Field(..., ge=0, description="客单价")
 
     # 关联信息
     store_id: str = Field(..., description="门店ID")
-
-    class Config:
-        json_encoders = {
-            Decimal: lambda v: float(v),
-            datetime: lambda v: v.isoformat()
-        }
 
 
 # ==================== 员工操作 (StaffAction) ====================
@@ -375,16 +330,10 @@ class StaffAction(BaseModel):
     brand_id: str = Field(..., description="品牌ID")
     store_id: str = Field(..., description="门店ID")
     operator_id: str = Field(..., description="操作人员ID")
-    amount: Optional[Decimal] = Field(None, ge=0, description="涉及金额（如折扣金额）")
+    amount: Optional[JsonDecimal] = Field(None, ge=0, description="涉及金额（如折扣金额）")
     reason: Optional[str] = Field(None, description="操作原因")
     approved_by: Optional[str] = Field(None, description="审批人员ID")
     created_at: datetime = Field(..., description="操作时间")
-
-    class Config:
-        json_encoders = {
-            Decimal: lambda v: float(v),
-            datetime: lambda v: v.isoformat()
-        }
 
 
 # ==================== 神经系统事件 (Neural System Event) ====================
@@ -420,8 +369,3 @@ class NeuralEventSchema(BaseModel):
 
     # 处理状态
     processed: bool = Field(False, description="是否已处理")
-
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
