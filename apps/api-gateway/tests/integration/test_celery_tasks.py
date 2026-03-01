@@ -8,6 +8,7 @@ Tests for ARCH-003/FEAT-002/INFRA-002 Celery tasks:
 All tasks use asyncio.run(_run()) internally.  We call them synchronously
 with a mock `self` and intercept lazy imports via patch.dict(sys.modules).
 """
+import asyncio
 import sys
 from datetime import date, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -47,6 +48,21 @@ from src.core.celery_tasks import (  # noqa: E402 — must come after sys.module
     push_daily_forecast,
     retry_failed_wechat_messages,
 )
+
+
+# ---------------------------------------------------------------------------
+# Event-loop guard
+# ---------------------------------------------------------------------------
+# Celery tasks call asyncio.run() internally, which calls set_event_loop(None)
+# after completing.  If any session-scoped event loop is already active (because
+# async tests from earlier test modules ran first), that clears it and breaks all
+# subsequent async tests.  This autouse fixture restores the loop after each call.
+
+@pytest.fixture(autouse=True)
+def _restore_event_loop(event_loop):
+    """After sync tests that call asyncio.run(), restore the session event loop."""
+    yield
+    asyncio.set_event_loop(event_loop)
 
 
 # ---------------------------------------------------------------------------
