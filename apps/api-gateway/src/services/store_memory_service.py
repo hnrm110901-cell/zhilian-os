@@ -242,6 +242,70 @@ class StoreMemoryService:
         """获取门店记忆（优先 Redis，无则返回 None）"""
         return await self._store.load(store_id)
 
+    async def detect_anomaly(
+        self,
+        store_id: str,
+        event: dict,
+    ) -> Optional[AnomalyPattern]:
+        """
+        基于 StaffAction 事件做实时异常检测。
+
+        规则：
+        - discount_apply 且金额 > 50元 → discount_spike 异常
+        - 其他 action_type 暂不触发异常
+
+        若检测到异常，更新 Redis 中的 anomaly_patterns 列表（
+        相同 pattern_type 则累加 occurrence_count，否则新增），
+        然后写回 Redis。
+
+        Returns:
+            AnomalyPattern（已写入记忆），或 None（无异常）
+        """
+        action_type = event.get("action_type", "")
+        amount_fen = event.get("amount", 0) or 0
+
+        # 当前仅处理折扣类异常（金额单位：分）
+        if action_type != "discount_apply" or amount_fen <= 5000:
+            return None
+
+        amount_yuan = amount_fen / 100
+        now = datetime.utcnow()
+        pattern = AnomalyPattern(
+            pattern_type="discount_spike",
+            description=f"单次折扣金额 ¥{amount_yuan:.2f} 超过阈值 ¥50",
+            first_seen=now,
+            last_seen=now,
+            severity="high" if amount_yuan >= 200 else "medium",
+        )
+
+        # 从 Redis 加载现有记忆并合并异常
+        memory = await self._store.load(store_id)
+        if memory is None:
+            memory = StoreMemory(store_id=store_id, updated_at=now)
+
+        existing = next(
+            (p for p in memory.anomaly_patterns if p.pattern_type == pattern.pattern_type),
+            None,
+        )
+        if existing:
+            existing.occurrence_count += 1
+            existing.last_seen = now
+            if pattern.severity == "high":
+                existing.severity = "high"
+        else:
+            memory.anomaly_patterns.append(pattern)
+
+        memory.updated_at = now
+        await self._store.save(memory)
+        logger.warning(
+            "store_memory.anomaly_detected",
+            store_id=store_id,
+            pattern_type=pattern.pattern_type,
+            amount_yuan=amount_yuan,
+            severity=pattern.severity,
+        )
+        return pattern
+
     def _mock_peak_patterns(self) -> List[PeakHourPattern]:
         """无 DB 时返回餐饮业典型高峰模式（用于测试/降级）"""
         patterns = []

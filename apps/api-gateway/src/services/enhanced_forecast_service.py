@@ -183,8 +183,14 @@ class EnhancedForecastService(BaseService):
                         factors.pop("pre_holiday_factor", None)
                         factors["auspicious_factor"] = auspicious_info.demand_factor
                     # 否则保留原节假日因子，不重复叠加
-            except Exception:
-                pass  # 吉日因子非致命
+            except Exception as e:
+                logger.warning(
+                    "enhanced_forecast.auspicious_factor_failed",
+                    store_id=store_id,
+                    target_date=str(target_date),
+                    error=str(e),
+                )
+                # 吉日因子非致命：失败时跳过，不影响其他因子
 
         return factors
 
