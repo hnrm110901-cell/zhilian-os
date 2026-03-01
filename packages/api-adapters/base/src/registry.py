@@ -20,7 +20,7 @@ POS_REGISTRY: Dict[str, Optional[str]] = {
     "pinzhi": "packages.api-adapters.pinzhi.src.adapter.PinzhiAdapter",
     "meituan": "packages.api-adapters.meituan-saas.src.adapter.MeituanSaasAdapter",
     "tiancai": "packages.api-adapters.tiancai-shanglong.src.adapter.TiancaiShanglongAdapter",
-    "keruyun": None,   # 客如云 - TODO: 实现中
+    "keruyun": "packages.api-adapters.keruyun.src.adapter.KeruyunAdapter",
 }
 
 
