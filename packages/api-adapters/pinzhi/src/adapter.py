@@ -587,11 +587,13 @@ class PinzhiAdapter:
         """
         import sys
         import os as _os
-        _repo_root = _os.path.abspath(_os.path.join(_os.path.dirname(__file__), "../../../../.."))
-        if _repo_root not in sys.path:
-            sys.path.insert(0, _repo_root)
+        _src_dir = _os.path.dirname(__file__)
+        _repo_root = _os.path.abspath(_os.path.join(_src_dir, "../../../.."))
+        _gateway_src = _os.path.join(_repo_root, "apps", "api-gateway", "src")
+        if _gateway_src not in sys.path:
+            sys.path.insert(0, _gateway_src)
 
-        from apps.api_gateway.src.schemas.restaurant_standard_schema import (
+        from schemas.restaurant_standard_schema import (
             OrderSchema, OrderStatus, OrderType, OrderItemSchema, DishCategory
         )
 
@@ -673,11 +675,13 @@ class PinzhiAdapter:
         """
         import sys
         import os as _os
-        _repo_root = _os.path.abspath(_os.path.join(_os.path.dirname(__file__), "../../../../.."))
-        if _repo_root not in sys.path:
-            sys.path.insert(0, _repo_root)
+        _src_dir = _os.path.dirname(__file__)
+        _repo_root = _os.path.abspath(_os.path.join(_src_dir, "../../../.."))
+        _gateway_src = _os.path.join(_repo_root, "apps", "api-gateway", "src")
+        if _gateway_src not in sys.path:
+            sys.path.insert(0, _gateway_src)
 
-        from apps.api_gateway.src.schemas.restaurant_standard_schema import StaffAction
+        from schemas.restaurant_standard_schema import StaffAction
 
         action_time_raw = raw.get("createdAt", raw.get("actionTime", ""))
         try:

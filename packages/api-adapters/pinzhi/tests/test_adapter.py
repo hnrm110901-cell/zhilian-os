@@ -1,6 +1,15 @@
 """
 品智适配器单元测试
 """
+import os
+import sys
+
+_here = os.path.dirname(__file__)
+_repo_root = os.path.abspath(os.path.join(_here, "../../../.."))
+_gateway_src = os.path.join(_repo_root, "apps", "api-gateway", "src")
+if _gateway_src not in sys.path:
+    sys.path.insert(0, _gateway_src)
+
 import pytest
 from decimal import Decimal
 from datetime import datetime
@@ -414,7 +423,7 @@ class TestPinzhiToOrderMapsCorrectly:
         assert order.waiter_id == "服务员001"
 
     def test_status_completed(self, adapter, raw_pinzhi_order):
-        from apps.api_gateway.src.schemas.restaurant_standard_schema import OrderStatus
+        from schemas.restaurant_standard_schema import OrderStatus
         order = adapter.to_order(raw_pinzhi_order, store_id="STORE_P1", brand_id="BRAND_P")
         assert order.order_status == OrderStatus.COMPLETED
 

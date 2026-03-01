@@ -18,8 +18,9 @@ logger = structlog.get_logger()
 POS_REGISTRY: Dict[str, Optional[str]] = {
     "aoqiwei": "packages.api-adapters.aoqiwei.src.adapter.AoqiweiAdapter",
     "pinzhi": "packages.api-adapters.pinzhi.src.adapter.PinzhiAdapter",
+    "meituan": "packages.api-adapters.meituan-saas.src.adapter.MeituanSaasAdapter",
+    "tiancai": "packages.api-adapters.tiancai-shanglong.src.adapter.TiancaiShanglongAdapter",
     "keruyun": None,   # 客如云 - TODO: 实现中
-    "meituan": None,   # 美团 POS - TODO: 实现中
 }
 
 
