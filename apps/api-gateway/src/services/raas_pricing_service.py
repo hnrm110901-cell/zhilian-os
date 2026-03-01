@@ -455,8 +455,8 @@ class RaaSPricingService:
             "year": year,
             "month": month,
             "pricing_tier": pricing_tier,
-            "baseline": baseline.dict(),
-            "effect_metrics": effect_metrics.dict(),
+            "baseline": baseline.model_dump(),
+            "effect_metrics": effect_metrics.model_dump(),
             "total_fee": effect_metrics.total_fee,
             "message": f"本月为您节省成本 ¥{effect_metrics.total_cost_saved:,.2f}，增加营收 ¥{effect_metrics.total_revenue_growth:,.2f}"
         }

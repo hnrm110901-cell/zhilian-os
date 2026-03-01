@@ -772,7 +772,7 @@ class ZhilianSDK:
         """同步订单（便捷方法）"""
         order = StandardOrder(**order_data)
         response = await self.api.sync_orders([order])
-        return response.dict()
+        return response.model_dump()
 
     async def get_sales_prediction(
         self,
@@ -784,7 +784,7 @@ class ZhilianSDK:
             store_id,
             datetime.fromisoformat(date)
         )
-        return response.dict()
+        return response.model_dump()
 
 
 # 使用示例

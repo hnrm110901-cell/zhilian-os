@@ -46,7 +46,7 @@ async def list_models(
 
     return {
         "total": len(models),
-        "models": [m.dict() for m in models]
+        "models": [m.model_dump() for m in models]
     }
 
 
@@ -67,7 +67,7 @@ async def purchase_model(
 
     return {
         "success": True,
-        "purchase": purchase.dict(),
+        "purchase": purchase.model_dump(),
         "message": "模型购买成功，已激活"
     }
 
@@ -97,7 +97,7 @@ async def contribute_data(
 
     return {
         "success": True,
-        "contribution": contribution.dict(),
+        "contribution": contribution.model_dump(),
         "message": f"数据贡献成功，预计分成 ¥{contribution.revenue_share:,.2f}"
     }
 
@@ -117,7 +117,7 @@ async def get_my_models(
     return {
         "store_id": store_id,
         "total": len(purchases),
-        "purchases": [p.dict() for p in purchases]
+        "purchases": [p.model_dump() for p in purchases]
     }
 
 
@@ -139,7 +139,7 @@ async def get_my_contributions(
         "store_id": store_id,
         "total_contributions": len(contributions),
         "total_revenue_share": total_revenue_share,
-        "contributions": [c.dict() for c in contributions]
+        "contributions": [c.model_dump() for c in contributions]
     }
 
 
