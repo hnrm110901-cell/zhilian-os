@@ -61,6 +61,8 @@ from src.api import bulk_import
 from src.api import hq_dashboard
 from src.api import ai_accuracy
 from src.api import dashboard_preferences
+# ARCH-004 可信执行层 / FEAT-004 动态菜单 / ARCH-003 门店记忆层 / 本体论 L2 API / FCT 公开接口
+from src.api import execution, menu, store_memory, ontology_api, fct_public
 from src.middleware.monitoring import MonitoringMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
 from src.middleware.audit_log import AuditLogMiddleware
@@ -540,6 +542,17 @@ app.include_router(dashboard_preferences.router, prefix="/api/v1", tags=["dashbo
 # 营销 Agent — 顾客画像 / 发券策略 / 活动管理
 from src.api import marketing_agent
 app.include_router(marketing_agent.router, tags=["marketing_agent"])
+
+# ARCH-004 可信执行层（折扣申请 / 审批 / 审计日志 / 回滚）
+app.include_router(execution.router)
+# FEAT-004 动态菜单权重引擎（Top-N 推荐 + 5因子评分）
+app.include_router(menu.router)
+# ARCH-003 门店记忆层（记忆快照 + 手动刷新）
+app.include_router(store_memory.router)
+# Palantir 本体论 L2 API
+app.include_router(ontology_api.router)
+# FCT 公开接口（独立部署形态，API Key 认证）
+app.include_router(fct_public.router, prefix="/api/v1/fct-public", tags=["fct_public"])
 
 # 业财税资金一体化（FCT）
 if getattr(settings, "FCT_ENABLED", False):
