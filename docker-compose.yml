@@ -31,6 +31,27 @@ services:
       - redis-dev-data:/data
     command: redis-server --appendonly yes
 
+  # Neo4j 图数据库（本体层 / 推理层核心）
+  neo4j:
+    image: neo4j:5.17-community
+    container_name: zhilian-neo4j-dev
+    restart: unless-stopped
+    ports:
+      - "7687:7687"   # Bolt 协议（应用连接）
+      - "7474:7474"   # HTTP 浏览器
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-changeme}
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_memory_heap_initial__size: 512m
+      NEO4J_dbms_memory_heap_max__size: 1G
+    volumes:
+      - neo4j-dev-data:/data
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "${NEO4J_PASSWORD:-changeme}", "RETURN 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
   # Qdrant向量数据库
   qdrant:
     image: qdrant/qdrant:v1.7.4
@@ -82,6 +103,8 @@ volumes:
   postgres-dev-data:
     driver: local
   redis-dev-data:
+    driver: local
+  neo4j-dev-data:
     driver: local
   qdrant-dev-data:
     driver: local

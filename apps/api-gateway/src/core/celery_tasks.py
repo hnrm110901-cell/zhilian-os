@@ -1585,754 +1585,1198 @@ def generate_daily_hub(
         raise self.retry(exc=e)
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# Phase 3 — 损耗推理 / 规则评估 / 本体日同步
+# ═══════════════════════════════════════════════════════════════════════════════
+
 @celery_app.task(
     base=CallbackTask,
     bind=True,
-    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
-    default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY_SHORT", "30")),
+    name="tasks.process_waste_event",
+    max_retries=3,
+    default_retry_delay=30,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=300,
+    retry_jitter=True,
 )
-def dispatch_training_recommendation(
+def process_waste_event(
     self,
-    store_id: str,
-    tenant_id: str,
-    root_cause_dimension: str,
-    affected_staff_ids: list,
-    waste_event_id: str,
+    event_id: str,
 ) -> Dict[str, Any]:
     """
-    废料根因 → 培训推荐分发。
+    损耗事件五步推理（异步，由 WasteEventService._enqueue_analysis 投递）
 
-    根据损耗推理根因维度查询 ROOT_CAUSE_TO_TRAINING 配置，
-    为当班员工批量创建针对性培训推荐记录，
-    并通过 AgentMemoryBus 通知 TrainingAgent。
+    步骤：
+      1. 从 PostgreSQL 加载 WasteEvent
+      2. 调用 WasteReasoningEngine.infer_root_cause(event_id)
+      3. 将根因 / 置信度 / 证据链回写 PostgreSQL
+      4. 同步推理结论到 Neo4j
 
-    由 run_waste_reasoning() 在 top3 根因确定后触发。
+    Args:
+        event_id: WasteEvent.event_id（格式 WE-XXXXXXXX）
+
+    Returns:
+        {"success": True, "event_id": ..., "root_cause": ..., "confidence": ...}
     """
     async def _run():
-        from src.core.root_cause_config import ROOT_CAUSE_TO_TRAINING
-        from src.services.training_service import TrainingService
-        from src.services.agent_memory_bus import agent_memory_bus
-
-        config = ROOT_CAUSE_TO_TRAINING.get(root_cause_dimension)
-        if not config:
-            logger.info(
-                "waste_training_dispatch_no_config",
-                root_cause=root_cause_dimension,
-                store_id=store_id,
-            )
-            return {"skipped": True, "reason": "no_mapping_config", "root_cause": root_cause_dimension}
-
-        training_svc = TrainingService(store_id=store_id)
-        created = []
-        for staff_id in affected_staff_ids:
-            try:
-                rec = await training_svc.create_waste_driven_recommendation(
-                    staff_id=staff_id,
-                    root_cause=root_cause_dimension,
-                    waste_event_id=waste_event_id,
-                    course_ids=config["course_ids"],
-                    urgency=config["urgency"],
-                    urgency_days=config.get("urgency_days", 7),
-                    skill_gap=config["skill_gap"],
-                    description=config["description"],
-                )
-                created.append(rec)
-            except Exception as staff_err:
-                logger.warning(
-                    "waste_training_dispatch_staff_failed",
-                    staff_id=staff_id,
-                    error=str(staff_err),
-                )
-
-        # 通知 AgentMemoryBus，TrainingAgent 可订阅此事件
-        await agent_memory_bus.publish(
-            store_id=store_id,
-            agent_id="waste_reasoning",
-            action="training_recommendation_dispatched",
-            summary=(
-                f"根因[{root_cause_dimension}]触发培训推荐：{config['skill_gap']}，"
-                f"共{len(created)}位员工，紧迫度{config['urgency']}"
-            ),
-            confidence=0.85,
-            data={
-                "root_cause": root_cause_dimension,
-                "waste_event_id": waste_event_id,
-                "affected_staff_count": len(created),
-                "course_ids": config["course_ids"],
-                "urgency": config["urgency"],
-                "skill_gap": config["skill_gap"],
-            },
-        )
-
-        # Phase 1.3: 写入 Neo4j Staff-Training 关系，关闭因果图闭环
-        from datetime import datetime as _dt_neo
-        from src.ontology import get_ontology_repository
-        repo = get_ontology_repository()
-        if repo and created:
-            # 使用根因维度 + 技能缺口作为 TrainingModule 唯一 ID
-            module_id = f"tm_{root_cause_dimension}_{config['skill_gap'].replace(' ', '_')}"
-            try:
-                repo.merge_training_module(
-                    module_id=module_id,
-                    name=config["description"],
-                    skill_gap=config["skill_gap"],
-                    course_ids=config["course_ids"],
-                    tenant_id=tenant_id,
-                )
-                for rec in created:
-                    s_id = rec.get("staff_id", "")
-                    if s_id:
-                        repo.staff_needs_training(
-                            staff_id=s_id,
-                            module_id=module_id,
-                            waste_event_id=waste_event_id,
-                            urgency=config["urgency"],
-                            deadline=rec.get("deadline", ""),
-                        )
-            except Exception as neo_err:
-                logger.warning(
-                    "neo4j_staff_needs_training_failed",
-                    store_id=store_id,
-                    error=str(neo_err),
-                )
-
-        logger.info(
-            "waste_training_dispatch_done",
-            store_id=store_id,
-            root_cause=root_cause_dimension,
-            waste_event_id=waste_event_id,
-            staff_count=len(created),
-        )
-
-        # 企微实时告警：通知门店管理员损耗根因与培训推荐
-        try:
-            from src.services.wechat_alert_service import wechat_alert_service as _wechat_svc
-            await _wechat_svc.send_waste_training_alert(
-                store_id=store_id,
-                root_cause=root_cause_dimension,
-                skill_gap=config["skill_gap"],
-                urgency=config["urgency"],
-                affected_staff_count=len(created),
-                course_ids=config["course_ids"],
-                waste_event_id=waste_event_id,
-            )
-        except Exception as alert_err:
-            logger.warning(
-                "waste_training_wechat_alert_failed",
-                store_id=store_id,
-                root_cause=root_cause_dimension,
-                error=str(alert_err),
-            )
-
-        # Phase 2.1: 7天后触发培训效果验证
-        from datetime import datetime as _dt, timedelta
-        eta_7d = _dt.utcnow() + timedelta(days=7)
-        for rec in created:
-            try:
-                verify_training_effectiveness.apply_async(
-                    kwargs={
-                        "store_id": store_id,
-                        "staff_id": rec.get("staff_id", ""),
-                        "waste_event_id": waste_event_id,
-                        "root_cause": root_cause_dimension,
-                    },
-                    eta=eta_7d,
-                )
-            except Exception as sched_err:
-                logger.warning(
-                    "verify_training_schedule_failed",
-                    staff_id=rec.get("staff_id"),
-                    error=str(sched_err),
-                )
-
-        return {
-            "store_id": store_id,
-            "root_cause": root_cause_dimension,
-            "waste_event_id": waste_event_id,
-            "created": len(created),
-            "recommendations": created,
-        }
-
-    try:
-        return asyncio.run(_run())
-    except Exception as e:
-        logger.warning("dispatch_training_recommendation_failed", store_id=store_id, error=str(e))
-        raise self.retry(exc=e)
-
-
-@celery_app.task(
-    base=CallbackTask,
-    bind=True,
-    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
-    default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY", "60")),
-)
-def escalate_ontology_actions(self) -> Dict[str, Any]:
-    """
-    L4 Action 超时自动升级：扫描已 SENT 且超过 deadline 未回执的 Action，
-    标记 escalation_at / escalated_to 并推送给配置的升级对象（企微）。
-    由 Celery Beat 每 5–10 分钟执行一次。
-    """
-    async def _run():
-        from src.core.database import get_db_session
-        from src.services.ontology_action_service import process_escalations
+        from ..core.database import get_db_session
+        from ..services.waste_event_service import WasteEventService
 
         async with get_db_session() as session:
-            n = await process_escalations(session)
+            svc = WasteEventService(session)
+
+            # 标记推理中
+            from sqlalchemy import update as _update
+            from ..models.waste_event import WasteEvent, WasteEventStatus
+            await session.execute(
+                _update(WasteEvent)
+                .where(WasteEvent.event_id == event_id)
+                .values(status=WasteEventStatus.ANALYZING)
+            )
             await session.commit()
-        return {"escalated": n}
 
-    try:
-        return asyncio.run(_run())
-    except Exception as e:
-        logger.warning("escalate_ontology_actions_failed", error=str(e))
-        raise self.retry(exc=e)
+        # 调用推理引擎（同步驱动，独立 session）
+        try:
+            from ..ontology.reasoning import WasteReasoningEngine
+            engine = WasteReasoningEngine()
+            result = engine.infer_root_cause(event_id)
+        except Exception as e:
+            logger.warning("推理引擎调用失败", event_id=event_id, error=str(e))
+            return {"success": False, "event_id": event_id, "error": str(e)}
 
+        if not result.get("success"):
+            return {"success": False, "event_id": event_id, "error": result.get("error")}
 
-@celery_app.task(
-    base=CallbackTask,
-    bind=True,
-    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
-    default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY", "60")),
-)
-def verify_training_effectiveness(
-    self,
-    store_id: str,
-    staff_id: str,
-    waste_event_id: str,
-    root_cause: str,
-    pre_training_period_days: int = 7,
-) -> Dict[str, Any]:
-    """
-    Phase 2.1 培训效果验证：
-
-    在培训推荐创建 7 天后（ETA 延迟触发），对比培训前后同员工/同根因的废料率。
-    结果写入 agent_memory_bus，供 TrainingAgent 和 KnowledgeRuleService 使用。
-    """
-    async def _run():
-        from datetime import datetime, timedelta
-        from sqlalchemy import select, func, and_
-        from src.core.database import get_db_session
-        from src.models.kpi import KPI, KPIRecord
-        from src.services.agent_memory_bus import agent_memory_bus
-
-        now = datetime.now()
-        pre_start = now - timedelta(days=pre_training_period_days * 2)
-        pre_end = now - timedelta(days=pre_training_period_days)
-        post_start = pre_end
-        post_end = now
-
+        # 写回分析结论
         async with get_db_session() as session:
-            # 查询培训前后同员工的 waste_driven_training 记录
-            def _query_waste_kpi(from_dt, to_dt):
-                return (
-                    select(func.avg(KPIRecord.value).label("avg_score"))
-                    .join(KPI, KPIRecord.kpi_id == KPI.id)
-                    .where(
-                        and_(
-                            KPIRecord.store_id == store_id,
-                            KPI.category == "waste_driven_training",
-                            KPIRecord.record_date >= from_dt.date(),
-                            KPIRecord.record_date <= to_dt.date(),
-                        )
-                    )
-                )
-
-            pre_result = await session.execute(_query_waste_kpi(pre_start, pre_end))
-            post_result = await session.execute(_query_waste_kpi(post_start, post_end))
-
-            pre_score = pre_result.scalar() or 0
-            post_score = post_result.scalar() or 0
-
-        improvement = post_score - pre_score
-        effectiveness = min(100.0, max(0.0, 50.0 + improvement))
-
-        # 写入 agent_memory_bus
-        await agent_memory_bus.publish(
-            store_id=store_id,
-            agent_id="training_verifier",
-            action="training_effectiveness_verified",
-            summary=(
-                f"员工[{staff_id}] 根因[{root_cause}] 培训效果："
-                f"训前得分{pre_score:.1f} → 训后{post_score:.1f}，"
-                f"改善{improvement:+.1f}，有效性{effectiveness:.0f}%"
-            ),
-            confidence=0.75,
-            data={
-                "staff_id": staff_id,
-                "waste_event_id": waste_event_id,
-                "root_cause": root_cause,
-                "pre_score": pre_score,
-                "post_score": post_score,
-                "improvement": improvement,
-                "effectiveness": effectiveness,
-            },
-        )
+            svc = WasteEventService(session)
+            await svc.write_back_analysis(
+                event_id=event_id,
+                root_cause=result.get("root_cause", "unknown"),
+                confidence=result.get("confidence", 0.0),
+                evidence=result.get("evidence_chain", {}),
+                scores=result.get("scores", {}),
+            )
+            # 同步到 Neo4j
+            ev = await svc.get_event(event_id)
+            if ev:
+                await svc._sync_analysis_to_neo4j(ev)
+            await session.commit()
 
         logger.info(
-            "training_effectiveness_verified",
-            store_id=store_id,
-            staff_id=staff_id,
-            root_cause=root_cause,
-            effectiveness=effectiveness,
+            "损耗推理任务完成",
+            event_id=event_id,
+            root_cause=result.get("root_cause"),
+            confidence=result.get("confidence"),
         )
-
-        # Phase 2.2: 更新知识库中对应根因的 waste_rule 精度（指数移动平均）
-        try:
-            from src.services.ontology_knowledge_service import update_knowledge_accuracy
-            # tenant_id 从 store_id 反查，或直接用 store_id 所属 tenant（此处简化为按 store_id 过滤所有租户）
-            update_knowledge_accuracy(
-                root_cause=root_cause,
-                effectiveness=effectiveness,
-                tenant_id="",  # 空字符串跳过 tenant 过滤，全局匹配
-            )
-        except Exception as ka_err:
-            logger.warning("knowledge_accuracy_update_failed", root_cause=root_cause, error=str(ka_err))
-
         return {
-            "store_id": store_id,
-            "staff_id": staff_id,
-            "root_cause": root_cause,
-            "pre_score": pre_score,
-            "post_score": post_score,
-            "improvement": improvement,
-            "effectiveness": effectiveness,
+            "success": True,
+            "event_id": event_id,
+            "root_cause": result.get("root_cause"),
+            "confidence": result.get("confidence"),
         }
 
     try:
         return asyncio.run(_run())
     except Exception as e:
-        logger.warning("verify_training_effectiveness_failed", store_id=store_id, error=str(e))
+        raise self.retry(exc=e)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# L3 — 跨店知识聚合夜间物化（凌晨 2:30 触发）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@celery_app.task(
+    base=CallbackTask,
+    bind=True,
+    name="tasks.nightly_cross_store_sync",
+    max_retries=2,
+    default_retry_delay=300,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=1800,
+    retry_jitter=False,
+)
+def nightly_cross_store_sync(
+    self,
+    store_ids: list = None,
+) -> Dict[str, Any]:
+    """
+    L3 跨店知识聚合夜间物化任务（建议凌晨 2:30 触发）
+
+    执行步骤：
+      1. 计算两两门店相似度矩阵，写入 store_similarity_cache
+      2. 重建同伴组 store_peer_groups（tier + region 分组）
+      3. 物化昨日 cross_store_metrics（6 项指标 × 全门店）
+      4. 同步 Neo4j 图（Store 节点 + SIMILAR_TO / BENCHMARK_OF / SHARES_RECIPE 边）
+
+    Args:
+        store_ids: 指定门店列表（None = 全部活跃门店）
+
+    Returns:
+        {
+          "similarity_pairs":  N,
+          "peer_groups":       N,
+          "metrics_upserted":  N,
+          "graph_synced":      bool,
+          "errors":            [...]
+        }
+    """
+    async def _run():
+        from ..core.database import get_db_session
+        from ..services.cross_store_knowledge_service import CrossStoreKnowledgeService
+
+        errors = []
+
+        async with get_db_session() as session:
+            svc = CrossStoreKnowledgeService(session)
+
+            # Step 1: 相似度矩阵
+            try:
+                sim_result = await svc.compute_pairwise_similarity(store_ids=store_ids)
+                similarity_pairs = sim_result.get("pairs_computed", 0)
+                logger.info("跨店相似度矩阵已计算", pairs=similarity_pairs)
+            except Exception as e:
+                errors.append({"step": "similarity", "error": str(e)})
+                similarity_pairs = 0
+                logger.error("相似度矩阵计算失败", error=str(e))
+
+            # Step 2: 同伴组重建
+            try:
+                pg_result = await svc.build_peer_groups(store_ids=store_ids)
+                peer_groups = pg_result.get("groups_built", 0)
+                logger.info("同伴组重建完成", groups=peer_groups)
+            except Exception as e:
+                errors.append({"step": "peer_groups", "error": str(e)})
+                peer_groups = 0
+                logger.error("同伴组重建失败", error=str(e))
+
+            # Step 3: 日维度指标物化
+            try:
+                mat_result = await svc.materialize_metrics(store_ids=store_ids)
+                metrics_upserted = mat_result.get("upserted", 0)
+                logger.info("跨店指标物化完成", upserted=metrics_upserted)
+            except Exception as e:
+                errors.append({"step": "materialize", "error": str(e)})
+                metrics_upserted = 0
+                logger.error("指标物化失败", error=str(e))
+
+            await session.commit()
+
+            # Step 4: Neo4j 图同步（独立异常处理，不影响前序结果）
+            graph_synced = False
+            try:
+                graph_result = await svc.sync_store_graph(store_ids=store_ids)
+                graph_synced = not graph_result.get("skipped", False)
+                logger.info("Neo4j 跨店图同步完成", result=graph_result)
+            except Exception as e:
+                errors.append({"step": "graph_sync", "error": str(e)})
+                logger.error("Neo4j 跨店图同步失败", error=str(e))
+
+        logger.info(
+            "L3 跨店知识聚合夜间任务完成",
+            similarity_pairs=similarity_pairs,
+            peer_groups=peer_groups,
+            metrics_upserted=metrics_upserted,
+            graph_synced=graph_synced,
+            errors=len(errors),
+        )
+        return {
+            "success":          len(errors) == 0,
+            "similarity_pairs": similarity_pairs,
+            "peer_groups":      peer_groups,
+            "metrics_upserted": metrics_upserted,
+            "graph_synced":     graph_synced,
+            "errors":           errors,
+        }
+
+    try:
+        return asyncio.run(_run())
+    except Exception as nightly_e:
+        raise self.retry(exc=nightly_e)
+
+
+@celery_app.task(
+    base=CallbackTask,
+    bind=True,
+    name="tasks.evaluate_store_rules",
+    max_retries=2,
+    default_retry_delay=60,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+)
+def evaluate_store_rules(
+    self,
+    store_id: str,
+    kpi_context: Dict[str, Any],
+    industry_type: str = "general",
+) -> Dict[str, Any]:
+    """
+    对门店 KPI 上下文运行推理规则库，匹配触发规则并自动推送企微告警
+
+    工作流程：
+      1. 从规则库加载 ACTIVE 规则
+      2. 对 kpi_context 执行规则匹配，获取 Top-10 匹配规则
+      3. 对命中规则写入 RuleExecution 日志
+      4. 置信度 >= 0.70 时，自动创建企微 P1/P2 Action
+      5. 行业基准对比（若 industry_type 非 "general"）
+
+    Args:
+        store_id: 门店ID
+        kpi_context: 当前 KPI 指标字典，如
+            {"waste_rate": 0.18, "labor_cost_ratio": 0.36, ...}
+        industry_type: 行业类型（seafood / hotpot / fastfood / general）
+
+    Returns:
+        {"matched": [...], "actions_created": N, "store_id": ...}
+    """
+    async def _run():
+        from ..core.database import get_db_session
+        from ..services.knowledge_rule_service import KnowledgeRuleService
+
+        matched_rules = []
+        actions_created = 0
+
+        async with get_db_session() as session:
+            rule_svc = KnowledgeRuleService(session)
+
+            # 规则匹配（全品类）
+            matched = await rule_svc.match_rules(kpi_context)
+
+            for hit in matched:
+                matched_rules.append(hit)
+
+                # 写入执行日志
+                rule_obj = await rule_svc.get_by_code(hit["rule_code"])
+                if rule_obj:
+                    await rule_svc.log_execution(
+                        rule=rule_obj,
+                        store_id=store_id,
+                        event_id=None,
+                        condition_values=kpi_context,
+                        conclusion_output=hit.get("conclusion", {}),
+                        confidence_score=hit["confidence"],
+                    )
+
+                # 置信度 ≥ 0.70 → 推送企微告警
+                if hit["confidence"] >= 0.70:
+                    try:
+                        from ..services.wechat_action_fsm import (
+                            ActionCategory,
+                            ActionPriority,
+                            get_wechat_fsm,
+                        )
+                        fsm = get_wechat_fsm()
+                        priority = (
+                            ActionPriority.P1 if hit["confidence"] >= 0.80
+                            else ActionPriority.P2
+                        )
+                        conclusion = hit.get("conclusion", {})
+                        action_text = (
+                            conclusion.get("action") or
+                            conclusion.get("conclusion", "请检查相关指标")
+                        )
+                        await fsm.create_action(
+                            store_id=store_id,
+                            category=ActionCategory.KPI_ALERT,
+                            priority=priority,
+                            title=f"规则告警：{hit['rule_code']}",
+                            content=(
+                                f"**{hit['name']}**\n"
+                                f"置信度：{hit['confidence']:.0%}\n"
+                                f"建议：{action_text}"
+                            ),
+                            receiver_user_id="store_manager",
+                            source_event_id=f"RULE-{hit['rule_code']}-{store_id}",
+                            evidence={"kpi_context": kpi_context, "rule_code": hit["rule_code"]},
+                        )
+                        actions_created += 1
+                    except Exception as e:
+                        logger.warning(
+                            "规则触发企微告警失败",
+                            store_id=store_id,
+                            rule_code=hit["rule_code"],
+                            error=str(e),
+                        )
+
+            # 行业基准对比（非 general 时）
+            benchmark_summary = []
+            if industry_type != "general":
+                benchmark_results = await rule_svc.compare_to_benchmark(
+                    industry_type, kpi_context
+                )
+                for br in benchmark_results:
+                    if br["percentile_band"] == "bottom_25":
+                        benchmark_summary.append(br)
+
+            await session.commit()
+
+        logger.info(
+            "门店规则评估完成",
+            store_id=store_id,
+            matched=len(matched_rules),
+            actions_created=actions_created,
+        )
+        return {
+            "success": True,
+            "store_id": store_id,
+            "matched": matched_rules,
+            "actions_created": actions_created,
+            "bottom_25_benchmarks": benchmark_summary,
+        }
+
+    try:
+        return asyncio.run(_run())
+    except Exception as e:
         raise self.retry(exc=e)
 
 
 @celery_app.task(
     base=CallbackTask,
     bind=True,
-    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
-    default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY_LONG", "300")),
+    name="tasks.daily_ontology_sync",
+    max_retries=2,
+    default_retry_delay=300,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=1800,
+    retry_jitter=False,
 )
-def propagate_training_knowledge(self) -> Dict[str, Any]:
+def daily_ontology_sync(
+    self,
+    store_id: str = None,
+) -> Dict[str, Any]:
     """
-    Phase 3.2 跨门店培训知识传播（周频定时任务）：
+    每日全量 PostgreSQL → Neo4j 本体同步（建议凌晨 3:00 触发）
 
-    查询各门店废料率改善 Top3 的培训方案，向相似门店自动创建培训建议，
-    标记来源为 cross_store_best_practice。
-    由 Celery Beat 每周一次执行。
+    范围：
+      - 活跃 BOMTemplate 及明细行 → BOM 节点 + HAS_INGREDIENT 边
+      - WasteEvent（最近 30 天）→ WasteEvent 节点 + WASTE_OF 边
+
+    Args:
+        store_id: 指定门店（None = 全部活跃门店）
+
+    Returns:
+        {"synced_stores": N, "nodes_upserted": N, "errors": [...]}
     """
     async def _run():
-        from sqlalchemy import select, func, and_
-        from src.core.database import get_db_session
-        from src.models.kpi import KPI, KPIRecord
-        from src.models.store import Store
-        from src.services.training_service import TrainingService
+        from ..core.database import get_db_session
+        from ..models.store import Store
+        from ..models.bom import BOMTemplate
+        from ..models.waste_event import WasteEvent
+        from sqlalchemy import select, and_
+        from datetime import datetime, timedelta
 
-        propagated = 0
+        synced_stores = 0
+        nodes_upserted = 0
+        errors = []
+
         async with get_db_session() as session:
-            # 查询所有门店
-            stores_result = await session.execute(select(Store))
-            stores = stores_result.scalars().all()
-            store_ids = [str(s.id) for s in stores]
+            # 确定要同步的门店
+            if store_id:
+                stmt = select(Store).where(Store.id == store_id, Store.is_active.is_(True))
+            else:
+                stmt = select(Store).where(Store.is_active.is_(True))
+            result = await session.execute(stmt)
+            stores = result.scalars().all()
 
-            # 查询各门店培训记录，找废料率改善最好的（得分最高）
-            top_practices = {}
-            for sid in store_ids:
-                stmt = (
-                    select(
-                        KPIRecord.kpi_id,
-                        func.avg(KPIRecord.value).label("avg_score"),
-                        func.count(KPIRecord.id).label("cnt"),
-                    )
-                    .join(KPI, KPIRecord.kpi_id == KPI.id)
-                    .where(
-                        and_(
-                            KPIRecord.store_id == sid,
-                            KPI.category == "waste_driven_training",
-                            KPIRecord.status == "on_track",
+            for store in stores:
+                sid = str(store.id)
+                try:
+                    # 1. 同步活跃 BOM
+                    bom_stmt = (
+                        select(BOMTemplate)
+                        .where(
+                            and_(BOMTemplate.store_id == sid, BOMTemplate.is_active.is_(True))
                         )
                     )
-                    .group_by(KPIRecord.kpi_id)
-                    .order_by(func.avg(KPIRecord.value).desc())
-                    .limit(3)
-                )
-                result = await session.execute(stmt)
-                rows = result.all()
-                if rows:
-                    top_practices[sid] = [
-                        {"kpi_id": r.kpi_id, "avg_score": float(r.avg_score), "cnt": r.cnt}
-                        for r in rows
-                    ]
+                    bom_result = await session.execute(bom_stmt)
+                    active_boms = bom_result.scalars().all()
 
-            # 向相似门店传播最佳实践；若 Neo4j 未配置则降级为全门店广播
-            from src.ontology import get_ontology_repository
-            neo_repo = get_ontology_repository()
-
-            for source_sid, practices in top_practices.items():
-                # Phase 3: 优先通过 SIMILAR_TO 关系缩小传播范围
-                if neo_repo:
                     try:
-                        similar = neo_repo.get_similar_stores(source_sid, min_score=0.5)
-                        target_sids = [s["store_id"] for s in similar] if similar else [
-                            sid for sid in store_ids if sid != source_sid
-                        ]
-                    except Exception:
-                        target_sids = [sid for sid in store_ids if sid != source_sid]
-                else:
-                    target_sids = [sid for sid in store_ids if sid != source_sid]
+                        from ..ontology.data_sync import OntologyDataSync
+                        with OntologyDataSync() as sync:
+                            for bom in active_boms:
+                                dish_id_str = f"DISH-{bom.dish_id}"
+                                sync.upsert_bom(
+                                    dish_id=dish_id_str,
+                                    version=bom.version,
+                                    effective_date=bom.effective_date,
+                                    yield_rate=float(bom.yield_rate),
+                                    expiry_date=bom.expiry_date,
+                                    notes=bom.notes,
+                                )
+                                nodes_upserted += 1
+                    except Exception as neo4j_err:
+                        logger.warning("Neo4j BOM 同步失败", store_id=sid, error=str(neo4j_err))
 
-                for target_sid in target_sids:
-                    for practice in practices[:1]:  # 每家门店只传播 Top1
+                    # 2. 同步近 30 天 WasteEvent
+                    since = datetime.utcnow() - timedelta(days=30)
+                    we_stmt = select(WasteEvent).where(
+                        and_(
+                            WasteEvent.store_id == sid,
+                            WasteEvent.occurred_at >= since,
+                        )
+                    )
+                    we_result = await session.execute(we_stmt)
+                    events = we_result.scalars().all()
+
+                    from ..services.waste_event_service import WasteEventService
+                    svc = WasteEventService(session)
+                    for ev in events:
                         try:
-                            svc = TrainingService(store_id=target_sid)
-                            kpi_id = practice["kpi_id"]
-                            # 从 kpi_id 解析 root_cause (格式: KPI_WASTE_{ROOT_CAUSE}_...)
-                            parts = kpi_id.split("_")
-                            root_cause = parts[2].lower() if len(parts) > 2 else "cross_store"
-                            await svc.create_waste_driven_recommendation(
-                                staff_id="STORE_GENERAL",
-                                root_cause=f"cross_store_{root_cause}",
-                                waste_event_id=f"cross_store_{source_sid}_{root_cause}",
-                                course_ids=[kpi_id],
-                                urgency="low",
-                                urgency_days=30,
-                                skill_gap=root_cause,
-                                description=(
-                                    f"跨门店最佳实践：来自门店[{source_sid}]，"
-                                    f"培训[{kpi_id}]平均得分{practice['avg_score']:.1f}"
-                                ),
-                            )
-                            propagated += 1
+                            await svc._sync_to_neo4j(ev)
+                            nodes_upserted += 1
                         except Exception as e:
                             logger.warning(
-                                "cross_store_propagate_failed",
-                                source=source_sid,
-                                target=target_sid,
+                                "WasteEvent Neo4j 同步失败",
+                                event_id=ev.event_id,
                                 error=str(e),
                             )
 
-        logger.info("cross_store_training_propagated", count=propagated)
-        return {"propagated": propagated}
+                    synced_stores += 1
+                    logger.info(
+                        "门店本体同步完成",
+                        store_id=sid,
+                        boms=len(active_boms),
+                        waste_events=len(events),
+                    )
 
-    try:
-        return asyncio.run(_run())
-    except Exception as e:
-        logger.warning("propagate_training_knowledge_failed", error=str(e))
-        raise self.retry(exc=e)
-
-
-# ============================================================
-# 图谱定期同步（每日凌晨 2AM，PG → Neo4j）
-# ============================================================
-
-@celery_app.task(
-    bind=True,
-    name="src.core.celery_tasks.sync_ontology_graph",
-    max_retries=2,
-    default_retry_delay=300,
-)
-def sync_ontology_graph(self, tenant_id: str = "") -> Dict[str, Any]:
-    """
-    每日定时将 PostgreSQL 主数据同步到 Neo4j 图谱（L2 本体层）。
-
-    同步内容：Store（含相似度自动计算）、Dish、Ingredient、Staff、Order。
-    tenant_id 为空时使用环境变量 DEFAULT_TENANT_ID，仍为空则使用 "default"。
-    由 Celery Beat 每日凌晨 2AM 触发；也可手动调用 POST /ontology/sync-from-pg。
-    """
-    import os as _os
-
-    async def _run():
-        from src.core.database import get_db_session
-        from src.services.ontology_sync_service import sync_ontology_from_pg
-
-        effective_tenant = tenant_id or _os.getenv("DEFAULT_TENANT_ID", "default")
-
-        async with get_db_session() as session:
-            result = await sync_ontology_from_pg(session, tenant_id=effective_tenant)
+                except Exception as e:
+                    errors.append({"store_id": sid, "error": str(e)})
+                    logger.error("门店本体同步失败", store_id=sid, error=str(e))
 
         logger.info(
-            "ontology_graph_synced",
-            tenant_id=effective_tenant,
-            stores=result.get("stores", 0),
-            staff=result.get("staff", 0),
-            dishes=result.get("dishes", 0),
-            ingredients=result.get("ingredients", 0),
-            orders=result.get("orders", 0),
+            "日常本体同步完成",
+            synced_stores=synced_stores,
+            nodes_upserted=nodes_upserted,
+            errors=len(errors),
         )
-        return {"ok": True, "tenant_id": effective_tenant, **result}
-
-    try:
-        return asyncio.run(_run())
-    except Exception as e:
-        logger.warning("sync_ontology_graph_failed", error=str(e))
-        raise self.retry(exc=e)
-
-
-# ============================================================
-# ARCH-003: 门店记忆层 Celery 任务
-# ============================================================
-
-@celery_app.task(
-    base=CallbackTask,
-    bind=True,
-    name="src.core.celery_tasks.update_store_memory",
-    max_retries=2,
-    default_retry_delay=300,
-)
-def update_store_memory(self, store_id: str = None, brand_id: str = None) -> Dict[str, Any]:
-    """
-    每日凌晨2点更新门店记忆层（Celery Beat 调度）
-
-    Args:
-        store_id: 指定门店ID（None 表示更新所有活跃门店）
-        brand_id: 品牌ID（可选）
-
-    Returns:
-        更新结果
-    """
-    async def _run():
-        from ..models.store import Store
-        from ..core.database import get_db_session
-        from ..services.store_memory_service import StoreMemoryService
-        from sqlalchemy import select
-
-        service = StoreMemoryService()
-        updated = 0
-        failed = 0
-
-        async with get_db_session() as session:
-            if store_id:
-                result = await session.execute(
-                    select(Store).where(Store.id == store_id, Store.is_active == True)
-                )
-                stores = result.scalars().all()
-            else:
-                result = await session.execute(
-                    select(Store).where(Store.is_active == True)
-                )
-                stores = result.scalars().all()
-
-        for store in stores:
-            try:
-                memory = await service.refresh_store_memory(
-                    store_id=str(store.id),
-                    brand_id=getattr(store, 'brand_id', None) or brand_id,
-                    lookback_days=30,
-                )
-                updated += 1
-                logger.info("store_memory.updated", store_id=str(store.id), confidence=memory.confidence)
-            except Exception as e:
-                failed += 1
-                logger.error("store_memory.update_failed", store_id=str(store.id), error=str(e))
-
-        logger.info("update_store_memory.done", updated=updated, failed=failed)
-        return {"updated": updated, "failed": failed}
-
-    try:
-        return asyncio.run(_run())
-    except Exception as e:
-        logger.warning("update_store_memory_failed", error=str(e))
-        raise self.retry(exc=e)
-
-
-@celery_app.task(
-    base=CallbackTask,
-    bind=True,
-    name="src.core.celery_tasks.realtime_anomaly_check",
-    max_retries=1,
-    default_retry_delay=10,
-)
-def realtime_anomaly_check(self, store_id: str, event: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    实时异常检测（StaffAction 写入后触发）
-
-    检测该门店最新操作是否触发异常模式：
-    - 短时间内多次折扣申请
-    - 营收突然异常下降
-    """
-    async def _run():
-        from ..services.store_memory_service import StoreMemoryService
-        from ..models.store_memory import AnomalyPattern
-        from datetime import datetime as _dt
-
-        service = StoreMemoryService()
-        memory = await service.get_memory(store_id)
-
-        if not memory:
-            return {"store_id": store_id, "anomaly_detected": False, "reason": "no_memory"}
-
-        action_type = event.get("action_type", "")
-        anomaly_detected = False
-        anomaly_type = None
-
-        # 简单规则：连续3次以上折扣申请标记为异常
-        if action_type == "discount_apply":
-            recent_discounts = [
-                p for p in memory.anomaly_patterns
-                if p.pattern_type == "frequent_discount"
-            ]
-            if len(recent_discounts) > 0:
-                recent_discounts[0].occurrence_count += 1
-                recent_discounts[0].last_seen = _dt.utcnow()
-                if recent_discounts[0].occurrence_count >= 3:
-                    anomaly_detected = True
-                    anomaly_type = "frequent_discount"
-            else:
-                memory.anomaly_patterns.append(AnomalyPattern(
-                    pattern_type="frequent_discount",
-                    description="短时间内多次折扣申请",
-                    first_seen=_dt.utcnow(),
-                    last_seen=_dt.utcnow(),
-                    severity="medium",
-                ))
-
-            await service._store.save(memory)
-
-        logger.info(
-            "realtime_anomaly_check.done",
-            store_id=store_id,
-            anomaly_detected=anomaly_detected,
-            anomaly_type=anomaly_type,
-        )
-
         return {
-            "store_id": store_id,
-            "anomaly_detected": anomaly_detected,
-            "anomaly_type": anomaly_type,
+            "success": True,
+            "synced_stores": synced_stores,
+            "nodes_upserted": nodes_upserted,
+            "errors": errors,
         }
 
     try:
         return asyncio.run(_run())
     except Exception as e:
-        logger.warning("realtime_anomaly_check_failed", store_id=store_id, error=str(e))
         raise self.retry(exc=e)
 
 
-# ============================================================
-# FEAT-002: 预测性备料 Celery 任务
-# ============================================================
+# ═══════════════════════════════════════════════════════════════════════════════
+# L4 — 全平台推理扫描夜间任务（凌晨 3:30 触发）
+# ═══════════════════════════════════════════════════════════════════════════════
 
 @celery_app.task(
     base=CallbackTask,
     bind=True,
-    name="src.core.celery_tasks.push_daily_forecast",
+    name="tasks.nightly_reasoning_scan",
     max_retries=2,
     default_retry_delay=300,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=1800,
+    retry_jitter=False,
 )
-def push_daily_forecast(self, store_id: str = None) -> Dict[str, Any]:
+def nightly_reasoning_scan(
+    self,
+    store_ids: list = None,
+) -> Dict[str, Any]:
     """
-    每日9AM 推送预测性备料建议
+    L4 全平台推理扫描夜间任务（建议凌晨 3:30 触发，在 L3 nightly_cross_store_sync 之后）
+
+    执行步骤：
+      1. 从 PostgreSQL 拉取所有活跃门店最近 24h KPI 快照
+      2. 调用 DiagnosisService.run_full_diagnosis() 全维度推理
+      3. 结论写入 reasoning_reports（upsert，幂等）
+      4. 对 P1/P2 报告同步写入 Neo4j ReasoningReport 节点
+      5. 置信度 ≥ 0.70 的 P1/P2 告警自动推送企微
 
     Args:
-        store_id: 指定门店（None 表示所有门店）
+        store_ids: 指定门店列表（None = 全部活跃门店）
 
     Returns:
-        推送结果
+        {
+          "stores_scanned":  N,
+          "p1_alerts":       N,
+          "p2_alerts":       N,
+          "wechat_sent":     N,
+          "errors":          [...]
+        }
+    """
+    async def _run():
+        from ..core.database import get_db_session
+        from ..models.store import Store
+        from ..services.diagnosis_service import DiagnosisService
+        from ..services.reasoning_engine import ALL_DIMENSIONS
+        from ..models.reasoning import ReasoningReport
+        from sqlalchemy import select, and_, func
+
+        errors = []
+        stores_scanned = 0
+        p1_count = 0
+        p2_count = 0
+        wechat_sent = 0
+
+        async with get_db_session() as session:
+            # 拉取活跃门店列表
+            if store_ids:
+                stmt = select(Store).where(
+                    and_(Store.id.in_(store_ids), Store.is_active.is_(True))
+                )
+            else:
+                stmt = select(Store).where(Store.is_active.is_(True))
+            stores = (await session.execute(stmt)).scalars().all()
+
+            svc = DiagnosisService(session)
+
+            for store in stores:
+                sid = str(store.id)
+                try:
+                    # 构造门店 KPI 快照（从近 30 天 cross_store_metrics 物化数据）
+                    kpi_context = await _build_kpi_context(session, sid)
+                    if not kpi_context:
+                        logger.debug("门店无 KPI 数据，跳过推理", store_id=sid)
+                        continue
+
+                    # 全维度诊断
+                    report = await svc.run_full_diagnosis(
+                        store_id=sid,
+                        kpi_context=kpi_context,
+                    )
+                    stores_scanned += 1
+
+                    # 统计 P1/P2
+                    for dim, c in report.dimensions.items():
+                        if c.severity == "P1":
+                            p1_count += 1
+                        elif c.severity == "P2":
+                            p2_count += 1
+
+                    # P1/P2 → 同步 Neo4j + 企微推送
+                    for dim, c in report.dimensions.items():
+                        if c.severity in ("P1", "P2") and c.confidence >= 0.70:
+                            # Neo4j 同步
+                            try:
+                                from ..ontology.data_sync import OntologyDataSync
+                                import uuid as _uuid
+                                # 查找刚写入的 reasoning_report id
+                                from ..models.reasoning import ReasoningReport as RR
+                                from datetime import date
+                                rr_stmt = select(RR).where(
+                                    and_(
+                                        RR.store_id    == sid,
+                                        RR.report_date == date.today(),
+                                        RR.dimension   == dim,
+                                    )
+                                ).limit(1)
+                                rr = (await session.execute(rr_stmt)).scalar_one_or_none()
+                                if rr:
+                                    with OntologyDataSync() as sync:
+                                        sync.upsert_reasoning_report(
+                                            report_id=str(rr.id),
+                                            store_id=sid,
+                                            report_date=rr.report_date.isoformat(),
+                                            dimension=dim,
+                                            severity=c.severity,
+                                            root_cause=c.root_cause,
+                                            confidence=c.confidence,
+                                            triggered_rules=c.triggered_rules,
+                                        )
+                            except Exception as neo4j_err:
+                                logger.warning(
+                                    "Neo4j ReasoningReport 同步失败",
+                                    store_id=sid,
+                                    error=str(neo4j_err),
+                                )
+
+                            # 企微推送
+                            try:
+                                from ..services.wechat_action_fsm import (
+                                    ActionCategory,
+                                    ActionPriority,
+                                    get_wechat_fsm,
+                                )
+                                fsm      = get_wechat_fsm()
+                                priority = (
+                                    ActionPriority.P1
+                                    if c.severity == "P1"
+                                    else ActionPriority.P2
+                                )
+                                action_text = (
+                                    c.recommended_actions[0]
+                                    if c.recommended_actions
+                                    else "请查看推理报告并采取行动"
+                                )
+                                await fsm.create_action(
+                                    store_id=sid,
+                                    category=ActionCategory.KPI_ALERT,
+                                    priority=priority,
+                                    title=f"L4推理告警：{dim} 维度 {c.severity}",
+                                    content=(
+                                        f"**{dim}** 维度异常\n"
+                                        f"根因: {c.root_cause or '待分析'}\n"
+                                        f"置信度: {c.confidence:.0%}\n"
+                                        f"建议: {action_text}"
+                                    ),
+                                    receiver_user_id="store_manager",
+                                    source_event_id=f"L4-{sid}-{dim}",
+                                    evidence={"dimension": dim, "severity": c.severity},
+                                )
+                                wechat_sent += 1
+                            except Exception as wx_err:
+                                logger.warning(
+                                    "L4 企微告警推送失败",
+                                    store_id=sid,
+                                    dim=dim,
+                                    error=str(wx_err),
+                                )
+
+                except Exception as e:
+                    errors.append({"store_id": sid, "error": str(e)})
+                    logger.error("门店推理扫描失败", store_id=sid, error=str(e))
+
+            await session.commit()
+
+        logger.info(
+            "L4 夜间推理扫描完成",
+            stores_scanned=stores_scanned,
+            p1_alerts=p1_count,
+            p2_alerts=p2_count,
+            wechat_sent=wechat_sent,
+            errors=len(errors),
+        )
+        return {
+            "success":       len(errors) == 0,
+            "stores_scanned": stores_scanned,
+            "p1_alerts":     p1_count,
+            "p2_alerts":     p2_count,
+            "wechat_sent":   wechat_sent,
+            "errors":        errors,
+        }
+
+    async def _build_kpi_context(session, store_id: str) -> Dict[str, Any]:
+        """从 cross_store_metrics 物化表拉取近期 KPI 值"""
+        from ..models.cross_store import CrossStoreMetric
+        from datetime import date, timedelta
+        from sqlalchemy import select, and_
+
+        yesterday = date.today() - timedelta(days=1)
+        stmt = select(
+            CrossStoreMetric.metric_name,
+            CrossStoreMetric.value,
+        ).where(
+            and_(
+                CrossStoreMetric.store_id    == store_id,
+                CrossStoreMetric.metric_date == yesterday,
+            )
+        )
+        rows = (await session.execute(stmt)).all()
+        return {r[0]: r[1] for r in rows}
+
+    try:
+        return asyncio.run(_run())
+    except Exception as e:
+        raise self.retry(exc=e)
+
+
+# ── L5 夜间行动派发任务 ───────────────────────────────────────────────────────
+
+@celery_app.task(
+    base=CallbackTask, bind=True,
+    name="tasks.nightly_action_dispatch",
+    max_retries=2, default_retry_delay=300,
+    autoretry_for=(Exception,), retry_backoff=True,
+    retry_backoff_max=1800, retry_jitter=False,
+)
+def nightly_action_dispatch(
+    self,
+    store_ids: list = None,
+    days_back: int  = 1,
+) -> Dict[str, Any]:
+    """
+    L5 夜间行动批量派发任务（建议调度时间: 04:30，L4 nightly_reasoning_scan 完成后执行）
+
+    执行步骤：
+      1. 查询近 days_back 天内所有未派发行动的 P1/P2 推理报告
+      2. 按 severity 优先级（P1 优先）逐一触发 ActionDispatchService.dispatch_from_report()
+      3. 汇总派发统计并返回
+
+    Args:
+        store_ids: 指定门店列表（None = 全平台）
+        days_back: 回溯天数（默认 1 = 仅处理昨日和今日报告）
+
+    Returns:
+        {success, stores_covered, plans_created, dispatched, partial, skipped, errors}
+    """
+    import asyncio
+    from typing import Dict, Any
+
+    async def _run():
+        from src.core.database import async_session_factory
+        from src.services.action_dispatch_service import ActionDispatchService
+        from src.models.reasoning import ReasoningReport
+        from src.models.action_plan import ActionPlan
+        from datetime import date, timedelta
+        from sqlalchemy import select, and_
+
+        total_stats = {
+            "plans_created": 0, "dispatched": 0,
+            "partial": 0, "skipped": 0, "errors": 0,
+        }
+        stores_covered: set = set()
+
+        async with async_session_factory() as session:
+            # 确定目标门店
+            if store_ids:
+                target_stores = store_ids
+            else:
+                from src.models.store import Store
+                rows  = (await session.execute(
+                    select(Store.id).where(Store.is_active == True)  # noqa: E712
+                )).all()
+                target_stores = [r[0] for r in rows]
+
+            svc = ActionDispatchService(session)
+            for sid in target_stores:
+                try:
+                    stats = await svc.dispatch_pending_alerts(
+                        store_id=sid, days_back=days_back
+                    )
+                    if stats["plans_created"] > 0 or stats["dispatched"] > 0:
+                        stores_covered.add(sid)
+                    for k in ("plans_created", "dispatched", "partial", "skipped", "errors"):
+                        total_stats[k] += stats.get(k, 0)
+                except Exception as e:
+                    total_stats["errors"] += 1
+                    logger.error("L5 门店行动派发失败", store_id=sid, error=str(e))
+
+            await session.commit()
+
+        logger.info(
+            "L5 夜间行动派发完成",
+            stores_covered=len(stores_covered),
+            **total_stats,
+        )
+        return {
+            "success":         total_stats["errors"] == 0,
+            "stores_covered":  len(stores_covered),
+            **total_stats,
+        }
+
+    try:
+        return asyncio.run(_run())
+    except Exception as e:
+        raise self.retry(exc=e)
+
+
+# ── 多阶段工作流 Celery 任务 ──────────────────────────────────────────────────
+
+@celery_app.task(
+    base=CallbackTask, bind=True,
+    name="tasks.start_evening_planning_all_stores",
+    max_retries=2, default_retry_delay=120,
+    autoretry_for=(Exception,), retry_backoff=True,
+    retry_backoff_max=600, retry_jitter=True,
+)
+def start_evening_planning_all_stores(
+    self,
+    store_ids: list = None,
+) -> Dict[str, Any]:
+    """
+    每日 17:00 触发：为全平台所有活跃门店启动 Day N+1 规划工作流，
+    并立即触发 initial_plan 阶段的快速规划（Fast Mode，<30s）。
+
+    调度建议：beat_schedule 中设置 crontab(hour=17, minute=0)
+
+    Args:
+        store_ids: 指定门店列表（None = 全平台活跃门店）
+
+    Returns:
+        {success, stores_started, fast_plan_ok, fast_plan_failed, errors}
     """
     async def _run():
         from datetime import date, timedelta
-        from ..models.store import Store
-        from ..core.database import get_db_session
-        from ..services.demand_forecaster import DemandForecaster
-        from sqlalchemy import select
+        from src.core.database import async_session_factory
+        from src.services.workflow_engine import WorkflowEngine
+        from src.services.fast_planning_service import FastPlanningService
 
-        target_date = date.today() + timedelta(days=1)
-        forecaster = DemandForecaster()
-        pushed = 0
-        low_confidence_count = 0
+        plan_date      = date.today() + timedelta(days=1)
+        started        = 0
+        fast_plan_ok   = 0
+        fast_plan_fail = 0
+        errors         = 0
 
-        async with get_db_session() as session:
-            if store_id:
-                result = await session.execute(
-                    select(Store).where(Store.id == store_id, Store.is_active == True)
-                )
-                stores = result.scalars().all()
+        async with async_session_factory() as session:
+            # 确定目标门店
+            if store_ids:
+                target_stores = store_ids
             else:
-                result = await session.execute(
-                    select(Store).where(Store.is_active == True)
-                )
-                stores = result.scalars().all()
+                from src.models.store import Store
+                from sqlalchemy import select
+                rows = (await session.execute(
+                    select(Store.id).where(Store.is_active == True)  # noqa: E712
+                )).all()
+                target_stores = [str(r[0]) for r in rows]
 
-        for store in stores:
-            try:
-                forecast = await forecaster.predict(
-                    store_id=str(store.id),
-                    target_date=target_date,
-                )
+            engine   = WorkflowEngine(session)
+            fast_svc = FastPlanningService(session)
 
-                # confidence=low 时推送含"数据积累中"提示
-                if forecast.confidence == "low":
-                    low_confidence_count += 1
-                    message = (
-                        f"【备料建议（参考）】明日 {target_date}\n"
-                        f"门店：{store.name}\n"
-                        f"⚠️ 数据积累中（历史数据不足），建议以近期经验为主。\n"
-                        f"预估营收：¥{forecast.estimated_revenue:.0f}"
+            for sid in target_stores:
+                try:
+                    # 1. 启动工作流（幂等）
+                    wf = await engine.start_daily_workflow(
+                        store_id=sid,
+                        plan_date=plan_date,
                     )
-                else:
-                    message = (
-                        f"【备料建议】明日 {target_date}\n"
-                        f"门店：{store.name}\n"
-                        f"预估营收：¥{forecast.estimated_revenue:.0f}\n"
-                        f"置信度：{forecast.confidence}\n"
-                        f"建议备料：{len(forecast.items)} 类食材"
-                    )
+                    started += 1
 
-                logger.info(
-                    "daily_forecast.pushed",
-                    store_id=str(store.id),
-                    confidence=forecast.confidence,
-                )
-                pushed += 1
+                    # 2. 获取 initial_plan 阶段，触发快速规划
+                    try:
+                        init_phase = await engine.get_phase(wf.id, "initial_plan")
+                        if init_phase:
+                            content = await fast_svc.generate_initial_plan(sid, plan_date)
+                            await engine.submit_decision(
+                                phase_id=init_phase.id,
+                                content=content,
+                                submitted_by="system",
+                                mode="fast",
+                                data_completeness=content.get("data_completeness", 0.7),
+                                confidence=content.get("confidence", 0.75),
+                                change_reason="系统 17:00 快速规划自动生成",
+                            )
+                            fast_plan_ok += 1
+                    except Exception as fp_err:
+                        fast_plan_fail += 1
+                        logger.warning(
+                            "快速规划触发失败（非致命）",
+                            store_id=sid,
+                            error=str(fp_err),
+                        )
 
-            except Exception as e:
-                logger.error("daily_forecast.push_failed", store_id=str(store.id), error=str(e))
+                except Exception as e:
+                    errors += 1
+                    logger.error("启动工作流失败", store_id=sid, error=str(e))
 
+            await session.commit()
+
+        logger.info(
+            "晚间规划工作流批量启动完成",
+            plan_date=str(plan_date),
+            stores_started=started,
+            fast_plan_ok=fast_plan_ok,
+            fast_plan_failed=fast_plan_fail,
+            errors=errors,
+        )
         return {
-            "pushed": pushed,
-            "low_confidence": low_confidence_count,
-            "target_date": str(target_date),
+            "success":          errors == 0,
+            "plan_date":        str(plan_date),
+            "stores_started":   started,
+            "fast_plan_ok":     fast_plan_ok,
+            "fast_plan_failed": fast_plan_fail,
+            "errors":           errors,
         }
 
     try:
         return asyncio.run(_run())
     except Exception as e:
-        logger.warning("push_daily_forecast_failed", error=str(e))
         raise self.retry(exc=e)
 
 
-# ============================================================
-# INFRA-002: 企微消息重试 Celery 任务
-# ============================================================
-
 @celery_app.task(
-    base=CallbackTask,
-    bind=True,
-    name="src.core.celery_tasks.retry_failed_wechat_messages",
-    max_retries=1,
-    default_retry_delay=60,
+    base=CallbackTask, bind=True,
+    name="tasks.check_workflow_deadlines",
+    max_retries=1, default_retry_delay=30,
 )
-def retry_failed_wechat_messages(self) -> Dict[str, Any]:
+def check_workflow_deadlines(self) -> Dict[str, Any]:
     """
-    每5分钟从告警队列取出失败的企微消息进行重试（最多3次）
+    每 5 分钟扫描全平台所有 running/reviewing 工作流阶段：
+      - 距 deadline ≤ 10 分钟 → 发送企微预警
+      - 已过 deadline          → 自动锁定阶段并推进到下一阶段
+
+    调度建议：beat_schedule 中设置 crontab(minute="*/5")
+
+    Returns:
+        {success, auto_locked, locked_phases}
     """
     async def _run():
-        from ..services.wechat_service import wechat_service
+        from src.core.database import async_session_factory
+        from src.services.timing_service import TimingService
 
-        retried = 0
-        succeeded = 0
+        async with async_session_factory() as session:
+            timing = TimingService(session)
+            locked = await timing.check_and_auto_lock_all()
+            await session.commit()
 
-        try:
-            results = await wechat_service.retry_failed_messages(max_retries=3, batch_size=10)
-            retried = results.get("retried", 0)
-            succeeded = results.get("succeeded", 0)
-        except Exception as e:
-            logger.warning("retry_failed_wechat_messages.error", error=str(e))
-
-        logger.info("retry_failed_wechat_messages.done", retried=retried, succeeded=succeeded)
-        return {"retried": retried, "succeeded": succeeded}
+        return {
+            "success":       True,
+            "auto_locked":   len(locked),
+            "locked_phases": locked,
+        }
 
     try:
         return asyncio.run(_run())
     except Exception as e:
-        logger.warning("retry_failed_wechat_messages_task_failed", error=str(e))
         raise self.retry(exc=e)
 
+
+@celery_app.task(
+    base=CallbackTask, bind=True,
+    name="tasks.release_expired_room_locks",
+    max_retries=2, default_retry_delay=60,
+    autoretry_for=(Exception,), retry_backoff=True,
+)
+def release_expired_room_locks(self) -> Dict[str, Any]:
+    """
+    每天凌晨 01:00 扫描全平台超时锁台预约并自动释放。
+
+    锁台（room_lock）超过 ROOM_LOCK_TIMEOUT_DAYS（默认 7 天）未签约，
+    自动回退到意向（intent）阶段，释放场地资源。
+
+    调度建议：beat_schedule 中设置 crontab(hour=1, minute=0)
+
+    Returns:
+        {success, released_count, released_ids}
+    """
+    async def _run():
+        from src.core.database import async_session_factory
+        from src.services.banquet_lifecycle_service import BanquetLifecycleService
+
+        async with async_session_factory() as session:
+            svc      = BanquetLifecycleService(session)
+            released = await svc.release_expired_locks()
+            await session.commit()
+
+        return {
+            "success":        True,
+            "released_count": len(released),
+            "released_ids":   released,
+        }
+
+    try:
+        return asyncio.run(_run())
+    except Exception as e:
+        raise self.retry(exc=e)
+
+
+@celery_app.task(
+    base=CallbackTask,
+    bind=True,
+    name="tasks.monthly_save_fct_tax",
+    max_retries=2,
+    default_retry_delay=300,
+)
+def monthly_save_fct_tax(self, year: int = 0, month: int = 0) -> Dict[str, Any]:
+    """
+    月度税务记录自动保存（FCT 业财税一体化）
+
+    每月1日凌晨 01:00 自动运行：
+      - 遍历所有门店
+      - 调用 FCTService.estimate_monthly_tax() 估算上月税务
+      - 将结果持久化到 fct_tax_records 表
+
+    Args:
+        year:  被保存的年份（默认 0 表示自动推断上个月所在年）
+        month: 被保存的月份（默认 0 表示自动推断上个月）
+    """
+    from datetime import date, timedelta
+
+    async def _run():
+        from src.core.database import async_session_factory
+        from src.models.store import Store
+        from src.services.fct_service import FCTService
+        from sqlalchemy import select
+
+        # 自动推断上个月
+        today = date.today()
+        if year == 0 or month == 0:
+            first_of_this_month = today.replace(day=1)
+            last_month_end = first_of_this_month - timedelta(days=1)
+            _year  = last_month_end.year
+            _month = last_month_end.month
+        else:
+            _year, _month = year, month
+
+        saved, failed = 0, 0
+
+        async with async_session_factory() as session:
+            stores_result = await session.execute(select(Store.id))
+            store_ids = [row[0] for row in stores_result.all()]
+
+        for store_id in store_ids:
+            try:
+                async with async_session_factory() as session:
+                    svc = FCTService(session)
+                    await svc.estimate_monthly_tax(
+                        store_id=store_id,
+                        year=_year,
+                        month=_month,
+                        save=True,
+                    )
+                    await session.commit()
+                    saved += 1
+            except Exception as exc:
+                logger.warning(
+                    "月度税务保存失败",
+                    store_id=store_id,
+                    year=_year,
+                    month=_month,
+                    error=str(exc),
+                )
+                failed += 1
+
+        logger.info(
+            "月度税务批量保存完成",
+            year=_year, month=_month,
+            saved=saved, failed=failed,
+        )
+        return {"year": _year, "month": _month, "saved": saved, "failed": failed}
+
+    try:
+        return asyncio.run(_run())
+    except Exception as e:
+        raise self.retry(exc=e)
+
+
+# ============================================================
+# ARCH-003: 门店记忆层更新任务
+# ============================================================
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=300)
+def update_store_memory(self, store_id: str = None, brand_id: str = None):
+    """每日凌晨2AM更新门店记忆层（峰时模式/菜品健康度/员工基线）"""
+    import asyncio
+
+    async def _run():
+        from src.core.database import get_db_session
+        from src.services.store_memory_service import StoreMemoryService
+
+        async with get_db_session() as db:
+            service = StoreMemoryService(db_session=db)
+            if store_id:
+                await service.refresh_store_memory(store_id=store_id, brand_id=brand_id)
+            else:
+                # 全量刷新：从 DB 获取所有门店
+                from sqlalchemy import select
+                from src.models.store import Store
+                result = await db.execute(select(Store.id, Store.brand_id))
+                stores = result.all()
+                for row in stores:
+                    try:
+                        await service.refresh_store_memory(
+                            store_id=str(row.id),
+                            brand_id=str(row.brand_id) if row.brand_id else None,
+                        )
+                    except Exception as exc:
+                        logger.warning(
+                            "update_store_memory.store_failed",
+                            store_id=str(row.id),
+                            error=str(exc),
+                        )
+
+    try:
+        asyncio.run(_run())
+    except Exception as exc:
+        raise self.retry(exc=exc)
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=30)
+def realtime_anomaly_check(self, store_id: str, event: dict):
+    """StaffAction 写入后触发的实时异常检测"""
+    import asyncio
+
+    async def _run():
+        from src.core.database import get_db_session
+        from src.services.store_memory_service import StoreMemoryService
+
+        async with get_db_session() as db:
+            service = StoreMemoryService(db_session=db)
+            await service.detect_anomaly(store_id=store_id, event=event)
+
+    try:
+        asyncio.run(_run())
+    except Exception as exc:
+        raise self.retry(exc=exc)
+
+
+# ============================================================
+# FEAT-002: 预测性备料推送任务
+# ============================================================
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=300)
+def push_daily_forecast(self, store_id: str = None):
+    """每日9AM推送预测性备料建议，confidence=low 时附\"数据积累中\"提示"""
+    import asyncio
+    from datetime import date, timedelta
+
+    async def _run():
+        from src.core.database import get_db_session
+        from src.services.demand_forecaster import DemandForecaster
+        from src.services.wechat_service import wechat_service
+
+        target_date = date.today() + timedelta(days=1)
+
+        async with get_db_session() as db:
+            forecaster = DemandForecaster(db_session=db)
+
+            stores_to_forecast = []
+            if store_id:
+                stores_to_forecast = [store_id]
+            else:
+                from sqlalchemy import select
+                from src.models.store import Store
+                result = await db.execute(select(Store.id))
+                stores_to_forecast = [str(row.id) for row in result.all()]
+
+            for sid in stores_to_forecast:
+                try:
+                    result = await forecaster.predict(store_id=sid, target_date=target_date)
+                    message_data = {
+                        "store_id": sid,
+                        "target_date": str(result.target_date),
+                        "estimated_revenue": result.estimated_revenue,
+                        "confidence": result.confidence,
+                        "basis": result.basis,
+                        "note": result.note or "",
+                        "item_count": len(result.items),
+                    }
+                    await wechat_service.send_templated_message(
+                        template="daily_forecast",
+                        data=message_data,
+                        to_user_id=f"store_{sid}",
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "push_daily_forecast.store_failed",
+                        store_id=sid,
+                        error=str(exc),
+                    )
+
+    try:
+        asyncio.run(_run())
+    except Exception as exc:
+        raise self.retry(exc=exc)
+
+
+# ============================================================
+# INFRA-002: 企微消息重试任务
+# ============================================================
+
+@celery_app.task(bind=True, max_retries=1)
+def retry_failed_wechat_messages(self):
+    """每5分钟从失败队列取出企微消息重试（最多3次）"""
+    import asyncio
+
+    async def _run():
+        from src.services.wechat_service import wechat_service
+        await wechat_service.retry_failed_messages(max_retries=3, batch_size=10)
+
+    try:
+        asyncio.run(_run())
+    except Exception as exc:
+        logger.warning("retry_failed_wechat_messages.error", error=str(exc))

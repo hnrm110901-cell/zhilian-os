@@ -314,7 +314,7 @@ async def register_supplier(
             delivery_time=request.delivery_time,
             notes=request.notes,
         )
-        return {\"success\": True, \"supplier_id\": supplier.id, \"code\": supplier.code}
+        return {"success": True, "supplier_id": supplier.id, "code": supplier.code}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

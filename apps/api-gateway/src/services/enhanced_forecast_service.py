@@ -9,6 +9,7 @@ import numpy as np
 import os
 
 from src.services.forecast_features import ChineseHolidays, WeatherImpact, BusinessDistrictEvents
+from src.services.auspicious_date_service import AuspiciousDateService
 from src.services.base_service import BaseService
 
 logger = structlog.get_logger()
@@ -163,6 +164,27 @@ class EnhancedForecastService(BaseService):
         elif month in [7, 8]:  # 夏季，火锅淡季
             if self.restaurant_type == "火锅":
                 factors["season_factor"] = float(os.getenv("FORECAST_HOTPOT_SUMMER_FACTOR", "0.8"))
+
+        # 7. 吉日因子（好日子宴会需求提振；对正餐/宴会类型有效）
+        if self.restaurant_type in ("正餐", "宴会", "中餐"):
+            try:
+                auspicious_svc = AuspiciousDateService()
+                auspicious_info = auspicious_svc.get_info(target_date)
+                if auspicious_info.is_auspicious:
+                    # 吉日因子只与需求侧因子取 max，避免与节假日重复叠加
+                    existing_demand = max(
+                        factors.get("holiday_factor", 1.0),
+                        factors.get("pre_holiday_factor", 1.0),
+                        1.0,
+                    )
+                    if auspicious_info.demand_factor > existing_demand:
+                        # 移除被覆盖的节假日因子，改用吉日因子
+                        factors.pop("holiday_factor", None)
+                        factors.pop("pre_holiday_factor", None)
+                        factors["auspicious_factor"] = auspicious_info.demand_factor
+                    # 否则保留原节假日因子，不重复叠加
+            except Exception:
+                pass  # 吉日因子非致命
 
         return factors
 

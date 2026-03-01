@@ -1,275 +1,136 @@
 """
-业财税资金一体化（FCT）数据模型
+FCT 业财税资金一体化数据模型
 
-- FctEvent: 业财事件原始记录
-- FctVoucher: 凭证
-- FctVoucherLine: 凭证分录
+新增两张表：
+  fct_tax_records      — 月度税务测算（增值税 / 企业所得税 / 附加税）
+  fct_cash_flow_items  — 资金流预测明细（每日预测进出流）
 """
-from sqlalchemy import Column, String, Integer, Text, Enum, JSON, ForeignKey, Date, Numeric
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
-import uuid
+from __future__ import annotations
+
 import enum
-from datetime import date
+import uuid
+
+from sqlalchemy import (
+    Column, String, Integer, Float, Date, DateTime, Boolean,
+    Text, JSON, Index, Enum,
+)
+from sqlalchemy.dialects.postgresql import UUID
 
 from .base import Base, TimestampMixin
 
 
-class FctVoucherStatus(str, enum.Enum):
-    """凭证状态"""
-    DRAFT = "draft"          # 草稿
-    PENDING = "pending"       # 待审核
-    APPROVED = "approved"     # 已审核
-    POSTED = "posted"         # 已过账
-    REJECTED = "rejected"     # 已驳回
-    VOIDED = "voided"         # 已作废（不参与总账）
+class TaxType(str, enum.Enum):
+    VAT          = "vat"           # 增值税
+    CIT          = "cit"           # 企业所得税
+    SURCHARGE    = "surcharge"     # 附加税（城建税 + 教育附加）
+    TOTAL        = "total"         # 合计
 
 
-class FctEvent(Base, TimestampMixin):
-    """业财事件原始记录（用于追溯与重跑）"""
-
-    __tablename__ = "fct_events"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    event_id = Column(String(64), unique=True, nullable=False, index=True)  # 业务侧幂等 id
-    event_type = Column(String(64), nullable=False, index=True)
-    occurred_at = Column(String(32), nullable=False)  # ISO8601
-    source_system = Column(String(64), nullable=False)
-    source_id = Column(String(128))
-    tenant_id = Column(String(64), nullable=False, index=True)
-    entity_id = Column(String(64), nullable=False, index=True)  # 门店/主体
-    payload = Column(JSON, nullable=False)
-    # 处理结果
-    processed_at = Column(String(32))
-    voucher_id = Column(UUID(as_uuid=True), ForeignKey("fct_vouchers.id"))
-    error_message = Column(Text)
-
-    voucher = relationship("FctVoucher", back_populates="source_events", foreign_keys=[voucher_id])
+class TaxpayerType(str, enum.Enum):
+    GENERAL      = "general"       # 一般纳税人（VAT 6%）
+    SMALL        = "small"         # 小规模纳税人（VAT 3%）
+    MICRO        = "micro"         # 微型企业（CIT 20%）
 
 
-class FctVoucher(Base, TimestampMixin):
-    """凭证"""
+class CashFlowDirection(str, enum.Enum):
+    INFLOW       = "inflow"
+    OUTFLOW      = "outflow"
 
-    __tablename__ = "fct_vouchers"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    voucher_no = Column(String(32), nullable=False, index=True)  # 凭证号，按主体+期间生成
-    tenant_id = Column(String(64), nullable=False, index=True)
-    entity_id = Column(String(64), nullable=False, index=True)
-    biz_date = Column(Date, nullable=False, index=True)
-    event_type = Column(String(64))  # 来源事件类型
-    event_id = Column(String(64))    # 来源 event_id
-    status = Column(
-        Enum(FctVoucherStatus, values_callable=lambda x: [e.value for e in x]),
-        default=FctVoucherStatus.DRAFT,
-        nullable=False,
-        index=True,
+class FCTTaxRecord(Base, TimestampMixin):
+    """
+    月度税务测算记录。
+
+    每个自然月末（或手动触发）生成一条测算记录：
+      - 收入口径：POS 实收 + 宴会预收
+      - 增值税（VAT）= 含税收入 / (1 + 税率) × 税率
+      - 企业所得税（CIT）= 应纳税所得额 × 税率（利润率假设 10-15%）
+      - 附加税 = VAT × 12%（城建 7% + 教育附加 3% + 地方教育 2%）
+    """
+    __tablename__ = "fct_tax_records"
+
+    id              = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    store_id        = Column(String(50), nullable=False, index=True)
+
+    # 计税周期
+    year            = Column(Integer, nullable=False)
+    month           = Column(Integer, nullable=False)
+    period_label    = Column(String(20))              # e.g. "2026-05"
+
+    # 纳税人类型
+    taxpayer_type   = Column(Enum(TaxpayerType), default=TaxpayerType.GENERAL)
+
+    # 收入口径（分）
+    gross_revenue       = Column(Integer, default=0)   # POS含税总收入
+    banquet_revenue     = Column(Integer, default=0)   # 宴会收入
+    other_revenue       = Column(Integer, default=0)   # 其他收入
+    total_taxable       = Column(Integer, default=0)   # 应税总收入
+
+    # 税额测算（分）
+    vat_rate            = Column(Float, default=0.06)  # 增值税率
+    vat_amount          = Column(Integer, default=0)   # 增值税额
+    vat_surcharge       = Column(Integer, default=0)   # 增值税附加（12% × VAT）
+    deductible_input    = Column(Integer, default=0)   # 进项税额（食材采购增值税）
+    net_vat             = Column(Integer, default=0)   # 应纳增值税 = 销项 - 进项
+
+    cit_rate            = Column(Float, default=0.20)  # 企业所得税率
+    estimated_profit    = Column(Integer, default=0)   # 预估利润（分）
+    cit_amount          = Column(Integer, default=0)   # 企业所得税额
+
+    total_tax           = Column(Integer, default=0)   # 合计应纳税额
+
+    # 状态
+    is_finalized        = Column(Boolean, default=False)  # 是否已确认入账
+    notes               = Column(Text)
+    generated_by        = Column(String(100), default="system")
+
+    __table_args__ = (
+        Index("ix_fct_tax_store_period", "store_id", "year", "month"),
     )
-    description = Column(Text)
-    attachments = Column(JSON)  # 可选附件/扩展
-
-    source_events = relationship("FctEvent", back_populates="voucher", foreign_keys="FctEvent.voucher_id")
-    lines = relationship("FctVoucherLine", back_populates="voucher", cascade="all, delete-orphan")
 
 
-class FctVoucherLine(Base, TimestampMixin):
-    """凭证分录"""
+class FCTCashFlowItem(Base, TimestampMixin):
+    """
+    资金流预测明细（逐日）。
 
-    __tablename__ = "fct_voucher_lines"
+    每次触发预测时写入 forecast_date 之后 N 天的预测数据，
+    方便前端展示 30/60/90 天资金流瀑布图。
+    """
+    __tablename__ = "fct_cash_flow_items"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    voucher_id = Column(UUID(as_uuid=True), ForeignKey("fct_vouchers.id", ondelete="CASCADE"), nullable=False, index=True)
-    line_no = Column(Integer, nullable=False)  # 行号
-    account_code = Column(String(32), nullable=False)  # 科目编码
-    account_name = Column(String(128))
-    debit = Column(Numeric(18, 2), default=0)   # 借方金额
-    credit = Column(Numeric(18, 2), default=0)   # 贷方金额
-    auxiliary = Column(JSON)  # 辅助核算：部门、客商等
-    description = Column(Text)
+    id              = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    store_id        = Column(String(50), nullable=False, index=True)
 
-    voucher = relationship("FctVoucher", back_populates="lines")
+    # 预测日期
+    forecast_date   = Column(Date, nullable=False, index=True)
+    is_actual       = Column(Boolean, default=False)  # True = 已发生的实际值
 
+    # 进流（分）
+    pos_inflow          = Column(Integer, default=0)   # POS 营业收入预测
+    prepaid_inflow      = Column(Integer, default=0)   # 预收款（宴会定金等）
+    other_inflow        = Column(Integer, default=0)
+    total_inflow        = Column(Integer, default=0)
 
-class FctMasterType(str, enum.Enum):
-    """主数据类型"""
-    STORE = "store"
-    SUPPLIER = "supplier"
-    ACCOUNT = "account"
-    BANK_ACCOUNT = "bank_account"
+    # 出流（分）
+    food_cost_outflow   = Column(Integer, default=0)   # 食材采购
+    labor_outflow       = Column(Integer, default=0)   # 人工
+    rent_outflow        = Column(Integer, default=0)   # 房租（按日分摊）
+    utilities_outflow   = Column(Integer, default=0)   # 水电
+    tax_outflow         = Column(Integer, default=0)   # 税款
+    other_outflow       = Column(Integer, default=0)
+    total_outflow       = Column(Integer, default=0)
 
+    # 净流 & 累计
+    net_flow            = Column(Integer, default=0)   # 当日净流
+    cumulative_balance  = Column(Integer, default=0)   # 累计余额
 
-class FctMaster(Base, TimestampMixin):
-    """业财主数据（门店、客商、科目、银行账户等）"""
-    __tablename__ = "fct_master"
+    # 预警
+    is_alert            = Column(Boolean, default=False)   # 是否触发资金预警
+    alert_message       = Column(String(200))
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id = Column(String(64), nullable=False, index=True)
-    type = Column(
-        Enum(FctMasterType, values_callable=lambda x: [e.value for e in x]),
-        nullable=False,
-        index=True,
+    # 预测置信度
+    confidence          = Column(Float, default=0.8)  # 0-1
+
+    __table_args__ = (
+        Index("ix_fct_cashflow_store_date", "store_id", "forecast_date"),
     )
-    code = Column(String(64), nullable=False, index=True)  # 编码，同 tenant+type 下唯一
-    name = Column(String(128), nullable=False)
-    extra = Column(JSON)  # 扩展字段
-
-
-class FctCashTransaction(Base, TimestampMixin):
-    """资金流水（用于对账）"""
-    __tablename__ = "fct_cash_transactions"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id = Column(String(64), nullable=False, index=True)
-    entity_id = Column(String(64), nullable=False, index=True)
-    tx_date = Column(Date, nullable=False, index=True)
-    amount = Column(Numeric(18, 2), nullable=False)  # 正为收入，负为支出
-    direction = Column(String(8), nullable=False)  # in / out
-    ref_type = Column(String(32))  # voucher / settlement / manual
-    ref_id = Column(String(64))
-    status = Column(String(20), default="pending")  # pending / matched
-    match_id = Column(UUID(as_uuid=True))  # 对账匹配 id
-    description = Column(Text)
-
-
-class FctTaxInvoice(Base, TimestampMixin):
-    """税务发票（销项/进项）；Phase 4 发票闭环：与凭证关联、验真占位"""
-    __tablename__ = "fct_tax_invoices"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id = Column(String(64), nullable=False, index=True)
-    entity_id = Column(String(64), nullable=False, index=True)
-    invoice_type = Column(String(16), nullable=False)  # output / input
-    invoice_no = Column(String(64), index=True)
-    amount = Column(Numeric(18, 2))
-    tax_amount = Column(Numeric(18, 2))
-    invoice_date = Column(Date)
-    status = Column(String(20), default="draft")
-    voucher_id = Column(UUID(as_uuid=True), ForeignKey("fct_vouchers.id"))
-    verify_status = Column(String(20), default="pending")  # pending / verified / failed（Phase 4 验真占位）
-    verified_at = Column(String(32))  # ISO8601（验真时间）
-    extra = Column(JSON)
-
-
-class FctTaxDeclaration(Base, TimestampMixin):
-    """税务申报记录占位"""
-    __tablename__ = "fct_tax_declarations"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id = Column(String(64), nullable=False, index=True)
-    entity_id = Column(String(64), nullable=False, index=True)
-    tax_type = Column(String(32), nullable=False)  # vat / income_tax
-    period = Column(String(16), nullable=False)  # 202502
-    declared_at = Column(String(32))
-    status = Column(String(20), default="draft")  # draft / submitted
-    extra = Column(JSON)
-
-
-class FctPlan(Base, TimestampMixin):
-    """年度计划（业财税资金目标，用于与日/周/月/季实际对比达成与差距）"""
-    __tablename__ = "fct_plans"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id = Column(String(64), nullable=False, index=True)
-    entity_id = Column(String(64), nullable=True, index=True)  # 空表示租户级
-    plan_year = Column(Integer, nullable=False, index=True)  # 2026
-    # 年度目标：revenue, cost, gross_margin, output_tax, input_tax, net_tax, cash_in, cash_out, voucher_count（可选）
-    targets = Column(JSON, nullable=False)  # {"revenue": 1000000, "cost": 600000, ...}
-    extra = Column(JSON)  # 备注、编制人等
-
-
-class FctPeriod(Base, TimestampMixin):
-    """会计期间（按租户，自然月 period_key=YYYYMM）"""
-    __tablename__ = "fct_periods"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id = Column(String(64), nullable=False, index=True)
-    period_key = Column(String(16), nullable=False, index=True)  # 202502
-    start_date = Column(Date, nullable=False)
-    end_date = Column(Date, nullable=False)
-    status = Column(String(20), default="open", nullable=False)  # open / closed
-    closed_at = Column(String(32))  # ISO8601
-    extra = Column(JSON)
-
-
-# ---------- Phase 4：费控/备用金 ----------
-class FctPettyCashType(str, enum.Enum):
-    """备用金类型"""
-    FIXED = "fixed"      # 固定备用金
-    TEMPORARY = "temporary"  # 临时备用金
-
-
-class FctPettyCash(Base, TimestampMixin):
-    """备用金主档（门店/主体维度，按类型）"""
-    __tablename__ = "fct_petty_cash"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id = Column(String(64), nullable=False, index=True)
-    entity_id = Column(String(64), nullable=False, index=True)
-    cash_type = Column(String(16), nullable=False, index=True)  # fixed / temporary
-    amount_limit = Column(Numeric(18, 2), nullable=False, default=0)  # 限额（元）
-    current_balance = Column(Numeric(18, 2), nullable=False, default=0)  # 当前余额
-    status = Column(String(20), default="active", nullable=False)  # active / closed
-    extra = Column(JSON)
-
-
-class FctPettyCashRecord(Base, TimestampMixin):
-    """备用金流水：申请/冲销/还款"""
-    __tablename__ = "fct_petty_cash_records"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    petty_cash_id = Column(UUID(as_uuid=True), ForeignKey("fct_petty_cash.id", ondelete="CASCADE"), nullable=False, index=True)
-    record_type = Column(String(16), nullable=False, index=True)  # apply / offset / repay
-    amount = Column(Numeric(18, 2), nullable=False)  # 申请/冲销/还款金额（元）
-    biz_date = Column(Date, nullable=False, index=True)
-    ref_type = Column(String(32))  # voucher / expense / manual
-    ref_id = Column(String(64))
-    description = Column(Text)
-    extra = Column(JSON)
-
-
-# ---------- Phase 4：预算占位 ----------
-class FctBudget(Base, TimestampMixin):
-    """项目/期间预算（编制与占用占位）"""
-    __tablename__ = "fct_budgets"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id = Column(String(64), nullable=False, index=True)
-    entity_id = Column(String(64), nullable=False, server_default="", index=True)
-    budget_type = Column(String(16), nullable=False, index=True)  # project / period
-    period = Column(String(32), nullable=False, index=True)  # 202602 或 project_id
-    category = Column(String(64), nullable=False, index=True)  # 费用类别
-    amount = Column(Numeric(18, 2), nullable=False, default=0)  # 预算金额
-    used = Column(Numeric(18, 2), nullable=False, default=0)  # 已占用
-    status = Column(String(20), default="active", nullable=False)  # active / frozen / closed
-    extra = Column(JSON)
-
-
-class FctBudgetControl(Base, TimestampMixin):
-    """预算控制配置：制单/过账/付款时是否强制校验预算、是否自动占用。entity_id/category 空表示「全部」。"""
-    __tablename__ = "fct_budget_control"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id = Column(String(64), nullable=False, index=True)
-    entity_id = Column(String(64), nullable=False, server_default="", index=True)
-    budget_type = Column(String(16), nullable=False, index=True)  # period / project
-    category = Column(String(64), nullable=False, server_default="", index=True)
-    enforce_check = Column(String(8), nullable=False, server_default="false")  # true: 制单/过账/付款前必须校验，超预算拒绝
-    auto_occupy = Column(String(8), nullable=False, server_default="false")   # true: 成功后自动占用预算
-    extra = Column(JSON)
-
-
-# ---------- Phase 4：审批流占位 ----------
-class FctApprovalRecord(Base, TimestampMixin):
-    """审批记录占位（凭证/付款/费用等，与 OA 或工作流对接）"""
-    __tablename__ = "fct_approval_records"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id = Column(String(64), nullable=False, index=True)
-    ref_type = Column(String(32), nullable=False, index=True)  # voucher / payment / expense
-    ref_id = Column(String(64), nullable=False, index=True)  # 业务单 id
-    step = Column(Integer, nullable=False, default=1)  # 审批步骤
-    status = Column(String(20), default="pending", nullable=False)  # pending / approved / rejected
-    approved_at = Column(String(32))  # ISO8601
-    approved_by = Column(String(64))
-    comment = Column(Text)
-    extra = Column(JSON)  # 工作流 id、回调 URL 等

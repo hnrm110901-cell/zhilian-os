@@ -253,8 +253,8 @@ class InventoryAgent(BaseAgent):
                     category=category
                 )
             else:
-                # 模拟数据
-                inventory_data = self._generate_mock_inventory(category)
+                # 从本地数据库获取
+                inventory_data = self._fetch_inventory_from_db(category)
 
             # 分析库存状态
             analyzed_items = []
@@ -872,6 +872,51 @@ class InventoryAgent(BaseAgent):
         except Exception as e:
             self.logger.error("get_inventory_report_failed", error=str(e))
             raise
+
+    def _fetch_inventory_from_db(self, category: Optional[str] = None) -> List[InventoryItem]:
+        """从 inventory_items 表查询库存数据，无 DB 时返回空列表"""
+        engine = self._get_db_engine()
+        if not engine:
+            self.logger.warning("inventory_db_unavailable", store_id=self.store_id)
+            return []
+        try:
+            from sqlalchemy import text
+            sql = text("""
+                SELECT id, name, category, unit,
+                       current_quantity, min_quantity, max_quantity, unit_cost
+                FROM inventory_items
+                WHERE store_id = :store_id
+                  AND (:category IS NULL OR category = :category)
+                ORDER BY name
+            """)
+            with engine.connect() as conn:
+                rows = conn.execute(sql, {
+                    "store_id": self.store_id,
+                    "category": category,
+                }).fetchall()
+            items: List[InventoryItem] = []
+            for row in rows:
+                min_q = float(row[5]) if row[5] is not None else 0.0
+                items.append({
+                    "item_id":        str(row[0]),
+                    "item_name":      str(row[1]),
+                    "category":       str(row[2] or ""),
+                    "unit":           str(row[3] or ""),
+                    "current_stock":  float(row[4]) if row[4] is not None else 0.0,
+                    "safe_stock":     min_q * 2,       # 安全库存 = 再订货点 × 2
+                    "min_stock":      min_q,
+                    "max_stock":      float(row[6]) if row[6] is not None else min_q * 4,
+                    "unit_cost":      int(row[7]) if row[7] is not None else 0,
+                    "supplier_id":    None,
+                    "lead_time_days": 2,
+                    "expiration_date": None,
+                    "location":       "",
+                })
+            self.logger.info("inventory_db_fetch_success", count=len(items), category=category)
+            return items
+        except Exception as e:
+            self.logger.warning("inventory_db_fetch_failed", error=str(e))
+            return []
 
     def _generate_mock_inventory(self, category: Optional[str] = None) -> List[InventoryItem]:
         """生成模拟库存数据"""

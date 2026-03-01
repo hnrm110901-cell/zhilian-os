@@ -163,24 +163,8 @@ class PinzhiAdapter:
         params = self._add_sign(params)
         logger.info("查询门店信息", ognid=ognid)
 
-        try:
-            response = await self._request("GET", "/pinzhi/storeInfo.do", params=params)
-            return response.get("res", [])
-        except Exception as e:
-            logger.warning("查询门店信息失败，返回模拟数据", error=str(e))
-            # 返回模拟数据作为降级方案
-            return [
-                {
-                    "ognid": 12345,
-                    "ognno": "SH001",
-                    "ognNewNo": "SH001",
-                    "ognname": "上海浦东店",
-                    "ognaddress": "上海市浦东新区XX路XX号",
-                    "ogntel": "021-12345678",
-                    "brandid": 1,
-                    "brandname": "测试品牌",
-                }
-            ]
+        response = await self._request("GET", "/pinzhi/storeInfo.do", params=params)
+        return response.get("res", [])
 
     async def get_dish_categories(self) -> List[Dict[str, Any]]:
         """
@@ -192,29 +176,8 @@ class PinzhiAdapter:
         params = self._add_sign({})
         logger.info("查询菜品类别")
 
-        try:
-            response = await self._request("GET", "/pinzhi/reportcategory.do", params=params)
-            return response.get("data", [])
-        except Exception as e:
-            logger.warning("查询菜品类别失败，返回模拟数据", error=str(e))
-            return [
-                {
-                    "rcId": 1,
-                    "brandId": 1,
-                    "rcNO": "01",
-                    "rcNAME": "热销菜品",
-                    "fatherId": 0,
-                    "status": 0,
-                },
-                {
-                    "rcId": 2,
-                    "brandId": 1,
-                    "rcNO": "0101",
-                    "rcNAME": "招牌菜",
-                    "fatherId": 1,
-                    "status": 0,
-                },
-            ]
+        response = await self._request("GET", "/pinzhi/reportcategory.do", params=params)
+        return response.get("data", [])
 
     async def get_dishes(self, updatetime: int = 0) -> List[Dict[str, Any]]:
         """
@@ -329,40 +292,8 @@ class PinzhiAdapter:
             page=page_index,
         )
 
-        try:
-            response = await self._request("GET", "/pinzhi/queryOrderListV2.do", params=params)
-            return response.get("res", [])
-        except Exception as e:
-            logger.warning("查询订单失败，返回模拟数据", error=str(e))
-            return [
-                {
-                    "billId": "uuid-001",
-                    "billNo": "B202401010001",
-                    "orderSource": 1,
-                    "outOrderID": "",
-                    "tableNo": "0001",
-                    "people": 4,
-                    "openOrderUser": "服务员001",
-                    "deskUser": "收银员001",
-                    "openTime": "2024-01-01 12:00:00",
-                    "cashiers": "收银员001",
-                    "payTime": "2024-01-01 13:00:00",
-                    "payDate": "2024-01-01",
-                    "vipCard": "M20240001",
-                    "vipName": "张三",
-                    "dishPriceTotal": 20000,
-                    "teaPrice": 400,
-                    "servicePrice": 0,
-                    "packingPrice": 0,
-                    "billPriceTotal": 20400,
-                    "specialOfferPrice": 2000,
-                    "singleDiscountPrice": 0,
-                    "freePrice": 0,
-                    "realPrice": 18400,
-                    "billStatus": 1,
-                    "paymentList": [],
-                }
-            ]
+        response = await self._request("GET", "/pinzhi/queryOrderListV2.do", params=params)
+        return response.get("res", [])
 
     async def query_order_summary(
         self, ognid: str, business_date: str

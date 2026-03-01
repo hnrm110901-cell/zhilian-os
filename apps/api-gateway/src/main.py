@@ -11,7 +11,7 @@ import time
 
 from src.core.config import settings
 # 核心模块
-from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation, approval, federated_learning, embedding, raas, model_marketplace, human_in_the_loop, hardware_integration, pos, dishes, benchmark
+from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation, approval, embedding, raas, model_marketplace, human_in_the_loop, hardware_integration, pos, dishes, benchmark
 from src.api.phase5_apis import platform_router, industry_router, supply_chain_router, i18n_router
 # 逐步启用的模块
 from src.api import dashboard, analytics, audit, multi_store, finance, customer360, wechat_triggers, queue, meituan_queue
@@ -20,6 +20,22 @@ from src.api import members
 from src.api import edge_node, decision_validator, recommendations, agent_collaboration
 # Phase 1: CRUD API
 from src.api import employees, inventory, schedules, reservations, kpis, orders
+# Phase 1 本体层 — BOM 版本化配方管理
+from src.api import bom
+# Phase 2 本体层 API — 推理层 / 企微 Action FSM / 自然语言查询
+from src.api import ontology, wechat_actions
+# Phase 3 — 数据主权 / 连锁扩展 / 推理规则库 / 损耗事件
+from src.api import data_security, chain_expansion, knowledge_rules, waste_events
+# Phase 4 — L2 融合层（多源食材ID规范化）
+from src.api import fusion
+# Phase 5 — L3 跨店知识聚合（同伴组 + 物化指标 + 图同步）
+from src.api import l3_knowledge
+# Phase 6 — L4 推理层（全维度规则推理 + 因果图谱 + 健康诊断）
+from src.api import l4_reasoning
+# Phase 7 — L5 行动层（行动派发 + WeChat FSM + 任务创建 + 反馈闭环）
+from src.api import l5_action
+# Phase 8 — 多阶段工作流引擎（Day N 晚上 17:00-22:00 规划 Day N+1）
+from src.api import workflow
 from src.api import ai_evolution_dashboard
 from src.api import compliance
 from src.api import quality
@@ -37,6 +53,9 @@ from src.api import backups
 from src.api import private_domain
 from src.api import ops
 from src.api import daily_hub
+from src.api import banquet
+from src.api import banquet_lifecycle
+from src.api import external_factors
 from src.api import pos_webhook
 from src.api import bulk_import
 from src.api import hq_dashboard
@@ -306,7 +325,7 @@ app = FastAPI(
 # 配置CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS + ["null"],  # 允许本地文件访问
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -432,7 +451,8 @@ app.include_router(edge_node.router, tags=["edge_node"])
 app.include_router(decision_validator.router, tags=["decision_validator"])
 
 # Phase 4: 智能优化期 (Intelligence Optimization Period)
-app.include_router(federated_learning.router, tags=["federated_learning"])
+# ⚠️ 联邦学习已冻结（战略 Phase 0 决策）：暂不对外暴露路由，待 Neo4j 本体层稳定后重新评估
+# app.include_router(federated_learning.router, tags=["federated_learning"])
 app.include_router(recommendations.router, tags=["recommendations"])
 app.include_router(agent_collaboration.router, tags=["agent_collaboration"])
 
@@ -467,6 +487,27 @@ app.include_router(schedules.router, prefix="/api/v1", tags=["schedules"])
 app.include_router(reservations.router, prefix="/api/v1", tags=["reservations"])
 app.include_router(kpis.router, prefix="/api/v1", tags=["kpis"])
 app.include_router(orders.router, prefix="/api/v1", tags=["orders"])
+# Phase 1 本体层 — BOM 版本化配方管理
+app.include_router(bom.router, tags=["bom"])
+# Phase 2 本体层 — 推理层 / 企微 Action FSM / 自然语言查询
+app.include_router(ontology.router, tags=["ontology"])
+app.include_router(wechat_actions.router, tags=["wechat_actions"])
+# Phase 3 — 数据主权 / 连锁扩展 / 推理规则库
+app.include_router(data_security.router, tags=["data_security"])
+app.include_router(chain_expansion.router, tags=["chain_expansion"])
+app.include_router(knowledge_rules.router)
+# Phase 3 — 损耗事件 CRUD（PostgreSQL + Neo4j 双写）
+app.include_router(waste_events.router, tags=["waste_events"])
+# Phase 4 — L2 融合层（多源食材 ID 规范化 + 置信度加权）
+app.include_router(fusion.router, tags=["fusion"])
+# Phase 5 — L3 跨店知识聚合（同伴组 + 物化指标 + 图同步）
+app.include_router(l3_knowledge.router, tags=["l3_knowledge"])
+# Phase 6 — L4 推理层（全维度规则推理 + 因果图谱 + 健康诊断）
+app.include_router(l4_reasoning.router, tags=["l4_reasoning"])
+# Phase 7 — L5 行动层（行动派发 + WeChat FSM + 任务创建 + 反馈闭环）
+app.include_router(l5_action.router, tags=["l5_action"])
+# Phase 8 — 多阶段工作流引擎（6 阶段规划 + 快速初版 + 版本链 + deadline 管理）
+app.include_router(workflow.router, tags=["workflow"])
 app.include_router(ai_evolution_dashboard.router, tags=["ai_evolution"])
 app.include_router(compliance.router)
 app.include_router(quality.router)
@@ -484,16 +525,29 @@ app.include_router(backups.router)
 app.include_router(private_domain.router, tags=["private_domain"])
 app.include_router(ops.router, prefix="/api/v1/ops", tags=["ops"])
 app.include_router(daily_hub.router, tags=["daily_hub"])
+# Phase 9 — 宴会熔断引擎（吉日感知 + BEO 单 + 采购/排班加成 + 资源冲突检测）
+app.include_router(banquet.router, tags=["banquet"])
+# Banquet Lifecycle — 7 阶段销售漏斗 + 锁台冲突 + 销控日历
+app.include_router(banquet_lifecycle.router, tags=["banquet_lifecycle"])
+# External Factors — 统一外部因子查询（天气/节假日/吉日/商圈事件）
+app.include_router(external_factors.router, tags=["external_factors"])
 app.include_router(pos_webhook.router, tags=["pos_webhook"])
 app.include_router(bulk_import.router, tags=["bulk_import"])
 app.include_router(hq_dashboard.router, prefix="/api/v1", tags=["hq_dashboard"])
 app.include_router(ai_accuracy.router, prefix="/api/v1", tags=["ai_accuracy"])
 app.include_router(dashboard_preferences.router, prefix="/api/v1", tags=["dashboard_preferences"])
 
-# 业财税资金一体化扩展（FCT）- 可选挂载
+# 营销 Agent — 顾客画像 / 发券策略 / 活动管理
+from src.api import marketing_agent
+app.include_router(marketing_agent.router, tags=["marketing_agent"])
+
+# 业财税资金一体化（FCT）
 if getattr(settings, "FCT_ENABLED", False):
-    from src.api import fct
-    app.include_router(fct.router, prefix="/api/v1/fct", tags=["fct"])
+    try:
+        from src.api import fct
+        app.include_router(fct.router, prefix="/api/v1/fct", tags=["fct"])
+    except ImportError:
+        logger.warning("FCT_ENABLED=True 但 src/api/fct.py 不存在，FCT 模块未加载")
 
 
 @app.on_event("startup")
@@ -502,6 +556,15 @@ async def startup_event():
     logger.info("智链OS API Gateway 启动中...")
     logger.info(f"环境: {settings.APP_ENV}")
     logger.info(f"调试模式: {settings.APP_DEBUG}")
+
+    # 启动企微 Action 升级巡检（Phase 2 M2.2）
+    try:
+        from src.services.wechat_action_fsm import get_wechat_fsm
+        fsm = get_wechat_fsm()
+        await fsm.start_escalation_monitor(interval_seconds=60)
+        logger.info("企微 Action 升级巡检已启动")
+    except Exception as e:
+        logger.warning("企微 Action 升级巡检启动失败（非致命）", error=str(e))
 
     # Initialize database
     try:
@@ -521,6 +584,35 @@ async def startup_event():
         logger.info("定时任务调度器启动成功")
     except Exception as e:
         logger.error("定时任务调度器启动失败", error=str(e))
+
+    # 初始化推理规则库种子数据（Phase 3 M3.3）
+    try:
+        from src.core.database import get_db as _get_db
+        from src.services.knowledge_rule_service import KnowledgeRuleService
+        async for db in _get_db():
+            svc = KnowledgeRuleService(db)
+            rules_result = await svc.seed_rules()
+            bench_result = await svc.seed_benchmarks()
+            cross_result = await svc.seed_cross_store_rules()
+            await db.commit()
+            logger.info(
+                "推理规则库初始化完成",
+                rules_created=rules_result.get("created", 0),
+                benchmarks_created=bench_result.get("created", 0),
+                cross_store_created=cross_result.get("created", 0),
+            )
+            break
+    except Exception as e:
+        logger.warning("推理规则库初始化失败（非致命）", error=str(e))
+
+    # 注册 PostgreSQL→Neo4j 本体同步管道（Phase 1 M1.3）
+    try:
+        from src.core.database import async_session_factory
+        from src.services.ontology_sync_pipeline import register_sync_listeners
+        register_sync_listeners(async_session_factory)
+        logger.info("Neo4j 本体同步管道注册成功")
+    except Exception as e:
+        logger.warning("Neo4j 本体同步管道注册失败（非致命）", error=str(e))
 
     # Initialize Redis cache
     try:

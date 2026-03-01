@@ -150,9 +150,9 @@ class EmailNotificationHandler(NotificationChannelHandler):
         try:
             # 检查配置
             if not email_config.SMTP_PASSWORD:
-                logger.warning("邮件服务未配置,使用模拟发送")
-                await asyncio.sleep(0.1)
-                return True
+                logger.warning("邮件服务未配置,通知跳过", recipient=recipient, channel="email",
+                               hint="请设置 SMTP_PASSWORD 环境变量")
+                return False
 
             # 创建邮件
             msg = MIMEMultipart('alternative')
@@ -240,9 +240,9 @@ class SMSNotificationHandler(NotificationChannelHandler):
         try:
             # 检查配置
             if not sms_config.ALIYUN_ACCESS_KEY_ID and not sms_config.TENCENT_SECRET_ID:
-                logger.warning("短信服务未配置,使用模拟发送")
-                await asyncio.sleep(0.1)
-                return True
+                logger.warning("短信服务未配置,通知跳过", recipient=recipient, channel="sms",
+                               hint="请设置 ALIYUN_ACCESS_KEY_ID 或 TENCENT_SECRET_ID 环境变量")
+                return False
 
             # 根据配置选择SMS提供商
             if sms_config.SMS_PROVIDER == "aliyun":
@@ -288,7 +288,7 @@ class SMSNotificationHandler(NotificationChannelHandler):
                 'PhoneNumbers': phone,
                 'SignName': sms_config.ALIYUN_SMS_SIGN_NAME,
                 'TemplateCode': extra_data.get('template_code') if extra_data else sms_config.ALIYUN_SMS_TEMPLATE_CODE,
-                'TemplateParam': json.dumps(extra_data.get('template_params', {'content': content})),
+                'TemplateParam': json.dumps(extra_data.get('template_params', {'content': content}) if extra_data else {'content': content}),
             }
 
             # 公共参数
@@ -372,7 +372,7 @@ class SMSNotificationHandler(NotificationChannelHandler):
                 "SmsSdkAppId": sms_config.TENCENT_SMS_APP_ID,
                 "SignName": sms_config.TENCENT_SMS_SIGN,
                 "TemplateId": extra_data.get('template_id') if extra_data else sms_config.TENCENT_SMS_TEMPLATE_ID,
-                "TemplateParamSet": extra_data.get('template_params', [content]),
+                "TemplateParamSet": extra_data.get('template_params', [content]) if extra_data else [content],
             }
             payload_str = json.dumps(payload)
 
@@ -461,9 +461,9 @@ class WeChatNotificationHandler(NotificationChannelHandler):
         try:
             # 检查配置
             if not wechat_config.WECHAT_CORP_ID and not wechat_config.WECHAT_APP_ID:
-                logger.warning("微信服务未配置,使用模拟发送")
-                await asyncio.sleep(0.1)
-                return True
+                logger.warning("微信服务未配置,通知跳过", recipient=recipient, channel="wechat",
+                               hint="请设置 WECHAT_CORP_ID 或 WECHAT_APP_ID 环境变量")
+                return False
 
             # 根据配置选择微信类型
             if wechat_config.WECHAT_TYPE == "corp":
@@ -594,8 +594,17 @@ class AppPushNotificationHandler(NotificationChannelHandler):
             是否发送成功
         """
         try:
-            # Future Enhancement: App push service integration (JPush, Firebase, etc.)
-            # Non-essential for MVP - Enterprise WeChat is primary channel
+            # App Push 渠道尚未接入推送服务（JPush / Firebase / APNs）
+            # 待接入后替换此处逻辑
+            if not push_config.JPUSH_APP_KEY and not push_config.FIREBASE_SERVER_KEY:
+                logger.warning(
+                    "App推送服务未配置,通知跳过",
+                    recipient=recipient,
+                    channel="app_push",
+                    hint="请设置 JPUSH_APP_KEY 或 FIREBASE_SERVER_KEY 环境变量并集成推送 SDK",
+                )
+                return False
+
             logger.info(
                 "发送App推送通知",
                 recipient=recipient,
@@ -603,14 +612,11 @@ class AppPushNotificationHandler(NotificationChannelHandler):
                 channel="app_push"
             )
 
-            # 模拟发送
-            await asyncio.sleep(0.1)
-
             # 这里应该调用推送服务
             # from jpush import JPush
             # ...
 
-            return True
+            return False  # 未接入推送 SDK，返回 False
         except Exception as e:
             logger.error("App推送发送失败", recipient=recipient, error=str(e))
             return False

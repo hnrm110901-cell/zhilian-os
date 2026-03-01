@@ -234,14 +234,14 @@ const KPIDashboardPage: React.FC = () => {
 
       <Card><Tabs items={tabItems} /></Card>
 
-      <Modal title=\"录入KPI数据\" open={addModal} onCancel={() => setAddModal(false)} footer={null}>
-        <Form form={addForm} layout=\"vertical\" onFinish={addRecord}>
-          <Form.Item name=\"kpi_id\" label=\"KPI指标\" rules={[{ required: true }]}>
-            <Select placeholder=\"选择KPI\">
+      <Modal title="录入KPI数据" open={addModal} onCancel={() => setAddModal(false)} footer={null}>
+        <Form form={addForm} layout="vertical" onFinish={addRecord}>
+          <Form.Item name="kpi_id" label="KPI指标" rules={[{ required: true }]}>
+            <Select placeholder="选择KPI">
               {kpis.map(k => <Option key={k.id} value={k.id}>{k.name}</Option>)}
             </Select>
           </Form.Item>
-          <Form.Item name=\"record_date\" label=\"日期\" rules={[{ required: true }]}>
+          <Form.Item name="record_date" label="日期" rules={[{ required: true }]}>
             <DatePicker style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="value" label="实际值" rules={[{ required: true }]}>

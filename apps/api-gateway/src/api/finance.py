@@ -2,11 +2,12 @@
 财务管理API
 """
 from typing import Optional
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, and_, func
 
 from src.core.database import get_db
 from src.core.dependencies import get_current_active_user, require_permission
@@ -19,7 +20,7 @@ try:
 except ImportError:
     pdf_report_service = None
     PDF_AVAILABLE = False
-from src.models import User
+from src.models import User, FinancialTransaction
 
 router = APIRouter()
 
@@ -265,6 +266,7 @@ async def export_report(
 
 class RefundRequest(BaseModel):
     order_id: str = Field(..., description="订单ID")
+    store_id: str = Field(..., description="门店ID")
     refund_amount: int = Field(..., description="退款金额（分）", gt=0)
     original_order_amount: int = Field(..., description="原订单金额（分）", gt=0)
     days_since_order: int = Field(..., description="下单至今天数", ge=0)
@@ -311,12 +313,47 @@ async def validate_refund(
         created_at=datetime.utcnow(),
     )
 
-    # 业务上下文（实际生产中应从DB查询当日营收、退款累计等）
+    # 从 DB 查询真实业务上下文，确保 REF_003/REF_005 规则有效触发
+    today = datetime.utcnow().date()
+    yesterday_dt = datetime.utcnow() - timedelta(hours=24)
+
+    daily_revenue = (await db.execute(
+        select(func.sum(FinancialTransaction.amount)).where(
+            and_(
+                FinancialTransaction.store_id == req.store_id,
+                FinancialTransaction.transaction_date == today,
+                FinancialTransaction.transaction_type == "income",
+            )
+        )
+    )).scalar() or 0
+
+    daily_refund_total = (await db.execute(
+        select(func.sum(FinancialTransaction.amount)).where(
+            and_(
+                FinancialTransaction.store_id == req.store_id,
+                FinancialTransaction.transaction_date == today,
+                FinancialTransaction.category == "refund",
+            )
+        )
+    )).scalar() or 0
+
+    # 顾客24h退款次数：统计当日该门店退款流水中 reference_id 匹配顾客的记录
+    customer_refund_count_24h = (await db.execute(
+        select(func.count()).select_from(FinancialTransaction).where(
+            and_(
+                FinancialTransaction.store_id == req.store_id,
+                FinancialTransaction.category == "refund",
+                FinancialTransaction.reference_id == req.customer_id,
+                FinancialTransaction.transaction_date >= yesterday_dt.date(),
+            )
+        )
+    )).scalar() or 0
+
     context = {
         "original_order_amount": req.original_order_amount,
-        "daily_revenue": req.original_order_amount * 20,   # 占位：实际应查DB
-        "daily_refund_total": 0,                            # 占位：实际应查Redis累计
-        "customer_refund_count_24h": 0,                     # 占位：实际应查Redis
+        "daily_revenue": daily_revenue,
+        "daily_refund_total": daily_refund_total,
+        "customer_refund_count_24h": customer_refund_count_24h,
     }
 
     result: GuardrailResult = guardrails.validate_proposal(proposal, context)

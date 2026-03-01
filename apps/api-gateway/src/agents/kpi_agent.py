@@ -1,13 +1,10 @@
 """
-KPIAgent - 绩效评估Agent (RAG增强)
+KPIAgent - 绩效评估Agent (Claude Tool Use 增强)
 """
 from typing import Dict, Any, List, Optional
-from datetime import datetime, timedelta
-import os
 import structlog
 
 from .llm_agent import LLMEnhancedAgent, AgentResult
-from ..services.rag_service import RAGService
 from ..services.decision_validator import DecisionValidator, ValidationResult
 from ..core.monitoring import error_monitor, ErrorSeverity, ErrorCategory
 
@@ -24,7 +21,7 @@ class KPIAgent(LLMEnhancedAgent):
     - 改进计划生成
     - KPI趋势预测
 
-    RAG增强:
+    Tool Use 增强:
     - 基于历史绩效数据
     - 基于行业标准
     - 基于改进案例
@@ -32,7 +29,6 @@ class KPIAgent(LLMEnhancedAgent):
 
     def __init__(self):
         super().__init__(agent_type="kpi")
-        self.rag_service = RAGService()
         self.validator = DecisionValidator()
 
     async def evaluate_store_performance(
@@ -50,52 +46,47 @@ class KPIAgent(LLMEnhancedAgent):
             kpi_types: KPI类型列表 (可选，如["revenue", "customer_satisfaction"])
 
         Returns:
-            AgentResult（含 reasoning / confidence / source_data）
+            AgentResult（含 reasoning / confidence / tool_calls）
         """
         try:
             kpi_text = ", ".join(kpi_types) if kpi_types else "全部KPI"
 
-            query = f"""
-            评估门店{store_id}最近{period}的绩效({kpi_text}):
-            - 营收指标(revenue, growth_rate)
-            - 运营指标(order_count, avg_order_value)
-            - 效率指标(table_turnover, staff_efficiency)
-            - 质量指标(customer_satisfaction, complaint_rate)
-
-            请基于历史数据和行业标准给出:
-            1. 各项KPI得分和排名
-            2. 优势和劣势分析
-            3. 与历史对比
-            4. 改进建议
-            """
+            user_message = (
+                f"评估门店 {store_id} 最近 {period} 的绩效（{kpi_text}）："
+                f"请查询历史绩效数据，分析营收指标(revenue, growth_rate)、"
+                f"运营指标(order_count, avg_order_value)、效率指标(table_turnover, staff_efficiency)、"
+                f"质量指标(customer_satisfaction, complaint_rate)，"
+                f"给出各项KPI得分和排名、优势和劣势分析、与历史对比及改进建议。"
+            )
 
             logger.info(
-                "Evaluating store performance with RAG",
+                "Evaluating store performance with Tool Use",
                 store_id=store_id,
                 period=period,
                 kpi_types=kpi_types
             )
 
-            rag_result = await self.rag_service.analyze_with_rag(
-                query=query,
+            result = await self.execute_with_tools(
+                user_message=user_message,
                 store_id=store_id,
-                collection="events",
-                top_k=int(os.getenv("RAG_KPI_TOP_K", "12"))
+                context={"period": period, "kpi_types": kpi_types}
             )
 
-            ctx_count = rag_result["metadata"]["context_count"]
+            if not result.success:
+                return result
+
             return self.format_response(
                 success=True,
                 data={
-                    "evaluation": rag_result["response"],
+                    "evaluation": result.data,
                     "period": period,
                     "kpi_types": kpi_types,
-                    "context_used": ctx_count,
-                    "timestamp": rag_result["metadata"]["timestamp"]
+                    "tool_calls": len(result.tool_calls),
+                    "iterations": result.iterations,
                 },
                 message="门店绩效评估完成",
-                reasoning=f"基于 {ctx_count} 条历史数据，评估 {period} 周期内 {kpi_text}",
-                confidence=min(0.9, 0.45 + ctx_count * 0.05),
+                reasoning=result.reasoning or f"评估 {period} 周期内 {kpi_text}",
+                confidence=result.confidence,
                 source_data={"store_id": store_id, "period": period, "kpi_types": kpi_types},
             )
 
@@ -123,60 +114,50 @@ class KPIAgent(LLMEnhancedAgent):
         """分析员工绩效"""
         try:
             if staff_id:
-                query = f"""
-                分析门店{store_id}员工{staff_id}最近{period}的绩效:
-                - 工作量指标(服务客户数, 订单处理数)
-                - 质量指标(客户满意度, 差评率)
-                - 效率指标(平均服务时间, 错误率)
-                - 态度指标(出勤率, 主动性)
-
-                请基于历史数据给出:
-                1. 绩效评分
-                2. 优势和待改进点
-                3. 与团队平均对比
-                4. 发展建议
-                """
+                user_message = (
+                    f"分析门店 {store_id} 员工 {staff_id} 最近 {period} 的绩效："
+                    f"请查询该员工历史数据，分析工作量指标(服务客户数/订单处理数)、"
+                    f"质量指标(客户满意度/差评率)、效率指标(平均服务时间/错误率)、"
+                    f"态度指标(出勤率/主动性)，给出绩效评分、优势和待改进点、与团队平均对比及发展建议。"
+                )
             else:
-                query = f"""
-                分析门店{store_id}全体员工最近{period}的绩效:
-                - 团队整体表现
-                - 绩效分布情况
-                - 优秀员工识别
-                - 待提升员工识别
+                user_message = (
+                    f"分析门店 {store_id} 全体员工最近 {period} 的绩效："
+                    f"请查询团队历史数据，分析团队整体表现、绩效分布情况、优秀员工识别、待提升员工识别，"
+                    f"给出团队绩效概况、绩效差异分析、激励建议和培训需求。"
+                )
 
-                请给出:
-                1. 团队绩效概况
-                2. 绩效差异分析
-                3. 激励建议
-                4. 培训需求
-                """
+            logger.info("Analyzing staff performance with Tool Use",
+                        store_id=store_id, staff_id=staff_id, period=period)
 
-            logger.info("Analyzing staff performance with RAG", store_id=store_id, staff_id=staff_id, period=period)
-
-            rag_result = await self.rag_service.analyze_with_rag(
-                query=query, store_id=store_id, collection="events",
-                top_k=int(os.getenv("RAG_KPI_TOP_K", "12"))
+            result = await self.execute_with_tools(
+                user_message=user_message,
+                store_id=store_id,
+                context={"staff_id": staff_id, "period": period}
             )
 
-            ctx_count = rag_result["metadata"]["context_count"]
+            if not result.success:
+                return result
+
             scope = f"员工 {staff_id}" if staff_id else "全体员工"
             return self.format_response(
                 success=True,
                 data={
-                    "analysis": rag_result["response"],
+                    "analysis": result.data,
                     "staff_id": staff_id,
                     "period": period,
-                    "context_used": ctx_count,
-                    "timestamp": rag_result["metadata"]["timestamp"]
+                    "tool_calls": len(result.tool_calls),
+                    "iterations": result.iterations,
                 },
                 message="员工绩效分析完成",
-                reasoning=f"基于 {ctx_count} 条历史数据，分析 {scope} {period} 绩效",
-                confidence=min(0.9, 0.45 + ctx_count * 0.05),
+                reasoning=result.reasoning or f"分析 {scope} {period} 绩效",
+                confidence=result.confidence,
                 source_data={"store_id": store_id, "staff_id": staff_id, "period": period},
             )
 
         except Exception as e:
-            logger.error("Staff performance analysis failed", store_id=store_id, staff_id=staff_id, error=str(e), exc_info=e)
+            logger.error("Staff performance analysis failed",
+                         store_id=store_id, staff_id=staff_id, error=str(e), exc_info=e)
             return self.format_response(
                 success=False, data=None, message=f"分析失败: {str(e)}",
                 reasoning=f"分析过程中发生异常: {str(e)}", confidence=0.0,
@@ -192,32 +173,27 @@ class KPIAgent(LLMEnhancedAgent):
     ) -> AgentResult:
         """生成改进计划"""
         try:
-            target_text = f"目标值{target_value}" if target_value else "提升目标"
+            target_text = f"目标值 {target_value}" if target_value else "提升目标"
 
-            query = f"""
-            为门店{store_id}生成{kpi_type}的改进计划({target_text}):
-            - 当前状态分析
-            - 差距识别
-            - 根本原因分析
-            - 改进措施
-
-            请基于历史成功案例给出:
-            1. 具体改进措施(优先级排序)
-            2. 实施步骤和时间表
-            3. 资源需求
-            4. 预期效果和风险
-            """
-
-            logger.info("Generating improvement plan with RAG", store_id=store_id, kpi_type=kpi_type)
-
-            rag_result = await self.rag_service.analyze_with_rag(
-                query=query, store_id=store_id, collection="events",
-                top_k=int(os.getenv("RAG_KPI_TOP_K", "12"))
+            user_message = (
+                f"为门店 {store_id} 生成 {kpi_type} 的改进计划（{target_text}）："
+                f"请查询历史成功案例，分析当前状态、差距识别、根本原因，"
+                f"给出具体改进措施（优先级排序）、实施步骤和时间表、资源需求、预期效果和风险。"
             )
 
-            ctx_count = rag_result["metadata"]["context_count"]
+            logger.info("Generating improvement plan with Tool Use",
+                        store_id=store_id, kpi_type=kpi_type)
 
-            # 步骤4：合规性校验（预算）
+            result = await self.execute_with_tools(
+                user_message=user_message,
+                store_id=store_id,
+                context={"kpi_type": kpi_type, "target_value": target_value}
+            )
+
+            if not result.success:
+                return result
+
+            # 合规性校验（预算）
             validation = None
             if validation_context:
                 decision = {"action": "improvement_plan", **validation_context.get("decision_overrides", {})}
@@ -229,7 +205,7 @@ class KPIAgent(LLMEnhancedAgent):
                 if validation["result"] == ValidationResult.REJECTED.value:
                     return self.format_response(
                         success=False,
-                        data={"plan": rag_result["response"], "kpi_type": kpi_type},
+                        data={"plan": result.data, "kpi_type": kpi_type},
                         message="改进计划未通过合规校验",
                         reasoning=f"预算校验拒绝: {validation.get('reason', '')}",
                         confidence=0.0,
@@ -239,23 +215,27 @@ class KPIAgent(LLMEnhancedAgent):
             source = {"store_id": store_id, "kpi_type": kpi_type, "target_value": target_value}
             if validation:
                 source["validation"] = validation
+
+            has_warning = validation and validation["result"] == ValidationResult.WARNING.value
             return self.format_response(
                 success=True,
                 data={
-                    "plan": rag_result["response"],
+                    "plan": result.data,
                     "kpi_type": kpi_type,
                     "target_value": target_value,
-                    "context_used": ctx_count,
-                    "timestamp": rag_result["metadata"]["timestamp"]
+                    "tool_calls": len(result.tool_calls),
+                    "iterations": result.iterations,
+                    **({"validation": validation} if validation else {}),
                 },
-                message="改进计划生成完成" + ("（含合规警告）" if validation and validation["result"] == ValidationResult.WARNING.value else ""),
-                reasoning=f"基于 {ctx_count} 条历史案例，为 {kpi_type} 生成改进计划（{target_text}）",
-                confidence=min(0.85, 0.4 + ctx_count * 0.05),
+                message="改进计划生成完成" + ("（含合规警告）" if has_warning else ""),
+                reasoning=result.reasoning or f"为 {kpi_type} 生成改进计划（{target_text}）",
+                confidence=result.confidence,
                 source_data=source,
             )
 
         except Exception as e:
-            logger.error("Improvement plan generation failed", store_id=store_id, kpi_type=kpi_type, error=str(e), exc_info=e)
+            logger.error("Improvement plan generation failed",
+                         store_id=store_id, kpi_type=kpi_type, error=str(e), exc_info=e)
             return self.format_response(
                 success=False, data=None, message=f"生成失败: {str(e)}",
                 reasoning=f"生成过程中发生异常: {str(e)}", confidence=0.0,
@@ -270,45 +250,42 @@ class KPIAgent(LLMEnhancedAgent):
     ) -> AgentResult:
         """预测KPI趋势"""
         try:
-            query = f"""
-            预测门店{store_id}的{kpi_name}未来{time_range}的趋势:
-            - 基于历史趋势分析
-            - 考虑季节性因素
-            - 考虑外部影响因素
-            - 考虑已实施的改进措施
-
-            请给出:
-            1. 趋势预测(上升/下降/稳定)
-            2. 预测值和置信区间
-            3. 影响因素分析
-            4. 风险提示和建议
-            """
-
-            logger.info("Predicting KPI trend with RAG", store_id=store_id, kpi_name=kpi_name, time_range=time_range)
-
-            rag_result = await self.rag_service.analyze_with_rag(
-                query=query, store_id=store_id, collection="events",
-                top_k=int(os.getenv("RAG_KPI_TOP_K", "12"))
+            user_message = (
+                f"预测门店 {store_id} 的 {kpi_name} 未来 {time_range} 的趋势："
+                f"请查询历史数据，基于历史趋势、季节性因素、外部影响因素和已实施的改进措施，"
+                f"给出趋势预测（上升/下降/稳定）、预测值和置信区间、影响因素分析及风险提示和建议。"
             )
 
-            ctx_count = rag_result["metadata"]["context_count"]
+            logger.info("Predicting KPI trend with Tool Use",
+                        store_id=store_id, kpi_name=kpi_name, time_range=time_range)
+
+            result = await self.execute_with_tools(
+                user_message=user_message,
+                store_id=store_id,
+                context={"kpi_name": kpi_name, "time_range": time_range}
+            )
+
+            if not result.success:
+                return result
+
             return self.format_response(
                 success=True,
                 data={
-                    "prediction": rag_result["response"],
+                    "prediction": result.data,
                     "kpi_name": kpi_name,
                     "time_range": time_range,
-                    "context_used": ctx_count,
-                    "timestamp": rag_result["metadata"]["timestamp"]
+                    "tool_calls": len(result.tool_calls),
+                    "iterations": result.iterations,
                 },
                 message="KPI趋势预测完成",
-                reasoning=f"基于 {ctx_count} 条历史数据，预测 {kpi_name} 未来 {time_range} 趋势",
-                confidence=min(0.85, 0.4 + ctx_count * 0.05),
+                reasoning=result.reasoning or f"预测 {kpi_name} 未来 {time_range} 趋势",
+                confidence=result.confidence,
                 source_data={"store_id": store_id, "kpi_name": kpi_name, "time_range": time_range},
             )
 
         except Exception as e:
-            logger.error("KPI trend prediction failed", store_id=store_id, kpi_name=kpi_name, error=str(e), exc_info=e)
+            logger.error("KPI trend prediction failed",
+                         store_id=store_id, kpi_name=kpi_name, error=str(e), exc_info=e)
             return self.format_response(
                 success=False, data=None, message=f"预测失败: {str(e)}",
                 reasoning=f"预测过程中发生异常: {str(e)}", confidence=0.0,

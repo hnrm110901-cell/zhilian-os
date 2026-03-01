@@ -4,6 +4,7 @@
 结合AI的直觉判断和规则引擎的逻辑校验
 """
 import os
+from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Any
 import structlog
 from datetime import datetime
@@ -19,13 +20,14 @@ class ValidationResult(str, Enum):
     WARNING = "warning"  # 警告（需人工审核）
 
 
-class ValidationRule:
+class ValidationRule(ABC):
     """校验规则基类"""
 
     def __init__(self, rule_id: str, rule_name: str):
         self.rule_id = rule_id
         self.rule_name = rule_name
 
+    @abstractmethod
     def validate(self, decision: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """
         校验决策
@@ -37,7 +39,6 @@ class ValidationRule:
         Returns:
             Dict: 校验结果
         """
-        raise NotImplementedError
 
 
 class BudgetCheckRule(ValidationRule):

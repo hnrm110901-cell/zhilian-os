@@ -66,19 +66,29 @@ class FinanceService:
         limit: int = int(os.getenv("FINANCE_QUERY_LIMIT", "100")),
     ) -> Dict[str, Any]:
         """获取财务交易记录列表"""
-        query = select(FinancialTransaction)
-
+        # 构建过滤条件
+        conditions = []
         if store_id:
-            query = query.where(FinancialTransaction.store_id == store_id)
+            conditions.append(FinancialTransaction.store_id == store_id)
         if start_date:
-            query = query.where(FinancialTransaction.transaction_date >= start_date)
+            conditions.append(FinancialTransaction.transaction_date >= start_date)
         if end_date:
-            query = query.where(FinancialTransaction.transaction_date <= end_date)
+            conditions.append(FinancialTransaction.transaction_date <= end_date)
         if transaction_type:
-            query = query.where(FinancialTransaction.transaction_type == transaction_type)
+            conditions.append(FinancialTransaction.transaction_type == transaction_type)
         if category:
-            query = query.where(FinancialTransaction.category == category)
+            conditions.append(FinancialTransaction.category == category)
 
+        # 查询真实总数（独立 COUNT，不受分页影响）
+        count_stmt = select(func.count()).select_from(FinancialTransaction)
+        if conditions:
+            count_stmt = count_stmt.where(and_(*conditions))
+        total_count = (await self.db.execute(count_stmt)).scalar() or 0
+
+        # 分页查询
+        query = select(FinancialTransaction)
+        if conditions:
+            query = query.where(and_(*conditions))
         query = query.order_by(FinancialTransaction.transaction_date.desc()).offset(skip).limit(limit)
         result = await self.db.execute(query)
         transactions = result.scalars().all()
@@ -98,7 +108,7 @@ class FinanceService:
                 }
                 for t in transactions
             ],
-            "total": len(transactions),
+            "total": total_count,
         }
 
     async def generate_income_statement(
@@ -156,7 +166,8 @@ class FinanceService:
                 tax_rate = float(cfg.get("tax_rate", os.getenv("FINANCE_DEFAULT_TAX_RATE", "0.06")))
         except Exception as e:
             logger.warning("tax_rate_fetch_failed", store_id=store_id, error=str(e))
-        tax_amount = int(mul_rate(operating_profit, tax_rate)) if operating_profit > 0 else 0
+        # 小规模纳税人增值税：税基为不含税收入，应纳税额 = 含税收入 / (1 + 征收率) × 征收率
+        tax_amount = int(total_revenue / (1 + tax_rate) * tax_rate) if total_revenue > 0 else 0
         net_profit = operating_profit - tax_amount
 
         # 计算比率

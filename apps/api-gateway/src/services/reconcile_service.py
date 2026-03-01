@@ -122,9 +122,9 @@ class ReconcileService:
                 await session.refresh(record)
 
                 # 6. 如果差异超过阈值，触发预警
-                if record.status == ReconciliationStatus.MISMATCHED and record.alert_sent == "false":
+                if record.status == ReconciliationStatus.MISMATCHED and not record.alert_sent:
                     await self._trigger_alert(record, threshold)
-                    record.alert_sent = "true"
+                    record.alert_sent = True
                     record.alert_sent_at = now_local().isoformat()
                     await session.commit()
 
@@ -449,10 +449,10 @@ class ReconcileService:
                 if status:
                     conditions.append(ReconciliationRecord.status == status)
 
-                # 查询总数
-                count_query = select(ReconciliationRecord).where(and_(*conditions))
+                # 查询总数（使用 COUNT 避免全量加载）
+                count_query = select(func.count()).select_from(ReconciliationRecord).where(and_(*conditions))
                 count_result = await session.execute(count_query)
-                total = len(count_result.scalars().all())
+                total = count_result.scalar()
 
                 # 分页查询
                 offset = (page - 1) * page_size

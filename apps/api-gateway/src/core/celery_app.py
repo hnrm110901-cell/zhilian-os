@@ -122,6 +122,14 @@ celery_app.conf.update(
             "queue": "low_priority",
             "routing_key": "low_priority",
         },
+        "tasks.release_expired_room_locks": {
+            "queue": "default",
+            "routing_key": "default",
+        },
+        "tasks.monthly_save_fct_tax": {
+            "queue": "default",
+            "routing_key": "default",
+        },
     },
 
     # Celery Beat定时任务调度
@@ -243,6 +251,36 @@ celery_app.conf.update(
                 "priority": 5,
             },
         },
+        # 每日 17:00 启动晚间多阶段规划工作流（为所有门店规划 Day N+1）
+        "start-evening-planning": {
+            "task": "tasks.start_evening_planning_all_stores",
+            "schedule": crontab(hour=17, minute=0),
+            "args": (),
+            "options": {
+                "queue": "default",
+                "priority": 9,   # 最高优先级，必须准时执行
+            },
+        },
+        # 每 5 分钟检查工作流 deadline（T-10min 预警 + 过期自动锁定）
+        "check-workflow-deadlines": {
+            "task": "tasks.check_workflow_deadlines",
+            "schedule": crontab(minute="*/5"),
+            "args": (),
+            "options": {
+                "queue": "default",
+                "priority": 8,
+            },
+        },
+        # 每日凌晨1点释放超时锁台（room_lock 超过 ROOM_LOCK_TIMEOUT_DAYS 未签约则回退到 intent）
+        "release-expired-room-locks": {
+            "task": "tasks.release_expired_room_locks",
+            "schedule": crontab(hour=1, minute=0),
+            "args": (),
+            "options": {
+                "queue": "default",
+                "priority": 5,
+            },
+        },
         # INFRA-002: 每5分钟重试失败的企微消息
         "retry-failed-wechat-messages": {
             "task": "src.core.celery_tasks.retry_failed_wechat_messages",
@@ -251,6 +289,16 @@ celery_app.conf.update(
             "options": {
                 "queue": "high_priority",
                 "priority": 8,
+            },
+        },
+        # 每月1日凌晨1:00 自动保存上月税务记录（FCT 业财税一体化）
+        "monthly-save-fct-tax": {
+            "task": "tasks.monthly_save_fct_tax",
+            "schedule": crontab(hour=1, minute=0, day_of_month=1),
+            "args": (),
+            "options": {
+                "queue": "default",
+                "priority": 5,
             },
         },
     },

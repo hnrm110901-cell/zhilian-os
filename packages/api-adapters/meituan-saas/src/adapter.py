@@ -193,42 +193,8 @@ class MeituanSaasAdapter:
 
         logger.info("查询订单", data=data)
 
-        try:
-            response = await self._request("GET", "/api/order/queryById", data=data)
-            return response.get("data", {})
-        except Exception as e:
-            logger.warning("查询订单失败，返回模拟数据", error=str(e))
-            return {
-                "order_id": order_id or "MT20240001",
-                "day_seq": day_seq or "001",
-                "poi_id": self.poi_id,
-                "order_time": int(datetime.now().timestamp()),
-                "delivery_time": int(datetime.now().timestamp()) + 3600,
-                "recipient_name": "张三",
-                "recipient_phone": "13800138000",
-                "recipient_address": "北京市朝阳区xxx",
-                "total": 15800,  # 单位：分
-                "original_price": 16800,
-                "shipping_fee": 500,
-                "package_fee": 200,
-                "status": 2,  # 订单状态
-                "detail": [
-                    {
-                        "food_name": "宫保鸡丁",
-                        "quantity": 2,
-                        "price": 4800,
-                        "box_num": 1,
-                        "box_price": 100,
-                    },
-                    {
-                        "food_name": "鱼香肉丝",
-                        "quantity": 1,
-                        "price": 3800,
-                        "box_num": 1,
-                        "box_price": 100,
-                    },
-                ],
-            }
+        response = await self._request("GET", "/api/order/queryById", data=data)
+        return response.get("data", {})
 
     async def confirm_order(
         self,
@@ -247,12 +213,8 @@ class MeituanSaasAdapter:
 
         logger.info("确认订单", order_id=order_id)
 
-        try:
-            response = await self._request("POST", "/api/order/confirm", data=data)
-            return response.get("data", {})
-        except Exception as e:
-            logger.warning("确认订单失败，返回模拟数据", error=str(e))
-            return {"message": "订单确认成功"}
+        response = await self._request("POST", "/api/order/confirm", data=data)
+        return response.get("data", {})
 
     async def cancel_order(
         self,
@@ -279,12 +241,8 @@ class MeituanSaasAdapter:
 
         logger.info("取消订单", order_id=order_id, reason=reason)
 
-        try:
-            response = await self._request("POST", "/api/order/cancel", data=data)
-            return response.get("data", {})
-        except Exception as e:
-            logger.warning("取消订单失败，返回模拟数据", error=str(e))
-            return {"message": "订单取消成功"}
+        response = await self._request("POST", "/api/order/cancel", data=data)
+        return response.get("data", {})
 
     async def refund_order(
         self,
@@ -308,12 +266,8 @@ class MeituanSaasAdapter:
 
         logger.info("订单退款", order_id=order_id, reason=reason)
 
-        try:
-            response = await self._request("POST", "/api/order/refund", data=data)
-            return response.get("data", {})
-        except Exception as e:
-            logger.warning("订单退款失败，返回模拟数据", error=str(e))
-            return {"message": "退款申请成功"}
+        response = await self._request("POST", "/api/order/refund", data=data)
+        return response.get("data", {})
 
     # ==================== 商品管理接口 ====================
 
@@ -340,35 +294,8 @@ class MeituanSaasAdapter:
 
         logger.info("查询商品", data=data)
 
-        try:
-            response = await self._request("GET", "/api/food/query", data=data)
-            return response.get("data", [])
-        except Exception as e:
-            logger.warning("查询商品失败，返回模拟数据", error=str(e))
-            return [
-                {
-                    "food_id": "F001",
-                    "food_name": "宫保鸡丁",
-                    "category_id": "C001",
-                    "category_name": "热菜",
-                    "price": 4800,
-                    "min_order_count": 1,
-                    "unit": "份",
-                    "stock": 100,
-                    "is_sold_out": 0,  # 0-在售 1-售罄
-                },
-                {
-                    "food_id": "F002",
-                    "food_name": "鱼香肉丝",
-                    "category_id": "C001",
-                    "category_name": "热菜",
-                    "price": 3800,
-                    "min_order_count": 1,
-                    "unit": "份",
-                    "stock": 100,
-                    "is_sold_out": 0,
-                },
-            ]
+        response = await self._request("GET", "/api/food/query", data=data)
+        return response.get("data", [])
 
     async def update_food_stock(
         self,
@@ -393,12 +320,8 @@ class MeituanSaasAdapter:
 
         logger.info("更新商品库存", food_id=food_id, stock=stock)
 
-        try:
-            response = await self._request("POST", "/api/food/updateStock", data=data)
-            return response.get("data", {})
-        except Exception as e:
-            logger.warning("更新商品库存失败，返回模拟数据", error=str(e))
-            return {"message": "库存更新成功"}
+        response = await self._request("POST", "/api/food/updateStock", data=data)
+        return response.get("data", {})
 
     async def update_food_price(
         self,
@@ -423,12 +346,8 @@ class MeituanSaasAdapter:
 
         logger.info("更新商品价格", food_id=food_id, price=price)
 
-        try:
-            response = await self._request("POST", "/api/food/updatePrice", data=data)
-            return response.get("data", {})
-        except Exception as e:
-            logger.warning("更新商品价格失败，返回模拟数据", error=str(e))
-            return {"message": "价格更新成功"}
+        response = await self._request("POST", "/api/food/updatePrice", data=data)
+        return response.get("data", {})
 
     async def sold_out_food(
         self,
@@ -450,12 +369,8 @@ class MeituanSaasAdapter:
 
         logger.info("商品售罄", food_id=food_id)
 
-        try:
-            response = await self._request("POST", "/api/food/soldout", data=data)
-            return response.get("data", {})
-        except Exception as e:
-            logger.warning("商品售罄失败，返回模拟数据", error=str(e))
-            return {"message": "商品已售罄"}
+        response = await self._request("POST", "/api/food/soldout", data=data)
+        return response.get("data", {})
 
     async def on_sale_food(
         self,
@@ -477,12 +392,8 @@ class MeituanSaasAdapter:
 
         logger.info("商品上架", food_id=food_id)
 
-        try:
-            response = await self._request("POST", "/api/food/onsale", data=data)
-            return response.get("data", {})
-        except Exception as e:
-            logger.warning("商品上架失败，返回模拟数据", error=str(e))
-            return {"message": "商品已上架"}
+        response = await self._request("POST", "/api/food/onsale", data=data)
+        return response.get("data", {})
 
     # ==================== 门店管理接口 ====================
 
@@ -497,22 +408,8 @@ class MeituanSaasAdapter:
 
         logger.info("查询门店信息", poi_id=self.poi_id)
 
-        try:
-            response = await self._request("GET", "/api/poi/query", data=data)
-            return response.get("data", {})
-        except Exception as e:
-            logger.warning("查询门店信息失败，返回模拟数据", error=str(e))
-            return {
-                "poi_id": self.poi_id,
-                "poi_name": "测试餐厅",
-                "address": "北京市朝阳区xxx",
-                "phone": "010-12345678",
-                "latitude": 39.9042,
-                "longitude": 116.4074,
-                "is_online": 1,  # 1-营业中 0-休息中
-                "open_time": "09:00",
-                "close_time": "22:00",
-            }
+        response = await self._request("GET", "/api/poi/query", data=data)
+        return response.get("data", {})
 
     async def update_poi_status(
         self,
@@ -534,12 +431,8 @@ class MeituanSaasAdapter:
 
         logger.info("更新门店状态", poi_id=self.poi_id, is_online=is_online)
 
-        try:
-            response = await self._request("POST", "/api/poi/updateStatus", data=data)
-            return response.get("data", {})
-        except Exception as e:
-            logger.warning("更新门店状态失败，返回模拟数据", error=str(e))
-            return {"message": "门店状态更新成功"}
+        response = await self._request("POST", "/api/poi/updateStatus", data=data)
+        return response.get("data", {})
 
     # ==================== 配送管理接口 ====================
 
@@ -560,19 +453,8 @@ class MeituanSaasAdapter:
 
         logger.info("查询配送信息", order_id=order_id)
 
-        try:
-            response = await self._request("GET", "/api/logistics/query", data=data)
-            return response.get("data", {})
-        except Exception as e:
-            logger.warning("查询配送信息失败，返回模拟数据", error=str(e))
-            return {
-                "order_id": order_id,
-                "logistics_status": 20,  # 配送状态
-                "courier_name": "李四",
-                "courier_phone": "13900139000",
-                "latitude": 39.9042,
-                "longitude": 116.4074,
-            }
+        response = await self._request("GET", "/api/logistics/query", data=data)
+        return response.get("data", {})
 
     async def close(self):
         """关闭适配器，释放资源"""

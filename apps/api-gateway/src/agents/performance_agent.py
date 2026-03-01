@@ -98,12 +98,6 @@ class PerformanceAgent(LLMEnhancedAgent):
 
     def __init__(self):
         super().__init__(agent_type="performance")
-        self._rag = None
-        try:
-            from ..services.rag_service import RAGService
-            self._rag = RAGService()
-        except Exception as e:
-            logger.warning("RAGService 未注入，绩效 Agent nl_query 将仅使用 LLM", reason=str(e))
 
     def get_supported_actions(self) -> List[str]:
         return [
@@ -346,28 +340,39 @@ class PerformanceAgent(LLMEnhancedAgent):
                 "data": None,
             }
 
-        context = {
-            "store_id": store_id,
-            "period": period,
-            "role_config_summary": {k: v["name"] for k, v in DEFAULT_ROLE_CONFIG.items()},
-        }
+        role_summary = {k: v["name"] for k, v in DEFAULT_ROLE_CONFIG.items()}
+        user_message = (
+            f"绩效查询 门店={store_id} 周期={period}：{question}。"
+            f"可用岗位配置：{role_summary}。"
+            f"请结合绩效规则给出具体数值与规则解释。"
+        )
+
         if self.llm_enabled:
             try:
-                llm_out = await self.execute_with_llm("nl_query", params, context=context)
-                if isinstance(llm_out, dict) and "data" in llm_out:
-                    return llm_out
+                result = await self.execute_with_tools(
+                    user_message=user_message,
+                    store_id=store_id or "",
+                    context={"period": period, "role_config_summary": role_summary}
+                )
                 return {
-                    "success": True,
-                    "data": {"answer": str(llm_out.get("data", llm_out)), "question": question},
-                    "metadata": {"source": "llm"},
+                    "success": result.success,
+                    "data": {
+                        "answer": result.data,
+                        "question": question,
+                        "tool_calls": len(result.tool_calls),
+                        "iterations": result.iterations,
+                    },
+                    "error": result.message if not result.success else None,
+                    "metadata": {"source": "tool_use"},
                 }
             except Exception as e:
-                logger.warning("绩效 nl_query LLM 失败，返回占位", error=str(e))
+                logger.warning("绩效 nl_query Tool Use 失败，返回占位", error=str(e))
+
         # 无 LLM 或失败时返回占位
         return {
             "success": True,
             "data": {
-                "answer": f"已收到查询：「{question}」。当前为占位回复，接入 RAG/LLM 与绩效数据后可返回具体数值与规则解释。门店={store_id}，周期={period}。",
+                "answer": f"已收到查询：「{question}」。当前为占位回复，接入 LLM 与绩效数据后可返回具体数值与规则解释。门店={store_id}，周期={period}。",
                 "question": question,
             },
             "metadata": {"source": "placeholder"},

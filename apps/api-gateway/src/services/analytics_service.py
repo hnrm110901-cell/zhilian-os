@@ -431,6 +431,247 @@ class AnalyticsService:
         return insights
 
 
+    async def get_revenue_trend(
+        self,
+        store_id:    str,
+        days:        int = 30,
+        granularity: str = "daily",   # "daily" | "weekly"
+    ) -> Dict[str, Any]:
+        """
+        营收趋势 — 返回指定颗粒度的营收时间序列及环比趋势。
+        """
+        end_date   = date.today()
+        start_date = end_date - timedelta(days=days)
+
+        query = select(
+            func.date(FinancialTransaction.transaction_date).label("day"),
+            func.sum(FinancialTransaction.amount).label("revenue"),
+            func.count(FinancialTransaction.id).label("tx_count"),
+        ).where(
+            and_(
+                FinancialTransaction.store_id == store_id,
+                FinancialTransaction.transaction_date >= start_date,
+                FinancialTransaction.transaction_date <= end_date,
+                FinancialTransaction.transaction_type == "income",
+            )
+        ).group_by(func.date(FinancialTransaction.transaction_date))
+
+        rows = (await self.db.execute(query)).all()
+        daily_map = {
+            str(r.day): {"revenue": int(r.revenue), "tx_count": int(r.tx_count)}
+            for r in rows
+        }
+
+        if granularity == "weekly":
+            weekly: Dict[str, Dict] = defaultdict(lambda: {"revenue": 0, "tx_count": 0})
+            for r in rows:
+                d = date.fromisoformat(str(r.day))
+                iso_y, iso_w, _ = d.isocalendar()
+                week_key = f"{iso_y}-W{iso_w:02d}"
+                weekly[week_key]["revenue"]  += int(r.revenue)
+                weekly[week_key]["tx_count"] += int(r.tx_count)
+            series = [{"period": k, **v} for k, v in sorted(weekly.items())]
+        else:
+            series = [
+                {
+                    "period":   (start_date + timedelta(days=i)).isoformat(),
+                    "revenue":  daily_map.get(
+                                    (start_date + timedelta(days=i)).isoformat(), {}
+                                ).get("revenue", 0),
+                    "tx_count": daily_map.get(
+                                    (start_date + timedelta(days=i)).isoformat(), {}
+                                ).get("tx_count", 0),
+                }
+                for i in range(days + 1)
+            ]
+
+        revenues = [s["revenue"] for s in series if s["revenue"] > 0]
+        trend_pct = 0.0
+        if len(revenues) >= 2:
+            half      = len(revenues) // 2
+            first_avg = sum(revenues[:half]) / half
+            last_avg  = sum(revenues[half:]) / (len(revenues) - half)
+            trend_pct = round((last_avg - first_avg) / first_avg * 100, 2) if first_avg > 0 else 0.0
+
+        return {
+            "store_id":      store_id,
+            "granularity":   granularity,
+            "period":        {"start_date": start_date.isoformat(), "end_date": end_date.isoformat()},
+            "series":        series,
+            "trend_pct":     trend_pct,
+            "total_revenue": sum(s["revenue"] for s in series),
+        }
+
+    async def get_customer_traffic(
+        self, store_id: str, days: int = 30
+    ) -> Dict[str, Any]:
+        """
+        客流分析 — 以订单数作为客流代理指标，返回每日趋势及时段分布。
+        """
+        end_date   = date.today()
+        start_date = end_date - timedelta(days=days)
+
+        from src.models.order import Order, OrderStatus
+
+        daily_query = select(
+            func.date(Order.created_at).label("day"),
+            func.count(Order.id).label("order_count"),
+            func.sum(Order.final_amount).label("revenue"),
+        ).where(
+            and_(
+                Order.store_id == store_id,
+                Order.created_at >= datetime.combine(start_date, datetime.min.time()),
+                Order.created_at <= datetime.combine(end_date,   datetime.max.time()),
+                Order.status == OrderStatus.COMPLETED.value,
+            )
+        ).group_by(func.date(Order.created_at)).order_by(func.date(Order.created_at))
+
+        daily_rows = (await self.db.execute(daily_query)).all()
+
+        hourly_query = select(
+            func.extract("hour", Order.created_at).label("hour"),
+            func.count(Order.id).label("order_count"),
+        ).where(
+            and_(
+                Order.store_id == store_id,
+                Order.created_at >= datetime.combine(start_date, datetime.min.time()),
+                Order.status == OrderStatus.COMPLETED.value,
+            )
+        ).group_by(func.extract("hour", Order.created_at))
+
+        hourly_rows = (await self.db.execute(hourly_query)).all()
+
+        daily_series = [
+            {"date": str(r.day), "orders": int(r.order_count), "revenue": int(r.revenue or 0)}
+            for r in daily_rows
+        ]
+        total_orders   = sum(r["orders"] for r in daily_series)
+        avg_daily      = round(total_orders / days, 1) if days > 0 else 0
+        hourly_dist    = {int(r.hour): int(r.order_count) for r in hourly_rows}
+        peak_hour      = max(hourly_dist, key=hourly_dist.get) if hourly_dist else None
+
+        return {
+            "store_id":    store_id,
+            "period":      {"start_date": start_date.isoformat(), "end_date": end_date.isoformat()},
+            "total_orders":  total_orders,
+            "avg_daily_orders": avg_daily,
+            "peak_hour":   peak_hour,
+            "daily_series":  daily_series,
+            "hourly_distribution": [
+                {"hour": h, "orders": hourly_dist.get(h, 0)} for h in range(24)
+            ],
+        }
+
+    async def get_dish_contribution(
+        self,
+        store_id: str,
+        days:     int = 30,
+        top_n:    int = 20,
+    ) -> Dict[str, Any]:
+        """
+        菜品贡献度 — 帕累托分析，返回各菜品营收/销量占比及累计贡献曲线。
+        """
+        end_date   = date.today()
+        start_date = end_date - timedelta(days=days)
+
+        from src.models.order import Order, OrderItem, OrderStatus
+
+        query = select(
+            OrderItem.item_name,
+            func.sum(OrderItem.quantity).label("total_qty"),
+            func.sum(OrderItem.subtotal).label("total_revenue"),
+            func.count(OrderItem.id.distinct()).label("order_count"),
+        ).join(
+            Order, OrderItem.order_id == Order.id
+        ).where(
+            and_(
+                Order.store_id == store_id,
+                Order.created_at >= datetime.combine(start_date, datetime.min.time()),
+                Order.status == OrderStatus.COMPLETED.value,
+            )
+        ).group_by(OrderItem.item_name).order_by(func.sum(OrderItem.subtotal).desc())
+
+        rows = (await self.db.execute(query)).all()
+        grand_total = sum(int(r.total_revenue) for r in rows) or 1
+
+        items = []
+        cumulative = 0
+        for r in rows[:top_n]:
+            revenue = int(r.total_revenue)
+            pct     = round(revenue / grand_total * 100, 2)
+            cumulative += pct
+            items.append({
+                "item_name":      r.item_name,
+                "total_qty":      int(r.total_qty),
+                "total_revenue":  revenue,
+                "revenue_pct":    pct,
+                "cumulative_pct": round(cumulative, 2),
+                "tier":           "A" if cumulative <= 70 else ("B" if cumulative <= 90 else "C"),
+            })
+
+        return {
+            "store_id":       store_id,
+            "period":         {"start_date": start_date.isoformat(), "end_date": end_date.isoformat()},
+            "total_revenue":  grand_total,
+            "total_items":    len(rows),
+            "top_n":          top_n,
+            "items":          items,
+            "pareto_note":    "A级=累计贡献前70%; B级=70-90%; C级=90%以上",
+        }
+
+    async def get_time_heatmap(
+        self, store_id: str, days: int = 30
+    ) -> Dict[str, Any]:
+        """
+        时段热力图 — 返回 7（周）× 24（小时）的平均营收矩阵，供前端渲染热力图。
+        """
+        end_date   = date.today()
+        start_date = end_date - timedelta(days=days)
+
+        query = select(
+            func.extract("dow",  FinancialTransaction.created_at).label("dow"),
+            func.extract("hour", FinancialTransaction.created_at).label("hour"),
+            func.avg(FinancialTransaction.amount).label("avg_revenue"),
+            func.count(FinancialTransaction.id).label("data_points"),
+        ).where(
+            and_(
+                FinancialTransaction.store_id == store_id,
+                FinancialTransaction.transaction_date >= start_date,
+                FinancialTransaction.transaction_date <= end_date,
+                FinancialTransaction.transaction_type == "income",
+            )
+        ).group_by(
+            func.extract("dow",  FinancialTransaction.created_at),
+            func.extract("hour", FinancialTransaction.created_at),
+        )
+
+        rows = (await self.db.execute(query)).all()
+
+        # Build 7×24 matrix (0=Sunday … 6=Saturday)
+        matrix: Dict[int, Dict[int, int]] = {d: {h: 0 for h in range(24)} for d in range(7)}
+        for r in rows:
+            matrix[int(r.dow)][int(r.hour)] = int(r.avg_revenue)
+
+        day_labels = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
+        heatmap = [
+            {
+                "day":       d,
+                "day_label": day_labels[d],
+                "hours":     [{"hour": h, "avg_revenue": matrix[d][h]} for h in range(24)],
+            }
+            for d in range(7)
+        ]
+
+        all_values = [matrix[d][h] for d in range(7) for h in range(24)]
+        return {
+            "store_id":  store_id,
+            "period":    {"start_date": start_date.isoformat(), "end_date": end_date.isoformat()},
+            "heatmap":   heatmap,
+            "max_value": max(all_values) if all_values else 0,
+            "min_value": min(v for v in all_values if v > 0) if any(v > 0 for v in all_values) else 0,
+        }
+
+
 # 全局服务实例
 def get_analytics_service(db: AsyncSession) -> AnalyticsService:
     """获取分析服务实例"""

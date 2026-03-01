@@ -30,6 +30,75 @@ from base_agent import BaseAgent, AgentResponse
 
 logger = structlog.get_logger()
 
+# 内置课程目录（无 DB 时的基础课程定义，与 training_type 枚举对齐）
+# 可通过未来的 training_courses 表扩展
+_BUILTIN_COURSE_CATALOG: dict = {
+    "COURSE_SERVICE_001": {
+        "course_id": "COURSE_SERVICE_001",
+        "course_name": "优质服务培训",
+        "training_type": "customer_service",
+        "description": "提升服务质量和客户满意度",
+        "duration_hours": 8.0,
+        "target_skill_level": "intermediate",
+        "prerequisites": [],
+        "content_url": "https://training.zhilian-os.com/service-001",
+        "instructor": "培训师A",
+        "max_participants": 20,
+        "passing_score": 70,
+    },
+    "COURSE_COOKING_001": {
+        "course_id": "COURSE_COOKING_001",
+        "course_name": "基础烹饪技能",
+        "training_type": "skill_upgrade",
+        "description": "学习基础烹饪技能和菜品制作",
+        "duration_hours": 16.0,
+        "target_skill_level": "intermediate",
+        "prerequisites": [],
+        "content_url": "https://training.zhilian-os.com/cooking-001",
+        "instructor": "厨师长",
+        "max_participants": 10,
+        "passing_score": 75,
+    },
+    "COURSE_SAFETY_001": {
+        "course_id": "COURSE_SAFETY_001",
+        "course_name": "食品安全培训",
+        "training_type": "safety",
+        "description": "食品安全法规和操作规范",
+        "duration_hours": 4.0,
+        "target_skill_level": "beginner",
+        "prerequisites": [],
+        "content_url": "https://training.zhilian-os.com/safety-001",
+        "instructor": "安全专员",
+        "max_participants": 30,
+        "passing_score": 80,
+    },
+    "COURSE_ONBOARDING_001": {
+        "course_id": "COURSE_ONBOARDING_001",
+        "course_name": "新员工入职培训",
+        "training_type": "onboarding",
+        "description": "企业文化、制度规范、基础操作流程",
+        "duration_hours": 4.0,
+        "target_skill_level": "beginner",
+        "prerequisites": [],
+        "content_url": "https://training.zhilian-os.com/onboarding-001",
+        "instructor": "人力资源专员",
+        "max_participants": 30,
+        "passing_score": 60,
+    },
+    "COURSE_MANAGEMENT_001": {
+        "course_id": "COURSE_MANAGEMENT_001",
+        "course_name": "门店管理培训",
+        "training_type": "management",
+        "description": "门店日常运营管理与团队领导力",
+        "duration_hours": 12.0,
+        "target_skill_level": "advanced",
+        "prerequisites": ["COURSE_SERVICE_001"],
+        "content_url": "https://training.zhilian-os.com/management-001",
+        "instructor": "运营总监",
+        "max_participants": 15,
+        "passing_score": 75,
+    },
+}
 
 class TrainingType(str, Enum):
     """培训类型 Training Type"""
@@ -1191,66 +1260,69 @@ class TrainingAgent(BaseAgent):
         return {}
 
     async def _get_courses_info(self, course_ids: List[str]) -> List[TrainingCourse]:
-        """获取课程信息"""
-        mock_courses = {
-            "COURSE_SERVICE_001": {
-                "course_id": "COURSE_SERVICE_001",
-                "course_name": "优质服务培训",
-                "training_type": TrainingType.CUSTOMER_SERVICE,
-                "description": "提升服务质量和客户满意度",
+        """获取课程信息 - 优先从 DB 查询，无 DB 时使用内置课程目录"""
+        if not course_ids:
+            return []
+
+        # 尝试从 DB 的 training_courses 表查询（表存在时使用）
+        engine = self._get_db_engine()
+        if engine:
+            try:
+                from sqlalchemy import text
+                placeholders = ", ".join(f":id_{i}" for i in range(len(course_ids)))
+                params = {f"id_{i}": cid for i, cid in enumerate(course_ids)}
+                with engine.connect() as conn:
+                    rows = conn.execute(text(f"""
+                        SELECT course_id, course_name, training_type, description,
+                               duration_hours, target_skill_level, prerequisites,
+                               content_url, instructor, max_participants, passing_score,
+                               created_at
+                        FROM training_courses
+                        WHERE course_id IN ({placeholders})
+                    """), params).fetchall()
+                if rows:
+                    return [
+                        {
+                            "course_id": str(r[0]),
+                            "course_name": str(r[1]),
+                            "training_type": r[2],
+                            "description": str(r[3] or ""),
+                            "duration_hours": float(r[4]) if r[4] else 8.0,
+                            "target_skill_level": r[5],
+                            "prerequisites": r[6] if isinstance(r[6], list) else [],
+                            "content_url": str(r[7]) if r[7] else None,
+                            "instructor": str(r[8]) if r[8] else None,
+                            "max_participants": int(r[9]) if r[9] else 20,
+                            "passing_score": int(r[10]) if r[10] else 70,
+                            "created_at": str(r[11]) if r[11] else datetime.now().isoformat(),
+                        }
+                        for r in rows
+                    ]
+            except Exception as e:
+                # training_courses 表不存在时静默降级到内置目录
+                self.logger.debug("get_courses_db_fallback", error=str(e))
+
+        # 降级：使用内置课程目录
+        now = datetime.now().isoformat()
+        return [
+            {**_BUILTIN_COURSE_CATALOG[cid], "created_at": now}
+            if cid in _BUILTIN_COURSE_CATALOG
+            else {
+                "course_id": cid,
+                "course_name": f"课程 {cid}",
+                "training_type": "skill_upgrade",
+                "description": "待完善课程",
                 "duration_hours": 8.0,
-                "target_skill_level": SkillLevel.INTERMEDIATE,
+                "target_skill_level": "intermediate",
                 "prerequisites": [],
-                "content_url": "https://training.zhilian-os.com/service-001",
-                "instructor": "培训师A",
+                "content_url": None,
+                "instructor": None,
                 "max_participants": 20,
                 "passing_score": 70,
-                "created_at": datetime.now().isoformat()
-            },
-            "COURSE_COOKING_001": {
-                "course_id": "COURSE_COOKING_001",
-                "course_name": "基础烹饪技能",
-                "training_type": TrainingType.SKILL_UPGRADE,
-                "description": "学习基础烹饪技能和菜品制作",
-                "duration_hours": 16.0,
-                "target_skill_level": SkillLevel.INTERMEDIATE,
-                "prerequisites": [],
-                "content_url": "https://training.zhilian-os.com/cooking-001",
-                "instructor": "厨师长",
-                "max_participants": 10,
-                "passing_score": 75,
-                "created_at": datetime.now().isoformat()
-            },
-            "COURSE_SAFETY_001": {
-                "course_id": "COURSE_SAFETY_001",
-                "course_name": "食品安全培训",
-                "training_type": TrainingType.SAFETY,
-                "description": "食品安全法规和操作规范",
-                "duration_hours": 4.0,
-                "target_skill_level": SkillLevel.BEGINNER,
-                "prerequisites": [],
-                "content_url": "https://training.zhilian-os.com/safety-001",
-                "instructor": "安全专员",
-                "max_participants": 30,
-                "passing_score": 80,
-                "created_at": datetime.now().isoformat()
+                "created_at": now,
             }
-        }
-
-        return [mock_courses.get(cid, {
-            "course_id": cid,
-            "course_name": f"课程{cid}",
-            "training_type": TrainingType.SKILL_UPGRADE,
-            "description": "培训课程",
-            "duration_hours": 8.0,
-            "target_skill_level": SkillLevel.INTERMEDIATE,
-            "prerequisites": [],
-            "content_url": None,
-            "instructor": None,
-            "max_participants": 20,
-            "passing_score": 70,
-            "created_at": datetime.now().isoformat()
-        }) for cid in course_ids]
+            for cid in course_ids
+        ]
 
     async def _get_training_records(
         self,

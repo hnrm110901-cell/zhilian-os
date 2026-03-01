@@ -1,13 +1,11 @@
 """
-DecisionAgent - 决策分析Agent (RAG增强)
+DecisionAgent - 决策分析Agent (Claude Tool Use 增强)
 """
 from typing import Dict, Any, Optional
 from decimal import Decimal
-import os
 import structlog
 
 from .llm_agent import LLMEnhancedAgent, AgentResult
-from ..services.rag_service import RAGService
 from ..services.decision_validator import DecisionValidator, ValidationResult
 from ..core.monitoring import error_monitor, ErrorSeverity, ErrorCategory
 
@@ -24,7 +22,7 @@ class DecisionAgent(LLMEnhancedAgent):
     - 客流预测
     - 经营建议生成
 
-    RAG增强:
+    Tool Use 增强:
     - 基于历史决策案例
     - 基于历史营收数据
     - 基于历史异常事件
@@ -32,7 +30,6 @@ class DecisionAgent(LLMEnhancedAgent):
 
     def __init__(self):
         super().__init__(agent_type="decision")
-        self.rag_service = RAGService()
         self.validator = DecisionValidator()
 
     async def analyze_revenue_anomaly(
@@ -52,52 +49,56 @@ class DecisionAgent(LLMEnhancedAgent):
             time_period: 时间周期
 
         Returns:
-            AgentResult（含 reasoning / confidence / source_data）
+            AgentResult（含 reasoning / confidence / tool_calls）
         """
         try:
             # 计算异常程度
             deviation = float((current_revenue - expected_revenue) / expected_revenue * 100)
 
-            # 构建查询
-            query = f"""
-            门店{store_id}在{time_period}出现营收异常:
-            - 当前营收: {current_revenue}元
-            - 预期营收: {expected_revenue}元
-            - 偏差: {deviation:.1f}%
-
-            请分析可能的原因并给出建议。
-            """
+            user_message = (
+                f"门店 {store_id} 在 {time_period} 出现营收异常："
+                f"当前营收 {current_revenue} 元，预期营收 {expected_revenue} 元，偏差 {deviation:.1f}%。"
+                f"请查询历史异常事件，分析可能的原因（天气/竞争/运营/节假日等），"
+                f"给出根本原因判断、短期应对措施和中长期改进建议。"
+            )
 
             logger.info(
-                "Analyzing revenue anomaly with RAG",
+                "Analyzing revenue anomaly with Tool Use",
                 store_id=store_id,
                 current_revenue=str(current_revenue),
                 expected_revenue=str(expected_revenue),
                 deviation=deviation
             )
 
-            # 使用RAG增强分析
-            rag_result = await self.rag_service.analyze_with_rag(
-                query=query,
+            result = await self.execute_with_tools(
+                user_message=user_message,
                 store_id=store_id,
-                collection="events",
-                top_k=int(os.getenv("RAG_DECISION_TOP_K", "8"))
+                context={
+                    "current_revenue": str(current_revenue),
+                    "expected_revenue": str(expected_revenue),
+                    "deviation_pct": deviation,
+                    "time_period": time_period,
+                }
             )
 
-            result = self.format_response(
+            if not result.success:
+                return result
+
+            formatted = self.format_response(
                 success=True,
                 data={
-                    "analysis": rag_result["response"],
+                    "analysis": result.data,
                     "deviation": deviation,
                     "current_revenue": str(current_revenue),
                     "expected_revenue": str(expected_revenue),
-                    "context_used": rag_result["metadata"]["context_count"],
-                    "timestamp": rag_result["metadata"]["timestamp"]
+                    "tool_calls": len(result.tool_calls),
+                    "iterations": result.iterations,
                 },
                 message="营收异常分析完成",
-                reasoning=f"当前营收 ¥{current_revenue}，预期 ¥{expected_revenue}，偏差 {deviation:.1f}%，"
-                          f"基于 {rag_result['metadata']['context_count']} 条历史事件分析",
-                confidence=min(0.95, 0.5 + rag_result["metadata"]["context_count"] * 0.05),
+                reasoning=result.reasoning or (
+                    f"当前营收 ¥{current_revenue}，预期 ¥{expected_revenue}，偏差 {deviation:.1f}%"
+                ),
+                confidence=result.confidence,
                 source_data={
                     "store_id": store_id,
                     "current_revenue": str(current_revenue),
@@ -112,11 +113,11 @@ class DecisionAgent(LLMEnhancedAgent):
                 store_id=store_id,
                 action="revenue_anomaly",
                 summary=f"营收偏差 {deviation:.1f}%，当前 ¥{current_revenue} vs 预期 ¥{expected_revenue}",
-                confidence=result.confidence,
+                confidence=formatted.confidence,
                 data={"deviation": deviation, "current": str(current_revenue), "expected": str(expected_revenue)},
             )
 
-            return result
+            return formatted
 
         except Exception as e:
             logger.error(
@@ -125,15 +126,6 @@ class DecisionAgent(LLMEnhancedAgent):
                 error=str(e),
                 exc_info=e
             )
-
-            error_monitor.log_error(
-                message=f"Revenue anomaly analysis failed for {store_id}",
-                severity=ErrorSeverity.ERROR,
-                category=ErrorCategory.AGENT,
-                exception=e,
-                context={"store_id": store_id}
-            )
-
             return self.format_response(
                 success=False,
                 data=None,
@@ -156,44 +148,41 @@ class DecisionAgent(LLMEnhancedAgent):
             time_range: 时间范围
 
         Returns:
-            AgentResult（含 reasoning / confidence / source_data）
+            AgentResult（含 reasoning / confidence / tool_calls）
         """
         try:
-            query = f"""
-            分析门店{store_id}最近{time_range}的订单趋势:
-            - 订单量变化
-            - 客单价变化
-            - 热门菜品变化
-            - 高峰时段变化
-
-            请给出趋势分析和经营建议。
-            """
+            user_message = (
+                f"分析门店 {store_id} 最近 {time_range} 的订单趋势："
+                f"请查询历史订单数据，分析订单量变化、客单价变化、热门菜品变化和高峰时段变化，"
+                f"给出趋势判断和经营建议。"
+            )
 
             logger.info(
-                "Analyzing order trend with RAG",
+                "Analyzing order trend with Tool Use",
                 store_id=store_id,
                 time_range=time_range
             )
 
-            # 使用RAG检索历史订单数据
-            rag_result = await self.rag_service.analyze_with_rag(
-                query=query,
+            result = await self.execute_with_tools(
+                user_message=user_message,
                 store_id=store_id,
-                collection="orders",
-                top_k=int(os.getenv("RAG_DECISION_TOP_K", "8"))
+                context={"time_range": time_range}
             )
+
+            if not result.success:
+                return result
 
             return self.format_response(
                 success=True,
                 data={
-                    "analysis": rag_result["response"],
+                    "analysis": result.data,
                     "time_range": time_range,
-                    "context_used": rag_result["metadata"]["context_count"],
-                    "timestamp": rag_result["metadata"]["timestamp"]
+                    "tool_calls": len(result.tool_calls),
+                    "iterations": result.iterations,
                 },
                 message="订单趋势分析完成",
-                reasoning=f"基于 {rag_result['metadata']['context_count']} 条历史订单数据，分析 {time_range} 趋势",
-                confidence=min(0.9, 0.4 + rag_result["metadata"]["context_count"] * 0.05),
+                reasoning=result.reasoning or f"分析 {time_range} 订单趋势",
+                confidence=result.confidence,
                 source_data={"store_id": store_id, "time_range": time_range},
             )
 
@@ -204,7 +193,6 @@ class DecisionAgent(LLMEnhancedAgent):
                 error=str(e),
                 exc_info=e
             )
-
             return self.format_response(
                 success=False,
                 data=None,
@@ -228,38 +216,33 @@ class DecisionAgent(LLMEnhancedAgent):
             focus_area: 关注领域 (revenue/orders/inventory/staff)
 
         Returns:
-            AgentResult（含 reasoning / confidence / source_data）
+            AgentResult（含 reasoning / confidence / tool_calls）
         """
         try:
             focus_text = f"重点关注{focus_area}" if focus_area else "全面分析"
 
-            query = f"""
-            为门店{store_id}生成经营建议({focus_text}):
-            - 基于历史数据分析
-            - 识别改进机会
-            - 提供可执行的建议
-            - 预测潜在风险
-
-            请给出具体的、可操作的建议。
-            """
+            user_message = (
+                f"为门店 {store_id} 生成经营建议（{focus_text}）："
+                f"请查询历史数据，识别改进机会，提供可执行的建议，预测潜在风险，"
+                f"给出具体的、可操作的经营改进方案。"
+            )
 
             logger.info(
-                "Generating business recommendations with RAG",
+                "Generating business recommendations with Tool Use",
                 store_id=store_id,
                 focus_area=focus_area
             )
 
-            # 使用RAG检索多个集合
-            rag_result = await self.rag_service.analyze_with_rag(
-                query=query,
+            result = await self.execute_with_tools(
+                user_message=user_message,
                 store_id=store_id,
-                collection="events",
-                top_k=int(os.getenv("RAG_DECISION_TOP_K", "8"))
+                context={"focus_area": focus_area}
             )
 
-            ctx_count = rag_result["metadata"]["context_count"]
+            if not result.success:
+                return result
 
-            # 步骤4：合规性校验（预算）
+            # 合规性校验（预算）
             validation = None
             if validation_context:
                 decision = {"action": "recommendation", **validation_context.get("decision_overrides", {})}
@@ -271,7 +254,7 @@ class DecisionAgent(LLMEnhancedAgent):
                 if validation["result"] == ValidationResult.REJECTED.value:
                     return self.format_response(
                         success=False,
-                        data={"recommendations": rag_result["response"], "focus_area": focus_area},
+                        data={"recommendations": result.data, "focus_area": focus_area},
                         message=f"经营建议被合规校验拒绝: {validation['message']}",
                         reasoning=f"LLM 生成了经营建议，但预算校验拒绝: {validation['message']}",
                         confidence=0.0,
@@ -282,17 +265,19 @@ class DecisionAgent(LLMEnhancedAgent):
             if validation:
                 source["validation"] = validation
 
+            has_warning = validation and validation["result"] == ValidationResult.WARNING.value
             return self.format_response(
                 success=True,
                 data={
-                    "recommendations": rag_result["response"],
+                    "recommendations": result.data,
                     "focus_area": focus_area,
-                    "context_used": ctx_count,
-                    "timestamp": rag_result["metadata"]["timestamp"]
+                    "tool_calls": len(result.tool_calls),
+                    "iterations": result.iterations,
+                    **({"validation": validation} if validation else {}),
                 },
-                message="经营建议生成完成" + ("（含合规警告）" if validation and validation["result"] == ValidationResult.WARNING.value else ""),
-                reasoning=f"基于 {ctx_count} 条历史事件，{focus_text}，生成可执行经营建议",
-                confidence=min(0.9, 0.45 + ctx_count * 0.05),
+                message="经营建议生成完成" + ("（含合规警告）" if has_warning else ""),
+                reasoning=result.reasoning or f"{focus_text}，生成可执行经营建议",
+                confidence=result.confidence,
                 source_data=source,
             )
 
@@ -303,7 +288,6 @@ class DecisionAgent(LLMEnhancedAgent):
                 error=str(e),
                 exc_info=e
             )
-
             return self.format_response(
                 success=False,
                 data=None,

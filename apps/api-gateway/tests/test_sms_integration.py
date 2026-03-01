@@ -160,5 +160,5 @@ class TestTencentSMS:
             "测试内容"
         )
 
-        # 未配置时应该返回True(模拟发送)
-        assert result is True
+        # 未配置时跳过发送，返回False
+        assert result is False

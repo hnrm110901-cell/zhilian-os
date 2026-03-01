@@ -1,9 +1,9 @@
 /**
  * 订单数据服务
- * 提供订单的CRUD操作和持久化
+ * 通过后端 REST API 进行 CRUD（原 localStorage 已移除）
  */
 
-import { storageService } from './storage';
+import apiClient from './api';
 
 export interface OrderItem {
   item_id: string;
@@ -23,177 +23,61 @@ export interface Order {
   updated_at: string;
 }
 
-const STORAGE_KEY = 'orders';
-
 class OrderDataService {
-  /**
-   * 获取所有订单
-   */
-  getAll(): Order[] {
-    const orders = storageService.get<Order[]>(STORAGE_KEY);
-    return orders || [];
+  private readonly basePath = '/api/v1/orders';
+
+  async getAll(storeId?: string): Promise<Order[]> {
+    const params = storeId ? `?store_id=${storeId}` : '';
+    const res = await apiClient.get<{ data: Order[] }>(`${this.basePath}${params}`);
+    return res.data ?? [];
   }
 
-  /**
-   * 根据ID获取订单
-   */
-  getById(orderId: string): Order | null {
-    const orders = this.getAll();
-    return orders.find((order) => order.order_id === orderId) || null;
+  async getById(orderId: string): Promise<Order | null> {
+    try {
+      const res = await apiClient.get<{ data: Order }>(`${this.basePath}/${orderId}`);
+      return res.data ?? null;
+    } catch {
+      return null;
+    }
   }
 
-  /**
-   * 创建订单
-   */
-  create(order: Omit<Order, 'order_id' | 'created_at' | 'updated_at'>): Order {
-    const orders = this.getAll();
-    const newOrder: Order = {
-      ...order,
-      order_id: `ORD_${Date.now()}`,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    orders.unshift(newOrder);
-    storageService.set(STORAGE_KEY, orders);
-    return newOrder;
+  async create(order: Omit<Order, 'order_id' | 'created_at' | 'updated_at'>): Promise<Order> {
+    const res = await apiClient.post<{ data: Order }>(this.basePath, order);
+    return res.data;
   }
 
-  /**
-   * 更新订单
-   */
-  update(orderId: string, updates: Partial<Order>): Order | null {
-    const orders = this.getAll();
-    const index = orders.findIndex((order) => order.order_id === orderId);
-    if (index === -1) return null;
-
-    orders[index] = {
-      ...orders[index],
-      ...updates,
-      updated_at: new Date().toISOString(),
-    };
-    storageService.set(STORAGE_KEY, orders);
-    return orders[index];
+  async update(orderId: string, updates: Partial<Order>): Promise<Order | null> {
+    try {
+      const res = await apiClient.put<{ data: Order }>(`${this.basePath}/${orderId}`, updates);
+      return res.data ?? null;
+    } catch {
+      return null;
+    }
   }
 
-  /**
-   * 删除订单
-   */
-  delete(orderId: string): boolean {
-    const orders = this.getAll();
-    const filteredOrders = orders.filter((order) => order.order_id !== orderId);
-    if (filteredOrders.length === orders.length) return false;
-
-    storageService.set(STORAGE_KEY, filteredOrders);
-    return true;
+  async delete(orderId: string): Promise<boolean> {
+    try {
+      await apiClient.delete(`${this.basePath}/${orderId}`);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
-  /**
-   * 更新订单状态
-   */
-  updateStatus(
-    orderId: string,
-    status: Order['status']
-  ): Order | null {
+  async updateStatus(orderId: string, status: Order['status']): Promise<Order | null> {
     return this.update(orderId, { status });
   }
 
-  /**
-   * 按状态筛选订单
-   */
-  getByStatus(status: Order['status']): Order[] {
-    const orders = this.getAll();
-    return orders.filter((order) => order.status === status);
+  async getByStatus(status: Order['status']): Promise<Order[]> {
+    const res = await apiClient.get<{ data: Order[] }>(`${this.basePath}?status=${status}`);
+    return res.data ?? [];
   }
 
-  /**
-   * 按门店筛选订单
-   */
-  getByStore(storeId: string): Order[] {
-    const orders = this.getAll();
-    return orders.filter((order) => order.store_id === storeId);
-  }
-
-  /**
-   * 清空所有订单
-   */
-  clear(): void {
-    storageService.remove(STORAGE_KEY);
-  }
-
-  /**
-   * 初始化示例数据
-   */
-  initializeSampleData(): void {
-    const existingOrders = this.getAll();
-    if (existingOrders.length > 0) return;
-
-    const sampleOrders: Order[] = [
-      {
-        order_id: 'ORD_001',
-        store_id: 'store_001',
-        table_number: 'A01',
-        status: 'pending',
-        items: [
-          {
-            item_id: 'item_001',
-            name: '宫保鸡丁',
-            quantity: 1,
-            price: 3800,
-          },
-          {
-            item_id: 'item_002',
-            name: '米饭',
-            quantity: 2,
-            price: 200,
-          },
-        ],
-        total_amount: 4200,
-        created_at: new Date(Date.now() - 3600000).toISOString(),
-        updated_at: new Date(Date.now() - 3600000).toISOString(),
-      },
-      {
-        order_id: 'ORD_002',
-        store_id: 'store_001',
-        table_number: 'B05',
-        status: 'processing',
-        items: [
-          {
-            item_id: 'item_003',
-            name: '麻婆豆腐',
-            quantity: 1,
-            price: 2800,
-          },
-        ],
-        total_amount: 2800,
-        created_at: new Date(Date.now() - 1800000).toISOString(),
-        updated_at: new Date(Date.now() - 900000).toISOString(),
-      },
-      {
-        order_id: 'ORD_003',
-        store_id: 'store_001',
-        table_number: 'C03',
-        status: 'completed',
-        items: [
-          {
-            item_id: 'item_004',
-            name: '红烧肉',
-            quantity: 1,
-            price: 4500,
-          },
-          {
-            item_id: 'item_005',
-            name: '青菜',
-            quantity: 1,
-            price: 1500,
-          },
-        ],
-        total_amount: 6000,
-        created_at: new Date(Date.now() - 7200000).toISOString(),
-        updated_at: new Date(Date.now() - 3600000).toISOString(),
-      },
-    ];
-
-    storageService.set(STORAGE_KEY, sampleOrders);
+  async getByStore(storeId: string): Promise<Order[]> {
+    const res = await apiClient.get<{ data: Order[] }>(
+      `${this.basePath}?store_id=${encodeURIComponent(storeId)}`
+    );
+    return res.data ?? [];
   }
 }
 

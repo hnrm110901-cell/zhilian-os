@@ -144,7 +144,7 @@ class Settings(BaseSettings):
     CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173"]
 
     # 业财税资金一体化扩展（FCT）
-    FCT_ENABLED: bool = False
+    FCT_ENABLED: bool = True
     FCT_MODE: str = "embedded"  # embedded | remote
     FCT_BASE_URL: str = ""  # mode=remote 时填独立服务 base_url
     FCT_EVENT_TARGET: str = "internal"  # internal | http | queue
