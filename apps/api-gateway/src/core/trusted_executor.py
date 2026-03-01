@@ -173,6 +173,32 @@ class TrustedExecutor:
             result = await self._do_execute(command_type, payload, actor)
             status = "completed"
 
+            # 折扣类指令执行后异步触发实时异常检测
+            if command_type == "discount_apply" and store_id:
+                try:
+                    from src.core.celery_tasks import realtime_anomaly_check
+                    anomaly_event = {
+                        "action_type": command_type,
+                        # detect_anomaly 期望 amount 单位为分
+                        "amount": int(float(amount) * 100) if amount is not None else 0,
+                        "store_id": store_id,
+                        "brand_id": brand_id,
+                        "actor_id": actor_id,
+                    }
+                    realtime_anomaly_check.delay(store_id=store_id, event=anomaly_event)
+                    logger.info(
+                        "trusted_executor.anomaly_check_dispatched",
+                        execution_id=execution_id,
+                        store_id=store_id,
+                    )
+                except Exception as e:
+                    # Celery 不可用时不阻断执行流程
+                    logger.warning(
+                        "trusted_executor.anomaly_dispatch_failed",
+                        execution_id=execution_id,
+                        error=str(e),
+                    )
+
         else:
             result = {}
             status = "unknown"

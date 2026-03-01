@@ -8,20 +8,11 @@ POS 适配器注册表（registry.py）单元测试
 - 模块路径无效 → ImportError（含清晰错误信息）
 - list_registered_pos_types / list_implemented_pos_types 辅助函数
 """
-import os
 import sys
 import types
 import pytest
 
-_here = os.path.dirname(os.path.abspath(__file__))
-_pkg_src = os.path.abspath(os.path.join(_here, "../src"))
-_repo_root = os.path.abspath(os.path.join(_here, "../../../.."))
-_gateway_src = os.path.join(_repo_root, "apps", "api-gateway", "src")
-
-for _p in (_pkg_src, _gateway_src):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
-
+# sys.path is set up in conftest.py
 from registry import (
     get_transformer,
     list_registered_pos_types,
