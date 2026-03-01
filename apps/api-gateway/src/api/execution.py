@@ -7,7 +7,7 @@ GET  /api/v1/execution/audit-logs        — 查询审计日志
 """
 from typing import Any, Dict, List, Optional
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, Request, status
 from pydantic import BaseModel
 import structlog
 
@@ -46,10 +46,19 @@ class AuditLogFilter(BaseModel):
 
 # ==================== 依赖注入 ====================
 
-async def get_current_user(request=None) -> Dict[str, Any]:
-    """获取当前用户（从 request.state.user 注入）"""
-    # 实际项目中从认证中间件获取
-    return {"user_id": "system", "role": "admin", "store_id": "", "brand_id": ""}
+async def get_current_user(request: Request) -> Dict[str, Any]:
+    """获取当前用户（从 request.state.user 注入，由 JWT 中间件填充）"""
+    user = getattr(request.state, "user", None)
+    if user is None:
+        # 中间件未填充 user — 返回匿名系统用户（仅供内部调用/测试降级）
+        return {"user_id": "system", "role": "admin", "store_id": "", "brand_id": ""}
+    role = getattr(user, "role", "")
+    return {
+        "user_id": str(getattr(user, "id", "")),
+        "role": role.value if hasattr(role, "value") else str(role),
+        "store_id": getattr(user, "store_id", "") or "",
+        "brand_id": getattr(user, "brand_id", "") or "",
+    }
 
 
 async def get_executor() -> TrustedExecutor:

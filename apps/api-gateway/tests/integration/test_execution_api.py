@@ -16,7 +16,7 @@ POST /api/v1/execution/{id}/rollback
   - ExecutionError → 400
 """
 import sys
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
@@ -224,3 +224,93 @@ class TestRollbackExecution:
         _override_executor(exc)
         resp = client.post("/api/v1/execution/EX001/rollback", json={})
         assert resp.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# GET /api/v1/execution/audit-logs
+# ---------------------------------------------------------------------------
+
+class TestAuditLogs:
+    def setup_method(self):
+        _clear_executor_override()
+
+    def _mock_db(self, records):
+        """Build a mock AsyncSessionLocal context manager returning mock records."""
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = records
+        mock_session = MagicMock()
+        mock_session.execute = AsyncMock(return_value=mock_result)
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=False)
+        return MagicMock(return_value=mock_session)
+
+    def _sys_modules_patch(self, session_local):
+        """Return a patch.dict that injects mock db/audit/sqlalchemy modules for lazy imports."""
+        mock_db_module = MagicMock()
+        mock_db_module.AsyncSessionLocal = session_local
+        mock_audit_module = MagicMock()
+        # Mock sqlalchemy so select(ExecutionRecord) doesn't reject a MagicMock model
+        mock_alchemy = MagicMock()
+        mock_stmt = MagicMock()
+        mock_alchemy.select.return_value = mock_stmt
+        mock_stmt.where.return_value = mock_stmt
+        mock_stmt.order_by.return_value = mock_stmt
+        mock_stmt.limit.return_value = mock_stmt
+        mock_stmt.offset.return_value = mock_stmt
+        return patch.dict(
+            "sys.modules",
+            {
+                "src.core.database": mock_db_module,
+                "src.models.execution_audit": mock_audit_module,
+                "sqlalchemy": mock_alchemy,
+            },
+        )
+
+    def test_empty_result_returns_200(self):
+        with self._sys_modules_patch(self._mock_db([])):
+            resp = client.get("/api/v1/execution/audit-logs")
+        assert resp.status_code == 200
+
+    def test_empty_result_has_records_list(self):
+        with self._sys_modules_patch(self._mock_db([])):
+            resp = client.get("/api/v1/execution/audit-logs")
+        assert resp.json()["records"] == []
+        assert resp.json()["total"] == 0
+
+    def test_limit_and_offset_in_response(self):
+        with self._sys_modules_patch(self._mock_db([])):
+            resp = client.get("/api/v1/execution/audit-logs?limit=10&offset=5")
+        body = resp.json()
+        assert body["limit"] == 10
+        assert body["offset"] == 5
+
+    def test_record_fields_present(self):
+        record = MagicMock()
+        record.id = "EX001"
+        record.command_type = "discount_apply"
+        record.actor_id = "U1"
+        record.actor_role = "store_manager"
+        record.store_id = "S1"
+        record.brand_id = "B1"
+        record.status = "completed"
+        record.level = "APPROVE"
+        record.amount = 2000
+        record.created_at = None
+        record.rollback_id = None
+        with self._sys_modules_patch(self._mock_db([record])):
+            resp = client.get("/api/v1/execution/audit-logs")
+        first = resp.json()["records"][0]
+        assert first["execution_id"] == "EX001"
+        assert first["command_type"] == "discount_apply"
+        assert first["actor_role"] == "store_manager"
+
+    def test_db_error_returns_500(self):
+        mock_session = MagicMock()
+        mock_session.execute = AsyncMock(side_effect=RuntimeError("DB down"))
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=False)
+        bad_session_local = MagicMock(return_value=mock_session)
+        with self._sys_modules_patch(bad_session_local):
+            resp = client.get("/api/v1/execution/audit-logs")
+        assert resp.status_code == 500
+        assert resp.json()["detail"]["error_code"] == "QUERY_ERROR"
