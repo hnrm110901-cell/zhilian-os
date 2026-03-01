@@ -141,7 +141,20 @@ class StoreMemoryService:
                 trend_7d = (recent_sales - prev_sales) / prev_sales
 
             avg_daily = recent_sales / 7
-            refund_rate = 0.0  # 简化：退单率计算需要退单记录
+
+            # 近7天取消/退单量
+            cancel_stmt = (
+                select(func.coalesce(func.sum(OrderItem.quantity), 0))
+                .join(Order, OrderItem.order_id == Order.id)
+                .where(
+                    Order.store_id == store_id,
+                    OrderItem.dish_id == sku_id,
+                    Order.order_time >= week_ago,
+                    Order.status == OrderStatus.CANCELLED,
+                )
+            )
+            cancelled_qty = float((await self._db.execute(cancel_stmt)).scalar() or 0)
+            refund_rate = min(1.0, cancelled_qty / max(recent_sales, 1))
 
             return DishHealth(
                 sku_id=sku_id,
@@ -191,8 +204,19 @@ class StoreMemoryService:
             result = await self._db.execute(stmt)
             row = result.one()
 
-            # 简化：假设每天1班次
-            shifts = max(lookback_days, 1)
+            # 统计实际出勤天数（有订单的不重复日期数）
+            shift_stmt = (
+                select(func.count(func.distinct(func.date(Order.order_time))))
+                .where(
+                    Order.store_id == store_id,
+                    Order.waiter_id == staff_id,
+                    Order.order_time >= start_date,
+                    Order.status.in_([OrderStatus.COMPLETED, OrderStatus.SERVED]),
+                )
+            )
+            shift_result = await self._db.execute(shift_stmt)
+            shifts = max(int(shift_result.scalar() or 1), 1)
+
             return StaffProfile(
                 staff_id=staff_id,
                 avg_orders_per_shift=float(row.order_count) / shifts,
