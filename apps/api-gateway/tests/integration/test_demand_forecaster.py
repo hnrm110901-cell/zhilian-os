@@ -256,3 +256,162 @@ class TestDBException:
 
         assert result.items == []
         assert result.basis == "rule_based"
+
+
+# ---------------------------------------------------------------------------
+# 5. _statistical() 路径（14-60 天历史数据）
+# ---------------------------------------------------------------------------
+
+class TestStatistical:
+    """
+    覆盖 _statistical() 移动加权平均路径:
+    - 3行数据验证权重算术（最新权重最高）
+    - 单行数据时结果等于该行营收
+    - DB返回空行时降级到 rule_based
+    - DB抛出异常时降级到 rule_based
+    """
+
+    @staticmethod
+    def _make_stat_row(revenue: float):
+        row = MagicMock()
+        row.revenue = revenue
+        return row
+
+    @staticmethod
+    def _make_db(history_days: int = 30, stat_rows=None, bom_rows=None, item_rows=None):
+        """
+        Call sequence:
+          0: _get_history_days  → scalar(history_days)
+          1: statistical query  → all(stat_rows)
+          2: BOM template       → all(bom_rows)
+          3: BOM items          → all(item_rows)
+        """
+        db = MagicMock()
+        stat_rows = stat_rows or []
+        bom_rows = bom_rows or []
+        item_rows = item_rows or []
+        call_count = [0]
+
+        async def execute_sequence(stmt):
+            result = MagicMock()
+            n = call_count[0]
+            call_count[0] += 1
+            if n == 0:
+                result.scalar = MagicMock(return_value=history_days)
+                result.all = MagicMock(return_value=[])
+            elif n == 1:
+                result.all = MagicMock(return_value=stat_rows)
+                result.scalar = MagicMock(return_value=None)
+            elif n == 2:
+                result.all = MagicMock(return_value=bom_rows)
+                result.scalar = MagicMock(return_value=None)
+            else:
+                result.all = MagicMock(return_value=item_rows)
+                result.scalar = MagicMock(return_value=None)
+            return result
+
+        db.execute = execute_sequence
+        return db
+
+    @pytest.mark.asyncio
+    async def test_weighted_average_three_rows(self):
+        """weights=[1,2,3], (1000×1 + 2000×2 + 3000×3) / 6 ≈ 2333.33"""
+        stat_rows = [
+            self._make_stat_row(1000.0),
+            self._make_stat_row(2000.0),
+            self._make_stat_row(3000.0),
+        ]
+        db = self._make_db(history_days=30, stat_rows=stat_rows)
+        fc = DemandForecaster(db_session=db)
+        result = await fc.predict("S1", date(2026, 3, 2))
+
+        expected = (1000 * 1 + 2000 * 2 + 3000 * 3) / 6
+        assert result.estimated_revenue == pytest.approx(expected, rel=1e-6)
+        assert result.basis == "statistical"
+        assert result.confidence == "medium"
+
+    @pytest.mark.asyncio
+    async def test_single_row_returns_that_revenue(self):
+        """1行数据时权重=1，结果等于该行营收"""
+        stat_rows = [self._make_stat_row(5500.0)]
+        db = self._make_db(history_days=20, stat_rows=stat_rows)
+        fc = DemandForecaster(db_session=db)
+        result = await fc.predict("S1", date(2026, 3, 2))
+
+        assert result.estimated_revenue == pytest.approx(5500.0)
+        assert result.basis == "statistical"
+
+    @pytest.mark.asyncio
+    async def test_empty_rows_fallback_to_rule_based(self):
+        """DB返回空行时降级到 rule_based（低置信度）"""
+        db = self._make_db(history_days=30, stat_rows=[])
+        fc = DemandForecaster(db_session=db)
+        result = await fc.predict("S1", date(2026, 3, 2))
+
+        assert result.basis == "rule_based"
+        assert result.confidence == "low"
+
+    @pytest.mark.asyncio
+    async def test_db_exception_fallback_to_rule_based(self):
+        """DB抛出异常时降级到 rule_based"""
+        db = MagicMock()
+        call_count = [0]
+
+        async def execute_seq(stmt):
+            n = call_count[0]
+            call_count[0] += 1
+            r = MagicMock()
+            if n == 0:
+                r.scalar = MagicMock(return_value=30)  # 14-60 → _statistical
+                return r
+            raise RuntimeError("connection lost")
+
+        db.execute = execute_seq
+        fc = DemandForecaster(db_session=db)
+        result = await fc.predict("S1", date(2026, 3, 2))
+
+        assert result.basis == "rule_based"
+        assert result.confidence == "low"
+
+
+# ---------------------------------------------------------------------------
+# 6. _ml_prophet() ImportError → 降级到 _statistical
+# ---------------------------------------------------------------------------
+
+class TestMLProphet:
+    """prophet 包缺失时 ImportError 被捕获，降级到 statistical（或 rule_based）"""
+
+    @pytest.mark.asyncio
+    async def test_prophet_import_error_fallback(self):
+        """sys.modules["prophet"]=None 触发 ImportError → 降级到 statistical"""
+        db = MagicMock()
+        call_count = [0]
+        stat_row = MagicMock()
+        stat_row.revenue = 4000.0
+
+        async def execute_seq(stmt):
+            n = call_count[0]
+            call_count[0] += 1
+            r = MagicMock()
+            if n == 0:
+                r.scalar = MagicMock(return_value=70)  # ≥60 → ML path
+                r.all = MagicMock(return_value=[])
+            elif n == 1:
+                # _statistical revenue query → 1 sampled row
+                r.all = MagicMock(return_value=[stat_row])
+                r.scalar = MagicMock(return_value=None)
+            else:
+                # BOM queries → empty
+                r.all = MagicMock(return_value=[])
+                r.scalar = MagicMock(return_value=None)
+            return r
+
+        db.execute = execute_seq
+        fc = DemandForecaster(db_session=db)
+
+        # Setting prophet to None makes "from prophet import Prophet" raise ImportError
+        with patch.dict("sys.modules", {"prophet": None}):
+            result = await fc.predict("S1", date(2026, 3, 2))
+
+        assert result.basis in ("statistical", "rule_based")
+        assert result.confidence in ("medium", "low")

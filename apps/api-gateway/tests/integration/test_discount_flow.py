@@ -232,3 +232,111 @@ class TestRollback:
         with pytest.raises(RollbackWindowExpiredError) as exc_info:
             await executor.rollback("old-exec-id", store_manager_actor)
         assert exc_info.value.error_code == "ROLLBACK_WINDOW_EXPIRED"
+
+    @pytest.mark.asyncio
+    async def test_rollback_happy_path(self, executor, store_manager_actor):
+        """30分钟内，有审批权限的操作员可以成功回滚"""
+        from datetime import datetime, timedelta
+
+        recent_time = datetime.utcnow() - timedelta(minutes=5)
+        executor._get_audit_record = AsyncMock(return_value={
+            "execution_id": "exec-123",
+            "command_type": "discount_apply",   # approver_roles includes store_manager
+            "store_id": "STORE_A1",
+            "brand_id": "BRAND_A",
+            "executed_at": recent_time,
+            "status": "completed",
+            "actor_id": "USER_001",
+        })
+
+        result = await executor.rollback("exec-123", store_manager_actor)
+
+        assert result["status"] == "rolled_back"
+        assert result["original_execution_id"] == "exec-123"
+        assert "rollback_id" in result
+        assert result["operator_id"] == store_manager_actor["user_id"]
+
+    @pytest.mark.asyncio
+    async def test_rollback_non_approver_denied(self, executor, waiter_actor):
+        """非审批角色尝试回滚 → PermissionDeniedError"""
+        from datetime import datetime, timedelta
+
+        recent_time = datetime.utcnow() - timedelta(minutes=5)
+        executor._get_audit_record = AsyncMock(return_value={
+            "execution_id": "exec-456",
+            "command_type": "discount_apply",   # waiter not in approver_roles
+            "store_id": "STORE_A1",
+            "brand_id": "BRAND_A",
+            "executed_at": recent_time,
+            "status": "completed",
+            "actor_id": "USER_001",
+        })
+
+        with pytest.raises(PermissionDeniedError) as exc_info:
+            await executor.rollback("exec-456", waiter_actor)
+        assert exc_info.value.error_code == "PERMISSION_DENIED"
+        assert "waiter" in str(exc_info.value)
+
+
+# ---------------------------------------------------------------------------
+# 金额熔断 reason 字符串
+# ---------------------------------------------------------------------------
+
+class TestCircuitBreaker:
+    @pytest.mark.asyncio
+    async def test_circuit_breaker_reason_contains_amount_and_threshold(
+        self, executor, store_manager_actor, discount_payload_large
+    ):
+        """熔断触发时 ApprovalRequiredError.reason 包含实际金额和熔断阈值"""
+        with pytest.raises(ApprovalRequiredError) as exc_info:
+            await executor.execute("discount_apply", discount_payload_large, store_manager_actor)
+        reason = exc_info.value.reason
+        # reason = "金额 800.0 超过熔断阈值 500.0 元，自动升级为 APPROVE"
+        assert "800" in reason
+        assert "500" in reason
+
+    @pytest.mark.asyncio
+    async def test_below_circuit_breaker_still_approve_level(
+        self, executor, store_manager_actor, discount_payload_small
+    ):
+        """小额折扣（200元，低于阈值500元）因 APPROVE 级别触发审批，非熔断"""
+        with pytest.raises(ApprovalRequiredError) as exc_info:
+            await executor.execute("discount_apply", discount_payload_small, store_manager_actor)
+        reason = exc_info.value.reason
+        # Not circuit-breaker triggered; reason should NOT mention threshold info
+        assert "500" not in reason or "超过熔断阈值" not in reason
+
+
+# ---------------------------------------------------------------------------
+# 折扣类指令异常检测触发
+# ---------------------------------------------------------------------------
+
+class TestAnomalyDispatch:
+    @pytest.mark.asyncio
+    async def test_discount_apply_dispatches_anomaly_check(
+        self, executor, store_manager_actor
+    ):
+        """discount_apply 在 AUTO 路由下执行后触发 realtime_anomaly_check.delay"""
+        from src.core.execution_registry import COMMAND_REGISTRY, ExecutionLevel
+
+        # Temporarily override level so discount_apply goes through AUTO path
+        original_level = COMMAND_REGISTRY["discount_apply"].level
+        COMMAND_REGISTRY["discount_apply"].level = ExecutionLevel.AUTO
+
+        mock_check = MagicMock()
+        mock_check.delay = MagicMock()
+        mock_celery = MagicMock()
+        mock_celery.realtime_anomaly_check = mock_check
+
+        try:
+            with patch.dict("sys.modules", {"src.core.celery_tasks": mock_celery}):
+                await executor.execute(
+                    "discount_apply",
+                    {"store_id": "STORE_A1", "brand_id": "BRAND_A", "amount": 100.0},
+                    store_manager_actor,
+                )
+            mock_check.delay.assert_called_once()
+            kwargs = mock_check.delay.call_args[1]
+            assert kwargs["store_id"] == "STORE_A1"
+        finally:
+            COMMAND_REGISTRY["discount_apply"].level = original_level
