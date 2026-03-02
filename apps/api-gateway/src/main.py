@@ -65,6 +65,7 @@ from src.api import dashboard_preferences
 from src.api import execution, menu, store_memory, ontology_api, fct_public
 # Phase 1 — 运营智能层：渠道毛利 API
 from src.api import channel_profit
+from src.api import performance_compute
 from src.middleware.monitoring import MonitoringMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
 from src.middleware.audit_log import AuditLogMiddleware
@@ -557,6 +558,8 @@ app.include_router(ontology_api.router)
 app.include_router(fct_public.router, prefix="/api/v1/fct-public", tags=["fct_public"])
 # Phase 1 — 运营智能层：渠道毛利看板
 app.include_router(channel_profit.router)
+# Phase 2 — 绩效计算引擎
+app.include_router(performance_compute.router)
 
 # 业财税资金一体化（FCT）
 if getattr(settings, "FCT_ENABLED", False):
