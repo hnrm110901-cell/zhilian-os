@@ -23,10 +23,17 @@
 - [x] 新增私域运营 18个增长 action（AARRR 框架）
 - [x] 企微 webhook 接入私域 Agent 对话（P0/P1）
 - [x] 生成智链OS功能明细思维导图
+- [x] P2 绩效计算引擎：EmployeeMetricRecord 模型 + PerformanceComputeService + API 端点（3个）+ 17个测试
 
 ---
 
 ## 评论
+
+### 2026-03-02
+- P2 绩效计算引擎上线：从订单/损耗事件聚合各岗位核心指标（store_manager/waiter/kitchen）
+- 新增 employee_metric_records 表（Alembic b03），幂等 upsert
+- API：POST /compute 触发计算，GET /metrics 查询，GET /summary 汇总
+- 17个集成测试全部通过
 
 ### 2026-02-26
 - 所有8个 package agent 测试套件在独立运行时全部通过（共 235 个测试）
