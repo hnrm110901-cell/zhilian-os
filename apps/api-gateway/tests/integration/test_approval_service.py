@@ -476,3 +476,325 @@ class TestGetDecisionStatistics:
         stats = await svc.get_decision_statistics(db=db)
         assert stats["by_type"]["purchase_suggestion"] == 2
         assert stats["by_type"]["inventory_alert"] == 1
+
+
+# ===========================================================================
+# create_approval_request — exception path (lines 99-103)
+# ===========================================================================
+
+class TestCreateApprovalRequestException:
+    @pytest.mark.asyncio
+    async def test_db_commit_raises_rolls_back_and_reraises(self):
+        svc = _svc()
+        db = _mock_db()
+        db.commit = AsyncMock(side_effect=RuntimeError("db error"))
+        with pytest.raises(RuntimeError, match="db error"):
+            await svc.create_approval_request(
+                decision_type=DecisionType.PURCHASE_SUGGESTION,
+                agent_type="agent",
+                agent_method="method",
+                store_id="S1",
+                ai_suggestion={},
+                ai_confidence=0.5,
+                ai_reasoning="test",
+                db=db,
+            )
+        db.rollback.assert_awaited_once()
+
+
+# ===========================================================================
+# _send_approval_notification (lines 107-146)
+# ===========================================================================
+
+class TestSendApprovalNotification:
+    @pytest.mark.asyncio
+    async def test_store_not_found_logs_warning_and_returns(self):
+        svc = _svc()
+        log = _decision_log()
+        db = _mock_db(scalar_value=None)
+        # No exception should be raised; method returns early
+        await svc._send_approval_notification(log, db)
+        svc.wechat_service.send_approval_card.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_no_managers_found_logs_warning_and_returns(self):
+        svc = _svc()
+        log = _decision_log()
+        store = MagicMock(spec=Store)
+        store.name = "Test Store"
+        # First execute returns the store; second execute returns empty managers list
+        store_result = MagicMock()
+        store_result.scalar_one_or_none = MagicMock(return_value=store)
+        managers_result = MagicMock()
+        managers_result.scalars = MagicMock(return_value=MagicMock(all=MagicMock(return_value=[])))
+        db = AsyncMock()
+        db.execute = AsyncMock(side_effect=[store_result, managers_result])
+        await svc._send_approval_notification(log, db)
+        svc.wechat_service.send_approval_card.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_sends_card_to_all_managers(self):
+        svc = _svc()
+        log = _decision_log()
+        store = MagicMock(spec=Store)
+        store.name = "Test Store"
+        mgr1 = MagicMock()
+        mgr1.wechat_user_id = "WX001"
+        mgr2 = MagicMock()
+        mgr2.wechat_user_id = "WX002"
+        store_result = MagicMock()
+        store_result.scalar_one_or_none = MagicMock(return_value=store)
+        managers_result = MagicMock()
+        managers_result.scalars = MagicMock(
+            return_value=MagicMock(all=MagicMock(return_value=[mgr1, mgr2]))
+        )
+        db = AsyncMock()
+        db.execute = AsyncMock(side_effect=[store_result, managers_result])
+        await svc._send_approval_notification(log, db)
+        assert svc.wechat_service.send_approval_card.await_count == 2
+
+    @pytest.mark.asyncio
+    async def test_exception_in_notification_is_swallowed(self):
+        svc = _svc()
+        log = _decision_log()
+        db = AsyncMock()
+        db.execute = AsyncMock(side_effect=RuntimeError("network error"))
+        # Method catches exception internally and does not re-raise
+        await svc._send_approval_notification(log, db)
+
+
+# ===========================================================================
+# reject_decision — not-found raise (line 268) and except block (lines 301-305)
+# ===========================================================================
+
+class TestRejectDecisionEdgeCases:
+    @pytest.mark.asyncio
+    async def test_reject_not_found_raises_value_error(self):
+        svc = _svc()
+        db = _mock_db(scalar_value=None)
+        with pytest.raises(ValueError, match="not found"):
+            await svc.reject_decision("MISSING", "MGR-1", "reason", db=db)
+
+    @pytest.mark.asyncio
+    async def test_reject_db_commit_raises_rolls_back_and_reraises(self):
+        svc = _svc()
+        log = _decision_log()
+        db = _mock_db(scalar_value=log)
+        db.commit = AsyncMock(side_effect=RuntimeError("commit error"))
+        with pytest.raises(RuntimeError, match="commit error"):
+            await svc.reject_decision("D1", "MGR-1", "reason", db=db)
+        db.rollback.assert_awaited_once()
+
+
+# ===========================================================================
+# modify_decision — not-found raise (line 332) and except block (lines 370-374)
+# ===========================================================================
+
+class TestModifyDecisionEdgeCases:
+    @pytest.mark.asyncio
+    async def test_modify_not_found_raises_value_error(self):
+        svc = _svc()
+        db = _mock_db(scalar_value=None)
+        with pytest.raises(ValueError, match="not found"):
+            await svc.modify_decision("MISSING", "MGR-1", {}, db=db)
+
+    @pytest.mark.asyncio
+    async def test_modify_db_commit_raises_rolls_back_and_reraises(self):
+        svc = _svc()
+        log = _decision_log()
+        db = _mock_db(scalar_value=log)
+        db.commit = AsyncMock(side_effect=RuntimeError("commit error"))
+        with pytest.raises(RuntimeError, match="commit error"):
+            await svc.modify_decision("D1", "MGR-1", {"qty": 10}, db=db)
+        db.rollback.assert_awaited_once()
+
+
+# ===========================================================================
+# _execute_decision (lines 378-431)
+# ===========================================================================
+
+class TestExecuteDecision:
+    @pytest.mark.asyncio
+    async def test_purchase_suggestion_adds_notification(self):
+        svc = _svc()
+        log = _decision_log(decision_type=DecisionType.PURCHASE_SUGGESTION)
+        db = _mock_db()
+        with patch.dict("sys.modules", {"src.models.notification": MagicMock()}):
+            await svc._execute_decision(log, db)
+        db.add.assert_called_once()
+        assert log.decision_status == DecisionStatus.EXECUTED
+        db.commit.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_inventory_alert_adds_notification(self):
+        svc = _svc()
+        log = _decision_log(decision_type=DecisionType.INVENTORY_ALERT)
+        db = _mock_db()
+        with patch.dict("sys.modules", {"src.models.notification": MagicMock()}):
+            await svc._execute_decision(log, db)
+        db.add.assert_called_once()
+        assert log.decision_status == DecisionStatus.EXECUTED
+
+    @pytest.mark.asyncio
+    async def test_schedule_optimization_adds_notification(self):
+        svc = _svc()
+        log = _decision_log(decision_type=DecisionType.SCHEDULE_OPTIMIZATION)
+        db = _mock_db()
+        with patch.dict("sys.modules", {"src.models.notification": MagicMock()}):
+            await svc._execute_decision(log, db)
+        db.add.assert_called_once()
+        assert log.decision_status == DecisionStatus.EXECUTED
+
+    @pytest.mark.asyncio
+    async def test_other_decision_type_no_notification_added(self):
+        svc = _svc()
+        log = _decision_log(decision_type=DecisionType.COST_OPTIMIZATION)
+        db = _mock_db()
+        with patch.dict("sys.modules", {"src.models.notification": MagicMock()}):
+            await svc._execute_decision(log, db)
+        db.add.assert_not_called()
+        assert log.decision_status == DecisionStatus.EXECUTED
+
+    @pytest.mark.asyncio
+    async def test_execute_decision_commit_raises_reraises(self):
+        svc = _svc()
+        log = _decision_log(decision_type=DecisionType.COST_OPTIMIZATION)
+        db = _mock_db()
+        db.commit = AsyncMock(side_effect=RuntimeError("execute error"))
+        with patch.dict("sys.modules", {"src.models.notification": MagicMock()}):
+            with pytest.raises(RuntimeError, match="execute error"):
+                await svc._execute_decision(log, db)
+
+
+# ===========================================================================
+# record_decision_outcome — not-found raise (line 460) and except block (lines 495-499)
+# ===========================================================================
+
+class TestRecordDecisionOutcomeEdgeCases:
+    @pytest.mark.asyncio
+    async def test_record_outcome_not_found_raises_value_error(self):
+        svc = _svc()
+        db = _mock_db(scalar_value=None)
+        with pytest.raises(ValueError, match="not found"):
+            await svc.record_decision_outcome(
+                decision_id="MISSING",
+                outcome=DecisionOutcome.SUCCESS,
+                actual_result={"value": 100},
+                expected_result={"value": 100},
+                db=db,
+            )
+
+    @pytest.mark.asyncio
+    async def test_record_outcome_db_commit_raises_rolls_back_and_reraises(self):
+        svc = _svc()
+        log = _decision_log(status=DecisionStatus.APPROVED, ai_confidence=0.8)
+        db = _mock_db(scalar_value=log)
+        db.commit = AsyncMock(side_effect=RuntimeError("commit failed"))
+        with pytest.raises(RuntimeError, match="commit failed"):
+            await svc.record_decision_outcome(
+                decision_id="D1",
+                outcome=DecisionOutcome.SUCCESS,
+                actual_result={"value": 100},
+                expected_result={"value": 100},
+                db=db,
+            )
+        db.rollback.assert_awaited_once()
+
+
+# ===========================================================================
+# get_pending_approvals (lines 554-576)
+# ===========================================================================
+
+class TestGetPendingApprovals:
+    @pytest.mark.asyncio
+    async def test_no_filters_returns_all_pending(self):
+        svc = _svc()
+        log = _decision_log()
+        db = _mock_db(scalars_all=[log])
+        result = await svc.get_pending_approvals(db=db)
+        assert result == [log]
+
+    @pytest.mark.asyncio
+    async def test_store_id_filter(self):
+        svc = _svc()
+        log = _decision_log()
+        db = _mock_db(scalars_all=[log])
+        result = await svc.get_pending_approvals(store_id="S1", db=db)
+        assert result == [log]
+
+    @pytest.mark.asyncio
+    async def test_manager_id_filter_uses_two_queries(self):
+        svc = _svc()
+        log = _decision_log()
+        # First execute call: returns store IDs for the manager
+        stores_result = MagicMock()
+        stores_result.all = MagicMock(return_value=[("S1",), ("S2",)])
+        # Second execute call: returns the pending decisions
+        decisions_result = MagicMock()
+        decisions_result.scalars = MagicMock(
+            return_value=MagicMock(all=MagicMock(return_value=[log]))
+        )
+        db = AsyncMock()
+        db.execute = AsyncMock(side_effect=[stores_result, decisions_result])
+        result = await svc.get_pending_approvals(manager_id="MGR-1", db=db)
+        assert result == [log]
+        assert db.execute.await_count == 2
+
+    @pytest.mark.asyncio
+    async def test_exception_reraises(self):
+        svc = _svc()
+        db = AsyncMock()
+        db.execute = AsyncMock(side_effect=RuntimeError("db down"))
+        with pytest.raises(RuntimeError, match="db down"):
+            await svc.get_pending_approvals(db=db)
+
+
+# ===========================================================================
+# get_decision_statistics — optional filters (lines 601, 603, 605) and except (lines 642-644)
+# ===========================================================================
+
+class TestGetDecisionStatisticsEdgeCases:
+    @pytest.mark.asyncio
+    async def test_store_id_filter_applied(self):
+        svc = _svc()
+        log = _decision_log(status=DecisionStatus.APPROVED)
+        db = _mock_db(scalars_all=[log])
+        stats = await svc.get_decision_statistics(store_id="S1", db=db)
+        assert stats["total"] == 1
+
+    @pytest.mark.asyncio
+    async def test_start_date_filter_applied(self):
+        svc = _svc()
+        log = _decision_log(status=DecisionStatus.PENDING)
+        db = _mock_db(scalars_all=[log])
+        stats = await svc.get_decision_statistics(start_date=datetime(2025, 1, 1), db=db)
+        assert stats["total"] == 1
+
+    @pytest.mark.asyncio
+    async def test_end_date_filter_applied(self):
+        svc = _svc()
+        log = _decision_log(status=DecisionStatus.PENDING)
+        db = _mock_db(scalars_all=[log])
+        stats = await svc.get_decision_statistics(end_date=datetime(2026, 12, 31), db=db)
+        assert stats["total"] == 1
+
+    @pytest.mark.asyncio
+    async def test_all_filters_combined(self):
+        svc = _svc()
+        log = _decision_log(status=DecisionStatus.REJECTED)
+        db = _mock_db(scalars_all=[log])
+        stats = await svc.get_decision_statistics(
+            store_id="S1",
+            start_date=datetime(2025, 1, 1),
+            end_date=datetime(2026, 12, 31),
+            db=db,
+        )
+        assert stats["total"] == 1
+
+    @pytest.mark.asyncio
+    async def test_exception_reraises(self):
+        svc = _svc()
+        db = AsyncMock()
+        db.execute = AsyncMock(side_effect=RuntimeError("statistics error"))
+        with pytest.raises(RuntimeError, match="statistics error"):
+            await svc.get_decision_statistics(db=db)
