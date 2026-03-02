@@ -48,6 +48,8 @@ class AuthService:
             "sub": str(user.id),
             "username": user.username,
             "role": user.role.value,
+            "store_id": user.store_id or "",
+            "brand_id": user.brand_id or "",
         }
 
         access_token = create_access_token(
@@ -72,6 +74,7 @@ class AuthService:
                 "full_name": user.full_name,
                 "role": user.role.value,
                 "store_id": user.store_id,
+                "brand_id": user.brand_id,
                 "is_active": user.is_active,
             },
         }
@@ -97,6 +100,8 @@ class AuthService:
                 "sub": str(user.id),
                 "username": user.username,
                 "role": user.role.value,
+                "store_id": user.store_id or "",
+                "brand_id": user.brand_id or "",
             },
             expires_delta=access_token_expires,
         )

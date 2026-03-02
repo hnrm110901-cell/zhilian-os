@@ -57,6 +57,7 @@ def _make_user(
     role=UserRole.WAITER,
     is_active=True,
     store_id="S1",
+    brand_id=None,
     password="secret",
 ):
     user = MagicMock(spec=User)
@@ -66,6 +67,7 @@ def _make_user(
     user.full_name = "Test User"
     user.role = role
     user.store_id = store_id
+    user.brand_id = brand_id
     user.is_active = is_active
     user.hashed_password = get_password_hash(password)
     return user
@@ -147,6 +149,41 @@ class TestCreateTokensForUser:
         assert r["access_token"] != r["refresh_token"]
 
     @pytest.mark.asyncio
+    async def test_brand_id_in_jwt_payload(self):
+        """ARCH-002: brand_id must be embedded in the access token claims."""
+        user = _make_user(brand_id="B42")
+        svc = AuthService()
+        result = await svc.create_tokens_for_user(user)
+        payload = decode_access_token(result["access_token"])
+        assert payload["brand_id"] == "B42"
+
+    @pytest.mark.asyncio
+    async def test_store_id_in_jwt_payload(self):
+        """store_id must be embedded in the access token claims."""
+        user = _make_user(store_id="S99")
+        svc = AuthService()
+        result = await svc.create_tokens_for_user(user)
+        payload = decode_access_token(result["access_token"])
+        assert payload["store_id"] == "S99"
+
+    @pytest.mark.asyncio
+    async def test_brand_id_in_user_info(self):
+        """ARCH-002: brand_id must appear in the user dict of the token response."""
+        user = _make_user(brand_id="B7")
+        svc = AuthService()
+        result = await svc.create_tokens_for_user(user)
+        assert result["user"]["brand_id"] == "B7"
+
+    @pytest.mark.asyncio
+    async def test_none_brand_id_becomes_empty_string_in_jwt(self):
+        """user.brand_id=None should produce brand_id='' in the JWT claim."""
+        user = _make_user(brand_id=None)
+        svc = AuthService()
+        result = await svc.create_tokens_for_user(user)
+        payload = decode_access_token(result["access_token"])
+        assert payload["brand_id"] == ""
+
+    @pytest.mark.asyncio
     async def test_create_access_token_for_user_alias(self):
         """Deprecated method delegates to create_tokens_for_user."""
         user = _make_user()
@@ -217,6 +254,17 @@ class TestRefreshAccessToken:
                    return_value={"type": "refresh"}):  # no 'sub'
             with pytest.raises(ValueError, match="无效的刷新令牌"):
                 await svc.refresh_access_token("any-token")
+
+    @pytest.mark.asyncio
+    async def test_refreshed_access_token_contains_brand_id(self):
+        """ARCH-002: refreshed access token must carry brand_id in claims."""
+        user = _make_user(username="eve", brand_id="B99")
+        svc = AuthService()
+        tokens = await svc.create_tokens_for_user(user)
+        svc.get_user_by_id = AsyncMock(return_value=user)
+        result = await svc.refresh_access_token(tokens["refresh_token"])
+        payload = decode_access_token(result["access_token"])
+        assert payload["brand_id"] == "B99"
 
 
 # ===========================================================================
