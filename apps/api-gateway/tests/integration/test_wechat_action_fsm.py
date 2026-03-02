@@ -739,3 +739,145 @@ class TestEscalationTimeouts:
 
     def test_p3_timeout_is_3_days(self):
         assert ESCALATION_TIMEOUTS[ActionPriority.P3] == 3 * 24 * 60 * 60
+
+
+# ===========================================================================
+# Push failure → FAILED state  (lines 219-220)
+# ===========================================================================
+class TestPushToWechatFailure:
+    @pytest.mark.asyncio
+    async def test_push_failure_sets_failed_state(self):
+        """_send_wechat_message returns False → action.state = FAILED (lines 219-220)."""
+        fsm = _fsm()
+        action = await _action(fsm)
+        mock_wwms = AsyncMock()
+        mock_wwms.send_markdown = AsyncMock(return_value={"errcode": 9999})
+        with patch.dict("sys.modules", {
+            "src.services.wechat_work_message_service": MagicMock(
+                wechat_work_message_service=mock_wwms
+            )
+        }):
+            result = await fsm.push_to_wechat(action.action_id)
+        assert result is False
+        assert action.state == ActionState.FAILED
+
+
+# ===========================================================================
+# _get_action not found  (line 431)
+# ===========================================================================
+class TestGetActionPrivate:
+    def test_not_found_raises_value_error(self):
+        fsm = _fsm()
+        with pytest.raises(ValueError, match="不存在"):
+            fsm._get_action("ghost-id")
+
+
+# ===========================================================================
+# _send_wechat_message success path  (lines 471-475)
+# ===========================================================================
+class TestSendWechatMessageInternal:
+    @pytest.mark.asyncio
+    async def test_successful_send_returns_true(self):
+        """Covers lines 471-475 (the import + successful send path)."""
+        fsm = _fsm()
+        mock_wwms = AsyncMock()
+        mock_wwms.send_markdown = AsyncMock(return_value={"errcode": 0})
+        with patch.dict("sys.modules", {
+            "src.services.wechat_work_message_service": MagicMock(
+                wechat_work_message_service=mock_wwms
+            )
+        }):
+            result = await fsm._send_wechat_message("U1", "test content")
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_non_zero_errcode_returns_false(self):
+        fsm = _fsm()
+        mock_wwms = AsyncMock()
+        mock_wwms.send_markdown = AsyncMock(return_value={"errcode": 40001})
+        with patch.dict("sys.modules", {
+            "src.services.wechat_work_message_service": MagicMock(
+                wechat_work_message_service=mock_wwms
+            )
+        }):
+            result = await fsm._send_wechat_message("U1", "test")
+        assert result is False
+
+
+# ===========================================================================
+# start_escalation_monitor (lines 313-322) + _check_escalations (lines 326-330)
+# ===========================================================================
+class TestEscalationMonitor:
+    @pytest.mark.asyncio
+    async def test_start_escalation_monitor_creates_task(self):
+        """start_escalation_monitor should create an asyncio Task (lines 313-322)."""
+        import asyncio
+        fsm = _fsm()
+        await fsm.start_escalation_monitor(interval_seconds=3600)
+        assert fsm._escalation_task is not None
+        # Clean up to avoid hanging
+        fsm._escalation_task.cancel()
+        try:
+            await fsm._escalation_task
+        except asyncio.CancelledError:
+            pass
+
+    @pytest.mark.asyncio
+    async def test_check_escalations_triggers_escalate_for_expired(self):
+        """_check_escalations escalates expired actions (lines 326-330)."""
+        fsm = _fsm()
+        action = await _action(fsm, priority=ActionPriority.P2)
+        # Put it in PUSHED state and fake pushed_at to be way in the past
+        action.state = ActionState.PUSHED
+        action.pushed_at = datetime(2020, 1, 1)  # far past any timeout
+        await fsm._check_escalations()
+        assert action.state == ActionState.ESCALATED
+
+
+# ===========================================================================
+# _monitor() inner function body (lines 315-319) — let the task run one tick
+# ===========================================================================
+class TestEscalationMonitorInnerLoop:
+    @pytest.mark.asyncio
+    async def test_monitor_loop_body_executes(self):
+        """
+        Lines 315-319: the _monitor() inner coroutine's try/except/sleep body.
+        We use a very short interval, let the task run one iteration by yielding
+        control with asyncio.sleep(0), then cancel.
+        """
+        import asyncio
+        fsm = _fsm()
+        await fsm.start_escalation_monitor(interval_seconds=0)
+        # Yield control so the event loop runs the task body at least once
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        # Now cancel
+        fsm._escalation_task.cancel()
+        try:
+            await fsm._escalation_task
+        except asyncio.CancelledError:
+            pass
+
+    @pytest.mark.asyncio
+    async def test_monitor_loop_exception_is_caught(self):
+        """
+        Lines 317-318: _check_escalations raises → loop catches and continues.
+        """
+        import asyncio
+        fsm = _fsm()
+        call_count = [0]
+
+        async def raising_check():
+            call_count[0] += 1
+            raise RuntimeError("boom")
+
+        fsm._check_escalations = raising_check
+        await fsm.start_escalation_monitor(interval_seconds=0)
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        assert call_count[0] >= 1
+        fsm._escalation_task.cancel()
+        try:
+            await fsm._escalation_task
+        except asyncio.CancelledError:
+            pass

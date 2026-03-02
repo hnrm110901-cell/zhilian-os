@@ -629,3 +629,218 @@ class TestGlobalSingleton:
     def test_redis_cache_not_initialized(self):
         # Module-level singleton starts uninitialized
         assert redis_cache._initialized is False
+
+
+# ===========================================================================
+# initialize: sentinel with password (line 42)
+# ===========================================================================
+class TestInitializeSentinelWithPassword:
+    @pytest.mark.asyncio
+    async def test_sentinel_with_password_sets_kwargs(self):
+        """Line 42: sentinel_kwargs['password'] is set when REDIS_SENTINEL_PASSWORD is truthy."""
+        svc = _svc(initialized=False)
+        sentinel_settings = MagicMock(
+            REDIS_SENTINEL_HOSTS="sentinel1:26379,sentinel2:26379",
+            REDIS_SENTINEL_PASSWORD="s3cr3t",  # non-empty → line 42 executes
+            REDIS_SENTINEL_MASTER="mymaster",
+            REDIS_SENTINEL_DB=0,
+        )
+        mock_client = AsyncMock()
+        mock_client.ping = AsyncMock()
+        mock_sentinel = MagicMock()
+        mock_sentinel.master_for = MagicMock(return_value=mock_client)
+
+        import src.services.redis_cache_service as mod
+        import types
+        sentinel_submod = types.ModuleType("redis.asyncio.sentinel")
+        captured_kwargs = {}
+
+        def capture_sentinel(sentinels, sentinel_kwargs=None, **kw):
+            captured_kwargs.update(sentinel_kwargs or {})
+            return mock_sentinel
+
+        sentinel_submod.Sentinel = capture_sentinel
+
+        with patch.object(mod, "settings", sentinel_settings), \
+             patch("src.services.redis_cache_service.redis") as mock_redis_mod, \
+             patch.dict("sys.modules", {"redis.asyncio.sentinel": sentinel_submod}):
+            mock_redis_mod.AuthenticationError = Exception
+            mock_redis_mod.ConnectionError = Exception
+            await svc.initialize()
+
+        assert captured_kwargs.get("password") == "s3cr3t"
+        assert svc._initialized is True
+
+
+# ===========================================================================
+# initialize: ConnectionError (lines 71-72)
+# ===========================================================================
+class TestInitializeConnectionError:
+    @pytest.mark.asyncio
+    async def test_connection_error_is_re_raised(self):
+        """Lines 71-72: redis.ConnectionError handler logs and re-raises."""
+        svc = _svc(initialized=False)
+
+        class FakeConnError(Exception):
+            pass
+
+        import src.services.redis_cache_service as mod
+        with patch.object(mod, "settings", _DIRECT_SETTINGS), \
+             patch("src.services.redis_cache_service.redis") as mock_redis_mod:
+            mock_redis_mod.from_url = AsyncMock(side_effect=FakeConnError("refused"))
+            mock_redis_mod.AuthenticationError = OSError  # different type
+            mock_redis_mod.ConnectionError = FakeConnError  # maps to our error
+            with pytest.raises(FakeConnError):
+                await svc.initialize()
+
+        assert svc._initialized is False
+
+
+# ===========================================================================
+# Auto-initialize on first call for each method
+# (lines 134, 172, 193, 214, 234, 255, 276, 297, 326, 352, 382, 404, 432, 437, 461, 490)
+# ===========================================================================
+class TestAutoInitializeOnFirstCall:
+    """
+    Each service method checks `if not self._initialized: await self.initialize()`.
+    We patch svc.initialize as an AsyncMock that sets _initialized=True and
+    _redis=mock_redis, then call the method and assert initialize was awaited once.
+    """
+
+    def _uninit_svc_with_mock_redis(self):
+        """Return (svc, mock_redis) with svc not yet initialized."""
+        svc = _svc(initialized=False)
+        mock_redis = AsyncMock()
+        # Patch initialize to set up the redis mock inline
+        async def fake_initialize():
+            svc._initialized = True
+            svc._redis = mock_redis
+        svc.initialize = AsyncMock(side_effect=fake_initialize)
+        return svc, mock_redis
+
+    @pytest.mark.asyncio
+    async def test_set_auto_initializes(self):  # line 172
+        svc, mock_redis = self._uninit_svc_with_mock_redis()
+        mock_redis.set = AsyncMock()
+        await svc.set("k", "v")
+        svc.initialize.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_delete_auto_initializes(self):  # line 193
+        svc, mock_redis = self._uninit_svc_with_mock_redis()
+        mock_redis.delete = AsyncMock()
+        await svc.delete("k")
+        svc.initialize.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_exists_auto_initializes(self):  # line 214
+        svc, mock_redis = self._uninit_svc_with_mock_redis()
+        mock_redis.exists = AsyncMock(return_value=0)
+        await svc.exists("k")
+        svc.initialize.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_expire_auto_initializes(self):  # line 234
+        svc, mock_redis = self._uninit_svc_with_mock_redis()
+        mock_redis.expire = AsyncMock(return_value=True)
+        await svc.expire("k", 60)
+        svc.initialize.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_ttl_auto_initializes(self):  # line 255
+        svc, mock_redis = self._uninit_svc_with_mock_redis()
+        mock_redis.ttl = AsyncMock(return_value=100)
+        await svc.ttl("k")
+        svc.initialize.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_incr_auto_initializes(self):  # line 276
+        svc, mock_redis = self._uninit_svc_with_mock_redis()
+        mock_redis.incrby = AsyncMock(return_value=1)
+        await svc.incr("k")
+        svc.initialize.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_decr_auto_initializes(self):  # line 297
+        svc, mock_redis = self._uninit_svc_with_mock_redis()
+        mock_redis.decrby = AsyncMock(return_value=-1)
+        await svc.decr("k")
+        svc.initialize.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_hget_auto_initializes(self):  # line 326
+        svc, mock_redis = self._uninit_svc_with_mock_redis()
+        mock_redis.hget = AsyncMock(return_value=None)
+        await svc.hget("h", "f")
+        svc.initialize.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_hset_auto_initializes(self):  # line 352
+        svc, mock_redis = self._uninit_svc_with_mock_redis()
+        mock_redis.hset = AsyncMock()
+        await svc.hset("h", "f", "v")
+        svc.initialize.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_hgetall_auto_initializes(self):  # line 382
+        svc, mock_redis = self._uninit_svc_with_mock_redis()
+        mock_redis.hgetall = AsyncMock(return_value={})
+        await svc.hgetall("h")
+        svc.initialize.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_hdel_auto_initializes(self):  # line 404
+        svc, mock_redis = self._uninit_svc_with_mock_redis()
+        mock_redis.hdel = AsyncMock()
+        await svc.hdel("h", "f")
+        svc.initialize.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_lpush_auto_initializes(self):  # line 432
+        svc, mock_redis = self._uninit_svc_with_mock_redis()
+        mock_redis.lpush = AsyncMock(return_value=1)
+        await svc.lpush("list", "v")
+        svc.initialize.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_rpush_auto_initializes(self):  # line 461
+        svc, mock_redis = self._uninit_svc_with_mock_redis()
+        mock_redis.rpush = AsyncMock(return_value=1)
+        await svc.rpush("list", "v")
+        svc.initialize.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_lrange_auto_initializes(self):  # line 490 (approx)
+        svc, mock_redis = self._uninit_svc_with_mock_redis()
+        mock_redis.lrange = AsyncMock(return_value=[])
+        await svc.lrange("list")
+        svc.initialize.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_clear_pattern_auto_initializes(self):  # line 437 (approx)
+        svc, mock_redis = self._uninit_svc_with_mock_redis()
+
+        async def empty_scan(*args, **kwargs):
+            return
+            yield
+
+        mock_redis.scan_iter = empty_scan
+        mock_redis.delete = AsyncMock()
+        await svc.clear_pattern("*")
+        svc.initialize.assert_awaited_once()
+
+
+# ===========================================================================
+# rpush with dict value serialization (line 437)
+# ===========================================================================
+class TestRpushDictSerialization:
+    @pytest.mark.asyncio
+    async def test_rpush_dict_value_json_serialized(self):
+        """Line 437: rpush with a dict value triggers json.dumps path."""
+        svc = _svc()
+        svc._redis.rpush = AsyncMock(return_value=1)
+        result = await svc.rpush("list", {"key": "value"})
+        assert result == 1
+        call_args = svc._redis.rpush.call_args[0]
+        # The dict should be JSON serialized
+        assert json.loads(call_args[1]) == {"key": "value"}
