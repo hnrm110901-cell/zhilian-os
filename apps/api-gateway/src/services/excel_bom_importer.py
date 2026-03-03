@@ -50,6 +50,8 @@ COLUMN_ALIASES: Dict[str, str] = {
     "菜品编码": "dish_code", "dish_code": "dish_code",
     "菜品名称": "dish_name", "菜品": "dish_name", "dish_name": "dish_name",
     "版本": "version", "配方版本": "version", "version": "version",
+    "售价": "dish_price", "价格": "dish_price", "单价": "dish_price",
+    "dish_price": "dish_price", "price": "dish_price",
     "出成率": "yield_rate", "yield_rate": "yield_rate",
     "标准份重": "standard_portion", "份重": "standard_portion",
     "制作工时": "prep_time_minutes", "工时": "prep_time_minutes",
@@ -86,6 +88,7 @@ class ImportRow:
     prep_time_minutes: Optional[int]
     notes: Optional[str]
     row_number: int
+    dish_price: Optional["Decimal"] = None
 
 
 @dataclass
@@ -205,6 +208,13 @@ class ExcelBOMImporter:
         std_portion = get("standard_portion")
         prep_time = get("prep_time_minutes")
 
+        price_val = get("dish_price")
+        try:
+            from decimal import Decimal as _Decimal
+            dish_price = _Decimal(str(price_val)).quantize(_Decimal("0.01")) if price_val not in (None, "", 0, "0") else None
+        except Exception:
+            dish_price = None
+
         return ImportRow(
             dish_code=dish_code,
             dish_name=dish_name,
@@ -223,6 +233,7 @@ class ExcelBOMImporter:
             prep_time_minutes=int(prep_time) if prep_time else None,
             notes=str(get("notes") or "").strip() or None,
             row_number=row_num,
+            dish_price=dish_price,
         )
 
     async def _process_rows(self, rows: List[ImportRow], report: ImportReport) -> None:
@@ -238,7 +249,7 @@ class ExcelBOMImporter:
             first = group_rows[0]
             try:
                 # 1. 确保 Dish 主档存在
-                dish = await self._ensure_dish(dish_code, first.dish_name)
+                dish = await self._ensure_dish(dish_code, first.dish_name, first.dish_price)
 
                 # 2. 创建 BOM 版本
                 bom = await self.bom_svc.create_bom(
@@ -304,7 +315,7 @@ class ExcelBOMImporter:
 
         await self.db.commit()
 
-    async def _ensure_dish(self, code: str, name: str) -> Dish:
+    async def _ensure_dish(self, code: str, name: str, price=None) -> Dish:
         """查找或创建菜品主档"""
         stmt = select(Dish).where(Dish.code == code)
         result = await self.db.execute(stmt)
@@ -319,11 +330,11 @@ class ExcelBOMImporter:
             store_id=self.store_id,
             code=code,
             name=name,
-            price=Decimal("0.00"),  # 占位价格，后续由 POS 同步更新
+            price=price if price is not None else Decimal("0.00"),
         )
         self.db.add(dish)
         await self.db.flush()
-        logger.info("创建菜品主档（Excel 导入）", code=code, name=name)
+        logger.info("创建菜品主档（Excel 导入）", code=code, name=name, price=str(dish.price))
         return dish
 
     async def _ensure_ingredient(
