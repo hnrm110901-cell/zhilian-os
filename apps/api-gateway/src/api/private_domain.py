@@ -265,10 +265,28 @@ async def mark_signal_handled(
     signal_id: str,
     body: MarkSignalRequest,
     current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """标记信号已处理"""
-    # 实际应更新DB；此处返回确认
-    return {"signal_id": signal_id, "action": body.action, "handled_at": __import__("datetime").datetime.utcnow().isoformat()}
+    import datetime
+    from sqlalchemy import update as _update
+    from ..models.private_domain import PrivateDomainSignal
+
+    handled_at = datetime.datetime.utcnow()
+    result = await db.execute(
+        _update(PrivateDomainSignal)
+        .where(
+            PrivateDomainSignal.signal_id == signal_id,
+            PrivateDomainSignal.store_id == store_id,
+        )
+        .values(action_taken=body.action, resolved_at=handled_at)
+        .returning(PrivateDomainSignal.signal_id)
+    )
+    updated = result.fetchone()
+    if not updated:
+        raise HTTPException(status_code=404, detail=f"信号 {signal_id} 不存在")
+    await db.commit()
+    return {"signal_id": signal_id, "action": body.action, "handled_at": handled_at.isoformat()}
 
 
 @router.get("/stats/trend/{store_id}")

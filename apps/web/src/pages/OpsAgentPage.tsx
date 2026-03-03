@@ -18,6 +18,7 @@ interface QARecord {
 
 const OpsAgentPage: React.FC = () => {
   const [selectedStore, setSelectedStore] = useState('STORE001');
+  const [stores, setStores] = useState<any[]>([]);
   const [healthResult, setHealthResult] = useState('');
   const [healthLoading, setHealthLoading] = useState(false);
   const [assetAdvice, setAssetAdvice] = useState('');
@@ -52,6 +53,15 @@ const OpsAgentPage: React.FC = () => {
   }, [selectedStore]);
 
   useEffect(() => {
+    const loadStores = async () => {
+      try {
+        const res = await apiClient.get('/api/v1/stores');
+        const list: any[] = res.data?.stores || res.data || [];
+        setStores(list);
+        if (list.length > 0) setSelectedStore(list[0].store_id || list[0].id || 'STORE001');
+      } catch { /* ignore */ }
+    };
+    loadStores();
     loadHealth();
     loadAssets();
   }, [loadHealth, loadAssets]);
@@ -224,9 +234,17 @@ const OpsAgentPage: React.FC = () => {
     <div>
       <Space wrap style={{ marginBottom: 16 }}>
         <Select value={selectedStore} onChange={setSelectedStore} style={{ width: 160 }}>
-          <Option value="STORE001">STORE001</Option>
-          <Option value="STORE002">STORE002</Option>
-          <Option value="STORE003">STORE003</Option>
+          {stores.length > 0
+            ? stores.map((s: any) => (
+                <Option key={s.store_id || s.id} value={s.store_id || s.id}>
+                  {s.name || s.store_id || s.id}
+                </Option>
+              ))
+            : <>
+                <Option value="STORE001">STORE001</Option>
+                <Option value="STORE002">STORE002</Option>
+                <Option value="STORE003">STORE003</Option>
+              </>}
         </Select>
       </Space>
 

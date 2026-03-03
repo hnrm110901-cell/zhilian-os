@@ -45,7 +45,8 @@ const DecisionPage: React.FC = () => {
   const [performanceData, setPerformanceData] = useState<PerformanceData[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<string>('month');
   const [loading, setLoading] = useState(false);
-  const [storeId] = useState('STORE001');
+  const [storeId, setStoreId] = useState('STORE001');
+  const [stores, setStores] = useState<any[]>([]);
 
   const loadData = useCallback(async () => {
     try {
@@ -72,6 +73,15 @@ const DecisionPage: React.FC = () => {
   }, [selectedPeriod, storeId]);
 
   useEffect(() => {
+    const loadStores = async () => {
+      try {
+        const res = await apiClient.get('/api/v1/stores');
+        const list: any[] = res.data?.stores || res.data || [];
+        setStores(list);
+        if (list.length > 0) setStoreId(list[0].store_id || list[0].id || 'STORE001');
+      } catch { /* ignore */ }
+    };
+    loadStores();
     loadData();
   }, [loadData]);
 
@@ -241,6 +251,15 @@ const DecisionPage: React.FC = () => {
       </div>
 
       <Space style={{ marginBottom: 16 }}>
+        <Select value={storeId} onChange={setStoreId} style={{ width: 180 }}>
+          {stores.length > 0
+            ? stores.map((s: any) => (
+                <Option key={s.store_id || s.id} value={s.store_id || s.id}>
+                  {s.name || s.store_id || s.id}
+                </Option>
+              ))
+            : <Option value="STORE001">STORE001</Option>}
+        </Select>
         <Select value={selectedPeriod} onChange={setSelectedPeriod} style={{ width: 120 }}>
           <Option value="week">本周</Option>
           <Option value="month">本月</Option>

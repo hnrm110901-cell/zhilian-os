@@ -66,6 +66,7 @@ interface BOMTemplate {
 
 const BOMManagementPage: React.FC = () => {
   const [storeId, setStoreId] = useState('STORE001');
+  const [stores, setStores] = useState<any[]>([]);
   const [boms, setBoms] = useState<BOMTemplate[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedBom, setSelectedBom] = useState<BOMTemplate | null>(null);
@@ -103,7 +104,18 @@ const BOMManagementPage: React.FC = () => {
     }
   }, [storeId]);
 
-  useEffect(() => { loadBoms(); }, [loadBoms]);
+  const loadStores = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/api/v1/stores');
+      const list: any[] = res.data?.stores || res.data || [];
+      setStores(list);
+      if (list.length > 0 && !list.find((s: any) => (s.store_id || s.id) === storeId)) {
+        setStoreId(list[0].store_id || list[0].id || 'STORE001');
+      }
+    } catch { /* ignore */ }
+  }, [storeId]);
+
+  useEffect(() => { loadStores(); loadBoms(); }, [loadStores, loadBoms]);
 
   // ── 查看 BOM 详情 ───────────────────────────────────────────────────────────
 
@@ -465,9 +477,17 @@ const BOMManagementPage: React.FC = () => {
               style={{ width: 160 }}
               placeholder="选择门店"
             >
-              <Option value="STORE001">北京旗舰店</Option>
-              <Option value="STORE002">上海直营店</Option>
-              <Option value="STORE003">广州加盟店</Option>
+              {stores.length > 0
+                ? stores.map((s: any) => (
+                    <Option key={s.store_id || s.id} value={s.store_id || s.id}>
+                      {s.name || s.store_id || s.id}
+                    </Option>
+                  ))
+                : <>
+                    <Option value="STORE001">北京旗舰店</Option>
+                    <Option value="STORE002">上海直营店</Option>
+                    <Option value="STORE003">广州加盟店</Option>
+                  </>}
             </Select>
             <Upload {...uploadProps}>
               <Button icon={<UploadOutlined />}>Excel 导入</Button>
