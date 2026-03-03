@@ -596,6 +596,40 @@ def _parse_period_to_ym(period: str) -> Tuple[Optional[int], Optional[int]]:
     return today.year, today.month
 
 
+# ── 自然语言查询关键词路由表 ─────────────────────────────────────────────────
+# 用于无 LLM 时的本地 keyword dispatch，将问题路由到对应工具调用。
+_NL_ROLE_KEYWORDS: Dict[str, List[str]] = {
+    "store_manager": ["店长", "门店经理"],
+    "shift_manager": ["值班经理", "值班"],
+    "waiter":        ["服务员", "服务", "waiter"],
+    "cashier":       ["收银", "收款"],
+    "kitchen":       ["后厨", "厨师", "厨房"],
+    "delivery":      ["外卖", "配送", "骑手"],
+}
+
+_NL_INTENT_REPORT     = ["报告", "报表", "绩效", "得分", "评分", "综合", "汇总", "总结"]
+_NL_INTENT_COMMISSION = ["提成", "奖金", "薪资", "工资", "收入", "佣金"]
+_NL_INTENT_RULE       = ["规则", "公式", "怎么算", "怎么计算", "如何计算", "计算方式", "说明", "解释", "阈值", "比例"]
+_NL_INTENT_CONFIG     = ["配置", "指标", "岗位", "有哪些", "什么指标", "考核"]
+
+
+def _detect_nl_role(question: str) -> Optional[str]:
+    """从问题文本中识别目标岗位 ID，无匹配返回 None。"""
+    for role_id, keywords in _NL_ROLE_KEYWORDS.items():
+        if any(kw in question for kw in keywords):
+            return role_id
+    return None
+
+
+def _detect_nl_rule(question: str) -> Optional[str]:
+    """从问题文本中识别规则名称片段（所有规则名的子串匹配）。"""
+    all_rules = [r["name"] for rules in COMMISSION_RULE_CONFIG.values() for r in rules]
+    for rule_name in sorted(all_rules, key=len, reverse=True):   # 长名优先
+        if any(seg in question for seg in rule_name.split("(")):
+            return rule_name
+    return None
+
+
 class PerformanceAgent(LLMEnhancedAgent):
     """
     绩效智能体（智链OS 连锁餐饮绩效方案）
@@ -1163,12 +1197,107 @@ class PerformanceAgent(LLMEnhancedAgent):
             except Exception as e:
                 logger.warning("绩效 nl_query Tool Use 失败，返回占位", error=str(e))
 
-        # 无 LLM 或失败时返回占位
+        # ── 无 LLM / LLM 失败时：keyword dispatch → 真实数据 ────────────────
+        detected_role = _detect_nl_role(question)
+        base = {
+            "store_id": store_id,
+            "period":   period or "month",
+            **({"role_id": detected_role} if detected_role else {}),
+        }
+
+        # 规则解释类
+        if any(kw in question for kw in _NL_INTENT_RULE):
+            rule_name = _detect_nl_rule(question)
+            if rule_name:
+                rule_res = await self._explain_rule({"rule_id": rule_name, **base})
+                if rule_res["success"]:
+                    d = rule_res["data"]
+                    steps_text = "\n".join(f"  {s}" for s in d["calculation_steps"])
+                    answer = (
+                        f"【{d['role_name']}】{d['rule_id']} 计算说明：\n"
+                        f"{d['rule_text']}\n\n计算步骤：\n{steps_text}"
+                    )
+                    return {
+                        "success": True,
+                        "data": {"answer": answer, "question": question, "tool": "explain_rule", "detail": d},
+                        "metadata": {"source": "keyword_dispatch"},
+                    }
+
+        # 提成类
+        if any(kw in question for kw in _NL_INTENT_COMMISSION):
+            comm_res = await self._calculate_commission(base)
+            if comm_res.get("success") and comm_res.get("data"):
+                d = comm_res["data"]
+                total = d.get("total_commission_yuan", 0)
+                rules_summary = "; ".join(
+                    f"{r['name']} ¥{r.get('amount_yuan', 0):.0f}"
+                    for r in d.get("rules", [])
+                    if r.get("amount_yuan") is not None
+                )
+                role_label = DEFAULT_ROLE_CONFIG.get(detected_role or "", {}).get("name", detected_role or "全员")
+                answer = (
+                    f"【{role_label}】{period or '本月'}提成合计：¥{total:.0f}\n"
+                    + (f"明细：{rules_summary}" if rules_summary else "（暂无数据）")
+                )
+                return {
+                    "success": True,
+                    "data": {"answer": answer, "question": question, "tool": "calculate_commission", "detail": d},
+                    "metadata": {"source": "keyword_dispatch"},
+                }
+
+        # 绩效报告类
+        if any(kw in question for kw in _NL_INTENT_REPORT):
+            report_res = await self._get_performance_report({**base, "format": "summary"})
+            if report_res.get("success") and report_res.get("data"):
+                d = report_res["data"]
+                roles_data = d.get("roles", [])
+                lines = []
+                for r in roles_data:
+                    score = r.get("avg_score")
+                    comm  = r.get("total_commission_yuan")
+                    score_str = f"{score:.2f}" if score is not None else "暂无"
+                    comm_str  = f"¥{comm:.0f}" if comm  is not None else "暂无"
+                    lines.append(f"  {r['role_name']}: 得分 {score_str}，提成 {comm_str}")
+                answer = (
+                    f"门店 {store_id or '-'} {period or '本月'} 绩效汇总：\n"
+                    + ("\n".join(lines) if lines else "  （暂无数据）")
+                )
+                return {
+                    "success": True,
+                    "data": {"answer": answer, "question": question, "tool": "get_performance_report", "detail": d},
+                    "metadata": {"source": "keyword_dispatch"},
+                }
+
+        # 配置 / 兜底：返回岗位指标配置
+        if detected_role:
+            cfg_res = await self._get_role_config({"role_id": detected_role})
+            if cfg_res.get("success"):
+                roles = cfg_res["data"].get("roles", [])
+                cfg = roles[0] if roles else {}
+                metrics_text = "、".join(m["name"] for m in cfg.get("metrics", []))
+                rules_text   = "、".join(cfg.get("commission_rules", []))
+                answer = (
+                    f"【{cfg.get('name', detected_role)}】考核指标：{metrics_text}\n"
+                    f"提成规则：{rules_text}"
+                )
+                return {
+                    "success": True,
+                    "data": {"answer": answer, "question": question, "tool": "get_role_config", "detail": cfg},
+                    "metadata": {"source": "keyword_dispatch"},
+                }
+
+        # 完全兜底：列出所有可用岗位和操作
+        role_list = "、".join(v["name"] for v in DEFAULT_ROLE_CONFIG.values())
         return {
             "success": True,
             "data": {
-                "answer": f"已收到查询：「{question}」。当前为占位回复，接入 LLM 与绩效数据后可返回具体数值与规则解释。门店={store_id}，周期={period}。",
+                "answer": (
+                    f"已收到查询：「{question}」\n"
+                    f"可查询岗位：{role_list}\n"
+                    f"支持查询类型：绩效报告、提成明细、规则说明、指标配置。\n"
+                    f"示例：「店长本月提成是多少」「服务员好评奖怎么算」"
+                ),
                 "question": question,
             },
-            "metadata": {"source": "placeholder"},
+            "metadata": {"source": "keyword_dispatch"},
         }
