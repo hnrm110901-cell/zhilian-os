@@ -7,8 +7,10 @@ PerformanceAgent - 连锁餐饮绩效与提成智能体 (智链OS 绩效方案)
 - 提成计算与规则追溯
 - 绩效报表与自然语言查询
 """
+import re
 import time
-from typing import Dict, Any, Optional, List
+from datetime import date, timedelta
+from typing import Dict, Any, Optional, List, Tuple
 import structlog
 
 from .llm_agent import LLMEnhancedAgent
@@ -86,6 +88,25 @@ DEFAULT_ROLE_CONFIG = {
         "commission_rules": ["单量提成(元/单或阶梯)", "准时奖", "差评扣减"],
     },
 }
+
+
+def _parse_period_to_ym(period: str) -> Tuple[Optional[int], Optional[int]]:
+    """将 period 字符串解析为 (year, month)。无法解析时返回当前年月。"""
+    if not period:
+        today = date.today()
+        return today.year, today.month
+    # "YYYY-MM"
+    m = re.match(r"^(\d{4})-(\d{2})$", period)
+    if m:
+        return int(m.group(1)), int(m.group(2))
+    # "last_month"
+    if period == "last_month":
+        first = date.today().replace(day=1)
+        last_m = first - timedelta(days=1)
+        return last_m.year, last_m.month
+    # "month" / "current_month" / anything else → current month
+    today = date.today()
+    return today.year, today.month
 
 
 class PerformanceAgent(LLMEnhancedAgent):
@@ -178,11 +199,11 @@ class PerformanceAgent(LLMEnhancedAgent):
         }
 
     async def _calculate_performance(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """计算指定岗位、周期、人员绩效得分（当前为规则引擎占位，无真实数据源时返回示例结构）。"""
+        """计算指定岗位、周期、人员绩效得分。DB-first：优先从 employee_metric_records 读取真实指标，无 DB 时降级占位。"""
         store_id = params.get("store_id", "")
         role_id = params.get("role_id", "")
         period = params.get("period", "month")
-        staff_ids = params.get("staff_ids")  # 可选，不传则按岗位汇总
+        staff_ids = params.get("staff_ids")  # 可选，不传则按门店汇总
 
         if not role_id or role_id not in DEFAULT_ROLE_CONFIG:
             return {
@@ -192,7 +213,95 @@ class PerformanceAgent(LLMEnhancedAgent):
             }
 
         role = DEFAULT_ROLE_CONFIG[role_id]
-        # 占位：实际应从 POS/ERP/考勤等聚合表读取指标值
+        year, month = _parse_period_to_ym(period)
+
+        # ── DB-first：有 store_id 时尝试计算真实指标 ─────────────────────────
+        if store_id and year and month:
+            try:
+                from ..core.database import get_db_session
+                from ..services.performance_compute_service import PerformanceComputeService
+                from ..models.employee_metric import EmployeeMetricRecord
+                from sqlalchemy import func as sa_func, select as sa_select, and_ as sa_and
+
+                async with get_db_session(enable_tenant_isolation=False) as session:
+                    # 计算并写入最新指标
+                    await PerformanceComputeService.compute_and_write(
+                        session, store_id, year, month
+                    )
+
+                    period_start = date(year, month, 1)
+                    metric_ids = [m["id"] for m in role["metrics"]]
+
+                    # 按 metric_id 聚合（AVG），支持多员工
+                    stmt = (
+                        sa_select(
+                            EmployeeMetricRecord.metric_id,
+                            sa_func.avg(EmployeeMetricRecord.value).label("value"),
+                            sa_func.avg(EmployeeMetricRecord.target).label("target"),
+                            sa_func.avg(EmployeeMetricRecord.achievement_rate).label("achievement_rate"),
+                        )
+                        .where(
+                            sa_and(
+                                EmployeeMetricRecord.store_id == store_id,
+                                EmployeeMetricRecord.period_start == period_start,
+                                EmployeeMetricRecord.metric_id.in_(metric_ids),
+                            )
+                        )
+                        .group_by(EmployeeMetricRecord.metric_id)
+                    )
+                    if staff_ids:
+                        stmt = stmt.where(EmployeeMetricRecord.employee_id.in_(staff_ids))
+
+                    rows = (await session.execute(stmt)).all()
+                    db_map = {r.metric_id: r for r in rows}
+
+                    items = []
+                    for m in role["metrics"]:
+                        row = db_map.get(m["id"])
+                        items.append({
+                            "metric_id": m["id"],
+                            "metric_name": m["name"],
+                            "weight": m["weight"],
+                            "value": float(row.value) if row and row.value is not None else None,
+                            "target": float(row.target) if row and row.target is not None else None,
+                            "achievement_rate": (
+                                float(row.achievement_rate)
+                                if row and row.achievement_rate is not None else None
+                            ),
+                        })
+
+                    # 加权总得分（仅含有数据的指标）
+                    scored = [i for i in items if i["achievement_rate"] is not None]
+                    if scored:
+                        w_sum = sum(i["weight"] for i in scored)
+                        total_score = round(
+                            sum(i["weight"] * i["achievement_rate"] for i in scored) / w_sum, 4
+                        )
+                    else:
+                        total_score = None
+
+                    return {
+                        "success": True,
+                        "data": {
+                            "store_id": store_id,
+                            "role_id": role_id,
+                            "role_name": role["name"],
+                            "period": period,
+                            "staff_ids": staff_ids,
+                            "metrics": items,
+                            "total_score": total_score,
+                            "data_source_note": "来自 employee_metric_records 实时计算",
+                        },
+                        "metadata": {
+                            "source": "performance_engine",
+                            "year": year,
+                            "month": month,
+                        },
+                    }
+            except Exception as e:
+                logger.warning("绩效 DB 查询失败，降级占位", error=str(e))
+
+        # ── 降级：占位结构（维持向后兼容） ───────────────────────────────────
         items = []
         for m in role["metrics"]:
             items.append({
@@ -203,7 +312,6 @@ class PerformanceAgent(LLMEnhancedAgent):
                 "target": None,
                 "achievement_rate": None,
             })
-        total_score = None  # 加权得分，有数据时计算
 
         return {
             "success": True,
@@ -214,7 +322,7 @@ class PerformanceAgent(LLMEnhancedAgent):
                 "period": period,
                 "staff_ids": staff_ids,
                 "metrics": items,
-                "total_score": total_score,
+                "total_score": None,
                 "data_source_note": "当前为占位结构，接入指标表后可计算真实得分",
             },
             "metadata": {"source": "performance_engine"},
