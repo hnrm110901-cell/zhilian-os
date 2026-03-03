@@ -347,21 +347,26 @@ async def _social_content_draft(params: Dict[str, Any]) -> Dict[str, Any]:
 
 
 async def _feedback_analysis(params: Dict[str, Any]) -> Dict[str, Any]:
-    """用户反馈分析。可选: source, time_range。"""
+    """用户反馈分析。可选: source, time_range（last_7d / last_30d / last_90d）。"""
     source = params.get("source") or "reviews"
     time_range = params.get("time_range") or "last_7d"
     store_id = params.get("store_id") or ""
+
+    # 将 time_range 映射为天数
+    _range_map = {"last_7d": 7, "last_30d": 30, "last_90d": 90}
+    days = _range_map.get(time_range, 7)
+    interval_label = f"近{days}天"
 
     rows = _query_db(
         """
         SELECT severity, COUNT(*) AS cnt, signal_type
         FROM private_domain_signals
         WHERE (:store_id = '' OR store_id = :store_id)
-          AND triggered_at >= NOW() - INTERVAL '7 days'
+          AND triggered_at >= NOW() - INTERVAL '1 day' * :days
         GROUP BY severity, signal_type
         ORDER BY cnt DESC
         """,
-        {"store_id": store_id},
+        {"store_id": store_id, "days": days},
     )
     if rows:
         total = sum(r["cnt"] for r in rows)
@@ -374,7 +379,11 @@ async def _feedback_analysis(params: Dict[str, Any]) -> Dict[str, Any]:
             "neutral": round(neu / total, 2) if total else 0.2,
             "positive": round(pos / total, 2) if total else 0.5,
         }
-        summary = f"近7天共 {total} 条信号，负面占比 {sentiment['negative']:.0%}，主要类型：{', '.join(top_themes)}。"
+        summary = (
+            f"{interval_label}共 {total} 条信号，"
+            f"负面占比 {sentiment['negative']:.0%}，"
+            f"主要类型：{', '.join(top_themes)}。"
+        )
         actions = ["针对高频负面信号制定改善计划", "保持正面信号对应的服务优势"]
     else:
         summary = "约 80% 用户反馈口味偏辣，建议调整配方或提供辣度选项。"
