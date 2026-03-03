@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Modal, Input, InputRef, List, Tag, Space, Empty } from 'antd';
+import { Modal, Input, type InputRef, List, Tag, Space, Empty } from 'antd';
 import {
   SearchOutlined,
   DashboardOutlined,
