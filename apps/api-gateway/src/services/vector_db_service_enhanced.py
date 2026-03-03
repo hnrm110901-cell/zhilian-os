@@ -293,12 +293,6 @@ class VectorDatabaseServiceEnhanced:
             logger.warning(f"嵌入 API 调用异常: {str(e)}")
             return None
 
-    def _generate_mock_embedding(self, text: str) -> List[float]:
-        """生成确定性哈希向量（嵌入模型不可用时的fallback，语义无意义）"""
-        import random
-        random.seed(hashlib.md5(text.encode()).hexdigest())
-        return [random.random() for _ in range(int(os.getenv("VECTOR_EMBEDDING_DIM", "384")))]
-
     @retry_on_failure(max_retries=int(os.getenv("VECTOR_DB_RETRY_MAX_SHORT", "2")), delay=float(os.getenv("VECTOR_DB_RETRY_DELAY", "1.0")))
     async def index_order(self, order_data: Dict[str, Any]) -> bool:
         """
