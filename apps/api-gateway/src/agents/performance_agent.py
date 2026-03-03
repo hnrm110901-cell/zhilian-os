@@ -395,6 +395,188 @@ def _compute_rule_amount(
     return None, f"未知规则类型: {rtype}", None
 
 
+def _build_rule_explanation(rule: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    从 COMMISSION_RULE_CONFIG 单条规则字典生成人类可读的计算步骤与所需数据。
+
+    Returns dict with keys: calculation_steps (List[str]), applicable_data (dict)
+    """
+    rtype = rule["type"]
+
+    if rtype == "achievement_bonus":
+        return {
+            "calculation_steps": [
+                f"1. 查询指标 {rule['metric']} 的实际值与目标值",
+                "2. 达成率 = 实际值 / 目标值",
+                f"3. 达成率 ≥ {rule['threshold']:.0%} → 固定奖金 ¥{rule['fixed_fen']/100:.0f}",
+                "4. 未达标 → 本规则奖金 ¥0",
+            ],
+            "applicable_data": {
+                "required_metrics": [rule["metric"]],
+                "threshold": f"{rule['threshold']:.0%}",
+                "reward": f"¥{rule['fixed_fen']/100:.0f}（固定）",
+            },
+        }
+
+    if rtype == "excess_commission":
+        return {
+            "calculation_steps": [
+                f"1. 查询 {rule['metric']} 实际值与目标值（分）",
+                "2. 超额 = max(0, 实际值 - 目标值)",
+                "3. 超额率 = 超额 / 目标值",
+                f"4. 提成率 = {rule['base_rate']:.0%} + 超额率/{rule['max_excess_rate']:.0%}"
+                f" × {(rule['max_rate']-rule['base_rate']):.0%}，上限 {rule['max_rate']:.0%}",
+                "5. 超额提成 = 超额金额 × 提成率",
+            ],
+            "applicable_data": {
+                "required_metrics": [rule["metric"]],
+                "rate_range": f"{rule['base_rate']:.0%} – {rule['max_rate']:.0%}",
+                "max_excess_rate": f"{rule['max_excess_rate']:.0%}",
+            },
+        }
+
+    if rtype == "score_coefficient":
+        return {
+            "calculation_steps": [
+                "1. 取综合绩效得分 total_score（0.0–2.0）",
+                f"2. 系数奖 = ¥{rule['base_salary_fen']/100:.0f}（基薪参考）"
+                f" × total_score × {rule['coeff_scale']:.0%}",
+            ],
+            "applicable_data": {
+                "required_metrics": ["（全部指标综合得分）"],
+                "base_salary_ref": f"¥{rule['base_salary_fen']/100:.0f}",
+                "coeff_scale": f"{rule['coeff_scale']:.0%}",
+            },
+        }
+
+    if rtype == "excess_linear":
+        return {
+            "calculation_steps": [
+                f"1. 查询 {rule['metric']} 实际值与目标值（分）",
+                "2. 超额 = max(0, 实际值 - 目标值)",
+                f"3. 提成 = 超额 × {rule['rate']}",
+            ],
+            "applicable_data": {
+                "required_metrics": [rule["metric"]],
+                "rate": str(rule["rate"]),
+            },
+        }
+
+    if rtype == "count_commission":
+        return {
+            "calculation_steps": [
+                f"1. 查询 {rule['metric']} 计数值",
+                f"2. 提成 = 计数 × ¥{rule['per_unit_fen']/100:.2f}/个",
+            ],
+            "applicable_data": {
+                "required_metrics": [rule["metric"]],
+                "per_unit": f"¥{rule['per_unit_fen']/100:.2f}",
+            },
+        }
+
+    if rtype == "rate_on_count":
+        cnt = rule.get("count_metric", "order_count")
+        return {
+            "calculation_steps": [
+                f"1. 查询 {rule['metric']}（比率）与 {cnt}（计数）",
+                "2. 有效次数 = 比率 × 计数",
+                f"3. 提成 = 有效次数 × ¥{rule['per_unit_fen']/100:.2f}/次",
+            ],
+            "applicable_data": {
+                "required_metrics": [rule["metric"], cnt],
+                "per_unit": f"¥{rule['per_unit_fen']/100:.2f}",
+            },
+        }
+
+    if rtype == "rate_on_value":
+        return {
+            "calculation_steps": [
+                f"1. 查询 {rule['metric']} 金额（分）",
+                f"2. 提成 = 金额 × {rule['rate']:.0%}",
+            ],
+            "applicable_data": {
+                "required_metrics": [rule["metric"]],
+                "rate": f"{rule['rate']:.0%}",
+            },
+        }
+
+    if rtype == "below_threshold":
+        return {
+            "calculation_steps": [
+                f"1. 查询 {rule['metric']} 实际值",
+                f"2. 实际值 < {rule['threshold']:.2%} → 固定奖金 ¥{rule['fixed_fen']/100:.0f}",
+                "3. 否则本规则奖金 ¥0",
+            ],
+            "applicable_data": {
+                "required_metrics": [rule["metric"]],
+                "threshold": f"{rule['threshold']:.2%}",
+                "reward": f"¥{rule['fixed_fen']/100:.0f}（固定）",
+            },
+        }
+
+    if rtype == "saving_bonus":
+        return {
+            "calculation_steps": [
+                f"1. 查询 {rule['metric']} 实际值",
+                f"2. 节约量 = max(0, {rule['base_target']:.2%} - 实际值)",
+                f"3. 提成 = 节约百分点数 × ¥{rule['coeff_fen']/100:.0f}/1%",
+            ],
+            "applicable_data": {
+                "required_metrics": [rule["metric"]],
+                "target": f"{rule['base_target']:.2%}",
+                "reward_per_pct": f"¥{rule['coeff_fen']/100:.0f}",
+            },
+        }
+
+    if rtype == "tiered_count":
+        prev = 0
+        tier_lines = []
+        for tier_max, rate_fen in rule["tiers"]:
+            label = f"{prev+1}–{'∞' if tier_max >= 9999 else tier_max} 单"
+            tier_lines.append(f"   {label}：¥{rate_fen/100:.1f}/单")
+            prev = tier_max
+        return {
+            "calculation_steps": [
+                f"1. 查询 {rule['metric']} 计数",
+                "2. 按阶梯计算各段提成并累加：",
+                *tier_lines,
+            ],
+            "applicable_data": {
+                "required_metrics": [rule["metric"]],
+                "tiers": [{"max": t[0], "rate": f"¥{t[1]/100:.1f}/单"} for t in rule["tiers"]],
+            },
+        }
+
+    if rtype == "penalty_on_rate":
+        cnt = rule.get("count_metric", "order_count")
+        return {
+            "calculation_steps": [
+                f"1. 查询 {rule['metric']}（差评率）与 {cnt}（订单数）",
+                "2. 差评数 = 差评率 × 订单数",
+                f"3. 扣减 = 差评数 × ¥{abs(rule['per_unit_fen'])/100:.0f}（负值）",
+            ],
+            "applicable_data": {
+                "required_metrics": [rule["metric"], cnt],
+                "penalty_per_review": f"¥{abs(rule['per_unit_fen'])/100:.0f}",
+            },
+        }
+
+    if rtype == "cross_store":
+        return {
+            "calculation_steps": [
+                "1. 汇总所有门店当期综合绩效数据（需总部）",
+                "2. 按得分排名",
+                "3. 按排名发放奖励",
+            ],
+            "applicable_data": {"required_metrics": ["（跨门店汇总，需总部数据）"]},
+        }
+
+    return {
+        "calculation_steps": [rule.get("desc", f"规则类型 {rtype} 暂无说明")],
+        "applicable_data": {"required_metrics": [rule.get("metric", "unknown")]},
+    }
+
+
 def _parse_period_to_ym(period: str) -> Tuple[Optional[int], Optional[int]]:
     """将 period 字符串解析为 (year, month)。无法解析时返回当前年月。"""
     if not period:
@@ -882,35 +1064,62 @@ class PerformanceAgent(LLMEnhancedAgent):
         }
 
     async def _explain_rule(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """解释某条规则或某笔提成。"""
-        rule_id = params.get("rule_id")
+        """
+        解释某条提成规则的计算逻辑。
+
+        查找策略：
+        1. 若提供 role_id，仅在该岗位的规则中搜索
+        2. 否则全量搜索所有岗位（名称子串匹配）
+        3. 找不到时返回错误
+        """
+        rule_id       = params.get("rule_id")
         commission_id = params.get("commission_id")
-        if not rule_id and not commission_id:
+        role_id       = params.get("role_id")
+
+        search_key = str(rule_id or commission_id or "").strip()
+        if not search_key:
+            return {"success": False, "error": "请提供 rule_id 或 commission_id", "data": None}
+
+        # ── 在 COMMISSION_RULE_CONFIG 中按名称子串匹配 ──────────────────────
+        candidate_roles = (
+            {role_id: COMMISSION_RULE_CONFIG[role_id]}
+            if role_id and role_id in COMMISSION_RULE_CONFIG
+            else COMMISSION_RULE_CONFIG
+        )
+        matches: List[tuple] = []   # (role_id, rule_dict)
+        for rid, rules in candidate_roles.items():
+            for rule in rules:
+                if search_key.lower() in rule["name"].lower():
+                    matches.append((rid, rule))
+
+        if not matches:
+            available = [r["name"] for rules in COMMISSION_RULE_CONFIG.values() for r in rules]
             return {
                 "success": False,
-                "error": "请提供 rule_id 或 commission_id",
+                "error": f"未找到规则「{search_key}」，可用规则：{available}",
                 "data": None,
             }
 
-        # 占位：从配置或审计表取规则原文与计算过程
-        role_id = params.get("role_id")
-        if rule_id and role_id and role_id in DEFAULT_ROLE_CONFIG:
-            rules = DEFAULT_ROLE_CONFIG[role_id]["commission_rules"]
-            rule_text = next((r for r in rules if rule_id in r or r == rule_id), rule_id)
-        else:
-            rule_text = str(rule_id or commission_id)
+        # ── 取第一个最佳匹配（精确匹配优先）────────────────────────────────
+        exact = [(rid, r) for rid, r in matches if r["name"] == search_key]
+        matched_role_id, matched_rule = (exact or matches)[0]
+
+        role_cfg    = DEFAULT_ROLE_CONFIG.get(matched_role_id, {})
+        explanation = _build_rule_explanation(matched_rule)
 
         return {
             "success": True,
             "data": {
-                "rule_id": rule_id,
-                "commission_id": commission_id,
-                "rule_text": rule_text,
-                "applicable_data": None,
-                "calculation_steps": None,
-                "note": "当前为占位，接入规则版本与审计后可返回完整追溯",
+                "rule_id":           matched_rule["name"],
+                "role_id":           matched_role_id,
+                "role_name":         role_cfg.get("name", matched_role_id),
+                "rule_text":         matched_rule["desc"],
+                "type":              matched_rule["type"],
+                "calculation_steps": explanation["calculation_steps"],
+                "applicable_data":   explanation["applicable_data"],
+                "all_matches":       len(matches),
             },
-            "metadata": {"source": "explain"},
+            "metadata": {"source": "config"},
         }
 
     async def _nl_query(self, params: Dict[str, Any]) -> Dict[str, Any]:
