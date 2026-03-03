@@ -471,27 +471,44 @@ class PrivateDomainAgent(BaseAgent):
         )
 
     async def get_journeys(self, status: Optional[str] = None) -> List[JourneyRecord]:
-        """获取旅程列表"""
+        """获取旅程列表（从 private_domain_journeys 表读取）"""
         self.logger.info("getting_journeys", status=status)
-        # 模拟数据
-        journeys = [
-            JourneyRecord(
-                journey_id=f"JRN_NEW_CUSTOMER_C00{i}_20260225",
-                journey_type=JourneyType.NEW_CUSTOMER.value,
-                customer_id=f"C00{i}",
-                store_id=self.store_id,
-                status=JourneyStatus.RUNNING.value if i % 3 != 0 else JourneyStatus.COMPLETED.value,
-                current_step=min(i % 4 + 1, 4),
-                total_steps=4,
-                started_at=(datetime.utcnow() - timedelta(days=i)).isoformat(),
-                next_action_at=(datetime.utcnow() + timedelta(days=1)).isoformat(),
-                completed_at=None,
-            )
-            for i in range(1, 11)
-        ]
-        if status:
-            journeys = [j for j in journeys if j["status"] == status]
-        return journeys
+        engine = self._get_db_engine()
+        if engine:
+            try:
+                from sqlalchemy import text
+                status_clause = "AND status = :status" if status else ""
+                query = text(f"""
+                    SELECT journey_id, journey_type, customer_id, store_id, status,
+                           current_step, total_steps, started_at, next_action_at, completed_at
+                    FROM private_domain_journeys
+                    WHERE store_id = :store_id {status_clause}
+                    ORDER BY started_at DESC
+                    LIMIT 50
+                """)
+                params: Dict[str, Any] = {"store_id": self.store_id}
+                if status:
+                    params["status"] = status
+                with engine.connect() as conn:
+                    rows = conn.execute(query, params).fetchall()
+                return [
+                    JourneyRecord(
+                        journey_id=str(row[0]),
+                        journey_type=str(row[1]),
+                        customer_id=str(row[2]),
+                        store_id=str(row[3]),
+                        status=str(row[4]),
+                        current_step=int(row[5]),
+                        total_steps=int(row[6]),
+                        started_at=str(row[7]) if row[7] else None,
+                        next_action_at=str(row[8]) if row[8] else None,
+                        completed_at=str(row[9]) if row[9] else None,
+                    )
+                    for row in rows
+                ]
+            except Exception as e:
+                self.logger.warning("fetch_journeys_from_db_failed", error=str(e))
+        return []
 
     async def get_signals(
         self,
