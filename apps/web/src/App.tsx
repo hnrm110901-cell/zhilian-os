@@ -105,7 +105,7 @@ const KnowledgeRulePage = lazy(() => import('./pages/KnowledgeRulePage'));
 const OntologyAdminPage = lazy(() => import('./pages/OntologyAdminPage'));
 const BOMManagementPage = lazy(() => import('./pages/BOMManagementPage'));
 const WasteEventPage = lazy(() => import('./pages/WasteEventPage'));
-const KnowledgeRulesPage = lazy(() => import('./pages/KnowledgeRulesPage'));
+
 const DataSecurityPage = lazy(() => import('./pages/DataSecurityPage'));
 const BanquetLifecyclePage = lazy(() => import('./pages/BanquetLifecyclePage'));
 const MarketingCampaignPage = lazy(() => import('./pages/MarketingCampaignPage'));

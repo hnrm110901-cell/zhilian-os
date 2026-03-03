@@ -22,12 +22,46 @@ const DECISION_TYPE_LABELS: Record<string, string> = {
   cost_optimization: '成本优化',
 };
 
+interface StoreOption {
+  id: string;
+  name: string;
+}
+
+interface ByTypeItem {
+  decision_type: string;
+  total: number;
+  success: number;
+  partial: number;
+  failure: number;
+  accuracy: number;
+  avg_confidence: number;
+}
+
+interface WeeklyTrendItem {
+  week_start: string;
+  accuracy: number;
+}
+
+interface ConfidenceBucketItem {
+  confidence_range: string;
+  accuracy: number;
+  total: number;
+}
+
+interface AccuracyData {
+  total_decisions?: number;
+  overall_accuracy?: number;
+  by_type?: ByTypeItem[];
+  weekly_trend?: WeeklyTrendItem[];
+  confidence_buckets?: ConfidenceBucketItem[];
+}
+
 const AIAccuracyPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [days, setDays] = useState(30);
-  const [stores, setStores] = useState<any[]>([]);
+  const [stores, setStores] = useState<StoreOption[]>([]);
   const [storeId, setStoreId] = useState<string | undefined>(undefined);
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<AccuracyData | null>(null);
 
   const loadStores = useCallback(async () => {
     try {
@@ -43,7 +77,7 @@ const AIAccuracyPage: React.FC = () => {
         params: { days, ...(storeId ? { store_id: storeId } : {}) },
       });
       setData(res.data);
-    } catch (err: any) {
+    } catch (err) {
       handleApiError(err, '加载准确率数据失败');
     } finally {
       setLoading(false);
@@ -53,20 +87,20 @@ const AIAccuracyPage: React.FC = () => {
   useEffect(() => { loadStores(); }, [loadStores]);
   useEffect(() => { load(); }, [load]);
 
-  const byType: any[] = data?.by_type || [];
-  const weeklyTrend: any[] = data?.weekly_trend || [];
-  const confidenceBuckets: any[] = data?.confidence_buckets || [];
+  const byType: ByTypeItem[] = data?.by_type || [];
+  const weeklyTrend: WeeklyTrendItem[] = data?.weekly_trend || [];
+  const confidenceBuckets: ConfidenceBucketItem[] = data?.confidence_buckets || [];
 
   // 趋势折线图
   const trendOption = {
     tooltip: { trigger: 'axis' },
-    xAxis: { type: 'category', data: weeklyTrend.map((w: any) => w.week_start) },
+    xAxis: { type: 'category', data: weeklyTrend.map((w) => w.week_start) },
     yAxis: { type: 'value', name: '准确率 (%)', min: 0, max: 100 },
     series: [{
       name: '准确率',
       type: 'line',
       smooth: true,
-      data: weeklyTrend.map((w: any) => w.accuracy),
+      data: weeklyTrend.map((w) => w.accuracy),
       markLine: { data: [{ type: 'average', name: '均值' }] },
       areaStyle: { opacity: 0.1 },
       itemStyle: { color: '#1890ff' },
@@ -76,7 +110,7 @@ const AIAccuracyPage: React.FC = () => {
   // 置信度 vs 准确率柱状图
   const confOption = {
     tooltip: { trigger: 'axis' },
-    xAxis: { type: 'category', data: confidenceBuckets.map((b: any) => b.confidence_range) },
+    xAxis: { type: 'category', data: confidenceBuckets.map((b) => b.confidence_range) },
     yAxis: [
       { type: 'value', name: '准确率 (%)', min: 0, max: 100 },
       { type: 'value', name: '决策数' },
@@ -85,14 +119,14 @@ const AIAccuracyPage: React.FC = () => {
       {
         name: '准确率',
         type: 'bar',
-        data: confidenceBuckets.map((b: any) => b.accuracy),
+        data: confidenceBuckets.map((b) => b.accuracy),
         itemStyle: { color: '#52c41a' },
       },
       {
         name: '决策数',
         type: 'line',
         yAxisIndex: 1,
-        data: confidenceBuckets.map((b: any) => b.total),
+        data: confidenceBuckets.map((b) => b.total),
         itemStyle: { color: '#faad14' },
       },
     ],
@@ -114,7 +148,7 @@ const AIAccuracyPage: React.FC = () => {
       render: (v: number) => (
         <Tag color={v >= 80 ? 'green' : v >= 60 ? 'orange' : 'red'}>{v}%</Tag>
       ),
-      sorter: (a: any, b: any) => a.accuracy - b.accuracy,
+      sorter: (a: ByTypeItem, b: ByTypeItem) => a.accuracy - b.accuracy,
     },
     {
       title: '平均置信度',
@@ -135,7 +169,7 @@ const AIAccuracyPage: React.FC = () => {
             value={storeId}
             onChange={setStoreId}
           >
-            {stores.map((s: any) => <Option key={s.id} value={s.id}>{s.name}</Option>)}
+            {stores.map((s) => <Option key={s.id} value={s.id}>{s.name}</Option>)}
           </Select>
           <Segmented
             options={[

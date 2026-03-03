@@ -6,14 +6,14 @@ const { RangePicker } = DatePicker;
 
 interface SearchBarProps {
   onSearch?: (value: string) => void;
-  onFilter?: (filters: Record<string, any>) => void;
+  onFilter?: (filters: Record<string, unknown>) => void;
   onRefresh?: () => void;
   placeholder?: string;
   filters?: Array<{
     key: string;
     label: string;
     type: 'select' | 'dateRange';
-    options?: Array<{ label: string; value: any }>;
+    options?: Array<{ label: string; value: string | number }>;
   }>;
   showRefresh?: boolean;
 }
@@ -27,7 +27,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   showRefresh = true,
 }) => {
   const [searchValue, setSearchValue] = useState('');
-  const [filterValues, setFilterValues] = useState<Record<string, any>>({});
+  const [filterValues, setFilterValues] = useState<Record<string, unknown>>({});
 
   const handleSearch = () => {
     if (onSearch) {
@@ -35,7 +35,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     }
   };
 
-  const handleFilterChange = (key: string, value: any) => {
+  const handleFilterChange = (key: string, value: unknown) => {
     const newFilters = { ...filterValues, [key]: value };
     setFilterValues(newFilters);
     if (onFilter) {

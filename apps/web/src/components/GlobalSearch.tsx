@@ -141,7 +141,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ visible, onClose }) 
   const [searchQuery, setSearchQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [activeIndex, setActiveIndex] = useState(-1);
-  const inputRef = useRef<any>(null);
+  const inputRef = useRef<{ focus: () => void } | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 

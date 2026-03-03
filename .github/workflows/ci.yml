@@ -94,7 +94,7 @@ jobs:
           JWT_SECRET: test-jwt-secret
         run: |
           cd apps/api-gateway
-          pytest tests/ -v --cov=src --cov-report=xml --cov-report=term \
+          PYTHONPATH=. pytest tests/ -v --cov=src --cov-report=xml --cov-report=term \
             --ignore=tests/test_agent_integration.py \
             --ignore=tests/test_api_endpoints.py \
             --ignore=tests/test_api_integration.py \
