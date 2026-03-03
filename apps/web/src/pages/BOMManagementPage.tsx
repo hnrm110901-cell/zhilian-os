@@ -359,7 +359,7 @@ const BOMManagementPage: React.FC = () => {
     accept: '.xlsx,.xls',
     action: `/api/v1/bom/import/excel?store_id=${storeId}`,
     headers: {
-      Authorization: `Bearer ${localStorage.getItem('access_token') || ''}`,
+      Authorization: `Bearer ${localStorage.getItem('token') || ''}`,
     },
     showUploadList: false,
     onChange(info) {
