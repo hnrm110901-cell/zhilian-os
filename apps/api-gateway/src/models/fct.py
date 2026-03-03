@@ -12,9 +12,10 @@ import uuid
 
 from sqlalchemy import (
     Column, String, Integer, Float, Date, DateTime, Boolean,
-    Text, JSON, Index, Enum,
+    Text, JSON, Index, Enum, Numeric, ForeignKey,
 )
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
 
 from .base import Base, TimestampMixin
 
@@ -134,3 +135,56 @@ class FCTCashFlowItem(Base, TimestampMixin):
     __table_args__ = (
         Index("ix_fct_cashflow_store_date", "store_id", "forecast_date"),
     )
+
+
+# ── 会计凭证（双分录）───────────────────────────────────────────────────────
+
+class Voucher(Base, TimestampMixin):
+    """
+    会计凭证主表。
+
+    每次业务事件（门店日结、采购入库、工资发放等）触发一张凭证，
+    凭证借贷必须平衡（允许 0.01 元尾差）。
+    """
+    __tablename__ = "fct_vouchers"
+
+    id          = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    voucher_no  = Column(String(50), nullable=False, index=True)
+    store_id    = Column(String(50), nullable=False, index=True)
+    event_type  = Column(String(80), nullable=False)      # store_daily_settlement / purchase_receipt / …
+    event_id    = Column(String(100), index=True)         # 来源业务事件 ID（幂等键）
+    biz_date    = Column(Date, nullable=False)
+    status      = Column(String(20), default="posted")    # draft / posted / reversed
+    description = Column(Text)
+
+    lines = relationship("VoucherLine", back_populates="voucher",
+                         cascade="all, delete-orphan", lazy="select")
+
+    __table_args__ = (
+        Index("ix_fct_voucher_store_date", "store_id", "biz_date"),
+        Index("ix_fct_voucher_event", "event_type", "event_id"),
+    )
+
+
+class VoucherLine(Base):
+    """
+    凭证分录行。
+
+    遵循中国企业会计准则：
+      - 借方（debit）和贷方（credit）互斥，同一行不同时有值
+      - Decimal(15, 2) 存储元，精度满足日常餐饮场景
+    """
+    __tablename__ = "fct_voucher_lines"
+
+    id           = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    voucher_id   = Column(UUID(as_uuid=True), ForeignKey("fct_vouchers.id", ondelete="CASCADE"),
+                          nullable=False, index=True)
+    line_no      = Column(Integer, nullable=False, default=1)  # 行序号
+    account_code = Column(String(20), nullable=False)
+    account_name = Column(String(100))
+    debit        = Column(Numeric(15, 2))    # 借方金额（元）
+    credit       = Column(Numeric(15, 2))   # 贷方金额（元）
+    auxiliary    = Column(JSON)             # 辅助核算（供应商ID、部门等）
+    summary      = Column(String(200))      # 摘要
+
+    voucher = relationship("Voucher", back_populates="lines")
