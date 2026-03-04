@@ -49,7 +49,6 @@ from .fct import FCTTaxRecord, FCTCashFlowItem, TaxType, TaxpayerType, CashFlowD
 from .banquet_lifecycle import BanquetStage, BanquetStageHistory
 from .banquet_event_order import BanquetEventOrder, BEOStatus
 from .waste_event import WasteEvent, WasteEventType, WasteEventStatus
-<<<<<<< HEAD
 # Phase 3-8 新增 model（后期添加，确保 Alembic autogenerate 能检测到）
 from .action_plan import ActionPlan, DispatchStatus, ActionOutcome
 from .knowledge_rule import KnowledgeRule, RuleExecution, IndustryBenchmark, RuleCategory, RuleType, RuleStatus
@@ -67,10 +66,8 @@ from .execution_audit import ExecutionRecord
 from .customer_key import CustomerKey, EncryptedField, KeyStatus, KeyAlgorithm
 from .workflow import DailyWorkflow, WorkflowPhase, DecisionVersion, WorkflowStatus, PhaseStatus, GenerationMode
 from .forecast import ForecastResult
-=======
 from .meal_period import MealPeriod
 from .employee_metric import EmployeeMetricRecord
->>>>>>> d1df728dec60bb243c50ae42ff68074712ddafd9
 
 __all__ = [
     "Base",
@@ -172,7 +169,6 @@ __all__ = [
     "WasteEvent",
     "WasteEventType",
     "WasteEventStatus",
-<<<<<<< HEAD
     # Phase 3-8
     "ActionPlan",
     "DispatchStatus",
@@ -225,8 +221,6 @@ __all__ = [
     "PhaseStatus",
     "GenerationMode",
     "ForecastResult",
-=======
     "MealPeriod",
     "EmployeeMetricRecord",
->>>>>>> d1df728dec60bb243c50ae42ff68074712ddafd9
 ]

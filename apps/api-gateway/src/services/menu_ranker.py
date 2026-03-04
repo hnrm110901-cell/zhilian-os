@@ -131,19 +131,13 @@ class MenuRanker:
     async def _compute_ranking(self, store_id: str) -> List[RankedDish]:
         """核心评分计算"""
         if not self._db:
-<<<<<<< HEAD
             logger.warning("menu_ranker.no_db_session", store_id=store_id)
-=======
->>>>>>> d1df728dec60bb243c50ae42ff68074712ddafd9
             return []
 
         try:
             dish_data = await self._fetch_dish_data(store_id)
             if not dish_data:
-<<<<<<< HEAD
                 logger.info("menu_ranker.no_dish_data", store_id=store_id)
-=======
->>>>>>> d1df728dec60bb243c50ae42ff68074712ddafd9
                 return []
 
             time_slot = await _current_time_slot(self._db, store_id)

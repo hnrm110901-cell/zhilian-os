@@ -211,10 +211,6 @@ class TestJourneyEngine:
     async def test_get_journeys_all(self, agent):
         # 无 DB 配置时返回空列表（结构测试）
         journeys = await agent.get_journeys()
-<<<<<<< HEAD
-=======
-        # 无 DB 时返回空列表；有 DB 时返回真实旅程记录
->>>>>>> d1df728dec60bb243c50ae42ff68074712ddafd9
         assert isinstance(journeys, list)
 
     @pytest.mark.asyncio
