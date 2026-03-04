@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zhilian-config
+  namespace: zhilian-os
+data:
+  APP_ENV: "production"
+  APP_DEBUG: "false"
+  APP_HOST: "0.0.0.0"
+  APP_PORT: "8000"
+  LOG_LEVEL: "INFO"
+  LOG_FORMAT: "json"
+  LLM_PROVIDER: "deepseek"
+  LLM_MODEL: "deepseek-chat"
+  LLM_TEMPERATURE: "0.7"
+  LLM_MAX_TOKENS: "2000"
+  LLM_ENABLED: "true"
+  NEURAL_SYSTEM_ENABLED: "true"
+  EMBEDDING_MODEL: "paraphrase-multilingual-MiniLM-L12-v2"
+  EMBEDDING_DIMENSION: "384"
+  QDRANT_URL: "http://qdrant:6333"
+  CELERY_BROKER_URL: "redis://:$(REDIS_PASSWORD)@redis:6379/1"
+  CELERY_RESULT_BACKEND: "redis://:$(REDIS_PASSWORD)@redis:6379/2"
+  # 缓存 TTL 配置
+  CACHE_DEFAULT_EXPIRE: "300"
+  CACHE_PERMISSIONS_EXPIRE: "600"
+  CACHE_USER_INFO_EXPIRE: "300"
+  # 速率限制
+  RATE_LIMIT_DEFAULT_REQUESTS: "100"
+  RATE_LIMIT_AUTH_REQUESTS: "10"

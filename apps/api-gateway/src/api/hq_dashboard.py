@@ -8,6 +8,7 @@ from datetime import date, datetime, timedelta
 import structlog
 
 from ..core.dependencies import get_current_active_user, get_db
+from ..services.food_cost_service import FoodCostService
 from ..models.user import User
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
@@ -73,8 +74,9 @@ async def get_hq_dashboard(
                     orders = review.get("order_count", 0)
                     health_score = review.get("health_score", 85)
                     has_alert = len(review.get("alerts", [])) > 0
-            except Exception:
-                pass  # 降级：使用默认值
+            except Exception as e:
+                logger.debug("hq_dashboard.store_cache_fetch_failed", store_id=getattr(store, "id", None), error=str(e))
+                # 降级：使用默认值
 
             pending_approvals = pending_map.get(store.id, 0)
             total_revenue += revenue
@@ -112,4 +114,65 @@ async def get_hq_dashboard(
 
     except Exception as e:
         logger.error("hq_dashboard_failed", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/hq/food-cost-variance")
+async def get_food_cost_variance(
+    store_id: str,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    门店食材成本差异分析：实际成本率 vs 理论成本率
+    - 实际成本：库存 usage 事务汇总
+    - 理论成本：激活 BOM 配方加权平均 food_cost%
+    - Top 10 食材按实际消耗成本排序
+    """
+    if start_date is None:
+        start_date = date.today() - timedelta(days=7)
+    if end_date is None:
+        end_date = date.today()
+
+    try:
+        result = await FoodCostService.get_store_food_cost_variance(
+            store_id=store_id,
+            start_date=start_date,
+            end_date=end_date,
+            db=db,
+        )
+        return result
+    except Exception as e:
+        logger.error("food_cost_variance_failed", store_id=store_id, error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/hq/food-cost-ranking")
+async def get_food_cost_ranking(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    总部跨店食材成本排名（按差异率倒序）
+    - 含门店级别汇总（ok/warning/critical）
+    - 全局摘要（门店总数、平均食材成本率、超预算门店数）
+    """
+    if start_date is None:
+        start_date = date.today() - timedelta(days=7)
+    if end_date is None:
+        end_date = date.today()
+
+    try:
+        result = await FoodCostService.get_hq_food_cost_ranking(
+            start_date=start_date,
+            end_date=end_date,
+            db=db,
+        )
+        return result
+    except Exception as e:
+        logger.error("food_cost_ranking_failed", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))

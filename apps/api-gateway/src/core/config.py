@@ -141,7 +141,20 @@ class Settings(BaseSettings):
     LOG_FORMAT: str = "json"
 
     # CORS配置
+    # 生产环境应配置为实际域名，如 ["https://app.zhilian.com"]
     CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173"]
+    # 生产环境建议明确列出方法，而非使用 ["*"]
+    CORS_ALLOW_METHODS: List[str] = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    # 生产环境建议明确列出允许的请求头
+    CORS_ALLOW_HEADERS: List[str] = [
+        "Authorization",
+        "Content-Type",
+        "X-Request-ID",
+        "X-Store-ID",
+        "X-Brand-ID",
+        "Accept",
+        "Accept-Language",
+    ]
 
     # 业财税资金一体化扩展（FCT）
     FCT_ENABLED: bool = True

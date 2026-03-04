@@ -243,7 +243,7 @@ class DailyHubService:
     ) -> Dict[str, Any]:
         yesterday = target_date - timedelta(days=1)
 
-        yesterday_review = await self._get_yesterday_review(store_id, yesterday)
+        yesterday_review = await self._get_yesterday_review(store_id, yesterday, db=db)
         weather_factors  = await self._get_weather_factors(target_date)
         banquet_track    = await self._get_banquet_variables(store_id, target_date, db=db)
         regular_track    = await self._compute_regular_forecast(store_id, target_date, weather_factors)
@@ -388,7 +388,7 @@ class DailyHubService:
     # ── Private: individual modules ───────────────────────────────────────────
 
     async def _get_yesterday_review(
-        self, store_id: str, report_date: date
+        self, store_id: str, report_date: date, db: Optional[Any] = None
     ) -> Dict[str, Any]:
         try:
             from src.services.daily_report_service import daily_report_service
@@ -396,12 +396,47 @@ class DailyHubService:
             report = await daily_report_service.generate_daily_report(
                 store_id=store_id, report_date=report_date
             )
+            alerts    = list(report.alerts or [])
+            food_cost = None
+
+            # ── 食材成本差异分析（需要 DB）────────────────────────────────────
+            if db:
+                try:
+                    from src.services.food_cost_service import FoodCostService
+
+                    fc = await FoodCostService.get_store_food_cost_variance(
+                        store_id=store_id,
+                        start_date=report_date,
+                        end_date=report_date,
+                        db=db,
+                    )
+                    food_cost = {
+                        "actual_pct":      fc["actual_pct"],
+                        "theoretical_pct": fc["theoretical_pct"],
+                        "variance_pct":    fc["variance_pct"],
+                        "variance_status": fc["variance_status"],
+                        "top_ingredients": fc["top_ingredients"],
+                    }
+                    if fc["variance_status"] == "critical":
+                        alerts.append(
+                            f"🔴 食材成本严重超标：实际成本率 {fc['actual_pct']}%"
+                            f"（差异 +{fc['variance_pct']}%）"
+                        )
+                    elif fc["variance_status"] == "warning":
+                        alerts.append(
+                            f"🟡 食材成本偏高：实际成本率 {fc['actual_pct']}%"
+                            f"（差异 +{fc['variance_pct']}%）"
+                        )
+                except Exception as e:
+                    logger.warning("食材成本分析失败（非致命）", store_id=store_id, error=str(e))
+
             return {
                 "total_revenue": report.total_revenue,
                 "order_count":   report.order_count,
                 "health_score":  getattr(report, "health_score", None),
                 "highlights":    report.highlights or [],
-                "alerts":        report.alerts or [],
+                "alerts":        alerts,
+                "food_cost":     food_cost,
             }
         except Exception as e:
             logger.warning("获取昨日复盘失败，使用空数据", error=str(e))
@@ -411,6 +446,7 @@ class DailyHubService:
                 "health_score":  None,
                 "highlights":    [],
                 "alerts":        [],
+                "food_cost":     None,
             }
 
     async def _get_weather_factors(

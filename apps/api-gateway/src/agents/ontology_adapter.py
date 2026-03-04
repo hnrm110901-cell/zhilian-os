@@ -189,12 +189,12 @@ class KnowledgeAwareAgent(LLMEnhancedAgent):
         scores = row.get("scores")
         try:
             evidence = json.loads(evidence) if isinstance(evidence, str) else evidence
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("ontology_adapter.evidence_parse_failed", error=str(e))
         try:
             scores = json.loads(scores) if isinstance(scores, str) else scores
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("ontology_adapter.scores_parse_failed", error=str(e))
         return {
             "event_id": row.get("event_id"),
             "root_cause": row.get("root_cause"),

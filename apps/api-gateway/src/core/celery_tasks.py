@@ -5,7 +5,11 @@ Celery异步任务
 from typing import Dict, Any
 import asyncio
 import os
+import re
 import structlog
+
+# 表名只允许小写字母/数字/下划线，防止通过 backup_jobs.tables 字段注入任意 SQL
+_SAFE_TABLE_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 from celery import Task
 
 from .celery_app import celery_app
@@ -1385,7 +1389,7 @@ def run_backup(self, job_id: str) -> Dict[str, Any]:
         from sqlalchemy.orm import sessionmaker
         from sqlalchemy import text
 
-        db_url = os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost/zhilian")
+        db_url = os.environ["DATABASE_URL"]
         backup_dir = os.getenv("BACKUP_TMP_DIR", "/tmp/backups")
         os.makedirs(backup_dir, exist_ok=True)
 
@@ -1432,6 +1436,12 @@ def run_backup(self, job_id: str) -> Dict[str, Any]:
         try:
             for idx, table in enumerate(target_tables):
                 async with async_session() as session:
+                    # 表名来自 pg_tables（系统目录）+ tables_filter（用户可控），
+                    # 必须通过白名单校验后才能拼入 SQL（表名无法参数化）
+                    if not _SAFE_TABLE_RE.match(table):
+                        logger.warning("backup.skip_unsafe_table", table=table)
+                        row_counts[table] = 0
+                        continue
                     if backup_type == "incremental" and since_ts:
                         # 增量：只取 updated_at > since_timestamp 的行
                         try:

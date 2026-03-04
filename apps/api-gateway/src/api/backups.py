@@ -85,22 +85,29 @@ async def list_backups(
     db: AsyncSession = Depends(get_db),
 ):
     """查询备份任务列表"""
-    where = "WHERE 1=1"
-    params: dict = {"limit": limit, "offset": offset}
     if status:
-        where += " AND status = :status"
-        params["status"] = status
+        count_sql = text("SELECT COUNT(*) FROM backup_jobs WHERE status = :status")
+        sql = text(
+            "SELECT * FROM backup_jobs WHERE status = :status"
+            " ORDER BY created_at DESC LIMIT :limit OFFSET :offset"
+        )
+        params: dict = {"status": status, "limit": limit, "offset": offset}
+    else:
+        count_sql = text("SELECT COUNT(*) FROM backup_jobs")
+        sql = text(
+            "SELECT * FROM backup_jobs"
+            " ORDER BY created_at DESC LIMIT :limit OFFSET :offset"
+        )
+        params = {"limit": limit, "offset": offset}
 
-    result = await db.execute(
-        text(f"SELECT * FROM backup_jobs {where} ORDER BY created_at DESC LIMIT :limit OFFSET :offset"),
-        params,
-    )
+    total = (await db.execute(count_sql, {k: v for k, v in params.items() if k in ("status",)})).scalar() or 0
+    result = await db.execute(sql, params)
     rows = [dict(r) for r in result.mappings().fetchall()]
     for r in rows:
         for k, v in r.items():
             if hasattr(v, "isoformat"):
                 r[k] = v.isoformat()
-    return {"items": rows, "total": len(rows)}
+    return {"items": rows, "total": total}
 
 
 @router.get("/{job_id}")

@@ -12,7 +12,17 @@ Create Date: 2026-03-01
 4. 创建 set_current_brand() / clear_current_brand() PG 辅助函数
 """
 from alembic import op
+import re
 import sqlalchemy as sa
+
+# DDL 标识符（表名/列名/策略名）不支持 bind 参数，必须拼入 SQL。
+# 白名单正则确保标识符只含小写字母、数字、下划线，防止未来维护失误。
+_SAFE_IDENT_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+
+
+def _assert_safe_ident(name: str) -> None:
+    if not _SAFE_IDENT_RE.match(name):
+        raise ValueError(f"Unsafe SQL identifier in migration: {name!r}")
 
 
 # revision identifiers, used by Alembic.
@@ -79,6 +89,7 @@ def upgrade() -> None:
 
     # --- 1. 为核心表添加 brand_id 列（nullable，向后兼容）---
     for table, col_type in [("stores", "VARCHAR(50)"), ("users", "VARCHAR(50)")]:
+        _assert_safe_ident(table)        # DDL 不支持 bind 参数，白名单前置校验
         if _table_exists(table) and not _column_exists(table, "brand_id"):
             op.execute(f"ALTER TABLE {table} ADD COLUMN brand_id {col_type};")
             op.execute(f"CREATE INDEX IF NOT EXISTS idx_{table}_brand_id ON {table} (brand_id);")
@@ -88,6 +99,7 @@ def upgrade() -> None:
     #   - 如果 app.current_brand 未设置（NULL/空），则允许所有行（向后兼容）
     #   - 如果已设置，则要求行的 brand_id 匹配（或行的 brand_id 为 NULL）
     for table_name in TENANT_TABLES:
+        _assert_safe_ident(table_name)   # DDL 不支持 bind 参数，白名单前置校验
         if not _table_exists(table_name):
             continue
 
@@ -158,6 +170,7 @@ def downgrade() -> None:
 
     # 删除品牌 RLS 策略
     for table_name in TENANT_TABLES:
+        _assert_safe_ident(table_name)   # DDL 不支持 bind 参数，白名单前置校验
         if not _table_exists(table_name):
             continue
         policy_name = f'{table_name}_brand_isolation_policy'
@@ -165,6 +178,7 @@ def downgrade() -> None:
 
     # 删除 stores / users 的 brand_id 列
     for table in ["stores", "users"]:
+        _assert_safe_ident(table)        # DDL 不支持 bind 参数，白名单前置校验
         if _table_exists(table) and _column_exists(table, "brand_id"):
             op.execute(f"DROP INDEX IF EXISTS idx_{table}_brand_id;")
             op.execute(f"ALTER TABLE {table} DROP COLUMN brand_id;")

@@ -96,12 +96,21 @@ class StaffingPlan(BaseModel):
     total_staff: int
 
 
+class FoodCostInfo(BaseModel):
+    actual_pct:      float
+    theoretical_pct: float
+    variance_pct:    float
+    variance_status: str                       # ok / warning / critical
+    top_ingredients: List[Dict[str, Any]] = []
+
+
 class YesterdayReview(BaseModel):
     total_revenue: float
     order_count:   int
-    health_score:  Optional[float] = None
+    health_score:  Optional[float]    = None
     highlights:    List[str]
     alerts:        List[str]
+    food_cost:     Optional[FoodCostInfo] = None
 
 
 class WorkflowPhaseInfo(BaseModel):

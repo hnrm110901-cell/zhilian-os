@@ -45,3 +45,39 @@
 ### L009 — 提交前排除自动生成文件
 **问题**：`apps/api-gateway/.coverage` 和 `coverage.xml` 是自动生成文件，不应提交到版本库。
 **规则**：确认 `.gitignore` 包含 `*.coverage`、`coverage.xml`、`.coverage`；提交时用具体文件名而非 `git add .`。
+
+---
+
+## SQL 安全
+
+### L010 — INTERVAL 字符串内不能嵌入 SQLAlchemy 参数
+**问题**：`INTERVAL ':weeks weeks'` 中的 `:weeks` 是 SQL 字符串字面量的一部分，SQLAlchemy **不会**将其替换为绑定参数，查询执行时会报 `invalid input syntax for type interval`，或静默忽略导致回溯范围逻辑失效。
+**相同问题已在两处出现**：`private_domain/agent.py`（:days）、`schedule/agent.py`（:weeks）。
+**规则**：INTERVAL 乘法必须写成 `(:n * INTERVAL '1 day')` 或 `(:n * INTERVAL '1 week')`，将数值作为独立参数绑定，而不是嵌入字符串内。
+
+### L011 — 动态 SQL 的 f-string 与字符串拼接的界定
+**问题**：用 `text(f"SELECT ... WHERE {where} ...")` 构建查询，即使 `where` 仅由代码常量（非用户输入）组成，也违反"绝不在 text() 中用 f-string"的宪法规则，且难以被代码审查者快速验证安全性。
+**规则**：
+- **条件数量固定（≤4种组合）**：写多个独立 `text()` 分支，用 `if/else` 选择，无 f-string。
+- **条件数量可变（如 WHERE IN）**：用 `bindparam("ids", expanding=True)` + `IN :ids`，无需 f-string。
+- **表名/列名必须动态（如全表备份）**：用正则 `^[a-z][a-z0-9_]*$` 白名单校验后再拼入，并在注释中写明"表名无法参数化，已通过白名单验证"。
+
+### L012 — 方法重命名后测试文件必须同步更新
+**问题**：将 `_generate_mock_feedbacks` 重命名为 `_fetch_feedbacks_from_db` 后，`service/tests/test_agent.py` 中仍调用旧名称，导致测试运行时报 `AttributeError`。
+**规则**：重命名方法时，用 `grep -r "old_method_name" packages/ apps/` 找到所有调用点（包括测试），一并更新。
+
+### L013 — JSON 消息体禁止字符串拼接
+**问题**：`'{"text":"' + content + '"}'` 或 `f'{{"text":"{content}"}}'` 在 `content` 含双引号、反斜杠或换行时会生成非法 JSON，导致消息发送失败（飞书/企微返回 400）。
+**规则**：所有 JSON 消息体必须用 `json.dumps({"key": value})` 构造，禁止字符串拼接或 f-string 格式化。
+
+### L014 — `except Exception: pass` 等同于删除错误记录
+**问题**：`except Exception: pass` 让异常彻底无声失败，线上无法追踪（如企微通知、Neo4j 同步失败时完全无日志）。
+**规则**：即使是"不阻断主流程"的次要操作，也必须用 `logger.warning(...)` 或 `logger.debug(...)` 记录异常，只有 JSON 解码等语义上"尝试性"操作才允许静默 pass。
+
+### L015 — 列表端点的 `total` 必须是真实总量
+**问题**：`return {"items": rows, "total": len(rows)}` 在分页时 `total` 返回的是当前页行数，而非数据库总行数，前端无法计算总页数。
+**规则**：分页接口必须单独执行 `SELECT COUNT(*) ...`（去掉 LIMIT/OFFSET），用其结果作为 `total`。
+
+### L016 — 勿在 `os.getenv()` 默认值里硬编码凭证
+**问题**：`os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost/zhilian")` 在未配置环境变量时会静默使用弱默认密码，若意外部署至生产环境将造成数据泄露。
+**规则**：必须配置的环境变量用 `os.environ["DATABASE_URL"]`（无默认值），启动时即刻崩溃并提示缺失配置，优于运行时出现意外行为。

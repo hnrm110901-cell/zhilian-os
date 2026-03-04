@@ -4,6 +4,7 @@
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, Response
 import structlog
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST, CollectorRegistry
@@ -66,6 +67,7 @@ from src.api import execution, menu, store_memory, ontology_api, fct_public
 from src.middleware.monitoring import MonitoringMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
 from src.middleware.audit_log import AuditLogMiddleware
+from src.middleware.security_headers import SecurityHeadersMiddleware
 
 # 配置结构化日志
 logger = structlog.get_logger()
@@ -324,13 +326,19 @@ app = FastAPI(
     ],
 )
 
+# 安全响应头（最外层，确保所有响应都带安全头）
+app.add_middleware(SecurityHeadersMiddleware)
+
+# GZip 压缩（响应体 > 1KB 自动压缩）
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
 # 配置CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=settings.CORS_ALLOW_METHODS,
+    allow_headers=settings.CORS_ALLOW_HEADERS,
 )
 
 # 添加速率限制中间件

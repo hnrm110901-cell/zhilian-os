@@ -45,6 +45,23 @@ from .fct import FCTTaxRecord, FCTCashFlowItem, TaxType, TaxpayerType, CashFlowD
 from .banquet_lifecycle import BanquetStage, BanquetStageHistory
 from .banquet_event_order import BanquetEventOrder, BEOStatus
 from .waste_event import WasteEvent, WasteEventType, WasteEventStatus
+# Phase 3-8 新增 model（后期添加，确保 Alembic autogenerate 能检测到）
+from .action_plan import ActionPlan, DispatchStatus, ActionOutcome
+from .knowledge_rule import KnowledgeRule, RuleExecution, IndustryBenchmark, RuleCategory, RuleType, RuleStatus
+from .private_domain import (
+    PrivateDomainMember, PrivateDomainSignal, PrivateDomainJourney,
+    StoreQuadrantRecord, RFMLevel, StoreQuadrant, SignalType, JourneyType, JourneyStatus,
+)
+from .ontology_action import OntologyAction, ActionStatus, ActionPriority
+from .ops import OpsEvent, OpsAsset, OpsMaintenancePlan, OpsEventSeverity, OpsEventStatus, OpsAssetType, OpsMaintenancePriority
+from .reasoning import ReasoningReport, SeverityLevel, ReasoningDimension
+from .bom import BOMTemplate, BOMItem
+from .cross_store import CrossStoreMetric, StoreSimilarityCache, StorePeerGroup
+from .ingredient_mapping import IngredientMapping, FusionAuditLog, FusionMethod
+from .execution_audit import ExecutionRecord
+from .customer_key import CustomerKey, EncryptedField, KeyStatus, KeyAlgorithm
+from .workflow import DailyWorkflow, WorkflowPhase, DecisionVersion, WorkflowStatus, PhaseStatus, GenerationMode
+from .forecast import ForecastResult
 
 __all__ = [
     "Base",
@@ -139,4 +156,56 @@ __all__ = [
     "WasteEvent",
     "WasteEventType",
     "WasteEventStatus",
+    # Phase 3-8
+    "ActionPlan",
+    "DispatchStatus",
+    "ActionOutcome",
+    "KnowledgeRule",
+    "RuleExecution",
+    "IndustryBenchmark",
+    "RuleCategory",
+    "RuleType",
+    "RuleStatus",
+    "PrivateDomainMember",
+    "PrivateDomainSignal",
+    "PrivateDomainJourney",
+    "StoreQuadrantRecord",
+    "RFMLevel",
+    "StoreQuadrant",
+    "SignalType",
+    "JourneyType",
+    "JourneyStatus",
+    "OntologyAction",
+    "ActionStatus",
+    "ActionPriority",
+    "OpsEvent",
+    "OpsAsset",
+    "OpsMaintenancePlan",
+    "OpsEventSeverity",
+    "OpsEventStatus",
+    "OpsAssetType",
+    "OpsMaintenancePriority",
+    "ReasoningReport",
+    "SeverityLevel",
+    "ReasoningDimension",
+    "BOMTemplate",
+    "BOMItem",
+    "CrossStoreMetric",
+    "StoreSimilarityCache",
+    "StorePeerGroup",
+    "IngredientMapping",
+    "FusionAuditLog",
+    "FusionMethod",
+    "ExecutionRecord",
+    "CustomerKey",
+    "EncryptedField",
+    "KeyStatus",
+    "KeyAlgorithm",
+    "DailyWorkflow",
+    "WorkflowPhase",
+    "DecisionVersion",
+    "WorkflowStatus",
+    "PhaseStatus",
+    "GenerationMode",
+    "ForecastResult",
 ]

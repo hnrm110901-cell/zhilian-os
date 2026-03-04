@@ -6,6 +6,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
+import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +16,8 @@ from src.models.ontology_action import (
     ActionPriority,
     ESCALATION_MINUTES,
 )
+
+logger = structlog.get_logger()
 
 
 def _deadline_for_priority(priority: str) -> datetime:
@@ -161,8 +164,8 @@ async def process_escalations(session: AsyncSession) -> int:
             for uid in escalation_to_ids:
                 try:
                     await wechat_service.send_text_message(content=content, touser=uid)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning("escalation.wechat_notify_failed", uid=uid, error=str(e))
         count += 1
     await session.flush()
     return count
@@ -216,7 +219,8 @@ async def push_action_to_wechat(
         else:
             content = f"【智链OS】{title}\n\n{body}\n\n截止: {deadline_str}"
             await wechat_service.send_text_message(content=content, touser=touser)
-    except Exception:
+    except Exception as e:
+        logger.warning("action.wechat_notify_failed", error=str(e))
         return None
     action.status = ActionStatus.SENT.value
     action.sent_at = datetime.utcnow()

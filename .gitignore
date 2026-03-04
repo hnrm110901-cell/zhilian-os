@@ -68,3 +68,9 @@ Thumbs.db
 
 # Kubernetes
 *.kubeconfig
+
+# SSL 证书（私钥不入库）
+ssl/*.pem
+ssl/*.key
+ssl/*.crt
+ssl/*.p12

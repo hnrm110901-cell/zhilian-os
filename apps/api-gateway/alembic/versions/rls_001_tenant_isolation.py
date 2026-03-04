@@ -7,6 +7,7 @@ Create Date: 2026-02-22
 
 """
 from alembic import op
+import re
 import sqlalchemy as sa
 
 
@@ -15,6 +16,15 @@ revision = 'rls_001_tenant_isolation'
 down_revision = 'm01_sync_phase1_models'
 branch_labels = None
 depends_on = None
+
+# DDL 标识符（表名/策略名）不支持 bind 参数，必须拼入 SQL。
+# 白名单正则确保表名只含小写字母、数字、下划线，防止未来维护失误。
+_SAFE_IDENT_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+
+
+def _assert_safe_ident(name: str) -> None:
+    if not _SAFE_IDENT_RE.match(name):
+        raise ValueError(f"Unsafe SQL identifier in migration: {name!r}")
 
 
 # 需要应用RLS的表列表
@@ -57,6 +67,7 @@ def upgrade() -> None:
     """
     # 为每个租户表启用RLS（跳过尚未创建的表）
     for table_name in TENANT_TABLES:
+        _assert_safe_ident(table_name)   # DDL 不支持 bind 参数，白名单前置校验
         if not _table_exists(table_name):
             continue
         # 启用RLS
@@ -141,6 +152,7 @@ def downgrade() -> None:
 
     # 为每个租户表移除RLS
     for table_name in TENANT_TABLES:
+        _assert_safe_ident(table_name)   # DDL 不支持 bind 参数，白名单前置校验
         if not _table_exists(table_name):
             continue
         policy_name = f'{table_name}_tenant_isolation_policy'

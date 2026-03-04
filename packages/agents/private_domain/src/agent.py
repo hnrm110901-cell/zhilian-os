@@ -173,6 +173,91 @@ class PrivateDomainAgent(BaseAgent):
                     self.logger.warning("db_engine_init_failed", error=str(e))
         return self._db_engine
 
+    def _fetch_journeys_from_db(self, status: Optional[str] = None) -> List[JourneyRecord]:
+        """从数据库查询旅程列表；无 DB 时返回空列表"""
+        engine = self._get_db_engine()
+        if not engine:
+            return []
+        try:
+            from sqlalchemy import text
+            sql = """
+                SELECT journey_id, journey_type, customer_id, store_id,
+                       status, current_step, total_steps,
+                       started_at, next_action_at, completed_at
+                FROM private_domain_journeys
+                WHERE store_id = :store_id
+            """
+            params: Dict[str, Any] = {"store_id": self.store_id}
+            if status:
+                sql += " AND status = :status"
+                params["status"] = status
+            sql += " ORDER BY started_at DESC LIMIT 100"
+            with engine.connect() as conn:
+                rows = conn.execute(text(sql), params).fetchall()
+            return [
+                JourneyRecord(
+                    journey_id=row.journey_id,
+                    journey_type=row.journey_type,
+                    customer_id=row.customer_id,
+                    store_id=row.store_id,
+                    status=row.status,
+                    current_step=row.current_step,
+                    total_steps=row.total_steps,
+                    started_at=row.started_at.isoformat() if row.started_at else None,
+                    next_action_at=row.next_action_at.isoformat() if row.next_action_at else None,
+                    completed_at=row.completed_at.isoformat() if row.completed_at else None,
+                )
+                for row in rows
+            ]
+        except Exception as e:
+            self.logger.warning("fetch_journeys_from_db_failed", error=str(e))
+            return []
+
+    def _persist_journey_to_db(self, journey: JourneyRecord) -> None:
+        """将旅程记录写入数据库；无 DB 或写入失败时静默跳过"""
+        engine = self._get_db_engine()
+        if not engine:
+            return
+        try:
+            import uuid as uuid_mod
+            from sqlalchemy import text
+            from datetime import datetime as dt
+
+            def _parse_dt(v: Optional[str]) -> Optional[dt]:
+                return dt.fromisoformat(v) if v else None
+
+            with engine.begin() as conn:
+                conn.execute(
+                    text("""
+                        INSERT INTO private_domain_journeys
+                            (id, journey_id, store_id, customer_id, journey_type,
+                             status, current_step, total_steps,
+                             started_at, next_action_at, completed_at,
+                             step_history, created_at, updated_at)
+                        VALUES
+                            (:id, :journey_id, :store_id, :customer_id, :journey_type,
+                             :status, :current_step, :total_steps,
+                             :started_at, :next_action_at, :completed_at,
+                             '[]'::json, NOW(), NOW())
+                        ON CONFLICT (journey_id) DO NOTHING
+                    """),
+                    {
+                        "id": str(uuid_mod.uuid4()),
+                        "journey_id": journey["journey_id"],
+                        "store_id": journey["store_id"],
+                        "customer_id": journey["customer_id"],
+                        "journey_type": journey["journey_type"],
+                        "status": journey["status"],
+                        "current_step": journey["current_step"],
+                        "total_steps": journey["total_steps"],
+                        "started_at": _parse_dt(journey.get("started_at")),
+                        "next_action_at": _parse_dt(journey.get("next_action_at")),
+                        "completed_at": _parse_dt(journey.get("completed_at")),
+                    },
+                )
+        except Exception as e:
+            self.logger.warning("persist_journey_to_db_failed", error=str(e))
+
     def get_supported_actions(self) -> List[str]:
         return [
             "get_dashboard",
@@ -337,21 +422,24 @@ class PrivateDomainAgent(BaseAgent):
             return []
         try:
             from sqlalchemy import text
+            # 注意：INTERVAL 不支持直接绑定参数，需用乘法形式传入天数
             query = text("""
                 SELECT
                     customer_id,
                     EXTRACT(DAY FROM NOW() - MAX(created_at))::int AS recency_days,
                     COUNT(*)::int AS frequency,
                     COALESCE(SUM(total_amount), 0)::int AS monetary,
-                    MAX(created_at)::date::text AS last_visit
+                    MAX(created_at)::date::text AS last_visit,
+                    EXTRACT(HOUR FROM AVG(created_at::time))::int AS avg_order_hour
                 FROM orders
                 WHERE store_id = :store_id
-                  AND created_at >= NOW() - INTERVAL ':days days'
+                  AND created_at >= NOW() - (:lookback_days * INTERVAL '1 day')
                   AND customer_id IS NOT NULL
                 GROUP BY customer_id
             """)
+            lookback = days * 3
             with engine.connect() as conn:
-                rows = conn.execute(query, {"store_id": self.store_id, "days": days * 3}).fetchall()
+                rows = conn.execute(query, {"store_id": self.store_id, "lookback_days": lookback}).fetchall()
             customers = []
             for row in rows:
                 customers.append({
@@ -360,7 +448,7 @@ class PrivateDomainAgent(BaseAgent):
                     "frequency": int(row[2]),
                     "monetary": int(row[3]),
                     "last_visit": str(row[4]) if row[4] else datetime.utcnow().strftime("%Y-%m-%d"),
-                    "avg_order_time": 12,
+                    "avg_order_time": int(row[5]) if row[5] is not None else 12,
                 })
             self.logger.info("rfm_db_fetch_success", count=len(customers))
             return customers
@@ -457,7 +545,7 @@ class PrivateDomainAgent(BaseAgent):
         }
         total_steps = journey_steps.get(journey_type, 3)
         now = datetime.utcnow()
-        return JourneyRecord(
+        record = JourneyRecord(
             journey_id=f"JRN_{journey_type.upper()}_{customer_id}_{now.strftime('%Y%m%d%H%M%S')}",
             journey_type=journey_type,
             customer_id=customer_id,
@@ -469,29 +557,13 @@ class PrivateDomainAgent(BaseAgent):
             next_action_at=(now + timedelta(days=2)).isoformat(),
             completed_at=None,
         )
+        self._persist_journey_to_db(record)
+        return record
 
     async def get_journeys(self, status: Optional[str] = None) -> List[JourneyRecord]:
-        """获取旅程列表"""
+        """获取旅程列表（DB-first，无 DB 时返回空列表）"""
         self.logger.info("getting_journeys", status=status)
-        # 模拟数据
-        journeys = [
-            JourneyRecord(
-                journey_id=f"JRN_NEW_CUSTOMER_C00{i}_20260225",
-                journey_type=JourneyType.NEW_CUSTOMER.value,
-                customer_id=f"C00{i}",
-                store_id=self.store_id,
-                status=JourneyStatus.RUNNING.value if i % 3 != 0 else JourneyStatus.COMPLETED.value,
-                current_step=min(i % 4 + 1, 4),
-                total_steps=4,
-                started_at=(datetime.utcnow() - timedelta(days=i)).isoformat(),
-                next_action_at=(datetime.utcnow() + timedelta(days=1)).isoformat(),
-                completed_at=None,
-            )
-            for i in range(1, 11)
-        ]
-        if status:
-            journeys = [j for j in journeys if j["status"] == status]
-        return journeys
+        return self._fetch_journeys_from_db(status)
 
     async def get_signals(
         self,
@@ -563,22 +635,3 @@ class PrivateDomainAgent(BaseAgent):
         if customer.get("avg_order_time", 12) in range(17, 21):
             tags.append("晚餐偏好")
         return tags or ["普通用户"]
-
-    def _generate_mock_customers(self, count: int) -> List[Dict[str, Any]]:
-        """生成模拟客户数据（实际应从DB查询）"""
-        import random
-        random.seed(42)
-        customers = []
-        for i in range(count):
-            recency = random.randint(1, 120)
-            freq = random.randint(0, 8)
-            monetary = random.randint(2000, 50000)
-            customers.append({
-                "customer_id": f"C{str(i+1).zfill(4)}",
-                "recency_days": recency,
-                "frequency": freq,
-                "monetary": monetary,
-                "last_visit": (datetime.utcnow() - timedelta(days=recency)).strftime("%Y-%m-%d"),
-                "avg_order_time": random.choice([12, 13, 18, 19, 20]),
-            })
-        return customers

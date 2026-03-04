@@ -170,7 +170,7 @@ class KMSService:
                     datetime.now().isoformat()
                 )
 
-            logger.debug(f"Decrypted secret: {key_id}")
+            logger.debug("secret.decrypted", key_id=key_id)
 
             # 审计日志
             self._audit_log("decrypt", key_id)

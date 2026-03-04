@@ -3,7 +3,7 @@ ARCH-003: 门店记忆服务
 
 计算门店的运营模式记忆：高峰时段、菜品健康度、员工基线。
 """
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 import structlog
 
@@ -45,7 +45,8 @@ class StoreMemoryService:
         权重：最近的天权重最高（指数衰减）。
         """
         if not self._db:
-            return self._mock_peak_patterns()
+            logger.warning("compute_peak_patterns.no_db", store_id=store_id)
+            return []
 
         try:
             from sqlalchemy import select, func, extract
@@ -85,7 +86,7 @@ class StoreMemoryService:
 
         except Exception as e:
             logger.warning("compute_peak_patterns.failed", store_id=store_id, error=str(e))
-            return self._mock_peak_patterns()
+            return []
 
     async def compute_dish_health(
         self,
@@ -330,17 +331,3 @@ class StoreMemoryService:
         )
         return pattern
 
-    def _mock_peak_patterns(self) -> List[PeakHourPattern]:
-        """无 DB 时返回餐饮业典型高峰模式（用于测试/降级）"""
-        patterns = []
-        peak_hours = {11, 12, 13, 18, 19, 20}
-        for hour in range(24):
-            is_peak = hour in peak_hours
-            patterns.append(PeakHourPattern(
-                hour=hour,
-                avg_orders=3.5 if is_peak else 0.5,
-                avg_revenue=1200.0 if is_peak else 150.0,
-                avg_customers=8.0 if is_peak else 1.5,
-                is_peak=is_peak,
-            ))
-        return patterns

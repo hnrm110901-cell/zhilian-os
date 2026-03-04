@@ -557,6 +557,6 @@ class FastPlanningService:
             report = (await self.db.execute(stmt)).scalar_one_or_none()
             if report and report.recommended_actions:
                 return list(report.recommended_actions)[:3]
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("fast_planning.recommended_actions_fetch_failed", error=str(e))
         return []

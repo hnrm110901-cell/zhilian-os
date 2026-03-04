@@ -93,7 +93,7 @@ class ScheduleAgent(BaseAgent):
                 FROM orders
                 WHERE store_id = :store_id
                   AND EXTRACT(DOW FROM created_at) = EXTRACT(DOW FROM :target_date::date)
-                  AND created_at >= :target_date::date - INTERVAL ':weeks weeks'
+                  AND created_at >= :target_date::date - (:weeks * INTERVAL '1 week')
                   AND created_at < :target_date::date
             """)
             with engine.connect() as conn:

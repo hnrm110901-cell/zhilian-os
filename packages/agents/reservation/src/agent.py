@@ -213,8 +213,8 @@ class ReservationAgent(BaseAgent):
                 try:
                     from sqlalchemy import create_engine
                     self._db_engine = create_engine(db_url, pool_pre_ping=True)
-                except Exception:
-                    pass
+                except Exception as e:
+                    self.logger.debug("db_engine_init_failed", error=str(e))
         return self._db_engine
 
     def get_supported_actions(self) -> List[str]:

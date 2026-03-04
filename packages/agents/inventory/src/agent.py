@@ -160,8 +160,8 @@ class InventoryAgent(BaseAgent):
                 try:
                     from sqlalchemy import create_engine
                     self._db_engine = create_engine(db_url, pool_pre_ping=True)
-                except Exception:
-                    pass
+                except Exception as e:
+                    self.logger.debug("db_engine_init_failed", error=str(e))
         return self._db_engine
 
     def get_supported_actions(self) -> List[str]:
@@ -918,87 +918,3 @@ class InventoryAgent(BaseAgent):
             self.logger.warning("inventory_db_fetch_failed", error=str(e))
             return []
 
-    def _generate_mock_inventory(self, category: Optional[str] = None) -> List[InventoryItem]:
-        """生成模拟库存数据"""
-        mock_items = [
-            {
-                "item_id": "INV001",
-                "item_name": "鸡胸肉",
-                "category": "meat",
-                "unit": "kg",
-                "current_stock": 15.5,
-                "safe_stock": 50.0,
-                "min_stock": 20.0,
-                "max_stock": 100.0,
-                "unit_cost": 2500,  # 25元/kg
-                "supplier_id": "SUP001",
-                "lead_time_days": 2,
-                "expiration_date": (datetime.now() + timedelta(days=5)).isoformat(),
-                "location": "冷藏区A1"
-            },
-            {
-                "item_id": "INV002",
-                "item_name": "番茄",
-                "category": "vegetable",
-                "unit": "kg",
-                "current_stock": 8.0,
-                "safe_stock": 30.0,
-                "min_stock": 10.0,
-                "max_stock": 60.0,
-                "unit_cost": 800,  # 8元/kg
-                "supplier_id": "SUP002",
-                "lead_time_days": 1,
-                "expiration_date": (datetime.now() + timedelta(days=3)).isoformat(),
-                "location": "常温区B2"
-            },
-            {
-                "item_id": "INV003",
-                "item_name": "食用油",
-                "category": "condiment",
-                "unit": "L",
-                "current_stock": 45.0,
-                "safe_stock": 40.0,
-                "min_stock": 20.0,
-                "max_stock": 80.0,
-                "unit_cost": 1500,  # 15元/L
-                "supplier_id": "SUP003",
-                "lead_time_days": 3,
-                "expiration_date": (datetime.now() + timedelta(days=180)).isoformat(),
-                "location": "仓库C3"
-            },
-            {
-                "item_id": "INV004",
-                "item_name": "大米",
-                "category": "grain",
-                "unit": "kg",
-                "current_stock": 120.0,
-                "safe_stock": 100.0,
-                "min_stock": 50.0,
-                "max_stock": 200.0,
-                "unit_cost": 600,  # 6元/kg
-                "supplier_id": "SUP004",
-                "lead_time_days": 2,
-                "expiration_date": None,
-                "location": "仓库C1"
-            },
-            {
-                "item_id": "INV005",
-                "item_name": "牛奶",
-                "category": "dairy",
-                "unit": "L",
-                "current_stock": 2.0,
-                "safe_stock": 20.0,
-                "min_stock": 10.0,
-                "max_stock": 40.0,
-                "unit_cost": 1200,  # 12元/L
-                "supplier_id": "SUP005",
-                "lead_time_days": 1,
-                "expiration_date": (datetime.now() + timedelta(days=2)).isoformat(),
-                "location": "冷藏区A2"
-            }
-        ]
-
-        if category:
-            return [item for item in mock_items if item["category"] == category]
-
-        return mock_items

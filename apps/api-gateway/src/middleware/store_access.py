@@ -188,8 +188,8 @@ class StoreAccessMiddleware(BaseHTTPMiddleware):
                             return data["brand_id"]
                     except json.JSONDecodeError:
                         pass
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("extract_brand_id_failed", error=str(e))
 
         return None
 

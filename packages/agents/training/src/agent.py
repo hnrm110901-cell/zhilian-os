@@ -294,8 +294,8 @@ class TrainingAgent(BaseAgent):
                 try:
                     from sqlalchemy import create_engine
                     self._db_engine = create_engine(db_url, pool_pre_ping=True)
-                except Exception:
-                    pass
+                except Exception as e:
+                    self.logger.debug("db_engine_init_failed", error=str(e))
         return self._db_engine
 
     def get_supported_actions(self) -> List[str]:
@@ -1268,18 +1268,19 @@ class TrainingAgent(BaseAgent):
         engine = self._get_db_engine()
         if engine:
             try:
-                from sqlalchemy import text
-                placeholders = ", ".join(f":id_{i}" for i in range(len(course_ids)))
-                params = {f"id_{i}": cid for i, cid in enumerate(course_ids)}
+                from sqlalchemy import text, bindparam
                 with engine.connect() as conn:
-                    rows = conn.execute(text(f"""
-                        SELECT course_id, course_name, training_type, description,
-                               duration_hours, target_skill_level, prerequisites,
-                               content_url, instructor, max_participants, passing_score,
-                               created_at
-                        FROM training_courses
-                        WHERE course_id IN ({placeholders})
-                    """), params).fetchall()
+                    rows = conn.execute(
+                        text("""
+                            SELECT course_id, course_name, training_type, description,
+                                   duration_hours, target_skill_level, prerequisites,
+                                   content_url, instructor, max_participants, passing_score,
+                                   created_at
+                            FROM training_courses
+                            WHERE course_id IN :course_ids
+                        """).bindparams(bindparam("course_ids", expanding=True)),
+                        {"course_ids": course_ids},
+                    ).fetchall()
                 if rows:
                     return [
                         {

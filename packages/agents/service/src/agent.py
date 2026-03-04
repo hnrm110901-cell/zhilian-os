@@ -198,8 +198,8 @@ class ServiceAgent(BaseAgent):
                 try:
                     from sqlalchemy import create_engine
                     self._db_engine = create_engine(db_url, pool_pre_ping=True)
-                except Exception:
-                    pass
+                except Exception as e:
+                    self.logger.debug("db_engine_init_failed", error=str(e))
         return self._db_engine
 
     def get_supported_actions(self) -> List[str]:
@@ -312,7 +312,7 @@ class ServiceAgent(BaseAgent):
                 )
             else:
                 # 使用模拟数据
-                feedbacks = self._generate_mock_feedbacks(start_date, end_date)
+                feedbacks = self._fetch_feedbacks_from_db(start_date, end_date)
 
             # 按类型筛选
             if feedback_type:
@@ -615,8 +615,8 @@ class ServiceAgent(BaseAgent):
                     """), {"store_id": self.store_id, "position": target_position}).fetchone()
                 if row:
                     return row[0]
-            except Exception:
-                pass
+            except Exception as e:
+                self.logger.debug("assignee_db_lookup_failed", error=str(e))
 
         fallback = {"manager": "MANAGER_001", "chef": "CHEF_MANAGER_001", "cashier": "CUSTOMER_SERVICE_001"}
         return fallback.get(target_position, "CUSTOMER_SERVICE_001")
@@ -1110,7 +1110,7 @@ class ServiceAgent(BaseAgent):
             self.logger.error("get_service_report_failed", error=str(e))
             raise
 
-    def _generate_mock_feedbacks(
+    def _fetch_feedbacks_from_db(
         self,
         start_date: Optional[str],
         end_date: Optional[str]
@@ -1120,24 +1120,21 @@ class ServiceAgent(BaseAgent):
         if engine:
             try:
                 from sqlalchemy import text
-                filters = ["store_id = :store_id"]
+                sql = "SELECT * FROM customer_feedbacks WHERE store_id = :store_id"
                 params: dict = {"store_id": self.store_id}
                 if start_date:
-                    filters.append("created_at >= :start_date")
+                    sql += " AND created_at >= :start_date"
                     params["start_date"] = start_date
                 if end_date:
-                    filters.append("created_at <= :end_date")
+                    sql += " AND created_at <= :end_date"
                     params["end_date"] = end_date
-                where = " AND ".join(filters)
+                sql += " ORDER BY created_at DESC LIMIT 200"
                 with engine.connect() as conn:
-                    rows = conn.execute(
-                        text(f"SELECT * FROM customer_feedbacks WHERE {where} ORDER BY created_at DESC LIMIT 200"),
-                        params,
-                    ).fetchall()
+                    rows = conn.execute(text(sql), params).fetchall()
                 if rows:
                     return [dict(r._mapping) for r in rows]
-            except Exception:
-                pass
+            except Exception as e:
+                self.logger.debug("feedbacks_db_fetch_failed", error=str(e))
         # 无DB时返回样本数据，保证测试可用
         now = datetime.now()
         sample = [

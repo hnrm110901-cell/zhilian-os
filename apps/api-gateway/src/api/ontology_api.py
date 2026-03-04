@@ -3,6 +3,7 @@
 """
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import PlainTextResponse
+import structlog
 from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional
 
@@ -13,6 +14,7 @@ from src.ontology import get_ontology_repository
 from src.services.ontology_sync_service import sync_bom_version_to_pg
 
 router = APIRouter(prefix="/ontology", tags=["Ontology (L2)"])
+logger = structlog.get_logger()
 
 
 class InitSchemaRequest(BaseModel):
@@ -221,8 +223,8 @@ async def perception_edge_push(
                 unit=s.unit,
             )
             snap_ok += 1
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("ontology.inventory_snapshot_failed", error=str(e))
     for e in body.equipment:
         try:
             repo.merge_equipment(
@@ -234,8 +236,8 @@ async def perception_edge_push(
                 tenant_id=tenant,
             )
             equip_ok += 1
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("ontology.equipment_merge_failed", error=str(e))
     return {
         "ok": True,
         "inventory_snapshots_written": snap_ok,

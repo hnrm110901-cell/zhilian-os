@@ -370,19 +370,6 @@ def test_calculate_confidence_single_record(agent):
     assert 0 <= confidence <= 1
 
 
-def test_generate_mock_inventory_all(agent):
-    """测试生成所有分类的模拟库存"""
-    inventory = agent._generate_mock_inventory()
-    assert len(inventory) == 5
-
-
-def test_generate_mock_inventory_by_category(agent):
-    """测试生成特定分类的模拟库存"""
-    inventory = agent._generate_mock_inventory(category="meat")
-    assert len(inventory) == 1
-    assert inventory[0]["category"] == "meat"
-
-
 @pytest.mark.asyncio
 async def test_concurrent_operations(agent):
     """测试并发操作"""

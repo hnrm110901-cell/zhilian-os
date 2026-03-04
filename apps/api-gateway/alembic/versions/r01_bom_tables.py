@@ -6,6 +6,7 @@ Revises: rls_001_tenant_isolation
 Create Date: 2026-02-28
 """
 from alembic import op
+import re
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
@@ -13,6 +14,14 @@ revision = 'r01_bom_tables'
 down_revision = 'rls_001_tenant_isolation'
 branch_labels = None
 depends_on = None
+
+# DDL 标识符不支持 bind 参数，白名单校验防止未来维护失误
+_SAFE_IDENT_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+
+
+def _assert_safe_ident(name: str) -> None:
+    if not _SAFE_IDENT_RE.match(name):
+        raise ValueError(f"Unsafe SQL identifier in migration: {name!r}")
 
 
 def upgrade() -> None:
@@ -70,6 +79,7 @@ def upgrade() -> None:
     # ── RLS for bom_templates ──────────────────────────────────────────────────
     conn = op.get_bind()
     for tbl in ('bom_templates', 'bom_items'):
+        _assert_safe_ident(tbl)          # DDL 不支持 bind 参数，白名单前置校验
         conn.execute(sa.text(f"ALTER TABLE {tbl} ENABLE ROW LEVEL SECURITY"))
         conn.execute(sa.text(
             f"CREATE POLICY tenant_isolation ON {tbl} "

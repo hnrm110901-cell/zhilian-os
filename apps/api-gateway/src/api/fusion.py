@@ -19,6 +19,7 @@ Neo4j 同步：
 from typing import Dict, List, Optional
 from datetime import datetime
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,6 +36,7 @@ from src.services.ingredient_fusion_service import (
 )
 
 router = APIRouter(prefix="/api/v1/fusion", tags=["fusion"])
+logger = structlog.get_logger()
 
 
 # ── Pydantic Schemas ──────────────────────────────────────────────────────────
@@ -136,8 +138,8 @@ def _sync_to_neo4j(mapping, method: str, source_system: str = None,
                 method=method,
             )
         sync.close()
-    except Exception:
-        pass  # Neo4j 不可用不阻断主流程
+    except Exception as e:
+        logger.warning("fusion.neo4j_sync_failed", error=str(e))  # Neo4j 不可用不阻断主流程
 
 
 def _serialize_mapping(m) -> dict:

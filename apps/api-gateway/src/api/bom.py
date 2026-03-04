@@ -22,6 +22,7 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,6 +33,7 @@ from src.models.user import User
 from src.services.bom_service import BOMService
 
 router = APIRouter(prefix="/api/v1/bom", tags=["bom"])
+logger = structlog.get_logger()
 
 
 # ── Pydantic Schemas ──────────────────────────────────────────────────────────
@@ -153,8 +155,8 @@ async def create_bom(
     # 异步触发 Neo4j 同步（不阻断响应）
     try:
         await svc.sync_to_neo4j(bom)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("bom.neo4j_sync_failed", bom_id=str(bom.id), error=str(e))
 
     return _serialize_bom(bom)
 
@@ -342,6 +344,20 @@ async def remove_bom_item(
     if not ok:
         raise HTTPException(status_code=404, detail="BOM 明细行不存在")
     await db.commit()
+
+
+@router.get("/{bom_id}/cost-report")
+async def get_bom_cost_report(
+    bom_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """查询 BOM 版本的标准食材成本报告（含 food_cost%）"""
+    from src.services.food_cost_service import FoodCostService
+    report = await FoodCostService.get_bom_cost_report(bom_id, db)
+    if report is None:
+        raise HTTPException(status_code=404, detail="BOM 不存在")
+    return report
 
 
 @router.post("/{bom_id}/sync")

@@ -6,14 +6,21 @@
 # 默认目标
 help:
 	@echo "智链OS - 可用命令:"
-	@echo "  make install    - 安装项目依赖"
-	@echo "  make dev        - 安装开发依赖"
-	@echo "  make test       - 运行所有测试"
-	@echo "  make lint       - 代码检查"
-	@echo "  make format     - 代码格式化"
-	@echo "  make clean      - 清理临时文件"
-	@echo "  make run        - 启动API Gateway"
-	@echo "  make docker     - 构建Docker镜像"
+	@echo "  make install         - 安装项目依赖"
+	@echo "  make dev             - 安装开发依赖"
+	@echo "  make test            - 运行所有测试"
+	@echo "  make lint            - 代码检查"
+	@echo "  make format          - 代码格式化"
+	@echo "  make clean           - 清理临时文件"
+	@echo "  make run             - 启动API Gateway"
+	@echo "  make docker          - 构建Docker镜像"
+	@echo ""
+	@echo "数据库迁移:"
+	@echo "  make migrate-gen msg=<描述>  - 生成迁移文件"
+	@echo "  make migrate-up              - 执行所有待迁移"
+	@echo "  make migrate-down            - 回滚上一次迁移"
+	@echo "  make migrate-status          - 查看当前版本"
+	@echo "  make migrate-history         - 查看迁移历史"
 
 # 安装生产依赖
 install:
@@ -108,3 +115,37 @@ deps:
 # 更新依赖
 update:
 	pip install --upgrade -r requirements.txt
+
+# ============================================================
+# 数据库迁移（Alembic）
+# 使用前请确保 DATABASE_URL 环境变量已设置
+# ============================================================
+ALEMBIC = cd apps/api-gateway && alembic
+
+# 生成新的迁移文件（自动检测 model 变化）
+migrate-gen:
+	$(ALEMBIC) revision --autogenerate -m "$(msg)"
+
+# 执行所有待执行的迁移（升级到最新）
+migrate-up:
+	$(ALEMBIC) upgrade head
+
+# 回滚最后一次迁移
+migrate-down:
+	$(ALEMBIC) downgrade -1
+
+# 回滚到指定版本：make migrate-to rev=<revision_id>
+migrate-to:
+	$(ALEMBIC) upgrade $(rev)
+
+# 查看当前迁移版本
+migrate-status:
+	$(ALEMBIC) current
+
+# 查看迁移历史
+migrate-history:
+	$(ALEMBIC) history --verbose
+
+# 生成 SQL 脚本（不执行，仅预览）
+migrate-sql:
+	$(ALEMBIC) upgrade head --sql

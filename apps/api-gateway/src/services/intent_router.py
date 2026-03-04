@@ -330,8 +330,8 @@ class CallSupportHandler:
                 },
                 to_user_id="store_manager",
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("call_support.notify_failed", error=str(e))
 
         msg = "支援请求已发送，同事正在赶来"
         return {

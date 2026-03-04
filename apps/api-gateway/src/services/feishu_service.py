@@ -2,6 +2,7 @@
 飞书服务
 Feishu (Lark) Service for message sending and user management
 """
+import json
 import os
 from typing import Dict, Any, List, Optional
 import httpx
@@ -79,7 +80,7 @@ class FeishuService:
         message_data = {
             "receive_id": receive_id,
             "msg_type": "text",
-            "content": '{"text":"' + content + '"}',
+            "content": json.dumps({"text": content}),
         }
 
         try:

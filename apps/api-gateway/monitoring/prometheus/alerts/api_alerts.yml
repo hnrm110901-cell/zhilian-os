@@ -142,3 +142,75 @@ groups:
         annotations:
           summary: "Celery队列积压"
           description: "队列长度超过1000，当前值: {{ $value }}"
+
+  - name: infrastructure_alerts
+    interval: 30s
+    rules:
+      # Redis 服务不可用
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: cache
+        annotations:
+          summary: "Redis 服务不可用"
+          description: "Redis 实例 {{ $labels.instance }} 已下线超过1分钟"
+
+      # 数据库连接池接近耗尽（使用率 > 90%）
+      - alert: DBConnectionPoolExhausted
+        expr: pg_stat_activity_count / pg_settings_max_connections > 0.9
+        for: 5m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "数据库连接池接近耗尽"
+          description: "连接池使用率超过90%，当前值: {{ $value | humanizePercentage }}"
+
+      # 磁盘空间不足（剩余 < 20%）
+      - alert: LowDiskSpace
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.2
+        for: 5m
+        labels:
+          severity: warning
+          service: infrastructure
+        annotations:
+          summary: "磁盘空间不足"
+          description: "根分区可用空间低于20%，当前剩余: {{ $value | humanizePercentage }}"
+
+      # 磁盘空间严重不足（剩余 < 10%）
+      - alert: CriticalLowDiskSpace
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.1
+        for: 2m
+        labels:
+          severity: critical
+          service: infrastructure
+        annotations:
+          summary: "磁盘空间严重不足"
+          description: "根分区可用空间低于10%，当前剩余: {{ $value | humanizePercentage }}"
+
+  - name: agent_alerts
+    interval: 60s
+    rules:
+      # Agent 调用错误率过高
+      - alert: AgentHighErrorRate
+        expr: rate(http_requests_total{endpoint=~"/api/v1/agents/.*", status=~"5.."}[10m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: agent
+        annotations:
+          summary: "Agent 错误率过高"
+          description: "Agent 接口 5xx 错误率超过10%，当前值: {{ $value }}"
+
+      # Agent 响应超时（P99 > 5s）
+      - alert: AgentHighLatency
+        expr: histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{endpoint=~"/api/v1/agents/.*"}[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: agent
+        annotations:
+          summary: "Agent 响应延迟过高"
+          description: "Agent P99 延迟超过5秒，当前值: {{ $value }}秒"

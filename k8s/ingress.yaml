@@ -1,0 +1,50 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: zhilian-ingress
+  namespace: zhilian-os
+  annotations:
+    # cert-manager 自动申请/续签 Let's Encrypt 证书
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    # 请求体大小限制
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    # WebSocket 支持（语音接口）
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+      add_header X-Frame-Options "DENY" always;
+      add_header X-Content-Type-Options "nosniff" always;
+      add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+      server_tokens off;
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - app.zhilian.com
+      secretName: zhilian-tls
+  rules:
+    - host: app.zhilian.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 8000
+          - path: /metrics
+            pathType: Prefix
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 8000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 80
