@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+import os
 import structlog
 
 from ..core.dependencies import get_current_active_user, get_db, require_permission
@@ -447,6 +448,19 @@ async def wechat_approval_callback(
             action=action,
             user_id=user_id
         )
+
+        # 审批后调度 48h 效果反馈检查
+        if action in ("approve", "modify"):
+            try:
+                from src.core.celery_tasks import check_decision_impact
+                check_decision_impact.apply_async(
+                    args=[decision_id],
+                    countdown=int(os.getenv("DECISION_FEEDBACK_DELAY_SECONDS", str(48 * 3600))),
+                )
+                logger.info("decision_feedback_scheduled", decision_id=decision_id)
+            except Exception as sched_err:
+                logger.warning("decision_feedback_schedule_failed",
+                               decision_id=decision_id, error=str(sched_err))
 
         return {
             "success": True,

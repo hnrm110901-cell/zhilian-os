@@ -202,3 +202,240 @@ class TestToStaffAction:
         del raw_staff_action["amount"]
         result = adapter.to_staff_action(raw_staff_action, "STORE_TC1", "BRAND_001")
         assert result.amount is None
+
+
+# ── to_dish ───────────────────────────────────────────────────────────────────
+
+class TestToDish:
+    def _raw(self):
+        return {
+            "dish_id":       "D001",
+            "dish_name":     "红油火锅",
+            "category_name": "主锅",
+            "price":         8800,    # 88.00 元（分）
+            "cost":          2800,    # 28.00 元（分）
+            "unit":          "份",
+            "status":        1,
+        }
+
+    def test_basic_fields(self, adapter):
+        result = adapter.to_dish(self._raw())
+        assert result["pos_dish_id"] == "D001"
+        assert result["name"] == "红油火锅"
+        assert result["category"] == "主锅"
+
+    def test_price_fen_to_yuan(self, adapter):
+        result = adapter.to_dish(self._raw())
+        assert result["price_yuan"] == 88.0
+
+    def test_cost_fen_to_yuan(self, adapter):
+        result = adapter.to_dish(self._raw())
+        assert result["cost_yuan"] == 28.0
+        assert result["cost_fen"] == 2800
+
+    def test_is_available_true_when_status_1(self, adapter):
+        result = adapter.to_dish(self._raw())
+        assert result["is_available"] is True
+
+    def test_is_available_false_when_status_0(self, adapter):
+        raw = self._raw()
+        raw["status"] = 0
+        result = adapter.to_dish(raw)
+        assert result["is_available"] is False
+
+    def test_default_unit_is_fen(self, adapter):
+        raw = self._raw()
+        del raw["unit"]
+        result = adapter.to_dish(raw)
+        assert result["unit"] == "份"
+
+    def test_missing_price_is_zero(self, adapter):
+        raw = self._raw()
+        del raw["price"]
+        result = adapter.to_dish(raw)
+        assert result["price_yuan"] == 0.0
+
+
+# ── to_inventory_item ─────────────────────────────────────────────────────────
+
+class TestToInventoryItem:
+    def _raw(self):
+        return {
+            "material_id":   "MAT-001",
+            "material_name": "鸡腿",
+            "category":      "meat",
+            "unit":          "kg",
+            "current_qty":   20.5,
+            "min_qty":       10.0,
+            "unit_cost":     1500,    # 15元/kg（分）
+            "supplier_name": "优鲜供应商",
+        }
+
+    def test_basic_fields(self, adapter):
+        result = adapter.to_inventory_item(self._raw())
+        assert result["pos_material_id"] == "MAT-001"
+        assert result["name"] == "鸡腿"
+        assert result["category"] == "meat"
+        assert result["unit"] == "kg"
+
+    def test_unit_cost_fen_large_treated_as_fen(self, adapter):
+        result = adapter.to_inventory_item(self._raw())
+        assert result["unit_cost_fen"] == 1500
+        assert result["unit_cost_yuan"] == 15.0
+
+    def test_unit_cost_small_treated_as_yuan(self, adapter):
+        raw = self._raw()
+        raw["unit_cost"] = 15.0     # 小于1000，推断为元
+        result = adapter.to_inventory_item(raw)
+        assert result["unit_cost_fen"] == 1500
+        assert result["unit_cost_yuan"] == 15.0
+
+    def test_quantities_mapped(self, adapter):
+        result = adapter.to_inventory_item(self._raw())
+        assert result["current_quantity"] == 20.5
+        assert result["min_quantity"] == 10.0
+
+    def test_supplier_name(self, adapter):
+        result = adapter.to_inventory_item(self._raw())
+        assert result["supplier_name"] == "优鲜供应商"
+
+
+# ── fetch_orders_by_date（mock HTTP） ─────────────────────────────────────────
+
+class TestFetchOrdersByDate:
+    @pytest.mark.asyncio
+    async def test_returns_items_and_pagination(self, adapter):
+        from unittest.mock import AsyncMock, patch
+
+        mock_response = {
+            "code": 0,
+            "data": {
+                "list": [
+                    {"order_id": "O001", "order_no": "N001", "status": 2,
+                     "pay_amount": 5000, "create_time": "2026-03-04 12:00:00",
+                     "table_no": "A01", "dishes": []},
+                ],
+                "total": 1,
+            },
+        }
+        with patch.object(adapter, "_request", new_callable=AsyncMock, return_value=mock_response):
+            result = await adapter.fetch_orders_by_date("2026-03-04", page=1)
+
+        assert len(result["items"]) == 1
+        assert result["total"] == 1
+        assert result["has_more"] is False
+
+    @pytest.mark.asyncio
+    async def test_has_more_true_when_more_pages(self, adapter):
+        from unittest.mock import AsyncMock, patch
+
+        mock_response = {
+            "code": 0,
+            "data": {
+                "list": [{"order_id": f"O{i:03d}", "status": 2,
+                          "pay_amount": 1000, "create_time": "2026-03-04 10:00:00",
+                          "dishes": []} for i in range(100)],
+                "total": 250,
+            },
+        }
+        with patch.object(adapter, "_request", new_callable=AsyncMock, return_value=mock_response):
+            result = await adapter.fetch_orders_by_date("2026-03-04", page=1, page_size=100)
+
+        assert result["has_more"] is True
+
+
+# ── pull_daily_orders（自动分页） ─────────────────────────────────────────────
+
+class TestPullDailyOrders:
+    @pytest.mark.asyncio
+    async def test_returns_order_schemas(self, adapter):
+        from unittest.mock import AsyncMock, patch
+
+        page1_items = [
+            {"order_id": "O001", "order_no": "N001", "status": 2,
+             "pay_amount": 5000, "discount_amount": 0,
+             "create_time": "2026-03-04 12:00:00",
+             "table_no": "B02", "dishes": [
+                 {"item_id": "I1", "dish_id": "D1", "dish_name": "红烧肉",
+                  "quantity": 1, "price": 5000}
+             ]}
+        ]
+
+        async def mock_fetch(date_str, page=1, page_size=100, status=None):
+            if page == 1:
+                return {"items": page1_items, "page": 1, "page_size": 100,
+                        "total": 1, "has_more": False}
+            return {"items": [], "page": page, "page_size": 100,
+                    "total": 1, "has_more": False}
+
+        with patch.object(adapter, "fetch_orders_by_date", side_effect=mock_fetch):
+            orders = await adapter.pull_daily_orders("2026-03-04", "BRAND_001")
+
+        assert len(orders) == 1
+        assert orders[0].order_id == "O001"
+        from decimal import Decimal
+        assert orders[0].total == Decimal("50.00")
+
+    @pytest.mark.asyncio
+    async def test_stops_after_last_page(self, adapter):
+        from unittest.mock import AsyncMock, patch
+
+        call_count = 0
+
+        async def mock_fetch(date_str, page=1, page_size=100, status=None):
+            nonlocal call_count
+            call_count += 1
+            return {"items": [], "page": page, "page_size": 100,
+                    "total": 0, "has_more": False}
+
+        with patch.object(adapter, "fetch_orders_by_date", side_effect=mock_fetch):
+            orders = await adapter.pull_daily_orders("2026-03-04", "BRAND_001")
+
+        assert orders == []
+        assert call_count == 1   # 只调用一次，第一页就没数据了
+
+
+# ── fetch_dishes（mock HTTP） ─────────────────────────────────────────────────
+
+class TestFetchDishes:
+    @pytest.mark.asyncio
+    async def test_normalizes_dish_items(self, adapter):
+        from unittest.mock import AsyncMock, patch
+
+        mock_response = {
+            "code": 0,
+            "data": {
+                "list": [{"dish_id": "D001", "dish_name": "宫保鸡丁",
+                          "price": 4800, "cost": 1200, "status": 1}],
+                "total": 1,
+            },
+        }
+        with patch.object(adapter, "_request", new_callable=AsyncMock, return_value=mock_response):
+            result = await adapter.fetch_dishes(page=1)
+
+        assert len(result["items"]) == 1
+        assert result["items"][0]["pos_dish_id"] == "D001"
+        assert result["items"][0]["price_yuan"] == 48.0
+
+
+# ── _normalize_store ──────────────────────────────────────────────────────────
+
+class TestNormalizeStore:
+    def test_basic_store_fields(self, adapter):
+        raw = {
+            "store_id":   "TC_001",
+            "store_name": "北京旗舰店",
+            "address":    "北京市朝阳区xxx",
+            "phone":      "010-12345678",
+            "open_time":  "10:00",
+            "close_time": "22:00",
+            "status":     1,
+        }
+        result = adapter._normalize_store(raw)
+        assert result["pos_store_id"] == "TC_001"
+        assert result["name"] == "北京旗舰店"
+        assert result["is_active"] is True
+
+    def test_inactive_store(self, adapter):
+        result = adapter._normalize_store({"status": 0})
+        assert result["is_active"] is False

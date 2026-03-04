@@ -111,12 +111,15 @@ class FCTService:
 
         anomaly_days = [
             {
-                "date":        r.reconciliation_date.isoformat(),
-                "pos_amount":  r.pos_total_amount,
-                "actual_amount": r.actual_total_amount,
-                "diff_amount": r.diff_amount,
-                "diff_ratio":  r.diff_ratio,
-                "status":      r.status,
+                "date":              r.reconciliation_date.isoformat(),
+                "pos_amount":        r.pos_total_amount,
+                "pos_amount_yuan":   self._y(r.pos_total_amount),
+                "actual_amount":     r.actual_total_amount,
+                "actual_amount_yuan": self._y(r.actual_total_amount),
+                "diff_amount":       r.diff_amount,
+                "diff_amount_yuan":  self._y(r.diff_amount),
+                "diff_ratio":        r.diff_ratio,
+                "status":            r.status,
             }
             for r in records
             if abs(r.diff_ratio or 0) > 1.0
@@ -124,12 +127,15 @@ class FCTService:
 
         daily_details = [
             {
-                "date":          r.reconciliation_date.isoformat(),
-                "pos_amount":    r.pos_total_amount,
-                "actual_amount": r.actual_total_amount,
-                "diff_amount":   r.diff_amount,
-                "diff_ratio":    r.diff_ratio,
-                "status":        r.status,
+                "date":              r.reconciliation_date.isoformat(),
+                "pos_amount":        r.pos_total_amount,
+                "pos_amount_yuan":   self._y(r.pos_total_amount),
+                "actual_amount":     r.actual_total_amount,
+                "actual_amount_yuan": self._y(r.actual_total_amount),
+                "diff_amount":       r.diff_amount,
+                "diff_amount_yuan":  self._y(r.diff_amount),
+                "diff_ratio":        r.diff_ratio,
+                "status":            r.status,
             }
             for r in records
         ]
@@ -145,12 +151,15 @@ class FCTService:
             "period":           f"{year}-{month:02d}",
             "reconciled_days":  len(records),
             "summary": {
-                "pos_total":      pos_total,
-                "finance_total":  actual_total,
-                "variance":       variance,
-                "variance_pct":   variance_pct,
-                "health":         "normal" if abs(variance_pct) <= 1.0 else
-                                  "warning" if abs(variance_pct) <= 3.0 else "critical",
+                "pos_total":           pos_total,
+                "pos_total_yuan":      self._y(pos_total),
+                "finance_total":       actual_total,
+                "finance_total_yuan":  self._y(actual_total),
+                "variance":            variance,
+                "variance_yuan":       self._y(variance),
+                "variance_pct":        variance_pct,
+                "health":              "normal" if abs(variance_pct) <= 1.0 else
+                                       "warning" if abs(variance_pct) <= 3.0 else "critical",
             },
             "status_breakdown": status_counts,
             "anomaly_days":     anomaly_days,
@@ -240,24 +249,34 @@ class FCTService:
             "period":        f"{year}-{month:02d}",
             "taxpayer_type": tp.value,
             "revenue": {
-                "gross_revenue":    gross_rev,
-                "food_cost":        food_cost,
+                "gross_revenue":      gross_rev,
+                "gross_revenue_yuan": self._y(gross_rev),
+                "food_cost":          food_cost,
+                "food_cost_yuan":     self._y(food_cost),
             },
             "vat": {
-                "rate":             vat_rate,
-                "output_vat":       output_vat,
-                "input_vat":        input_vat,
-                "net_vat":          net_vat,
-                "surcharge":        vat_surcharge,
-                "total_vat_burden": net_vat + vat_surcharge,
+                "rate":                  vat_rate,
+                "output_vat":            output_vat,
+                "output_vat_yuan":       self._y(output_vat),
+                "input_vat":             input_vat,
+                "input_vat_yuan":        self._y(input_vat),
+                "net_vat":               net_vat,
+                "net_vat_yuan":          self._y(net_vat),
+                "surcharge":             vat_surcharge,
+                "surcharge_yuan":        self._y(vat_surcharge),
+                "total_vat_burden":      net_vat + vat_surcharge,
+                "total_vat_burden_yuan": self._y(net_vat + vat_surcharge),
             },
             "cit": {
-                "rate":             cit_rate,
-                "estimated_profit": est_profit,
-                "cit_amount":       cit_amount,
-                "profit_margin_assumption": PROFIT_MARGIN,
+                "rate":                      cit_rate,
+                "estimated_profit":          est_profit,
+                "estimated_profit_yuan":     self._y(est_profit),
+                "cit_amount":                cit_amount,
+                "cit_amount_yuan":           self._y(cit_amount),
+                "profit_margin_assumption":  PROFIT_MARGIN,
             },
-            "total_tax":     total_tax,
+            "total_tax":      total_tax,
+            "total_tax_yuan": self._y(total_tax),
             "effective_rate": round(total_tax / gross_rev * 100, 2) if gross_rev else 0.0,
             "disclaimer":    "本测算基于历史数据估算，实际纳税以税务机关认定为准",
         }
@@ -358,39 +377,53 @@ class FCTService:
             is_alert = balance < alert_threshold
             if is_alert:
                 msg = f"{d.isoformat()} 累计余额 ¥{balance/100:.0f} 低于预警线 ¥{alert_threshold/100:.0f}"
-                alerts.append({"date": d.isoformat(), "balance": balance, "message": msg})
+                alerts.append({"date": d.isoformat(), "balance": balance, "balance_yuan": self._y(balance), "message": msg})
 
             daily_forecast.append({
-                "date":               d.isoformat(),
-                "weekday":            ["周一","周二","周三","周四","周五","周六","周日"][d.weekday()],
-                "inflow":             inflow,
-                "outflow":            total_out,
+                "date":                    d.isoformat(),
+                "weekday":                 ["周一","周二","周三","周四","周五","周六","周日"][d.weekday()],
+                "inflow":                  inflow,
+                "inflow_yuan":             self._y(inflow),
+                "outflow":                 total_out,
+                "outflow_yuan":            self._y(total_out),
                 "outflow_breakdown": {
-                    "food_cost": food_out,
-                    "labor":     daily_labor,
-                    "rent":      daily_rent,
-                    "utilities": daily_util,
+                    "food_cost":       food_out,
+                    "food_cost_yuan":  self._y(food_out),
+                    "labor":           daily_labor,
+                    "labor_yuan":      self._y(daily_labor),
+                    "rent":            daily_rent,
+                    "rent_yuan":       self._y(daily_rent),
+                    "utilities":       daily_util,
+                    "utilities_yuan":  self._y(daily_util),
                 },
-                "net_flow":           net,
-                "cumulative_balance": balance,
-                "is_alert":           is_alert,
-                "confidence":         0.85 if i < 7 else 0.70 if i < 14 else 0.55,
+                "net_flow":                net,
+                "net_flow_yuan":           self._y(net),
+                "cumulative_balance":      balance,
+                "cumulative_balance_yuan": self._y(balance),
+                "is_alert":                is_alert,
+                "confidence":              0.85 if i < 7 else 0.70 if i < 14 else 0.55,
             })
 
         total_inflow  = sum(d["inflow"]   for d in daily_forecast)
         total_outflow = sum(d["outflow"]  for d in daily_forecast)
 
         return {
-            "store_id":          store_id,
-            "forecast_days":     days,
-            "starting_balance":  starting_balance,
-            "avg_daily_inflow":  avg_daily_inflow,
+            "store_id":           store_id,
+            "forecast_days":      days,
+            "starting_balance":   starting_balance,
+            "starting_balance_yuan": self._y(starting_balance),
+            "avg_daily_inflow":   avg_daily_inflow,
+            "avg_daily_inflow_yuan": self._y(avg_daily_inflow),
             "summary": {
-                "total_inflow":      total_inflow,
-                "total_outflow":     total_outflow,
-                "net_flow":          total_inflow - total_outflow,
-                "ending_balance":    balance,
-                "alert_count":       len(alerts),
+                "total_inflow":         total_inflow,
+                "total_inflow_yuan":    self._y(total_inflow),
+                "total_outflow":        total_outflow,
+                "total_outflow_yuan":   self._y(total_outflow),
+                "net_flow":             total_inflow - total_outflow,
+                "net_flow_yuan":        self._y(total_inflow - total_outflow),
+                "ending_balance":       balance,
+                "ending_balance_yuan":  self._y(balance),
+                "alert_count":          len(alerts),
             },
             "alerts":            alerts[:5],   # 最多返回 5 条预警
             "daily_forecast":    daily_forecast,
@@ -481,12 +514,15 @@ class FCTService:
             actual_total_expense += actual
 
             row = {
-                "category":   cat,
-                "label":      label,
-                "budgeted":   budgeted,
-                "actual":     actual,
-                "variance":   diff,
-                "exec_rate":  exec_rate,
+                "category":        cat,
+                "label":           label,
+                "budgeted":        budgeted,
+                "budgeted_yuan":   self._y(budgeted),
+                "actual":          actual,
+                "actual_yuan":     self._y(actual),
+                "variance":        diff,
+                "variance_yuan":   self._y(diff),
+                "exec_rate":       exec_rate,
                 "status": (
                     "over"   if exec_rate and exec_rate > 110 else
                     "under"  if exec_rate and exec_rate < 80  else
@@ -511,17 +547,23 @@ class FCTService:
             "store_id": store_id,
             "period":   f"{year}-{month:02d}",
             "revenue": {
-                "budgeted":  revenue_budget,
-                "actual":    revenue_actual,
-                "variance":  revenue_actual - revenue_budget,
+                "budgeted":       revenue_budget,
+                "budgeted_yuan":  self._y(revenue_budget),
+                "actual":         revenue_actual,
+                "actual_yuan":    self._y(revenue_actual),
+                "variance":       revenue_actual - revenue_budget,
+                "variance_yuan":  self._y(revenue_actual - revenue_budget),
                 "exec_rate": round(revenue_actual / revenue_budget * 100, 1) if revenue_budget else None,
             },
             "categories":   categories,
             "overall": {
-                "total_expense_budgeted": budget_total_expense,
-                "total_expense_actual":   actual_total_expense,
-                "gross_profit":           gross_profit,
-                "profit_margin_pct":      profit_margin,
+                "total_expense_budgeted":      budget_total_expense,
+                "total_expense_budgeted_yuan": self._y(budget_total_expense),
+                "total_expense_actual":        actual_total_expense,
+                "total_expense_actual_yuan":   self._y(actual_total_expense),
+                "gross_profit":                gross_profit,
+                "gross_profit_yuan":           self._y(gross_profit),
+                "profit_margin_pct":           profit_margin,
             },
             "alerts": alerts,
         }
@@ -585,16 +627,26 @@ class FCTService:
             "store_id":   store_id,
             "as_of":      today.isoformat(),
             "cash_flow":  {
-                "next_7d_net":    cf_summary["net_flow"],
-                "ending_balance": cf_summary["ending_balance"],
-                "alert_count":    cf_summary["alert_count"],
+                "next_7d_net":         cf_summary["net_flow"],
+                "next_7d_net_yuan":    self._y(cf_summary["net_flow"]),
+                "ending_balance":      cf_summary["ending_balance"],
+                "ending_balance_yuan": self._y(cf_summary["ending_balance"]),
+                "alert_count":         cf_summary["alert_count"],
             },
-            "tax":        tax_summary,
+            "tax":        {
+                **tax_summary,
+                "total_tax_yuan": self._y(tax_summary["total_tax"]),
+            },
             "budget":     bex_summary,
             "health_score": self._calc_health_score(cf_summary, bex_summary),
         }
 
     # ── Private helpers ───────────────────────────────────────────────────────
+
+    @staticmethod
+    def _y(fen: int) -> float:
+        """将分（fen）转换为元（yuan），保留2位小数。"""
+        return round((fen or 0) / 100, 2)
 
     async def _save_tax_record(
         self,

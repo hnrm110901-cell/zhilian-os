@@ -549,3 +549,134 @@ class TestGetDashboard:
         assert "tax"          in result
         assert "budget"       in result
         assert "health_score" in result
+
+
+# ── ¥化字段验证 ──────────────────────────────────────────────────────────────
+
+class TestYuanFields:
+    """验证所有方法的 _yuan 伴随字段正确输出（Rule 6：¥优先）。"""
+
+    @pytest.mark.asyncio
+    async def test_estimate_monthly_tax_yuan_fields(self):
+        db = _mock_db()
+        db.execute.side_effect = [
+            _single_scalar(1_000_000_00),   # 100万 gross revenue
+            _single_scalar(350_000_00),     # 35万 food cost
+        ]
+        svc    = FCTService(db)
+        result = await svc.estimate_monthly_tax("S001", 2026, 3)
+
+        # revenue
+        assert result["revenue"]["gross_revenue_yuan"] == pytest.approx(1_000_000.00, abs=0.01)
+        assert result["revenue"]["food_cost_yuan"]     == pytest.approx(350_000.00, abs=0.01)
+        # vat
+        assert "output_vat_yuan"       in result["vat"]
+        assert "input_vat_yuan"        in result["vat"]
+        assert "net_vat_yuan"          in result["vat"]
+        assert "surcharge_yuan"        in result["vat"]
+        assert "total_vat_burden_yuan" in result["vat"]
+        # cit
+        assert "estimated_profit_yuan" in result["cit"]
+        assert "cit_amount_yuan"       in result["cit"]
+        # top-level
+        assert "total_tax_yuan" in result
+        assert result["total_tax_yuan"] == pytest.approx(result["total_tax"] / 100, abs=0.01)
+
+    @pytest.mark.asyncio
+    async def test_forecast_cash_flow_yuan_fields(self):
+        db = _mock_db()
+        hist_result   = _rows([MagicMock(daily_total=50_000_00)] * 10)
+        budget_result = _scalars_all([])
+        db.execute.side_effect = [hist_result, budget_result]
+
+        svc    = FCTService(db)
+        result = await svc.forecast_cash_flow("S001", days=3, starting_balance=100_000_00)
+
+        assert "starting_balance_yuan"  in result
+        assert "avg_daily_inflow_yuan"  in result
+        assert result["starting_balance_yuan"] == pytest.approx(100_000.00, abs=0.01)
+
+        s = result["summary"]
+        assert "total_inflow_yuan"   in s
+        assert "total_outflow_yuan"  in s
+        assert "net_flow_yuan"       in s
+        assert "ending_balance_yuan" in s
+        assert s["total_inflow_yuan"] == pytest.approx(s["total_inflow"] / 100, abs=0.01)
+
+        day0 = result["daily_forecast"][0]
+        assert "inflow_yuan"             in day0
+        assert "outflow_yuan"            in day0
+        assert "net_flow_yuan"           in day0
+        assert "cumulative_balance_yuan" in day0
+        assert "food_cost_yuan"          in day0["outflow_breakdown"]
+        assert "labor_yuan"              in day0["outflow_breakdown"]
+        assert "rent_yuan"               in day0["outflow_breakdown"]
+        assert "utilities_yuan"          in day0["outflow_breakdown"]
+
+    @pytest.mark.asyncio
+    async def test_get_budget_execution_yuan_fields(self):
+        budgets = []
+        revenue_row = MagicMock()
+        revenue_row.category         = "sales"
+        revenue_row.transaction_type = "income"
+        revenue_row.total            = 500_000_00
+
+        food_row = MagicMock()
+        food_row.category         = "food_cost"
+        food_row.transaction_type = "expense"
+        food_row.total            = 200_000_00
+
+        db = _mock_db()
+        db.execute.side_effect = [_scalars_all(budgets), _rows([revenue_row, food_row])]
+
+        svc    = FCTService(db)
+        result = await svc.get_budget_execution("S001", 2026, 3)
+
+        rev = result["revenue"]
+        assert "budgeted_yuan" in rev
+        assert "actual_yuan"   in rev
+        assert "variance_yuan" in rev
+        assert rev["actual_yuan"] == pytest.approx(500_000.00, abs=0.01)
+
+        for cat in result["categories"]:
+            assert "budgeted_yuan" in cat
+            assert "actual_yuan"   in cat
+            assert "variance_yuan" in cat
+
+        overall = result["overall"]
+        assert "total_expense_budgeted_yuan" in overall
+        assert "total_expense_actual_yuan"   in overall
+        assert "gross_profit_yuan"           in overall
+        assert overall["gross_profit_yuan"] == pytest.approx(
+            overall["gross_profit"] / 100, abs=0.01
+        )
+
+    @pytest.mark.asyncio
+    async def test_get_dashboard_yuan_fields(self):
+        db  = _mock_db()
+        svc = FCTService(db)
+
+        svc.forecast_cash_flow   = AsyncMock(return_value={
+            "summary": {"net_flow": 200_000_00, "ending_balance": 800_000_00, "alert_count": 0}
+        })
+        svc.estimate_monthly_tax = AsyncMock(return_value={
+            "total_tax": 60_000_00, "effective_rate": 6.0, "period": "2026-03",
+            "vat": {}, "cit": {}, "revenue": {}, "disclaimer": "",
+        })
+        svc.get_budget_execution = AsyncMock(return_value={
+            "overall": {"profit_margin_pct": 10.0},
+            "alerts": [],
+            "categories": [], "revenue": {}
+        })
+        db.execute.return_value = _scalars_all([])
+
+        result = await svc.get_dashboard("S001")
+
+        cf = result["cash_flow"]
+        assert "next_7d_net_yuan"    in cf
+        assert "ending_balance_yuan" in cf
+        assert cf["next_7d_net_yuan"]    == pytest.approx(200_000.00, abs=0.01)
+        assert cf["ending_balance_yuan"] == pytest.approx(800_000.00, abs=0.01)
+
+        assert "total_tax_yuan" in result["tax"]
+        assert result["tax"]["total_tax_yuan"] == pytest.approx(600_000.00, abs=0.01)

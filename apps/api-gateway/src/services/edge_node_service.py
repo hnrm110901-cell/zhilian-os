@@ -479,6 +479,133 @@ class EdgeNodeService:
             "timestamp": datetime.utcnow().isoformat()
         }
 
+    # ── v2.0：离线基础查询（断网可用）─────────────────────────────────────────
+
+    async def query_revenue_offline(
+        self,
+        store_id:  str,
+        date_str:  Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        离线查询营业额（断网时返回本地缓存数据）。
+
+        优先返回当日缓存；无缓存时基于历史均值估算，并标注 is_estimate=True。
+
+        Args:
+            store_id: 门店 ID
+            date_str: 查询日期（YYYY-MM-DD，默认今天）
+
+        Returns:
+            {"store_id", "date", "revenue_yuan", "is_estimate", "source", "cached_at"}
+        """
+        target_date = date_str or datetime.utcnow().strftime("%Y-%m-%d")
+        cache_key   = f"revenue:{store_id}:{target_date}"
+
+        cached = await self.get_cached_data(cache_key)
+        if cached:
+            return {
+                "store_id":    store_id,
+                "date":        target_date,
+                "revenue_yuan": cached.get("revenue_yuan", 0.0),
+                "is_estimate": cached.get("is_estimate", False),
+                "source":      "local_cache",
+                "cached_at":   cached.get("cached_at", "unknown"),
+                "mode":        "offline",
+            }
+
+        # 回退：读取历史均值缓存（写入时 key 为 revenue_avg:{store_id}）
+        avg_key = f"revenue_avg:{store_id}"
+        avg_cached = await self.get_cached_data(avg_key)
+        est_revenue = float(avg_cached.get("avg_yuan", 0.0)) if avg_cached else 0.0
+
+        logger.warning(
+            "query_revenue_offline.no_cache",
+            store_id=store_id,
+            date=target_date,
+            estimated=est_revenue,
+        )
+        return {
+            "store_id":    store_id,
+            "date":        target_date,
+            "revenue_yuan": est_revenue,
+            "is_estimate": True,
+            "source":      "historical_avg",
+            "cached_at":   None,
+            "mode":        "offline",
+        }
+
+    async def query_inventory_offline(
+        self,
+        store_id: str,
+    ) -> Dict[str, Any]:
+        """
+        离线查询库存快照（断网时返回本地缓存数据）。
+
+        Args:
+            store_id: 门店 ID
+
+        Returns:
+            {"store_id", "items": [...], "item_count", "low_stock_count",
+             "out_of_stock_count", "snapshot_at", "source", "mode"}
+        """
+        cache_key = f"inventory_snapshot:{store_id}"
+        cached    = await self.get_cached_data(cache_key)
+
+        if cached:
+            items = cached.get("items", [])
+            low_stock     = sum(1 for i in items if i.get("status") in ("low", "critical"))
+            out_of_stock  = sum(1 for i in items if i.get("status") == "out_of_stock")
+            return {
+                "store_id":        store_id,
+                "items":           items,
+                "item_count":      len(items),
+                "low_stock_count": low_stock,
+                "out_of_stock_count": out_of_stock,
+                "snapshot_at":     cached.get("snapshot_at", "unknown"),
+                "source":          "local_cache",
+                "mode":            "offline",
+            }
+
+        logger.warning("query_inventory_offline.no_cache", store_id=store_id)
+        return {
+            "store_id":        store_id,
+            "items":           [],
+            "item_count":      0,
+            "low_stock_count": 0,
+            "out_of_stock_count": 0,
+            "snapshot_at":     None,
+            "source":          "no_cache",
+            "mode":            "offline",
+        }
+
+    async def update_revenue_cache(
+        self,
+        store_id:     str,
+        date_str:     str,
+        revenue_yuan: float,
+        ttl:          int = 86400 * 3,   # 保留3天
+    ) -> None:
+        """在线时主动写入营业额缓存（供离线时使用）。"""
+        cache_key = f"revenue:{store_id}:{date_str}"
+        await self.cache_data(cache_key, {
+            "revenue_yuan": revenue_yuan,
+            "is_estimate":  False,
+            "cached_at":    datetime.utcnow().isoformat(),
+        }, ttl=ttl)
+
+    async def update_inventory_cache(
+        self,
+        store_id:     str,
+        items:        List[Dict[str, Any]],
+        ttl:          int = 3600 * 4,    # 4小时内有效
+    ) -> None:
+        """在线时主动写入库存快照缓存（供离线时使用）。"""
+        cache_key = f"inventory_snapshot:{store_id}"
+        await self.cache_data(cache_key, {
+            "items":       items,
+            "snapshot_at": datetime.utcnow().isoformat(),
+        }, ttl=ttl)
+
 
 # 全局实例
 edge_node_service = EdgeNodeService()

@@ -477,6 +477,237 @@ class TiancaiShanglongAdapter:
         logger.info("关闭天财商龙适配器")
         await self.client.aclose()
 
+    # ==================== 4个核心拉取接口（分页） ====================
+
+    async def fetch_store_info(self) -> Dict[str, Any]:
+        """
+        拉取门店基础信息（名称、地址、营业时间等）。
+
+        Returns:
+            标准化门店 dict：
+              pos_store_id, name, address, phone, open_time, close_time, is_active
+        """
+        response = await self._request("POST", "/api/store/info", data={"store_id": self.store_id})
+        raw = response.get("data", {})
+        return self._normalize_store(raw)
+
+    async def fetch_dishes(
+        self,
+        page: int = 1,
+        page_size: int = 100,
+        category_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        分页拉取菜品列表。
+
+        Returns:
+            {
+                "items":      list of normalized dish dicts,
+                "page":       int,
+                "page_size":  int,
+                "total":      int,   # 总记录数（API 返回）
+                "has_more":   bool,
+            }
+        """
+        data: Dict[str, Any] = {
+            "store_id": self.store_id,
+            "page":     page,
+            "page_size": page_size,
+        }
+        if category_id:
+            data["category_id"] = category_id
+
+        response = await self._request("POST", "/api/dish/list", data=data)
+        raw_data = response.get("data", {})
+        raw_items = raw_data.get("list", raw_data.get("items", []))
+        total = int(raw_data.get("total", len(raw_items)))
+
+        return {
+            "items":     [self.to_dish(item) for item in raw_items],
+            "page":      page,
+            "page_size": page_size,
+            "total":     total,
+            "has_more":  page * page_size < total,
+        }
+
+    async def fetch_orders_by_date(
+        self,
+        date_str: str,
+        page: int = 1,
+        page_size: int = 100,
+        status: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        分页拉取指定日期的订单列表。
+
+        Args:
+            date_str:  目标日期，格式 YYYY-MM-DD
+            page:      页码（从1开始）
+            page_size: 每页条数
+            status:    订单状态过滤（None=全部，2=已支付）
+
+        Returns:
+            {
+                "items":     list of raw order dicts（未映射，供 to_order() 使用）,
+                "page":      int,
+                "page_size": int,
+                "total":     int,
+                "has_more":  bool,
+            }
+        """
+        data: Dict[str, Any] = {
+            "store_id":   self.store_id,
+            "start_time": f"{date_str} 00:00:00",
+            "end_time":   f"{date_str} 23:59:59",
+            "page":       page,
+            "page_size":  page_size,
+        }
+        if status is not None:
+            data["status"] = status
+
+        response = await self._request("POST", "/api/order/list", data=data)
+        raw_data = response.get("data", {})
+        raw_items = raw_data.get("list", raw_data.get("orders", []))
+        total = int(raw_data.get("total", len(raw_items)))
+
+        return {
+            "items":     raw_items,
+            "page":      page,
+            "page_size": page_size,
+            "total":     total,
+            "has_more":  page * page_size < total,
+        }
+
+    async def fetch_inventory(
+        self,
+        page: int = 1,
+        page_size: int = 200,
+        category: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        分页拉取库存/原料列表。
+
+        Returns:
+            {
+                "items":     list of normalized inventory dicts,
+                "page":      int,
+                "page_size": int,
+                "total":     int,
+                "has_more":  bool,
+            }
+        """
+        data: Dict[str, Any] = {
+            "store_id":  self.store_id,
+            "page":      page,
+            "page_size": page_size,
+        }
+        if category:
+            data["category"] = category
+
+        response = await self._request("POST", "/api/inventory/list", data=data)
+        raw_data = response.get("data", {})
+        raw_items = raw_data.get("list", raw_data.get("materials", []))
+        total = int(raw_data.get("total", len(raw_items)))
+
+        return {
+            "items":     [self.to_inventory_item(item) for item in raw_items],
+            "page":      page,
+            "page_size": page_size,
+            "total":     total,
+            "has_more":  page * page_size < total,
+        }
+
+    # ==================== 高层日度全量拉取（自动分页） ====================
+
+    async def pull_daily_orders(
+        self,
+        date_str: str,
+        brand_id: str,
+        status: int = 2,
+        max_pages: int = 50,
+    ) -> List[Any]:
+        """
+        拉取指定日期的全量已支付订单，自动处理分页，返回 OrderSchema 列表。
+
+        Args:
+            date_str:  目标日期 YYYY-MM-DD
+            brand_id:  品牌ID（传入 to_order() 映射器）
+            status:    订单状态（默认2=已支付）
+            max_pages: 最大拉取页数（防止无限循环，默认50页=5000条）
+
+        Returns:
+            List[OrderSchema]
+        """
+        all_orders = []
+        page = 1
+
+        while page <= max_pages:
+            result = await self.fetch_orders_by_date(
+                date_str=date_str,
+                page=page,
+                page_size=100,
+                status=status,
+            )
+            raw_items = result["items"]
+            for raw in raw_items:
+                try:
+                    order = self.to_order(raw, self.store_id, brand_id)
+                    all_orders.append(order)
+                except Exception as exc:
+                    logger.warning(
+                        "tiancai_order_map_failed",
+                        order_id=raw.get("order_id"),
+                        error=str(exc),
+                    )
+
+            if not result["has_more"]:
+                break
+            page += 1
+
+        logger.info(
+            "tiancai_pull_daily_orders_done",
+            date=date_str,
+            total_orders=len(all_orders),
+            pages_fetched=page,
+        )
+        return all_orders
+
+    async def pull_all_dishes(self, max_pages: int = 20) -> List[Dict[str, Any]]:
+        """
+        拉取全量菜品列表（自动分页）。
+
+        Returns:
+            List of normalized dish dicts
+        """
+        all_dishes: List[Dict[str, Any]] = []
+        page = 1
+        while page <= max_pages:
+            result = await self.fetch_dishes(page=page, page_size=100)
+            all_dishes.extend(result["items"])
+            if not result["has_more"]:
+                break
+            page += 1
+        logger.info("tiancai_pull_all_dishes_done", total=len(all_dishes))
+        return all_dishes
+
+    async def pull_all_inventory(self, max_pages: int = 20) -> List[Dict[str, Any]]:
+        """
+        拉取全量库存原料（自动分页）。
+
+        Returns:
+            List of normalized inventory item dicts
+        """
+        all_items: List[Dict[str, Any]] = []
+        page = 1
+        while page <= max_pages:
+            result = await self.fetch_inventory(page=page, page_size=200)
+            all_items.extend(result["items"])
+            if not result["has_more"]:
+                break
+            page += 1
+        logger.info("tiancai_pull_all_inventory_done", total=len(all_items))
+        return all_items
+
     # ==================== 标准化数据总线接口 ====================
 
     def to_order(self, raw: Dict[str, Any], store_id: str, brand_id: str):
@@ -595,3 +826,74 @@ class TiancaiShanglongAdapter:
             approved_by=raw.get("approved_by"),
             created_at=created_at,
         )
+
+    def _normalize_store(self, raw: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        将天财商龙门店原始字段标准化。
+
+        天财商龙门店字段参考：
+          store_id, store_name, address, phone, open_time, close_time, status
+        """
+        return {
+            "pos_store_id": str(raw.get("store_id", self.store_id)),
+            "name":         str(raw.get("store_name", raw.get("name", ""))),
+            "address":      raw.get("address", ""),
+            "phone":        raw.get("phone", raw.get("tel", "")),
+            "open_time":    raw.get("open_time", ""),
+            "close_time":   raw.get("close_time", ""),
+            "is_active":    int(raw.get("status", 1)) == 1,
+        }
+
+    def to_dish(self, raw: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        将天财商龙原始菜品字段标准化。
+
+        天财商龙菜品字段参考：
+          dish_id, dish_name, category_id, category_name, price (分),
+          status (1=在售 0=停售), unit
+        """
+        price_raw = raw.get("price", raw.get("sale_price", 0))
+        price_yuan = round(int(price_raw) / 100, 2) if price_raw else 0.0
+
+        cost_raw = raw.get("cost", raw.get("cost_price", 0))
+        cost_fen = int(cost_raw) if cost_raw else 0
+
+        return {
+            "pos_dish_id":   str(raw.get("dish_id", raw.get("good_id", ""))),
+            "name":          str(raw.get("dish_name", raw.get("good_name", ""))),
+            "category":      str(raw.get("category_name", raw.get("category_id", ""))),
+            "price_yuan":    price_yuan,
+            "cost_fen":      cost_fen,
+            "cost_yuan":     round(cost_fen / 100, 2),
+            "unit":          raw.get("unit", "份"),
+            "is_available":  int(raw.get("status", 1)) == 1,
+        }
+
+    def to_inventory_item(self, raw: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        将天财商龙原始库存原料字段标准化。
+
+        天财商龙原料字段参考：
+          material_id, material_name, category, unit,
+          current_qty, min_qty, unit_cost (分 或 元), supplier_name
+        """
+        # unit_cost：天财商龙可能以分或元返回，根据量级判断
+        unit_cost_raw = raw.get("unit_cost", raw.get("price", 0))
+        unit_cost_val = float(unit_cost_raw) if unit_cost_raw else 0.0
+        # 如果数值小于 1000 且有小数，推断为元；否则推断为分
+        if unit_cost_val > 0 and unit_cost_val < 1000:
+            unit_cost_fen = int(unit_cost_val * 100)
+        else:
+            unit_cost_fen = int(unit_cost_val)
+
+        return {
+            "pos_material_id": str(raw.get("material_id", raw.get("id", ""))),
+            "name":            str(raw.get("material_name", raw.get("name", ""))),
+            "category":        str(raw.get("category", "")),
+            "unit":            raw.get("unit", "kg"),
+            "current_quantity": float(raw.get("current_qty", raw.get("qty", 0))),
+            "min_quantity":    float(raw.get("min_qty", raw.get("reorder_point", 0))),
+            "unit_cost_fen":   unit_cost_fen,
+            "unit_cost_yuan":  round(unit_cost_fen / 100, 2),
+            "supplier_name":   raw.get("supplier_name", raw.get("supplier", "")),
+        }

@@ -562,6 +562,15 @@ app.include_router(ontology_api.router)
 # FCT 公开接口（独立部署形态，API Key 认证）
 app.include_router(fct_public.router, prefix="/api/v1/fct-public", tags=["fct_public"])
 
+# v2.0 MVP — 决策中枢（Top3 + 手动推送 + 场景识别）
+from src.api import decision_hub, monthly_report
+app.include_router(decision_hub.router, tags=["decision_hub"])
+app.include_router(monthly_report.router, tags=["monthly_report"])
+
+# v2.0 MVP #3 — 损耗Top5排名（含¥归因）
+from src.api import waste_guard
+app.include_router(waste_guard.router, tags=["waste_guard"])
+
 # 业财税资金一体化（FCT）
 if getattr(settings, "FCT_ENABLED", False):
     try:

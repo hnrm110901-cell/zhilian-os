@@ -417,6 +417,81 @@ class WeChatService:
         """检查是否已配置"""
         return bool(self.corp_id and self.corp_secret and self.agent_id)
 
+    # ==================== 决策型卡片推送（v2.0 P0）====================
+
+    async def send_decision_card(
+        self,
+        title:         str,
+        description:   str,
+        action_url:    str,
+        btntxt:        str = "立即审批",
+        to_user_id:    Optional[str] = None,
+        message_id:    Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        发送决策型 textcard 消息（含¥影响+置信度+一键操作按钮）。
+
+        带 Redis 去重保护（TTL 24h）。
+
+        Args:
+            title:        卡片标题（≤128字符）
+            description:  决策摘要（¥影响/置信度/执行难度，≤512字符）
+            action_url:   点击按钮跳转的URL（审批页或详情页）
+            btntxt:       按钮文字（默认"立即审批"）
+            to_user_id:   接收人 userid（None 则 @all）
+            message_id:   去重ID（None 时自动生成）
+
+        Returns:
+            {"status": "sent"|"skipped"|"failed", "message_id": str, ...}
+        """
+        import hashlib
+        import json as _json
+
+        if not message_id:
+            message_id = hashlib.md5(
+                f"decision_card:{to_user_id}:{title}:{description[:50]}".encode()
+            ).hexdigest()
+
+        if await self._is_duplicate(message_id):
+            logger.info(
+                "wechat.send_decision_card.duplicate_skipped",
+                message_id=message_id,
+                to_user_id=to_user_id,
+            )
+            return {"status": "skipped", "reason": "duplicate", "message_id": message_id}
+
+        try:
+            result = await self.send_card_message(
+                title=title[:128],
+                description=description[:512],
+                url=action_url,
+                btntxt=btntxt[:4],
+                touser=to_user_id,
+            )
+            await self._mark_sent(message_id)
+            logger.info(
+                "wechat.send_decision_card.success",
+                to_user_id=to_user_id,
+                message_id=message_id,
+            )
+            return {"status": "sent", "message_id": message_id, "result": result}
+
+        except Exception as e:
+            logger.error(
+                "wechat.send_decision_card.failed",
+                to_user_id=to_user_id,
+                error=str(e),
+            )
+            await self._enqueue_failed_message(
+                template="decision_card",
+                data={"title": title, "description": description, "action_url": action_url,
+                      "btntxt": btntxt},
+                to_user_id=to_user_id or "@all",
+                message_id=message_id,
+                error=str(e),
+            )
+            return {"status": "failed", "message_id": message_id, "error": str(e)}
+
     # ==================== INFRA-002: 标准化消息接口 ====================
 
     async def send_templated_message(

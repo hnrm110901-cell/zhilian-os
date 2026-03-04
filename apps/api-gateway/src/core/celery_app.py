@@ -301,6 +301,57 @@ celery_app.conf.update(
                 "priority": 5,
             },
         },
+        # ── v2.0 决策型企微推送（4时间点）────────────────────────────────────────
+        # 08:00晨推：今日 Top3 决策卡片
+        "push-morning-decisions": {
+            "task": "src.core.celery_tasks.push_morning_decisions",
+            "schedule": crontab(
+                hour=int(os.getenv("PUSH_MORNING_HOUR", "8")),
+                minute=int(os.getenv("PUSH_MORNING_MINUTE", "0")),
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 8},
+        },
+        # 12:00午推：上午异常汇总（损耗/成本率）
+        "push-noon-anomaly": {
+            "task": "src.core.celery_tasks.push_noon_anomaly",
+            "schedule": crontab(
+                hour=int(os.getenv("PUSH_NOON_HOUR", "12")),
+                minute=int(os.getenv("PUSH_NOON_MINUTE", "0")),
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 8},
+        },
+        # 17:30战前推：库存/排班备战核查
+        "push-prebattle": {
+            "task": "src.core.celery_tasks.push_prebattle_decisions",
+            "schedule": crontab(
+                hour=int(os.getenv("PUSH_PREBATTLE_HOUR", "17")),
+                minute=int(os.getenv("PUSH_PREBATTLE_MINUTE", "30")),
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 9},
+        },
+        # 20:30晚推：当日回顾+待批决策提醒
+        "push-evening-recap": {
+            "task": "src.core.celery_tasks.push_evening_recap",
+            "schedule": crontab(
+                hour=int(os.getenv("PUSH_EVENING_HOUR", "20")),
+                minute=int(os.getenv("PUSH_EVENING_MINUTE", "30")),
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 7},
+        },
+        # 09:30 食材成本率 KPI 阈值检查（AlertThresholdsPage 配置驱动）
+        "check-food-cost-kpi-alert": {
+            "task": "src.core.celery_tasks.check_food_cost_kpi_alert",
+            "schedule": crontab(
+                hour=int(os.getenv("FOOD_COST_ALERT_HOUR", "9")),
+                minute=int(os.getenv("FOOD_COST_ALERT_MINUTE", "30")),
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 8},
+        },
     },
 )
 

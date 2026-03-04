@@ -1,15 +1,40 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   Row, Col, Card, Select, Button, Alert, Tag, Table, Statistic,
-  Space, Spin, Typography, Divider,
+  Space, Spin, Typography, Divider, Progress, Tooltip,
 } from 'antd';
-import { CheckCircleOutlined, ReloadOutlined } from '@ant-design/icons';
+import {
+  CheckCircleOutlined, ReloadOutlined, ThunderboltOutlined,
+  DollarOutlined, ClockCircleOutlined, RiseOutlined,
+} from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { apiClient } from '../services/api';
 import { handleApiError, showSuccess } from '../utils/message';
 
 const { Option } = Select;
-const { Text } = Typography;
+const { Text, Title } = Typography;
+
+// ── 状态颜色 ──────────────────────────────────────────────────────────────────
+
+const sourceTag = (src: string) => {
+  const map: Record<string, { color: string; text: string }> = {
+    inventory:  { color: 'orange',  text: '库存' },
+    food_cost:  { color: 'blue',    text: '成本' },
+    reasoning:  { color: 'purple',  text: '综合' },
+  };
+  const cfg = map[src] || { color: 'default', text: src };
+  return <Tag color={cfg.color}>{cfg.text}</Tag>;
+};
+
+const difficultyTag = (d: string) => {
+  const map: Record<string, { color: string; text: string }> = {
+    low:    { color: 'success', text: '易执行' },
+    medium: { color: 'warning', text: '中等' },
+    high:   { color: 'error',   text: '较复杂' },
+  };
+  const cfg = map[d] || { color: 'default', text: d };
+  return <Tag color={cfg.color}>{cfg.text}</Tag>;
+};
 
 const DailyHubPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -17,6 +42,8 @@ const DailyHubPage: React.FC = () => {
   const [stores, setStores] = useState<any[]>([]);
   const [selectedStore, setSelectedStore] = useState('STORE001');
   const [board, setBoard] = useState<any>(null);
+  const [decisions, setDecisions] = useState<any[]>([]);
+  const [decisionsLoading, setDecisionsLoading] = useState(false);
 
   const loadStores = useCallback(async () => {
     try {
@@ -41,6 +68,24 @@ const DailyHubPage: React.FC = () => {
 
   useEffect(() => { loadStores(); }, [loadStores]);
   useEffect(() => { loadBoard(); }, [loadBoard]);
+
+  const loadDecisions = useCallback(async () => {
+    if (!selectedStore) return;
+    setDecisionsLoading(true);
+    try {
+      const res = await apiClient.get('/api/v1/decisions/top3', {
+        params: { store_id: selectedStore },
+      });
+      setDecisions(res.data?.decisions || []);
+    } catch {
+      // 决策加载失败不阻断页面，静默降级
+      setDecisions([]);
+    } finally {
+      setDecisionsLoading(false);
+    }
+  }, [selectedStore]);
+
+  useEffect(() => { loadDecisions(); }, [loadDecisions]);
 
   const handleApprove = async () => {
     if (!board) return;
@@ -246,6 +291,99 @@ const DailyHubPage: React.FC = () => {
             </Card>
           </Col>
         </Row>
+
+        {/* Top3 AI 决策推荐 */}
+        <Card
+          title={
+            <Space>
+              <ThunderboltOutlined style={{ color: '#faad14' }} />
+              <span>今日 AI 决策推荐</span>
+              <Tag color="blue">Top 3</Tag>
+            </Space>
+          }
+          extra={
+            <Button size="small" icon={<ReloadOutlined />} onClick={loadDecisions} loading={decisionsLoading}>
+              刷新
+            </Button>
+          }
+          style={{ marginTop: 16 }}
+        >
+          <Spin spinning={decisionsLoading}>
+            {decisions.length === 0 && !decisionsLoading ? (
+              <Alert message="暂无决策推荐，系统正在分析中" type="info" showIcon />
+            ) : (
+              <Row gutter={16}>
+                {decisions.map((d: any) => (
+                  <Col key={d.rank} xs={24} md={8}>
+                    <Card
+                      size="small"
+                      style={{
+                        borderLeft: `4px solid ${d.rank === 1 ? '#f5222d' : d.rank === 2 ? '#fa8c16' : '#1890ff'}`,
+                        marginBottom: 8,
+                      }}
+                    >
+                      <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                        <Space>
+                          <Tag color={d.rank === 1 ? 'red' : d.rank === 2 ? 'orange' : 'blue'}>
+                            #{d.rank}
+                          </Tag>
+                          {sourceTag(d.source)}
+                          {difficultyTag(d.execution_difficulty)}
+                        </Space>
+
+                        <Text strong style={{ fontSize: 14 }}>{d.title}</Text>
+                        <Text type="secondary" style={{ fontSize: 12 }}>{d.action}</Text>
+
+                        <Row gutter={8} style={{ marginTop: 4 }}>
+                          <Col span={12}>
+                            <Tooltip title="预期净收益">
+                              <Space size={4}>
+                                <DollarOutlined style={{ color: '#52c41a' }} />
+                                <Text style={{ color: '#52c41a', fontWeight: 600 }}>
+                                  ¥{d.net_benefit_yuan?.toLocaleString()}
+                                </Text>
+                              </Space>
+                            </Tooltip>
+                          </Col>
+                          <Col span={12}>
+                            <Tooltip title="执行窗口">
+                              <Space size={4}>
+                                <ClockCircleOutlined style={{ color: '#fa8c16' }} />
+                                <Text style={{ fontSize: 12 }}>{d.decision_window_label}</Text>
+                              </Space>
+                            </Tooltip>
+                          </Col>
+                        </Row>
+
+                        <div>
+                          <Text type="secondary" style={{ fontSize: 11 }}>
+                            置信度 {d.confidence_pct?.toFixed(0)}%
+                          </Text>
+                          <Progress
+                            percent={d.confidence_pct}
+                            size="small"
+                            showInfo={false}
+                            strokeColor={d.confidence_pct >= 80 ? '#52c41a' : d.confidence_pct >= 60 ? '#faad14' : '#f5222d'}
+                          />
+                        </div>
+
+                        <Button
+                          type={d.rank === 1 ? 'primary' : 'default'}
+                          size="small"
+                          icon={<RiseOutlined />}
+                          block
+                          href="/approval-list"
+                        >
+                          去审批
+                        </Button>
+                      </Space>
+                    </Card>
+                  </Col>
+                ))}
+              </Row>
+            )}
+          </Spin>
+        </Card>
       </Spin>
     </div>
   );

@@ -2790,3 +2790,262 @@ def retry_failed_wechat_messages(self):
         asyncio.run(_run())
     except Exception as exc:
         logger.warning("retry_failed_wechat_messages.error", error=str(exc))
+
+
+# ============================================================
+# v2.0 决策效果反馈（48h 后检查）
+# ============================================================
+
+@celery_app.task(bind=True, max_retries=2, default_retry_delay=300)
+def check_decision_impact(self, decision_id: str):
+    """
+    审批后 48h 效果回检。
+
+    对比决策前后的关键指标，向审批人发送效果反馈消息，
+    并将决策 outcome 设为 PENDING（待人工核实）。
+    """
+    import asyncio
+
+    async def _run():
+        from src.core.database import get_db_session
+        from src.models.decision_log import DecisionLog, DecisionStatus, DecisionOutcome
+        from src.services.wechat_service import wechat_service
+        from src.services.decision_push_service import _APPROVAL_BASE_URL
+        from sqlalchemy import select
+
+        async with get_db_session() as db:
+            result = await db.execute(
+                select(DecisionLog).where(DecisionLog.id == decision_id)
+            )
+            dl = result.scalar_one_or_none()
+            if not dl:
+                logger.warning("check_decision_impact.not_found", decision_id=decision_id)
+                return
+
+            # 仅处理已批准且尚无结果的决策
+            if dl.decision_status not in (DecisionStatus.APPROVED, DecisionStatus.EXECUTED):
+                logger.info("check_decision_impact.skip_status",
+                            decision_id=decision_id, status=str(dl.decision_status))
+                return
+            if dl.outcome is None:
+                dl.outcome = DecisionOutcome.PENDING
+                await db.commit()
+
+            # 向审批人发送 48h 效果反馈提醒
+            try:
+                title       = f"【48h效果反馈】{dl.decision_type}"
+                description = (
+                    f"您于48小时前批准的决策\n"
+                    f"来源：{dl.agent_type} / {dl.agent_method}\n"
+                    f"门店：{dl.store_id}\n"
+                    f"请核实执行效果并在系统中记录结果"
+                )
+                action_url = f"{_APPROVAL_BASE_URL}/{decision_id}/outcome"
+                recipient  = dl.manager_id or f"store_{dl.store_id}"
+                await wechat_service.send_decision_card(
+                    title=title,
+                    description=description,
+                    action_url=action_url,
+                    btntxt="记录结果",
+                    to_user_id=recipient,
+                )
+                logger.info("check_decision_impact.feedback_sent",
+                            decision_id=decision_id, recipient=recipient)
+            except Exception as exc:
+                logger.warning("check_decision_impact.feedback_failed",
+                               decision_id=decision_id, error=str(exc))
+
+    try:
+        asyncio.run(_run())
+    except Exception as exc:
+        raise self.retry(exc=exc)
+
+
+# ============================================================
+# v2.0 决策型企微推送（4时间点）
+# ============================================================
+
+def _get_store_recipient(store_id: str) -> str:
+    """获取门店负责人的企微 user_id（优先从环境变量读，兜底返回 store_{id}）。"""
+    return os.getenv(f"WECHAT_RECIPIENT_{store_id.upper()}", f"store_{store_id}")
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=120)
+def push_morning_decisions(self, store_id: str = None):
+    """08:00晨推：为所有（或指定）门店推送今日 Top3 决策卡片。"""
+    import asyncio
+
+    async def _run():
+        from src.core.database import get_db_session
+        from src.models.store import Store
+        from sqlalchemy import select
+        from src.services.decision_push_service import DecisionPushService
+
+        async with get_db_session() as db:
+            if store_id:
+                stores = [(store_id, "")]
+            else:
+                rows = (await db.execute(select(Store.id, Store.name))).all()
+                stores = [(str(r.id), r.name or "") for r in rows]
+
+            for sid, sname in stores:
+                try:
+                    await DecisionPushService.push_morning_decisions(
+                        store_id=sid,
+                        brand_id="",
+                        recipient_user_id=_get_store_recipient(sid),
+                        db=db,
+                        store_name=sname,
+                    )
+                except Exception as exc:
+                    logger.warning("push_morning_decisions.store_failed",
+                                   store_id=sid, error=str(exc))
+
+    try:
+        asyncio.run(_run())
+    except Exception as exc:
+        raise self.retry(exc=exc)
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=120)
+def push_noon_anomaly(self, store_id: str = None):
+    """12:00午推：上午损耗/成本率异常汇总（仅在存在异常时推送）。"""
+    import asyncio
+
+    async def _run():
+        from src.core.database import get_db_session
+        from src.models.store import Store
+        from sqlalchemy import select
+        from src.services.decision_push_service import DecisionPushService
+
+        async with get_db_session() as db:
+            if store_id:
+                stores = [(store_id, "")]
+            else:
+                rows = (await db.execute(select(Store.id, Store.name))).all()
+                stores = [(str(r.id), r.name or "") for r in rows]
+
+            for sid, sname in stores:
+                try:
+                    await DecisionPushService.push_noon_anomaly(
+                        store_id=sid,
+                        brand_id="",
+                        recipient_user_id=_get_store_recipient(sid),
+                        db=db,
+                        store_name=sname,
+                    )
+                except Exception as exc:
+                    logger.warning("push_noon_anomaly.store_failed",
+                                   store_id=sid, error=str(exc))
+
+    try:
+        asyncio.run(_run())
+    except Exception as exc:
+        raise self.retry(exc=exc)
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=120)
+def push_prebattle_decisions(self, store_id: str = None):
+    """17:30战前推：库存/排班备战核查（仅在有库存或紧急决策时推送）。"""
+    import asyncio
+
+    async def _run():
+        from src.core.database import get_db_session
+        from src.models.store import Store
+        from sqlalchemy import select
+        from src.services.decision_push_service import DecisionPushService
+
+        async with get_db_session() as db:
+            if store_id:
+                stores = [(store_id, "")]
+            else:
+                rows = (await db.execute(select(Store.id, Store.name))).all()
+                stores = [(str(r.id), r.name or "") for r in rows]
+
+            for sid, sname in stores:
+                try:
+                    await DecisionPushService.push_prebattle_decisions(
+                        store_id=sid,
+                        brand_id="",
+                        recipient_user_id=_get_store_recipient(sid),
+                        db=db,
+                        store_name=sname,
+                    )
+                except Exception as exc:
+                    logger.warning("push_prebattle_decisions.store_failed",
+                                   store_id=sid, error=str(exc))
+
+    try:
+        asyncio.run(_run())
+    except Exception as exc:
+        raise self.retry(exc=exc)
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=120)
+def push_evening_recap(self, store_id: str = None):
+    """20:30晚推：当日回顾+待批决策提醒。"""
+    import asyncio
+
+    async def _run():
+        from src.core.database import get_db_session
+        from src.models.store import Store
+        from sqlalchemy import select
+        from src.services.decision_push_service import DecisionPushService
+
+        async with get_db_session() as db:
+            if store_id:
+                stores = [(store_id, "")]
+            else:
+                rows = (await db.execute(select(Store.id, Store.name))).all()
+                stores = [(str(r.id), r.name or "") for r in rows]
+
+            for sid, sname in stores:
+                try:
+                    await DecisionPushService.push_evening_recap(
+                        store_id=sid,
+                        brand_id="",
+                        recipient_user_id=_get_store_recipient(sid),
+                        db=db,
+                        store_name=sname,
+                    )
+                except Exception as exc:
+                    logger.warning("push_evening_recap.store_failed",
+                                   store_id=sid, error=str(exc))
+
+    try:
+        asyncio.run(_run())
+    except Exception as exc:
+        raise self.retry(exc=exc)
+
+
+# ============================================================
+# v2.0 KPI 食材成本率告警（09:30 日检）
+# ============================================================
+
+@celery_app.task(bind=True, max_retries=2, default_retry_delay=300)
+def check_food_cost_kpi_alert(self):
+    """
+    每日 09:30 检查所有门店食材成本率是否超过 AlertThresholdsPage 中配置的阈值。
+    超标时发送企业微信告警（warning=橙 / critical=红）。
+    """
+    import asyncio
+
+    async def _run():
+        from src.core.database import get_db_session
+        from src.services.kpi_alert_service import KPIAlertService
+
+        async with get_db_session() as db:
+            result = await KPIAlertService.run_and_notify(db=db)
+            logger.info(
+                "food_cost_kpi_alert_done",
+                total=result["total"],
+                alerts=result["alert_count"],
+                sent=result["sent_count"],
+                failed=result["failed_count"],
+            )
+            return result
+
+    try:
+        asyncio.run(_run())
+    except Exception as exc:
+        raise self.retry(exc=exc)
