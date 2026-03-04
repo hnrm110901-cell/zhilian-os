@@ -27,7 +27,6 @@ import { apiClient } from '../services/api';
 import { handleApiError, showSuccess } from '../utils/message';
 
 const { Option } = Select;
-const { TabPane } = Tabs;
 const { TextArea } = Input;
 
 // ── 类型定义 ──────────────────────────────────────────────────────────────────
@@ -426,132 +425,148 @@ const WasteEventPage: React.FC = () => {
       </Row>
 
       {/* 主区域 */}
-      <Tabs activeKey={activeTab} onChange={setActiveTab}>
-        <TabPane tab="事件列表" key="events">
-          {/* 过滤栏 */}
-          <Space style={{ marginBottom: 12 }}>
-            <Select
-              placeholder="事件状态"
-              allowClear
-              style={{ width: 120 }}
-              value={filterStatus}
-              onChange={setFilterStatus}
-            >
-              {Object.entries(STATUS_CONFIG).map(([k, v]) => (
-                <Option key={k} value={k}>{v.label}</Option>
-              ))}
-            </Select>
-            <Select
-              placeholder="事件类型"
-              allowClear
-              style={{ width: 120 }}
-              value={filterType}
-              onChange={setFilterType}
-            >
-              {Object.entries(TYPE_CONFIG).map(([k, v]) => (
-                <Option key={k} value={k}>{v.label}</Option>
-              ))}
-            </Select>
-            <Select
-              value={days}
-              onChange={setDays}
-              style={{ width: 110 }}
-            >
-              {[7, 14, 30, 60, 90].map(d => (
-                <Option key={d} value={d}>最近{d}天</Option>
-              ))}
-            </Select>
-          </Space>
+      <Tabs
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        items={[
+          {
+            key: 'events',
+            label: '事件列表',
+            children: (
+              <>
+                {/* 过滤栏 */}
+                <Space style={{ marginBottom: 12 }}>
+                  <Select
+                    placeholder="事件状态"
+                    allowClear
+                    style={{ width: 120 }}
+                    value={filterStatus}
+                    onChange={setFilterStatus}
+                  >
+                    {Object.entries(STATUS_CONFIG).map(([k, v]) => (
+                      <Option key={k} value={k}>{v.label}</Option>
+                    ))}
+                  </Select>
+                  <Select
+                    placeholder="事件类型"
+                    allowClear
+                    style={{ width: 120 }}
+                    value={filterType}
+                    onChange={setFilterType}
+                  >
+                    {Object.entries(TYPE_CONFIG).map(([k, v]) => (
+                      <Option key={k} value={k}>{v.label}</Option>
+                    ))}
+                  </Select>
+                  <Select
+                    value={days}
+                    onChange={setDays}
+                    style={{ width: 110 }}
+                  >
+                    {[7, 14, 30, 60, 90].map(d => (
+                      <Option key={d} value={d}>最近{d}天</Option>
+                    ))}
+                  </Select>
+                </Space>
 
-          <Table
-            rowKey="event_id"
-            columns={columns}
-            dataSource={events}
-            loading={loading}
-            scroll={{ x: 1000 }}
-            pagination={{ pageSize: 20, showTotal: (t) => `共 ${t} 条` }}
-          />
-        </TabPane>
-
-        <TabPane tab="根因分布" key="distribution">
-          <Row gutter={24}>
-            <Col span={12}>
-              <Card title="根因分布（饼图）" size="small">
-                {rootCauses.length > 0 ? (
-                  <ReactECharts option={pieOption} style={{ height: 320 }} />
-                ) : (
-                  <Alert type="info" message="暂无已推理事件的根因数据" showIcon />
-                )}
-              </Card>
-            </Col>
-            <Col span={12}>
-              <Card title="根因明细" size="small">
                 <Table
-                  rowKey="root_cause"
-                  dataSource={rootCauses}
+                  rowKey="event_id"
+                  columns={columns}
+                  dataSource={events}
+                  loading={loading}
+                  scroll={{ x: 1000 }}
+                  pagination={{ pageSize: 20, showTotal: (t) => `共 ${t} 条` }}
+                />
+              </>
+            ),
+          },
+          {
+            key: 'distribution',
+            label: '根因分布',
+            children: (
+              <Row gutter={24}>
+                <Col span={12}>
+                  <Card title="根因分布（饼图）" size="small">
+                    {rootCauses.length > 0 ? (
+                      <ReactECharts option={pieOption} style={{ height: 320 }} />
+                    ) : (
+                      <Alert type="info" message="暂无已推理事件的根因数据" showIcon />
+                    )}
+                  </Card>
+                </Col>
+                <Col span={12}>
+                  <Card title="根因明细" size="small">
+                    <Table
+                      rowKey="root_cause"
+                      dataSource={rootCauses}
+                      pagination={false}
+                      size="small"
+                      columns={[
+                        {
+                          title: '根因',
+                          dataIndex: 'root_cause',
+                          render: (v) => ROOT_CAUSE_LABELS[v] || v,
+                        },
+                        { title: '事件数', dataIndex: 'count', width: 80 },
+                        {
+                          title: '平均置信度',
+                          dataIndex: 'avg_confidence',
+                          width: 110,
+                          render: (v) => (
+                            <Progress
+                              percent={Math.round(v * 100)}
+                              size="small"
+                              strokeColor={v >= 0.7 ? '#52c41a' : v >= 0.5 ? '#faad14' : '#f5222d'}
+                            />
+                          ),
+                        },
+                      ]}
+                    />
+                  </Card>
+                </Col>
+              </Row>
+            ),
+          },
+          {
+            key: 'summary',
+            label: '食材排行',
+            children: (
+              <Card title={`食材损耗排行（Top 20，近${days}天）`} size="small">
+                <Table
+                  rowKey="ingredient_id"
+                  dataSource={summary?.by_ingredient || []}
                   pagination={false}
                   size="small"
                   columns={[
+                    { title: '排名', width: 60, render: (_, __, idx) => idx + 1 },
+                    { title: '食材 ID', dataIndex: 'ingredient_id', ellipsis: true },
                     {
-                      title: '根因',
-                      dataIndex: 'root_cause',
-                      render: (v) => ROOT_CAUSE_LABELS[v] || v,
-                    },
-                    { title: '事件数', dataIndex: 'count', width: 80 },
-                    {
-                      title: '平均置信度',
-                      dataIndex: 'avg_confidence',
+                      title: '损耗总量',
+                      dataIndex: 'total_qty',
                       width: 110,
-                      render: (v) => (
-                        <Progress
-                          percent={Math.round(v * 100)}
-                          size="small"
-                          strokeColor={v >= 0.7 ? '#52c41a' : v >= 0.5 ? '#faad14' : '#f5222d'}
-                        />
-                      ),
+                      render: (v) => v?.toFixed(2),
+                      sorter: (a: any, b: any) => b.total_qty - a.total_qty,
+                      defaultSortOrder: 'ascend',
+                    },
+                    { title: '事件数', dataIndex: 'event_count', width: 80 },
+                    {
+                      title: '平均偏差%',
+                      dataIndex: 'avg_variance_pct',
+                      width: 110,
+                      render: (v) => {
+                        if (v == null) return '—';
+                        const pct = (v * 100).toFixed(1);
+                        const color = Math.abs(v) >= 0.3 ? 'red' : Math.abs(v) >= 0.2 ? 'orange' : 'default';
+                        return <Tag color={color}>{v >= 0 ? '+' : ''}{pct}%</Tag>;
+                      },
                     },
                   ]}
                 />
               </Card>
-            </Col>
-          </Row>
-        </TabPane>
-
-        <TabPane tab="食材排行" key="summary">
-          <Card title={`食材损耗排行（Top 20，近${days}天）`} size="small">
-            <Table
-              rowKey="ingredient_id"
-              dataSource={summary?.by_ingredient || []}
-              pagination={false}
-              size="small"
-              columns={[
-                { title: '排名', width: 60, render: (_, __, idx) => idx + 1 },
-                { title: '食材 ID', dataIndex: 'ingredient_id', ellipsis: true },
-                {
-                  title: '损耗总量',
-                  dataIndex: 'total_qty',
-                  width: 110,
-                  render: (v) => v?.toFixed(2),
-                  sorter: (a: any, b: any) => b.total_qty - a.total_qty,
-                  defaultSortOrder: 'ascend',
-                },
-                { title: '事件数', dataIndex: 'event_count', width: 80 },
-                {
-                  title: '平均偏差%',
-                  dataIndex: 'avg_variance_pct',
-                  width: 110,
-                  render: (v) => {
-                    if (v == null) return '—';
-                    const pct = (v * 100).toFixed(1);
-                    const color = Math.abs(v) >= 0.3 ? 'red' : Math.abs(v) >= 0.2 ? 'orange' : 'default';
-                    return <Tag color={color}>{v >= 0 ? '+' : ''}{pct}%</Tag>;
-                  },
-                },
-              ]}
-            />
-          </Card>
-        </TabPane>
-      </Tabs>
+            ),
+          },
+        ]}
+      />
 
       {/* ── 事件详情 Drawer ────────────────────────────────────────────────── */}
       <Drawer

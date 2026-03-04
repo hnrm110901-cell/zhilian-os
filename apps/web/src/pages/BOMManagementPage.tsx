@@ -27,7 +27,6 @@ import { apiClient } from '../services/api';
 import { handleApiError, showSuccess } from '../utils/message';
 
 const { Option } = Select;
-const { TabPane } = Tabs;
 
 // ── 类型定义 ──────────────────────────────────────────────────────────────────
 
@@ -65,7 +64,7 @@ interface BOMTemplate {
 // ── 主组件 ────────────────────────────────────────────────────────────────────
 
 const BOMManagementPage: React.FC = () => {
-  const [storeId, setStoreId] = useState('STORE001');
+  const [storeId, setStoreId] = useState(localStorage.getItem('store_id') || 'STORE001');
   const [stores, setStores] = useState<any[]>([]);
   const [boms, setBoms] = useState<BOMTemplate[]>([]);
   const [loading, setLoading] = useState(false);

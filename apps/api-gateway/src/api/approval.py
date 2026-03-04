@@ -155,35 +155,58 @@ async def create_approval(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/approvals", summary="获取待审批列表", response_model=List[DecisionLogResponse])
-async def get_pending_approvals(
+@router.get("/approvals", summary="获取审批列表", response_model=List[DecisionLogResponse])
+async def get_approvals(
     store_id: Optional[str] = Query(None, description="门店ID"),
+    status: Optional[str] = Query(None, description="状态: pending/approved/rejected/modified，默认 pending"),
+    decision_type: Optional[str] = Query(None, description="决策类型"),
+    start_date: Optional[str] = Query(None, description="开始日期 YYYY-MM-DD"),
+    end_date: Optional[str] = Query(None, description="结束日期 YYYY-MM-DD"),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    获取待审批决策列表
+    获取审批决策列表（支持多状态过滤）
 
-    店长可以查看自己管理门店的待审批决策。
-    管理员可以查看所有门店的待审批决策。
+    店长可以查看自己管理门店的决策，管理员可以查看所有门店。
+    不传 status 或传 status=all 返回全部状态；传具体状态值则只返回该状态的记录。
     """
     try:
-        # 如果是店长，只能查看自己管理的门店
-        if current_user.role in ["store_manager", "assistant_manager"]:
-            manager_id = current_user.id
-        else:
-            manager_id = None
+        stmt = select(DecisionLog)
 
-        decisions = await approval_service.get_pending_approvals(
-            store_id=store_id,
-            manager_id=manager_id,
-            db=db
-        )
+        # 状态过滤：不传或传 "all" → 返回全部；传具体状态 → 过滤
+        if status and status != "all":
+            stmt = stmt.where(DecisionLog.decision_status == status)
 
-        return [decision.to_dict() for decision in decisions]
+        # 门店权限：店长只能看自己管理的门店
+        if current_user.role in ["store_manager", "assistant_manager"] and not store_id:
+            from ..models.store import Store as StoreModel
+            mgr_stores_result = await db.execute(
+                select(StoreModel.id).where(StoreModel.manager_id == current_user.id)
+            )
+            managed_ids = [r[0] for r in mgr_stores_result.all()]
+            if managed_ids:
+                stmt = stmt.where(DecisionLog.store_id.in_(managed_ids))
+
+        if store_id:
+            stmt = stmt.where(DecisionLog.store_id == store_id)
+
+        if decision_type and decision_type != "all":
+            stmt = stmt.where(DecisionLog.decision_type == decision_type)
+
+        if start_date:
+            stmt = stmt.where(DecisionLog.created_at >= start_date)
+        if end_date:
+            stmt = stmt.where(DecisionLog.created_at <= f"{end_date} 23:59:59")
+
+        stmt = stmt.order_by(DecisionLog.created_at.desc()).limit(200)
+        result = await db.execute(stmt)
+        decisions = result.scalars().all()
+
+        return [d.to_dict() for d in decisions]
 
     except Exception as e:
-        logger.error("get_pending_approvals_failed", error=str(e))
+        logger.error("get_approvals_failed", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 

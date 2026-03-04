@@ -107,7 +107,7 @@ const rootCauseColor = (cause: string) => {
 const WasteReasoningPage: React.FC = () => {
   const [loading, setLoading]     = useState(false);
   const [stores, setStores]       = useState<any[]>([]);
-  const [storeId, setStoreId]     = useState('STORE001');
+  const [storeId, setStoreId]     = useState(localStorage.getItem('store_id') || 'STORE001');
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>([
     dayjs().subtract(6, 'day'),
     dayjs(),

@@ -40,7 +40,7 @@ const DailyHubPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [approving, setApproving] = useState(false);
   const [stores, setStores] = useState<any[]>([]);
-  const [selectedStore, setSelectedStore] = useState('STORE001');
+  const [selectedStore, setSelectedStore] = useState(localStorage.getItem('store_id') || 'STORE001');
   const [board, setBoard] = useState<any>(null);
   const [decisions, setDecisions] = useState<any[]>([]);
   const [decisionsLoading, setDecisionsLoading] = useState(false);

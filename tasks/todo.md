@@ -233,3 +233,28 @@
   - CashFlowTab：dataIndex 改为 `inflow_yuan` / `outflow_yuan` / `cumulative_balance_yuan`
   - BudgetTab：dataIndex 改为 `actual_yuan` / `budget_yuan`
   - 所有改动均保留降级兜底（`?? 旧字段/100`），不破坏旧版后端兼容性
+
+### 2026-03-05（merge conflict 批量修复）
+- 发现并修复 `git pull --no-rebase` 遗留的全量 merge conflict：
+  - `waste_guard_service.py`：保留 HEAD v2.0（Top5+BOM分析），弃 d1df728 旧实时告警版
+  - `models/__init__.py`：合并两版本——保留 Phase 3-8 models，新增 MealPeriod + EmployeeMetricRecord
+  - `feishu_message_service.py`：同时保留 `import json` 和 `import os`
+  - `menu_ranker.py`：保留 HEAD 的 logger.warning/info 日志调用
+  - `private_domain/src/agent.py`：保留 HEAD（使用 `_fetch_journeys_from_db` + `_persist_journey_to_db`），修复 `next_action_at` 缺失 bug
+  - `private_domain/tests/test_agent.py`：保留 HEAD，移除 d1df728 多余注释
+  - `test_store_memory_service.py`：保留 HEAD 中文测试套件（含 os.environ.setdefault 环境设置）
+  - 47 个 TSX 归档页面（`apps/web/src/pages/*.tsx`）：保留 HEAD null stubs（`() => null`），弃 d1df728 旧完整实现
+- commit c401756 推送至 main
+
+### 2026-03-05（代码质量修复）
+- **前端 TabPane 废弃 API 修复**（Ant Design 5.x 兼容）：4个文件迁移到 `items` 数组 API
+  - `FctPage.tsx`（MVP #2）：4个 TabPane → items 数组
+  - `WasteEventPage.tsx`（损耗事件）：3个 TabPane → items 数组
+  - `NotificationCenter.tsx`：2个 TabPane → items 数组
+  - `BOMManagementPage.tsx`（MVP #6）：移除未使用的 `const { TabPane } = Tabs;`
+- **MVP 页面 store_id 初始值修复**：改用 `localStorage.getItem('store_id') || 'STORE001'` 避免首次渲染查错门店数据
+  - `DailyHubPage.tsx`、`WasteReasoningPage.tsx`、`BOMManagementPage.tsx`
+- **`waste-reasoning` 路由权限修复**：从 `admin` 改为 `store_manager`（MVP #3 损耗Top5排名需店长可见）
+- **`GET /api/v1/approvals` 端点增强**（MVP #5 一键审批）：
+  - 新增 `status`/`decision_type`/`start_date`/`end_date` 查询参数支持多状态过滤
+  - 不传 status 默认返回全部（而非仅 pending），与前端"全部"筛选对齐

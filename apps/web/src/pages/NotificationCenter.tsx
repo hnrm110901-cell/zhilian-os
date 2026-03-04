@@ -24,7 +24,6 @@ import {
 import { apiClient } from '../services/api';
 import { showSuccess, handleApiError } from '../utils/message';
 
-const { TabPane } = Tabs;
 const { TextArea } = Input;
 const { Option } = Select;
 
@@ -239,74 +238,86 @@ const NotificationCenter: React.FC = () => {
       </h1>
 
       <Card>
-        <Tabs defaultActiveKey="list">
-          <TabPane tab="通知列表" key="list">
-            <Space style={{ marginBottom: '16px' }}>
-              <Button
-                type="primary"
-                icon={<SendOutlined />}
-                onClick={() => setSendModalVisible(true)}
-              >
-                发送多渠道通知
-              </Button>
-              <Button
-                icon={<SendOutlined />}
-                onClick={() => setTemplateModalVisible(true)}
-              >
-                发送模板通知
-              </Button>
-              <Button onClick={handleMarkAllAsRead}>全部标记为已读</Button>
-            </Space>
-
-            <Table
-              columns={notificationColumns}
-              dataSource={notifications}
-              rowKey="id"
-              loading={loading}
-              pagination={{ pageSize: 10 }}
-            />
-          </TabPane>
-
-          <TabPane tab="通知模板" key="templates">
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
-              {Object.entries(templates).map(([name, template]: [string, any]) => (
-                <Card
-                  key={name}
-                  title={template.title}
-                  size="small"
-                  extra={
+        <Tabs
+          defaultActiveKey="list"
+          items={[
+            {
+              key: 'list',
+              label: '通知列表',
+              children: (
+                <>
+                  <Space style={{ marginBottom: '16px' }}>
                     <Button
-                      type="link"
-                      size="small"
-                      onClick={() => {
-                        templateForm.setFieldsValue({ template_name: name });
-                        setTemplateModalVisible(true);
-                      }}
+                      type="primary"
+                      icon={<SendOutlined />}
+                      onClick={() => setSendModalVisible(true)}
                     >
-                      使用
+                      发送多渠道通知
                     </Button>
-                  }
-                >
-                  <p style={{ fontSize: '12px', color: '#666' }}>{template.content}</p>
-                  <div style={{ marginTop: '8px' }}>
-                    <Space size="small">
-                      {template.channels.map((ch: string) => (
-                        <Tag key={ch} icon={channelIcons[ch]}>
-                          {channelNames[ch]}
+                    <Button
+                      icon={<SendOutlined />}
+                      onClick={() => setTemplateModalVisible(true)}
+                    >
+                      发送模板通知
+                    </Button>
+                    <Button onClick={handleMarkAllAsRead}>全部标记为已读</Button>
+                  </Space>
+
+                  <Table
+                    columns={notificationColumns}
+                    dataSource={notifications}
+                    rowKey="id"
+                    loading={loading}
+                    pagination={{ pageSize: 10 }}
+                  />
+                </>
+              ),
+            },
+            {
+              key: 'templates',
+              label: '通知模板',
+              children: (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+                  {Object.entries(templates).map(([name, template]: [string, any]) => (
+                    <Card
+                      key={name}
+                      title={template.title}
+                      size="small"
+                      extra={
+                        <Button
+                          type="link"
+                          size="small"
+                          onClick={() => {
+                            templateForm.setFieldsValue({ template_name: name });
+                            setTemplateModalVisible(true);
+                          }}
+                        >
+                          使用
+                        </Button>
+                      }
+                    >
+                      <p style={{ fontSize: '12px', color: '#666' }}>{template.content}</p>
+                      <div style={{ marginTop: '8px' }}>
+                        <Space size="small">
+                          {template.channels.map((ch: string) => (
+                            <Tag key={ch} icon={channelIcons[ch]}>
+                              {channelNames[ch]}
+                            </Tag>
+                          ))}
+                        </Space>
+                      </div>
+                      <div style={{ marginTop: '8px' }}>
+                        <Tag color={template.priority === 'urgent' ? 'red' : 'blue'}>
+                          {template.priority}
                         </Tag>
-                      ))}
-                    </Space>
-                  </div>
-                  <div style={{ marginTop: '8px' }}>
-                    <Tag color={template.priority === 'urgent' ? 'red' : 'blue'}>
-                      {template.priority}
-                    </Tag>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </TabPane>
-        </Tabs>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              ),
+            },
+          ]}
+        />
       </Card>
 
       {/* 发送多渠道通知模态框 */}

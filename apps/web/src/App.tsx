@@ -379,7 +379,7 @@ const AppContent: React.FC = () => {
                     <ProtectedRoute><MenuRecommendationPage /></ProtectedRoute>
                   } />
                   <Route path="waste-reasoning" element={
-                    <ProtectedRoute requiredRole="admin"><WasteReasoningPage /></ProtectedRoute>
+                    <ProtectedRoute requiredRole="store_manager"><WasteReasoningPage /></ProtectedRoute>
                   } />
                   <Route path="ontology-graph" element={
                     <ProtectedRoute requiredRole="admin"><OntologyGraphPage /></ProtectedRoute>

@@ -15,7 +15,6 @@ import {
 import axios from 'axios';
 import dayjs from 'dayjs';
 
-const { TabPane } = Tabs;
 const { Option } = Select;
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -507,20 +506,15 @@ const FctPage: React.FC = () => (
       </p>
     </div>
 
-    <Tabs defaultActiveKey="dashboard">
-      <TabPane tab={<><DashboardOutlined />仪表盘</>} key="dashboard">
-        <DashboardTab />
-      </TabPane>
-      <TabPane tab={<><CalculatorOutlined />税务测算</>} key="tax">
-        <TaxTab />
-      </TabPane>
-      <TabPane tab={<><FundOutlined />资金流预测</>} key="cashflow">
-        <CashFlowTab />
-      </TabPane>
-      <TabPane tab={<><BarChartOutlined />预算执行</>} key="budget">
-        <BudgetTab />
-      </TabPane>
-    </Tabs>
+    <Tabs
+      defaultActiveKey="dashboard"
+      items={[
+        { key: 'dashboard', label: <><DashboardOutlined />仪表盘</>, children: <DashboardTab /> },
+        { key: 'tax', label: <><CalculatorOutlined />税务测算</>, children: <TaxTab /> },
+        { key: 'cashflow', label: <><FundOutlined />资金流预测</>, children: <CashFlowTab /> },
+        { key: 'budget', label: <><BarChartOutlined />预算执行</>, children: <BudgetTab /> },
+      ]}
+    />
   </div>
 );
 
