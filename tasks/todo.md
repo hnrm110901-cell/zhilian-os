@@ -225,3 +225,11 @@
   - BOM 偏差排名表格（偏差成本¥ / 超用数量 / 平均偏差率）
   - 日期范围选择器（默认近7天） + 门店选择 + 手动刷新
   - 加载失败显示 Alert 错误信息
+
+### 2026-03-04（续11）
+- `apps/web/src/pages/FctPage.tsx`：Rule 6 合规修复——所有金额展示改用 `_yuan` 伴随字段
+  - DashboardTab：`net_7d_yuan` / `total_tax_yuan`（降级兜底：旧字段 ÷100）
+  - TaxTab：`total_tax_yuan` / `output_vat_yuan` / `input_vat_yuan` / `net_vat_yuan` / `surcharge_yuan` / `taxable_income_yuan` / `cit_amount_yuan` / `pos_total_yuan` / `avg_order_yuan`
+  - CashFlowTab：dataIndex 改为 `inflow_yuan` / `outflow_yuan` / `cumulative_balance_yuan`
+  - BudgetTab：dataIndex 改为 `actual_yuan` / `budget_yuan`
+  - 所有改动均保留降级兜底（`?? 旧字段/100`），不破坏旧版后端兼容性

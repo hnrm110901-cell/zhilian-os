@@ -46,6 +46,7 @@ import {
   UploadOutlined,
   TrophyOutlined,
   WarningOutlined,
+  FireOutlined,
   PieChartOutlined,
   UnorderedListOutlined,
 } from '@ant-design/icons';
@@ -80,13 +81,8 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/my-schedule': 'agents',
   '/hq-dashboard': 'admin-system',
   '/ai-accuracy': 'admin-ai',
-<<<<<<< HEAD
-  '/dish-cost': 'business', '/employee-performance': 'business', '/bom-management': 'business',
-  '/waste-events': 'business', '/alert-thresholds': 'business', '/knowledge-rules': 'business',
-=======
   '/dish-cost': 'business', '/channel-profit': 'business', '/employee-performance': 'business', '/bom-management': 'business',
-  '/waste-events': 'business', '/knowledge-rules': 'business',
->>>>>>> d1df728dec60bb243c50ae42ff68074712ddafd9
+  '/waste-events': 'business', '/waste-reasoning': 'business', '/alert-thresholds': 'business', '/knowledge-rules': 'business',
   '/data-security': 'admin-system',
   '/raas': 'admin-system', '/model-marketplace': 'admin-system',
   '/llm-config': 'admin-ai', '/hardware': 'admin-ai',
@@ -221,6 +217,7 @@ const MainLayout: React.FC = () => {
     '/employee-performance': '员工绩效看板',
     '/bom-management': 'BOM 配方管理',
     '/waste-events': '损耗事件管理',
+    '/waste-reasoning': '损耗Top5分析',
     '/alert-thresholds': '告警阈值配置',
     '/knowledge-rules': '知识规则库',
     '/data-security': '数据安全管理',
@@ -404,6 +401,7 @@ const MainLayout: React.FC = () => {
         { key: '/employee-performance', icon: <TrophyOutlined />, label: '员工绩效看板' },
         { key: '/bom-management', icon: <ReadOutlined />, label: 'BOM 配方管理' },
         { key: '/waste-events', icon: <WarningOutlined />, label: '损耗事件管理' },
+        { key: '/waste-reasoning', icon: <FireOutlined />, label: '损耗Top5分析' },
         { key: '/alert-thresholds', icon: <BellOutlined />, label: '告警阈值配置' },
         { key: '/knowledge-rules', icon: <DatabaseOutlined />, label: '知识规则库' },
       ],

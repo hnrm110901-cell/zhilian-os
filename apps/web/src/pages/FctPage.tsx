@@ -69,9 +69,9 @@ const DashboardTab: React.FC = () => {
           <Card>
             <Statistic
               title="7 日净流"
-              value={((data.cash_flow?.net_7d ?? 0) / 100).toFixed(0)}
+              value={(data.cash_flow?.net_7d_yuan ?? (data.cash_flow?.net_7d ?? 0) / 100).toFixed(0)}
               prefix="¥"
-              valueStyle={{ color: (data.cash_flow?.net_7d ?? 0) >= 0 ? '#3f8600' : '#cf1322' }}
+              valueStyle={{ color: (data.cash_flow?.net_7d_yuan ?? data.cash_flow?.net_7d ?? 0) >= 0 ? '#3f8600' : '#cf1322' }}
             />
           </Card>
         </Col>
@@ -79,7 +79,7 @@ const DashboardTab: React.FC = () => {
           <Card>
             <Statistic
               title="当月估算税额"
-              value={((data.tax?.total_tax ?? 0) / 100).toFixed(0)}
+              value={(data.tax?.total_tax_yuan ?? (data.tax?.total_tax ?? 0) / 100).toFixed(0)}
               prefix="¥"
             />
           </Card>
@@ -194,7 +194,7 @@ const TaxTab: React.FC = () => {
                 <Descriptions.Item label="纳税人类型">{data.taxpayer_type}</Descriptions.Item>
                 <Descriptions.Item label="合计税额">
                   <span style={{ color: '#cf1322', fontWeight: 600 }}>
-                    ¥{((data.total_tax || 0) / 100).toLocaleString()}
+                    ¥{(data.total_tax_yuan ?? (data.total_tax || 0) / 100).toLocaleString()}
                   </span>
                 </Descriptions.Item>
                 <Descriptions.Item label="综合税负率">
@@ -206,29 +206,29 @@ const TaxTab: React.FC = () => {
           <Col xs={24} md={12}>
             <Card title="增值税" size="small">
               <Descriptions column={1} size="small">
-                <Descriptions.Item label="销项税">¥{((data.vat?.output_vat || 0) / 100).toLocaleString()}</Descriptions.Item>
-                <Descriptions.Item label="进项税">¥{((data.vat?.input_vat || 0) / 100).toLocaleString()}</Descriptions.Item>
-                <Descriptions.Item label="应纳增值税">¥{((data.vat?.net_vat || 0) / 100).toLocaleString()}</Descriptions.Item>
-                <Descriptions.Item label="附加税">¥{((data.vat?.surcharge || 0) / 100).toLocaleString()}</Descriptions.Item>
+                <Descriptions.Item label="销项税">¥{(data.vat?.output_vat_yuan ?? (data.vat?.output_vat || 0) / 100).toLocaleString()}</Descriptions.Item>
+                <Descriptions.Item label="进项税">¥{(data.vat?.input_vat_yuan ?? (data.vat?.input_vat || 0) / 100).toLocaleString()}</Descriptions.Item>
+                <Descriptions.Item label="应纳增值税">¥{(data.vat?.net_vat_yuan ?? (data.vat?.net_vat || 0) / 100).toLocaleString()}</Descriptions.Item>
+                <Descriptions.Item label="附加税">¥{(data.vat?.surcharge_yuan ?? (data.vat?.surcharge || 0) / 100).toLocaleString()}</Descriptions.Item>
               </Descriptions>
             </Card>
           </Col>
           <Col xs={24} md={12}>
             <Card title="企业所得税" size="small">
               <Descriptions column={1} size="small">
-                <Descriptions.Item label="应税收入">¥{((data.cit?.taxable_income || 0) / 100).toLocaleString()}</Descriptions.Item>
+                <Descriptions.Item label="应税收入">¥{(data.cit?.taxable_income_yuan ?? (data.cit?.taxable_income || 0) / 100).toLocaleString()}</Descriptions.Item>
                 <Descriptions.Item label="假定利润率">{(data.cit?.assumed_margin || 0).toFixed(0)}%</Descriptions.Item>
                 <Descriptions.Item label="税率">{(data.cit?.cit_rate || 0).toFixed(0)}%</Descriptions.Item>
-                <Descriptions.Item label="应缴所得税">¥{((data.cit?.cit_amount || 0) / 100).toLocaleString()}</Descriptions.Item>
+                <Descriptions.Item label="应缴所得税">¥{(data.cit?.cit_amount_yuan ?? (data.cit?.cit_amount || 0) / 100).toLocaleString()}</Descriptions.Item>
               </Descriptions>
             </Card>
           </Col>
           <Col xs={24} md={12}>
             <Card title="收入基础" size="small">
               <Descriptions column={1} size="small">
-                <Descriptions.Item label="POS 总收入">¥{((data.revenue?.pos_total || 0) / 100).toLocaleString()}</Descriptions.Item>
+                <Descriptions.Item label="POS 总收入">¥{(data.revenue?.pos_total_yuan ?? (data.revenue?.pos_total || 0) / 100).toLocaleString()}</Descriptions.Item>
                 <Descriptions.Item label="订单数">{data.revenue?.order_count || 0}</Descriptions.Item>
-                <Descriptions.Item label="均单价">¥{((data.revenue?.avg_order || 0) / 100).toFixed(0)}</Descriptions.Item>
+                <Descriptions.Item label="均单价">¥{(data.revenue?.avg_order_yuan ?? (data.revenue?.avg_order || 0) / 100).toFixed(0)}</Descriptions.Item>
               </Descriptions>
             </Card>
           </Col>
@@ -267,25 +267,34 @@ const CashFlowTab: React.FC = () => {
     { title: '日期', dataIndex: 'date', key: 'date' },
     {
       title: '进流 (¥)',
-      dataIndex: 'inflow',
+      dataIndex: 'inflow_yuan',
       key: 'inflow',
-      render: (v: number) => <span style={{ color: '#3f8600' }}>+{(v / 100).toLocaleString()}</span>,
+      render: (v: number, row: any) => {
+        const val = v ?? (row.inflow || 0) / 100;
+        return <span style={{ color: '#3f8600' }}>+{val.toLocaleString()}</span>;
+      },
     },
     {
       title: '出流 (¥)',
-      dataIndex: 'outflow',
+      dataIndex: 'outflow_yuan',
       key: 'outflow',
-      render: (v: number) => <span style={{ color: '#cf1322' }}>-{(v / 100).toLocaleString()}</span>,
+      render: (v: number, row: any) => {
+        const val = v ?? (row.outflow || 0) / 100;
+        return <span style={{ color: '#cf1322' }}>-{val.toLocaleString()}</span>;
+      },
     },
     {
       title: '累计余额 (¥)',
-      dataIndex: 'cumulative_balance',
+      dataIndex: 'cumulative_balance_yuan',
       key: 'balance',
-      render: (v: number) => (
-        <span style={{ fontWeight: 600, color: v >= 0 ? '#3f8600' : '#cf1322' }}>
-          {(v / 100).toLocaleString()}
-        </span>
-      ),
+      render: (v: number, row: any) => {
+        const val = v ?? (row.cumulative_balance || 0) / 100;
+        return (
+          <span style={{ fontWeight: 600, color: val >= 0 ? '#3f8600' : '#cf1322' }}>
+            {val.toLocaleString()}
+          </span>
+        );
+      },
     },
     {
       title: '置信度',
@@ -379,15 +388,18 @@ const BudgetTab: React.FC = () => {
     { title: '科目', dataIndex: 'category', key: 'category' },
     {
       title: '实际 (¥)',
-      dataIndex: 'actual',
+      dataIndex: 'actual_yuan',
       key: 'actual',
-      render: (v: number) => (v / 100).toLocaleString(),
+      render: (v: number, row: any) => (v ?? (row.actual || 0) / 100).toLocaleString(),
     },
     {
       title: '预算 (¥)',
-      dataIndex: 'budget',
+      dataIndex: 'budget_yuan',
       key: 'budget',
-      render: (v: number) => v > 0 ? (v / 100).toLocaleString() : '—',
+      render: (v: number, row: any) => {
+        const val = v ?? (row.budget || 0) / 100;
+        return val > 0 ? val.toLocaleString() : '—';
+      },
     },
     {
       title: '执行率',
