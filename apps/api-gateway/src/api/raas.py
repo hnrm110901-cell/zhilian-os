@@ -72,7 +72,7 @@ async def get_baseline_metrics(
 
     return {
         "store_id": store_id,
-        "baseline": baseline.dict()
+        "baseline": baseline.model_dump()
     }
 
 
@@ -120,7 +120,7 @@ async def get_effect_metrics(
         "store_id": store_id,
         "year": year,
         "month": month,
-        "effect_metrics": effect_metrics.dict()
+        "effect_metrics": effect_metrics.model_dump()
     }
 
 

@@ -1,7 +1,7 @@
 """
 本体层 API（Palantir L2）：图谱初始化、BOM 本体化、同步入口、感知层导入
 """
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import PlainTextResponse
 import structlog
 from pydantic import BaseModel, Field

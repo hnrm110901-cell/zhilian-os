@@ -30,7 +30,7 @@ from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
 import structlog
-from sqlalchemy import and_, delete, select, text
+from sqlalchemy import and_, delete, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.cross_store import CrossStoreMetric, StorePeerGroup, StoreSimilarityCache
@@ -375,14 +375,12 @@ class CrossStoreKnowledgeService:
         计算并写入 cross_store_metrics。
 
         指标来源：
-          waste_rate      — WasteEvent.variance_pct > 0 的平均偏差（近 lookback_days）
-          cost_ratio      — InventoryTransaction.total_cost / Order.total_amount 近 30 天
-          bom_compliance  — BOM 实际用量/标准用量合规率（近 30 天有 WasteEvent 数据的门店）
-          menu_coverage   — Dish 数量 / 全品牌 Dish 名称总数
-          revenue_per_seat — 占位符，需接入真实 Order 数据
-          labor_ratio     — 占位符，需接入 HR 数据
-
-        当前实现：waste_rate 和 menu_coverage 有真实计算，其余为结构占位符。
+          waste_rate       — WasteEvent.variance_pct > 0 的平均偏差（近 lookback_days）
+          cost_ratio       — InventoryTransaction.total_cost / Order.total_amount 近 30 天
+          bom_compliance   — BOM 实际用量/标准用量合规率（近 30 天有 WasteEvent 数据的门店）
+          menu_coverage    — Dish 数量 / 全品牌 Dish 名称总数
+          revenue_per_seat — SUM(Order.final_amount) / store.seats（当日）
+          labor_ratio      — SUM(labor_cost FinancialTransaction) / SUM(Order.final_amount)（当日）
         """
         d = target_date or (date.today() - timedelta(days=1))
         stores = await self._load_stores(store_ids)
@@ -391,13 +389,17 @@ class CrossStoreKnowledgeService:
         await self.build_peer_groups([s.id for s in stores])
         peer_group_map = await self._load_peer_group_map()   # store_id → group_key
 
-        # 计算各门店 waste_rate（近 lookback_days 的平均损耗超标率）
-        waste_rates  = await self._compute_waste_rates(stores, lookback_days)
-        menu_coverages = await self._compute_menu_coverages(stores)
+        # 计算各门店指标
+        waste_rates     = await self._compute_waste_rates(stores, lookback_days)
+        menu_coverages  = await self._compute_menu_coverages(stores)
+        rev_per_seats   = await self._compute_revenue_per_seat(stores, d)
+        labor_ratios    = await self._compute_labor_ratio(stores, d)
 
         metric_values: Dict[str, Dict[str, float]] = {
-            "waste_rate":   waste_rates,
-            "menu_coverage": menu_coverages,
+            "waste_rate":      waste_rates,
+            "menu_coverage":   menu_coverages,
+            "revenue_per_seat": rev_per_seats,
+            "labor_ratio":     labor_ratios,
         }
 
         written = 0
@@ -762,6 +764,74 @@ class CrossStoreKnowledgeService:
             )
             names = set((await self.db.execute(stmt)).scalars().all())
             result[store.id] = round(len(names) / total, 4)
+
+        return result
+
+    async def _compute_revenue_per_seat(
+        self, stores: List[Store], target_date: date
+    ) -> Dict[str, float]:
+        """
+        每座位日营收 = SUM(Order.final_amount WHERE status=completed AND date=target_date) / store.seats
+
+        seats 为 0 时返回 0.0（避免除零）。金额单位为分，保持原始精度。
+        """
+        from src.models.order import Order
+
+        result: Dict[str, float] = {}
+        for store in stores:
+            seats = store.seats or 0
+            if seats == 0:
+                result[store.id] = 0.0
+                continue
+            stmt = select(func.sum(Order.final_amount)).where(
+                and_(
+                    Order.store_id == store.id,
+                    Order.status == "completed",
+                    func.date(Order.order_time) == target_date,
+                )
+            )
+            revenue = (await self.db.execute(stmt)).scalar() or 0
+            result[store.id] = round(float(revenue) / seats, 4)
+
+        return result
+
+    async def _compute_labor_ratio(
+        self, stores: List[Store], target_date: date
+    ) -> Dict[str, float]:
+        """
+        人力成本占比 = SUM(FinancialTransaction.amount WHERE category='labor_cost' AND date=target_date)
+                       / SUM(Order.final_amount WHERE status=completed AND date=target_date)
+
+        revenue 为 0 时返回 0.0（避免除零）。
+        """
+        from src.models.order import Order
+        from src.models.finance import FinancialTransaction
+
+        result: Dict[str, float] = {}
+        for store in stores:
+            # 当日完成订单营收
+            rev_stmt = select(func.sum(Order.final_amount)).where(
+                and_(
+                    Order.store_id == store.id,
+                    Order.status == "completed",
+                    func.date(Order.order_time) == target_date,
+                )
+            )
+            revenue = (await self.db.execute(rev_stmt)).scalar() or 0
+            if revenue == 0:
+                result[store.id] = 0.0
+                continue
+
+            # 当日人力成本
+            labor_stmt = select(func.sum(FinancialTransaction.amount)).where(
+                and_(
+                    FinancialTransaction.store_id == store.id,
+                    FinancialTransaction.category == "labor_cost",
+                    FinancialTransaction.transaction_date == target_date,
+                )
+            )
+            labor_cost = (await self.db.execute(labor_stmt)).scalar() or 0
+            result[store.id] = round(float(labor_cost) / float(revenue), 4)
 
         return result
 

@@ -1,7 +1,7 @@
 """
 Order Models
 """
-from sqlalchemy import Column, String, Integer, ForeignKey, Enum, JSON, DateTime, Index
+from sqlalchemy import Column, String, Integer, ForeignKey, Enum, JSON, DateTime, Index, Numeric
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import uuid
@@ -47,6 +47,9 @@ class Order(Base, TimestampMixin):
     # Staff tracking
     waiter_id = Column(String(50), index=True)   # 服务员ID（用于员工绩效基线计算）
 
+    # 销售渠道（Task2 P0 字段）
+    sales_channel = Column(String(30), nullable=True, index=True)
+
     # Metadata
     notes = Column(String(500))
     order_metadata = Column(JSON, default=dict)  # Renamed from metadata to avoid SQLAlchemy conflict
@@ -80,6 +83,10 @@ class OrderItem(Base, TimestampMixin):
     quantity = Column(Integer, nullable=False)
     unit_price = Column(Integer, nullable=False)  # Price in cents
     subtotal = Column(Integer, nullable=False)  # quantity * unit_price
+
+    # 食材实际成本（BOM 理论成本）
+    food_cost_actual = Column(Integer, nullable=True)       # 分，BOM 理论成本
+    gross_margin     = Column(Numeric(6, 4), nullable=True) # 毛利率 0.0000–1.0000
 
     # Special requests
     notes = Column(String(255))

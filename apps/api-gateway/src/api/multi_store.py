@@ -78,7 +78,7 @@ async def create_store(
     需要权限: store:write
     """
     try:
-        store = await store_service.create_store(**request.dict())
+        store = await store_service.create_store(**request.model_dump())
         return {
             "success": True,
             "store_id": store.id,

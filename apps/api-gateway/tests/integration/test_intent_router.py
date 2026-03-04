@@ -364,3 +364,35 @@ class TestCallSupportHandler:
         # Either way, the except clause must swallow it and the handler must return.
         result = await self.handler.handle("支援", "S1", _ctx())
         assert result["intent"] == "call_support"
+
+    @pytest.mark.asyncio
+    async def test_wechat_send_exception_is_suppressed(self):
+        """Explicitly trigger except Exception: pass by forcing send_templated_message to raise."""
+        import src.services.wechat_service as ws_mod
+        with patch.object(
+            ws_mod.wechat_service, "send_templated_message",
+            AsyncMock(side_effect=RuntimeError("wechat down"))
+        ):
+            result = await self.handler.handle("支援", "S1", _ctx())
+        assert result["intent"] == "call_support"
+
+
+# ---------------------------------------------------------------------------
+# IntentRouter: handler exception path
+# ---------------------------------------------------------------------------
+
+class TestIntentRouterHandlerException:
+    @pytest.mark.asyncio
+    async def test_handler_exception_returns_error_dict(self):
+        """Trigger IntentRouter except block (lines 485-487) by making handler raise."""
+        from src.services.intent_router import QueryRevenueHandler
+        router = IntentRouter()
+        ctx = _ctx()
+        with patch.object(
+            QueryRevenueHandler, "handle",
+            AsyncMock(side_effect=RuntimeError("handler crashed"))
+        ):
+            result = await router.route("今日营收多少", ctx, actor_role="store_manager")
+        assert result["intent"] == "query_revenue"
+        assert "失败" in result["message"]
+        assert result["voice_response"] == "抱歉，处理时出现错误"

@@ -444,6 +444,7 @@ class EmbeddingModelService:
         dishes = result.fetchall()
 
         # 计算相似度
+        similarities = []
         for dish in dishes:
             if dish.name == dish_name:
                 continue

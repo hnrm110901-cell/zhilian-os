@@ -12,7 +12,7 @@ import time
 
 from src.core.config import settings
 # 核心模块
-from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation, approval, embedding, raas, model_marketplace, human_in_the_loop, hardware_integration, pos, dishes, benchmark
+from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation, approval, embedding, raas, model_marketplace, human_in_the_loop, hardware_integration, pos, dishes, benchmark, dish_master
 from src.api.phase5_apis import platform_router, industry_router, supply_chain_router, i18n_router
 # 逐步启用的模块
 from src.api import dashboard, analytics, audit, multi_store, finance, customer360, wechat_triggers, queue, meituan_queue
@@ -64,6 +64,9 @@ from src.api import ai_accuracy
 from src.api import dashboard_preferences
 # ARCH-004 可信执行层 / FEAT-004 动态菜单 / ARCH-003 门店记忆层 / 本体论 L2 API / FCT 公开接口
 from src.api import execution, menu, store_memory, ontology_api, fct_public
+# Phase 1 — 运营智能层：渠道毛利 API
+from src.api import channel_profit
+from src.api import performance_compute
 from src.middleware.monitoring import MonitoringMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
 from src.middleware.audit_log import AuditLogMiddleware
@@ -442,6 +445,7 @@ app.include_router(adapters.router, tags=["adapters"])
 app.include_router(tasks.router, prefix="/api/v1", tags=["tasks"])
 app.include_router(reconciliation.router, prefix="/api/v1", tags=["reconciliation"])
 app.include_router(dishes.router, prefix="/api/v1", tags=["dishes"])
+app.include_router(dish_master.router, tags=["dish-master"])
 app.include_router(benchmark.router, prefix="/api/v1", tags=["benchmark"])
 
 # 逐步启用的模块
@@ -561,6 +565,10 @@ app.include_router(store_memory.router)
 app.include_router(ontology_api.router)
 # FCT 公开接口（独立部署形态，API Key 认证）
 app.include_router(fct_public.router, prefix="/api/v1/fct-public", tags=["fct_public"])
+# Phase 1 — 运营智能层：渠道毛利看板
+app.include_router(channel_profit.router)
+# Phase 2 — 绩效计算引擎
+app.include_router(performance_compute.router)
 
 # v2.0 MVP — 决策中枢（Top3 + 手动推送 + 场景识别）
 from src.api import decision_hub, monthly_report

@@ -15,6 +15,7 @@ from sqlalchemy import (
     ForeignKey, UniqueConstraint, Index, Integer,
 )
 from sqlalchemy.dialects.postgresql import UUID
+
 from sqlalchemy.orm import relationship
 
 from src.models.base import Base, TimestampMixin
@@ -53,6 +54,21 @@ class BOMTemplate(Base, TimestampMixin):
     approved_by = Column(String(100))  # 审核人
     approved_at = Column(DateTime)
 
+    # BOM 作用域 / 渠道 / 继承（Task3A P0 字段）
+    scope = Column(String(20), nullable=False, server_default='store')
+    # store | region | brand | group
+    scope_id = Column(String(100), nullable=True)
+    # 门店/区域/品牌/集团 ID，scope='store' 时对应 store_id
+    channel = Column(String(30), nullable=True)
+    # 渠道覆盖，null=适用所有渠道
+    parent_bom_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("bom_templates.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    is_delta = Column(Boolean, nullable=False, server_default='false')
+    # True=差异 BOM（仅存变更行），False=完整 BOM
+
     # 元数据
     notes = Column(Text)
     created_by = Column(String(100))
@@ -71,6 +87,11 @@ class BOMTemplate(Base, TimestampMixin):
         Index("idx_bom_dish_id", "dish_id"),
         Index("idx_bom_active", "dish_id", "is_active"),
         Index("idx_bom_effective_date", "effective_date"),
+        Index("idx_bom_scope", "scope"),
+        Index("idx_bom_scope_id", "scope_id"),
+        Index("idx_bom_channel", "channel"),
+        Index("idx_bom_parent_bom_id", "parent_bom_id"),
+        Index("idx_bom_is_delta", "is_delta"),
     )
 
     def __repr__(self):
@@ -117,6 +138,12 @@ class BOMItem(Base, TimestampMixin):
     # 备注
     prep_notes = Column(Text)  # 加工说明
 
+    # Delta BOM 动作（Task3A P0 字段）
+    item_action = Column(String(20), nullable=False, server_default='ADD')
+    # ADD | OVERRIDE | REMOVE
+    ingredient_master_id = Column(String(50), nullable=True)
+    # 软引用 canonical_id（集团食材主档，无 FK 约束）
+
     # 关联
     bom_template = relationship("BOMTemplate", back_populates="items")
     ingredient = relationship("InventoryItem", foreign_keys=[ingredient_id])
@@ -126,6 +153,8 @@ class BOMItem(Base, TimestampMixin):
         Index("idx_bom_item_bom_id", "bom_id"),
         Index("idx_bom_item_ingredient_id", "ingredient_id"),
         Index("idx_bom_item_store_id", "store_id"),
+        Index("idx_bom_item_action", "item_action"),
+        Index("idx_bom_item_ingredient_master_id", "ingredient_master_id"),
     )
 
     def __repr__(self):

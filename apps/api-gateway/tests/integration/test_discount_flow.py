@@ -232,3 +232,368 @@ class TestRollback:
         with pytest.raises(RollbackWindowExpiredError) as exc_info:
             await executor.rollback("old-exec-id", store_manager_actor)
         assert exc_info.value.error_code == "ROLLBACK_WINDOW_EXPIRED"
+
+    @pytest.mark.asyncio
+    async def test_rollback_happy_path(self, executor, store_manager_actor):
+        """30分钟内，有审批权限的操作员可以成功回滚"""
+        from datetime import datetime, timedelta
+
+        recent_time = datetime.utcnow() - timedelta(minutes=5)
+        executor._get_audit_record = AsyncMock(return_value={
+            "execution_id": "exec-123",
+            "command_type": "discount_apply",   # approver_roles includes store_manager
+            "store_id": "STORE_A1",
+            "brand_id": "BRAND_A",
+            "executed_at": recent_time,
+            "status": "completed",
+            "actor_id": "USER_001",
+        })
+
+        result = await executor.rollback("exec-123", store_manager_actor)
+
+        assert result["status"] == "rolled_back"
+        assert result["original_execution_id"] == "exec-123"
+        assert "rollback_id" in result
+        assert result["operator_id"] == store_manager_actor["user_id"]
+
+    @pytest.mark.asyncio
+    async def test_rollback_non_approver_denied(self, executor, waiter_actor):
+        """非审批角色尝试回滚 → PermissionDeniedError"""
+        from datetime import datetime, timedelta
+
+        recent_time = datetime.utcnow() - timedelta(minutes=5)
+        executor._get_audit_record = AsyncMock(return_value={
+            "execution_id": "exec-456",
+            "command_type": "discount_apply",   # waiter not in approver_roles
+            "store_id": "STORE_A1",
+            "brand_id": "BRAND_A",
+            "executed_at": recent_time,
+            "status": "completed",
+            "actor_id": "USER_001",
+        })
+
+        with pytest.raises(PermissionDeniedError) as exc_info:
+            await executor.rollback("exec-456", waiter_actor)
+        assert exc_info.value.error_code == "PERMISSION_DENIED"
+        assert "waiter" in str(exc_info.value)
+
+
+# ---------------------------------------------------------------------------
+# 金额熔断 reason 字符串
+# ---------------------------------------------------------------------------
+
+class TestCircuitBreaker:
+    @pytest.mark.asyncio
+    async def test_circuit_breaker_reason_contains_amount_and_threshold(
+        self, executor, store_manager_actor, discount_payload_large
+    ):
+        """熔断触发时 ApprovalRequiredError.reason 包含实际金额和熔断阈值"""
+        with pytest.raises(ApprovalRequiredError) as exc_info:
+            await executor.execute("discount_apply", discount_payload_large, store_manager_actor)
+        reason = exc_info.value.reason
+        # reason = "金额 800.0 超过熔断阈值 500.0 元，自动升级为 APPROVE"
+        assert "800" in reason
+        assert "500" in reason
+
+    @pytest.mark.asyncio
+    async def test_below_circuit_breaker_still_approve_level(
+        self, executor, store_manager_actor, discount_payload_small
+    ):
+        """小额折扣（200元，低于阈值500元）因 APPROVE 级别触发审批，非熔断"""
+        with pytest.raises(ApprovalRequiredError) as exc_info:
+            await executor.execute("discount_apply", discount_payload_small, store_manager_actor)
+        reason = exc_info.value.reason
+        # Not circuit-breaker triggered; reason should NOT mention threshold info
+        assert "500" not in reason or "超过熔断阈值" not in reason
+
+
+# ---------------------------------------------------------------------------
+# 折扣类指令异常检测触发
+# ---------------------------------------------------------------------------
+
+class TestAnomalyDispatch:
+    @pytest.mark.asyncio
+    async def test_discount_apply_dispatches_anomaly_check(
+        self, executor, store_manager_actor
+    ):
+        """discount_apply 在 AUTO 路由下执行后触发 realtime_anomaly_check.delay"""
+        from src.core.execution_registry import COMMAND_REGISTRY, ExecutionLevel
+
+        # Temporarily override level so discount_apply goes through AUTO path
+        original_level = COMMAND_REGISTRY["discount_apply"].level
+        COMMAND_REGISTRY["discount_apply"].level = ExecutionLevel.AUTO
+
+        mock_check = MagicMock()
+        mock_check.delay = MagicMock()
+        mock_celery = MagicMock()
+        mock_celery.realtime_anomaly_check = mock_check
+
+        try:
+            with patch.dict("sys.modules", {"src.core.celery_tasks": mock_celery}):
+                await executor.execute(
+                    "discount_apply",
+                    {"store_id": "STORE_A1", "brand_id": "BRAND_A", "amount": 100.0},
+                    store_manager_actor,
+                )
+            mock_check.delay.assert_called_once()
+            kwargs = mock_check.delay.call_args[1]
+            assert kwargs["store_id"] == "STORE_A1"
+        finally:
+            COMMAND_REGISTRY["discount_apply"].level = original_level
+
+
+# ===========================================================================
+# TrustedExecutor with DB session (lines 356-374, 381-395, 406-416)
+# ===========================================================================
+
+class TestTrustedExecutorWithDB:
+    @pytest.mark.asyncio
+    async def test_write_audit_with_db_success(self):
+        """_write_audit stores a DB record when db_session is provided (lines 356-374)."""
+        mock_db = AsyncMock()
+        mock_db.add = MagicMock()
+        mock_db.flush = AsyncMock()
+
+        with patch.dict("sys.modules", {
+            "src.models.execution_audit": MagicMock(
+                ExecutionRecord=MagicMock(return_value=MagicMock())
+            )
+        }):
+            executor = TrustedExecutor(db_session=mock_db)
+            record = await executor._write_audit(
+                execution_id="EX-1",
+                command_type="discount_apply",
+                payload={"store_id": "S1"},
+                actor_id="U1",
+                actor_role="store_manager",
+                store_id="S1",
+                brand_id="B1",
+                status="completed",
+                level="auto",
+                amount=100.0,
+            )
+
+        mock_db.add.assert_called_once()
+        mock_db.flush.assert_awaited_once()
+        assert record["execution_id"] == "EX-1"
+
+    @pytest.mark.asyncio
+    async def test_write_audit_with_db_exception_is_swallowed(self):
+        """DB exception during audit write is logged and swallowed (line 373-374)."""
+        mock_db = AsyncMock()
+        mock_db.flush = AsyncMock(side_effect=RuntimeError("DB down"))
+        mock_db.add = MagicMock()
+
+        with patch.dict("sys.modules", {
+            "src.models.execution_audit": MagicMock(
+                ExecutionRecord=MagicMock(return_value=MagicMock())
+            )
+        }):
+            executor = TrustedExecutor(db_session=mock_db)
+            # Should NOT raise
+            record = await executor._write_audit(
+                execution_id="EX-2",
+                command_type="shift_report",
+                payload={},
+                actor_id="U1",
+                actor_role="store_manager",
+                store_id="S1",
+                brand_id="B1",
+                status="completed",
+                level="auto",
+            )
+        assert record["execution_id"] == "EX-2"
+
+    @pytest.mark.asyncio
+    async def test_get_audit_record_with_db_found(self):
+        """_get_audit_record returns dict when DB record found (lines 381-393)."""
+        mock_record = MagicMock()
+        mock_record.id = "EX-3"
+        mock_record.command_type = "shift_report"
+        mock_record.store_id = "S1"
+        mock_record.brand_id = "B1"
+        mock_record.created_at = "2026-01-01T00:00:00"
+        mock_record.status = "completed"
+        mock_record.actor_id = "U1"
+
+        mock_db = AsyncMock()
+        mock_db.get = AsyncMock(return_value=mock_record)
+
+        with patch.dict("sys.modules", {
+            "src.models.execution_audit": MagicMock(ExecutionRecord=MagicMock())
+        }):
+            executor = TrustedExecutor(db_session=mock_db)
+            result = await executor._get_audit_record("EX-3")
+
+        assert result is not None
+        assert result["execution_id"] == "EX-3"
+        assert result["command_type"] == "shift_report"
+
+    @pytest.mark.asyncio
+    async def test_get_audit_record_with_db_not_found(self):
+        """_get_audit_record returns None when DB record not found."""
+        mock_db = AsyncMock()
+        mock_db.get = AsyncMock(return_value=None)
+
+        with patch.dict("sys.modules", {
+            "src.models.execution_audit": MagicMock(ExecutionRecord=MagicMock())
+        }):
+            executor = TrustedExecutor(db_session=mock_db)
+            result = await executor._get_audit_record("NONEXISTENT")
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_get_audit_record_exception_returns_none(self):
+        """DB exception in _get_audit_record is swallowed, returns None (lines 394-395)."""
+        mock_db = AsyncMock()
+        mock_db.get = AsyncMock(side_effect=RuntimeError("DB error"))
+
+        with patch.dict("sys.modules", {
+            "src.models.execution_audit": MagicMock(ExecutionRecord=MagicMock())
+        }):
+            executor = TrustedExecutor(db_session=mock_db)
+            result = await executor._get_audit_record("EX-X")
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_mark_rolled_back_with_db_success(self):
+        """_mark_rolled_back updates record in DB (lines 406-414)."""
+        mock_record = MagicMock()
+        mock_db = AsyncMock()
+        mock_db.get = AsyncMock(return_value=mock_record)
+        mock_db.flush = AsyncMock()
+
+        with patch.dict("sys.modules", {
+            "src.models.execution_audit": MagicMock(ExecutionRecord=MagicMock())
+        }):
+            executor = TrustedExecutor(db_session=mock_db)
+            await executor._mark_rolled_back("EX-4", "U1", "RB-1")
+
+        assert mock_record.status == "rolled_back"
+        assert mock_record.rollback_id == "RB-1"
+        assert mock_record.rolled_back_by == "U1"
+        mock_db.flush.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_mark_rolled_back_exception_is_swallowed(self):
+        """DB exception in _mark_rolled_back is swallowed (lines 415-416)."""
+        mock_db = AsyncMock()
+        mock_db.get = AsyncMock(side_effect=RuntimeError("DB error"))
+
+        with patch.dict("sys.modules", {
+            "src.models.execution_audit": MagicMock(ExecutionRecord=MagicMock())
+        }):
+            executor = TrustedExecutor(db_session=mock_db)
+            # Should NOT raise
+            await executor._mark_rolled_back("EX-5", "U1", "RB-2")
+
+
+# ===========================================================================
+# Celery dispatch exception handler (lines 194-204)
+# ===========================================================================
+
+class TestCeleryDispatchException:
+    @pytest.mark.asyncio
+    async def test_celery_unavailable_does_not_block_execution(self):
+        """
+        When realtime_anomaly_check.delay raises, execution continues normally (lines 194-204).
+        Patch get_command_def to return AUTO level so the anomaly-check code path fires.
+        """
+        # Patch get_command_def to return AUTO level with discount_apply type
+        auto_cmd = MagicMock()
+        auto_cmd.level = ExecutionLevel.AUTO
+        auto_cmd.allowed_roles = {"store_manager"}
+        auto_cmd.amount_circuit_breaker = None
+
+        executor = TrustedExecutor()
+
+        # Stub celery_tasks module so the import inside the try block resolves
+        mock_celery_task = MagicMock()
+        mock_celery_task.delay = MagicMock(side_effect=RuntimeError("celery down"))
+        mock_celery_module = MagicMock(realtime_anomaly_check=mock_celery_task)
+
+        with patch("src.core.trusted_executor.get_command_def", return_value=auto_cmd), \
+             patch("src.core.trusted_executor.COMMAND_REGISTRY", {}), \
+             patch.dict("sys.modules", {"src.core.celery_tasks": mock_celery_module}):
+            result = await executor.execute(
+                "discount_apply",
+                {"store_id": "S1", "brand_id": "B1", "amount": 10.0},
+                {"user_id": "U1", "role": "store_manager", "store_id": "S1"},
+            )
+        # Execution should succeed despite celery failure
+        assert result["command_type"] == "discount_apply"
+        assert result["status"] == "completed"
+
+
+# ===========================================================================
+# rollback with string executed_at (line 265)
+# ===========================================================================
+
+class TestRollbackWithStringTimestamp:
+    @pytest.mark.asyncio
+    async def test_rollback_parses_string_executed_at(self):
+        """
+        When executed_at in the audit record is a string (ISO format),
+        it gets parsed via datetime.fromisoformat() (line 265).
+        """
+        from datetime import datetime, timedelta
+
+        executor = TrustedExecutor()
+
+        # Mock _get_audit_record to return a record with string executed_at
+        fresh_ts = (datetime.utcnow() - timedelta(minutes=5)).isoformat()
+        mock_record = {
+            "execution_id": "EX-OLD",
+            "command_type": "shift_report",
+            "store_id": "S1",
+            "brand_id": "B1",
+            "executed_at": fresh_ts,  # string, not datetime
+            "status": "completed",
+            "actor_id": "U1",
+        }
+
+        executor._get_audit_record = AsyncMock(return_value=mock_record)
+        executor._write_audit = AsyncMock(return_value=mock_record)
+        executor._mark_rolled_back = AsyncMock()
+
+        result = await executor.rollback(
+            "EX-OLD",
+            {"user_id": "ADMIN", "role": "super_admin"},
+        )
+        assert result["original_execution_id"] == "EX-OLD"
+        assert result["status"] == "rolled_back"
+
+
+# ===========================================================================
+# Defensive else branch (lines 203-204): level is not APPROVE/AUTO/NOTIFY
+# ===========================================================================
+
+class TestUnknownLevelBranch:
+    @pytest.mark.asyncio
+    async def test_unknown_level_status_is_unknown(self):
+        """
+        When effective_level is not APPROVE, AUTO, or NOTIFY, the else branch
+        sets result={} and status='unknown' (lines 203-204).
+        """
+        class _SentinelLevel:
+            """Not equal to any ExecutionLevel enum value."""
+            value = "unknown_level"
+
+        mock_cmd = MagicMock()
+        mock_cmd.level = _SentinelLevel()
+        mock_cmd.allowed_roles = {"store_manager"}
+        mock_cmd.amount_circuit_breaker = None  # no circuit breaking
+
+        executor = TrustedExecutor()
+
+        with patch("src.core.trusted_executor.get_command_def", return_value=mock_cmd), \
+             patch("src.core.trusted_executor.COMMAND_REGISTRY", {}):
+            result = await executor.execute(
+                "mystery_command",
+                {"store_id": "S1"},
+                {"user_id": "U1", "role": "store_manager", "store_id": "S1"},
+            )
+
+        assert result["status"] == "unknown"

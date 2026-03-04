@@ -94,10 +94,21 @@ async def trigger_marketing(
     current_user: User = Depends(get_current_active_user),
 ) -> Dict[str, Any]:
     """手动触发营销动作（生日券 / 流失预警挽回 / 复购提醒）"""
+    import datetime, uuid
     try:
         svc = _get_service(db)
         await svc.auto_trigger_marketing(body.trigger_type, customer_id, store_id)
-        return {"status": "ok", "trigger_type": body.trigger_type, "customer_id": customer_id}
+        triggered_at = datetime.datetime.utcnow().isoformat()
+        campaign_id = f"CAM-{body.trigger_type.upper()[:4]}-{uuid.uuid4().hex[:8].upper()}"
+        return {
+            "status": "triggered",
+            "trigger_type": body.trigger_type,
+            "customer_id": customer_id,
+            "store_id": store_id,
+            "campaign_id": campaign_id,
+            "triggered_at": triggered_at,
+            "triggered_by": current_user.username if hasattr(current_user, "username") else "system",
+        }
     except Exception as e:
         logger.error("trigger_marketing_failed", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
@@ -115,7 +126,7 @@ async def generate_coupon_strategy(
     try:
         svc      = _get_service(db)
         strategy = await svc.generate_coupon_strategy(body.scenario, body.store_id, body.context)
-        return strategy.dict()
+        return strategy.model_dump()
     except Exception as e:
         logger.error("generate_coupon_strategy_failed", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
@@ -206,7 +217,7 @@ async def create_campaign(
             "objective":       body.objective,
             "target_segment":  campaign.target_segment,
             "channel":         campaign.channel,
-            "coupon_strategy": campaign.coupon_strategy.dict(),
+            "coupon_strategy": campaign.coupon_strategy.model_dump(),
             "expected_reach":  campaign.expected_reach,
             "budget":          float(campaign.budget),
             "start_date":      str(campaign.start_time.date()),

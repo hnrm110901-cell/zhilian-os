@@ -71,6 +71,7 @@
 - [x] 新增私域运营 18个增长 action（AARRR 框架）
 - [x] 企微 webhook 接入私域 Agent 对话（P0/P1）
 - [x] 生成智链OS功能明细思维导图
+<<<<<<< HEAD
 - [x] Phase 3 安全加固：SecurityHeadersMiddleware（防 XSS/点击劫持/MIME 嗅探/HSTS）
 - [x] Phase 3 安全加固：CORS 配置环境感知（明确 methods/headers，不使用 *）
 - [x] Phase 3 安全加固：Nginx SSL/TLS 配置（HTTP→HTTPS 重定向、TLS 1.2+、安全头、OCSP Stapling）
@@ -85,10 +86,19 @@
 - [x] P1-2 服务质量Agent _generate_mock_feedbacks 重命名为 _fetch_feedbacks_from_db
 - [x] P1-3 README Phase 3 路线图状态同步（性能优化/安全加固/生产部署标记完成）
 - [x] P2-1 补充服务层核心单元测试（MenuRanker/StoreMemoryService/VectorDbService 共3个测试文件）
+=======
+- [x] P2 绩效计算引擎：EmployeeMetricRecord 模型 + PerformanceComputeService + API 端点（3个）+ 17个测试
+>>>>>>> d1df728dec60bb243c50ae42ff68074712ddafd9
 
 ---
 
 ## 评论
+
+### 2026-03-02
+- P2 绩效计算引擎上线：从订单/损耗事件聚合各岗位核心指标（store_manager/waiter/kitchen）
+- 新增 employee_metric_records 表（Alembic b03），幂等 upsert
+- API：POST /compute 触发计算，GET /metrics 查询，GET /summary 汇总
+- 17个集成测试全部通过
 
 ### 2026-02-26
 - 所有8个 package agent 测试套件在独立运行时全部通过（共 235 个测试）

@@ -55,7 +55,7 @@ async def create_transaction(
 ):
     """创建财务交易记录"""
     service = get_finance_service(db)
-    transaction_data = data.dict()
+    transaction_data = data.model_dump()
     transaction_data["created_by"] = current_user.id
     return await service.create_transaction(transaction_data)
 
@@ -119,7 +119,7 @@ async def create_budget(
 ):
     """创建预算"""
     service = get_finance_service(db)
-    budget_data = data.dict()
+    budget_data = data.model_dump()
     budget_data["created_by"] = current_user.id
     return await service.create_budget(budget_data)
 

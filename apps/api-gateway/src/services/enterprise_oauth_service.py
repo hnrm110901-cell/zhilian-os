@@ -3,6 +3,7 @@
 Enterprise OAuth Login Service
 支持企业微信、钉钉、飞书的OAuth 2.0登录
 """
+import os
 from typing import Dict, Any, Optional
 import httpx
 import structlog

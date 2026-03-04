@@ -96,7 +96,7 @@ async def create_category(
 ):
     """创建菜品分类"""
     service = DishCategoryService()
-    category = await service.create_category(category_data.dict())
+    category = await service.create_category(category_data.model_dump())
     return category
 
 
@@ -117,7 +117,7 @@ async def create_dish(
 ):
     """创建菜品"""
     service = DishService()
-    dish = await service.create_dish(dish_data.dict())
+    dish = await service.create_dish(dish_data.model_dump())
     return dish
 
 

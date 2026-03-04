@@ -24,9 +24,16 @@ logger = structlog.get_logger()
 CACHE_TTL = 5 * 60  # 5分钟
 CACHE_KEY_PREFIX = "menu_rank:"
 
+# 默认时段配置（MealPeriod 表为空时 fallback）
+_DEFAULT_SLOTS = [
+    ("breakfast", 6, 10),
+    ("lunch",    10, 14),
+    ("dinner",   17, 21),
+]
 
-def _current_time_slot() -> str:
-    """返回当前时段：breakfast/lunch/dinner/off_peak"""
+
+def _default_time_slot() -> str:
+    """默认时段判断（fallback，无 DB 时使用）"""
     hour = datetime.now().hour
     if 6 <= hour < 10:
         return "breakfast"
@@ -35,6 +42,42 @@ def _current_time_slot() -> str:
     elif 17 <= hour < 21:
         return "dinner"
     return "off_peak"
+
+
+async def _current_time_slot(session, store_id: str) -> str:
+    """
+    从 meal_periods 表查询当前时段。
+    无记录/匹配失败时 fallback 到默认分段。
+    """
+    try:
+        from sqlalchemy import select
+        from ..models.meal_period import MealPeriod
+
+        stmt = select(MealPeriod).where(
+            MealPeriod.store_id == store_id,
+            MealPeriod.is_active.is_(True),
+        )
+        result = await session.execute(stmt)
+        periods = result.scalars().all()
+
+        if not periods:
+            return _default_time_slot()
+
+        hour = datetime.now().hour
+        for period in periods:
+            if period.start_hour <= period.end_hour:
+                # 普通时段（不跨午夜）
+                if period.start_hour <= hour < period.end_hour:
+                    return period.name
+            else:
+                # 跨午夜时段（如深夜 22-2）
+                if hour >= period.start_hour or hour < period.end_hour:
+                    return period.name
+
+        return "off_peak"
+    except Exception as e:
+        logger.warning("meal_period.query_failed", store_id=store_id, error=str(e))
+        return _default_time_slot()
 
 
 class MenuRanker:
@@ -88,16 +131,22 @@ class MenuRanker:
     async def _compute_ranking(self, store_id: str) -> List[RankedDish]:
         """核心评分计算"""
         if not self._db:
+<<<<<<< HEAD
             logger.warning("menu_ranker.no_db_session", store_id=store_id)
+=======
+>>>>>>> d1df728dec60bb243c50ae42ff68074712ddafd9
             return []
 
         try:
             dish_data = await self._fetch_dish_data(store_id)
             if not dish_data:
+<<<<<<< HEAD
                 logger.info("menu_ranker.no_dish_data", store_id=store_id)
+=======
+>>>>>>> d1df728dec60bb243c50ae42ff68074712ddafd9
                 return []
 
-            time_slot = _current_time_slot()
+            time_slot = await _current_time_slot(self._db, store_id)
             scored_dishes = []
 
             for dish in dish_data:

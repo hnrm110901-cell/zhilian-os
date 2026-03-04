@@ -92,6 +92,7 @@ const MySchedulePage = lazy(() => import('./pages/MySchedulePage'));
 const HQDashboardPage = lazy(() => import('./pages/HQDashboardPage'));
 const AIAccuracyPage = lazy(() => import('./pages/AIAccuracyPage'));
 const DishCostPage = lazy(() => import('./pages/DishCostPage'));
+const ChannelProfitPage = lazy(() => import('./pages/ChannelProfitPage'));
 const EmployeePerformancePage = lazy(() => import('./pages/EmployeePerformancePage'));
 const OrderAnalyticsPage = lazy(() => import('./pages/OrderAnalyticsPage'));
 const DashboardPreferencesPage = lazy(() => import('./pages/DashboardPreferencesPage'));
@@ -104,7 +105,7 @@ const KnowledgeRulePage = lazy(() => import('./pages/KnowledgeRulePage'));
 const OntologyAdminPage = lazy(() => import('./pages/OntologyAdminPage'));
 const BOMManagementPage = lazy(() => import('./pages/BOMManagementPage'));
 const WasteEventPage = lazy(() => import('./pages/WasteEventPage'));
-const KnowledgeRulesPage = lazy(() => import('./pages/KnowledgeRulesPage'));
+
 const DataSecurityPage = lazy(() => import('./pages/DataSecurityPage'));
 const BanquetLifecyclePage = lazy(() => import('./pages/BanquetLifecyclePage'));
 const MarketingCampaignPage = lazy(() => import('./pages/MarketingCampaignPage'));
@@ -355,6 +356,9 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="dish-cost" element={
                     <ProtectedRoute requiredRole="store_manager"><DishCostPage /></ProtectedRoute>
+                  } />
+                  <Route path="channel-profit" element={
+                    <ProtectedRoute requiredRole="store_manager"><ChannelProfitPage /></ProtectedRoute>
                   } />
                   <Route path="employee-performance" element={
                     <ProtectedRoute requiredRole="store_manager"><EmployeePerformancePage /></ProtectedRoute>

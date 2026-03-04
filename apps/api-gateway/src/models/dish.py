@@ -4,6 +4,7 @@
 """
 from sqlalchemy import Column, String, Numeric, Integer, Boolean, Text, ForeignKey, Index
 from sqlalchemy.dialects.postgresql import UUID, ARRAY, JSON
+
 from sqlalchemy.orm import relationship
 import uuid
 
@@ -98,6 +99,14 @@ class Dish(Base, TimestampMixin):
     # 库存关联
     requires_inventory = Column(Boolean, default=True)  # 是否需要库存管理
     low_stock_threshold = Column(Integer)  # 低库存阈值
+
+    # 集团主档关联（Task1 P0 字段）
+    dish_master_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("dish_master.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     # 额外信息
     notes = Column(Text)  # 备注

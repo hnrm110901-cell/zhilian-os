@@ -6,6 +6,7 @@ WeChat Push Trigger Service
 """
 from typing import Dict, Any, Optional
 import asyncio
+import uuid
 import structlog
 import os
 from datetime import datetime

@@ -226,7 +226,7 @@ async def create_pos_transaction(
         session=session,
         system_id=system_id,
         store_id=current_user.store_id or system.store_id,
-        transaction_data=request.dict(),
+        transaction_data=request.model_dump(),
     )
 
     return transaction.to_dict()
@@ -283,7 +283,7 @@ async def create_supplier_order(
         session=session,
         system_id=system_id,
         store_id=current_user.store_id or system.store_id,
-        order_data=request.dict(),
+        order_data=request.model_dump(),
     )
 
     return order.to_dict()
@@ -339,7 +339,7 @@ async def sync_member_data(
     member = await integration_service.sync_member(
         session=session,
         system_id=system_id,
-        member_data=request.dict(),
+        member_data=request.model_dump(),
     )
 
     return member.to_dict()
@@ -501,7 +501,7 @@ async def sync_reservation(
         session=session,
         system_id=system_id,
         store_id=current_user.store_id or system.store_id,
-        reservation_data=request.dict(),
+        reservation_data=request.model_dump(),
     )
 
     return reservation.to_dict()

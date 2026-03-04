@@ -81,6 +81,7 @@ class OrderService:
                 await session.flush()
 
                 # 创建订单项
+                order_items_created = []
                 for item in items:
                     order_item = OrderItem(
                         order_id=order_id,
@@ -93,6 +94,30 @@ class OrderService:
                         customizations=item.get("customizations", {})
                     )
                     session.add(order_item)
+                    order_items_created.append((order_item, item))
+
+                # 回写食材实际成本（BOM 理论成本），失败时静默忽略，不阻塞订单创建
+                sales_channel = kwargs.get("sales_channel") or getattr(order, "sales_channel", None)
+                for order_item, item in order_items_created:
+                    try:
+                        from src.services.bom_resolver import BOMResolverService
+                        resolved = await BOMResolverService.resolve(
+                            session,
+                            item["item_id"],
+                            self.store_id,
+                            channel=sales_channel,
+                        )
+                        order_item.food_cost_actual = int(
+                            resolved.total_bom_cost_fen * order_item.quantity
+                        )
+                        if order_item.unit_price > 0:
+                            order_item.gross_margin = max(
+                                0,
+                                (order_item.unit_price - order_item.food_cost_actual / order_item.quantity)
+                                / order_item.unit_price,
+                            )
+                    except Exception:
+                        pass  # food_cost_actual 保持 NULL，不阻塞订单
 
                 await session.commit()
 

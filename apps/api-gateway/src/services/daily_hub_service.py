@@ -252,6 +252,9 @@ class DailyHubService:
         purchase_order = await self._build_purchase_order(store_id)
         staffing_plan  = await self._get_staffing_plan(store_id, target_date)
 
+        # 真实菜品成本（MenuProfitEngine）
+        profit_summary = await self._compute_profit_summary(store_id, db=db)
+
         # 宴会熔断：将各宴会的采购加成合并到采购清单
         circuit_breaker_addons = banquet_track.pop("circuit_breaker_addons", [])
         for addon in circuit_breaker_addons:
@@ -288,6 +291,7 @@ class DailyHubService:
                 "total_predicted_revenue": total_predicted,
                 "total_lower":            total_lower,
                 "total_upper":            total_upper,
+                "gross_margin_pct":       profit_summary.get("avg_gross_margin_pct"),
             },
             "purchase_order":   purchase_order,
             "staffing_plan":    staffing_plan,
@@ -652,6 +656,51 @@ class DailyHubService:
         except Exception as e:
             logger.warning("获取排班计划失败", error=str(e))
             return {"shifts": [], "total_staff": 0}
+
+    async def _compute_profit_summary(
+        self,
+        store_id: str,
+        db: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        """
+        使用 MenuProfitEngine 计算门店菜品真实毛利摘要。
+
+        Returns:
+            {
+                avg_gross_margin_pct: float | None,  # 全菜品加权平均毛利率
+                profitable_count: int,               # 赚钱菜品数
+                marginal_count:   int,               # 勉强菜品数
+                losing_count:     int,               # 亏钱菜品数
+                data_source:      str,
+            }
+        """
+        if db is None:
+            return {"avg_gross_margin_pct": None, "data_source": "no_db"}
+
+        try:
+            from src.services.menu_profit_engine import MenuProfitEngine
+
+            results = await MenuProfitEngine.get_store_channel_report(db, store_id)
+            if not results:
+                return {"avg_gross_margin_pct": None, "data_source": "menu_profit_engine:empty"}
+
+            margins = [r.gross_margin_pct for r in results]
+            avg_margin = round(sum(margins) / len(margins), 4)
+
+            profitable = sum(1 for r in results if r.label == "赚钱")
+            marginal   = sum(1 for r in results if r.label == "勉强")
+            losing     = sum(1 for r in results if r.label == "亏钱")
+
+            return {
+                "avg_gross_margin_pct": avg_margin,
+                "profitable_count":     profitable,
+                "marginal_count":       marginal,
+                "losing_count":         losing,
+                "data_source":          "menu_profit_engine",
+            }
+        except Exception as e:
+            logger.warning("MenuProfitEngine 毛利摘要失败，降级为空", store_id=store_id, error=str(e))
+            return {"avg_gross_margin_pct": None, "data_source": "error:fallback"}
 
     # ── Private: L5 WeChat notification ──────────────────────────────────────
 

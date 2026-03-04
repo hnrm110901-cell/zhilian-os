@@ -8,10 +8,13 @@ import os
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel, Field
 from typing import Optional, List
+from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
 
 from src.core.dependencies import get_current_active_user, require_permission
 from src.core.permissions import Permission
+from src.services.voice_command_service import voice_command_service
+from src.core.database import get_db
 from src.services.shokz_service import shokz_service, DeviceType, DeviceRole
 from src.services.voice_orchestrator import voice_orchestrator
 from src.models import User
@@ -383,11 +386,6 @@ async def broadcast_voice_notification(
 
 
 # ==================== 轻量级语音指令 (MVP) ====================
-
-
-from ..services.voice_command_service import voice_command_service
-from ..core.database import get_db
-from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class SimpleVoiceCommandRequest(BaseModel):

@@ -45,6 +45,40 @@ SYSTEM_TABLES = {
 }
 
 
+def receive_do_orm_execute(orm_execute_state) -> None:
+    """
+    拦截ORM查询，自动添加租户过滤条件
+    """
+    if not orm_execute_state.is_select:
+        return
+
+    # 获取当前租户ID
+    current_tenant = TenantContext.get_current_tenant()
+    if not current_tenant:
+        return
+
+    # 检查查询涉及的表
+    statement = orm_execute_state.statement
+
+    # 遍历查询中的所有表
+    for table in statement.froms:
+        table_name = table.name if hasattr(table, "name") else str(table)
+
+        # 如果是需要租户隔离的表，添加过滤条件
+        if table_name in TENANT_TABLES:
+            # 检查是否已经有store_id过滤条件
+            if not _has_store_filter(statement):
+                # 添加租户过滤条件
+                orm_execute_state.statement = statement.where(
+                    table.c.store_id == current_tenant
+                )
+                logger.debug(
+                    "Tenant filter applied",
+                    table=table_name,
+                    tenant_id=current_tenant
+                )
+
+
 async def enable_tenant_filter(session: AsyncSession, use_rls: bool = True) -> None:
     """
     为Session启用租户过滤器
@@ -80,40 +114,7 @@ async def enable_tenant_filter(session: AsyncSession, use_rls: bool = True) -> N
 
     # 如果不使用RLS或RLS设置失败，使用ORM级别的过滤器
     if not use_rls:
-        @event.listens_for(session, "do_orm_execute")
-        def receive_do_orm_execute(orm_execute_state):
-            """
-            拦截ORM查询，自动添加租户过滤条件
-            """
-            if not orm_execute_state.is_select:
-                return
-
-            # 获取当前租户ID
-            current_tenant = TenantContext.get_current_tenant()
-            if not current_tenant:
-                return
-
-            # 检查查询涉及的表
-            statement = orm_execute_state.statement
-
-            # 遍历查询中的所有表
-            for table in statement.froms:
-                table_name = table.name if hasattr(table, "name") else str(table)
-
-                # 如果是需要租户隔离的表，添加过滤条件
-                if table_name in TENANT_TABLES:
-                    # 检查是否已经有store_id过滤条件
-                    if not _has_store_filter(statement):
-                        # 添加租户过滤条件
-                        orm_execute_state.statement = statement.where(
-                            table.c.store_id == current_tenant
-                        )
-                        logger.debug(
-                            "Tenant filter applied",
-                            table=table_name,
-                            tenant_id=current_tenant
-                        )
-
+        event.listen(session, "do_orm_execute", receive_do_orm_execute)
         logger.info("ORM-level tenant filter enabled for session", tenant_id=tenant_id)
 
 

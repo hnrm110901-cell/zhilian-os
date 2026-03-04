@@ -594,29 +594,74 @@ class AppPushNotificationHandler(NotificationChannelHandler):
             是否发送成功
         """
         try:
-            # App Push 渠道尚未接入推送服务（JPush / Firebase / APNs）
-            # 待接入后替换此处逻辑
-            if not push_config.JPUSH_APP_KEY and not push_config.FIREBASE_SERVER_KEY:
-                logger.warning(
-                    "App推送服务未配置,通知跳过",
-                    recipient=recipient,
-                    channel="app_push",
-                    hint="请设置 JPUSH_APP_KEY 或 FIREBASE_SERVER_KEY 环境变量并集成推送 SDK",
+            # 若已配置 JPush，调用极光推送
+            if push_config.JPUSH_APP_KEY and push_config.JPUSH_MASTER_SECRET:
+                import base64
+                import httpx
+                auth = base64.b64encode(
+                    f"{push_config.JPUSH_APP_KEY}:{push_config.JPUSH_MASTER_SECRET}".encode()
+                ).decode()
+                payload = {
+                    "platform": "all",
+                    "audience": {"registration_id": [recipient]},
+                    "notification": {"title": title, "alert": content},
+                    "options": {"apns_production": True},
+                }
+                async with httpx.AsyncClient(timeout=10) as client:
+                    resp = await client.post(
+                        "https://api.jpush.cn/v3/push",
+                        json=payload,
+                        headers={"Authorization": f"Basic {auth}"},
+                    )
+                ok = resp.status_code == 200
+                logger.info("JPush 推送完成", recipient=recipient, ok=ok)
+                return ok
+
+            # 若已配置 Firebase FCM，调用 FCM HTTP v1
+            if push_config.FIREBASE_SERVER_KEY:
+                import httpx
+                payload = {
+                    "message": {
+                        "token": recipient,
+                        "notification": {"title": title, "body": content},
+                        "data": {k: str(v) for k, v in (extra_data or {}).items()},
+                    }
+                }
+                async with httpx.AsyncClient(timeout=10) as client:
+                    resp = await client.post(
+                        "https://fcm.googleapis.com/v1/projects/zhilian-os/messages:send",
+                        json=payload,
+                        headers={"Authorization": f"Bearer {push_config.FIREBASE_SERVER_KEY}"},
+                    )
+                ok = resp.status_code == 200
+                logger.info("FCM 推送完成", recipient=recipient, ok=ok)
+                return ok
+
+            # 降级：通过企业微信转发推送内容（recipient 视为企业微信 user_id）
+            try:
+                from .wechat_work_message_service import wechat_work_message_service
+                message = f"【App通知】{title}\n\n{content}"
+                result = await wechat_work_message_service.send_text_message(
+                    user_id=recipient, content=message
                 )
-                return False
+                ok = result.get("success", False)
+                if ok:
+                    logger.info(
+                        "App推送降级至企业微信成功",
+                        recipient=recipient,
+                        channel="app_push_via_wechat_work",
+                    )
+                return ok
+            except Exception:
+                pass
 
-            logger.info(
-                "发送App推送通知",
+            logger.warning(
+                "App推送服务未配置且企业微信不可用，通知跳过",
                 recipient=recipient,
-                title=title,
-                channel="app_push"
+                channel="app_push",
+                hint="请设置 JPUSH_APP_KEY / FIREBASE_SERVER_KEY 或 WECHAT_CORP_ID 环境变量",
             )
-
-            # 这里应该调用推送服务
-            # from jpush import JPush
-            # ...
-
-            return False  # 未接入推送 SDK，返回 False
+            return False
         except Exception as e:
             logger.error("App推送发送失败", recipient=recipient, error=str(e))
             return False

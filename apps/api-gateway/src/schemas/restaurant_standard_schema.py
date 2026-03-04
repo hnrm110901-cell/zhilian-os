@@ -37,6 +37,20 @@ class OrderType(str, Enum):
     RESERVATION = "reservation"  # 预定
 
 
+class SalesChannel(str, Enum):
+    """销售渠道"""
+    DINE_IN = "dine_in"          # 堂食
+    TAKEOUT = "takeout"          # 外带
+    MEITUAN = "meituan"          # 美团外卖
+    ELEME = "eleme"              # 饿了么
+    WAIMAI_OWN = "waimai_own"    # 自营外卖
+    GROUP_BUY = "group_buy"      # 团购
+    RESERVATION = "reservation"  # 预订
+    CATERING = "catering"        # 外宴/餐饮服务
+    SELF_PICKUP = "self_pickup"  # 自提
+    OTHER = "other"              # 其他
+
+
 class DishCategory(str, Enum):
     """菜品分类"""
     APPETIZER = "appetizer"  # 开胃菜

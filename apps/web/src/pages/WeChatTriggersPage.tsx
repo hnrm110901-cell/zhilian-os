@@ -22,8 +22,8 @@ const WeChatTriggersPage: React.FC = () => {
     setLoading(true);
     try {
       const [rulesRes, statsRes] = await Promise.allSettled([
-        apiClient.get('/wechat/triggers/rules'),
-        apiClient.get('/wechat/triggers/stats'),
+        apiClient.get('/api/v1/wechat/triggers/rules'),
+        apiClient.get('/api/v1/wechat/triggers/stats'),
       ]);
       if (rulesRes.status === 'fulfilled') setRules(rulesRes.value.data?.rules || rulesRes.value.data || []);
       if (statsRes.status === 'fulfilled') setStats(statsRes.value.data);
@@ -40,7 +40,7 @@ const WeChatTriggersPage: React.FC = () => {
     const key = record.event_type;
     setToggleLoading(prev => ({ ...prev, [key]: true }));
     try {
-      await apiClient.put(`/wechat/triggers/rules/${record.event_type}/toggle`, { enabled });
+      await apiClient.put(`/api/v1/wechat/triggers/rules/${record.event_type}/toggle`, { enabled });
       showSuccess(enabled ? '已启用' : '已禁用');
       loadData();
     } catch (err: any) {
@@ -53,7 +53,7 @@ const WeChatTriggersPage: React.FC = () => {
   const testTrigger = async (values: any) => {
     setSubmitting(true);
     try {
-      await apiClient.post('/wechat/triggers/test', {
+      await apiClient.post('/api/v1/wechat/triggers/test', {
         event_type: values.event_type,
         event_data: JSON.parse(values.event_data || '{}'),
         store_id: values.store_id,
@@ -71,7 +71,7 @@ const WeChatTriggersPage: React.FC = () => {
   const manualSend = async (values: any) => {
     setSubmitting(true);
     try {
-      await apiClient.post('/wechat/triggers/manual-send', values);
+      await apiClient.post('/api/v1/wechat/triggers/manual-send', values);
       showSuccess('消息已发送');
       setManualVisible(false);
       manualForm.resetFields();

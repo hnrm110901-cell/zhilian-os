@@ -1,7 +1,7 @@
 """FCT 凭证状态增加 voided（作废）
 
 Revision ID: w01_fct_voucher_voided
-Revises: v01_fct_phase4_tables
+Revises: v01_fct_phase4
 Create Date: 2026-02-26
 
 """
@@ -10,7 +10,7 @@ from typing import Sequence, Union
 from alembic import op
 
 revision = 'w01_fct_voucher_voided'
-down_revision = 'v01_fct_phase4_tables'
+down_revision = 'v01_fct_phase4'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

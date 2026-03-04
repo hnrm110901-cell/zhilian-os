@@ -12,8 +12,9 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models import Schedule, Shift, PurchaseOrder, Order, OrderItem
+from src.models import Schedule, Shift, PurchaseOrder, Order, OrderItem, Dish
 from src.ontology import get_ontology_repository
+from src.services.bom_resolver import BOMResolverService
 
 logger = structlog.get_logger()
 
@@ -63,56 +64,128 @@ async def _step2_bom_deviation(
     date_end: str,
     variances: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
-    """步骤2：BOM 偏差计算。实际消耗 vs 标准用量×销量，标异常。"""
+    """步骤2：BOM 偏差计算。实际消耗 vs 标准用量×销量，标异常。
+
+    Primary path: BOMResolverService（SQL 路径，无需 Neo4j）
+    Fallback: 原 Neo4j Cypher 路径（resolver 失败或 expected==0 时降级）
+    """
     repo = get_ontology_repository()
-    if not repo:
-        return []
     deviations = []
+    dt_start = None
+    dt_end = None
+    try:
+        dt_start = datetime.fromisoformat(date_start + "T00:00:00")
+        dt_end = datetime.fromisoformat(date_end + "T23:59:59")
+    except Exception:
+        pass
+
+    # 取门店所有 active dishes（用于 resolver 路径）
+    active_dishes: List[Any] = []
+    try:
+        dish_result = await session.execute(
+            select(Dish).where(
+                Dish.store_id == store_id,
+                Dish.is_available == True,  # noqa: E712
+            )
+        )
+        active_dishes = list(dish_result.scalars().all())
+    except Exception as e:
+        logger.debug("waste_reasoning_step2_dish_fetch_error", store_id=store_id, error=str(e))
+
     for v in variances:
         ing_id = v.get("ing_id", "")
-        actual_consumption = abs(v.get("diff", 0))  # 简化：用库存变化量作为实际消耗
-        # 从图谱取该食材被哪些 BOM 使用
-        with repo.session() as neo_session:
-            r = neo_session.run(
-                """
-                MATCH (b:BOM)-[r:REQUIRES]->(i:Ingredient { ing_id: $ing_id })
-                WHERE b.store_id = $store_id
-                RETURN b.dish_id AS dish_id, r.qty AS std_qty, r.unit AS unit
-                """,
-                ing_id=ing_id,
-                store_id=store_id,
-            )
-            bom_rows = [dict(rec) for rec in r]
-        if not bom_rows:
-            deviations.append({
-                "ing_id": ing_id,
-                "actual": actual_consumption,
-                "expected": 0,
-                "deviation": actual_consumption,
-                "anomaly": actual_consumption > 0,
-                "trace": "无BOM关联",
-            })
-            continue
-        # 简化：预期用量用 BOM 标准量之和的某个倍数（无订单时用 0）
+        actual_consumption = abs(v.get("diff", 0))
+
+        # ── Primary: BOMResolverService ──────────────────────────────────
         expected = 0.0
+        resolver_success = False
+        bom_dish_ids: List[str] = []
         try:
-            dt_start = datetime.fromisoformat(date_start + "T00:00:00")
-            dt_end = datetime.fromisoformat(date_end + "T23:59:59")
-            for row in bom_rows:
-                dish_id = row.get("dish_id")
-                std_qty = float(row.get("std_qty", 0))
-                q = select(OrderItem).join(Order, OrderItem.order_id == Order.id).where(
-                    Order.store_id == store_id,
-                    Order.order_time >= dt_start,
-                    Order.order_time <= dt_end,
-                    OrderItem.item_id == str(dish_id),
-                )
-                res = await session.execute(q)
-                items = res.scalars().all()
-                sales = sum(getattr(it, "quantity", 0) or 0 for it in items)
-                expected += std_qty * sales
+            if active_dishes and dt_start and dt_end:
+                for dish in active_dishes:
+                    qty = await BOMResolverService.get_theoretical_qty(
+                        session, str(dish.id), store_id, ing_id
+                    )
+                    if qty > 0:
+                        bom_dish_ids.append(str(dish.id))
+                        sales_q = (
+                            select(OrderItem)
+                            .join(Order, OrderItem.order_id == Order.id)
+                            .where(
+                                Order.store_id == store_id,
+                                Order.order_time >= dt_start,
+                                Order.order_time <= dt_end,
+                                OrderItem.item_id == str(dish.id),
+                            )
+                        )
+                        res = await session.execute(sales_q)
+                        items = res.scalars().all()
+                        sales = sum(getattr(it, "quantity", 0) or 0 for it in items)
+                        expected += float(qty) * sales
+                resolver_success = True
         except Exception as e:
-            logger.debug("waste_reasoning_bom_expected_skip", ing_id=ing_id, error=str(e))
+            logger.debug(
+                "waste_reasoning_step2_resolver_error",
+                ing_id=ing_id, store_id=store_id, error=str(e),
+            )
+
+        # ── Fallback: 原 Neo4j Cypher 路径 ──────────────────────────────
+        if not resolver_success or (expected == 0.0 and not bom_dish_ids):
+            if repo:
+                try:
+                    with repo.session() as neo_session:
+                        r = neo_session.run(
+                            """
+                            MATCH (b:BOM)-[r:REQUIRES]->(i:Ingredient { ing_id: $ing_id })
+                            WHERE b.store_id = $store_id
+                            RETURN b.dish_id AS dish_id, r.qty AS std_qty, r.unit AS unit
+                            """,
+                            ing_id=ing_id,
+                            store_id=store_id,
+                        )
+                        bom_rows = [dict(rec) for rec in r]
+                    if not bom_rows:
+                        deviations.append({
+                            "ing_id": ing_id,
+                            "actual": actual_consumption,
+                            "expected": 0,
+                            "deviation": actual_consumption,
+                            "anomaly": actual_consumption > 0,
+                            "trace": "无BOM关联",
+                        })
+                        continue
+                    expected = 0.0
+                    if dt_start and dt_end:
+                        for row in bom_rows:
+                            dish_id_neo = row.get("dish_id")
+                            std_qty = float(row.get("std_qty", 0))
+                            q = select(OrderItem).join(Order, OrderItem.order_id == Order.id).where(
+                                Order.store_id == store_id,
+                                Order.order_time >= dt_start,
+                                Order.order_time <= dt_end,
+                                OrderItem.item_id == str(dish_id_neo),
+                            )
+                            res = await session.execute(q)
+                            items = res.scalars().all()
+                            sales = sum(getattr(it, "quantity", 0) or 0 for it in items)
+                            expected += std_qty * sales
+                    bom_dish_ids = [row.get("dish_id") for row in bom_rows]
+                except Exception as e:
+                    logger.debug(
+                        "waste_reasoning_bom_expected_skip", ing_id=ing_id, error=str(e)
+                    )
+            else:
+                # Neo4j 不可用且 resolver 也失败
+                deviations.append({
+                    "ing_id": ing_id,
+                    "actual": actual_consumption,
+                    "expected": 0,
+                    "deviation": actual_consumption,
+                    "anomaly": actual_consumption > 0,
+                    "trace": "无BOM关联",
+                })
+                continue
+
         dev = actual_consumption - expected
         deviations.append({
             "ing_id": ing_id,
@@ -120,7 +193,7 @@ async def _step2_bom_deviation(
             "expected": expected,
             "deviation": dev,
             "anomaly": abs(dev) > (expected * 0.2 if expected else 0),
-            "trace": [row.get("dish_id") for row in bom_rows],
+            "trace": bom_dish_ids,
         })
     return deviations
 

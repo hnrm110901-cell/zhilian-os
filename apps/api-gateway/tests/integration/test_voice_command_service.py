@@ -6,8 +6,11 @@ VoiceCommandService 单元测试
 - handle_stateful_command: 加载/创建上下文、路由、保存、session_id透传
 - broadcast_meituan_queue_update: 零排队 / 有排队消息格式
 - alert_timeout_order: voice_response 格式
+- _handle_queue_status / _handle_order_reminder / _handle_inventory_query
+- _handle_revenue_today / _handle_call_support (DB-backed private methods)
 """
 import sys
+from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -20,6 +23,7 @@ sys.modules.setdefault("src.models.inventory", MagicMock())
 
 from src.services.voice_command_service import VoiceCommandService, VoiceIntent
 from src.models.conversation import ConversationContext
+import src.services.voice_command_service as _vcs_mod
 
 
 # ---------------------------------------------------------------------------
@@ -292,3 +296,368 @@ class TestAlertTimeoutOrder:
         result = await svc.alert_timeout_order("S1", "C5", 60)
         assert result["data"]["table_number"] == "C5"
         assert result["data"]["wait_time"] == 60
+
+
+# ---------------------------------------------------------------------------
+# recognize_intent — exception branch (line 143-145)
+# ---------------------------------------------------------------------------
+
+class TestRecognizeIntentException:
+    def test_exception_in_re_search_returns_none(self):
+        svc = _svc()
+        with patch("src.services.voice_command_service.re.search", side_effect=RuntimeError("re err")):
+            result = svc.recognize_intent("any text")
+        assert result is None
+
+
+# ---------------------------------------------------------------------------
+# broadcast / alert exception paths
+# ---------------------------------------------------------------------------
+
+class TestBroadcastException:
+    @pytest.mark.asyncio
+    async def test_exception_returns_failure(self):
+        svc = _svc()
+        with patch.object(_vcs_mod, "logger") as mock_logger:
+            mock_logger.info = MagicMock(side_effect=RuntimeError("log err"))
+            result = await svc.broadcast_meituan_queue_update("S1", 3, 15)
+        assert result["success"] is False
+        assert "广播" in result["message"]
+
+
+class TestAlertException:
+    @pytest.mark.asyncio
+    async def test_exception_returns_failure(self):
+        svc = _svc()
+        with patch.object(_vcs_mod, "logger") as mock_logger:
+            mock_logger.warning = MagicMock(side_effect=RuntimeError("log err"))
+            result = await svc.alert_timeout_order("S1", "T1", 30)
+        assert result["success"] is False
+        assert "告警" in result["message"]
+
+
+# ---------------------------------------------------------------------------
+# _handle_queue_status (lines 181-220)
+# ---------------------------------------------------------------------------
+
+class TestHandleQueueStatus:
+
+    @staticmethod
+    def _db_mock(count, avg_actual=None):
+        db = AsyncMock()
+        count_res = MagicMock()
+        count_res.scalar = MagicMock(return_value=count)
+        avg_res = MagicMock()
+        avg_res.scalar = MagicMock(return_value=avg_actual)
+        db.execute = AsyncMock(side_effect=[count_res, avg_res])
+        return db
+
+    @pytest.mark.asyncio
+    async def test_zero_waiting(self):
+        svc = _svc()
+        db = AsyncMock()
+        res = MagicMock()
+        res.scalar = MagicMock(return_value=0)
+        db.execute = AsyncMock(return_value=res)
+        with patch.dict("sys.modules", {"src.models.queue": MagicMock()}), \
+             patch.object(_vcs_mod, "select", MagicMock()), \
+             patch.object(_vcs_mod, "sa_func", MagicMock()):
+            result = await svc._handle_queue_status("S1", db)
+        assert result["success"] is True
+        assert "没有排队" in result["voice_response"]
+        assert result["data"]["waiting_count"] == 0
+        assert result["data"]["estimated_wait_time"] == 0
+
+    @pytest.mark.asyncio
+    async def test_nonzero_with_avg_actual(self):
+        svc = _svc()
+        db = self._db_mock(3, avg_actual=20)
+        with patch.dict("sys.modules", {"src.models.queue": MagicMock()}), \
+             patch.object(_vcs_mod, "select", MagicMock()), \
+             patch.object(_vcs_mod, "sa_func", MagicMock()):
+            result = await svc._handle_queue_status("S1", db)
+        assert result["success"] is True
+        assert "3" in result["voice_response"]
+        assert result["data"]["waiting_count"] == 3
+        assert result["data"]["estimated_wait_time"] == 60  # 3 * 20
+
+    @pytest.mark.asyncio
+    async def test_nonzero_no_avg_uses_env_default(self):
+        svc = _svc()
+        db = self._db_mock(2, avg_actual=None)
+        with patch.dict("sys.modules", {"src.models.queue": MagicMock()}), \
+             patch.object(_vcs_mod, "select", MagicMock()), \
+             patch.object(_vcs_mod, "sa_func", MagicMock()), \
+             patch.dict("os.environ", {"VOICE_DEFAULT_WAIT_MINUTES": "10"}):
+            result = await svc._handle_queue_status("S1", db)
+        assert "2" in result["voice_response"]
+        assert result["data"]["estimated_wait_time"] == 20  # 2 * 10
+
+    @pytest.mark.asyncio
+    async def test_exception_returns_failure(self):
+        svc = _svc()
+        db = AsyncMock()
+        db.execute = AsyncMock(side_effect=RuntimeError("db error"))
+        with patch.dict("sys.modules", {"src.models.queue": MagicMock()}), \
+             patch.object(_vcs_mod, "select", MagicMock()), \
+             patch.object(_vcs_mod, "sa_func", MagicMock()):
+            result = await svc._handle_queue_status("S1", db)
+        assert result["success"] is False
+
+
+# ---------------------------------------------------------------------------
+# _handle_order_reminder (lines 228-272)
+# ---------------------------------------------------------------------------
+
+class TestHandleOrderReminder:
+
+    @staticmethod
+    def _db_mock(orders):
+        db = AsyncMock()
+        res = MagicMock()
+        res.scalars = MagicMock(return_value=MagicMock(all=MagicMock(return_value=orders)))
+        db.execute = AsyncMock(return_value=res)
+        return db
+
+    @staticmethod
+    def _make_order(wait_minutes=35):
+        order = MagicMock()
+        order.id = "O1"
+        order.table_number = "T1"
+        order.created_at = datetime.utcnow() - timedelta(minutes=wait_minutes)
+        return order
+
+    @pytest.mark.asyncio
+    async def test_no_timeout_orders(self):
+        svc = _svc()
+        db = self._db_mock([])
+        with patch.object(_vcs_mod, "select", MagicMock()), \
+             patch.dict("os.environ", {"VOICE_ORDER_TIMEOUT_MINUTES": "30"}):
+            result = await svc._handle_order_reminder("S1", db)
+        assert result["success"] is True
+        assert "没有超时" in result["voice_response"]
+        assert result["data"]["timeout_count"] == 0
+
+    @pytest.mark.asyncio
+    async def test_with_timeout_orders(self):
+        svc = _svc()
+        orders = [self._make_order(45), self._make_order(60)]
+        db = self._db_mock(orders)
+        with patch.object(_vcs_mod, "select", MagicMock()), \
+             patch.dict("os.environ", {"VOICE_ORDER_TIMEOUT_MINUTES": "30"}):
+            result = await svc._handle_order_reminder("S1", db)
+        assert result["success"] is True
+        assert "2" in result["voice_response"]
+        assert result["data"]["timeout_count"] == 2
+
+    @pytest.mark.asyncio
+    async def test_timeout_orders_capped_at_five(self):
+        svc = _svc()
+        orders = [self._make_order(35 + i) for i in range(8)]
+        db = self._db_mock(orders)
+        with patch.object(_vcs_mod, "select", MagicMock()), \
+             patch.dict("os.environ", {"VOICE_ORDER_TIMEOUT_MINUTES": "30"}):
+            result = await svc._handle_order_reminder("S1", db)
+        assert len(result["data"]["timeout_orders"]) <= 5
+
+    @pytest.mark.asyncio
+    async def test_exception_returns_failure(self):
+        svc = _svc()
+        db = AsyncMock()
+        db.execute = AsyncMock(side_effect=RuntimeError("db err"))
+        with patch.object(_vcs_mod, "select", MagicMock()):
+            result = await svc._handle_order_reminder("S1", db)
+        assert result["success"] is False
+
+
+# ---------------------------------------------------------------------------
+# _handle_inventory_query (lines 285-324)
+# ---------------------------------------------------------------------------
+
+class TestHandleInventoryQuery:
+
+    @staticmethod
+    def _db_mock(items):
+        db = AsyncMock()
+        res = MagicMock()
+        res.scalars = MagicMock(return_value=MagicMock(all=MagicMock(return_value=items)))
+        db.execute = AsyncMock(return_value=res)
+        return db
+
+    @staticmethod
+    def _make_item(name="猪肉", qty=2, min_qty=10):
+        item = MagicMock()
+        item.id = "I1"
+        item.name = name
+        item.quantity = qty
+        item.min_quantity = min_qty
+        return item
+
+    @staticmethod
+    def _inv_cls_mock():
+        """InventoryItem mock whose column attrs support the < operator."""
+        cls = MagicMock()
+        qty_col = MagicMock()
+        type(qty_col).__lt__ = MagicMock(return_value=MagicMock())
+        cls.quantity = qty_col
+        cls.min_quantity = MagicMock()
+        return cls
+
+    @pytest.mark.asyncio
+    async def test_sufficient_stock(self):
+        svc = _svc()
+        db = self._db_mock([])
+        with patch.object(_vcs_mod, "select", MagicMock()), \
+             patch.object(_vcs_mod, "InventoryItem", self._inv_cls_mock()):
+            result = await svc._handle_inventory_query("S1", "库存查询", db)
+        assert result["success"] is True
+        assert "充足" in result["voice_response"]
+        assert result["data"]["low_stock_count"] == 0
+
+    @pytest.mark.asyncio
+    async def test_low_stock_items(self):
+        svc = _svc()
+        items = [self._make_item("猪肉"), self._make_item("鸡肉"), self._make_item("牛肉")]
+        db = self._db_mock(items)
+        with patch.object(_vcs_mod, "select", MagicMock()), \
+             patch.object(_vcs_mod, "InventoryItem", self._inv_cls_mock()):
+            result = await svc._handle_inventory_query("S1", "库存", db)
+        assert result["success"] is True
+        assert result["data"]["low_stock_count"] == 3
+        assert "猪肉" in result["voice_response"]
+
+    @pytest.mark.asyncio
+    async def test_exception_returns_failure(self):
+        svc = _svc()
+        db = AsyncMock()
+        db.execute = AsyncMock(side_effect=RuntimeError("db err"))
+        with patch.object(_vcs_mod, "select", MagicMock()), \
+             patch.object(_vcs_mod, "InventoryItem", self._inv_cls_mock()):
+            result = await svc._handle_inventory_query("S1", "查库存", db)
+        assert result["success"] is False
+
+
+# ---------------------------------------------------------------------------
+# _handle_revenue_today (lines 332-384)
+# ---------------------------------------------------------------------------
+
+class TestHandleRevenueToday:
+
+    @staticmethod
+    def _db_mock(today_rev, yesterday_rev):
+        db = AsyncMock()
+        today_res = MagicMock()
+        today_res.scalar = MagicMock(return_value=today_rev)
+        yest_res = MagicMock()
+        yest_res.scalar = MagicMock(return_value=yesterday_rev)
+        db.execute = AsyncMock(side_effect=[today_res, yest_res])
+        return db
+
+    @pytest.mark.asyncio
+    async def test_growth_vs_yesterday(self):
+        svc = _svc()
+        db = self._db_mock(1100, 1000)
+        with patch.object(_vcs_mod, "select", MagicMock()):
+            result = await svc._handle_revenue_today("S1", db)
+        assert result["success"] is True
+        assert "增长" in result["voice_response"]
+        assert result["data"]["today_revenue"] == 1100
+        assert result["data"]["growth_rate"] > 0
+
+    @pytest.mark.asyncio
+    async def test_decline_vs_yesterday(self):
+        svc = _svc()
+        db = self._db_mock(800, 1000)
+        with patch.object(_vcs_mod, "select", MagicMock()):
+            result = await svc._handle_revenue_today("S1", db)
+        assert result["success"] is True
+        assert "下降" in result["voice_response"]
+        assert result["data"]["growth_rate"] < 0
+
+    @pytest.mark.asyncio
+    async def test_no_yesterday_data(self):
+        svc = _svc()
+        db = self._db_mock(800, 0)
+        with patch.object(_vcs_mod, "select", MagicMock()):
+            result = await svc._handle_revenue_today("S1", db)
+        assert result["success"] is True
+        assert "昨天无营收" in result["voice_response"]
+        assert result["data"]["growth_rate"] is None
+
+    @pytest.mark.asyncio
+    async def test_exception_returns_failure(self):
+        svc = _svc()
+        db = AsyncMock()
+        db.execute = AsyncMock(side_effect=RuntimeError("db err"))
+        with patch.object(_vcs_mod, "select", MagicMock()):
+            result = await svc._handle_revenue_today("S1", db)
+        assert result["success"] is False
+
+
+# ---------------------------------------------------------------------------
+# _handle_call_support (lines 397-440)
+# ---------------------------------------------------------------------------
+
+class TestHandleCallSupport:
+
+    @staticmethod
+    def _db_mock(store):
+        db = AsyncMock()
+        res = MagicMock()
+        res.scalar_one_or_none = MagicMock(return_value=store)
+        db.execute = AsyncMock(return_value=res)
+        return db
+
+    @pytest.mark.asyncio
+    async def test_store_not_found_returns_failure(self):
+        svc = _svc()
+        db = self._db_mock(None)
+        with patch.object(_vcs_mod, "select", MagicMock()):
+            result = await svc._handle_call_support("S1", "U1", db)
+        assert result["success"] is False
+
+    @pytest.mark.asyncio
+    async def test_store_found_returns_success(self):
+        svc = _svc()
+        store = MagicMock()
+        store.name = "Test Store"
+        db = self._db_mock(store)
+        mock_wechat = AsyncMock()
+        mock_wechat.send_text_message = AsyncMock()
+        mock_wechat_mod = MagicMock()
+        mock_wechat_mod.WeChatWorkMessageService = MagicMock(return_value=mock_wechat)
+        with patch.object(_vcs_mod, "select", MagicMock()), \
+             patch.dict("sys.modules", {
+                 "src.services.wechat_work_message_service": mock_wechat_mod,
+             }):
+            result = await svc._handle_call_support("S1", "U1", db)
+        assert result["success"] is True
+        assert result["data"]["store_name"] == "Test Store"
+        assert result["data"]["requester_id"] == "U1"
+
+    @pytest.mark.asyncio
+    async def test_wechat_failure_is_swallowed(self):
+        """WeChatWork error inside inner try/except does not prevent success."""
+        svc = _svc()
+        store = MagicMock()
+        store.name = "Store"
+        db = self._db_mock(store)
+        mock_wechat = AsyncMock()
+        mock_wechat.send_text_message = AsyncMock(side_effect=RuntimeError("net err"))
+        mock_wechat_mod = MagicMock()
+        mock_wechat_mod.WeChatWorkMessageService = MagicMock(return_value=mock_wechat)
+        with patch.object(_vcs_mod, "select", MagicMock()), \
+             patch.dict("sys.modules", {
+                 "src.services.wechat_work_message_service": mock_wechat_mod,
+             }):
+            result = await svc._handle_call_support("S1", "U1", db)
+        assert result["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_db_exception_returns_failure(self):
+        svc = _svc()
+        db = AsyncMock()
+        db.execute = AsyncMock(side_effect=RuntimeError("db err"))
+        with patch.object(_vcs_mod, "select", MagicMock()):
+            result = await svc._handle_call_support("S1", "U1", db)
+        assert result["success"] is False

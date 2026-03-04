@@ -208,6 +208,7 @@ class RaaSPricingService:
         current_energy_cost = float(os.getenv("RAAS_CURRENT_ENERGY_COST", "7500.0"))
         current_inventory_turnover = float(os.getenv("RAAS_CURRENT_INVENTORY_TURNOVER", "15.0"))
         current_repeat_rate = float(os.getenv("RAAS_CURRENT_REPEAT_RATE", "32.0"))
+        days_in_period = (current_period_end - current_period_start).days
 
         try:
             from sqlalchemy import and_
@@ -455,8 +456,8 @@ class RaaSPricingService:
             "year": year,
             "month": month,
             "pricing_tier": pricing_tier,
-            "baseline": baseline.dict(),
-            "effect_metrics": effect_metrics.dict(),
+            "baseline": baseline.model_dump(),
+            "effect_metrics": effect_metrics.model_dump(),
             "total_fee": effect_metrics.total_fee,
             "message": f"本月为您节省成本 ¥{effect_metrics.total_cost_saved:,.2f}，增加营收 ¥{effect_metrics.total_revenue_growth:,.2f}"
         }

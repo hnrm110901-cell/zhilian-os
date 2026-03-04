@@ -314,3 +314,83 @@ class TestAuditLogs:
             resp = client.get("/api/v1/execution/audit-logs")
         assert resp.status_code == 500
         assert resp.json()["detail"]["error_code"] == "QUERY_ERROR"
+
+    def test_all_filter_params_accepted(self):
+        """Lines 180-189: all 5 filter conditions are built when all params are provided."""
+        with self._sys_modules_patch(self._mock_db([])):
+            resp = client.get(
+                "/api/v1/execution/audit-logs"
+                "?store_id=S1&brand_id=B1&command_type=discount_apply"
+                "&actor_id=U1&status_filter=completed"
+            )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["records"] == []
+        assert body["total"] == 0
+
+
+# ---------------------------------------------------------------------------
+# get_current_user — no user in request.state (lines 51-54)
+# ---------------------------------------------------------------------------
+
+class TestGetCurrentUser:
+    """
+    Lines 51-54: when request.state has no 'user' attribute,
+    get_current_user must return the system fallback dict.
+    """
+
+    @pytest.mark.asyncio
+    async def test_no_user_in_state_returns_system_fallback(self):
+        from src.api.execution import get_current_user
+        from unittest.mock import MagicMock
+
+        mock_request = MagicMock()
+        # Simulate missing 'user' attribute on state
+        del mock_request.state.user
+        mock_request.state = MagicMock(spec=[])  # empty spec → no attributes
+
+        result = await get_current_user(mock_request)
+
+        assert result["user_id"] == "system"
+        assert result["role"] == "admin"
+        assert result["store_id"] == ""
+        assert result["brand_id"] == ""
+
+    @pytest.mark.asyncio
+    async def test_user_present_in_state_returns_user_fields(self):
+        from src.api.execution import get_current_user
+        from unittest.mock import MagicMock
+
+        mock_user = MagicMock()
+        mock_user.id = "U42"
+        mock_user.role = "store_manager"  # plain string role (no .value)
+        mock_user.store_id = "S99"
+        mock_user.brand_id = "B7"
+
+        mock_request = MagicMock()
+        mock_request.state.user = mock_user
+
+        result = await get_current_user(mock_request)
+
+        assert result["user_id"] == "U42"
+        assert result["store_id"] == "S99"
+        assert result["brand_id"] == "B7"
+
+
+# ---------------------------------------------------------------------------
+# get_executor (lines 64-66)
+# ---------------------------------------------------------------------------
+
+class TestGetExecutor:
+    """
+    Lines 64-66: get_executor() must return a TrustedExecutor instance
+    without requiring any arguments.
+    """
+
+    @pytest.mark.asyncio
+    async def test_get_executor_returns_trusted_executor(self):
+        from src.api.execution import get_executor
+        from src.core.trusted_executor import TrustedExecutor
+
+        executor = await get_executor()
+        assert isinstance(executor, TrustedExecutor)

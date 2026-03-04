@@ -50,7 +50,7 @@ async def register_edge_node(
 
     return {
         "success": True,
-        "node": node.dict(),
+        "node": node.model_dump(),
         "message": "边缘节点注册成功"
     }
 
@@ -82,7 +82,7 @@ async def update_node_status(
 
     return {
         "success": True,
-        "node": node.dict()
+        "node": node.model_dump()
     }
 
 
@@ -104,7 +104,7 @@ async def switch_network_mode(
 
     return {
         "success": True,
-        "node": node.dict(),
+        "node": node.model_dump(),
         "message": f"已切换到{mode}模式"
     }
 
@@ -171,7 +171,7 @@ async def get_edge_node_info(
     node = await service.get_node_info(node_id=node_id)
 
     return {
-        "node": node.dict()
+        "node": node.model_dump()
     }
 
 
@@ -187,7 +187,7 @@ async def list_store_edge_nodes(
     return {
         "store_id": store_id,
         "total": len(nodes),
-        "nodes": [node.dict() for node in nodes]
+        "nodes": [node.model_dump() for node in nodes]
     }
 
 
@@ -257,7 +257,7 @@ async def register_shokz_device(
 
     return {
         "success": True,
-        "device": device.dict(),
+        "device": device.model_dump(),
         "message": "Shokz设备注册成功"
     }
 
@@ -273,7 +273,7 @@ async def connect_shokz_device(
 
     return {
         "success": True,
-        "device": device.dict(),
+        "device": device.model_dump(),
         "message": "设备已连接"
     }
 
@@ -289,7 +289,7 @@ async def disconnect_shokz_device(
 
     return {
         "success": True,
-        "device": device.dict(),
+        "device": device.model_dump(),
         "message": "设备已断开"
     }
 
@@ -313,7 +313,7 @@ async def shokz_voice_input(
 
     return {
         "success": True,
-        "interaction": interaction.dict()
+        "interaction": interaction.model_dump()
     }
 
 
@@ -383,7 +383,7 @@ async def get_shokz_device_info(
     device = await service.get_device_info(device_id=device_id)
 
     return {
-        "device": device.dict()
+        "device": device.model_dump()
     }
 
 
@@ -399,7 +399,7 @@ async def list_store_shokz_devices(
     return {
         "store_id": store_id,
         "total": len(devices),
-        "devices": [device.dict() for device in devices]
+        "devices": [device.model_dump() for device in devices]
     }
 
 
@@ -419,7 +419,7 @@ async def get_shokz_interaction_history(
     return {
         "device_id": device_id,
         "total": len(interactions),
-        "interactions": [i.dict() for i in interactions]
+        "interactions": [i.model_dump() for i in interactions]
     }
 
 

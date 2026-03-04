@@ -34,6 +34,10 @@ from .compliance import ComplianceLicense, LicenseType, LicenseStatus
 from .quality import QualityInspection, InspectionStatus
 from .neural_event_log import NeuralEventLog, EventProcessingStatus
 from .dish import DishCategory, Dish, DishIngredient
+from .bom import BOMTemplate, BOMItem
+from .dish_master import DishMaster, BrandMenu, StoreMenu
+from .channel_config import SalesChannelConfig
+from .dish_channel import DishChannelConfig
 from .ai_model import AIModel, ModelPurchaseRecord, DataContributionRecord, ModelType, ModelLevel, ModelStatus, PurchaseStatus
 from .federated_learning import FLTrainingRound, FLModelUpload, RoundStatus
 from .marketing_campaign import MarketingCampaign
@@ -41,10 +45,11 @@ from .report_template import ReportTemplate, ScheduledReport, ReportFormat, Sche
 from .competitor import CompetitorStore, CompetitorPrice
 from .export_job import ExportJob, ExportStatus
 from .backup_job import BackupJob, BackupType, BackupStatus
-from .fct import FCTTaxRecord, FCTCashFlowItem, TaxType, TaxpayerType, CashFlowDirection
+from .fct import FCTTaxRecord, FCTCashFlowItem, TaxType, TaxpayerType, CashFlowDirection, Voucher, VoucherLine
 from .banquet_lifecycle import BanquetStage, BanquetStageHistory
 from .banquet_event_order import BanquetEventOrder, BEOStatus
 from .waste_event import WasteEvent, WasteEventType, WasteEventStatus
+<<<<<<< HEAD
 # Phase 3-8 新增 model（后期添加，确保 Alembic autogenerate 能检测到）
 from .action_plan import ActionPlan, DispatchStatus, ActionOutcome
 from .knowledge_rule import KnowledgeRule, RuleExecution, IndustryBenchmark, RuleCategory, RuleType, RuleStatus
@@ -62,6 +67,10 @@ from .execution_audit import ExecutionRecord
 from .customer_key import CustomerKey, EncryptedField, KeyStatus, KeyAlgorithm
 from .workflow import DailyWorkflow, WorkflowPhase, DecisionVersion, WorkflowStatus, PhaseStatus, GenerationMode
 from .forecast import ForecastResult
+=======
+from .meal_period import MealPeriod
+from .employee_metric import EmployeeMetricRecord
+>>>>>>> d1df728dec60bb243c50ae42ff68074712ddafd9
 
 __all__ = [
     "Base",
@@ -122,6 +131,13 @@ __all__ = [
     "DishCategory",
     "Dish",
     "DishIngredient",
+    "BOMTemplate",
+    "BOMItem",
+    "DishMaster",
+    "BrandMenu",
+    "StoreMenu",
+    "SalesChannelConfig",
+    "DishChannelConfig",
     "AIModel",
     "ModelPurchaseRecord",
     "DataContributionRecord",
@@ -156,6 +172,7 @@ __all__ = [
     "WasteEvent",
     "WasteEventType",
     "WasteEventStatus",
+<<<<<<< HEAD
     # Phase 3-8
     "ActionPlan",
     "DispatchStatus",
@@ -208,4 +225,8 @@ __all__ = [
     "PhaseStatus",
     "GenerationMode",
     "ForecastResult",
+=======
+    "MealPeriod",
+    "EmployeeMetricRecord",
+>>>>>>> d1df728dec60bb243c50ae42ff68074712ddafd9
 ]

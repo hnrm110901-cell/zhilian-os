@@ -106,7 +106,7 @@ async def create_order(
 ):
     """创建订单"""
     svc = OrderService(body.store_id)
-    items = [i.dict() for i in body.items]
+    items = [i.model_dump() for i in body.items]
     try:
         order = await svc.create_order(
             table_number=body.table_number,
@@ -163,7 +163,7 @@ async def add_items(
     """追加订单菜品"""
     svc = OrderService()
     try:
-        order = await svc.add_items(order_id, [i.dict() for i in body.items])
+        order = await svc.add_items(order_id, [i.model_dump() for i in body.items])
         return order
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

@@ -80,8 +80,13 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/my-schedule': 'agents',
   '/hq-dashboard': 'admin-system',
   '/ai-accuracy': 'admin-ai',
+<<<<<<< HEAD
   '/dish-cost': 'business', '/employee-performance': 'business', '/bom-management': 'business',
   '/waste-events': 'business', '/alert-thresholds': 'business', '/knowledge-rules': 'business',
+=======
+  '/dish-cost': 'business', '/channel-profit': 'business', '/employee-performance': 'business', '/bom-management': 'business',
+  '/waste-events': 'business', '/knowledge-rules': 'business',
+>>>>>>> d1df728dec60bb243c50ae42ff68074712ddafd9
   '/data-security': 'admin-system',
   '/raas': 'admin-system', '/model-marketplace': 'admin-system',
   '/llm-config': 'admin-ai', '/hardware': 'admin-ai',
@@ -212,6 +217,7 @@ const MainLayout: React.FC = () => {
     '/hq-dashboard': '总部看板',
     '/ai-accuracy': 'AI准确率回溯',
     '/dish-cost': '菜品成本分析',
+    '/channel-profit': '渠道毛利看板',
     '/employee-performance': '员工绩效看板',
     '/bom-management': 'BOM 配方管理',
     '/waste-events': '损耗事件管理',
@@ -394,6 +400,7 @@ const MainLayout: React.FC = () => {
         { key: '/reconciliation', icon: <FileExcelOutlined />, label: '对账管理' },
         { key: '/bulk-import', icon: <UploadOutlined />, label: '数据导入' },
         { key: '/dish-cost', icon: <DollarOutlined />, label: '菜品成本分析' },
+        { key: '/channel-profit', icon: <ShopOutlined />, label: '渠道毛利看板' },
         { key: '/employee-performance', icon: <TrophyOutlined />, label: '员工绩效看板' },
         { key: '/bom-management', icon: <ReadOutlined />, label: 'BOM 配方管理' },
         { key: '/waste-events', icon: <WarningOutlined />, label: '损耗事件管理' },

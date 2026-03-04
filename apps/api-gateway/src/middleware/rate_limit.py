@@ -256,7 +256,6 @@ def init_rate_limiter(redis_url: str = "redis://localhost:6379/0"):
 
 async def close_rate_limiter():
     """关闭速率限制器"""
-    global rate_limiter
     if rate_limiter:
         await rate_limiter.close()
         logger.info("Redis rate limiter closed")

@@ -93,7 +93,7 @@ async def approve_request(
 
     return {
         "success": True,
-        "approval": approval.dict(),
+        "approval": approval.model_dump(),
         "message": "审批成功" if decision.approved else "已拒绝"
     }
 
@@ -115,7 +115,7 @@ async def get_pending_approvals(
     return {
         "store_id": store_id,
         "total": len(approvals),
-        "approvals": [a.dict() for a in approvals]
+        "approvals": [a.model_dump() for a in approvals]
     }
 
 

@@ -2,6 +2,7 @@
 企业微信消息服务
 WeChat Work Message Service
 """
+import os
 import httpx
 import structlog
 from typing import Dict, Any, Optional

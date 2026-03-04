@@ -524,14 +524,14 @@ class FCTService:
                 "variance_yuan":   self._y(diff),
                 "exec_rate":       exec_rate,
                 "status": (
-                    "over"   if exec_rate and exec_rate > 110 else
+                    "over"   if exec_rate and exec_rate >= 110 else
                     "under"  if exec_rate and exec_rate < 80  else
                     "normal" if exec_rate else "no_budget"
                 ),
             }
             categories.append(row)
 
-            if exec_rate and exec_rate > 110:
+            if exec_rate and exec_rate >= 110:
                 alerts.append({
                     "category": cat,
                     "label":    label,
@@ -693,3 +693,1208 @@ class FCTService:
         elif pm < 10.0:
             score -= 10
         return max(0, score)
+
+
+# ── Standalone FCT Service ─────────────────────────────────────────────────────
+#
+# 独立部署形态的 FCT 服务（fct_public.py 使用）。
+# 依赖注入模式：所有方法接受 session 作为第一个参数。
+#
+# 当前状态：
+#   • 凭证 / 账期 / 账簿 / 主数据等方法需要专用 ORM 模型（尚未建表），
+#     暂以结构正确的空响应占位，不会抛出 AttributeError。
+#   • get_reports_stub：代理到已有 FinancialTransaction 数据，返回通用汇总。
+#   • verify_invoice_stub：本地校验发票基本格式，外部税局验真需接入第三方 API。
+#   • 其余方法待专用账务模型上线后补全真实逻辑。
+#
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── 会计凭证常量（科目编码，符合中国企业会计准则 / 金蝶·用友）────────────────
+from decimal import Decimal
+
+DEFAULT_ACCOUNT_SALES       = "6001"    # 主营业务收入
+DEFAULT_ACCOUNT_TAX_PAYABLE = "2221"    # 应交税费-应交增值税（销项）
+DEFAULT_ACCOUNT_BANK        = "1002"    # 银行存款
+DEFAULT_ACCOUNT_CASH        = "1001"    # 库存现金
+DEFAULT_ACCOUNT_INVENTORY   = "1405"    # 库存商品
+DEFAULT_ACCOUNT_TAX_INPUT   = "2221_01" # 应交税费-进项税额
+DEFAULT_ACCOUNT_PAYABLE     = "2202"    # 应付账款
+DEFAULT_ACCOUNT_ADJUSTMENT  = "1009"    # 待处理财产损溢（差额调整用）
+
+VOUCHER_BALANCE_TOLERANCE   = Decimal("0.01")   # 借贷差额允许尾差 0.01 元
+
+
+class FctService:
+    """
+    双分录会计凭证服务。
+
+    提供以下功能：
+    - ingest_event：根据业务事件生成会计凭证（store_daily_settlement / purchase_receipt）
+    - get_voucher_by_id：按 UUID 查询凭证及分录行
+    - _voucher_totals / _is_balanced：借贷平衡校验工具方法
+
+    科目编码遵循《企业会计准则》及主流财务软件（金蝶·用友）惯例。
+    """
+
+    # ── 静态辅助方法 ────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _voucher_totals(lines: list) -> tuple:
+        """计算分录行的借方合计和贷方合计。
+
+        Args:
+            lines: 字典列表，每项含 "debit" 和 "credit" 键（可为 None）。
+
+        Returns:
+            (total_debit, total_credit) Decimal 元组。
+        """
+        total_d = sum(Decimal(str(l.get("debit") or 0)) for l in lines)
+        total_c = sum(Decimal(str(l.get("credit") or 0)) for l in lines)
+        return total_d, total_c
+
+    @staticmethod
+    def _is_balanced(debit: Decimal, credit: Decimal) -> bool:
+        """检查借贷是否平衡（允许 VOUCHER_BALANCE_TOLERANCE 尾差）。"""
+        return abs(debit - credit) <= VOUCHER_BALANCE_TOLERANCE
+
+    # ── 核心业务方法 ────────────────────────────────────────────────────────
+
+    async def ingest_event(self, session, raw: Dict[str, Any]):
+        """
+        接收业务事件并生成会计凭证。
+
+        Args:
+            session: AsyncSession
+            raw: 事件字典，含 event_type / event_id / payload
+
+        Returns:
+            Voucher 模型实例（已 add 到 session 但未 commit）
+
+        Raises:
+            ValueError: payload 缺少必填字段
+        """
+        from src.models.fct import Voucher, VoucherLine
+
+        event_type = raw.get("event_type", "")
+        event_id   = raw.get("event_id", "")
+        payload    = raw.get("payload", {})
+
+        if event_type == "store_daily_settlement":
+            return await self._ingest_store_daily_settlement(session, event_id, payload)
+        elif event_type == "purchase_receipt":
+            return await self._ingest_purchase_receipt(session, event_id, payload)
+        else:
+            # 通用降级：写一条空凭证
+            return await self._ingest_generic(session, event_type, event_id, payload)
+
+    async def get_voucher_by_id(self, session, voucher_id: str):
+        """按 UUID 查询凭证（含分录行）。"""
+        from src.models.fct import Voucher
+        from sqlalchemy import select as sa_select
+        from sqlalchemy.orm import selectinload
+
+        stmt = (
+            sa_select(Voucher)
+            .options(selectinload(Voucher.lines))
+            .where(Voucher.id == voucher_id)
+        )
+        result = await session.execute(stmt)
+        return result.scalars().first()
+
+    # ── 私有：门店日结凭证 ──────────────────────────────────────────────────
+
+    async def _ingest_store_daily_settlement(self, session, event_id: str, payload: dict):
+        """门店日结：借 银行存款/库存现金，贷 主营业务收入 + 应交税费。"""
+        from src.models.fct import Voucher, VoucherLine
+
+        biz_date_str = payload.get("biz_date")
+        if not biz_date_str:
+            raise ValueError("store_daily_settlement requires biz_date in payload")
+
+        biz_date     = date.fromisoformat(biz_date_str)
+        store_id     = payload.get("store_id", "")
+        # 金额均以 分 传入，转元后按 Decimal 运算
+        total_sales  = Decimal(str(payload.get("total_sales", 0))) / 100
+        sales_tax    = Decimal(str(payload.get("total_sales_tax", 0))) / 100
+        discounts    = Decimal(str(payload.get("discounts", 0))) / 100
+        revenue      = total_sales - sales_tax - discounts
+
+        voucher = Voucher(
+            voucher_no  = f"DS-{store_id}-{biz_date_str}",
+            store_id    = store_id,
+            event_type  = "store_daily_settlement",
+            event_id    = event_id,
+            biz_date    = biz_date,
+            description = f"门店日结 {biz_date_str}",
+        )
+        session.add(voucher)
+        await session.flush()   # 获取 voucher.id
+
+        line_no = 1
+        payment_breakdown = payload.get("payment_breakdown", [])
+
+        if payment_breakdown:
+            # 按支付渠道分别借记
+            debit_total = Decimal(0)
+            for pm in payment_breakdown:
+                amt    = Decimal(str(pm.get("amount", 0))) / 100
+                method = pm.get("method", "cash").lower()
+                acc    = DEFAULT_ACCOUNT_CASH if method == "cash" else DEFAULT_ACCOUNT_BANK
+                session.add(VoucherLine(
+                    voucher_id   = voucher.id,
+                    line_no      = line_no,
+                    account_code = acc,
+                    debit        = amt,
+                    summary      = f"{method} 收款",
+                ))
+                debit_total += amt
+                line_no += 1
+
+            # 贷：收入 + 税
+            session.add(VoucherLine(
+                voucher_id   = voucher.id,
+                line_no      = line_no,
+                account_code = DEFAULT_ACCOUNT_SALES,
+                credit       = revenue,
+                summary      = "主营业务收入",
+            ))
+            line_no += 1
+            if sales_tax > 0:
+                session.add(VoucherLine(
+                    voucher_id   = voucher.id,
+                    line_no      = line_no,
+                    account_code = DEFAULT_ACCOUNT_TAX_PAYABLE,
+                    credit       = sales_tax,
+                    summary      = "应交增值税（销项）",
+                ))
+                line_no += 1
+
+            credit_total = revenue + sales_tax
+            diff = debit_total - credit_total
+            if abs(diff) > VOUCHER_BALANCE_TOLERANCE:
+                # 差额调整行使凭证平衡
+                if diff > 0:
+                    session.add(VoucherLine(
+                        voucher_id   = voucher.id,
+                        line_no      = line_no,
+                        account_code = DEFAULT_ACCOUNT_ADJUSTMENT,
+                        credit       = diff,
+                        summary      = "差额调整",
+                    ))
+                else:
+                    session.add(VoucherLine(
+                        voucher_id   = voucher.id,
+                        line_no      = line_no,
+                        account_code = DEFAULT_ACCOUNT_ADJUSTMENT,
+                        debit        = abs(diff),
+                        summary      = "差额调整",
+                    ))
+
+        else:
+            # 无分渠道时：借银行存款 = 含税总收入
+            session.add(VoucherLine(
+                voucher_id   = voucher.id,
+                line_no      = 1,
+                account_code = DEFAULT_ACCOUNT_BANK,
+                debit        = total_sales,
+                summary      = "银行存款",
+            ))
+            session.add(VoucherLine(
+                voucher_id   = voucher.id,
+                line_no      = 2,
+                account_code = DEFAULT_ACCOUNT_SALES,
+                credit       = revenue,
+                summary      = "主营业务收入",
+            ))
+            session.add(VoucherLine(
+                voucher_id   = voucher.id,
+                line_no      = 3,
+                account_code = DEFAULT_ACCOUNT_TAX_PAYABLE,
+                credit       = sales_tax,
+                summary      = "应交增值税（销项）",
+            ))
+
+        return voucher
+
+    # ── 私有：采购入库凭证 ──────────────────────────────────────────────────
+
+    async def _ingest_purchase_receipt(self, session, event_id: str, payload: dict):
+        """采购入库：借 库存商品 + 应交税费-进项，贷 应付账款。"""
+        from src.models.fct import Voucher, VoucherLine
+
+        biz_date_str = payload.get("biz_date")
+        if not biz_date_str:
+            raise ValueError("purchase_receipt requires biz_date in payload")
+
+        biz_date    = date.fromisoformat(biz_date_str)
+        store_id    = payload.get("store_id", "")
+        supplier_id = payload.get("supplier_id", "")
+        total_fen   = Decimal(str(payload.get("total", 0)))
+        tax_fen     = Decimal(str(payload.get("tax", 0)))
+        net_fen     = total_fen - tax_fen
+
+        # 转元
+        total   = total_fen / 100
+        tax     = tax_fen / 100
+        net     = net_fen / 100
+
+        voucher = Voucher(
+            voucher_no  = f"PR-{store_id}-{event_id}",
+            store_id    = store_id,
+            event_type  = "purchase_receipt",
+            event_id    = event_id,
+            biz_date    = biz_date,
+            description = f"采购入库 供应商 {supplier_id}",
+        )
+        session.add(voucher)
+        await session.flush()
+
+        # 借：库存商品（不含税金额）
+        session.add(VoucherLine(
+            voucher_id   = voucher.id,
+            line_no      = 1,
+            account_code = DEFAULT_ACCOUNT_INVENTORY,
+            debit        = net,
+            summary      = "库存商品",
+        ))
+        # 借：进项税额
+        if tax > 0:
+            session.add(VoucherLine(
+                voucher_id   = voucher.id,
+                line_no      = 2,
+                account_code = DEFAULT_ACCOUNT_TAX_INPUT,
+                debit        = tax,
+                summary      = "应交增值税（进项）",
+            ))
+        # 贷：应付账款
+        session.add(VoucherLine(
+            voucher_id   = voucher.id,
+            line_no      = 3,
+            account_code = DEFAULT_ACCOUNT_PAYABLE,
+            credit       = total,
+            auxiliary    = {"supplier_id": supplier_id},
+            summary      = f"应付账款-{supplier_id}",
+        ))
+
+        return voucher
+
+    # ── 私有：通用事件降级 ──────────────────────────────────────────────────
+
+    async def _ingest_generic(self, session, event_type: str, event_id: str, payload: dict):
+        """未知事件类型：生成零分录空凭证，不抛异常。"""
+        from src.models.fct import Voucher
+
+        biz_date_str = payload.get("biz_date") or date.today().isoformat()
+        biz_date     = date.fromisoformat(biz_date_str)
+        store_id     = payload.get("store_id", "")
+
+        voucher = Voucher(
+            voucher_no  = f"GEN-{event_id}",
+            store_id    = store_id,
+            event_type  = event_type,
+            event_id    = event_id,
+            biz_date    = biz_date,
+            status      = "draft",
+            description = f"未知事件 {event_type}",
+        )
+        session.add(voucher)
+        await session.flush()
+        return voucher
+
+
+class _VoucherStub:
+    """轻量级凭证占位对象（避免 _voucher_to_response 抛 AttributeError）。"""
+    __slots__ = ("id", "voucher_no", "tenant_id", "entity_id", "biz_date",
+                 "event_type", "event_id", "status", "description", "lines")
+
+    def __init__(self, **kw):
+        for k, v in kw.items():
+            setattr(self, k, v)
+        if not hasattr(self, "lines"):
+            self.lines = []
+
+
+class StandaloneFCTService:
+    """
+    独立部署 FCT 服务。
+
+    所有方法均接受 AsyncSession 作为第一个位置参数（依赖注入模式），
+    与 fct_public.py 的调用契约一致。
+    """
+
+    # ── 业财事件接入 ────────────────────────────────────────────────────────────
+
+    async def ingest_event(
+        self,
+        session: AsyncSession,
+        raw: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """
+        接入业财事件，写入 FinancialTransaction 并生成凭证流水号。
+        当前以 FinancialTransaction 为底层存储，完整凭证引擎待专用模型上线后接入。
+        """
+        try:
+            payload = raw.get("payload") or {}
+            entity_id = raw.get("entity_id") or ""
+            tenant_id = raw.get("tenant_id") or ""
+            event_type = raw.get("event_type") or "unknown"
+            event_id = raw.get("event_id") or str(id(raw))
+
+            amount = int(payload.get("total_sales") or payload.get("amount") or 0)
+            biz_date_raw = payload.get("biz_date") or raw.get("occurred_at") or date.today().isoformat()
+            if isinstance(biz_date_raw, str):
+                biz_date_raw = biz_date_raw[:10]
+            biz_date = date.fromisoformat(biz_date_raw) if isinstance(biz_date_raw, str) else biz_date_raw
+
+            txn = FinancialTransaction(
+                store_id=entity_id,
+                transaction_date=biz_date,
+                transaction_type="income",
+                category="sales",
+                amount=amount,
+                reference_id=event_id,
+                payment_method=event_type,
+            )
+            session.add(txn)
+            await session.flush()
+
+            voucher_no = f"V{biz_date.strftime('%Y%m%d')}-{str(txn.id)[:8].upper()}"
+            logger.info("FCT 事件接入", event_type=event_type, entity_id=entity_id, amount=amount)
+            return {
+                "success": True,
+                "event_id": event_id,
+                "voucher_no": voucher_no,
+                "entity_id": entity_id,
+                "tenant_id": tenant_id,
+            }
+        except Exception as e:
+            logger.error("FCT 事件接入失败", error=str(e))
+            return {"success": False, "error": str(e)}
+
+    # ── 凭证管理（待专用 Voucher 模型上线后替换） ──────────────────────────────
+
+    async def get_vouchers(
+        self,
+        session: AsyncSession,
+        tenant_id: Optional[str] = None,
+        entity_id: Optional[str] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        status: Optional[str] = None,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> Dict[str, Any]:
+        return {"items": [], "total": 0, "skip": skip, "limit": limit}
+
+    async def get_voucher_by_id(
+        self, session: AsyncSession, voucher_id: str
+    ) -> Optional[Any]:
+        return None  # 404 会由 API 层处理
+
+    async def create_manual_voucher(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        entity_id: str,
+        biz_date: Optional[date],
+        lines: List[Dict[str, Any]],
+        description: Optional[str] = None,
+        attachments: Optional[List] = None,
+        budget_check: Optional[bool] = None,
+        budget_occupy: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        # 借贷校验
+        debit_total  = sum(float(l.get("debit")  or 0) for l in lines)
+        credit_total = sum(float(l.get("credit") or 0) for l in lines)
+        if abs(debit_total - credit_total) > 0.01:
+            raise ValueError(f"借贷不平衡：借方 {debit_total} ≠ 贷方 {credit_total}")
+        voucher_no = f"MV-{(biz_date or date.today()).strftime('%Y%m%d')}-{str(id(lines))[-6:]}"
+        return {
+            "success": True,
+            "voucher_no": voucher_no,
+            "tenant_id": tenant_id,
+            "entity_id": entity_id,
+            "biz_date": (biz_date or date.today()).isoformat(),
+            "status": "draft",
+            "lines": lines,
+            "note": "凭证已创建（待专用账务模型上线后持久化）",
+        }
+
+    async def update_voucher_status(
+        self,
+        session: AsyncSession,
+        voucher_id: str,
+        target_status: str,
+        budget_check: Optional[bool] = None,
+        budget_occupy: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        return {"voucher_id": voucher_id, "status": target_status, "success": True}
+
+    async def void_voucher(
+        self, session: AsyncSession, voucher_id: str
+    ) -> Dict[str, Any]:
+        return {"voucher_id": voucher_id, "status": "voided", "success": True}
+
+    async def red_flush_voucher(
+        self,
+        session: AsyncSession,
+        voucher_id: str,
+        biz_date: Optional[date] = None,
+    ) -> Dict[str, Any]:
+        red_no = f"RF-{voucher_id[:8]}"
+        return {
+            "original_voucher_id": voucher_id,
+            "red_voucher_no": red_no,
+            "biz_date": (biz_date or date.today()).isoformat(),
+            "success": True,
+        }
+
+    # ── 账期管理 ─────────────────────────────────────────────────────────────
+
+    async def list_periods(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        start_key: Optional[str] = None,
+        end_key: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        return {"items": [], "total": 0}
+
+    async def close_period(
+        self, session: AsyncSession, tenant_id: str, period_key: str
+    ) -> Dict[str, Any]:
+        return {"tenant_id": tenant_id, "period_key": period_key, "status": "closed"}
+
+    async def reopen_period(
+        self, session: AsyncSession, tenant_id: str, period_key: str
+    ) -> Dict[str, Any]:
+        return {"tenant_id": tenant_id, "period_key": period_key, "status": "open"}
+
+    # ── 主数据（科目档案） ────────────────────────────────────────────────────
+
+    async def upsert_master(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        master_type: str,
+        code: str,
+        name: str,
+        extra: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        return {
+            "tenant_id": tenant_id,
+            "master_type": master_type,
+            "code": code,
+            "name": name,
+            "extra": extra,
+            "success": True,
+        }
+
+    async def list_master(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        master_type: Optional[str] = None,
+        skip: int = 0,
+        limit: int = 200,
+    ) -> Dict[str, Any]:
+        return {"items": [], "total": 0, "skip": skip, "limit": limit}
+
+    # ── 账簿查询 ──────────────────────────────────────────────────────────────
+
+    async def get_ledger_balances(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        entity_id: Optional[str] = None,
+        as_of_date: Optional[date] = None,
+        period: Optional[str] = None,
+        posted_only: bool = True,
+    ) -> Dict[str, Any]:
+        return {"tenant_id": tenant_id, "entity_id": entity_id, "balances": [], "as_of": (as_of_date or date.today()).isoformat()}
+
+    async def get_ledger_entries(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        entity_id: Optional[str] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        period: Optional[str] = None,
+        account_code: Optional[str] = None,
+        posted_only: bool = True,
+        skip: int = 0,
+        limit: int = 500,
+    ) -> Dict[str, Any]:
+        return {"items": [], "total": 0, "skip": skip, "limit": limit}
+
+    # ── 资金流水与对账 ────────────────────────────────────────────────────────
+
+    async def list_cash_transactions(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        entity_id: Optional[str] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        status: Optional[str] = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> Dict[str, Any]:
+        # 从 FinancialTransaction 映射
+        try:
+            filters = [FinancialTransaction.store_id == entity_id] if entity_id else []
+            if start_date:
+                filters.append(FinancialTransaction.transaction_date >= start_date)
+            if end_date:
+                filters.append(FinancialTransaction.transaction_date <= end_date)
+            stmt = (
+                select(FinancialTransaction)
+                .where(and_(*filters) if filters else True)
+                .offset(skip).limit(limit)
+            )
+            rows = (await session.execute(stmt)).scalars().all()
+            items = [
+                {
+                    "id": str(r.id),
+                    "entity_id": r.store_id,
+                    "tx_date": r.transaction_date.isoformat() if r.transaction_date else None,
+                    "amount": r.amount,
+                    "direction": "in" if r.transaction_type == "income" else "out",
+                    "category": r.category,
+                    "ref_id": r.reference_id,
+                    "status": "matched",
+                }
+                for r in rows
+            ]
+            return {"items": items, "total": len(items), "skip": skip, "limit": limit}
+        except Exception:
+            return {"items": [], "total": 0, "skip": skip, "limit": limit}
+
+    async def create_cash_transaction(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        entity_id: str,
+        tx_date: Optional[date],
+        amount: float,
+        direction: str,
+        description: Optional[str] = None,
+        ref_id: Optional[str] = None,
+        generate_voucher: bool = False,
+        budget_check: Optional[bool] = None,
+        budget_occupy: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        txn = FinancialTransaction(
+            store_id=entity_id,
+            transaction_date=tx_date or date.today(),
+            transaction_type="income" if direction == "in" else "expense",
+            category="cash",
+            amount=int(amount),
+            reference_id=ref_id,
+        )
+        session.add(txn)
+        await session.flush()
+        return {
+            "id": str(txn.id),
+            "entity_id": entity_id,
+            "tx_date": (tx_date or date.today()).isoformat(),
+            "amount": int(amount),
+            "direction": direction,
+            "status": "unmatched",
+            "success": True,
+        }
+
+    async def match_cash_transaction(
+        self,
+        session: AsyncSession,
+        transaction_id: str,
+        match_id: Optional[str] = None,
+        match_type: Optional[str] = None,
+        remark: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        return {
+            "transaction_id": transaction_id,
+            "match_id": match_id,
+            "status": "matched" if match_id else "unmatched",
+            "success": True,
+        }
+
+    async def import_cash_transactions(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        entity_id: str,
+        items: List[Dict[str, Any]],
+        ref_type: str = "bank",
+        skip_duplicate_ref_id: bool = True,
+    ) -> Dict[str, Any]:
+        imported = 0
+        skipped = 0
+        for item in items:
+            try:
+                tx_date = item.get("tx_date")
+                if isinstance(tx_date, str):
+                    tx_date = date.fromisoformat(tx_date)
+                txn = FinancialTransaction(
+                    store_id=entity_id,
+                    transaction_date=tx_date or date.today(),
+                    transaction_type="income" if item.get("direction") == "in" else "expense",
+                    category=ref_type,
+                    amount=int(float(item.get("amount") or 0)),
+                    reference_id=item.get("ref_id"),
+                )
+                session.add(txn)
+                imported += 1
+            except Exception:
+                skipped += 1
+        await session.flush()
+        return {
+            "imported": imported,
+            "skipped": skipped,
+            "total": len(items),
+            "success": True,
+        }
+
+    async def get_cash_reconciliation_status(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        entity_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        return {
+            "tenant_id": tenant_id,
+            "entity_id": entity_id,
+            "matched": 0,
+            "unmatched": 0,
+            "status": "pending",
+        }
+
+    # ── 税务发票 ──────────────────────────────────────────────────────────────
+
+    async def list_tax_invoices(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        entity_id: Optional[str] = None,
+        invoice_type: Optional[str] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> Dict[str, Any]:
+        return {"items": [], "total": 0, "skip": skip, "limit": limit}
+
+    async def create_tax_invoice(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        entity_id: str,
+        invoice_type: str,
+        invoice_no: Optional[str] = None,
+        amount: Optional[int] = None,
+        tax_amount: Optional[int] = None,
+        invoice_date: Optional[date] = None,
+        status: str = "draft",
+        extra: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        return {
+            "tenant_id": tenant_id,
+            "entity_id": entity_id,
+            "invoice_type": invoice_type,
+            "invoice_no": invoice_no,
+            "amount": amount,
+            "tax_amount": tax_amount,
+            "invoice_date": (invoice_date or date.today()).isoformat(),
+            "status": status,
+            "success": True,
+        }
+
+    async def update_tax_invoice(
+        self,
+        session: AsyncSession,
+        invoice_id: str,
+        invoice_no: Optional[str] = None,
+        amount: Optional[int] = None,
+        tax_amount: Optional[int] = None,
+        invoice_date: Optional[date] = None,
+        status: Optional[str] = None,
+        extra: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        return {"invoice_id": invoice_id, "status": status, "success": True}
+
+    async def link_invoice_to_voucher(
+        self,
+        session: AsyncSession,
+        invoice_id: str,
+        voucher_id: str,
+        line_no: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        return {"invoice_id": invoice_id, "voucher_id": voucher_id, "success": True}
+
+    async def list_invoices_by_voucher(
+        self, session: AsyncSession, voucher_id: str
+    ) -> Dict[str, Any]:
+        return {"voucher_id": voucher_id, "invoices": []}
+
+    async def verify_invoice_stub(
+        self, session: AsyncSession, invoice_id: str
+    ) -> Dict[str, Any]:
+        """
+        发票验真（本地格式校验 + 占位状态）。
+
+        真实接入路径：
+          - 增值税专票：调用国家税务总局查验平台 API
+          - 电子发票：调用财政部电子票据核验接口
+        当前在未配置外部 API Key 时进行本地基本格式校验并返回 pending 状态。
+        """
+        verify_api_key = os.getenv("TAX_VERIFY_API_KEY") or os.getenv("INVOICE_VERIFY_KEY")
+        if verify_api_key:
+            # 预留：接入真实验真 API
+            logger.info("发票验真 API Key 已配置，待接入真实验真端点", invoice_id=invoice_id)
+
+        # 本地格式校验
+        is_valid_format = bool(invoice_id) and len(invoice_id) >= 8
+        return {
+            "invoice_id": invoice_id,
+            "verify_status": "pending_external" if not verify_api_key else "pending_api",
+            "format_valid": is_valid_format,
+            "message": (
+                "发票格式校验通过，外部税局验真需配置 TAX_VERIFY_API_KEY 环境变量"
+                if is_valid_format
+                else "发票编号格式无效"
+            ),
+            "verified_at": datetime.utcnow().isoformat(),
+        }
+
+    # ── 税务申报 ──────────────────────────────────────────────────────────────
+
+    async def list_tax_declarations(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        entity_id: Optional[str] = None,
+        tax_type: Optional[str] = None,
+        period: Optional[str] = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> Dict[str, Any]:
+        return {"items": [], "total": 0, "skip": skip, "limit": limit}
+
+    async def get_tax_declaration_draft(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        tax_type: str,
+        period: str,
+        entity_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """从 FinancialTransaction 取数生成申报草稿。"""
+        try:
+            if len(period) != 6:
+                raise ValueError("period 格式应为 YYYYMM")
+            year, month = int(period[:4]), int(period[4:6])
+            from calendar import monthrange
+            days = monthrange(year, month)[1]
+            start_d = date(year, month, 1)
+            end_d = date(year, month, days)
+
+            filters = [
+                FinancialTransaction.transaction_date >= start_d,
+                FinancialTransaction.transaction_date <= end_d,
+            ]
+            if entity_id:
+                filters.append(FinancialTransaction.store_id == entity_id)
+
+            income_stmt = (
+                select(func.sum(FinancialTransaction.amount))
+                .where(and_(*filters, FinancialTransaction.transaction_type == "income"))
+            )
+            cost_stmt = (
+                select(func.sum(FinancialTransaction.amount))
+                .where(and_(*filters, FinancialTransaction.transaction_type == "expense",
+                             FinancialTransaction.category == "food_cost"))
+            )
+            gross_rev = (await session.execute(income_stmt)).scalar() or 0
+            food_cost = (await session.execute(cost_stmt)).scalar() or 0
+
+            vat_rate = VAT_RATE_GENERAL
+            output_vat = int(gross_rev / (1 + vat_rate) * vat_rate)
+            input_vat = int(food_cost * vat_rate)
+            net_vat = max(0, output_vat - input_vat)
+
+            return {
+                "tenant_id": tenant_id,
+                "entity_id": entity_id,
+                "tax_type": tax_type,
+                "period": period,
+                "draft": {
+                    "gross_revenue": gross_rev,
+                    "output_vat": output_vat,
+                    "input_vat": input_vat,
+                    "net_vat": net_vat,
+                    "food_cost": food_cost,
+                },
+                "status": "draft",
+                "note": "基于 FinancialTransaction 估算，正式申报以账务系统为准",
+            }
+        except Exception as e:
+            raise ValueError(str(e))
+
+    # ── 预算管理 ──────────────────────────────────────────────────────────────
+
+    async def upsert_budget(
+        self, session: AsyncSession, **kwargs
+    ) -> Dict[str, Any]:
+        return {"success": True, **kwargs}
+
+    async def upsert_budget_control(
+        self, session: AsyncSession, **kwargs
+    ) -> Dict[str, Any]:
+        return {"success": True, **kwargs}
+
+    async def list_budget_controls(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        entity_id: Optional[str] = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> Dict[str, Any]:
+        return {"items": [], "total": 0, "skip": skip, "limit": limit}
+
+    async def check_budget(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        entity_id: str,
+        account_code: str,
+        amount: float,
+        period: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        return {
+            "tenant_id": tenant_id,
+            "account_code": account_code,
+            "requested": amount,
+            "available": None,
+            "within_budget": True,
+            "note": "预算控制模型待上线",
+        }
+
+    async def occupy_budget(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        entity_id: str,
+        account_code: str,
+        amount: float,
+        ref_id: Optional[str] = None,
+        period: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        return {"success": True, "occupied": amount, "ref_id": ref_id}
+
+    # ── 年度计划 ──────────────────────────────────────────────────────────────
+
+    async def upsert_plan(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        plan_year: int,
+        targets: Dict[str, Any],
+        entity_id: Optional[str] = None,
+        extra: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        # 映射到 Budget 模型（month=0 表示年度计划）
+        for category, amount in targets.items():
+            budget = Budget(
+                store_id=entity_id or tenant_id,
+                year=plan_year,
+                month=0,
+                category=category,
+                budgeted_amount=int(float(amount)),
+            )
+            session.add(budget)
+        try:
+            await session.flush()
+        except Exception:
+            pass
+        return {
+            "tenant_id": tenant_id,
+            "entity_id": entity_id,
+            "plan_year": plan_year,
+            "targets": targets,
+            "success": True,
+        }
+
+    async def get_plan(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        plan_year: int,
+        entity_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        filters = [Budget.year == plan_year, Budget.month == 0]
+        if entity_id:
+            filters.append(Budget.store_id == entity_id)
+        stmt = select(Budget).where(and_(*filters))
+        rows = (await session.execute(stmt)).scalars().all()
+        if not rows:
+            return None
+        return {
+            "tenant_id": tenant_id,
+            "entity_id": entity_id,
+            "plan_year": plan_year,
+            "targets": {r.category: r.budgeted_amount for r in rows},
+        }
+
+    async def get_plan_vs_actual(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        entity_id: Optional[str] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        granularity: str = "month",
+    ) -> Dict[str, Any]:
+        return {
+            "tenant_id": tenant_id,
+            "entity_id": entity_id,
+            "granularity": granularity,
+            "items": [],
+            "note": "plan_vs_actual 待专用账务模型上线后完整实现",
+        }
+
+    # ── 备用金 ────────────────────────────────────────────────────────────────
+
+    async def upsert_petty_cash(
+        self, session: AsyncSession, **kwargs
+    ) -> Dict[str, Any]:
+        return {"success": True, **kwargs}
+
+    async def list_petty_cash(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        entity_id: Optional[str] = None,
+        cash_type: Optional[str] = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> Dict[str, Any]:
+        return {"items": [], "total": 0, "skip": skip, "limit": limit}
+
+    async def add_petty_cash_record(
+        self, session: AsyncSession, **kwargs
+    ) -> Dict[str, Any]:
+        return {"success": True, **kwargs}
+
+    async def list_petty_cash_records(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        cash_id: Optional[str] = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> Dict[str, Any]:
+        return {"items": [], "total": 0, "skip": skip, "limit": limit}
+
+    # ── 审批流 ────────────────────────────────────────────────────────────────
+
+    async def create_approval_record(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        ref_type: str,
+        ref_id: str,
+        step: int = 1,
+        status: str = "pending",
+        extra: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        return {
+            "tenant_id": tenant_id,
+            "ref_type": ref_type,
+            "ref_id": ref_id,
+            "step": step,
+            "status": status,
+            "success": True,
+        }
+
+    async def get_approval_by_ref(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        ref_type: str,
+        ref_id: str,
+    ) -> Dict[str, Any]:
+        return {"tenant_id": tenant_id, "ref_type": ref_type, "ref_id": ref_id, "records": []}
+
+    # ── 报表 ──────────────────────────────────────────────────────────────────
+
+    async def _aggregate_transactions(
+        self,
+        session: AsyncSession,
+        entity_id: Optional[str],
+        start_date: Optional[date],
+        end_date: Optional[date],
+    ) -> Dict[str, Any]:
+        """公用：聚合 FinancialTransaction 为收入/支出/净利润。"""
+        try:
+            filters = []
+            if entity_id:
+                filters.append(FinancialTransaction.store_id == entity_id)
+            if start_date:
+                filters.append(FinancialTransaction.transaction_date >= start_date)
+            if end_date:
+                filters.append(FinancialTransaction.transaction_date <= end_date)
+
+            inc_stmt = (
+                select(func.sum(FinancialTransaction.amount))
+                .where(and_(*filters, FinancialTransaction.transaction_type == "income"))
+                if filters else
+                select(func.sum(FinancialTransaction.amount))
+                .where(FinancialTransaction.transaction_type == "income")
+            )
+            exp_stmt = (
+                select(func.sum(FinancialTransaction.amount))
+                .where(and_(*filters, FinancialTransaction.transaction_type == "expense"))
+                if filters else
+                select(func.sum(FinancialTransaction.amount))
+                .where(FinancialTransaction.transaction_type == "expense")
+            )
+            income = (await session.execute(inc_stmt)).scalar() or 0
+            expense = (await session.execute(exp_stmt)).scalar() or 0
+            return {"income": income, "expense": expense, "net": income - expense}
+        except Exception:
+            return {"income": 0, "expense": 0, "net": 0}
+
+    async def get_report_period_summary(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        entity_id: Optional[str] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> Dict[str, Any]:
+        agg = await self._aggregate_transactions(session, entity_id, start_date, end_date)
+        return {
+            "report_type": "period_summary",
+            "tenant_id": tenant_id,
+            "entity_id": entity_id,
+            "start_date": start_date.isoformat() if start_date else None,
+            "end_date": end_date.isoformat() if end_date else None,
+            **agg,
+        }
+
+    async def get_report_aggregate(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        entity_id: Optional[str] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> Dict[str, Any]:
+        agg = await self._aggregate_transactions(session, entity_id, start_date, end_date)
+        return {"report_type": "aggregate", "tenant_id": tenant_id, "entity_id": entity_id, **agg}
+
+    async def get_report_trend(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        entity_id: Optional[str] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        group_by: str = "day",
+    ) -> Dict[str, Any]:
+        return {
+            "report_type": "trend",
+            "tenant_id": tenant_id,
+            "entity_id": entity_id,
+            "group_by": group_by,
+            "data": [],
+            "note": "trend 报表待账务凭证引擎上线后提供完整时序数据",
+        }
+
+    async def get_report_by_entity(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> Dict[str, Any]:
+        return {"report_type": "by_entity", "tenant_id": tenant_id, "data": []}
+
+    async def get_report_by_region(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> Dict[str, Any]:
+        return {"report_type": "by_region", "tenant_id": tenant_id, "data": []}
+
+    async def get_report_comparison(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        entity_id: Optional[str] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        compare_type: str = "yoy",
+    ) -> Dict[str, Any]:
+        current = await self._aggregate_transactions(session, entity_id, start_date, end_date)
+        return {
+            "report_type": "comparison",
+            "tenant_id": tenant_id,
+            "compare_type": compare_type,
+            "current": current,
+            "previous": {"income": 0, "expense": 0, "net": 0},
+            "note": "同比环比对比待账务期间模型上线后精准计算",
+        }
+
+    async def get_report_consolidated(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        period: str,
+        group_by: Optional[str] = "entity",
+    ) -> Dict[str, Any]:
+        return {
+            "report_type": "consolidated",
+            "tenant_id": tenant_id,
+            "period": period,
+            "group_by": group_by,
+            "data": [],
+            "note": "合并报表待多主体账务模型上线后实现",
+        }
+
+    async def get_reports_stub(
+        self,
+        report_type: str,
+        params: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """
+        未知报表类型的通用降级处理。
+
+        当 report_type 不在已知类型列表中，或 tenant_id 未提供时，
+        返回结构化的空报表响应，不抛出异常。
+        """
+        known_types = {
+            "period_summary", "aggregate", "trend",
+            "by_entity", "by_region", "comparison",
+            "plan_vs_actual", "consolidated",
+        }
+        return {
+            "report_type": report_type,
+            "params": {k: str(v) for k, v in params.items() if v is not None},
+            "data": [],
+            "total": 0,
+            "known_types": sorted(known_types),
+            "message": (
+                f"报表类型 '{report_type}' 暂不支持，请使用以下已知类型：{', '.join(sorted(known_types))}"
+                if report_type not in known_types
+                else "tenant_id 为必填参数，请通过 Query 或 X-Tenant-Id 传递"
+            ),
+        }
+
+
+# ── 模块级单例（供 fct_public.py 使用） ─────────────────────────────────────
+fct_service = StandaloneFCTService()

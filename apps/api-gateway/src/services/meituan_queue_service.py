@@ -3,6 +3,7 @@
 Meituan Queue API Integration Service
 """
 from typing import Dict, Any, List, Optional
+import os
 import httpx
 import hashlib
 import time

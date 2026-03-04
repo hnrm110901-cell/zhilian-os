@@ -9,7 +9,7 @@
 - 每天03:00 → perform_daily_reconciliation（POS对账）
 """
 import asyncio
-from datetime import date
+from datetime import date, datetime
 from typing import Optional, Dict
 import os
 import structlog

@@ -47,7 +47,7 @@ const NotificationCenter: React.FC = () => {
   const loadNotifications = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get('/notifications');
+      const response = await apiClient.get('/api/v1/notifications');
       setNotifications(response.data || []);
     } catch (err: any) {
       handleApiError(err, '加载通知列表失败');
@@ -58,7 +58,7 @@ const NotificationCenter: React.FC = () => {
 
   const loadTemplates = async () => {
     try {
-      const response = await apiClient.get('/notifications/templates');
+      const response = await apiClient.get('/api/v1/notifications/templates');
       setTemplates(response.data.templates || {});
     } catch (err: any) {
       handleApiError(err, '加载通知模板失败');
@@ -67,7 +67,7 @@ const NotificationCenter: React.FC = () => {
 
   const loadUnreadCount = async () => {
     try {
-      const response = await apiClient.get('/notifications/unread-count');
+      const response = await apiClient.get('/api/v1/notifications/unread-count');
       setUnreadCount(response.data.unread_count || 0);
     } catch (err: any) {
       handleApiError(err, '加载未读数量失败');
@@ -76,7 +76,7 @@ const NotificationCenter: React.FC = () => {
 
   const handleSendMultiChannel = async (values: any) => {
     try {
-      await apiClient.post('/notifications/multi-channel', values);
+      await apiClient.post('/api/v1/notifications/multi-channel', values);
       showSuccess('多渠道通知发送成功');
       setSendModalVisible(false);
       form.resetFields();
@@ -87,7 +87,7 @@ const NotificationCenter: React.FC = () => {
 
   const handleSendTemplate = async (values: any) => {
     try {
-      await apiClient.post('/notifications/template', values);
+      await apiClient.post('/api/v1/notifications/template', values);
       showSuccess('模板通知发送成功');
       setTemplateModalVisible(false);
       templateForm.resetFields();
@@ -98,7 +98,7 @@ const NotificationCenter: React.FC = () => {
 
   const handleMarkAsRead = async (notificationId: string) => {
     try {
-      await apiClient.put(`/notifications/${notificationId}/read`);
+      await apiClient.put(`/api/v1/notifications/${notificationId}/read`);
       showSuccess('已标记为已读');
       loadNotifications();
       loadUnreadCount();
@@ -109,7 +109,7 @@ const NotificationCenter: React.FC = () => {
 
   const handleMarkAllAsRead = async () => {
     try {
-      await apiClient.put('/notifications/read-all');
+      await apiClient.put('/api/v1/notifications/read-all');
       showSuccess('已全部标记为已读');
       loadNotifications();
       loadUnreadCount();
@@ -120,7 +120,7 @@ const NotificationCenter: React.FC = () => {
 
   const handleDeleteNotification = async (notificationId: string) => {
     try {
-      await apiClient.delete(`/notifications/${notificationId}`);
+      await apiClient.delete(`/api/v1/notifications/${notificationId}`);
       showSuccess('通知已删除');
       loadNotifications();
       loadUnreadCount();
