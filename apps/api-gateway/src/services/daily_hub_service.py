@@ -415,7 +415,7 @@ class DailyHubService:
                         db=db,
                     )
                     food_cost = {
-                        "actual_pct":      fc["actual_pct"],
+                        "actual_pct":      fc["actual_cost_pct"],
                         "theoretical_pct": fc["theoretical_pct"],
                         "variance_pct":    fc["variance_pct"],
                         "variance_status": fc["variance_status"],
@@ -423,12 +423,12 @@ class DailyHubService:
                     }
                     if fc["variance_status"] == "critical":
                         alerts.append(
-                            f"🔴 食材成本严重超标：实际成本率 {fc['actual_pct']}%"
+                            f"🔴 食材成本严重超标：实际成本率 {fc['actual_cost_pct']}%"
                             f"（差异 +{fc['variance_pct']}%）"
                         )
                     elif fc["variance_status"] == "warning":
                         alerts.append(
-                            f"🟡 食材成本偏高：实际成本率 {fc['actual_pct']}%"
+                            f"🟡 食材成本偏高：实际成本率 {fc['actual_cost_pct']}%"
                             f"（差异 +{fc['variance_pct']}%）"
                         )
                 except Exception as e:
