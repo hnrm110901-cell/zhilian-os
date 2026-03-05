@@ -115,6 +115,7 @@ const DecisionStatisticsDashboard = lazy(() => import('./pages/DecisionStatistic
 const ProfitDashboard = lazy(() => import('./pages/ProfitDashboard'));
 const AlertThresholdsPage = lazy(() => import('./pages/AlertThresholdsPage'));
 const MonthlyReportPage = lazy(() => import('./pages/MonthlyReportPage'));
+const DynamicPricingPage = lazy(() => import('./pages/DynamicPricingPage'));
 
 const PageLoader = (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
@@ -423,6 +424,9 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="monthly-report" element={
                     <ProtectedRoute requiredRole="admin"><MonthlyReportPage /></ProtectedRoute>
+                  } />
+                  <Route path="dynamic-pricing" element={
+                    <ProtectedRoute requiredRole="admin"><DynamicPricingPage /></ProtectedRoute>
                   } />
                 </Route>
                 <Route path="*" element={<NotFoundPage />} />

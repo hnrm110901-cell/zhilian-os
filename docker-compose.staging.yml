@@ -1,6 +1,31 @@
 version: '3.8'
 
+# ─────────────────────────────────────────────────────────────────
+# Staging 环境 — 类生产、无 HA 复杂度
+#
+# 设计原则：
+#   1. 与 dev 栈端口互不冲突（dev: 5432/6379/6333/3000/8000）
+#   2. 无 Nginx — 直连端口，SSL 是生产专属关注点
+#   3. 单节点 Redis — Sentinel 仅用于生产 HA
+#   4. 独立 DB zhilian_staging — 迁移不影响 dev 数据
+#   5. 与生产使用相同 Dockerfile.prod — 确保构建一致性
+#
+# 快速启动：
+#   cp .env.staging.example .env.staging   # 填入真实密钥
+#   make staging-up                         # 构建 + 启动（首次 ~2 min）
+#   make staging-migrate                    # 执行 Alembic 迁移
+#   make staging-health                     # 验证 API 健康
+#
+# 端口映射：
+#   前端    http://localhost:3002
+#   API     http://localhost:8001  (Swagger: /docs)
+#   PG      localhost:5435  db=zhilian_staging
+#   Redis   localhost:6381
+#   Qdrant  localhost:6335
+# ─────────────────────────────────────────────────────────────────
+
 services:
+  # ── 前端服务 ────────────────────────────────────────────────────
   web:
     build:
       context: ./apps/web
@@ -16,6 +41,7 @@ services:
     depends_on:
       - api-gateway
 
+  # ── API Gateway ─────────────────────────────────────────────────
   api-gateway:
     build:
       context: .
@@ -48,21 +74,23 @@ services:
       retries: 3
       start_period: 40s
 
+  # ── Redis（单节点，无 Sentinel）─────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: zhilian-staging-redis
     restart: unless-stopped
     ports:
       - "6381:6379"
+    command: redis-server --appendonly yes --requirepass "staging"
     networks:
       - staging-network
-    command: redis-server --appendonly yes --requirepass "staging"
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "staging", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
 
+  # ── PostgreSQL ──────────────────────────────────────────────────
   postgres:
     image: postgres:15-alpine
     container_name: zhilian-staging-postgres
@@ -83,6 +111,7 @@ services:
       timeout: 5s
       retries: 5
 
+  # ── Qdrant 向量数据库 ────────────────────────────────────────────
   qdrant:
     image: qdrant/qdrant:v1.7.4
     container_name: zhilian-staging-qdrant
