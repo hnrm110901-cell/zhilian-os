@@ -20,7 +20,7 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from typing import Any, Dict, List, Optional
-from datetime import date
+from datetime import date, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.dependencies import get_current_active_user, get_db
@@ -236,3 +236,43 @@ async def get_store_scenario(
     except Exception as exc:
         logger.error("scenario_query_failed", store_id=store_id, error=str(exc))
         raise HTTPException(status_code=500, detail=f"场景识别失败: {exc}")
+
+
+# ── GET /api/v1/decisions/behavior-report ────────────────────────────────────
+
+@router.get("/behavior-report")
+async def get_behavior_report(
+    store_id:   str,
+    start_date: Optional[date] = None,
+    end_date:   Optional[date] = None,
+    current_user: User         = Depends(get_current_active_user),
+    db: AsyncSession           = Depends(get_db),
+):
+    """
+    门店 AI 建议采纳率报告（BehaviorScoreEngine）。
+
+    指标：
+      - AI建议发出数 / 采纳数 / 采纳率%
+      - 已采纳建议中：有效果反馈数 / 执行准确率%
+      - 累计节省¥（系统价值证明，不归因到个人）
+
+    默认区间：最近30天。
+    """
+    from src.services.behavior_score_engine import BehaviorScoreEngine
+
+    if start_date is None:
+        start_date = date.today() - timedelta(days=30)
+    if end_date is None:
+        end_date = date.today()
+
+    try:
+        report = await BehaviorScoreEngine.get_store_report(
+            store_id=store_id,
+            start_date=start_date,
+            end_date=end_date,
+            db=db,
+        )
+        return report
+    except Exception as exc:
+        logger.error("behavior_report_failed", store_id=store_id, error=str(exc))
+        raise HTTPException(status_code=500, detail=f"采纳率报告查询失败: {exc}")

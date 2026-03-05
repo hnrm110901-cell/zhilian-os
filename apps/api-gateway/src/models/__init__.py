@@ -68,6 +68,11 @@ from .workflow import DailyWorkflow, WorkflowPhase, DecisionVersion, WorkflowSta
 from .forecast import ForecastResult
 from .meal_period import MealPeriod
 from .employee_metric import EmployeeMetricRecord
+from .member_lifecycle import (
+    LifecycleState,
+    StateTransitionTrigger,
+    MemberLifecycleHistory,
+)
 
 __all__ = [
     "Base",
@@ -223,4 +228,7 @@ __all__ = [
     "ForecastResult",
     "MealPeriod",
     "EmployeeMetricRecord",
+    "LifecycleState",
+    "StateTransitionTrigger",
+    "MemberLifecycleHistory",
 ]

@@ -3043,6 +3043,51 @@ def check_food_cost_kpi_alert(self):
                 sent=result["sent_count"],
                 failed=result["failed_count"],
             )
+    try:
+        asyncio.run(_run())
+    except Exception as exc:
+        raise self.retry(exc=exc)
+
+
+# ============================================================
+# 私域增长：旅程步骤延迟执行
+# ============================================================
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def execute_journey_step(
+    self,
+    journey_db_id: str,
+    step_index: int,
+    wechat_user_id: str = None,
+):
+    """
+    执行旅程的单个步骤（由 JourneyOrchestrator.trigger() 调度）。
+
+    Args:
+        journey_db_id:  private_domain_journeys.id（UUID 字符串）
+        step_index:     步骤序号（0-based）
+        wechat_user_id: 接收人企微 user_id（可为 None，跳过发送）
+    """
+    import asyncio
+
+    async def _run():
+        from src.core.database import get_db_session
+        from src.services.journey_orchestrator import JourneyOrchestrator
+
+        async with get_db_session() as db:
+            orchestrator = JourneyOrchestrator()
+            result = await orchestrator.execute_step(
+                journey_db_id,
+                step_index,
+                db,
+                wechat_user_id=wechat_user_id,
+            )
+            logger.info(
+                "journey.celery_step_done",
+                journey_db_id=journey_db_id,
+                step_index=step_index,
+                result=result,
+            )
             return result
 
     try:

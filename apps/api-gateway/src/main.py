@@ -579,6 +579,10 @@ app.include_router(monthly_report.router, tags=["monthly_report"])
 from src.api import waste_guard
 app.include_router(waste_guard.router, tags=["waste_guard"])
 
+# v2.1 StoreHealthScore — 门店健康指数（5维度加权综合指数）
+from src.api import store_health
+app.include_router(store_health.router, prefix="/api/v1", tags=["store_health"])
+
 # 业财税资金一体化（FCT）
 if getattr(settings, "FCT_ENABLED", False):
     try:

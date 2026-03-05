@@ -55,6 +55,47 @@
 
 ---
 
+## Sprint v2.1 — 从"工具"到"主动外脑"
+
+> 来源：智链OS架构升级深度分析 + 三大设计假设重构方案（2026-03-05）
+> 目标：系统主动找老板，老板30秒读懂生意状态
+> 原则：在现有代码上叠加能力层，不重写，不扩张 MVP 范围
+
+### ① NarrativeEngine — 经营故事叙述器
+> 老板30秒读懂今天生意，系统讲故事，不是让老板查报表
+
+- [x] 新建 `src/services/narrative_engine.py`：纯函数层（`_build_overview` / `_detect_anomalies` / `_build_action` / `compose_brief`）+ `NarrativeEngine.generate_store_brief`（≤200字硬约束）
+- [x] 修改 `decision_push_service.py`：`push_evening_recap` 接入 NarrativeEngine，标题升级为「20:30晚推·经营简报」，失败时降级回原有格式
+- [x] 新建 `tests/test_narrative_engine.py`：13个测试（纯函数11 + 集成3）
+
+### ② StoreHealthScore — 门店健康指数
+> 老板一眼看出5家店哪家有问题，不需要看20张报表
+
+- [x] 新建 `src/services/store_health_service.py`：5维度加权综合指数
+  - 营收完成率30% + 翻台率20% + 成本率25% + 客诉率15% + 人效10%
+  - 纯函数：`compute_health_score(metrics) → float (0-100)` + `classify_health(score) → excellent/good/warning/critical`
+  - `StoreHealthService.get_store_score(store_id, target_date, db)` — 单店当日评分
+  - `StoreHealthService.get_multi_store_scores(store_ids, target_date, db)` — 多店排名（供老板看全局）
+  - 缺失维度数据时按已有维度比例归一化（不返回0）
+- [x] 在 `daily_hub_service.py` 的 `health_score` 字段改为调用 `StoreHealthService`（替代当前简单单值）
+- [x] 新建 `src/api/store_health.py`：`GET /api/v1/stores/health?date=` 返回所有门店评分排名
+- [x] 前端 `HQDashboardPage.tsx`：新增门店健康度排名卡片（评分 + 状态色标 + 最弱维度标注）
+- [x] 新建 `tests/test_store_health_service.py`：≥12个测试（纯函数 + 缺失维度降级 + 多店排名）
+
+### ③ BehaviorScoreEngine — AI建议采纳率跟踪
+> 替代个人利润归因，记录"跟着AI走"的行为，向老板证明系统ROI
+
+- [x] 新建 `src/services/behavior_score_engine.py`：追踪AI建议生命周期
+  - 纯函数：`compute_adoption_rate(decisions) → float` / `compute_execution_accuracy(decisions) → float`
+  - `BehaviorScoreEngine.get_store_report(store_id, start_date, end_date, db)` — 门店维度报告
+    - AI建议发出数 / 采纳数 / 采纳率%
+    - 已采纳建议中：48h内有效果回馈的数量 / 执行准确率%
+    - 累计节省¥（系统价值证明，不归因到个人）
+  - `BehaviorScoreEngine.get_system_roi_summary(brand_id, month, db)` — 品牌级ROI汇总（供老板续费决策）
+- [x] 在 `monthly_report_service.py` 中接入 `BehaviorScoreEngine.get_store_report`，替代当前手工汇总的采纳率字段
+- [x] 在 `src/api/decision_hub.py` 新增端点：`GET /api/v1/decisions/behavior-report?store_id=&start_date=&end_date=`
+- [x] 新建 `tests/test_behavior_score_engine.py`：≥10个测试（纯函数 + 各方法 + ROI汇总）
+
 ## 已完成
 
 - [x] 私域 Agent get_journeys 接入真实 DB（_fetch_journeys_from_db + _persist_journey_to_db）
@@ -71,7 +112,6 @@
 - [x] 新增私域运营 18个增长 action（AARRR 框架）
 - [x] 企微 webhook 接入私域 Agent 对话（P0/P1）
 - [x] 生成智链OS功能明细思维导图
-<<<<<<< HEAD
 - [x] Phase 3 安全加固：SecurityHeadersMiddleware（防 XSS/点击劫持/MIME 嗅探/HSTS）
 - [x] Phase 3 安全加固：CORS 配置环境感知（明确 methods/headers，不使用 *）
 - [x] Phase 3 安全加固：Nginx SSL/TLS 配置（HTTP→HTTPS 重定向、TLS 1.2+、安全头、OCSP Stapling）
@@ -86,9 +126,7 @@
 - [x] P1-2 服务质量Agent _generate_mock_feedbacks 重命名为 _fetch_feedbacks_from_db
 - [x] P1-3 README Phase 3 路线图状态同步（性能优化/安全加固/生产部署标记完成）
 - [x] P2-1 补充服务层核心单元测试（MenuRanker/StoreMemoryService/VectorDbService 共3个测试文件）
-=======
 - [x] P2 绩效计算引擎：EmployeeMetricRecord 模型 + PerformanceComputeService + API 端点（3个）+ 17个测试
->>>>>>> d1df728dec60bb243c50ae42ff68074712ddafd9
 
 ---
 
@@ -303,10 +341,26 @@
 
 ### 2026-03-05（NarrativeEngine 经营故事叙述器）
 - 新建 `src/services/narrative_engine.py`：架构升级 v2.1，将结构化数据转为 ≤200字 自然语言简报
-  - 纯函数：`_build_overview`（今日概况1句话）/ `_detect_anomalies`（TOP3异常，按严重度排序）/ `_build_action`（明日1个行动）/ `compose_brief`（组装+硬截断）
-  - `NarrativeEngine.generate_store_brief`：调用 CaseStoryGenerator + WasteGuardService，任何子查询失败均静默降级
-  - 固定格式：概况 + 异常（0-3条）+ 建议，严格 ≤200字
-- 修改 `src/services/decision_push_service.py`：`push_evening_recap` 调用 NarrativeEngine 替代原有简单文本
-  - 标题升级为「20:30晚推·经营简报」
-  - NarrativeEngine 失败时自动降级回 `_format_evening_description`
-- 新建 `tests/test_narrative_engine.py`：13个测试（纯函数11 + 集成3）
+
+### 2026-03-05（StoreHealthScore 门店健康指数）
+- 新建 `src/services/store_health_service.py`：5维度加权综合指数（0-100分）
+  - 纯函数全部实现：compute_health_score / classify_health / _score_* × 5
+  - StoreHealthService.get_store_score（单店）/ get_multi_store_scores（多店排名）
+  - 缺失维度按已有维度比例归一化（不返回0）
+  - 成本率维度复用 FoodCostService（Rule 3），不重复 SQL
+- 新建 `src/api/store_health.py`：GET /api/v1/stores/health（所有活跃门店评分排名+汇总）
+- `src/main.py` 注册 store_health router
+- `apps/web/src/pages/HQDashboardPage.tsx`：新增「门店健康度排名」卡片
+  - 评分 Progress 条（颜色分级）+ 状态 Tag + 最弱维度标注 + 营收¥
+  - 汇总 Tag：危险/需关注/良好/优秀门店数
+- 新建 `tests/test_store_health_service.py`：28个测试（纯函数17 + 集成5）
+
+### 2026-03-05（BehaviorScoreEngine AI建议采纳率跟踪）
+- 新建 `src/services/behavior_score_engine.py`：AI建议生命周期追踪
+  - 纯函数：compute_adoption_rate / compute_execution_accuracy / compute_total_saving
+  - BehaviorScoreEngine.get_store_report（门店维度：采纳率/执行准确率/累计节省¥）
+  - BehaviorScoreEngine.get_system_roi_summary（品牌级ROI：total_saving/monthly_cost/roi_multiple）
+  - _MONTHLY_SYSTEM_COST_YUAN 环境变量可覆盖（默认¥2000/店/月）
+- `src/api/decision_hub.py` 新增 GET /api/v1/decisions/behavior-report 端点
+- `src/services/monthly_report_service.py` 接入 BehaviorScoreEngine，覆盖 decision_summary 采纳率字段
+- 新建 `tests/test_behavior_score_engine.py`：22个测试（纯函数14 + 集成4）

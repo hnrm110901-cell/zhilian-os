@@ -269,9 +269,32 @@ class MonthlyReportService:
               generated_at
             }
         """
+        from src.services.behavior_score_engine import BehaviorScoreEngine
+
         monthly_story = await CaseStoryGenerator.generate_monthly_story(
             store_id=store_id, year=year, month=month, db=db
         )
+
+        # 用 BehaviorScoreEngine 替代 CaseStoryGenerator 的手工采纳率汇总（更准确）
+        try:
+            days = monthrange(year, month)[1]
+            behavior = await BehaviorScoreEngine.get_store_report(
+                store_id=store_id,
+                start_date=date(year, month, 1),
+                end_date=date(year, month, days),
+                db=db,
+            )
+            # 覆盖 decision_summary 中的采纳率字段
+            monthly_story["decision_summary"]["adoption_rate_pct"] = behavior["adoption_rate_pct"]
+            monthly_story["decision_summary"]["total_saving_yuan"]  = behavior["total_saving_yuan"]
+            monthly_story["decision_summary"]["total"]              = behavior["total_sent"]
+            monthly_story["decision_summary"]["approved"]           = behavior["total_adopted"]
+        except Exception as exc:
+            logger.warning(
+                "monthly_report.behavior_engine_failed",
+                store_id=store_id,
+                error=str(exc),
+            )
 
         executive_summary = build_executive_summary(monthly_story)
         weekly_chart      = build_weekly_trend_chart(monthly_story["weekly_trend"])

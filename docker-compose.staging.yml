@@ -1,0 +1,108 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile.prod
+    container_name: zhilian-staging-web
+    restart: unless-stopped
+    ports:
+      - "3002:80"
+    environment:
+      - NODE_ENV=production
+    networks:
+      - staging-network
+    depends_on:
+      - api-gateway
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: ./apps/api-gateway/Dockerfile.prod
+    container_name: zhilian-staging-api
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    environment:
+      - APP_ENV=staging
+      - DEBUG=False
+      - PYTHONPATH=/app:/app/packages
+    env_file:
+      - .env.staging
+    volumes:
+      - ./logs:/var/log/zhilian-os
+    networks:
+      - staging-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  redis:
+    image: redis:7-alpine
+    container_name: zhilian-staging-redis
+    restart: unless-stopped
+    ports:
+      - "6381:6379"
+    networks:
+      - staging-network
+    command: redis-server --appendonly yes --requirepass "staging"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "staging", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: zhilian-staging-postgres
+    restart: unless-stopped
+    ports:
+      - "5435:5432"
+    environment:
+      - POSTGRES_USER=zhilian
+      - POSTGRES_PASSWORD=zhilian
+      - POSTGRES_DB=zhilian_staging
+    volumes:
+      - staging-postgres-data:/var/lib/postgresql/data
+    networks:
+      - staging-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zhilian"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  qdrant:
+    image: qdrant/qdrant:v1.7.4
+    container_name: zhilian-staging-qdrant
+    restart: unless-stopped
+    ports:
+      - "6335:6333"
+      - "6336:6334"
+    volumes:
+      - staging-qdrant-data:/qdrant/storage
+    networks:
+      - staging-network
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+
+networks:
+  staging-network:
+    driver: bridge
+
+volumes:
+  staging-postgres-data:
+    driver: local
+  staging-qdrant-data:
+    driver: local

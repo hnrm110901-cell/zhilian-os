@@ -400,8 +400,21 @@ class DailyHubService:
             report = await daily_report_service.generate_daily_report(
                 store_id=store_id, report_date=report_date
             )
-            alerts    = list(report.alerts or [])
-            food_cost = None
+            alerts       = list(report.alerts or [])
+            food_cost    = None
+            health_score = getattr(report, "health_score", None)
+
+            # ── 门店健康指数（StoreHealthService，需要 DB）───────────────────
+            if db:
+                try:
+                    from src.services.store_health_service import StoreHealthService
+
+                    score_result = await StoreHealthService.get_store_score(
+                        store_id=store_id, target_date=report_date, db=db
+                    )
+                    health_score = score_result.get("score")
+                except Exception as e:
+                    logger.warning("StoreHealthService 评分失败（非致命）", store_id=store_id, error=str(e))
 
             # ── 食材成本差异分析（需要 DB）────────────────────────────────────
             if db:
@@ -437,7 +450,7 @@ class DailyHubService:
             return {
                 "total_revenue": report.total_revenue,
                 "order_count":   report.order_count,
-                "health_score":  getattr(report, "health_score", None),
+                "health_score":  health_score,
                 "highlights":    report.highlights or [],
                 "alerts":        alerts,
                 "food_cost":     food_cost,

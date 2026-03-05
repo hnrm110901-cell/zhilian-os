@@ -1,7 +1,7 @@
 # Makefile for Zhilian OS
 # 智链OS开发辅助命令
 
-.PHONY: help install dev test lint format clean run docker
+.PHONY: help install dev test lint format clean run docker staging-up staging-down staging-logs staging-migrate staging-health
 
 # 默认目标
 help:
@@ -21,6 +21,13 @@ help:
 	@echo "  make migrate-down            - 回滚上一次迁移"
 	@echo "  make migrate-status          - 查看当前版本"
 	@echo "  make migrate-history         - 查看迁移历史"
+	@echo ""
+	@echo "Staging 环境:"
+	@echo "  make staging-up              - 构建并启动 staging 栈"
+	@echo "  make staging-down            - 停止 staging 栈"
+	@echo "  make staging-logs            - 查看 staging 日志"
+	@echo "  make staging-migrate         - 对 staging DB 执行 Alembic 迁移"
+	@echo "  make staging-health          - 检查 staging API 健康状态"
 
 # 安装生产依赖
 install:
@@ -149,3 +156,22 @@ migrate-history:
 # 生成 SQL 脚本（不执行，仅预览）
 migrate-sql:
 	$(ALEMBIC) upgrade head --sql
+
+# ============================================================
+# Staging 环境
+# 使用前：cp .env.staging.example .env.staging 并填入真实密钥
+# ============================================================
+staging-up:
+	docker-compose -f docker-compose.staging.yml up -d --build
+
+staging-down:
+	docker-compose -f docker-compose.staging.yml down
+
+staging-logs:
+	docker-compose -f docker-compose.staging.yml logs -f
+
+staging-migrate:
+	docker-compose -f docker-compose.staging.yml exec api-gateway alembic upgrade head
+
+staging-health:
+	@curl -sf http://localhost:8001/api/v1/health && echo "✅ API healthy" || echo "❌ API unhealthy"
