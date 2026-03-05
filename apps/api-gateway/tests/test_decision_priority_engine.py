@@ -203,7 +203,7 @@ async def test_get_top3_returns_list():
     with patch(
         "src.services.decision_priority_engine.FoodCostService.get_store_food_cost_variance",
         new_callable=AsyncMock,
-        return_value={"variance_status": "ok", "variance_pct": 0.0, "actual_pct": 30.0,
+        return_value={"variance_status": "ok", "variance_pct": 0.0, "actual_cost_pct": 30.0,
                       "revenue_yuan": 0.0, "top_ingredients": []},
     ):
         result = await engine.get_top3(db=db, target_date=date(2026, 3, 4))
@@ -237,7 +237,7 @@ async def test_get_top3_inventory_candidate():
     with patch(
         "src.services.decision_priority_engine.FoodCostService.get_store_food_cost_variance",
         new_callable=AsyncMock,
-        return_value={"variance_status": "ok", "variance_pct": 0.5, "actual_pct": 31.0,
+        return_value={"variance_status": "ok", "variance_pct": 0.5, "actual_cost_pct": 31.0,
                       "revenue_yuan": 0.0, "top_ingredients": []},
     ):
         result = await engine.get_top3(db=db, target_date=date(2026, 3, 4))
@@ -275,7 +275,7 @@ async def test_get_top3_top3_limit():
     with patch(
         "src.services.decision_priority_engine.FoodCostService.get_store_food_cost_variance",
         new_callable=AsyncMock,
-        return_value={"variance_status": "ok", "variance_pct": 0.0, "actual_pct": 28.0,
+        return_value={"variance_status": "ok", "variance_pct": 0.0, "actual_cost_pct": 28.0,
                       "revenue_yuan": 0.0, "top_ingredients": []},
     ):
         result = await engine.get_top3(db=db, target_date=date(2026, 3, 4))
@@ -299,7 +299,7 @@ async def test_get_top3_food_cost_critical():
         return_value={
             "variance_status": "critical",
             "variance_pct": 6.5,
-            "actual_pct": 40.0,
+            "actual_cost_pct": 40.0,
             "theoretical_pct": 33.5,
             "revenue_yuan": 7000.0,
             "top_ingredients": [

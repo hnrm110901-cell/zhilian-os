@@ -29,9 +29,9 @@ def _make_report(alerts=None):
     return r
 
 
-def _make_fc_data(actual_pct, theoretical_pct, variance_pct, status):
+def _make_fc_data(actual_cost_pct, theoretical_pct, variance_pct, status):
     return {
-        "actual_pct":      actual_pct,
+        "actual_cost_pct":  actual_cost_pct,
         "theoretical_pct": theoretical_pct,
         "variance_pct":    variance_pct,
         "variance_status": status,

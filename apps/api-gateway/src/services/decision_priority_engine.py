@@ -302,7 +302,7 @@ class DecisionPriorityEngine:
             return []
 
         variance_pct = variance.get("variance_pct", 0.0)
-        actual_pct   = variance.get("actual_pct", 0.0)
+        actual_pct   = variance.get("actual_cost_pct", 0.0)
         revenue_yuan = variance.get("revenue_yuan", 0.0)
         monthly_rev  = revenue_yuan / 7 * 30  # 周转月营收估算
 

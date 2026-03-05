@@ -262,3 +262,27 @@
   - 新增「成本分析」按钮（¥图标）在每条 BOM 操作列
   - 弹出 Modal：标准总成本¥ / 菜品售价¥ / 食材成本率%（红/橙/绿色标）
   - 食材明细表：按成本贡献降序 + Progress 占比可视化
+
+### 2026-03-05（字段命名修复 — ProfitDashboard NaN bug）
+- **`food_cost_service.py` 字段名统一**（Breaking bug fix）：
+  - `get_store_food_cost_variance`：`actual_pct` → `actual_cost_pct`（与 monthly_report / kpi_alert_service 一致）
+  - `get_hq_food_cost_ranking` summary：`total_stores`→`store_count`，`avg_actual_food_cost_pct`→`avg_actual_cost_pct`，`over_budget_stores`→`over_budget_count`（与 ProfitDashboard.tsx 接口匹配）
+- **级联修复**（读取旧字段名的 5 个位置）：
+  - `food_cost_service.py`：avg 计算改用 `actual_cost_pct`
+  - `daily_hub_service.py`：`fc["actual_pct"]` → `fc["actual_cost_pct"]`（×3 行）
+  - `decision_priority_engine.py`：`variance.get("actual_pct")` → `variance.get("actual_cost_pct")`
+- **测试同步更新**：`test_food_cost_service.py`、`test_decision_priority_engine.py`、`test_daily_hub_food_cost.py` 中 mock 数据字段名统一更新
+
+### 2026-03-05（ProfitDashboard 第3个Tab — 食材成本明细钻取）
+- `apps/web/src/pages/ProfitDashboard.tsx`：新增「单店食材明细」Tab
+  - 新增 `VarianceDetail` / `VarianceIngredient` 接口，新增 `varianceData` / `varianceLoading` 状态
+  - `loadVariance(storeId)` 调用 `GET /api/v1/hq/food-cost-variance`
+  - 4个 KPI 卡片：实际成本¥ / 实际成本率%（颜色分级）/ 理论成本率% / 差异%（±图标）
+  - Top10 食材用料明细表：排名badge + 食材名称 + 用料成本¥ + 占实际成本%（Progress条）
+  - 门店切换与排名 Tab 联动；首次进入提示用户先选门店
+
+### 2026-03-05（DailyHubPage 食材成本率展示）
+- `apps/web/src/pages/DailyHubPage.tsx`：「昨日复盘」卡片补充食材成本率区块
+  - 后端 `review.food_cost` 已有数据（`actual_pct`/`theoretical_pct`/`variance_pct`/`variance_status`/`top_ingredients`），但前端未展示
+  - 新增：实际成本率%（绿/橙/红分级）+ 状态 Tag + 理论值 + 差异%
+  - warning/critical 时展示 Top2 问题食材名称 + 用料成本¥

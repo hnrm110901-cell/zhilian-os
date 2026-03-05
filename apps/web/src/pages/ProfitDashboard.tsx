@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card, Row, Col, Statistic, Select, DatePicker, Space, Table,
-  Tag, Typography, Spin, Alert, Button, Tabs,
+  Tag, Typography, Spin, Alert, Button, Tabs, Progress,
 } from 'antd';
 import {
   ReloadOutlined, RiseOutlined, FallOutlined,
   DollarOutlined, WarningOutlined, CheckCircleOutlined,
+  SearchOutlined,
 } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import ReactECharts from 'echarts-for-react';
@@ -60,6 +61,27 @@ interface MonthlyReport {
   };
 }
 
+interface VarianceIngredient {
+  item_id:         string;
+  name:            string;
+  usage_cost_fen:  number;
+  usage_cost_yuan: number;
+}
+
+interface VarianceDetail {
+  store_id:        string;
+  start_date:      string;
+  end_date:        string;
+  actual_cost_fen: number;
+  actual_cost_yuan: number;
+  revenue_yuan:    number;
+  actual_cost_pct: number;
+  theoretical_pct: number;
+  variance_pct:    number;
+  variance_status: string;
+  top_ingredients: VarianceIngredient[];
+}
+
 // ── 状态颜色工具 ──────────────────────────────────────────────────────────────
 
 const statusColor = (s: string) =>
@@ -83,6 +105,8 @@ const ProfitDashboard: React.FC = () => {
   const [loading,       setLoading]       = useState(false);
   const [rankingData,   setRankingData]   = useState<RankingResponse | null>(null);
   const [monthlyReport, setMonthlyReport] = useState<MonthlyReport | null>(null);
+  const [varianceData,  setVarianceData]  = useState<VarianceDetail | null>(null);
+  const [varianceLoading, setVarianceLoading] = useState(false);
   const [selectedStore, setSelectedStore] = useState<string>('');
   const [reportLoading, setReportLoading] = useState(false);
   const [dateRange,     setDateRange]     = useState<[Dayjs, Dayjs]>([
@@ -134,10 +158,34 @@ const ProfitDashboard: React.FC = () => {
     }
   }, [reportMonth]);
 
+  // ── 加载单店食材成本差异明细 ──────────────────────────────────────────────
+
+  const loadVariance = useCallback(async (storeId: string) => {
+    if (!storeId) return;
+    setVarianceLoading(true);
+    try {
+      const res = await apiClient.get('/api/v1/hq/food-cost-variance', {
+        params: {
+          store_id:   storeId,
+          start_date: dateRange[0].format('YYYY-MM-DD'),
+          end_date:   dateRange[1].format('YYYY-MM-DD'),
+        },
+      });
+      setVarianceData(res.data);
+    } catch (err: any) {
+      handleApiError(err, '加载食材成本明细失败');
+    } finally {
+      setVarianceLoading(false);
+    }
+  }, [dateRange]);
+
   useEffect(() => { loadRanking(); }, [loadRanking]);
   useEffect(() => {
     if (selectedStore) loadMonthlyReport(selectedStore);
   }, [selectedStore, loadMonthlyReport]);
+  useEffect(() => {
+    if (selectedStore) loadVariance(selectedStore);
+  }, [selectedStore, loadVariance]);
 
   // ── 跨店成本率排名柱状图 ──────────────────────────────────────────────────
 
@@ -495,6 +543,191 @@ const ProfitDashboard: React.FC = () => {
                   !reportLoading && selectedStore && (
                     <Alert message="请先选择门店或点击刷新" type="info" />
                   )
+                )}
+              </Spin>
+            ),
+          },
+          {
+            key:   'variance',
+            label: (
+              <span>
+                <SearchOutlined />
+                单店食材明细{selectedStore ? ` — ${rankingData?.stores.find(s => s.store_id === selectedStore)?.store_name || selectedStore}` : ''}
+              </span>
+            ),
+            children: (
+              <Spin spinning={varianceLoading}>
+                {/* 门店选择 */}
+                <Card style={{ marginBottom: 16 }}>
+                  <Space wrap>
+                    <span>选择门店：</span>
+                    <Select
+                      placeholder="选择门店"
+                      value={selectedStore || undefined}
+                      onChange={(v) => { setSelectedStore(v); loadVariance(v); }}
+                      style={{ width: 200 }}
+                    >
+                      {rankingData?.stores.map((s) => (
+                        <Option key={s.store_id} value={s.store_id}>
+                          {s.store_name || s.store_id}
+                        </Option>
+                      ))}
+                    </Select>
+                    <Button
+                      icon={<ReloadOutlined />}
+                      onClick={() => selectedStore && loadVariance(selectedStore)}
+                      loading={varianceLoading}
+                      disabled={!selectedStore}
+                    >
+                      刷新
+                    </Button>
+                    {varianceData && (
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        {varianceData.start_date} 至 {varianceData.end_date}
+                      </Text>
+                    )}
+                  </Space>
+                </Card>
+
+                {varianceData ? (
+                  <>
+                    {/* KPI 卡片 */}
+                    <Row gutter={16} style={{ marginBottom: 16 }}>
+                      <Col span={6}>
+                        <Card size="small">
+                          <Statistic
+                            title="实际食材成本"
+                            value={varianceData.actual_cost_yuan}
+                            prefix="¥"
+                            precision={0}
+                            valueStyle={{ color: '#1677ff' }}
+                          />
+                        </Card>
+                      </Col>
+                      <Col span={6}>
+                        <Card size="small">
+                          <Statistic
+                            title="实际成本率"
+                            value={varianceData.actual_cost_pct?.toFixed(1)}
+                            suffix="%"
+                            valueStyle={{ color: statusColor(varianceData.variance_status) }}
+                          />
+                          {statusTag(varianceData.variance_status)}
+                        </Card>
+                      </Col>
+                      <Col span={6}>
+                        <Card size="small">
+                          <Statistic
+                            title="理论成本率"
+                            value={varianceData.theoretical_pct?.toFixed(1)}
+                            suffix="%"
+                            valueStyle={{ color: '#52c41a' }}
+                          />
+                        </Card>
+                      </Col>
+                      <Col span={6}>
+                        <Card size="small">
+                          <Statistic
+                            title="实际 vs 理论差异"
+                            value={varianceData.variance_pct?.toFixed(1)}
+                            suffix="%"
+                            prefix={varianceData.variance_pct > 0 ? <RiseOutlined /> : <FallOutlined />}
+                            valueStyle={{
+                              color: varianceData.variance_pct > 5 ? '#f5222d'
+                                   : varianceData.variance_pct > 2 ? '#faad14'
+                                   : '#52c41a',
+                            }}
+                          />
+                        </Card>
+                      </Col>
+                    </Row>
+
+                    {/* Top 10 食材用料明细表 */}
+                    <Card
+                      title={
+                        <Space>
+                          <DollarOutlined style={{ color: '#1677ff' }} />
+                          Top 10 食材用料成本（按金额排序）
+                        </Space>
+                      }
+                      extra={
+                        <Text type="secondary">
+                          营业额 ¥{varianceData.revenue_yuan?.toLocaleString('zh-CN', { minimumFractionDigits: 0 })}
+                        </Text>
+                      }
+                    >
+                      <Table
+                        dataSource={varianceData.top_ingredients.map((item, idx) => ({
+                          ...item,
+                          rank: idx + 1,
+                          cost_share_pct: varianceData.actual_cost_fen > 0
+                            ? Math.round(item.usage_cost_fen / varianceData.actual_cost_fen * 1000) / 10
+                            : 0,
+                        }))}
+                        rowKey="item_id"
+                        pagination={false}
+                        size="middle"
+                        locale={{ emptyText: '暂无食材用料数据' }}
+                        columns={[
+                          {
+                            title: '排名',
+                            dataIndex: 'rank',
+                            width: 56,
+                            render: (rank: number) => (
+                              <span style={{
+                                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                width: 28, height: 28, borderRadius: '50%',
+                                background: rank <= 3 ? '#1677ff' : '#d9d9d9',
+                                color: rank <= 3 ? '#fff' : '#666',
+                                fontWeight: 'bold', fontSize: 13,
+                              }}>
+                                {rank}
+                              </span>
+                            ),
+                          },
+                          {
+                            title: '食材名称',
+                            dataIndex: 'name',
+                            render: (name: string) => <Text strong>{name}</Text>,
+                          },
+                          {
+                            title: '用料成本',
+                            dataIndex: 'usage_cost_yuan',
+                            sorter: (a: any, b: any) => b.usage_cost_yuan - a.usage_cost_yuan,
+                            render: (yuan: number) => (
+                              <Text strong style={{ color: '#1677ff' }}>
+                                ¥{yuan?.toLocaleString('zh-CN', { minimumFractionDigits: 0 })}
+                              </Text>
+                            ),
+                          },
+                          {
+                            title: '占实际成本',
+                            dataIndex: 'cost_share_pct',
+                            render: (pct: number) => (
+                              <Space>
+                                <Progress
+                                  percent={pct}
+                                  size="small"
+                                  style={{ width: 90 }}
+                                  showInfo={false}
+                                  strokeColor={pct >= 20 ? '#f5222d' : pct >= 10 ? '#faad14' : '#1677ff'}
+                                />
+                                <Text style={{ fontSize: 12 }}>{pct?.toFixed(1)}%</Text>
+                              </Space>
+                            ),
+                          },
+                        ]}
+                      />
+                    </Card>
+                  </>
+                ) : (
+                  !varianceLoading && selectedStore && (
+                    <Alert message="请点击刷新加载食材成本明细" type="info" />
+                  )
+                )}
+
+                {!selectedStore && (
+                  <Alert message="请在「跨店成本排名」中点击一家门店，或在上方下拉菜单中选择门店" type="info" />
                 )}
               </Spin>
             ),

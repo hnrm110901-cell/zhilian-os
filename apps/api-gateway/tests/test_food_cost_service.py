@@ -163,7 +163,7 @@ class TestStoreFoodCostVariance:
 
     @pytest.mark.asyncio
     async def test_store_variance_no_revenue(self):
-        """收入为 0 时 actual_pct = 0，不除零"""
+        """收入为 0 时 actual_cost_pct = 0，不除零"""
         db = _mock_db()
 
         results_iter = iter([
@@ -181,13 +181,13 @@ class TestStoreFoodCostVariance:
             db=db,
         )
 
-        assert variance["actual_pct"] == 0.0
+        assert variance["actual_cost_pct"] == 0.0
         assert variance["variance_pct"] == 0.0
         assert variance["variance_status"] == "ok"
 
     @pytest.mark.asyncio
     async def test_store_variance_calculation(self):
-        """已知数值验证 actual_pct / theoretical_pct / variance 计算
+        """已知数值验证 actual_cost_pct / theoretical_pct / variance 计算
 
         actual_cost = 30000 分, revenue = 100000 分
           → actual_pct = 30%
@@ -218,7 +218,7 @@ class TestStoreFoodCostVariance:
             db=db,
         )
 
-        assert variance["actual_pct"] == 30.0
+        assert variance["actual_cost_pct"] == 30.0
         assert variance["theoretical_pct"] == 20.0
         assert variance["variance_pct"] == 10.0
         assert variance["variance_status"] == "critical"
@@ -244,7 +244,7 @@ class TestHQFoodCostRanking:
         db.execute = AsyncMock(return_value=execute_result)
 
         # 三家门店差异数据
-        def _variance(sid, actual_pct, theoretical_pct, variance_pct, status):
+        def _variance(sid, actual_cost_pct, theoretical_pct, variance_pct, status):
             return {
                 "store_id": sid,
                 "start_date": "2026-02-01",
@@ -253,7 +253,7 @@ class TestHQFoodCostRanking:
                 "actual_cost_yuan": 0.0,
                 "revenue_fen": 100000.0,
                 "revenue_yuan": 1000.0,
-                "actual_pct": actual_pct,
+                "actual_cost_pct": actual_cost_pct,
                 "theoretical_pct": theoretical_pct,
                 "variance_pct": variance_pct,
                 "variance_status": status,
@@ -280,8 +280,8 @@ class TestHQFoodCostRanking:
         assert variances == sorted(variances, reverse=True)
         assert ranking["stores"][0]["store_id"] == "S002"   # highest variance
         assert ranking["stores"][0]["rank"] == 1
-        assert ranking["summary"]["total_stores"] == 3
-        assert ranking["summary"]["over_budget_stores"] == 2  # warning + critical
+        assert ranking["summary"]["store_count"] == 3
+        assert ranking["summary"]["over_budget_count"] == 2  # warning + critical
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

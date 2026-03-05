@@ -186,6 +186,57 @@ const DailyHubPage: React.FC = () => {
                   <Text strong>{review.health_score}</Text>
                 </div>
               )}
+
+              {/* 食材成本率 */}
+              {review?.food_cost && (
+                <>
+                  <Divider style={{ margin: '8px 0' }} />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text type="secondary" style={{ fontSize: 12 }}>食材成本率</Text>
+                    <Space size={4}>
+                      <Text
+                        strong
+                        style={{
+                          color: review.food_cost.variance_status === 'critical' ? '#f5222d'
+                               : review.food_cost.variance_status === 'warning'  ? '#faad14'
+                               : '#52c41a',
+                          fontSize: 14,
+                        }}
+                      >
+                        {review.food_cost.actual_pct?.toFixed(1)}%
+                      </Text>
+                      <Tag
+                        color={
+                          review.food_cost.variance_status === 'critical' ? 'error'
+                          : review.food_cost.variance_status === 'warning' ? 'warning'
+                          : 'success'
+                        }
+                        style={{ fontSize: 11, padding: '0 4px' }}
+                      >
+                        {review.food_cost.variance_status === 'critical' ? '超标'
+                         : review.food_cost.variance_status === 'warning' ? '偏高'
+                         : '正常'}
+                      </Tag>
+                    </Space>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginTop: 2 }}>
+                    <Text type="secondary">理论 {review.food_cost.theoretical_pct?.toFixed(1)}%</Text>
+                    <Text style={{ color: review.food_cost.variance_pct > 0 ? '#f5222d' : '#52c41a', fontWeight: 600 }}>
+                      {review.food_cost.variance_pct > 0 ? '+' : ''}{review.food_cost.variance_pct?.toFixed(1)}%
+                    </Text>
+                  </div>
+                  {review.food_cost.variance_status !== 'ok' && (review.food_cost.top_ingredients || []).length > 0 && (
+                    <div style={{ marginTop: 4 }}>
+                      <Text type="secondary" style={{ fontSize: 11 }}>主要消耗：</Text>
+                      {review.food_cost.top_ingredients.slice(0, 2).map((ing: any, i: number) => (
+                        <div key={i} style={{ fontSize: 11, color: '#fa8c16' }}>
+                          • {ing.name} ¥{ing.usage_cost_yuan?.toLocaleString('zh-CN', { minimumFractionDigits: 0 })}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
               {(review?.highlights || []).length > 0 && (
                 <>
                   <Divider style={{ margin: '8px 0' }} />
