@@ -6,6 +6,7 @@ OpsAgent - 连锁餐饮IT运维智能体 (智链OS 运维方案)
 - L2 推理层：诊断大脑（根因分析、故障预测、Runbook 建议）
 - L3 执行层：行动建议（链路切换、安全加固、备件建议）
 - 协调层：自然语言运维问答
+- V2.0 新增：store_dashboard / alert_convergence / food_safety_status
 """
 import time
 from typing import Dict, Any, Optional, List
@@ -42,6 +43,10 @@ class OpsAgent(LLMEnhancedAgent):
             "link_switch_advice",  # 主备链路切换建议
             "asset_overview",      # 资产概览与台账建议
             "nl_query",            # 自然语言运维问答
+            # V2.0 新增 ──────────────────────────────────────────────────────
+            "store_dashboard",     # 门店健康总览（L1+L2+L3实时数据汇总）
+            "alert_convergence",   # 告警收敛（多信号→根因事件）
+            "food_safety_status",  # 食安合规状态查询
         ]
 
     async def execute(self, action: str, params: Dict[str, Any]) -> AgentResponse:
@@ -68,6 +73,12 @@ class OpsAgent(LLMEnhancedAgent):
                 out = await self._link_switch_advice(params)
             elif action == "asset_overview":
                 out = await self._asset_overview(params)
+            elif action == "store_dashboard":
+                out = await self._store_dashboard(params)
+            elif action == "alert_convergence":
+                out = await self._alert_convergence(params)
+            elif action == "food_safety_status":
+                out = await self._food_safety_status(params)
             else:  # nl_query
                 out = await self._nl_query(params)
 
@@ -264,4 +275,135 @@ class OpsAgent(LLMEnhancedAgent):
                      "tool_calls": len(result.tool_calls), "iterations": result.iterations},
             "error": result.message if not result.success else None,
             "metadata": {"source": "tool_use"},
+        }
+
+    # ── V2.0 新增方法 ─────────────────────────────────────────────────────────
+
+    async def _store_dashboard(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        门店健康总览（L1设备 + L2网络 + L3系统实时数据）。
+        直接调用 OpsMonitorService.get_store_dashboard，
+        再用 Claude 对结果生成自然语言摘要和处置建议。
+        """
+        from ..services.ops_monitor_service import OpsMonitorService
+        store_id = params.get("store_id", "")
+        session = params.get("session")
+        window_minutes = params.get("window_minutes", 30)
+
+        # 如果有真实 DB session，先拉实时数据
+        dashboard_data: Dict = {}
+        if session:
+            svc = OpsMonitorService()
+            try:
+                dashboard_data = await svc.get_store_dashboard(
+                    session, store_id, window_minutes=window_minutes
+                )
+            except Exception as exc:
+                logger.warning("get_store_dashboard DB error", error=str(exc))
+
+        summary_text = (
+            f"门店 {store_id} 运维健康总览（最近 {window_minutes} 分钟）：\n"
+            + (f"整体状态: {dashboard_data.get('overall_status', '未知')}，"
+               f"健康分: {dashboard_data.get('overall_score', 'N/A')}，"
+               f"活跃告警: {dashboard_data.get('active_alerts', 'N/A')} 条"
+               if dashboard_data else "暂无实时数据，请基于运维知识给出巡检建议")
+        )
+        result = await self.execute_with_tools(
+            user_message=summary_text + "。请给出摘要解读和优先处置建议。",
+            store_id=store_id,
+            context={"dashboard": dashboard_data},
+        )
+        return {
+            "success": result.success,
+            "data": {
+                "dashboard": dashboard_data,
+                "llm_summary": result.data,
+                "store_id": store_id,
+                "window_minutes": window_minutes,
+            },
+            "error": result.message if not result.success else None,
+            "metadata": {"source": "tool_use+db"},
+        }
+
+    async def _alert_convergence(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        告警收敛：将同一时间窗口内多条告警归并为根因事件。
+        对应方案 5.2 故障关联分析。
+        """
+        from ..services.ops_monitor_service import OpsMonitorService
+        store_id = params.get("store_id", "")
+        session = params.get("session")
+        window_minutes = params.get("window_minutes", 5)
+
+        convergence_data: Dict = {}
+        if session:
+            svc = OpsMonitorService()
+            try:
+                convergence_data = await svc.converge_alerts(
+                    session, store_id, window_minutes=window_minutes
+                )
+            except Exception as exc:
+                logger.warning("converge_alerts DB error", error=str(exc))
+
+        root_cause = convergence_data.get("root_cause", "")
+        user_message = (
+            f"门店 {store_id} 告警收敛分析（窗口 {window_minutes} 分钟）：\n"
+            f"规则引擎判断根因：{root_cause or '待分析'}。\n"
+            f"告警分布：{convergence_data.get('alert_counts', {})}。\n"
+            f"请验证根因判断，补充可能遗漏的原因，并给出优先级排序的处置步骤。"
+        )
+        result = await self.execute_with_tools(
+            user_message=user_message,
+            store_id=store_id,
+            context={"convergence": convergence_data},
+        )
+        return {
+            "success": result.success,
+            "data": {
+                "convergence": convergence_data,
+                "llm_analysis": result.data,
+                "store_id": store_id,
+            },
+            "error": result.message if not result.success else None,
+            "metadata": {"source": "rule_engine+llm"},
+        }
+
+    async def _food_safety_status(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """食安合规状态查询（对应方案 3.2 食安设备监控SOP）。"""
+        from ..services.ops_monitor_service import OpsMonitorService
+        store_id = params.get("store_id", "")
+        session = params.get("session")
+        days = params.get("days", 7)
+
+        fs_data: Dict = {}
+        if session:
+            svc = OpsMonitorService()
+            try:
+                fs_data = await svc.get_food_safety_status(session, store_id, days=days)
+            except Exception as exc:
+                logger.warning("get_food_safety_status DB error", error=str(exc))
+
+        violations = fs_data.get("total_violations", 0)
+        user_message = (
+            f"门店 {store_id} 最近 {days} 天食安合规状态：\n"
+            f"违规次数: {violations}，"
+            f"分类明细: {fs_data.get('by_type', [])}，"
+            f"未解决问题: {fs_data.get('open_issues', [])}。\n"
+            f"请给出食安风险等级评估和整改建议，并关注2026年6月食安新规合规要求。"
+        )
+        result = await self.execute_with_tools(
+            user_message=user_message,
+            store_id=store_id,
+            context={"food_safety": fs_data},
+        )
+        return {
+            "success": result.success,
+            "data": {
+                "food_safety": fs_data,
+                "llm_assessment": result.data,
+                "store_id": store_id,
+                "days": days,
+            },
+            "error": result.message if not result.success else None,
+            "metadata": {"source": "db+llm"},
         }
