@@ -223,7 +223,7 @@ class TestExecuteStep:
         db     = AsyncMock()
         wechat = AsyncMock()
 
-        # step_index=1 有 condition={"event_not_exist": "order_pay"}
+        # step_index=1 有 condition={\"event_not_exist\": \"order_pay\"}
         db.execute.return_value.fetchone.side_effect = [
             _make_journey_row(),   # 旅程记录
             MagicMock(cnt=1),      # 1条新订单 → 条件不满足

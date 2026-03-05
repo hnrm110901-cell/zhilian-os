@@ -289,6 +289,23 @@ async def mark_signal_handled(
     return {"signal_id": signal_id, "action": body.action, "handled_at": handled_at.isoformat()}
 
 
+@router.get("/metrics/{store_id}", summary="私域三角 KPI 驾驶舱")
+async def get_private_domain_metrics(
+    store_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    私域增长三角 KPI：
+      - **owned_audience**  — 自有流量（会员规模、活跃率、企微连接率）
+      - **customer_value**  — 客户价值（复购率、LTV、AOV）
+      - **journey_health**  — 旅程健康（完成率、风险信号数）
+      - **lifecycle_funnel** — 生命周期漏斗分布（9段）
+    """
+    from ..services.private_domain_metrics import get_full_metrics
+    return await get_full_metrics(store_id, db)
+
+
 @router.get("/stats/trend/{store_id}")
 async def get_trend_stats(
     store_id: str,
