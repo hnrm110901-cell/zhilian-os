@@ -544,10 +544,31 @@ class JourneyOrchestrator:
         """
         查询会员基础画像（用于 JourneyNarrator 个性化生成）。
 
+        策略：先读 Redis 缓存（MemberContextStore），miss 再查 DB，
+        命中 DB 后写透到缓存，下次直接命中 Redis。
+
         查询失败或无记录时返回 None，上层降级为静态模板。
         """
+        from src.services.journey_narrator import MemberProfile
+
+        # 1. 尝试 Redis 缓存
         try:
-            from src.services.journey_narrator import MemberProfile
+            from src.services.member_context_store import get_context_store
+            ctx_store = await get_context_store()
+            if ctx_store:
+                cached = await ctx_store.get(store_id, customer_id)
+                if cached:
+                    return MemberProfile(
+                        frequency=cached.get("frequency", 0),
+                        monetary=cached.get("monetary", 0),
+                        recency_days=cached.get("recency_days"),
+                        lifecycle_state=cached.get("lifecycle_state"),
+                    )
+        except Exception:
+            pass  # Redis 不可用，继续走 DB
+
+        # 2. 查 DB
+        try:
             row = (await db.execute(
                 text("""
                     SELECT frequency, monetary, recency_days, lifecycle_state
@@ -557,13 +578,34 @@ class JourneyOrchestrator:
                 """),
                 {"cid": customer_id, "sid": store_id},
             )).fetchone()
-            if row:
-                return MemberProfile(
-                    frequency=row[0] or 0,
-                    monetary=row[1] or 0,
-                    recency_days=row[2],
-                    lifecycle_state=row[3],
-                )
+            if not row:
+                return None
+
+            profile = MemberProfile(
+                frequency=row[0] or 0,
+                monetary=row[1] or 0,
+                recency_days=row[2],
+                lifecycle_state=row[3],
+            )
+
+            # 3. 写透到 Redis（异步，失败不影响主流程）
+            try:
+                from src.services.member_context_store import get_context_store
+                from src.services.journey_narrator import classify_maslow_level
+                ctx_store = await get_context_store()
+                if ctx_store:
+                    await ctx_store.set(store_id, customer_id, {
+                        "frequency":       profile.frequency,
+                        "monetary":        profile.monetary,
+                        "recency_days":    profile.recency_days,
+                        "lifecycle_state": profile.lifecycle_state,
+                        "maslow_level":    classify_maslow_level(profile),
+                    })
+            except Exception:
+                pass
+
+            return profile
+
         except Exception as exc:
             logger.debug(
                 "journey.get_member_profile_failed",

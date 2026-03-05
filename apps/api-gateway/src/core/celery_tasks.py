@@ -3069,10 +3069,12 @@ def scan_lifecycle_transitions(self):
         from src.services.lifecycle_state_machine import LifecycleStateMachine
         from src.services.journey_orchestrator import JourneyOrchestrator
         from src.models.member_lifecycle import StateTransitionTrigger
+        from src.services.member_context_store import get_context_store, MemberContextStore
 
-        sm   = LifecycleStateMachine()
-        orch = JourneyOrchestrator()
-        stats = {"scanned": 0, "transitioned": 0, "journeys_triggered": 0}
+        sm        = LifecycleStateMachine()
+        orch      = JourneyOrchestrator()
+        ctx_store = await get_context_store() or MemberContextStore(None)  # None = no-op
+        stats     = {"scanned": 0, "transitioned": 0, "journeys_triggered": 0}
 
         async with get_db_session() as db:
             # 获取近30天有交易的活跃门店
@@ -3106,6 +3108,7 @@ def scan_lifecycle_transitions(self):
                     )
                     if result.get("transitioned"):
                         stats["transitioned"] += 1
+                        await ctx_store.invalidate(store_id, row[0])
                         jr = await orch.trigger(
                             row[0], store_id, "dormant_wakeup", db,
                             wechat_user_id=row[1],
@@ -3133,6 +3136,7 @@ def scan_lifecycle_transitions(self):
                     )
                     if result.get("transitioned"):
                         stats["transitioned"] += 1
+                        await ctx_store.invalidate(store_id, row[0])
                         jr = await orch.trigger(
                             row[0], store_id, "dormant_wakeup", db,
                             wechat_user_id=row[1],
@@ -3218,6 +3222,7 @@ def refresh_private_domain_rfm(self):
     async def _run():
         from sqlalchemy import text as _text
         from src.core.database import get_db_session
+        from src.services.member_context_store import get_context_store, MemberContextStore
 
         sql = _text("""
             UPDATE private_domain_members AS m
@@ -3246,8 +3251,23 @@ def refresh_private_domain_rfm(self):
             result = await db.execute(sql)
             await db.commit()
             updated = result.rowcount
-            logger.info("rfm.refresh_done", updated_rows=updated)
-            return {"updated": updated}
+
+        # DB 更新后批量清除 Redis 缓存（按门店），下次读时重新填充
+        invalidated = 0
+        ctx_store = await get_context_store() or MemberContextStore(None)
+        try:
+            stores_sql = _text("""
+                SELECT DISTINCT store_id FROM private_domain_members
+            """)
+            async with get_db_session() as db2:
+                store_rows = (await db2.execute(stores_sql)).fetchall()
+            for (sid,) in store_rows:
+                invalidated += await ctx_store.invalidate_store(sid)
+        except Exception as exc:
+            logger.warning("rfm.ctx_invalidate_failed", error=str(exc))
+
+        logger.info("rfm.refresh_done", updated_rows=updated, cache_invalidated=invalidated)
+        return {"updated": updated, "cache_invalidated": invalidated}
 
     try:
         return asyncio.run(_run())
