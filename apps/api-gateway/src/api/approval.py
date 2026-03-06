@@ -75,7 +75,7 @@ class DecisionLogResponse(BaseModel):
     ai_suggestion: Dict[str, Any]
     ai_confidence: float
     ai_reasoning: str
-    ai_alternatives: List[Dict[str, Any]]
+    ai_alternatives: Optional[List[Dict[str, Any]]] = None
     manager_id: Optional[str]
     manager_decision: Optional[Dict[str, Any]]
     manager_feedback: Optional[str]
@@ -207,6 +207,34 @@ async def get_approvals(
 
     except Exception as e:
         logger.error("get_approvals_failed", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/approvals/statistics", summary="获取决策统计", response_model=DecisionStatisticsResponse)
+async def get_decision_statistics(
+    store_id: Optional[str] = Query(None, description="门店ID"),
+    start_date: Optional[datetime] = Query(None, description="开始日期"),
+    end_date: Optional[datetime] = Query(None, description="结束日期"),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    获取决策统计数据
+
+    查看决策的批准率、拒绝率、修改率等统计指标。
+    """
+    try:
+        statistics = await approval_service.get_decision_statistics(
+            store_id=store_id,
+            start_date=start_date,
+            end_date=end_date,
+            db=db
+        )
+
+        return statistics
+
+    except Exception as e:
+        logger.error("get_decision_statistics_failed", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -387,34 +415,6 @@ async def record_decision_outcome(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         logger.error("record_decision_outcome_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/approvals/statistics", summary="获取决策统计", response_model=DecisionStatisticsResponse)
-async def get_decision_statistics(
-    store_id: Optional[str] = Query(None, description="门店ID"),
-    start_date: Optional[datetime] = Query(None, description="开始日期"),
-    end_date: Optional[datetime] = Query(None, description="结束日期"),
-    current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    获取决策统计数据
-
-    查看决策的批准率、拒绝率、修改率等统计指标。
-    """
-    try:
-        statistics = await approval_service.get_decision_statistics(
-            store_id=store_id,
-            start_date=start_date,
-            end_date=end_date,
-            db=db
-        )
-
-        return statistics
-
-    except Exception as e:
-        logger.error("get_decision_statistics_failed", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 
