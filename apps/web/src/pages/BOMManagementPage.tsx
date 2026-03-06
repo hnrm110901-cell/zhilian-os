@@ -831,7 +831,7 @@ const BOMManagementPage: React.FC = () => {
               ]}
             />
           </>
-        )}
+        ) : null}
       </Modal>
 
       {/* ── 新建 BOM Modal ───────────────────────────────────────────────────── */}
