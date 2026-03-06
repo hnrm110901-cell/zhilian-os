@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import structlog
@@ -404,12 +404,15 @@ async def _fetch_pending_count(store_id: Optional[str], db: AsyncSession) -> int
 
 async def _fetch_food_cost_variance(store_id: str, db: AsyncSession) -> Optional[Dict]:
     from src.services.food_cost_service import FoodCostService
-    return await FoodCostService.get_store_food_cost_variance(store_id=store_id, db=db)
+    end   = date.today()
+    start = end - timedelta(days=7)
+    return await FoodCostService.get_store_food_cost_variance(
+        store_id=store_id, start_date=start, end_date=end, db=db
+    )
 
 
 async def _fetch_waste_top5(store_id: str, db: AsyncSession) -> List[Dict]:
     from src.services.waste_guard_service import WasteGuardService
-    from datetime import timedelta
     end   = date.today()
     start = end - timedelta(days=7)
     result = await WasteGuardService.get_top5_waste(
@@ -530,7 +533,6 @@ async def _fetch_all_stores_health(db: AsyncSession) -> List[Dict]:
 async def _fetch_hq_food_cost_ranking(db: AsyncSession) -> List[Dict]:
     from src.services.food_cost_service import FoodCostService
     from sqlalchemy import text
-    from datetime import timedelta
     end   = date.today()
     start = end - timedelta(days=7)
     result = await FoodCostService.get_hq_food_cost_ranking(
@@ -548,7 +550,6 @@ async def _fetch_hq_food_cost_ranking(db: AsyncSession) -> List[Dict]:
 async def _food_cost_ranking_from_kpi(db: AsyncSession) -> List[Dict]:
     """从 kpi_records 读取各店近30天 KPI_COST_RATE 均值，生成食材成本排名。"""
     from sqlalchemy import text
-    from datetime import timedelta
     end   = date.today()
     start = end - timedelta(days=29)
     rows = await db.execute(
@@ -590,7 +591,6 @@ async def _food_cost_ranking_from_kpi(db: AsyncSession) -> List[Dict]:
 async def _fetch_revenue_trend(db: AsyncSession) -> Dict:
     """近7天全平台按门店每日营收趋势（从 kpi_records 读取）。"""
     from sqlalchemy import text
-    from datetime import timedelta
     end   = date.today()
     start = end - timedelta(days=6)
     rows = await db.execute(
