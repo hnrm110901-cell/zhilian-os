@@ -30,7 +30,7 @@ from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 import structlog
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.inventory import InventoryItem, InventoryStatus
@@ -261,7 +261,7 @@ class DecisionPriorityEngine:
                     context={
                         "item_id": str(item.id),
                         "item_name": item.name,
-                        "status": item.status.value,
+                        "status": item.status.value if hasattr(item.status, "value") else item.status,
                         "current_quantity": item.current_quantity,
                         "min_quantity": item.min_quantity,
                         "restock_quantity": restock_qty,
@@ -298,12 +298,20 @@ class DecisionPriorityEngine:
             return []
 
         status = variance.get("variance_status", "ok")
+        actual_pct = variance.get("actual_cost_pct", 0.0)
+        revenue_yuan = variance.get("revenue_yuan", 0.0)
+
+        # 当 BOM/库存流水缺失（actual_pct=0），回退读 kpi_records
+        if status == "ok" and actual_pct == 0.0:
+            variance = await self._food_cost_from_kpi_records(target_date, db)
+            status = variance.get("variance_status", "ok")
+            actual_pct = variance.get("actual_cost_pct", 0.0)
+            revenue_yuan = variance.get("revenue_yuan", 0.0)
+
         if status == "ok":
             return []
 
         variance_pct = variance.get("variance_pct", 0.0)
-        actual_pct   = variance.get("actual_cost_pct", 0.0)
-        revenue_yuan = variance.get("revenue_yuan", 0.0)
         monthly_rev  = revenue_yuan / 7 * 30  # 周转月营收估算
 
         # 预期节省：本月内将差异修正到0可节省的¥
@@ -339,6 +347,88 @@ class DecisionPriorityEngine:
             )
         ]
         return candidates
+
+    # ── 数据源2b：kpi_records 回退（BOM 未配置时） ──────────────────────────────
+
+    async def _food_cost_from_kpi_records(
+        self,
+        target_date: date,
+        db: AsyncSession,
+    ) -> dict:
+        """
+        当 inventory_transactions 为空（BOM 未录入）时，
+        直接从 kpi_records 读取 KPI_COST_RATE 最近30天均值，
+        与 stores.cost_ratio_target 对比生成 variance。
+        """
+        try:
+            r = await db.execute(
+                text(
+                    "SELECT AVG(value) AS avg_cost_pct, "
+                    "       AVG(kr.previous_value) AS prev_pct "
+                    "FROM kpi_records kr "
+                    "WHERE kr.store_id = :sid "
+                    "  AND kr.kpi_id = 'KPI_COST_RATE' "
+                    "  AND kr.record_date >= :start "
+                    "  AND kr.record_date <= :end"
+                ),
+                {
+                    "sid": self.store_id,
+                    "start": target_date - timedelta(days=29),
+                    "end": target_date,
+                },
+            )
+            row = r.fetchone()
+            if not row or row[0] is None:
+                return {"variance_status": "ok"}
+
+            actual_pct = float(row[0])
+
+            # 读取门店目标成本率
+            r2 = await db.execute(
+                text("SELECT cost_ratio_target FROM stores WHERE id = :sid"),
+                {"sid": self.store_id},
+            )
+            row2 = r2.fetchone()
+            target_pct = float(row2[0]) * 100 if (row2 and row2[0]) else 33.0
+
+            variance_pct = round(actual_pct - target_pct, 2)
+
+            # 读取月营收估算
+            r3 = await db.execute(
+                text(
+                    "SELECT AVG(value) FROM kpi_records "
+                    "WHERE store_id = :sid AND kpi_id = 'KPI_REVENUE' "
+                    "  AND record_date >= :start AND record_date <= :end"
+                ),
+                {
+                    "sid": self.store_id,
+                    "start": target_date - timedelta(days=29),
+                    "end": target_date,
+                },
+            )
+            row3 = r3.fetchone()
+            avg_daily_revenue = float(row3[0]) if (row3 and row3[0]) else 0.0
+            monthly_revenue = avg_daily_revenue * 30
+
+            if variance_pct <= 1.0:
+                status = "ok"
+            elif variance_pct <= 3.0:
+                status = "warning"
+            else:
+                status = "critical"
+
+            return {
+                "variance_status": status,
+                "actual_cost_pct": actual_pct,
+                "theoretical_pct": target_pct,
+                "variance_pct": variance_pct,
+                "revenue_yuan": monthly_revenue / 30 * 7,  # 模拟7天营收
+                "top_ingredients": [],
+                "period_label": "近30天KPI",
+            }
+        except Exception as exc:
+            self.logger.warning("kpi_records_fallback_failed", error=str(exc))
+            return {"variance_status": "ok"}
 
     # ── 数据源3：推理引擎（可选） ─────────────────────────────────────────────────
 
