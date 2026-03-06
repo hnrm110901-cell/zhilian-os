@@ -27,7 +27,7 @@ class Order(Base, TimestampMixin):
 
     __tablename__ = "orders"
 
-    id = Column(String(50), primary_key=True)  # e.g., ORD_20240217_001
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)  # DB stores UUID
     store_id = Column(String(50), ForeignKey("stores.id"), nullable=False, index=True)
     table_number = Column(String(20))
     customer_name = Column(String(100))
@@ -35,9 +35,9 @@ class Order(Base, TimestampMixin):
 
     # Order details
     status = Column(String(20), default=OrderStatus.PENDING.value, nullable=False, index=True)
-    total_amount = Column(Integer, nullable=False)  # Amount in cents
+    total_amount = Column(Numeric(10, 2), nullable=False)  # stored as yuan in DB
     discount_amount = Column(Integer, default=0)
-    final_amount = Column(Integer, nullable=False)
+    final_amount = Column(Integer)
 
     # Timestamps
     order_time = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -75,14 +75,14 @@ class OrderItem(Base, TimestampMixin):
     __tablename__ = "order_items"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    order_id = Column(String(50), ForeignKey("orders.id"), nullable=False, index=True)
+    order_id = Column(UUID(as_uuid=True), ForeignKey("orders.id"), nullable=False, index=True)
 
     # Item details
     item_id = Column(String(50), nullable=False)
     item_name = Column(String(100), nullable=False)
     quantity = Column(Integer, nullable=False)
-    unit_price = Column(Integer, nullable=False)  # Price in cents
-    subtotal = Column(Integer, nullable=False)  # quantity * unit_price
+    unit_price = Column(Numeric(10, 2), nullable=False)  # yuan in DB
+    subtotal = Column(Numeric(10, 2), nullable=False)    # yuan in DB
 
     # 食材实际成本（BOM 理论成本）
     food_cost_actual = Column(Integer, nullable=True)       # 分，BOM 理论成本
