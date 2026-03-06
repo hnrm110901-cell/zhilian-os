@@ -225,30 +225,42 @@ async def hq_overview(
         if cached:
             return {**cached, "_from_cache": True}
 
-    health_task = _fetch_all_stores_health(db)
-    fc_rank_task = _fetch_hq_food_cost_ranking(db)
-    pending_task = _fetch_pending_count(store_id=None, db=db)
+    health_task       = _fetch_all_stores_health(db)
+    fc_rank_task      = _fetch_hq_food_cost_ranking(db)
+    pending_task      = _fetch_pending_count(store_id=None, db=db)
+    trend_task        = _fetch_revenue_trend(db)
+    decisions_task    = _fetch_cross_store_decisions(db)
 
-    health_ranking, fc_ranking, pending = await asyncio.gather(
-        _safe(health_task,    default=[]),
-        _safe(fc_rank_task,   default=[]),
-        _safe(pending_task,   default=0),
+    health_ranking, fc_ranking, pending, revenue_trend, cross_decisions = await asyncio.gather(
+        _safe(health_task,       default=[]),
+        _safe(fc_rank_task,      default=[]),
+        _safe(pending_task,      default=0),
+        _safe(trend_task,        default={}),
+        _safe(decisions_task,    default=[]),
     )
 
     # 计算汇总指标
     avg_health = (
-        round(sum(s.get("total_score", 0) for s in health_ranking) / len(health_ranking), 1)
+        round(sum(s.get("score", 0) for s in health_ranking) / len(health_ranking), 1)
         if health_ranking else 0.0
     )
+    total_revenue_yuan = round(sum(s.get("revenue_yuan", 0) or 0 for s in health_ranking), 2)
+    critical_count     = sum(1 for s in health_ranking if s.get("level") == "critical")
+    warning_count      = sum(1 for s in health_ranking if s.get("level") == "warning")
 
     payload = {
-        "as_of":                   datetime.utcnow().isoformat(),
-        "stores_health_ranking":   health_ranking,
-        "food_cost_ranking":       fc_ranking,
-        "pending_approvals_count": pending,
+        "as_of":                    datetime.utcnow().isoformat(),
+        "stores_health_ranking":    health_ranking,
+        "food_cost_ranking":        fc_ranking,
+        "pending_approvals_count":  pending,
+        "revenue_trend":            revenue_trend,
+        "cross_store_decisions":    cross_decisions,
         "hq_summary": {
-            "store_count":        len(health_ranking),
-            "avg_health_score":   avg_health,
+            "store_count":          len(health_ranking),
+            "avg_health_score":     avg_health,
+            "total_revenue_yuan":   total_revenue_yuan,
+            "critical_store_count": critical_count,
+            "warning_store_count":  warning_count,
         },
     }
 
@@ -517,10 +529,133 @@ async def _fetch_all_stores_health(db: AsyncSession) -> List[Dict]:
 
 async def _fetch_hq_food_cost_ranking(db: AsyncSession) -> List[Dict]:
     from src.services.food_cost_service import FoodCostService
+    from sqlalchemy import text
     from datetime import timedelta
     end   = date.today()
     start = end - timedelta(days=7)
     result = await FoodCostService.get_hq_food_cost_ranking(
         start_date=start, end_date=end, db=db
     )
-    return result.get("stores", []) if isinstance(result, dict) else []
+    stores = result.get("stores", []) if isinstance(result, dict) else []
+
+    # 若 BOM 数据缺失（全部 actual_cost_pct=0），回退读 kpi_records
+    if all(s.get("actual_cost_pct", 0) == 0 for s in stores):
+        stores = await _food_cost_ranking_from_kpi(db)
+
+    return stores
+
+
+async def _food_cost_ranking_from_kpi(db: AsyncSession) -> List[Dict]:
+    """从 kpi_records 读取各店近30天 KPI_COST_RATE 均值，生成食材成本排名。"""
+    from sqlalchemy import text
+    from datetime import timedelta
+    end   = date.today()
+    start = end - timedelta(days=29)
+    rows = await db.execute(
+        text("""
+            SELECT kr.store_id,
+                   s.name AS store_name,
+                   ROUND(AVG(kr.value)::numeric, 2) AS actual_cost_pct,
+                   COALESCE(s.cost_ratio_target * 100, 33.0) AS target_pct
+            FROM kpi_records kr
+            JOIN stores s ON s.id = kr.store_id
+            WHERE kr.kpi_id = 'KPI_COST_RATE'
+              AND kr.record_date >= :start
+              AND kr.record_date <= :end
+            GROUP BY kr.store_id, s.name, s.cost_ratio_target
+            ORDER BY actual_cost_pct DESC
+        """),
+        {"start": start, "end": end},
+    )
+    result = []
+    for i, r in enumerate(rows.fetchall(), start=1):
+        actual = float(r[2])
+        target = float(r[3])
+        result.append({
+            "store_id":       r[0],
+            "store_name":     r[1],
+            "actual_cost_pct": actual,
+            "theoretical_pct": target,
+            "variance_pct":   round(actual - target, 2),
+            "variance_status": (
+                "critical" if actual - target > 3
+                else "warning" if actual - target > 1
+                else "ok"
+            ),
+            "rank": i,
+        })
+    return result
+
+
+async def _fetch_revenue_trend(db: AsyncSession) -> Dict:
+    """近7天全平台按门店每日营收趋势（从 kpi_records 读取）。"""
+    from sqlalchemy import text
+    from datetime import timedelta
+    end   = date.today()
+    start = end - timedelta(days=6)
+    rows = await db.execute(
+        text("""
+            SELECT kr.store_id, s.name, kr.record_date, kr.value
+            FROM kpi_records kr
+            JOIN stores s ON s.id = kr.store_id
+            WHERE kr.kpi_id = 'KPI_REVENUE'
+              AND kr.record_date >= :start
+              AND kr.record_date <= :end
+            ORDER BY kr.store_id, kr.record_date
+        """),
+        {"start": start, "end": end},
+    )
+    all_rows = rows.fetchall()
+
+    # 构建日期序列
+    dates = [(start + timedelta(days=i)).isoformat() for i in range(7)]
+
+    # 按 store_id 归组
+    store_map: Dict[str, Dict] = {}
+    for r in all_rows:
+        sid = r[0]
+        if sid not in store_map:
+            store_map[sid] = {"store_id": sid, "store_name": r[1], "values": {}}
+        store_map[sid]["values"][r[2].isoformat()] = round(float(r[3]), 2)
+
+    stores = []
+    for sid, info in store_map.items():
+        stores.append({
+            "store_id":   sid,
+            "store_name": info["store_name"],
+            "values":     [info["values"].get(d, 0) for d in dates],
+        })
+
+    return {"dates": dates, "stores": stores}
+
+
+async def _fetch_cross_store_decisions(db: AsyncSession) -> List[Dict]:
+    """跨门店紧急决策汇总：取库存告警最多5家店的 Top1 决策，合并排序。"""
+    from sqlalchemy import text
+    # 查有 critical/out_of_stock 库存告警的门店，最多取5家
+    rows = await db.execute(
+        text("""
+            SELECT DISTINCT store_id FROM inventory_items
+            WHERE status IN ('critical', 'out_of_stock')
+            LIMIT 5
+        """)
+    )
+    store_ids = [r[0] for r in rows.fetchall()]
+    if not store_ids:
+        return []
+
+    from src.services.decision_priority_engine import DecisionPriorityEngine
+    tasks = [
+        _safe(DecisionPriorityEngine(store_id=sid).get_top3(db=db), default=[])
+        for sid in store_ids
+    ]
+    results = await asyncio.gather(*tasks)
+
+    merged = []
+    for sid, decisions in zip(store_ids, results):
+        if decisions:
+            top = decisions[0]
+            merged.append({**top, "store_id": sid})
+
+    merged.sort(key=lambda x: x.get("priority_score", 0), reverse=True)
+    return merged[:5]

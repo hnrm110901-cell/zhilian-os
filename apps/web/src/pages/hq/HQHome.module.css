@@ -8,27 +8,83 @@
   background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
-
 .title { font-size: 24px; font-weight: 700; color: var(--text-primary); }
 .sub   { font-size: 12px; color: var(--text-tertiary); margin-top: 3px; }
 
 .body {
   flex: 1;
-  padding: 20px 24px 32px;
+  padding: 20px 24px 40px;
   display: flex;
   flex-direction: column;
   gap: 20px;
-  max-width: 1200px;
+  max-width: 1400px;
 }
 
 .kpiRow {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
 }
 
-@media (max-width: 600px) {
-  .kpiRow { grid-template-columns: 1fr; }
-  .body { padding: 12px; gap: 12px; }
+.criticalBanner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  border-radius: 8px;
+  color: #dc2626;
+  font-size: 14px;
+}
+
+.mainGrid {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.bottomGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.healthList { display: flex; flex-direction: column; gap: 2px; max-height: 340px; overflow-y: auto; }
+.healthRow  { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 1px solid var(--border); }
+.healthRow:last-child { border-bottom: none; }
+.healthRank { font-size: 11px; color: var(--text-tertiary); width: 22px; text-align: right; flex-shrink: 0; }
+.healthMeta { flex: 1; min-width: 0; }
+.healthName { font-size: 13px; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.healthDim  { font-size: 11px; color: var(--text-tertiary); margin-top: 1px; }
+.healthRight { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
+.healthRev  { font-size: 11px; color: var(--text-secondary); }
+
+.fcList    { display: flex; flex-direction: column; gap: 10px; max-height: 320px; overflow-y: auto; }
+.fcRow     { display: flex; align-items: center; gap: 10px; }
+.fcRank    { font-size: 12px; color: var(--text-tertiary); width: 18px; text-align: right; flex-shrink: 0; }
+.fcMeta    { flex: 1; min-width: 0; }
+.fcName    { font-size: 13px; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
+.fcBarWrap { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.fcFill    { height: 100%; border-radius: 3px; }
+.fcValues  { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; flex-shrink: 0; }
+.fcActual  { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.fcVariance { font-size: 11px; font-weight: 500; }
+
+.decList   { display: flex; flex-direction: column; gap: 2px; max-height: 320px; overflow-y: auto; }
+.decRow    { display: flex; align-items: center; gap: 10px; padding: 9px 4px; border-bottom: 1px solid var(--border); }
+.decRow:last-child { border-bottom: none; }
+.decMeta   { flex: 1; min-width: 0; }
+.decTitle  { font-size: 13px; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.decStore  { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+.decSaving { font-size: 13px; font-weight: 700; color: var(--accent); flex-shrink: 0; }
+
+@media (max-width: 900px) {
+  .kpiRow     { grid-template-columns: repeat(2, 1fr); }
+  .mainGrid   { grid-template-columns: 1fr; }
+  .bottomGrid { grid-template-columns: 1fr; }
+  .body   { padding: 12px; gap: 14px; }
   .header { padding: 16px; }
 }
