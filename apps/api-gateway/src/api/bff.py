@@ -459,19 +459,25 @@ async def _fetch_today_reservations(
     store_id: str, target_date: Optional[date], db: AsyncSession
 ) -> List[Dict]:
     from sqlalchemy import text
-    tdate = target_date or date.today()
+    # 若未指定日期，用 DB 端的 UTC 当日（与 Python date.today() 保持一致，避免服务器时区差异）
+    if target_date:
+        date_clause = ":tdate"
+        params: dict = {"sid": store_id, "tdate": target_date.isoformat()}
+    else:
+        date_clause = "(NOW() AT TIME ZONE 'UTC')::date"
+        params = {"sid": store_id}
     result = await db.execute(
-        text("""
+        text(f"""
             SELECT id, customer_name, party_size, reservation_date,
                    reservation_time, table_number, status, notes
             FROM reservations
             WHERE store_id = :sid
-              AND reservation_date = :tdate
+              AND reservation_date = {date_clause}
               AND status NOT IN ('cancelled', 'no_show')
             ORDER BY reservation_time ASC NULLS LAST
             LIMIT 10
         """),
-        {"sid": store_id, "tdate": tdate.isoformat()},
+        params,
     )
     rows = result.fetchall()
     return [
