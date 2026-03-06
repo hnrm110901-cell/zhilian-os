@@ -120,16 +120,18 @@ const OpsMonitoringPage = lazy(() => import('./pages/OpsMonitoringPage'));
 
 // Role-based views (Phase 1 — Store Manager /sm)
 const StoreManagerLayout = lazy(() => import('./layouts/StoreManagerLayout'));
-const SmHome     = lazy(() => import('./pages/sm/Home'));
-const SmBusiness = lazy(() => import('./pages/sm/Business'));
+const SmHome      = lazy(() => import('./pages/sm/Home'));
+const SmBusiness  = lazy(() => import('./pages/sm/Business'));
+const SmDecisions = lazy(() => import('./pages/sm/Decisions'));
 
 // Role-based views (Phase 2 — Chef /chef, Floor /floor, HQ /hq)
-const ChefLayout = lazy(() => import('./layouts/ChefLayout'));
-const ChefHome   = lazy(() => import('./pages/chef/Home'));
+const ChefLayout  = lazy(() => import('./layouts/ChefLayout'));
+const ChefHome    = lazy(() => import('./pages/chef/Home'));
 const FloorLayout = lazy(() => import('./layouts/FloorLayout'));
-const FloorHome  = lazy(() => import('./pages/floor/Home'));
-const HQLayout   = lazy(() => import('./layouts/HQLayout'));
-const HQHome     = lazy(() => import('./pages/hq/Home'));
+const FloorHome   = lazy(() => import('./pages/floor/Home'));
+const HQLayout    = lazy(() => import('./layouts/HQLayout'));
+const HQHome      = lazy(() => import('./pages/hq/Home'));
+const HQStores    = lazy(() => import('./pages/hq/Stores'));
 
 const PageLoader = (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
@@ -455,7 +457,8 @@ const AppContent: React.FC = () => {
                   </ProtectedRoute>
                 }>
                   <Route index element={<SmHome />} />
-                  <Route path="business" element={<SmBusiness />} />
+                  <Route path="business"  element={<SmBusiness />} />
+                  <Route path="decisions" element={<SmDecisions />} />
                 </Route>
 
                 {/* Role-based views — Chef (手机) */}
@@ -483,6 +486,7 @@ const AppContent: React.FC = () => {
                   </ProtectedRoute>
                 }>
                   <Route index element={<HQHome />} />
+                  <Route path="stores" element={<HQStores />} />
                 </Route>
               </Routes>
             </Suspense>

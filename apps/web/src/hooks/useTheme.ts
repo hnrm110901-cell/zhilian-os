@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { injectTokens } from '../design-system/tokens/index';
 
 export type Theme = 'light' | 'dark' | 'auto';
 
@@ -15,12 +16,18 @@ const getAppliedTheme = (theme: Theme): 'light' | 'dark' => {
   return theme === 'auto' ? getSystemTheme() : theme;
 };
 
-// 应用主题到DOM，同步更新 theme-color meta
+// 应用主题到DOM，同步更新 theme-color meta，并重注入 Design Tokens
 const applyTheme = (theme: 'light' | 'dark') => {
   document.documentElement.setAttribute('data-theme', theme);
+  if (theme === 'dark') {
+    document.documentElement.classList.add('dark');
+  } else {
+    document.documentElement.classList.remove('dark');
+  }
+  injectTokens();
   const metaThemeColor = document.querySelector('meta[name="theme-color"]');
   if (metaThemeColor) {
-    metaThemeColor.setAttribute('content', theme === 'dark' ? '#1f1f1f' : '#667eea');
+    metaThemeColor.setAttribute('content', theme === 'dark' ? '#1C1C1E' : '#F5F5F7');
   }
 };
 

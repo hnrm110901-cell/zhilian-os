@@ -8,6 +8,8 @@ export { default as ZSkeleton } from './ZSkeleton';
 export { default as ZAvatar } from './ZAvatar';
 export { default as ZTabs } from './ZTabs';
 export { default as ZTable } from './ZTable';
+export { default as ZModal } from './ZModal';
+export { default as ZSelect } from './ZSelect';
 // Business components
 export { default as HealthRing } from './HealthRing';
 export { default as UrgencyList } from './UrgencyList';
