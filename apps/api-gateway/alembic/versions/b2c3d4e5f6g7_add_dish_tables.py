@@ -103,7 +103,7 @@ def upgrade() -> None:
         sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column('store_id', sa.String(50), sa.ForeignKey('stores.id'), nullable=False),
         sa.Column('dish_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('dishes.id'), nullable=False),
-        sa.Column('ingredient_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('inventory_items.id'), nullable=False),
+        sa.Column('ingredient_id', sa.String(50), sa.ForeignKey('inventory_items.id'), nullable=False),
         sa.Column('quantity', sa.Numeric(10, 3), nullable=False),
         sa.Column('unit', sa.String(20), nullable=False),
         sa.Column('cost_per_serving', sa.Numeric(10, 2)),

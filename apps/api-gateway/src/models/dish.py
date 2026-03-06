@@ -146,7 +146,7 @@ class DishIngredient(Base, TimestampMixin):
 
     # 关联信息
     dish_id = Column(UUID(as_uuid=True), ForeignKey("dishes.id"), nullable=False)
-    ingredient_id = Column(UUID(as_uuid=True), ForeignKey("inventory_items.id"), nullable=False)
+    ingredient_id = Column(String(50), ForeignKey("inventory_items.id"), nullable=False)
 
     # 用量信息
     quantity = Column(Numeric(10, 3), nullable=False)  # 用量
