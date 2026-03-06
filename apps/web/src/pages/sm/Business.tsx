@@ -17,11 +17,12 @@ const STORE_ID = localStorage.getItem('store_id') || 'S001';
 interface ChefData {
   store_id:           string;
   food_cost_variance: null | {
-    actual_pct:           number;
-    theoretical_pct:      number;
-    variance_pct:         number;
-    variance_yuan:        number;
-    period_label:         string;
+    actual_cost_pct:  number;
+    theoretical_pct:  number;
+    variance_pct:     number;
+    actual_cost_yuan: number;
+    revenue_yuan:     number;
+    period_label:     string;
   };
   waste_top5: Array<{
     item_name:        string;
@@ -61,6 +62,9 @@ export default function SmBusiness() {
 
   const fc = data?.food_cost_variance;
   const variance = fc?.variance_pct ?? 0;
+  const varianceYuan = fc
+    ? Math.abs(fc.actual_cost_yuan - fc.revenue_yuan * fc.theoretical_pct / 100)
+    : 0;
 
   return (
     <div className={styles.page}>
@@ -95,7 +99,7 @@ export default function SmBusiness() {
             {fc ? (
               <div className={styles.fcRow}>
                 <ZKpi
-                  value={fc.actual_pct.toFixed(1)}
+                  value={fc.actual_cost_pct.toFixed(1)}
                   label="实际成本率"
                   unit="%"
                   change={-variance}
@@ -103,7 +107,7 @@ export default function SmBusiness() {
                   size="lg"
                 />
                 <ZKpi
-                  value={Math.abs(fc.variance_yuan).toFixed(0)}
+                  value={varianceYuan.toFixed(0)}
                   label={variance > 0 ? '超支金额' : '节省金额'}
                   unit="元"
                   size="lg"

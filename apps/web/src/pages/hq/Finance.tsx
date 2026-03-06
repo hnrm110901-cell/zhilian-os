@@ -34,9 +34,6 @@ interface FctDashboard {
   };
 }
 
-const CURRENT_YEAR  = new Date().getFullYear();
-const CURRENT_MONTH = new Date().getMonth() + 1;
-
 // ¥ helper: prefer _yuan field, fallback to fen÷100
 const y = (yuan?: number, fen?: number) =>
   yuan != null ? yuan : fen != null ? fen / 100 : null;
@@ -68,9 +65,7 @@ export default function HQFinance() {
     setLoading(true);
     setError(null);
     try {
-      const resp = await apiClient.get('/api/v1/fct/dashboard', {
-        params: { store_id: storeId, year: CURRENT_YEAR, month: CURRENT_MONTH },
-      });
+      const resp = await apiClient.get(`/api/v1/fct/${storeId}/dashboard`);
       setData(resp.data);
     } catch (e: any) {
       setError(e?.response?.data?.detail || '数据加载失败');
