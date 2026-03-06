@@ -203,7 +203,7 @@ const DailyHubPage: React.FC = () => {
                           fontSize: 14,
                         }}
                       >
-                        {review.food_cost.actual_pct?.toFixed(1)}%
+                        {review.food_cost.actual_cost_pct?.toFixed(1)}%
                       </Text>
                       <Tag
                         color={

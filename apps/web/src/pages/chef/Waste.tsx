@@ -23,14 +23,14 @@ function getDateRange() {
 }
 
 interface WasteItem {
-  rank:               number;
-  ingredient_name:    string;
-  waste_amount_yuan:  number;
-  quantity:           number;
-  unit:               string;
-  proportion_pct:     number;
-  reason:             string;
-  suggested_action?:  string;
+  rank:             number;
+  item_name:        string;
+  waste_cost_yuan:  number;
+  waste_qty:        number;
+  unit:             string;
+  cost_share_pct:   number;
+  root_causes:      string[];
+  action?:          string;
 }
 
 interface WasteReport {
@@ -102,22 +102,22 @@ export default function ChefWaste() {
               <ZEmpty title="暂无损耗记录" />
             ) : (
               report.top5.map(item => {
-                const reason = REASON_LABELS[item.reason] ?? { label: item.reason, type: 'info' as const };
+                const reason = REASON_LABELS[item.root_causes?.[0]] ?? { label: item.root_causes?.[0] ?? '未知', type: 'info' as const };
                 return (
                   <div key={item.rank} className={styles.row}>
                     <div className={styles.rank}>#{item.rank}</div>
                     <div className={styles.info}>
-                      <div className={styles.name}>{item.ingredient_name}</div>
+                      <div className={styles.name}>{item.item_name}</div>
                       <div className={styles.sub}>
-                        {item.quantity.toFixed(1)}{item.unit} · 占比 {item.proportion_pct.toFixed(1)}%
+                        {item.waste_qty.toFixed(1)}{item.unit} · 占比 {item.cost_share_pct.toFixed(1)}%
                       </div>
-                      {item.suggested_action && (
-                        <div className={styles.action}>{item.suggested_action}</div>
+                      {item.action && (
+                        <div className={styles.action}>{item.action}</div>
                       )}
                     </div>
                     <div className={styles.right}>
                       <ZBadge type={reason.type} text={reason.label} />
-                      <span className={styles.yuan}>¥{item.waste_amount_yuan.toFixed(0)}</span>
+                      <span className={styles.yuan}>¥{item.waste_cost_yuan.toFixed(0)}</span>
                     </div>
                   </div>
                 );
