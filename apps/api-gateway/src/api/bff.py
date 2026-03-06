@@ -418,7 +418,7 @@ async def _fetch_waste_top5(store_id: str, db: AsyncSession) -> List[Dict]:
     result = await WasteGuardService.get_top5_waste(
         store_id=store_id, start_date=start, end_date=end, db=db
     )
-    return result.get("items", []) if isinstance(result, dict) else []
+    return result.get("top5", []) if isinstance(result, dict) else []
 
 
 async def _fetch_inventory_alerts(store_id: str, db: AsyncSession) -> List[Dict]:
