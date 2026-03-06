@@ -139,7 +139,7 @@ function WelcomeStep({ onNext }: { onNext: (storeId: string) => void }) {
           <ZInput
             placeholder="例如：S001"
             value={storeId}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setStoreId(e.target.value)}
+            onChange={(v) => setStoreId(v)}
           />
           <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 8 }}>
             也可以稍后在设置中修改
@@ -219,8 +219,8 @@ function ConnectStep({ storeId, onNext, onSkip }: { storeId: string; onNext: () 
               <ZInput
                 placeholder={`请输入 ${field}`}
                 value={credentials[field] || ''}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  setCredentials(prev => ({ ...prev, [field]: e.target.value }))
+                onChange={(v) =>
+                  setCredentials(prev => ({ ...prev, [field]: v }))
                 }
               />
             </div>
@@ -447,7 +447,7 @@ function BuildingStep({ storeId, onNext }: { storeId: string; onNext: () => void
   const [status, setStatus]             = useState('');
   const [error, setError]               = useState('');
   const [started, setStarted]           = useState(false);
-  const pollRef = useRef<ReturnType<typeof setTimeout>>();
+  const pollRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const poll = useCallback(async () => {
     try {
