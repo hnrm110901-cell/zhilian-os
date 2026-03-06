@@ -22,10 +22,10 @@ interface StoreHealth {
   weakest_dimension?: string;
 }
 interface FcRanking {
-  store_id:     string;
-  store_name:   string;
-  actual_pct:   number;
-  variance_pct: number;
+  store_id:        string;
+  store_name:      string;
+  actual_cost_pct: number;
+  variance_pct:    number;
 }
 interface HQData {
   as_of:                   string;
@@ -58,7 +58,7 @@ const HEALTH_COLS: ZTableColumn<StoreHealth>[] = [
 
 const FC_COLS: ZTableColumn<FcRanking>[] = [
   { key: 'store_name',  title: '门店' },
-  { key: 'actual_pct',  title: '实际成本率', align: 'right', render: (v) => `${Number(v).toFixed(1)}%` },
+  { key: 'actual_cost_pct',  title: '实际成本率', align: 'right', render: (v) => `${Number(v).toFixed(1)}%` },
   { key: 'variance_pct', title: '与目标差', align: 'right', render: (v) => (
     <span style={{ color: v > 0 ? 'var(--red)' : 'var(--green)', fontWeight: 600 }}>
       {v > 0 ? '+' : ''}{Number(v).toFixed(1)}%
