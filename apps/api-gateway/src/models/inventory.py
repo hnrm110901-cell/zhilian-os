@@ -49,8 +49,8 @@ class InventoryItem(Base, TimestampMixin):
     # Pricing
     unit_cost = Column(Integer)  # Cost in cents
 
-    # Status
-    status = Column(Enum(InventoryStatus), default=InventoryStatus.NORMAL, nullable=False, index=True)
+    # Status — stored as VARCHAR in DB, not PostgreSQL ENUM
+    status = Column(String(20), default=InventoryStatus.NORMAL.value, nullable=False, index=True)
 
     # Supplier info
     supplier_name = Column(String(100))
@@ -72,8 +72,8 @@ class InventoryTransaction(Base, TimestampMixin):
     item_id = Column(String(50), ForeignKey("inventory_items.id"), nullable=False, index=True)
     store_id = Column(String(50), ForeignKey("stores.id"), nullable=False, index=True)
 
-    # Transaction details
-    transaction_type = Column(Enum(TransactionType), nullable=False, index=True)
+    # Transaction details — stored as VARCHAR in DB
+    transaction_type = Column(String(20), nullable=False, index=True)
     quantity = Column(Float, nullable=False)  # Positive for in, negative for out
     unit_cost = Column(Integer)  # Cost in cents
     total_cost = Column(Integer)  # quantity * unit_cost
