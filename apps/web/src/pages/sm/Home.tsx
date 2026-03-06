@@ -27,7 +27,7 @@ interface BffSmData {
     confidence_pct:        number;
     urgency_hours:         number;
   }>;
-  queue_status:            null | { waiting_groups: number; avg_wait_minutes: number };
+  queue_status:            null | { waiting_count: number; avg_wait_min: number };
   pending_approvals_count: number;
 }
 
@@ -105,13 +105,13 @@ export default function SmHome() {
                 <div className={styles.kpiRow}>
                   <ZKpi value={data?.pending_approvals_count ?? 0} label="待审批" size="sm" />
                   <ZKpi
-                    value={data?.queue_status?.waiting_groups ?? 0}
+                    value={data?.queue_status?.waiting_count ?? 0}
                     label="排队桌"
                     unit="组"
                     size="sm"
                   />
                   <ZKpi
-                    value={data?.queue_status?.avg_wait_minutes ?? 0}
+                    value={data?.queue_status?.avg_wait_min ?? 0}
                     label="平均等待"
                     unit="分"
                     size="sm"

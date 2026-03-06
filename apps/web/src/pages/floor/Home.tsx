@@ -17,7 +17,7 @@ interface Reservation {
   id:               string;
   guest_name:       string;
   party_size:       number;
-  reservation_time: string;
+  reserved_time: string;
   table_number:     string | null;
   status:           string;
 }
@@ -29,13 +29,13 @@ interface ServiceAlert {
 }
 interface FloorData {
   store_id:          string;
-  queue_status:      null | { waiting_groups: number; avg_wait_minutes: number };
+  queue_status:      null | { waiting_count: number; avg_wait_min: number };
   today_reservations: Reservation[];
   service_alerts:    ServiceAlert[];
 }
 
 const RESV_COLUMNS: ZTableColumn<Reservation>[] = [
-  { key: 'reservation_time', title: '时间', render: (v) => v ? new Date(v).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '—' },
+  { key: 'reserved_time', title: '时间', render: (v) => v ? new Date(v).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '—' },
   { key: 'guest_name',       title: '客人' },
   { key: 'party_size',       title: '人数', align: 'center', render: (v) => `${v}人` },
   { key: 'table_number',     title: '桌号', align: 'center', render: (v) => v || '待分配' },
@@ -102,13 +102,13 @@ export default function FloorHome() {
           <ZCard title="当前排队">
             <div className={styles.queueRow}>
               <ZKpi
-                value={q?.waiting_groups ?? 0}
+                value={q?.waiting_count ?? 0}
                 label="等候桌数"
                 unit="组"
                 size="lg"
               />
               <ZKpi
-                value={q?.avg_wait_minutes ?? 0}
+                value={q?.avg_wait_min ?? 0}
                 label="平均等待"
                 unit="分钟"
                 size="lg"
