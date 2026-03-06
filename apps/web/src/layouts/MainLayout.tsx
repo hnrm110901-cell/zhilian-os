@@ -81,6 +81,7 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/bulk-import': 'business',
   '/my-schedule': 'agents',
   '/hq-dashboard': 'admin-system',
+  '/hq': 'role-views', '/sm': 'role-views', '/chef': 'role-views', '/floor': 'role-views',
   '/ai-accuracy': 'admin-ai',
   '/dish-cost': 'business', '/channel-profit': 'business', '/employee-performance': 'business', '/bom-management': 'business',
   '/waste-events': 'business', '/waste-reasoning': 'business', '/alert-thresholds': 'business', '/knowledge-rules': 'business',
@@ -214,6 +215,7 @@ const MainLayout: React.FC = () => {
     '/bulk-import': '数据导入',
     '/my-schedule': '我的班表',
     '/hq-dashboard': '总部看板',
+    '/hq': '总部大屏', '/sm': '店长移动端', '/chef': '厨师长看板', '/floor': '楼面经理看板',
     '/ai-accuracy': 'AI准确率回溯',
     '/dish-cost': '菜品成本分析',
     '/channel-profit': '渠道毛利看板',
@@ -322,6 +324,19 @@ const MainLayout: React.FC = () => {
       key: '/',
       icon: <DashboardOutlined />,
       label: '控制台',
+    },
+    {
+      key: 'role-views',
+      icon: <MobileOutlined />,
+      label: '角色视图',
+      children: [
+        ...(user?.role === 'admin' ? [
+          { key: '/hq',    icon: <ShopOutlined />,   label: '总部大屏' },
+        ] : []),
+        { key: '/sm',    icon: <MobileOutlined />,  label: '店长移动端' },
+        { key: '/chef',  icon: <TeamOutlined />,    label: '厨师长看板' },
+        { key: '/floor', icon: <HomeOutlined />,    label: '楼面经理看板' },
+      ],
     },
     {
       key: 'agents',

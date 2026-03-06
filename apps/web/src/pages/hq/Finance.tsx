@@ -39,7 +39,7 @@ const y = (yuan?: number, fen?: number) =>
   yuan != null ? yuan : fen != null ? fen / 100 : null;
 
 export default function HQFinance() {
-  const [storeId,  setStoreId]  = useState<string>('S001');
+  const [storeId,  setStoreId]  = useState<string>('');
   const [stores,   setStores]   = useState<StoreOption[]>([]);
   const [data,     setData]     = useState<FctDashboard | null>(null);
   const [loading,  setLoading]  = useState(false);
