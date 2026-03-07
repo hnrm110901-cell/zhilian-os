@@ -1,0 +1,424 @@
+/* ── Page ──────────────────────────────────────────────────────────────────── */
+
+.page {
+  padding: 0;
+}
+
+.pageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.pageHeaderLeft {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+/* ── KPI Strip ─────────────────────────────────────────────────────────────── */
+
+.kpiStrip {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+@media (max-width: 1200px) {
+  .kpiStrip {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .kpiStrip {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.kpiStripItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-right: 1px solid #f0f0f0;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: default;
+  transition: background 0.15s;
+}
+
+.kpiStripItem:hover {
+  background: #fafafa;
+}
+
+.kpiStripItem:nth-child(6n) {
+  border-right: none;
+}
+
+.kpiStripIcon {
+  font-size: 18px;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f5f5f5;
+  border-radius: 8px;
+}
+
+.kpiStripBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.kpiStripLabel {
+  font-size: 12px;
+  color: #8c8c8c;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.kpiStripValue {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.kpiStripUnit {
+  font-size: 12px;
+  font-weight: 400;
+  margin-left: 2px;
+  color: #8c8c8c;
+}
+
+.kpiStripBadge {
+  flex-shrink: 0;
+}
+
+/* ── Cards ─────────────────────────────────────────────────────────────────── */
+
+.card {
+  height: 100%;
+}
+
+/* ── Phase navigation ──────────────────────────────────────────────────────── */
+
+.phaseNav {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 14px;
+}
+
+.phaseBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid #e8e8e8;
+  border-radius: 6px;
+  font-size: 13px;
+  background: #fafafa;
+  color: #595959;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.phaseBtn:hover {
+  border-color: #1890ff;
+  color: #1890ff;
+  background: #e6f7ff;
+}
+
+.phaseBtnCurrent {
+  border-color: #52c41a !important;
+  background: #f6ffed !important;
+  color: #389e0d !important;
+}
+
+.phaseBtnSelected {
+  border-color: #1890ff;
+  color: #1890ff;
+  background: #e6f7ff;
+}
+
+.phaseBtnCurrent.phaseBtnSelected {
+  border-color: #52c41a;
+  background: #52c41a;
+  color: #fff;
+}
+
+.phaseDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Phase detail ──────────────────────────────────────────────────────────── */
+
+.phaseDetail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.phaseSection {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.phaseSectionTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: #595959;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.phaseItem {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: #434343;
+  padding: 2px 0;
+  line-height: 1.5;
+}
+
+.aiTip {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  background: #f9f0ff;
+  border: 1px solid #d3adf7;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: #531dab;
+  line-height: 1.6;
+}
+
+/* ── Event cards ───────────────────────────────────────────────────────────── */
+
+.eventCard {
+  padding: 10px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  border-left: 3px solid transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transition: background 0.15s;
+}
+
+.eventCard:hover {
+  background: #fafafa;
+}
+
+.eventCard:last-child {
+  border-bottom: none;
+}
+
+.eventCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.eventCardAction {
+  padding: 0;
+  height: auto;
+  font-size: 12px;
+  margin-top: 4px;
+  align-self: flex-start;
+}
+
+/* ── Empty state ───────────────────────────────────────────────────────────── */
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px 16px;
+  color: #8c8c8c;
+  font-size: 13px;
+  text-align: center;
+}
+
+/* ── Decision cards ────────────────────────────────────────────────────────── */
+
+.decisionsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 992px) {
+  .decisionsGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.decisionCard {
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.decisionCardHeader {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.decisionCardTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #262626;
+  line-height: 1.4;
+}
+
+.decisionCardMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 2px;
+  padding-top: 6px;
+  border-top: 1px solid #f0f0f0;
+}
+
+/* ── Board preview strip ───────────────────────────────────────────────────── */
+
+.boardStrip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 16px;
+}
+
+@media (max-width: 992px) {
+  .boardStrip {
+    grid-template-columns: 1fr;
+  }
+}
+
+.boardStripItem {
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.boardStripIcon {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.boardStripBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.boardStripLabel {
+  font-size: 11px;
+  color: #8c8c8c;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.boardStripValue {
+  font-size: 18px;
+  font-weight: 700;
+  color: #262626;
+  line-height: 1.3;
+}
+
+.boardStripSub {
+  font-size: 11px;
+  color: #8c8c8c;
+}
+
+/* ── AI panel (drawer) ─────────────────────────────────────────────────────── */
+
+.aiPanel {
+  padding: 20px 16px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.aiSuggestionsTitle {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 10px;
+  color: #262626;
+}
+
+.aiSuggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 0;
+}
+
+.aiSuggestionItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+  background: #fafafa;
+  border-radius: 8px;
+  border: 1px solid #f0f0f0;
+}
+
+.aiSuggestionRank {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.aiSuggestionText {
+  font-size: 13px;
+  color: #262626;
+  line-height: 1.5;
+}
+
+.aiActionsTitle {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 10px;
+  color: #262626;
+}
+
+.aiActionBtn {
+  text-align: left !important;
+  height: 40px !important;
+  margin-bottom: 8px;
+}
