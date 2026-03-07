@@ -26,6 +26,7 @@ class VectorDatabaseService:
         self.qdrant_api_key = settings.QDRANT_API_KEY
         self.client = None
         self.embedding_model = None
+        self.embedding_degraded: bool = False  # True 表示当前使用伪随机向量降级
 
         logger.info("VectorDatabaseService初始化完成")
 
@@ -50,10 +51,12 @@ class VectorDatabaseService:
                     self.embedding_model = SentenceTransformer(model_name)
                     logger.info("嵌入模型加载成功", model=model_name)
                 except Exception as e:
-                    logger.warning("嵌入模型加载失败，将使用模拟嵌入", error=str(e))
+                    logger.warning("嵌入模型加载失败，将使用模拟嵌入", error=str(e), degraded=True)
                     self.embedding_model = None
+                    self.embedding_degraded = True
             else:
                 logger.info("RAG_ENABLED=false，跳过嵌入模型加载")
+                self.embedding_degraded = True
 
             # 创建集合（如果不存在）
             await self._ensure_collections()
@@ -127,6 +130,11 @@ class VectorDatabaseService:
             return embedding.tolist()
         else:
             # 嵌入模型不可用时，使用确定性哈希向量（语义无意义，仅保证服务不崩溃）
+            logger.warning(
+                "嵌入模型不可用，使用哈希向量（语义检索结果失真）",
+                degraded=True,
+                text_preview=text[:50],
+            )
             import random
             random.seed(hashlib.md5(text.encode()).hexdigest())
             return [random.random() for _ in range(int(os.getenv("VECTOR_EMBEDDING_DIM", "384")))]

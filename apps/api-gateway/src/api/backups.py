@@ -6,11 +6,13 @@ import os
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
 from src.core.database import get_db
+from src.core.dependencies import get_current_active_user, require_role
+from src.models.user import User, UserRole
 
 router = APIRouter(prefix="/api/v1/backups", tags=["backups"])
 
@@ -18,11 +20,11 @@ router = APIRouter(prefix="/api/v1/backups", tags=["backups"])
 class BackupCreateRequest(BaseModel):
     backup_type: str = "full"          # full / incremental
     since_timestamp: Optional[str] = None  # ISO 8601，增量备份起始时间
-    tables: List[str] = []             # 空列表 = 全部表
+    tables: List[str] = Field(default_factory=list)  # 空列表 = 全部表
 
 
 @router.get("/types")
-async def get_backup_types():
+async def get_backup_types(_: User = Depends(get_current_active_user)):
     """支持的备份类型"""
     return {
         "types": [
@@ -33,7 +35,11 @@ async def get_backup_types():
 
 
 @router.post("/", status_code=202)
-async def create_backup(req: BackupCreateRequest, db: AsyncSession = Depends(get_db)):
+async def create_backup(
+    req: BackupCreateRequest,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_role(UserRole.ADMIN)),
+):
     """触发备份任务，立即返回 job_id，后台异步执行"""
     if req.backup_type not in ("full", "incremental"):
         raise HTTPException(status_code=400, detail="backup_type 必须为 full 或 incremental")
@@ -83,6 +89,7 @@ async def list_backups(
     offset: int = 0,
     status: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_active_user),
 ):
     """查询备份任务列表"""
     if status:
@@ -111,7 +118,11 @@ async def list_backups(
 
 
 @router.get("/{job_id}")
-async def get_backup(job_id: str, db: AsyncSession = Depends(get_db)):
+async def get_backup(
+    job_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_active_user),
+):
     """查询单个备份任务状态"""
     result = await db.execute(
         text("SELECT * FROM backup_jobs WHERE id = :id"),
@@ -128,7 +139,11 @@ async def get_backup(job_id: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/{job_id}/download")
-async def download_backup(job_id: str, db: AsyncSession = Depends(get_db)):
+async def download_backup(
+    job_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_active_user),
+):
     """下载备份压缩包（仅 completed 状态可下载）"""
     result = await db.execute(
         text("SELECT status, file_path, backup_type, created_at FROM backup_jobs WHERE id = :id"),
@@ -151,7 +166,11 @@ async def download_backup(job_id: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.delete("/{job_id}", status_code=204)
-async def delete_backup(job_id: str, db: AsyncSession = Depends(get_db)):
+async def delete_backup(
+    job_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_role(UserRole.ADMIN)),
+):
     """删除备份任务记录及临时文件"""
     result = await db.execute(
         text("SELECT file_path FROM backup_jobs WHERE id = :id"),

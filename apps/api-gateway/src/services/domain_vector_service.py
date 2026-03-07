@@ -61,6 +61,7 @@ class DomainVectorService:
         self.qdrant_api_key = os.getenv("QDRANT_API_KEY", "")
         self.client = None
         self.embedding_model = None
+        self.embedding_degraded: bool = False  # True 表示当前使用伪随机向量降级
         self._ensured: set[str] = set()   # 已确认存在的 collection 缓存
 
     async def initialize(self):
@@ -73,6 +74,7 @@ class DomainVectorService:
         rag_enabled = os.getenv("RAG_ENABLED", "true").lower() not in ("false", "0", "no")
         if not rag_enabled:
             logger.info("RAG_ENABLED=false，跳过嵌入模型加载，使用哈希向量")
+            self.embedding_degraded = True
             return
         try:
             from sentence_transformers import SentenceTransformer
@@ -80,13 +82,19 @@ class DomainVectorService:
             self.embedding_model = SentenceTransformer(model_name)
             logger.info("DomainVectorService 嵌入模型加载成功", model=model_name)
         except Exception as e:
-            logger.warning("嵌入模型加载失败，使用哈希向量", error=str(e))
+            logger.warning("嵌入模型加载失败，使用哈希向量降级", error=str(e), degraded=True)
             self.embedding_model = None
+            self.embedding_degraded = True
 
     def _embed(self, text: str) -> List[float]:
-        """生成嵌入向量"""
+        """生成嵌入向量。降级时使用语义无意义的哈希向量，并记录告警。"""
         if self.embedding_model:
             return self.embedding_model.encode(text).tolist()
+        logger.warning(
+            "嵌入模型不可用，使用哈希向量（语义检索结果失真）",
+            degraded=True,
+            text_preview=text[:50],
+        )
         import random
         random.seed(hashlib.md5(text.encode()).hexdigest())
         return [random.random() for _ in range(384)]
@@ -245,7 +253,10 @@ class DomainVectorService:
                 limit=top_k,
                 score_threshold=score_threshold if score_threshold > 0 else None,
             )
-            return [{"score": r.score, "payload": r.payload} for r in results]
+            hits = [{"score": r.score, "payload": r.payload} for r in results]
+            if self.embedding_degraded:
+                logger.warning("搜索结果基于降级哈希向量，语义相关性不可靠", degraded=True)
+            return hits
         except Exception as e:
             logger.error("领域搜索失败", domain=domain, store_id=store_id, error=str(e))
             return []

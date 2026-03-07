@@ -6,13 +6,12 @@ Prophet 时序预测服务
 - 自动捕捉周季节性、年季节性
 - 内置中国节假日效应
 - 置信区间输出
-- 模型持久化（Redis 缓存，避免每次重训）
+- 预测结果 JSON 缓存（不缓存 pickle 对象，避免反序列化风险）
 
 降级策略：Prophet 未安装或数据不足时，回退到 EnhancedForecastService。
 """
 import json
 import os
-import pickle
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
@@ -57,27 +56,31 @@ class ProphetForecastService:
             self._redis = aioredis.from_url(os.getenv("REDIS_URL", "redis://localhost:6379"))
         return self._redis
 
-    def _cache_key(self, store_id: str, metric: str) -> str:
-        return f"prophet:model:{store_id}:{metric}"
+    def _cache_key(self, store_id: str, metric: str, horizon_days: int) -> str:
+        return f"prophet:forecast:{store_id}:{metric}:{horizon_days}"
 
-    async def _load_model(self, store_id: str, metric: str):
-        """从 Redis 加载缓存的 Prophet 模型"""
+    async def _load_forecast_cache(self, store_id: str, metric: str, horizon_days: int) -> Optional[Dict]:
+        """从 Redis 加载缓存的预测结果（JSON，非 pickle）"""
         try:
             r = await self._get_redis()
-            data = await r.get(self._cache_key(store_id, metric))
+            data = await r.get(self._cache_key(store_id, metric, horizon_days))
             if data:
-                return pickle.loads(data)
+                return json.loads(data)
         except Exception as e:
-            logger.warning("Prophet 模型缓存读取失败", error=str(e))
+            logger.warning("Prophet 预测缓存读取失败", error=str(e))
         return None
 
-    async def _save_model(self, store_id: str, metric: str, model) -> None:
-        """将训练好的 Prophet 模型序列化到 Redis"""
+    async def _save_forecast_cache(self, store_id: str, metric: str, horizon_days: int, result: Dict) -> None:
+        """将预测结果序列化为 JSON 写入 Redis（不使用 pickle）"""
         try:
             r = await self._get_redis()
-            await r.setex(self._cache_key(store_id, metric), MODEL_CACHE_TTL, pickle.dumps(model))
+            await r.setex(
+                self._cache_key(store_id, metric, horizon_days),
+                MODEL_CACHE_TTL,
+                json.dumps(result),
+            )
         except Exception as e:
-            logger.warning("Prophet 模型缓存写入失败", error=str(e))
+            logger.warning("Prophet 预测缓存写入失败", error=str(e))
 
     def _train(self, history: List[Dict[str, Any]], metric: str = "revenue"):
         """
@@ -151,18 +154,20 @@ class ProphetForecastService:
         """
         horizon_days = max(1, min(30, horizon_days))
 
-        # 尝试加载缓存模型
-        model = None if retrain else await self._load_model(store_id, metric)
+        # 尝试加载缓存的预测结果（JSON，非 pickle）
+        if not retrain:
+            cached = await self._load_forecast_cache(store_id, metric, horizon_days)
+            if cached:
+                return cached
 
-        # 训练新模型
-        if model is None:
-            model = self._train(history, metric)
-            if model is not None:
-                await self._save_model(store_id, metric, model)
+        # 训练新模型并生成预测
+        model = self._train(history, metric)
 
         if model is None:
             # 降级：用历史均值 + 简单趋势
-            return self._fallback_forecast(store_id, history, horizon_days, metric)
+            result = self._fallback_forecast(store_id, history, horizon_days, metric)
+            await self._save_forecast_cache(store_id, metric, horizon_days, result)
+            return result
 
         try:
             import pandas as pd
@@ -183,7 +188,7 @@ class ProphetForecastService:
             ]
 
             logger.info("Prophet 预测完成", store_id=store_id, metric=metric, horizon=horizon_days)
-            return {
+            result = {
                 "store_id": store_id,
                 "metric": metric,
                 "horizon_days": horizon_days,
@@ -191,9 +196,13 @@ class ProphetForecastService:
                 "model": "prophet",
                 "training_points": len(history),
             }
+            await self._save_forecast_cache(store_id, metric, horizon_days, result)
+            return result
         except Exception as e:
             logger.error("Prophet 预测失败，降级", error=str(e))
-            return self._fallback_forecast(store_id, history, horizon_days, metric)
+            result = self._fallback_forecast(store_id, history, horizon_days, metric)
+            await self._save_forecast_cache(store_id, metric, horizon_days, result)
+            return result
 
     def _fallback_forecast(
         self,
@@ -244,13 +253,17 @@ class ProphetForecastService:
         }
 
     async def invalidate_model(self, store_id: str, metric: str) -> None:
-        """清除门店指定指标的模型缓存（数据更新后调用）"""
+        """清除门店指定指标的所有预测缓存（数据更新后调用）"""
         try:
             r = await self._get_redis()
-            await r.delete(self._cache_key(store_id, metric))
-            logger.info("Prophet 模型缓存已清除", store_id=store_id, metric=metric)
+            # 清除所有 horizon 的预测缓存
+            pattern = f"prophet:forecast:{store_id}:{metric}:*"
+            keys = await r.keys(pattern)
+            if keys:
+                await r.delete(*keys)
+            logger.info("Prophet 预测缓存已清除", store_id=store_id, metric=metric, keys_deleted=len(keys))
         except Exception as e:
-            logger.warning("Prophet 模型缓存清除失败", error=str(e))
+            logger.warning("Prophet 预测缓存清除失败", error=str(e))
 
 
 # Singleton
