@@ -99,6 +99,7 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/employee-performance': 'nav-operations',
 
   // 03 商品与供应链
+  '/products-hub': 'nav-products',
   '/dishes': 'nav-products',
   '/bom-management': 'nav-products',
   '/inventory': 'nav-products',
@@ -189,7 +190,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   '/competitive-analysis': '竞争分析',
   '/report-templates': '报表模板',
   '/finance': '财务管理',
-  '/ops-hub': '门店运营中心',
+  '/products-hub': '商品与供应链中心',
   '/schedule': '智能排班',
   '/employees': '员工管理',
   '/my-schedule': '我的班表',
@@ -389,6 +390,7 @@ const MainLayout: React.FC = () => {
       icon: <InboxOutlined />,
       label: '商品与供应链',
       children: [
+        { key: '/products-hub',    icon: <AppstoreOutlined />,  label: '供应链中心' },
         { key: '/dishes',          icon: <ShoppingOutlined />,  label: '菜品管理' },
         { key: '/bom-management',  icon: <ReadOutlined />,      label: 'BOM配方' },
         { key: '/inventory',       icon: <InboxOutlined />,     label: '库存管理' },
