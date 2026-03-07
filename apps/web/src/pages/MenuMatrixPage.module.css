@@ -1,0 +1,76 @@
+.pageHeader {
+  margin-bottom: 16px;
+}
+
+.controlBar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+/* ── 矩阵散点图占位卡片 ─────────────────────────────────── */
+.matrixCanvas {
+  width: 100%;
+  height: 460px;
+}
+
+/* ── 象限颜色 ───────────────────────────────────────────── */
+.tagStar         { background: #fffbe6; border-color: #faad14; color: #d48806; }
+.tagCashCow      { background: #f6ffed; border-color: #52c41a; color: #389e0d; }
+.tagQuestionMark { background: #e6f4ff; border-color: #1677ff; color: #0958d9; }
+.tagDog          { background: #fff2f0; border-color: #ff4d4f; color: #cf1322; }
+
+/* ── 优先级徽标 ─────────────────────────────────────────── */
+.prioHigh   { color: #ff4d4f; font-weight: 700; }
+.prioMedium { color: #fa8c16; font-weight: 600; }
+.prioLow    { color: #8c8c8c; }
+
+/* ── 行着色 ─────────────────────────────────────────────── */
+.rowStar         { background: #fffbe6 !important; }
+.rowCashCow      { background: #f6ffed !important; }
+.rowQuestionMark { background: #e6f4ff !important; }
+.rowDog          { background: #fff2f0 !important; }
+
+/* ── 汇总卡片 ───────────────────────────────────────────── */
+.quadrantGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.quadrantCard {
+  border-radius: 10px;
+  padding: 16px;
+  text-align: center;
+  border: 1px solid #f0f0f0;
+}
+
+.qLabel { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+.qCount { font-size: 26px; font-weight: 800; }
+.qRevenue { font-size: 13px; color: #8c8c8c; margin-top: 2px; }
+.qImpact  { font-size: 12px; margin-top: 4px; }
+
+/* ── 行动榜 ─────────────────────────────────────────────── */
+.actionsRow {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+/* ── 历史 ───────────────────────────────────────────────── */
+.historySearch {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  align-items: center;
+}
+
+.historyHint {
+  color: #8c8c8c;
+  font-size: 13px;
+  padding: 40px;
+  text-align: center;
+}
