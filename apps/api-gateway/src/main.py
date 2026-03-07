@@ -617,6 +617,10 @@ from src.api.budget_alerts import budget_router, alerts_router
 app.include_router(budget_router)
 app.include_router(alerts_router)
 
+# 业财税资金 Agent — Phase 5 Month 5: 财务健康评分系统
+from src.api import finance_health
+app.include_router(finance_health.router)
+
 # ARCH-004 可信执行层（折扣申请 / 审批 / 审计日志 / 回滚）
 app.include_router(execution.router)
 # FEAT-004 动态菜单权重引擎（Top-N 推荐 + 5因子评分）

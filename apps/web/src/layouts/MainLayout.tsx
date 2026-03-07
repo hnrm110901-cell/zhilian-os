@@ -181,6 +181,7 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/ceo-dashboard':      'nav-overview',
   '/budget-management':  'nav-overview',
   '/financial-alerts':   'nav-overview',
+  '/finance-health':     'nav-overview',
   '/industry-solutions': 'nav-platform',
   '/i18n': 'nav-platform',
   '/raas': 'nav-platform',
@@ -300,6 +301,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   '/ceo-dashboard':      'CEO 驾驶舱',
   '/budget-management':  '预算管理',
   '/financial-alerts':   '财务预警',
+  '/finance-health':     '财务健康评分',
   '/industry-solutions': '行业解决方案',
   '/i18n': '国际化',
   '/raas': 'RaaS定价',
@@ -401,6 +403,7 @@ const MainLayout: React.FC = () => {
         { key: '/ceo-dashboard',        icon: <FundOutlined />,       label: 'CEO 驾驶舱' },
         { key: '/budget-management',    icon: <DollarOutlined />,     label: '预算管理' },
         { key: '/financial-alerts',     icon: <BellOutlined />,       label: '财务预警' },
+        { key: '/finance-health',        icon: <FundOutlined />,       label: '财务健康评分' },
       ],
     },
 
