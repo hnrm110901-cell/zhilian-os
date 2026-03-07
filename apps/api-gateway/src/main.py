@@ -562,6 +562,10 @@ app.include_router(dashboard_preferences.router, prefix="/api/v1", tags=["dashbo
 from src.api import marketing_agent
 app.include_router(marketing_agent.router, tags=["marketing_agent"])
 
+# aPaaS 开放平台 — ISV 开发者自助注册 + 能力目录
+from src.api import open_platform
+app.include_router(open_platform.router, tags=["open_platform"])
+
 # ARCH-004 可信执行层（折扣申请 / 审批 / 审计日志 / 回滚）
 app.include_router(execution.router)
 # FEAT-004 动态菜单权重引擎（Top-N 推荐 + 5因子评分）
