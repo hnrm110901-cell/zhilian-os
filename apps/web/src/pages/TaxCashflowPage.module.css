@@ -1,0 +1,166 @@
+.page { display: flex; flex-direction: column; gap: 16px; }
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.pageTitle { font-size: 20px; font-weight: 700; margin: 0 0 4px; color: var(--text-primary); }
+.pageSub   { font-size: 13px; color: var(--text-secondary); margin: 0; }
+.headerActions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+@media (max-width: 960px) { .kpiGrid { grid-template-columns: repeat(2, 1fr); } }
+
+.kpiSub     { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+.kpiSubWarn { font-size: 11px; color: #f5222d; margin-top: 4px; font-weight: 600; }
+
+/* Tab */
+.tabBar {
+  display: flex;
+  border-bottom: 1px solid var(--border-color, #f0f0f0);
+  margin-bottom: 16px;
+}
+.tab {
+  padding: 8px 20px;
+  font-size: 13px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: color 0.2s, border-color 0.2s;
+}
+.tab:hover { color: var(--text-primary); }
+.tabActive {
+  color: var(--accent, #FF6B2C);
+  border-bottom-color: var(--accent, #FF6B2C);
+  font-weight: 600;
+}
+
+/* Money */
+.mono {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+}
+.amount {
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: #f5222d;
+}
+.amountGreen {
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: #52c41a;
+}
+
+/* Deviation */
+.devWarn {
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: #fa8c16;
+}
+.devOk {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: #52c41a;
+}
+
+/* Tax note */
+.taxNote {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-color, #f0f0f0);
+}
+
+/* Cashflow */
+.chart { height: 280px; }
+
+.gapAlert {
+  background: #fff2f0;
+  border: 1px solid #ffccc7;
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #cf1322;
+  margin-top: 12px;
+  font-weight: 600;
+}
+
+/* Agent action cards */
+.actionCard {
+  border: 1px solid var(--border-color, #f0f0f0);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 10px;
+  background: var(--bg-primary, #fff);
+  transition: border-color 0.2s;
+}
+.actionCard:hover { border-color: var(--accent, #FF6B2C); }
+.actionDone { opacity: 0.55; }
+
+.actionHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.agentName {
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: var(--bg-secondary, #f5f5f5);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.actionTitle { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+
+.actionDesc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 6px;
+  line-height: 1.6;
+}
+
+.actionBtns {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.actionStatus {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 6px;
+}
+
+/* Level badge */
+.levelBadge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.levelL1 {
+  background: rgba(250, 173, 20, 0.15);
+  color: #d48806;
+}
+.levelL2 {
+  background: rgba(245, 34, 45, 0.12);
+  color: #cf1322;
+}
+.levelL3 {
+  background: rgba(114, 46, 209, 0.12);
+  color: #531dab;
+}

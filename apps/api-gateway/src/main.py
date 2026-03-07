@@ -603,6 +603,10 @@ app.include_router(developer_console.router, tags=["developer_console"])
 from src.api import business_events
 app.include_router(business_events.router, tags=["business_events"])
 
+# 业财税资金 Agent — Phase 5 Month 2: 税务智能引擎 + 现金流预测
+from src.api import tax_cashflow
+app.include_router(tax_cashflow.router, tags=["finance_agent"])
+
 # ARCH-004 可信执行层（折扣申请 / 审批 / 审计日志 / 回滚）
 app.include_router(execution.router)
 # FEAT-004 动态菜单权重引擎（Top-N 推荐 + 5因子评分）

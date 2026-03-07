@@ -176,6 +176,7 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/api-billing':        'nav-platform',
   '/developer-console':  'nav-platform',
   '/business-events':    'nav-overview',
+  '/cfo-dashboard':      'nav-overview',
   '/industry-solutions': 'nav-platform',
   '/i18n': 'nav-platform',
   '/raas': 'nav-platform',
@@ -290,6 +291,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   '/api-billing':        'API 计量计费',
   '/developer-console':  'ISV 开发者控制台',
   '/business-events':    '经营事件中心',
+  '/cfo-dashboard':      'CFO 工作台',
   '/industry-solutions': '行业解决方案',
   '/i18n': '国际化',
   '/raas': 'RaaS定价',
@@ -386,6 +388,7 @@ const MainLayout: React.FC = () => {
         { key: '/data-visualization',  icon: <MonitorOutlined />,    label: '数据大屏' },
         { key: '/finance',             icon: <DollarOutlined />,     label: '财务管理' },
         { key: '/business-events',     icon: <NodeIndexOutlined />,  label: '经营事件中心' },
+        { key: '/cfo-dashboard',        icon: <DollarOutlined />,     label: 'CFO 工作台' },
       ],
     },
 
