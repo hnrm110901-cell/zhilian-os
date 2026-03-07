@@ -1,0 +1,230 @@
+/* ── Page ──────────────────────────────────────────────────────────────────── */
+
+.page { padding: 0; }
+
+.pageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pageHeaderLeft {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+/* ── KPI Strip ─────────────────────────────────────────────────────────────── */
+
+.kpiStrip {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 1200px) { .kpiStrip { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 720px)  { .kpiStrip { grid-template-columns: repeat(2, 1fr); } }
+
+.kpiItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-right: 1px solid #f0f0f0;
+}
+.kpiItem:last-child { border-right: none; }
+
+.kpiIconWrap {
+  width: 36px; height: 36px;
+  border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; flex-shrink: 0;
+}
+
+.kpiBody   { flex: 1; min-width: 0; }
+.kpiLabel  { font-size: 12px; color: #8c8c8c; line-height: 1.4; }
+.kpiValue  { font-size: 22px; font-weight: 700; line-height: 1.2; white-space: nowrap; }
+.kpiUnit   { font-size: 12px; font-weight: 400; margin-left: 2px; color: #8c8c8c; }
+.kpiSub    { font-size: 11px; color: #52c41a; margin-top: 1px; }
+.kpiSubWarn { font-size: 11px; color: #fa8c16; margin-top: 1px; }
+
+/* ── 3-col main ────────────────────────────────────────────────────────────── */
+
+.mainGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+@media (max-width: 1100px) { .mainGrid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 720px)  { .mainGrid { grid-template-columns: 1fr; } }
+
+/* ── 人群分层 ──────────────────────────────────────────────────────────────── */
+
+.segmentList { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+
+.segmentRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.segmentRow:hover { background: #fafafa; }
+
+.segmentDot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.segmentName { font-size: 13px; color: #262626; font-weight: 500; flex: 1; }
+.segmentCount { font-size: 15px; font-weight: 700; flex-shrink: 0; }
+.segmentPct   { font-size: 11px; color: #8c8c8c; flex-shrink: 0; min-width: 36px; text-align: right; }
+
+.segmentBarTrack {
+  width: 70px; height: 5px;
+  background: #f0f0f0;
+  border-radius: 3px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.segmentBarFill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s;
+}
+
+.segmentTotal {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.segmentTotalLabel { font-size: 12px; color: #8c8c8c; }
+.segmentTotalValue { font-size: 18px; font-weight: 700; color: #262626; }
+
+/* ── 增长信号 ──────────────────────────────────────────────────────────────── */
+
+.signalList { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+
+.signalCard {
+  padding: 10px 12px;
+  border-radius: 7px;
+  border: 1px solid #f0f0f0;
+  background: #fafafa;
+}
+
+.signalCardTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.signalTitle { font-size: 13px; color: #262626; font-weight: 500; flex: 1; line-height: 1.4; }
+
+.signalMeta  { font-size: 11px; color: #8c8c8c; }
+
+.signalAction {
+  font-size: 11px;
+  color: #1890ff;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.signalAction:hover { text-decoration: underline; }
+
+.signalDesc {
+  font-size: 12px;
+  color: #595959;
+  line-height: 1.5;
+}
+
+/* ── 流失预警 ──────────────────────────────────────────────────────────────── */
+
+.churnSummaryRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.churnSummaryNum  { font-size: 24px; font-weight: 700; color: #f5222d; }
+.churnSummaryDesc { font-size: 12px; color: #8c8c8c; margin-top: 2px; }
+
+.churnList { display: flex; flex-direction: column; gap: 6px; }
+
+.churnRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #fff9f9;
+  border: 1px solid #fff1f0;
+}
+
+.churnAvatar {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  background: #ffccc7;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; color: #f5222d;
+  flex-shrink: 0;
+}
+
+.churnName { font-size: 13px; color: #262626; font-weight: 500; flex: 1; }
+.churnDays { font-size: 11px; color: #8c8c8c; white-space: nowrap; }
+
+/* ── 快捷导航 ──────────────────────────────────────────────────────────────── */
+
+.quickNav {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+}
+
+@media (max-width: 1100px) { .quickNav { grid-template-columns: repeat(4, 1fr); } }
+@media (max-width: 720px)  { .quickNav { grid-template-columns: repeat(3, 1fr); } }
+
+.quickNavItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px;
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+  text-align: center;
+}
+
+.quickNavItem:hover {
+  background: #fff0f6;
+  border-color: #eb2f96;
+  box-shadow: 0 2px 8px rgba(235,47,150,.10);
+}
+
+.quickNavIcon  { font-size: 20px; line-height: 1; }
+.quickNavLabel { font-size: 12px; color: #434343; white-space: nowrap; font-weight: 500; }

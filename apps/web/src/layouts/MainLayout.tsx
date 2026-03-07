@@ -113,6 +113,7 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/dynamic-pricing': 'nav-products',
 
   // 04 会员与增长
+  '/crm-hub': 'nav-crm',
   '/members': 'nav-crm',
   '/customer360': 'nav-crm',
   '/private-domain': 'nav-crm',
@@ -218,6 +219,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   '/reconciliation': '对账管理',
   '/dynamic-pricing': '动态定价',
   '/members': '会员中心',
+  '/crm-hub': '会员与增长中心',
   '/customer360': '客户360',
   '/private-domain': '私域运营',
   '/channel-profit': '渠道毛利',
@@ -411,6 +413,7 @@ const MainLayout: React.FC = () => {
       icon: <UsergroupAddOutlined />,
       label: '会员与增长',
       children: [
+        { key: '/crm-hub',          icon: <AppstoreOutlined />,  label: '会员增长中心' },
         { key: '/members',          icon: <UserOutlined />,      label: '会员中心' },
         { key: '/customer360',      icon: <UserOutlined />,      label: '客户360' },
         { key: '/private-domain',   icon: <TeamOutlined />,      label: '私域运营' },

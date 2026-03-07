@@ -95,6 +95,7 @@ const GovDashboardPage = lazy(() => import('./pages/GovDashboardPage'));
 const AgentHubPage     = lazy(() => import('./pages/AgentHubPage'));
 const OpsHubPage       = lazy(() => import('./pages/OpsHubPage'));
 const ProductsHubPage  = lazy(() => import('./pages/ProductsHubPage'));
+const CrmHubPage       = lazy(() => import('./pages/CrmHubPage'));
 const DishCostPage = lazy(() => import('./pages/DishCostPage'));
 const ChannelProfitPage = lazy(() => import('./pages/ChannelProfitPage'));
 const EmployeePerformancePage = lazy(() => import('./pages/EmployeePerformancePage'));
@@ -396,6 +397,9 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="products-hub" element={
                     <ProtectedRoute><ProductsHubPage /></ProtectedRoute>
+                  } />
+                  <Route path="crm-hub" element={
+                    <ProtectedRoute><CrmHubPage /></ProtectedRoute>
                   } />
                   <Route path="dish-cost" element={
                     <ProtectedRoute requiredRole="store_manager"><DishCostPage /></ProtectedRoute>
