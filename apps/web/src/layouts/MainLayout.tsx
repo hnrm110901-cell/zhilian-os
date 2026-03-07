@@ -119,6 +119,7 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/wechat-triggers': 'nav-crm',
 
   // 05 智能体中心
+  '/agent-hub': 'nav-agents',
   '/decision': 'nav-agents',
   '/training': 'nav-agents',
   '/ai-evolution': 'nav-agents',
@@ -174,7 +175,7 @@ const ROUTE_TO_GROUP: Record<string, string> = {
 // ── 面包屑 label 映射 ─────────────────────────────────────────────────────────
 const BREADCRUMB_LABELS: Record<string, string> = {
   '/': '经营总览',
-  '/daily-hub': '明日备战板',
+  '/daily-hub': '经营作战台',
   '/kpi-dashboard': 'KPI看板',
   '/profit-dashboard': '成本率分析',
   '/monthly-report': '月度经营报告',
@@ -219,6 +220,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   '/channel-profit': '渠道毛利',
   '/recommendations': '推荐引擎',
   '/wechat-triggers': '企微触发器',
+  '/agent-hub': '智能体总览',
   '/decision': '决策支持',
   '/training': '培训辅导',
   '/ai-evolution': 'AI进化看板',
@@ -419,22 +421,27 @@ const MainLayout: React.FC = () => {
       icon: <RobotOutlined />,
       label: '智能体中心',
       children: [
-        { key: '/decision',          icon: <BarChartOutlined />,    label: '经营决策Agent' },
-        { key: '/training',          icon: <ReadOutlined />,        label: '培训辅导Agent' },
-        { key: '/agent-collaboration',icon: <ApartmentOutlined />,  label: 'Agent协作' },
-        { key: '/agent-memory',      icon: <DatabaseOutlined />,    label: '智能体记忆' },
+        // 总览
+        { key: '/agent-hub',         icon: <AppstoreOutlined />,    label: 'Agent 总览' },
+        // Agent 工作台
+        { key: '/decision',          icon: <BarChartOutlined />,    label: '经营决策 Agent' },
+        { key: '/training',          icon: <ReadOutlined />,        label: '培训管理 Agent' },
+        // 配置与治理
+        { key: '/agent-collaboration',icon: <ApartmentOutlined />,  label: '协作编排' },
+        { key: '/agent-memory',      icon: <DatabaseOutlined />,    label: 'Agent 记忆' },
         { key: '/knowledge-rules',   icon: <DatabaseOutlined />,    label: '知识规则库' },
-        { key: '/ai-evolution',      icon: <RobotOutlined />,       label: 'AI进化看板' },
-        { key: '/ai-accuracy',       icon: <BarChartOutlined />,    label: 'AI准确率' },
-        { key: '/governance',        icon: <SafetyOutlined />,      label: 'AI治理看板' },
-        { key: '/decision-validator',icon: <CheckCircleOutlined />, label: '决策验证' },
+        { key: '/governance',        icon: <SafetyOutlined />,      label: 'AI 治理看板' },
+        { key: '/decision-validator',icon: <CheckCircleOutlined />, label: '决策验证器' },
+        { key: '/ai-accuracy',       icon: <BarChartOutlined />,    label: 'AI 准确率' },
+        { key: '/ai-evolution',      icon: <RobotOutlined />,       label: 'AI 进化追踪' },
+        // 底层技术
         { key: '/edge-node',         icon: <CloudOutlined />,       label: '边缘节点' },
         { key: '/federated-learning',icon: <ExperimentOutlined />,  label: '联邦学习' },
         { key: '/neural',            icon: <ApartmentOutlined />,   label: '神经系统' },
         { key: '/embedding',         icon: <ExperimentOutlined />,  label: '嵌入模型' },
         { key: '/vector-index',      icon: <SearchOutlined />,      label: '向量知识库' },
         { key: '/event-sourcing',    icon: <FileTextOutlined />,    label: '事件溯源' },
-        { key: '/voice-ws',          icon: <SoundOutlined />,       label: '语音WebSocket' },
+        { key: '/voice-ws',          icon: <SoundOutlined />,       label: '语音 WebSocket' },
       ],
     },
 
