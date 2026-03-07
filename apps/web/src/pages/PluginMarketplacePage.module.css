@@ -1,0 +1,225 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.pageTitle {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  color: var(--text-primary);
+}
+
+.pageSub {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.headerActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* KPI row */
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 960px) {
+  .kpiGrid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Toolbar: search + category */
+.toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 200px;
+  max-width: 360px;
+  height: 32px;
+  border: 1px solid var(--border-color, #d9d9d9);
+  border-radius: 6px;
+  padding: 0 10px;
+  font-size: 14px;
+  outline: none;
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary);
+}
+
+.searchInput:focus { border-color: #4096ff; }
+
+.categoryPill {
+  height: 28px;
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border-color, #d9d9d9);
+  background: var(--bg-primary, #fff);
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+}
+
+.categoryPill:hover {
+  border-color: var(--accent, #FF6B2C);
+  color: var(--accent, #FF6B2C);
+}
+
+.categoryPillActive {
+  background: var(--accent, #FF6B2C);
+  border-color: var(--accent, #FF6B2C);
+  color: #fff;
+}
+
+/* Plugin grid */
+.pluginGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 1100px) {
+  .pluginGrid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 640px) {
+  .pluginGrid { grid-template-columns: 1fr; }
+}
+
+/* Plugin card */
+.pluginCard {
+  padding: 16px;
+  border: 1px solid var(--border-color, #f0f0f0);
+  border-radius: 10px;
+  background: var(--bg-primary, #fff);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: box-shadow 0.2s;
+}
+
+.pluginCard:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+}
+
+.pluginCardTop {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.pluginIcon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--bg-secondary, #fafafa);
+  border: 1px solid var(--border-color, #f0f0f0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.pluginMeta {
+  flex: 1;
+  min-width: 0;
+}
+
+.pluginName {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pluginDev {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0 0 6px;
+}
+
+.pluginBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.pluginDesc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.pluginFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-color, #f0f0f0);
+}
+
+.pluginInstallCount {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* Submit form */
+.nativeSelect {
+  width: 100%;
+  height: 32px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  padding: 0 8px;
+  font-size: 14px;
+  background: #fff;
+  color: inherit;
+  cursor: pointer;
+  outline: none;
+}
+
+.nativeSelect:hover { border-color: #4096ff; }
+.nativeSelect:focus { border-color: #4096ff; box-shadow: 0 0 0 2px rgba(5,145,255,0.1); }
+
+/* Admin section */
+.adminHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.installedBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #52c41a;
+  font-weight: 500;
+}

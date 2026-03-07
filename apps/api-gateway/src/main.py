@@ -575,6 +575,10 @@ app.include_router(sandbox_router, tags=["developer_docs"])
 from src.api import isv_management
 app.include_router(isv_management.router, tags=["isv_management"])
 
+# aPaaS 插件市场 — Phase 3 Month 4
+from src.api import plugin_marketplace
+app.include_router(plugin_marketplace.router, tags=["plugin_marketplace"])
+
 # ARCH-004 可信执行层（折扣申请 / 审批 / 审计日志 / 回滚）
 app.include_router(execution.router)
 # FEAT-004 动态菜单权重引擎（Top-N 推荐 + 5因子评分）
