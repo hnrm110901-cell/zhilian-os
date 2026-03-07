@@ -85,6 +85,7 @@ const DishBenchmarkPage = lazy(() => import('./pages/DishBenchmarkPage'));
 const DishPricingPage = lazy(() => import('./pages/DishPricingPage'));
 const DishLifecyclePage = lazy(() => import('./pages/DishLifecyclePage'));
 const DishForecastPage  = lazy(() => import('./pages/DishForecastPage'));
+const DishHealthPage    = lazy(() => import('./pages/DishHealthPage'));
 const IndustrySolutionsPage = lazy(() => import('./pages/IndustrySolutionsPage'));
 const I18nPage = lazy(() => import('./pages/I18nPage'));
 const TaskManagementPage = lazy(() => import('./pages/TaskManagementPage'));
@@ -394,6 +395,9 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="dish-forecast" element={
                     <ProtectedRoute requiredRole="admin"><DishForecastPage /></ProtectedRoute>
+                  } />
+                  <Route path="dish-health" element={
+                    <ProtectedRoute requiredRole="admin"><DishHealthPage /></ProtectedRoute>
                   } />
                   <Route path="industry-solutions" element={
                     <ProtectedRoute requiredRole="admin"><IndustrySolutionsPage /></ProtectedRoute>

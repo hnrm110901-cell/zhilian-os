@@ -55,6 +55,7 @@ import {
   UsergroupAddOutlined,
   NodeIndexOutlined,
   RocketOutlined,
+  HeartOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -194,6 +195,7 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/dish-pricing': 'nav-overview',
   '/dish-lifecycle': 'nav-overview',
   '/dish-forecast': 'nav-overview',
+  '/dish-health': 'nav-overview',
   '/industry-solutions': 'nav-platform',
   '/i18n': 'nav-platform',
   '/raas': 'nav-platform',
@@ -325,6 +327,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   '/dish-pricing': '菜品智能定价',
   '/dish-lifecycle': '菜品生命周期',
   '/dish-forecast': '菜品销售预测',
+  '/dish-health': '菜品健康评分',
   '/industry-solutions': '行业解决方案',
   '/i18n': '国际化',
   '/raas': 'RaaS定价',
@@ -438,6 +441,7 @@ const MainLayout: React.FC = () => {
         { key: '/dish-pricing',             icon: <DollarOutlined />, label: '菜品智能定价' },
         { key: '/dish-lifecycle',           icon: <HistoryOutlined />, label: '菜品生命周期' },
         { key: '/dish-forecast',            icon: <LineChartOutlined />, label: '菜品销售预测' },
+        { key: '/dish-health',              icon: <HeartOutlined />, label: '菜品健康评分' },
       ],
     },
 

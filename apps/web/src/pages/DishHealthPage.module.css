@@ -1,0 +1,51 @@
+.page {
+  padding: 16px 24px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.impact {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: #52c41a;
+}
+
+/* Row highlights */
+.rowExcellent :global(td) {
+  background-color: #f6ffed !important;
+}
+
+.rowGood :global(td) {
+  background-color: #f0f5ff !important;
+}
+
+.rowFair :global(td) {
+  background-color: #fffbe6 !important;
+}
+
+.rowPoor :global(td) {
+  background-color: #fff1f0 !important;
+}
+
+/* Action card */
+.actionCard {
+  transition: box-shadow 0.2s;
+}
+
+.actionCard:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.scoreRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
