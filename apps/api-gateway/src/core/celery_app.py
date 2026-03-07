@@ -162,6 +162,10 @@ celery_app.conf.update(
             "queue": "high_priority",
             "routing_key": "high_priority",
         },
+        "src.core.celery_tasks.dispatch_agent_message": {
+            "queue": "high_priority",   # P0/P1 走高优先队列；fire_and_forget 本身按 priority 选队列
+            "routing_key": "high_priority",
+        },
     },
 
     # Celery Beat定时任务调度

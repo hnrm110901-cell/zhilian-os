@@ -4000,3 +4000,68 @@ def ops_patrol(self, store_id: str = None):
     except Exception as exc:
         logger.error("ops_patrol.failed", error=str(exc))
         raise self.retry(exc=exc)
+
+
+# ============================================================
+# P5: Agent 间通信协议 — 异步分发任务
+# ============================================================
+
+@celery_app.task(bind=True, max_retries=2, default_retry_delay=30)
+def dispatch_agent_message(
+    self,
+    from_agent: str,
+    to_agent: str,
+    action: str,
+    payload: Dict[str, Any],
+    store_id: str = "",
+    priority: int = 5,
+    trace_id: str = "",
+    msg_id: str = "",
+) -> Dict[str, Any]:
+    """
+    即发即忘模式下的 Agent 消息异步分发（AgentBus.fire_and_forget 的 Celery 后端）。
+
+    收到消息后实例化目标 Agent 并执行 action，
+    结果写入日志（不推送，调用方不等待回复）。
+    """
+    async def _run():
+        from ..core.agent_bus import AgentMessage, AgentBus
+
+        msg = AgentMessage(
+            from_agent=from_agent,
+            to_agent=to_agent,
+            action=action,
+            payload=payload,
+            store_id=store_id,
+            priority=priority,
+            msg_id=msg_id or str(__import__("uuid").uuid4()),
+        )
+        if trace_id:
+            msg.trace_id = trace_id
+
+        bus = AgentBus.get()
+        reply = await bus.send(msg)
+
+        logger.info(
+            "dispatch_agent_message.done",
+            from_agent=from_agent,
+            to_agent=to_agent,
+            action=action,
+            success=reply.success,
+            trace_id=msg.trace_id,
+        )
+        return {
+            "success": reply.success,
+            "from_agent": from_agent,
+            "to_agent": to_agent,
+            "action": action,
+            "error": reply.error,
+            "trace_id": msg.trace_id,
+        }
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        logger.error("dispatch_agent_message.failed",
+                     to_agent=to_agent, action=action, error=str(exc))
+        raise self.retry(exc=exc)
