@@ -612,6 +612,11 @@ from src.api import settlement_risk, role_dashboards
 app.include_router(settlement_risk.router, tags=["settlement_risk"])
 app.include_router(role_dashboards.router, tags=["role_dashboards"])
 
+# 业财税资金 Agent — Phase 5 Month 4: 预算管理 + 财务预警体系
+from src.api.budget_alerts import budget_router, alerts_router
+app.include_router(budget_router)
+app.include_router(alerts_router)
+
 # ARCH-004 可信执行层（折扣申请 / 审批 / 审计日志 / 回滚）
 app.include_router(execution.router)
 # FEAT-004 动态菜单权重引擎（Top-N 推荐 + 5因子评分）

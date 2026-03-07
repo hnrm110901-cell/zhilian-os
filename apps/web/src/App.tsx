@@ -70,6 +70,8 @@ const BusinessEventsPage = lazy(() => import('./pages/BusinessEventsPage'));
 const TaxCashflowPage = lazy(() => import('./pages/TaxCashflowPage'));
 const SettlementRiskPage = lazy(() => import('./pages/SettlementRiskPage'));
 const CeoDashboardPage = lazy(() => import('./pages/CeoDashboardPage'));
+const BudgetManagementPage = lazy(() => import('./pages/BudgetManagementPage'));
+const FinancialAlertsPage = lazy(() => import('./pages/FinancialAlertsPage'));
 const IndustrySolutionsPage = lazy(() => import('./pages/IndustrySolutionsPage'));
 const I18nPage = lazy(() => import('./pages/I18nPage'));
 const TaskManagementPage = lazy(() => import('./pages/TaskManagementPage'));
@@ -337,6 +339,12 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="ceo-dashboard" element={
                     <ProtectedRoute requiredRole="admin"><CeoDashboardPage /></ProtectedRoute>
+                  } />
+                  <Route path="budget-management" element={
+                    <ProtectedRoute requiredRole="admin"><BudgetManagementPage /></ProtectedRoute>
+                  } />
+                  <Route path="financial-alerts" element={
+                    <ProtectedRoute requiredRole="admin"><FinancialAlertsPage /></ProtectedRoute>
                   } />
                   <Route path="industry-solutions" element={
                     <ProtectedRoute requiredRole="admin"><IndustrySolutionsPage /></ProtectedRoute>

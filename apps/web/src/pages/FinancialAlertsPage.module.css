@@ -1,0 +1,177 @@
+.page { display: flex; flex-direction: column; gap: 16px; }
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.pageTitle { font-size: 20px; font-weight: 700; margin: 0 0 4px; color: var(--text-primary); }
+.pageSub   { font-size: 13px; color: var(--text-secondary); margin: 0; }
+.headerActions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* KPI */
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+@media (max-width: 960px) { .kpiGrid { grid-template-columns: repeat(2, 1fr); } }
+.kpiSub     { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+.kpiSubWarn { font-size: 11px; color: #f5222d; margin-top: 4px; font-weight: 600; }
+
+/* Tab */
+.tabBar {
+  display: flex;
+  border-bottom: 1px solid var(--border-color, #f0f0f0);
+  margin-bottom: 16px;
+}
+.tab {
+  padding: 8px 20px;
+  font-size: 13px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: color 0.2s, border-color 0.2s;
+}
+.tab:hover { color: var(--text-primary); }
+.tabActive {
+  color: var(--accent, #FF6B2C);
+  border-bottom-color: var(--accent, #FF6B2C);
+  font-weight: 600;
+}
+
+/* Filter row */
+.filterRow { margin-bottom: 12px; }
+.filterSelect {
+  padding: 4px 10px;
+  border: 1px solid var(--border-color, #d9d9d9);
+  border-radius: 6px;
+  font-size: 13px;
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary);
+  cursor: pointer;
+  outline: none;
+}
+.filterSelect:focus { border-color: var(--accent, #FF6B2C); }
+
+/* Alert event cards */
+.alertList { display: flex; flex-direction: column; gap: 8px; }
+.alertCard {
+  border: 1px solid var(--border-color, #f0f0f0);
+  border-radius: 8px;
+  padding: 12px 16px;
+  background: var(--bg-primary, #fff);
+  transition: border-color 0.2s;
+}
+.alertCard:hover { border-color: var(--accent, #FF6B2C); }
+.alertCardCritical {
+  border-color: #ffccc7;
+  background: #fff8f8;
+}
+.alertDone { opacity: 0.6; }
+
+.alertHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.alertMetric {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.alertMsg {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+.alertActions { display: flex; gap: 8px; }
+
+/* Rules list */
+.ruleList { display: flex; flex-direction: column; gap: 6px; margin-bottom: 24px; }
+.ruleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color, #f0f0f0);
+  border-radius: 6px;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+.ruleDisabled { opacity: 0.5; }
+.ruleMetric   { font-weight: 600; color: var(--text-primary); }
+.ruleThreshold {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.ruleCooldown {
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: var(--bg-secondary, #f5f5f5);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.ruleStatus {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* New rule form */
+.ruleForm {
+  border-top: 1px solid var(--border-color, #f0f0f0);
+  padding-top: 16px;
+  margin-top: 8px;
+}
+.ruleFormTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 14px;
+}
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 20px;
+}
+@media (max-width: 720px) { .formGrid { grid-template-columns: 1fr; } }
+
+.formRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.formLabel {
+  width: 80px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+.formInput,
+.formSelect {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid var(--border-color, #d9d9d9);
+  border-radius: 6px;
+  font-size: 12px;
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary);
+  outline: none;
+}
+.formInput:focus,
+.formSelect:focus { border-color: var(--accent, #FF6B2C); }
+.formActions { display: flex; gap: 8px; margin-top: 14px; }
+
+/* Money */
+.mono {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+}
