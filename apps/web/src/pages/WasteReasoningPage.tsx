@@ -1,21 +1,19 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import {
-  Row, Col, Card, Select, Button, Table, Tag, Statistic,
-  Space, Spin, Typography, DatePicker, Alert, Tooltip, Badge,
-  Progress,
-} from 'antd';
+import { DatePicker } from 'antd';
 import {
   ReloadOutlined, WarningOutlined, FireOutlined,
   ArrowUpOutlined, ArrowDownOutlined, MinusOutlined,
 } from '@ant-design/icons';
-import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
+import {
+  ZCard, ZBadge, ZButton, ZSkeleton, ZSelect, ZTable, ZKpi, ZEmpty,
+} from '../design-system/components';
+import type { ZTableColumn } from '../design-system/components/ZTable';
 import { apiClient } from '../services/api';
 import { handleApiError } from '../utils/message';
+import styles from './WasteReasoningPage.module.css';
 
 const { RangePicker } = DatePicker;
-const { Text, Title } = Typography;
-const { Option } = Select;
 
 // ── 类型定义 ──────────────────────────────────────────────────────────────────
 
@@ -62,16 +60,27 @@ interface WasteReport {
   bom_deviation:     BomDeviationItem[];
 }
 
-// ── 辅助组件 ──────────────────────────────────────────────────────────────────
+// ── 辅助函数 ──────────────────────────────────────────────────────────────────
 
-const statusBadge = (status: string) => {
-  const map: Record<string, { color: string; text: string }> = {
-    ok:       { color: 'success', text: '正常' },
-    warning:  { color: 'warning', text: '偏高' },
-    critical: { color: 'error',   text: '超标' },
+const wasteRateStatusType = (status: string): 'success' | 'warning' | 'critical' | 'default' => {
+  if (status === 'ok')       return 'success';
+  if (status === 'warning')  return 'warning';
+  if (status === 'critical') return 'critical';
+  return 'default';
+};
+
+const rootCauseBadgeType = (cause: string): 'critical' | 'warning' | 'info' | 'accent' | 'default' => {
+  const map: Record<string, 'critical' | 'warning' | 'info' | 'accent' | 'default'> = {
+    staff_error:   'critical',
+    food_quality:  'warning',
+    over_prep:     'warning',
+    spoilage:      'warning',
+    bom_deviation: 'accent',
+    transfer_loss: 'info',
+    drop_damage:   'info',
+    unknown:       'default',
   };
-  const cfg = map[status] || { color: 'default', text: status };
-  return <Badge status={cfg.color as any} text={cfg.text} />;
+  return map[cause] ?? 'default';
 };
 
 const rootCauseLabel = (cause: string) => {
@@ -88,19 +97,150 @@ const rootCauseLabel = (cause: string) => {
   return map[cause] || cause;
 };
 
-const rootCauseColor = (cause: string) => {
-  const map: Record<string, string> = {
-    staff_error:   'red',
-    food_quality:  'orange',
-    over_prep:     'gold',
-    spoilage:      'volcano',
-    bom_deviation: 'purple',
-    transfer_loss: 'blue',
-    drop_damage:   'geekblue',
-    unknown:       'default',
-  };
-  return map[cause] || 'default';
-};
+// ── 表格列定义 ────────────────────────────────────────────────────────────────
+
+const top5Columns: ZTableColumn<WasteItem>[] = [
+  {
+    key: 'rank',
+    title: '排名',
+    width: 56,
+    align: 'center',
+    render: (rank) => (
+      <span style={{
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        width: 28, height: 28, borderRadius: '50%',
+        background: rank <= 3 ? '#ff4d4f' : '#d9d9d9',
+        color: rank <= 3 ? '#fff' : '#666',
+        fontWeight: 'bold', fontSize: 13,
+      }}>
+        {rank}
+      </span>
+    ),
+  },
+  {
+    key: 'item_name',
+    title: '食材名称',
+    render: (name, row) => (
+      <div>
+        <strong style={{ color: 'var(--text-primary)' }}>{name}</strong>
+        {row.category && (
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 1 }}>{row.category}</div>
+        )}
+      </div>
+    ),
+  },
+  {
+    key: 'waste_cost_yuan',
+    title: '损耗金额',
+    align: 'right',
+    render: (yuan) => (
+      <strong style={{ color: '#cf1322' }}>
+        ¥{(yuan as number).toLocaleString('zh-CN', { minimumFractionDigits: 0 })}
+      </strong>
+    ),
+  },
+  {
+    key: 'waste_qty',
+    title: '损耗数量',
+    render: (_, row) => `${row.waste_qty.toFixed(2)} ${row.unit}`,
+  },
+  {
+    key: 'cost_share_pct',
+    title: '占总损耗',
+    render: (pct) => {
+      const p = pct as number;
+      const barColor = p >= 30 ? 'var(--red)' : p >= 15 ? 'var(--yellow)' : 'var(--green)';
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ width: 80, height: 5, background: '#f0f0f0', borderRadius: 3, overflow: 'hidden', flexShrink: 0 }}>
+            <div style={{ width: `${Math.min(p, 100)}%`, height: '100%', borderRadius: 3, background: barColor }} />
+          </div>
+          <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{p.toFixed(1)}%</span>
+        </div>
+      );
+    },
+  },
+  {
+    key: 'root_causes',
+    title: '归因',
+    render: (causes: RootCause[]) => {
+      if (!causes || causes.length === 0) {
+        return <ZBadge type="default" text="待记录" />;
+      }
+      return (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+          {causes.slice(0, 2).map((c, i) => (
+            <ZBadge key={i} type={rootCauseBadgeType(c.root_cause)}
+              text={`${rootCauseLabel(c.root_cause)}×${c.event_count}`} />
+          ))}
+        </div>
+      );
+    },
+  },
+  {
+    key: 'action',
+    title: '建议行动',
+    width: 240,
+    render: (action) => (
+      <span style={{ fontSize: 12, color: 'var(--accent)' }}>{action}</span>
+    ),
+  },
+];
+
+const bomColumns: ZTableColumn<BomDeviationItem>[] = [
+  {
+    key: 'rank',
+    title: '排名',
+    width: 56,
+    align: 'center',
+    render: (rank) => (
+      <span style={{
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        width: 28, height: 28, borderRadius: '50%',
+        background: rank <= 3 ? '#fa8c16' : '#d9d9d9',
+        color: rank <= 3 ? '#fff' : '#666',
+        fontWeight: 'bold', fontSize: 13,
+      }}>
+        {rank}
+      </span>
+    ),
+  },
+  {
+    key: 'item_name',
+    title: '食材名称',
+    render: (name) => <strong style={{ color: 'var(--text-primary)' }}>{name}</strong>,
+  },
+  {
+    key: 'variance_cost_yuan',
+    title: '偏差成本',
+    align: 'right',
+    render: (yuan) => (
+      <strong style={{ color: '#d46b08' }}>
+        ¥{(yuan as number).toLocaleString('zh-CN', { minimumFractionDigits: 0 })}
+      </strong>
+    ),
+  },
+  {
+    key: 'total_variance_qty',
+    title: '超用数量',
+    render: (_, row) => `+${row.total_variance_qty.toFixed(2)} ${row.unit}`,
+  },
+  {
+    key: 'avg_variance_pct',
+    title: '平均偏差率',
+    align: 'center',
+    render: (pct) => {
+      const p = pct as number;
+      const type = p >= 20 ? 'critical' : p >= 10 ? 'warning' : 'default';
+      return <ZBadge type={type} text={`+${p.toFixed(1)}%`} />;
+    },
+  },
+  {
+    key: 'event_count',
+    title: '事件次数',
+    align: 'right',
+  },
+];
 
 // ── 主组件 ────────────────────────────────────────────────────────────────────
 
@@ -115,7 +255,6 @@ const WasteReasoningPage: React.FC = () => {
   const [report, setReport]       = useState<WasteReport | null>(null);
   const [error, setError]         = useState<string | null>(null);
 
-  // 加载门店列表
   const loadStores = useCallback(async () => {
     try {
       const res = await apiClient.get('/api/v1/stores');
@@ -129,7 +268,6 @@ const WasteReasoningPage: React.FC = () => {
     }
   }, [storeId]);
 
-  // 加载损耗报告
   const loadReport = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -151,331 +289,159 @@ const WasteReasoningPage: React.FC = () => {
     }
   }, [storeId, dateRange]);
 
-  useEffect(() => {
-    loadStores();
-  }, [loadStores]);
+  useEffect(() => { loadStores(); }, [loadStores]);
+  useEffect(() => { loadReport(); }, [loadReport]);
 
-  useEffect(() => {
-    loadReport();
-  }, [loadReport]);
+  const storeOptions = stores.length > 0
+    ? stores.map((s: any) => ({ value: s.id || s.store_id, label: s.name || s.store_name || s.id }))
+    : [{ value: 'STORE001', label: '默认门店' }];
 
-  // ── Top5 损耗食材表格列定义 ─────────────────────────────────────────────────
-
-  const top5Columns: ColumnsType<WasteItem> = [
-    {
-      title: '排名',
-      dataIndex: 'rank',
-      width: 56,
-      render: (rank) => (
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          width: 28, height: 28, borderRadius: '50%',
-          background: rank <= 3 ? '#ff4d4f' : '#d9d9d9',
-          color: rank <= 3 ? '#fff' : '#666',
-          fontWeight: 'bold', fontSize: 13,
-        }}>
-          {rank}
-        </span>
-      ),
-    },
-    {
-      title: '食材名称',
-      dataIndex: 'item_name',
-      render: (name, row) => (
-        <Space direction="vertical" size={2}>
-          <Text strong>{name}</Text>
-          {row.category && <Text type="secondary" style={{ fontSize: 12 }}>{row.category}</Text>}
-        </Space>
-      ),
-    },
-    {
-      title: '损耗金额',
-      dataIndex: 'waste_cost_yuan',
-      sorter: (a, b) => a.waste_cost_yuan - b.waste_cost_yuan,
-      render: (yuan) => (
-        <Text strong style={{ color: '#cf1322' }}>¥{yuan.toLocaleString('zh-CN', { minimumFractionDigits: 0 })}</Text>
-      ),
-    },
-    {
-      title: '损耗数量',
-      render: (_, row) => `${row.waste_qty.toFixed(2)} ${row.unit}`,
-    },
-    {
-      title: '占总损耗',
-      dataIndex: 'cost_share_pct',
-      render: (pct) => (
-        <Space>
-          <Progress percent={pct} size="small" style={{ width: 80 }} showInfo={false}
-            strokeColor={pct >= 30 ? '#ff4d4f' : pct >= 15 ? '#faad14' : '#52c41a'} />
-          <Text style={{ fontSize: 12 }}>{pct.toFixed(1)}%</Text>
-        </Space>
-      ),
-    },
-    {
-      title: '归因',
-      dataIndex: 'root_causes',
-      render: (causes: RootCause[]) => {
-        if (!causes || causes.length === 0) {
-          return <Tag color="default">待记录</Tag>;
-        }
-        return (
-          <Space wrap>
-            {causes.slice(0, 2).map((c, i) => (
-              <Tag key={i} color={rootCauseColor(c.root_cause)}>
-                {rootCauseLabel(c.root_cause)}×{c.event_count}
-              </Tag>
-            ))}
-          </Space>
-        );
-      },
-    },
-    {
-      title: '建议行动',
-      dataIndex: 'action',
-      width: 240,
-      render: (action) => (
-        <Text style={{ fontSize: 12, color: '#1677ff' }}>{action}</Text>
-      ),
-    },
-  ];
-
-  // ── BOM偏差表格列定义 ────────────────────────────────────────────────────────
-
-  const bomColumns: ColumnsType<BomDeviationItem> = [
-    {
-      title: '排名',
-      dataIndex: 'rank',
-      width: 56,
-      render: (rank) => (
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          width: 28, height: 28, borderRadius: '50%',
-          background: rank <= 3 ? '#fa8c16' : '#d9d9d9',
-          color: rank <= 3 ? '#fff' : '#666',
-          fontWeight: 'bold', fontSize: 13,
-        }}>
-          {rank}
-        </span>
-      ),
-    },
-    { title: '食材名称', dataIndex: 'item_name', render: (name) => <Text strong>{name}</Text> },
-    {
-      title: '偏差成本',
-      dataIndex: 'variance_cost_yuan',
-      sorter: (a, b) => a.variance_cost_yuan - b.variance_cost_yuan,
-      render: (yuan) => (
-        <Text strong style={{ color: '#d46b08' }}>
-          ¥{yuan.toLocaleString('zh-CN', { minimumFractionDigits: 0 })}
-        </Text>
-      ),
-    },
-    {
-      title: '超用数量',
-      render: (_, row) => `+${row.total_variance_qty.toFixed(2)} ${row.unit}`,
-    },
-    {
-      title: '平均偏差率',
-      dataIndex: 'avg_variance_pct',
-      render: (pct) => (
-        <Tag color={pct >= 20 ? 'red' : pct >= 10 ? 'orange' : 'gold'}>
-          +{pct.toFixed(1)}%
-        </Tag>
-      ),
-    },
-    { title: '事件次数', dataIndex: 'event_count' },
-  ];
-
-  // ── 渲染 KPI 卡片 ──────────────────────────────────────────────────────────
-
-  const renderKpiCards = () => {
-    if (!report) return null;
-    const change = report.waste_change_yuan;
-    const changeColor = change > 0 ? '#cf1322' : change < 0 ? '#3f8600' : undefined;
-    const changeIcon = change > 0 ? <ArrowUpOutlined /> : change < 0 ? <ArrowDownOutlined /> : <MinusOutlined />;
-
-    return (
-      <Row gutter={16} style={{ marginBottom: 16 }}>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title="总损耗金额"
-              value={report.total_waste_yuan}
-              prefix="¥"
-              precision={0}
-              valueStyle={{ color: '#cf1322', fontWeight: 'bold' }}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title={<Space>损耗率 {statusBadge(report.waste_rate_status)}</Space>}
-              value={report.waste_rate_pct}
-              suffix="%"
-              precision={2}
-              valueStyle={{
-                color: report.waste_rate_status === 'critical' ? '#cf1322'
-                     : report.waste_rate_status === 'warning'  ? '#d46b08'
-                     : '#3f8600',
-              }}
-            />
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              行业标准：&lt;3%为优秀
-            </Text>
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title="较上期损耗变化"
-              value={Math.abs(change)}
-              prefix={<span style={{ color: changeColor }}>{changeIcon} ¥</span>}
-              precision={0}
-              valueStyle={{ color: changeColor }}
-              suffix={change === 0 ? '' : change > 0 ? '（增加）' : '（减少）'}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title="Top5食材"
-              value={report.top5?.length ?? 0}
-              suffix="种"
-              valueStyle={{ color: '#1677ff' }}
-            />
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              {report.start_date} 至 {report.end_date}
-            </Text>
-          </Card>
-        </Col>
-      </Row>
-    );
-  };
-
-  // ── 渲染主体 ────────────────────────────────────────────────────────────────
+  const change = report?.waste_change_yuan ?? 0;
+  const changeColor = change > 0 ? '#cf1322' : change < 0 ? '#3f8600' : 'var(--text-secondary)';
+  const ChangeIcon = change > 0 ? ArrowUpOutlined : change < 0 ? ArrowDownOutlined : MinusOutlined;
 
   return (
-    <div style={{ padding: 24 }}>
-      <Space style={{ marginBottom: 16 }} wrap>
-        <Title level={4} style={{ margin: 0 }}>
+    <div className={styles.page}>
+      {/* 页头 */}
+      <div className={styles.header}>
+        <h4 className={styles.pageTitle}>
           <FireOutlined style={{ color: '#ff4d4f', marginRight: 8 }} />
           损耗Top5分析
-        </Title>
+        </h4>
+        <div className={styles.headerControls}>
+          <ZSelect
+            value={storeId}
+            options={storeOptions}
+            onChange={(v) => setStoreId(v as string)}
+            style={{ width: 160 }}
+          />
+          <RangePicker
+            value={dateRange}
+            onChange={(dates) => {
+              if (dates && dates[0] && dates[1]) {
+                setDateRange([dates[0], dates[1]]);
+              }
+            }}
+            format="YYYY-MM-DD"
+            allowClear={false}
+          />
+          <ZButton icon={<ReloadOutlined />} onClick={loadReport} disabled={loading}>
+            刷新
+          </ZButton>
+        </div>
+      </div>
 
-        {/* 门店选择 */}
-        <Select
-          value={storeId}
-          onChange={setStoreId}
-          style={{ width: 160 }}
-          placeholder="选择门店"
-        >
-          {stores.length > 0
-            ? stores.map((s: any) => (
-                <Option key={s.id || s.store_id} value={s.id || s.store_id}>
-                  {s.name || s.store_name || s.id}
-                </Option>
-              ))
-            : <Option value="STORE001">默认门店</Option>
-          }
-        </Select>
-
-        {/* 日期范围 */}
-        <RangePicker
-          value={dateRange}
-          onChange={(dates) => {
-            if (dates && dates[0] && dates[1]) {
-              setDateRange([dates[0], dates[1]]);
-            }
-          }}
-          format="YYYY-MM-DD"
-          allowClear={false}
-        />
-
-        <Button
-          icon={<ReloadOutlined />}
-          onClick={loadReport}
-          loading={loading}
-        >
-          刷新
-        </Button>
-      </Space>
-
+      {/* 错误提示 */}
       {error && (
-        <Alert type="error" message={error} style={{ marginBottom: 16 }} showIcon />
+        <div className={styles.alertError}>
+          <WarningOutlined style={{ marginRight: 6 }} />
+          {error}
+        </div>
       )}
 
-      <Spin spinning={loading}>
-        {/* KPI 卡片 */}
-        {renderKpiCards()}
+      {/* 主体内容 */}
+      {loading ? (
+        <ZSkeleton rows={8} block />
+      ) : !report ? (
+        <ZCard>
+          <div className={styles.alertInfo}>
+            请选择门店和日期范围后点击刷新加载损耗数据
+          </div>
+        </ZCard>
+      ) : (
+        <>
+          {/* KPI 卡片 */}
+          <div className={styles.kpiGrid}>
+            <ZCard>
+              <ZKpi
+                value={`¥${report.total_waste_yuan.toLocaleString('zh-CN', { minimumFractionDigits: 0 })}`}
+                label="总损耗金额"
+              />
+            </ZCard>
+            <ZCard>
+              <ZKpi
+                value={report.waste_rate_pct.toFixed(2)}
+                unit="%"
+                label="损耗率"
+              />
+              <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <ZBadge
+                  type={wasteRateStatusType(report.waste_rate_status)}
+                  text={report.waste_rate_status === 'ok' ? '正常' : report.waste_rate_status === 'warning' ? '偏高' : '超标'}
+                />
+                <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>行业标准：&lt;3%为优秀</span>
+              </div>
+            </ZCard>
+            <ZCard>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.4, marginBottom: 4 }}>较上期损耗变化</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: changeColor, lineHeight: 1.2 }}>
+                <ChangeIcon style={{ fontSize: 16, marginRight: 2 }} />
+                ¥{Math.abs(change).toLocaleString('zh-CN', { minimumFractionDigits: 0 })}
+              </div>
+              <div style={{ marginTop: 4, fontSize: 12, color: changeColor }}>
+                {change === 0 ? '持平' : change > 0 ? '损耗增加' : '损耗减少'}
+              </div>
+            </ZCard>
+            <ZCard>
+              <ZKpi
+                value={report.top5?.length ?? 0}
+                unit="种"
+                label="Top5食材"
+              />
+              <div style={{ marginTop: 4, fontSize: 11, color: 'var(--text-secondary)' }}>
+                {report.start_date} 至 {report.end_date}
+              </div>
+            </ZCard>
+          </div>
 
-        {/* Top5 损耗食材表 */}
-        <Card
-          title={
-            <Space>
-              <WarningOutlined style={{ color: '#ff4d4f' }} />
-              Top5 损耗食材（按损耗金额排序）
-            </Space>
-          }
-          style={{ marginBottom: 16 }}
-          extra={
-            report && report.total_waste_yuan > 0 && (
-              <Text type="secondary">
-                总损耗 ¥{report.total_waste_yuan.toLocaleString('zh-CN', { minimumFractionDigits: 0 })}
-              </Text>
-            )
-          }
-        >
-          <Table
-            columns={top5Columns}
-            dataSource={report?.top5 ?? []}
-            rowKey="item_id"
-            pagination={false}
-            size="middle"
-            locale={{ emptyText: '暂无损耗数据' }}
-            expandable={{
-              expandedRowRender: (row) => (
-                <div style={{ padding: '8px 16px', background: '#fafafa', borderRadius: 4 }}>
-                  <Text strong style={{ marginRight: 8 }}>建议行动：</Text>
-                  <Text style={{ color: '#1677ff' }}>{row.action}</Text>
-                </div>
-              ),
-              rowExpandable: (row) => !!row.action,
-            }}
-          />
-        </Card>
-
-        {/* BOM 偏差排名 */}
-        {report?.bom_deviation && report.bom_deviation.length > 0 && (
-          <Card
+          {/* Top5 损耗食材表 */}
+          <ZCard
             title={
-              <Space>
-                <WarningOutlined style={{ color: '#fa8c16' }} />
-                BOM配方偏差排名（实际用量超出标准）
-              </Space>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <WarningOutlined style={{ color: '#ff4d4f' }} />
+                Top5 损耗食材（按损耗金额排序）
+              </div>
             }
+            extra={
+              report.total_waste_yuan > 0 ? (
+                <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                  总损耗 ¥{report.total_waste_yuan.toLocaleString('zh-CN', { minimumFractionDigits: 0 })}
+                </span>
+              ) : undefined
+            }
+            style={{ marginBottom: 14 }}
           >
-            <Table
-              columns={bomColumns}
-              dataSource={report.bom_deviation}
-              rowKey="ingredient_id"
-              pagination={false}
-              size="middle"
-              locale={{ emptyText: '暂无BOM偏差数据（需要开启损耗事件追踪）' }}
-            />
-          </Card>
-        )}
+            {report.top5?.length === 0 ? (
+              <ZEmpty description="暂无损耗数据" />
+            ) : (
+              <ZTable
+                columns={top5Columns}
+                data={report.top5 ?? []}
+                rowKey="item_id"
+              />
+            )}
+          </ZCard>
 
-        {!report && !loading && !error && (
-          <Card>
-            <Alert
-              type="info"
-              message="请选择门店和日期范围后点击刷新加载损耗数据"
-              showIcon
-            />
-          </Card>
-        )}
-      </Spin>
+          {/* BOM 偏差排名 */}
+          {report.bom_deviation && report.bom_deviation.length > 0 && (
+            <ZCard
+              title={
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <WarningOutlined style={{ color: '#fa8c16' }} />
+                  BOM配方偏差排名（实际用量超出标准）
+                </div>
+              }
+            >
+              <ZTable
+                columns={bomColumns}
+                data={report.bom_deviation}
+                rowKey="ingredient_id"
+                emptyText="暂无BOM偏差数据（需要开启损耗事件追踪）"
+              />
+            </ZCard>
+          )}
+        </>
+      )}
     </div>
   );
 };
