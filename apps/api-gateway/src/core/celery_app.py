@@ -158,6 +158,10 @@ celery_app.conf.update(
             "queue": "low_priority",
             "routing_key": "low_priority",
         },
+        "src.core.celery_tasks.ops_patrol": {
+            "queue": "high_priority",
+            "routing_key": "high_priority",
+        },
     },
 
     # Celery Beat定时任务调度
@@ -427,6 +431,16 @@ celery_app.conf.update(
             ),
             "args": (),
             "options": {"queue": "default", "priority": 7},
+        },
+        # P3: 每N分钟 OpsAgent 巡检 + P0 级别自动推送企微告警
+        "ops-patrol": {
+            "task": "src.core.celery_tasks.ops_patrol",
+            "schedule": crontab(minute=f"*/{os.getenv('OPS_PATROL_INTERVAL', '15')}"),
+            "args": (),
+            "options": {
+                "queue": "high_priority",
+                "priority": 9,
+            },
         },
     },
 )

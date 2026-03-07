@@ -3890,3 +3890,113 @@ def pull_historical_backfill(
     except Exception as e:
         logger.error("backfill.failed", store_id=store_id, adapter=adapter, error=str(e))
         raise self.retry(exc=e)
+
+
+# ============================================================
+# P3: OpsAgent 定时巡检 + 企微 P0 告警推送
+# ============================================================
+
+def _build_ops_alert_markdown(store_id: str, store_name: str, dashboard: Dict[str, Any]) -> str:
+    """将 get_store_dashboard 结果格式化为企微 Markdown 告警消息。"""
+    score = dashboard.get("overall_score", 0)
+    status = dashboard.get("overall_status", "unknown")
+    active = dashboard.get("active_alerts", 0)
+    layers = dashboard.get("layers", {})
+
+    l1 = layers.get("l1_device", {})
+    l2 = layers.get("l2_network", {})
+    l3 = layers.get("l3_system", {})
+    fs = dashboard.get("food_safety", {})
+
+    label = store_name or store_id
+    status_emoji = "🔴" if status == "critical" else "🟡"
+
+    lines = [
+        f"{status_emoji} **【运维P0告警】{label}**",
+        f"> 健康分：**{score}/100** | 活跃告警：{active} 条",
+        "",
+        f"**L1 设备层**：{l1.get('score', '-')} 分，告警 {l1.get('alert_count', 0)} 条",
+        f"**L2 网络层**：{l2.get('score', '-')} 分，"
+        f"可用率 {l2.get('availability_pct', 100):.1f}%",
+        f"**L3 系统层**：{l3.get('score', '-')} 分，"
+        f"宕机系统 {l3.get('down_systems', 0)} 个"
+        + (f"（其中 P0 = {l3['p0_down']} 个）" if l3.get("p0_down") else ""),
+    ]
+
+    down_list = l3.get("down_list") or []
+    if down_list:
+        lines.append(f"**已停服**：{', '.join(down_list[:5])}")
+
+    violations = fs.get("violations", 0)
+    if violations:
+        rate = fs.get("compliance_rate_pct", 0)
+        lines.append(f"**食安违规**：{violations} 条（合规率 {rate:.1f}%）")
+
+    lines += ["", f"*巡检时间：{dashboard.get('generated_at', '')}*"]
+    return "\n".join(lines)
+
+
+@celery_app.task(bind=True, max_retries=2, default_retry_delay=60)
+def ops_patrol(self, store_id: str = None):
+    """
+    OpsAgent 定时巡检（默认每15分钟）。
+
+    对所有（或指定）门店执行 get_store_dashboard；
+    当 overall_status == 'critical' 或存在 P0 系统宕机时，
+    立即通过企微 Markdown 推送 P0 告警给门店负责人。
+    warning 状态仅记录日志，不推送（避免告警风暴）。
+    """
+    async def _run():
+        from src.core.database import get_db_session
+        from src.models.store import Store
+        from sqlalchemy import select
+        from src.services.ops_monitor_service import OpsMonitorService
+        from src.services.wechat_service import wechat_service
+
+        svc = OpsMonitorService()
+
+        async with get_db_session() as db:
+            if store_id:
+                stores = [(store_id, "")]
+            else:
+                rows = (await db.execute(select(Store.id, Store.name))).all()
+                stores = [(str(r.id), r.name or "") for r in rows]
+
+            pushed = 0
+            for sid, sname in stores:
+                try:
+                    dashboard = await svc.get_store_dashboard(db, store_id=sid, window_minutes=15)
+                    status = dashboard.get("overall_status", "healthy")
+                    l3 = dashboard.get("layers", {}).get("l3_system", {})
+                    p0_down = l3.get("p0_down", 0)
+
+                    # 仅 critical 或 P0 系统宕机时推送
+                    if status != "critical" and p0_down == 0:
+                        logger.debug("ops_patrol.ok", store_id=sid, status=status)
+                        continue
+
+                    markdown = _build_ops_alert_markdown(sid, sname, dashboard)
+                    recipient = _get_store_recipient(sid)
+                    await wechat_service.send_markdown_message(
+                        content=markdown,
+                        touser=recipient,
+                    )
+                    pushed += 1
+                    logger.info(
+                        "ops_patrol.alert_pushed",
+                        store_id=sid,
+                        status=status,
+                        p0_down=p0_down,
+                        recipient=recipient,
+                    )
+                except Exception as exc:
+                    logger.warning("ops_patrol.store_failed", store_id=sid, error=str(exc))
+
+        logger.info("ops_patrol.done", total_stores=len(stores), pushed=pushed)
+        return {"stores_checked": len(stores), "alerts_pushed": pushed}
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        logger.error("ops_patrol.failed", error=str(exc))
+        raise self.retry(exc=exc)
