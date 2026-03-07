@@ -1,0 +1,53 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* 对标档位标签色 */
+.tierTop {
+  color: #389e0d;
+  font-weight: 600;
+}
+
+.tierAboveAvg {
+  color: #1677ff;
+}
+
+.tierBelowAvg {
+  color: #fa8c16;
+}
+
+.tierLaggard {
+  color: #ff4d4f;
+  font-weight: 600;
+}
+
+/* 落后菜品行着色 */
+.rowLaggard {
+  background: #fff2f0 !important;
+}
+
+/* 对标汇总卡片 */
+.potentialBadge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #fff7e6;
+  color: #fa8c16;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* 横向对比表 */
+.bestStore {
+  background: #f6ffed;
+}

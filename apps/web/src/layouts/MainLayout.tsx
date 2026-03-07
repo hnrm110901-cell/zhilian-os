@@ -189,6 +189,7 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/dish-profitability': 'nav-overview',
   '/menu-optimization': 'nav-overview',
   '/dish-cost-alert': 'nav-overview',
+  '/dish-benchmark': 'nav-overview',
   '/industry-solutions': 'nav-platform',
   '/i18n': 'nav-platform',
   '/raas': 'nav-platform',
@@ -316,6 +317,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   '/dish-profitability': '菜品盈利分析',
   '/menu-optimization': '菜单优化建议',
   '/dish-cost-alert': '菜品成本预警',
+  '/dish-benchmark': '跨店菜品对标',
   '/industry-solutions': '行业解决方案',
   '/i18n': '国际化',
   '/raas': 'RaaS定价',
@@ -425,6 +427,7 @@ const MainLayout: React.FC = () => {
         { key: '/dish-profitability',      icon: <PieChartOutlined />, label: '菜品盈利分析' },
         { key: '/menu-optimization',       icon: <BulbOutlined />,    label: '菜单优化建议' },
         { key: '/dish-cost-alert',         icon: <WarningOutlined />, label: '菜品成本预警' },
+        { key: '/dish-benchmark',           icon: <TrophyOutlined />, label: '跨店菜品对标' },
       ],
     },
 
