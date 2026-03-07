@@ -1,0 +1,446 @@
+/* ── Page ──────────────────────────────────────────────────────────────────── */
+
+.page {
+  padding: 0;
+}
+
+.pageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pageHeaderLeft {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+/* ── KPI Strip ─────────────────────────────────────────────────────────────── */
+
+.kpiStrip {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 1100px) {
+  .kpiStrip { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 720px) {
+  .kpiStrip { grid-template-columns: repeat(2, 1fr); }
+}
+
+.kpiItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-right: 1px solid #f0f0f0;
+}
+
+.kpiItem:last-child { border-right: none; }
+
+.kpiIconWrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.kpiBody { flex: 1; min-width: 0; }
+
+.kpiLabel {
+  font-size: 12px;
+  color: #8c8c8c;
+  line-height: 1.4;
+}
+
+.kpiValue {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.kpiUnit {
+  font-size: 12px;
+  font-weight: 400;
+  margin-left: 2px;
+  color: #8c8c8c;
+}
+
+/* ── 3-col main ────────────────────────────────────────────────────────────── */
+
+.mainGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+@media (max-width: 1100px) {
+  .mainGrid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 720px) {
+  .mainGrid { grid-template-columns: 1fr; }
+}
+
+/* ── Schedule card ─────────────────────────────────────────────────────────── */
+
+.shiftRows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.shiftRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: #fafafa;
+  border-radius: 7px;
+  border: 1px solid #f0f0f0;
+}
+
+.shiftColor {
+  width: 4px;
+  height: 32px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.shiftInfo { flex: 1; min-width: 0; }
+
+.shiftName {
+  font-size: 12px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.shiftTime {
+  font-size: 11px;
+  color: #8c8c8c;
+  margin-top: 1px;
+}
+
+.shiftCount {
+  font-size: 18px;
+  font-weight: 700;
+  color: #262626;
+  flex-shrink: 0;
+}
+
+.shiftUnit {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-left: 2px;
+}
+
+.staffList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.staffRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: 5px;
+  font-size: 12px;
+}
+
+.staffRow:hover { background: #fafafa; }
+
+.staffDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.staffName {
+  flex: 1;
+  color: #434343;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.staffPosition {
+  color: #8c8c8c;
+  white-space: nowrap;
+}
+
+/* ── Queue card ────────────────────────────────────────────────────────────── */
+
+.queueCenter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 0 12px;
+}
+
+.queueCircle {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+  border: 3px solid currentColor;
+}
+
+.queueCircleNum {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.queueCircleUnit {
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.queueStats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  width: 100%;
+  border-top: 1px solid #f0f0f0;
+}
+
+.queueStatItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 4px;
+  border-right: 1px solid #f0f0f0;
+}
+
+.queueStatItem:last-child { border-right: none; }
+
+.queueStatValue {
+  font-size: 17px;
+  font-weight: 700;
+  color: #262626;
+}
+
+.queueStatLabel {
+  font-size: 10px;
+  color: #8c8c8c;
+  margin-top: 2px;
+  white-space: nowrap;
+}
+
+/* ── Service quality card ──────────────────────────────────────────────────── */
+
+.ratingHeader {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.ratingBig {
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.ratingStars {
+  font-size: 18px;
+  color: #faad14;
+  letter-spacing: 2px;
+  margin-bottom: 4px;
+}
+
+.ratingReviews {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-bottom: 4px;
+}
+
+.ratingBars {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 12px;
+}
+
+.ratingBarRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.ratingBarLabel {
+  width: 20px;
+  color: #8c8c8c;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.ratingBarTrack {
+  flex: 1;
+  height: 6px;
+  background: #f0f0f0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.ratingBarFill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+.ratingBarCount {
+  width: 24px;
+  color: #8c8c8c;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.issueList {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.issueRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 8px;
+  border-radius: 5px;
+  font-size: 12px;
+}
+
+.issueLabel { color: #434343; }
+.issueCount { font-weight: 600; }
+
+/* ── Task list ─────────────────────────────────────────────────────────────── */
+
+.taskItems {
+  display: flex;
+  flex-direction: column;
+}
+
+.taskRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #f5f5f5;
+  transition: background 0.15s;
+}
+
+.taskRow:hover { background: #fafafa; }
+.taskRow:last-child { border-bottom: none; }
+
+.taskPriorityDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.taskBody { flex: 1; min-width: 0; }
+
+.taskTitle {
+  font-size: 13px;
+  color: #262626;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.taskMeta {
+  font-size: 11px;
+  color: #8c8c8c;
+  margin-top: 2px;
+  display: flex;
+  gap: 8px;
+}
+
+.taskAction { flex-shrink: 0; }
+
+/* ── Quick nav ─────────────────────────────────────────────────────────────── */
+
+.quickNav {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin-top: 14px;
+}
+
+@media (max-width: 1100px) {
+  .quickNav { grid-template-columns: repeat(4, 1fr); }
+}
+@media (max-width: 720px) {
+  .quickNav { grid-template-columns: repeat(3, 1fr); }
+}
+
+.quickNavItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px;
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+  text-align: center;
+}
+
+.quickNavItem:hover {
+  background: #f0f7ff;
+  border-color: #1890ff;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.1);
+}
+
+.quickNavIcon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.quickNavLabel {
+  font-size: 12px;
+  color: #434343;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.quickNavBadge {
+  font-size: 10px;
+  background: #f5222d;
+  color: #fff;
+  border-radius: 8px;
+  padding: 0 5px;
+  min-width: 16px;
+  line-height: 16px;
+  text-align: center;
+}

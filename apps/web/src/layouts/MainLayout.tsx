@@ -81,6 +81,7 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/finance': 'nav-overview',
 
   // 02 门店运营
+  '/ops-hub': 'nav-operations',
   '/schedule': 'nav-operations',
   '/employees': 'nav-operations',
   '/my-schedule': 'nav-operations',
@@ -188,6 +189,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   '/competitive-analysis': '竞争分析',
   '/report-templates': '报表模板',
   '/finance': '财务管理',
+  '/ops-hub': '门店运营中心',
   '/schedule': '智能排班',
   '/employees': '员工管理',
   '/my-schedule': '我的班表',
@@ -362,6 +364,7 @@ const MainLayout: React.FC = () => {
       icon: <ShopOutlined />,
       label: '门店运营',
       children: [
+        { key: '/ops-hub',           icon: <AppstoreOutlined />,       label: '运营中心' },
         { key: '/schedule',          icon: <ScheduleOutlined />,      label: '智能排班' },
         { key: '/employees',         icon: <TeamOutlined />,          label: '员工管理' },
         { key: '/my-schedule',       icon: <CalendarOutlined />,      label: '我的班表' },
