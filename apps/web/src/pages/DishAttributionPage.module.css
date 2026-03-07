@@ -1,0 +1,98 @@
+.pageHeader {
+  margin-bottom: 16px;
+}
+
+.controlBar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+/* ── 归因看板 ───────────────────────────────────────────── */
+.effectCell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+
+.positive {
+  color: #52c41a;
+}
+
+.negative {
+  color: #ff4d4f;
+}
+
+.driverTag {
+  font-size: 11px;
+  padding: 0 6px;
+}
+
+.rowPrice       { background: #fff7e6 !important; }
+.rowVolume      { background: #e6f4ff !important; }
+.rowInteraction { background: #f6ffed !important; }
+.rowMixed       { background: #f5f5f5 !important; }
+.rowStable      { background: #ffffff !important; }
+
+/* ── 汇总分析 ───────────────────────────────────────────── */
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.statCard {
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  padding: 16px 20px;
+  text-align: center;
+}
+
+.statLabel {
+  font-size: 13px;
+  color: #8c8c8c;
+  margin-bottom: 4px;
+}
+
+.statValue {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1d1d1d;
+}
+
+.statValuePositive { color: #52c41a; }
+.statValueNegative { color: #ff4d4f; }
+
+.chartsRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* ── 增降幅榜 ───────────────────────────────────────────── */
+.moversRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* ── 菜品归因历史 ─────────────────────────────────────────── */
+.historySearch {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  align-items: center;
+}
+
+.historyHint {
+  color: #8c8c8c;
+  font-size: 13px;
+  padding: 40px;
+  text-align: center;
+}

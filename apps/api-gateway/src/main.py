@@ -673,6 +673,10 @@ app.include_router(dish_forecast.router)
 from src.api import dish_health
 app.include_router(dish_health.router)
 
+# Phase 6 Month 9: 菜品营收归因引擎
+from src.api import dish_attribution
+app.include_router(dish_attribution.router)
+
 # ARCH-004 可信执行层（折扣申请 / 审批 / 审计日志 / 回滚）
 app.include_router(execution.router)
 # FEAT-004 动态菜单权重引擎（Top-N 推荐 + 5因子评分）
