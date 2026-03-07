@@ -91,6 +91,7 @@ const BulkImportPage = lazy(() => import('./pages/BulkImportPage'));
 const MySchedulePage = lazy(() => import('./pages/MySchedulePage'));
 const HQDashboardPage = lazy(() => import('./pages/HQDashboardPage'));
 const AIAccuracyPage = lazy(() => import('./pages/AIAccuracyPage'));
+const GovDashboardPage = lazy(() => import('./pages/GovDashboardPage'));
 const DishCostPage = lazy(() => import('./pages/DishCostPage'));
 const ChannelProfitPage = lazy(() => import('./pages/ChannelProfitPage'));
 const EmployeePerformancePage = lazy(() => import('./pages/EmployeePerformancePage'));
@@ -380,6 +381,9 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="ai-accuracy" element={
                     <ProtectedRoute requiredRole="admin"><AIAccuracyPage /></ProtectedRoute>
+                  } />
+                  <Route path="governance" element={
+                    <ProtectedRoute requiredRole="admin"><GovDashboardPage /></ProtectedRoute>
                   } />
                   <Route path="dish-cost" element={
                     <ProtectedRoute requiredRole="store_manager"><DishCostPage /></ProtectedRoute>

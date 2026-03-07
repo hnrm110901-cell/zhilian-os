@@ -62,6 +62,7 @@ from src.api import bulk_import
 from src.api import hq_dashboard
 from src.api import ai_accuracy
 from src.api import dashboard_preferences
+from src.api import governance
 # ARCH-004 可信执行层 / FEAT-004 动态菜单 / ARCH-003 门店记忆层 / 本体论 L2 API / FCT 公开接口
 from src.api import execution, menu, store_memory, ontology_api, fct_public
 # Phase 1 — 运营智能层：渠道毛利 API
@@ -554,6 +555,7 @@ app.include_router(pos_webhook.router, tags=["pos_webhook"])
 app.include_router(bulk_import.router, tags=["bulk_import"])
 app.include_router(hq_dashboard.router, prefix="/api/v1", tags=["hq_dashboard"])
 app.include_router(ai_accuracy.router, prefix="/api/v1", tags=["ai_accuracy"])
+app.include_router(governance.router, prefix="/api/v1", tags=["governance"])
 app.include_router(dashboard_preferences.router, prefix="/api/v1", tags=["dashboard_preferences"])
 
 # 营销 Agent — 顾客画像 / 发券策略 / 活动管理
