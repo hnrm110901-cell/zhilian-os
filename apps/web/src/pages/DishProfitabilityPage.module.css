@@ -1,0 +1,61 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.kpiRow {
+  margin-bottom: 0 !important;
+}
+
+.kpiCard {
+  height: 100%;
+}
+
+/* BCG 四象限提示卡片行 */
+.quadrantHints {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+
+@media (max-width: 900px) {
+  .quadrantHints {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.quadrantHint {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1.5px solid;
+  font-size: 12px;
+}
+
+/* 收入占比进度条 */
+.shareBar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.shareBarFill {
+  height: 6px;
+  border-radius: 3px;
+  background: #1677ff;
+  min-width: 2px;
+  max-width: 80px;
+  transition: width 0.3s;
+}
