@@ -685,6 +685,10 @@ app.include_router(menu_matrix.router)
 from src.api import cost_compression
 app.include_router(cost_compression.router)
 
+# Phase 6 Month 12: 菜品经营综合月报引擎
+from src.api import dish_monthly_summary
+app.include_router(dish_monthly_summary.router)
+
 # ARCH-004 可信执行层（折扣申请 / 审批 / 审计日志 / 回滚）
 app.include_router(execution.router)
 # FEAT-004 动态菜单权重引擎（Top-N 推荐 + 5因子评分）

@@ -89,6 +89,7 @@ const DishHealthPage       = lazy(() => import('./pages/DishHealthPage'));
 const DishAttributionPage  = lazy(() => import('./pages/DishAttributionPage'));
 const MenuMatrixPage       = lazy(() => import('./pages/MenuMatrixPage'));
 const CostCompressionPage  = lazy(() => import('./pages/CostCompressionPage'));
+const DishMonthlySummaryPage = lazy(() => import('./pages/DishMonthlySummaryPage'));
 const IndustrySolutionsPage = lazy(() => import('./pages/IndustrySolutionsPage'));
 const I18nPage = lazy(() => import('./pages/I18nPage'));
 const TaskManagementPage = lazy(() => import('./pages/TaskManagementPage'));
@@ -410,6 +411,9 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="cost-compression" element={
                     <ProtectedRoute requiredRole="admin"><CostCompressionPage /></ProtectedRoute>
+                  } />
+                  <Route path="dish-monthly-summary" element={
+                    <ProtectedRoute requiredRole="admin"><DishMonthlySummaryPage /></ProtectedRoute>
                   } />
                   <Route path="industry-solutions" element={
                     <ProtectedRoute requiredRole="admin"><IndustrySolutionsPage /></ProtectedRoute>

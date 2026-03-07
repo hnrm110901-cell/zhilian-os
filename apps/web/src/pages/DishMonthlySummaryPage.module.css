@@ -1,0 +1,56 @@
+.page {
+  padding: 16px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+/* ── 总览 tab ── */
+.overviewWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.insightBanner {
+  border-radius: 8px;
+}
+
+.sourceCard {
+  border-radius: 8px;
+}
+
+.sectionCard {
+  border-radius: 8px;
+}
+
+.genAt {
+  text-align: right;
+  padding-top: 4px;
+}
+
+/* ── 趋势 tab ── */
+.trendWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.chartCard {
+  border-radius: 8px;
+}
+
+/* ── 行动清单 tab ── */
+.rowHigh {
+  background: #fff2f0;
+}
+
+.rowMedium {
+  background: #fffbe6;
+}
