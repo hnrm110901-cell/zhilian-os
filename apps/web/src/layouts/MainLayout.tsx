@@ -151,6 +151,7 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/multi-store': 'nav-platform',
   '/approval': 'nav-platform',
   '/approval-list': 'nav-platform',
+  '/action-plans': 'nav-platform',
   '/audit': 'nav-platform',
   '/data-security': 'nav-platform',
   '/integrations': 'nav-platform',
@@ -287,6 +288,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   '/multi-store': '多门店管理',
   '/approval': '审批管理',
   '/approval-list': '审批列表',
+  '/action-plans': 'L5 行动计划',
   '/audit': '审计日志',
   '/data-security': '数据安全',
   '/integrations': '外部集成',
@@ -563,6 +565,7 @@ const MainLayout: React.FC = () => {
         { key: '/multi-store',      icon: <ShopOutlined />,       label: '多门店管理' },
         { key: '/approval',         icon: <CheckCircleOutlined />,label: '审批管理' },
         { key: '/approval-list',    icon: <UnorderedListOutlined />,label: '审批列表' },
+        { key: '/action-plans',     icon: <CheckCircleOutlined />, label: 'L5 行动计划' },
         { key: '/audit',            icon: <FileTextOutlined />,   label: '审计日志' },
         { key: '/data-security',    icon: <SafetyOutlined />,     label: '数据安全' },
         // 集成与适配

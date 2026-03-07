@@ -484,7 +484,7 @@ class WeChatActionFSM:
         """优先级升级（P3→P2→P1→P0，P0 不再升级）"""
         order = [ActionPriority.P3, ActionPriority.P2, ActionPriority.P1, ActionPriority.P0]
         idx = order.index(p)
-        return order[max(0, idx - 1)]
+        return order[min(len(order) - 1, idx + 1)]
 
 
 # ── 全局单例 ──────────────────────────────────────────────────────────────────

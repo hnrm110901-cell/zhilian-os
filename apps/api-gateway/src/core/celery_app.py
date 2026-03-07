@@ -456,6 +456,19 @@ celery_app.conf.update(
                 "priority": 9,
             },
         },
+        # Phase 7 — L5 夜间行动批量派发（在 L4 nightly_reasoning_scan 04:00 完成后执行）
+        "nightly-action-dispatch": {
+            "task": "tasks.nightly_action_dispatch",
+            "schedule": crontab(
+                hour=int(os.getenv("L5_DISPATCH_HOUR", "4")),
+                minute=int(os.getenv("L5_DISPATCH_MINUTE", "30")),
+            ),
+            "args": (),
+            "options": {
+                "queue": "default",
+                "priority": 8,
+            },
+        },
     },
 )
 

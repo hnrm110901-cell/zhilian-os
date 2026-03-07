@@ -1,0 +1,133 @@
+/* ── Page ──────────────────────────────────────────────────────────────────── */
+
+.page {
+  padding: 0;
+}
+
+/* ── KPI grid ───────────────────────────────────────────────────────────────── */
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+@media (max-width: 1200px) { .kpiGrid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 720px)  { .kpiGrid { grid-template-columns: repeat(2, 1fr); } }
+
+/* ── Filter row ─────────────────────────────────────────────────────────────── */
+
+.filterRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filterLabel {
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* ── Severity badge ─────────────────────────────────────────────────────────── */
+
+.severityP1 { color: #d9363e; font-weight: 700; }
+.severityP2 { color: #fa8c16; font-weight: 700; }
+.severityP3 { color: #52c41a; font-weight: 600; }
+
+/* ── Table ellipsis ─────────────────────────────────────────────────────────── */
+
+.ellipsis {
+  display: block;
+  max-width: 260px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ── Drawer content ─────────────────────────────────────────────────────────── */
+
+.drawerContent {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.drawerSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.drawerSectionTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── Description list ───────────────────────────────────────────────────────── */
+
+.descList {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  overflow: hidden;
+}
+
+.descRow {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  border-bottom: 1px solid var(--border);
+}
+
+.descRow:last-child {
+  border-bottom: none;
+}
+
+.descRow dt {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: #fafafa;
+  padding: 8px 12px;
+  border-right: 1px solid var(--border);
+}
+
+.descRow dd {
+  font-size: 13px;
+  color: var(--text-primary);
+  padding: 8px 12px;
+  margin: 0;
+  word-break: break-all;
+}
+
+/* ── KPI delta ──────────────────────────────────────────────────────────────── */
+
+.kpiDelta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.kpiDeltaRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.kpiDeltaName {
+  min-width: 90px;
+  color: var(--text-secondary);
+}
+
+.kpiDeltaImprove { color: #52c41a; font-weight: 600; }
+.kpiDeltaWorsen  { color: #d9363e; font-weight: 600; }
