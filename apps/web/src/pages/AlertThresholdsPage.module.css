@@ -1,0 +1,45 @@
+/* ── Page ──────────────────────────────────────────────────────────────────── */
+
+.page {
+  padding: 0;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.pageTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  display: flex;
+  align-items: center;
+}
+
+/* ── Info banner ────────────────────────────────────────────────────────────── */
+
+.infoBar {
+  display: flex;
+  align-items: flex-start;
+  background: #e6f4ff;
+  border: 1px solid #91caff;
+  border-radius: var(--radius-md, 8px);
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #0958d9;
+  margin-bottom: 14px;
+  line-height: 1.6;
+}
+
+/* ── Table header controls ──────────────────────────────────────────────────── */
+
+.tableHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}

@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  Card, Table, InputNumber, Button, Space, Tag, Typography,
-  Spin, Alert, Tooltip, message,
-} from 'antd';
+import { InputNumber, message } from 'antd';
 import {
   EditOutlined, SaveOutlined, CloseOutlined,
   BellOutlined, WarningOutlined,
 } from '@ant-design/icons';
+import {
+  ZCard, ZBadge, ZButton, ZSkeleton, ZSelect, ZTable,
+} from '../design-system/components';
+import type { ZTableColumn } from '../design-system/components/ZTable';
 import { apiClient } from '../services/api';
 import { handleApiError } from '../utils/message';
-
-const { Title, Text } = Typography;
+import styles from './AlertThresholdsPage.module.css';
 
 // ── 类型定义 ──────────────────────────────────────────────────────────────────
 
@@ -31,17 +31,17 @@ interface EditState {
   critical_threshold: number | null;
 }
 
-// ── 类别标签颜色 ──────────────────────────────────────────────────────────────
+// ── 辅助函数 ──────────────────────────────────────────────────────────────────
 
-const categoryColor = (cat: string) => {
-  const map: Record<string, string> = {
-    food_cost:  'blue',
-    waste:      'orange',
-    revenue:    'green',
-    decision:   'purple',
-    operations: 'cyan',
+const categoryBadgeType = (cat: string): 'info' | 'warning' | 'success' | 'accent' | 'default' => {
+  const map: Record<string, 'info' | 'warning' | 'success' | 'accent' | 'default'> = {
+    food_cost:  'info',
+    waste:      'warning',
+    revenue:    'success',
+    decision:   'accent',
+    operations: 'info',
   };
-  return map[cat] || 'default';
+  return map[cat] ?? 'default';
 };
 
 const categoryLabel = (cat: string) => {
@@ -56,16 +56,15 @@ const categoryLabel = (cat: string) => {
 };
 
 // ════════════════════════════════════════════════════════════════════════════════
-// AlertThresholdsPage — 异常告警阈值配置
+// AlertThresholdsPage
 // ════════════════════════════════════════════════════════════════════════════════
 
 const AlertThresholdsPage: React.FC = () => {
-  const [loading,  setLoading]  = useState(false);
-  const [saving,   setSaving]   = useState<string | null>(null);
-  const [kpis,     setKpis]     = useState<KPIItem[]>([]);
-  const [editRows, setEditRows] = useState<Record<string, EditState>>({});
-
-  // ── 加载 KPI 列表 ──────────────────────────────────────────────────────────
+  const [loading,    setLoading]    = useState(false);
+  const [saving,     setSaving]     = useState<string | null>(null);
+  const [kpis,       setKpis]       = useState<KPIItem[]>([]);
+  const [editRows,   setEditRows]   = useState<Record<string, EditState>>({});
+  const [catFilter,  setCatFilter]  = useState<string>('all');
 
   const loadKpis = useCallback(async () => {
     setLoading(true);
@@ -80,8 +79,6 @@ const AlertThresholdsPage: React.FC = () => {
   }, []);
 
   useEffect(() => { loadKpis(); }, [loadKpis]);
-
-  // ── 编辑行操作 ────────────────────────────────────────────────────────────
 
   const startEdit = (kpi: KPIItem) => {
     setEditRows(prev => ({
@@ -130,60 +127,60 @@ const AlertThresholdsPage: React.FC = () => {
     }
   };
 
-  // ── 表格列定义 ────────────────────────────────────────────────────────────
+  const catOptions = [
+    { value: 'all',       label: '全部类别' },
+    { value: 'food_cost', label: '食材成本' },
+    { value: 'waste',     label: '损耗管理' },
+    { value: 'revenue',   label: '营业收入' },
+    { value: 'decision',  label: '决策执行' },
+    { value: 'operations',label: '运营效率' },
+  ];
 
-  const columns = [
+  const displayKpis = catFilter === 'all'
+    ? kpis
+    : kpis.filter(k => k.category === catFilter);
+
+  const columns: ZTableColumn<KPIItem>[] = [
     {
-      title:     '指标名称',
-      dataIndex: 'name',
-      width:     180,
-      render:    (name: string, row: KPIItem) => (
-        <Space direction="vertical" size={0}>
-          <Text strong>{name}</Text>
+      key:   'name',
+      title: '指标名称',
+      width: 180,
+      render: (name: string, row: KPIItem) => (
+        <div>
+          <strong style={{ color: 'var(--text-primary)' }}>{name}</strong>
           {row.description && (
-            <Text type="secondary" style={{ fontSize: 12 }}>{row.description}</Text>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 1 }}>{row.description}</div>
           )}
-        </Space>
+        </div>
       ),
     },
     {
-      title:     '类别',
-      dataIndex: 'category',
-      width:     110,
-      render:    (cat: string) => (
-        <Tag color={categoryColor(cat)}>{categoryLabel(cat)}</Tag>
+      key:   'category',
+      title: '类别',
+      width: 110,
+      render: (cat: string) => (
+        <ZBadge type={categoryBadgeType(cat)} text={categoryLabel(cat)} />
       ),
-      filters: [
-        { text: '食材成本', value: 'food_cost' },
-        { text: '损耗管理', value: 'waste' },
-        { text: '营业收入', value: 'revenue' },
-        { text: '决策执行', value: 'decision' },
-      ],
-      onFilter: (value: any, row: KPIItem) => row.category === value,
     },
     {
-      title:     '单位',
-      dataIndex: 'unit',
-      width:     70,
-      render:    (u: string | null) => u || '—',
+      key:   'unit',
+      title: '单位',
+      width: 70,
+      align: 'center',
+      render: (u: string | null) => u || '—',
     },
     {
-      title:     '目标值',
-      dataIndex: 'target_value',
-      width:     90,
-      render:    (v: number | null, row: KPIItem) =>
-        v != null ? `${v}${row.unit || ''}` : '—',
+      key:   'target_value',
+      title: '目标值',
+      width: 90,
+      align: 'right',
+      render: (v: number | null, row: KPIItem) => v != null ? `${v}${row.unit || ''}` : '—',
     },
     {
-      title: (
-        <Space>
-          <WarningOutlined style={{ color: '#faad14' }} />
-          警告阈值
-        </Space>
-      ),
-      dataIndex: 'warning_threshold',
-      width:     140,
-      render:    (v: number | null, row: KPIItem) => {
+      key:   'warning_threshold',
+      title: '警告阈值',
+      width: 160,
+      render: (v: number | null, row: KPIItem) => {
         const editing = editRows[row.id];
         if (editing) {
           return (
@@ -193,28 +190,23 @@ const AlertThresholdsPage: React.FC = () => {
                 ...prev,
                 [row.id]: { ...prev[row.id], warning_threshold: val ?? null },
               }))}
-              style={{ width: 110 }}
-              suffix={row.unit || undefined}
+              style={{ width: 120 }}
+              addonAfter={row.unit || undefined}
               step={0.1}
               precision={1}
             />
           );
         }
         return v != null
-          ? <Tag color="warning">{v}{row.unit || ''}</Tag>
-          : <Text type="secondary">未设置</Text>;
+          ? <ZBadge type="warning" text={`${v}${row.unit || ''}`} />
+          : <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>未设置</span>;
       },
     },
     {
-      title: (
-        <Space>
-          <WarningOutlined style={{ color: '#f5222d' }} />
-          超标阈值
-        </Space>
-      ),
-      dataIndex: 'critical_threshold',
-      width:     140,
-      render:    (v: number | null, row: KPIItem) => {
+      key:   'critical_threshold',
+      title: '超标阈值',
+      width: 160,
+      render: (v: number | null, row: KPIItem) => {
         const editing = editRows[row.id];
         if (editing) {
           return (
@@ -224,89 +216,95 @@ const AlertThresholdsPage: React.FC = () => {
                 ...prev,
                 [row.id]: { ...prev[row.id], critical_threshold: val ?? null },
               }))}
-              style={{ width: 110 }}
-              suffix={row.unit || undefined}
+              style={{ width: 120 }}
+              addonAfter={row.unit || undefined}
               step={0.1}
               precision={1}
             />
           );
         }
         return v != null
-          ? <Tag color="error">{v}{row.unit || ''}</Tag>
-          : <Text type="secondary">未设置</Text>;
+          ? <ZBadge type="critical" text={`${v}${row.unit || ''}`} />
+          : <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>未设置</span>;
       },
     },
     {
-      title:  '操作',
-      width:  120,
+      key:   'id',
+      title: '操作',
+      width: 120,
+      align: 'center',
       render: (_: any, row: KPIItem) => {
         const editing = editRows[row.id];
         if (editing) {
           return (
-            <Space>
-              <Tooltip title="保存">
-                <Button
-                  type="primary"
-                  size="small"
-                  icon={<SaveOutlined />}
-                  loading={saving === row.id}
-                  onClick={() => saveThreshold(row.id)}
-                />
-              </Tooltip>
-              <Tooltip title="取消">
-                <Button
-                  size="small"
-                  icon={<CloseOutlined />}
-                  onClick={() => cancelEdit(row.id)}
-                />
-              </Tooltip>
-            </Space>
+            <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+              <ZButton
+                size="sm"
+                variant="primary"
+                icon={<SaveOutlined />}
+                disabled={saving === row.id}
+                onClick={() => saveThreshold(row.id)}
+                title="保存"
+              />
+              <ZButton
+                size="sm"
+                icon={<CloseOutlined />}
+                onClick={() => cancelEdit(row.id)}
+                title="取消"
+              />
+            </div>
           );
         }
         return (
-          <Tooltip title="编辑阈值">
-            <Button
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => startEdit(row)}
-            />
-          </Tooltip>
+          <ZButton
+            size="sm"
+            icon={<EditOutlined />}
+            onClick={() => startEdit(row)}
+            title="编辑阈值"
+          />
         );
       },
     },
   ];
 
-  // ── 渲染 ──────────────────────────────────────────────────────────────────
-
   return (
-    <div style={{ padding: 24 }}>
-      <Title level={3}>
-        <BellOutlined style={{ marginRight: 8 }} />
-        异常告警阈值配置
-      </Title>
+    <div className={styles.page}>
+      {/* 页头 */}
+      <div className={styles.header}>
+        <h3 className={styles.pageTitle}>
+          <BellOutlined style={{ marginRight: 8 }} />
+          异常告警阈值配置
+        </h3>
+      </div>
 
-      <Alert
-        message="配置说明"
-        description="超过「警告阈值」时系统发送橙色告警推送；超过「超标阈值」时发送红色紧急推送并推送至企业微信。阈值调整立即生效。"
-        type="info"
-        showIcon
-        style={{ marginBottom: 16 }}
-      />
+      {/* 配置说明 */}
+      <div className={styles.infoBar}>
+        <WarningOutlined style={{ color: '#1677ff', marginRight: 8, flexShrink: 0 }} />
+        超过「警告阈值」时系统发送橙色告警推送；超过「超标阈值」时发送红色紧急推送并推送至企业微信。阈值调整立即生效。
+      </div>
 
-      <Card>
-        <Spin spinning={loading}>
-          <Table
-            dataSource={kpis}
-            columns={columns}
-            rowKey="id"
-            pagination={{ pageSize: 20, hideOnSinglePage: true }}
-            size="small"
-            rowClassName={(row) =>
-              editRows[row.id] ? 'ant-table-row-selected' : ''
-            }
+      {/* 类别筛选 + 表格 */}
+      <ZCard>
+        <div className={styles.tableHeader}>
+          <ZSelect
+            value={catFilter}
+            options={catOptions}
+            onChange={(v) => setCatFilter(v as string)}
+            style={{ width: 140 }}
           />
-        </Spin>
-      </Card>
+        </div>
+
+        {loading ? (
+          <ZSkeleton rows={6} block />
+        ) : (
+          <ZTable<KPIItem>
+            columns={columns}
+            data={displayKpis}
+            rowKey="id"
+            emptyText="暂无 KPI 数据"
+          />
+        )}
+      </ZCard>
     </div>
   );
 };
