@@ -118,6 +118,7 @@ export interface TransferActionResult {
 }
 
 export type TransferRequestStatus = 'pending' | 'approved' | 'rejected' | 'executed' | 'unknown';
+export type TransferRequestQueryStatus = Exclude<TransferRequestStatus, 'unknown'> | 'pending_approval';
 
 class InventoryDataService {
   private readonly basePath = '/api/v1/inventory';
@@ -227,7 +228,7 @@ class InventoryDataService {
 
   async listTransferRequests(params?: {
     storeId?: string;
-    status?: string;
+    status?: TransferRequestQueryStatus;
     limit?: number;
   }): Promise<TransferRequestListResult> {
     const query = new URLSearchParams({ limit: String(params?.limit ?? 30) });
@@ -246,17 +247,25 @@ class InventoryDataService {
   }
 
   async approveTransferRequest(decisionId: string, managerFeedback?: string): Promise<TransferActionResult> {
-    return apiClient.post<TransferActionResult>(
+    const response = await apiClient.post<{ success: boolean; decision_id: string; status: string; source_new_quantity?: number; target_new_quantity?: number }>(
       `/api/v1/inventory/transfer-requests/${decisionId}/approve`,
       { manager_feedback: managerFeedback }
     );
+    return {
+      ...response,
+      status: this.normalizeTransferStatus(response.status),
+    };
   }
 
   async rejectTransferRequest(decisionId: string, managerFeedback: string): Promise<TransferActionResult> {
-    return apiClient.post<TransferActionResult>(
+    const response = await apiClient.post<{ success: boolean; decision_id: string; status: string; source_new_quantity?: number; target_new_quantity?: number }>(
       `/api/v1/inventory/transfer-requests/${decisionId}/reject`,
       { manager_feedback: managerFeedback }
     );
+    return {
+      ...response,
+      status: this.normalizeTransferStatus(response.status),
+    };
   }
 }
 
