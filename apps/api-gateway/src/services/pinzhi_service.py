@@ -6,10 +6,24 @@ from typing import Dict, Any, Optional, List
 import httpx
 import structlog
 from datetime import datetime
+import hashlib
 
 from ..core.config import settings
 
 logger = structlog.get_logger()
+
+
+def _generate_sign(token: str, params: Dict[str, Any]) -> str:
+    """
+    生成品智 API 签名（与适配器算法保持一致）。
+    """
+    filtered = {
+        k: v for k, v in params.items()
+        if k not in ["sign", "pageIndex", "pageSize"] and v is not None
+    }
+    sorted_items = sorted(filtered.items(), key=lambda item: item[0])
+    param_str = "&".join([f"{k}={v}" for k, v in sorted_items]) + f"&token={token}"
+    return hashlib.md5(param_str.encode("utf-8")).hexdigest()
 
 
 class PinzhiService:
@@ -24,6 +38,11 @@ class PinzhiService:
     def is_configured(self) -> bool:
         """检查是否已配置"""
         return bool(self.token and self.base_url)
+
+    def _probe_params(self, extra: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        params = dict(extra or {})
+        params["sign"] = _generate_sign(self.token, params)
+        return params
 
     async def health_check(self) -> Dict[str, Any]:
         """
@@ -42,29 +61,71 @@ class PinzhiService:
 
         try:
             async with httpx.AsyncClient() as client:
-                # 尝试调用一个简单的API端点来验证连接
+                # 优先探测品智 .do 接口（更贴近真实业务通路）
+                probe_candidates = [
+                    ("/pinzhi/reportcategory.do", self._probe_params()),
+                    ("/pinzhi/storeInfo.do", self._probe_params()),
+                ]
+
+                for endpoint, params in probe_candidates:
+                    response = await client.get(
+                        f"{self.base_url}{endpoint}",
+                        params=params,
+                        timeout=self.timeout,
+                    )
+                    if response.status_code != 200:
+                        continue
+
+                    payload: Dict[str, Any] = {}
+                    try:
+                        payload = response.json() if response.content else {}
+                    except Exception:
+                        payload = {}
+
+                    success = payload.get("success")
+                    errcode = payload.get("errcode")
+                    if success in (0, "0") or (
+                        success is None and errcode in (0, "0")
+                    ):
+                        return {
+                            "status": "healthy",
+                            "message": "品智 .do 接口连接正常",
+                            "configured": True,
+                            "reachable": True,
+                            "probe_endpoint": endpoint,
+                            "response_time_ms": response.elapsed.total_seconds() * 1000,
+                        }
+
+                    return {
+                        "status": "auth_failed",
+                        "message": f"品智鉴权失败: {payload.get('msg') or payload.get('errmsg') or payload}",
+                        "configured": True,
+                        "reachable": False,
+                        "probe_endpoint": endpoint,
+                    }
+
+                # 回退到历史健康接口（兼容部分代理环境）
                 response = await client.get(
                     f"{self.base_url}/api/health",
                     headers={"Authorization": f"Bearer {self.token}"},
                     timeout=self.timeout,
                 )
-
                 if response.status_code == 200:
                     return {
                         "status": "healthy",
-                        "message": "品智连接正常",
+                        "message": "品智连接正常（health fallback）",
                         "configured": True,
                         "reachable": True,
+                        "probe_endpoint": "/api/health",
                         "response_time_ms": response.elapsed.total_seconds() * 1000,
                     }
-                else:
-                    return {
-                        "status": "unhealthy",
-                        "message": f"品智API返回错误: {response.status_code}",
-                        "configured": True,
-                        "reachable": False,
-                        "status_code": response.status_code,
-                    }
+                return {
+                    "status": "unhealthy",
+                    "message": f"品智API返回错误: {response.status_code}",
+                    "configured": True,
+                    "reachable": False,
+                    "status_code": response.status_code,
+                }
 
         except httpx.TimeoutException:
             logger.error("品智API超时")
