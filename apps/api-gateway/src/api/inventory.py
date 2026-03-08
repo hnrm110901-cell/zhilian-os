@@ -109,25 +109,6 @@ async def list_inventory(
     ) for i in items]
 
 
-@router.get("/inventory/{item_id}", response_model=InventoryItemResponse)
-async def get_inventory_item(
-    item_id: str,
-    session: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
-):
-    """获取库存项详情"""
-    result = await session.execute(select(InventoryItem).where(InventoryItem.id == item_id))
-    item = result.scalar_one_or_none()
-    if not item:
-        raise HTTPException(status_code=404, detail="库存项不存在")
-    return InventoryItemResponse(
-        id=item.id, store_id=item.store_id, name=item.name, category=item.category,
-        unit=item.unit, current_quantity=item.current_quantity, min_quantity=item.min_quantity,
-        max_quantity=item.max_quantity, unit_cost=item.unit_cost,
-        status=item.status.value if hasattr(item.status, "value") else item.status
-    )
-
-
 @router.post("/inventory", response_model=InventoryItemResponse, status_code=201)
 async def create_inventory_item(
     req: CreateInventoryItemRequest,
@@ -174,107 +155,6 @@ async def update_inventory_item(
         max_quantity=item.max_quantity, unit_cost=item.unit_cost,
         status=item.status.value if hasattr(item.status, "value") else item.status
     )
-
-
-@router.post("/inventory/{item_id}/transaction", status_code=201)
-async def record_transaction(    item_id: str,
-    req: InventoryTransactionRequest,
-    session: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
-):
-    """记录库存变动（入库/出库/损耗）"""
-    result = await session.execute(select(InventoryItem).where(InventoryItem.id == item_id))
-    item = result.scalar_one_or_none()
-    if not item:
-        raise HTTPException(status_code=404, detail="库存项不存在")
-
-    quantity_before = item.current_quantity
-
-    if req.transaction_type in (TransactionType.PURCHASE,):
-        # 入库：直接更新DB，无并发竞争风险
-        item.current_quantity += req.quantity
-    else:
-        # 出库/损耗：使用 Redis Lua 原子扣减防止超卖
-        qty_key = f"inventory:qty:{item_id}"
-        lock_key = f"inventory:lock:{item_id}"
-        new_qty = None
-
-        try:
-            await _redis_svc.initialize()
-            r = _redis_svc._redis
-            if r:
-                # 若 Redis 中无缓存，先写入当前 DB 值
-                if not await r.exists(qty_key):
-                    await r.set(qty_key, item.current_quantity)
-
-                result_lua = await r.eval(
-                    _LUA_DEDUCT_STOCK, 2, lock_key, qty_key, req.quantity
-                )
-                if result_lua == -1:
-                    raise HTTPException(status_code=400, detail="库存不足")
-                if result_lua >= 0:
-                    new_qty = float(result_lua)
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.warning("Redis Lua扣减失败，回退到DB校验", error=str(e))
-
-        # 回退或同步 DB
-        if new_qty is None:
-            # Redis 不可用，回退到 DB 校验
-            if item.current_quantity < req.quantity:
-                raise HTTPException(status_code=400, detail="库存不足")
-            item.current_quantity -= req.quantity
-        else:
-            item.current_quantity = new_qty
-
-    quantity_after = item.current_quantity
-
-    txn = InventoryTransaction(
-        item_id=item_id,
-        store_id=item.store_id,
-        transaction_type=req.transaction_type,
-        quantity=req.quantity,
-        quantity_before=quantity_before,
-        quantity_after=quantity_after,
-        notes=req.notes,
-        performed_by=str(current_user.id),
-    )
-    session.add(txn)
-    await session.commit()
-    logger.info("inventory_transaction_recorded", item_id=item_id, type=req.transaction_type.value)
-    return {"success": True, "new_quantity": item.current_quantity}
-
-
-@router.get("/inventory/{item_id}/transactions")
-async def get_item_transactions(
-    item_id: str,
-    limit: int = Query(50, ge=1, le=200),
-    session: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
-):
-    """获取库存物品流水记录"""
-    from sqlalchemy import desc
-    result = await session.execute(
-        select(InventoryTransaction)
-        .where(InventoryTransaction.item_id == item_id)
-        .order_by(desc(InventoryTransaction.transaction_time))
-        .limit(limit)
-    )
-    txns = result.scalars().all()
-    return [
-        {
-            "id": str(t.id),
-            "transaction_type": t.transaction_type.value,
-            "quantity": t.quantity,
-            "quantity_before": t.quantity_before,
-            "quantity_after": t.quantity_after,
-            "notes": t.notes,
-            "performed_by": t.performed_by,
-            "transaction_time": t.transaction_time.isoformat() if t.transaction_time else None,
-        }
-        for t in txns
-    ]
 
 
 @router.get("/inventory-stats")
@@ -746,3 +626,118 @@ async def reject_transfer_request(
 
     await session.commit()
     return {"success": True, "decision_id": decision_id, "status": DecisionStatus.REJECTED.value}
+
+
+@router.get("/inventory/{item_id}", response_model=InventoryItemResponse)
+async def get_inventory_item(
+    item_id: str,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """获取库存项详情。放在静态子路径后，避免吞掉 transfer-* 路由。"""
+    result = await session.execute(select(InventoryItem).where(InventoryItem.id == item_id))
+    item = result.scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=404, detail="库存项不存在")
+    return InventoryItemResponse(
+        id=item.id, store_id=item.store_id, name=item.name, category=item.category,
+        unit=item.unit, current_quantity=item.current_quantity, min_quantity=item.min_quantity,
+        max_quantity=item.max_quantity, unit_cost=item.unit_cost,
+        status=item.status.value if hasattr(item.status, "value") else item.status
+    )
+
+
+@router.post("/inventory/{item_id}/transaction", status_code=201)
+async def record_transaction(
+    item_id: str,
+    req: InventoryTransactionRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """记录库存变动（入库/出库/损耗）。"""
+    result = await session.execute(select(InventoryItem).where(InventoryItem.id == item_id))
+    item = result.scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=404, detail="库存项不存在")
+
+    quantity_before = item.current_quantity
+
+    if req.transaction_type in (TransactionType.PURCHASE,):
+        item.current_quantity += req.quantity
+    else:
+        qty_key = f"inventory:qty:{item_id}"
+        lock_key = f"inventory:lock:{item_id}"
+        new_qty = None
+
+        try:
+            await _redis_svc.initialize()
+            r = _redis_svc._redis
+            if r:
+                if not await r.exists(qty_key):
+                    await r.set(qty_key, item.current_quantity)
+
+                result_lua = await r.eval(_LUA_DEDUCT_STOCK, 2, lock_key, qty_key, req.quantity)
+                if result_lua == -1:
+                    raise HTTPException(status_code=400, detail="库存不足")
+                if result_lua >= 0:
+                    new_qty = float(result_lua)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.warning("Redis Lua扣减失败，回退到DB校验", error=str(e))
+
+        if new_qty is None:
+            if item.current_quantity < req.quantity:
+                raise HTTPException(status_code=400, detail="库存不足")
+            item.current_quantity -= req.quantity
+        else:
+            item.current_quantity = new_qty
+
+    quantity_after = item.current_quantity
+
+    txn = InventoryTransaction(
+        item_id=item_id,
+        store_id=item.store_id,
+        transaction_type=req.transaction_type,
+        quantity=req.quantity,
+        quantity_before=quantity_before,
+        quantity_after=quantity_after,
+        notes=req.notes,
+        performed_by=str(current_user.id),
+    )
+    session.add(txn)
+    await session.commit()
+    logger.info("inventory_transaction_recorded", item_id=item_id, type=req.transaction_type.value)
+    return {"success": True, "new_quantity": item.current_quantity}
+
+
+@router.get("/inventory/{item_id}/transactions")
+async def get_item_transactions(
+    item_id: str,
+    limit: int = Query(50, ge=1, le=200),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """获取库存物品流水记录。"""
+    from sqlalchemy import desc
+
+    result = await session.execute(
+        select(InventoryTransaction)
+        .where(InventoryTransaction.item_id == item_id)
+        .order_by(desc(InventoryTransaction.transaction_time))
+        .limit(limit)
+    )
+    txns = result.scalars().all()
+    return [
+        {
+            "id": str(t.id),
+            "transaction_type": t.transaction_type.value,
+            "quantity": t.quantity,
+            "quantity_before": t.quantity_before,
+            "quantity_after": t.quantity_after,
+            "notes": t.notes,
+            "performed_by": t.performed_by,
+            "transaction_time": t.transaction_time.isoformat() if t.transaction_time else None,
+        }
+        for t in txns
+    ]

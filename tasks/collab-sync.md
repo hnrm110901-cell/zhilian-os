@@ -49,6 +49,8 @@
   - 体验增强：列表按门店/状态筛选、手动刷新、审批意见弹窗（驳回必填）与意见回显
   - 契约收敛：后端调货接口补齐 `response_model`；前端抽离 `inventoryDataService` 调货类型与调用
   - 文档补齐：新增《跨店调货API契约V1》统一字段字典、状态机与请求响应示例
+  - HTTP 回归补齐：新增 `TestClient` 路由级用例（创建/列表/批准/驳回）
+  - 路由顺序修复：`/inventory/{item_id}` 后置，避免吞掉 `/inventory/transfer-requests`
 
 ## P2
 - [x] 角色权限管理体验优化（页面入口可见性与无权限提示一致性）
@@ -105,6 +107,9 @@
   - `apps/web/src/App.tsx`
   - `tasks/collab-sync.md`
 - verify:
+  - `python3 -m py_compile apps/api-gateway/src/api/inventory.py`（通过）
+  - `python3 -m pytest -q apps/api-gateway/tests/test_inventory_transfer_routes_http.py`（4 passed）
+  - `python3 -m pytest -q apps/api-gateway/tests/test_inventory_transfer_workflow_api.py apps/api-gateway/tests/test_multi_store_api_routes.py`（14 passed）
   - 文档校对：`docs/跨店调货API契约V1.md`（已添加接口、状态机、规则、错误语义）
   - `python3 -m pytest -q apps/api-gateway/tests/test_multi_store_api_routes.py`（9 passed，含动态路由顺序防吞断言）
   - `python3 -m py_compile apps/api-gateway/src/api/inventory.py`（通过）
