@@ -170,11 +170,10 @@ class AdapterIntegrationService:
         try:
             for offset in range(lookback_days + 1):
                 biz_date = (datetime.now() - timedelta(days=offset)).strftime("%Y-%m-%d")
-                order_rows = await adapter.query_order_list(
-                    ognid=store_id,
-                    begin_date=biz_date,
-                    end_date=biz_date,
-                    page_index=1,
+                order_rows = await self._query_pinzhi_orders(
+                    adapter=adapter,
+                    store_id=store_id,
+                    biz_date=biz_date,
                     page_size=int(os.getenv("PINZHI_SYNC_PAGE_SIZE", "200")),
                 )
                 for row in order_rows or []:
@@ -204,6 +203,34 @@ class AdapterIntegrationService:
         except Exception as e:
             logger.error("品智订单同步失败", order_id=order_id, error=str(e))
             raise
+
+    async def _query_pinzhi_orders(
+        self,
+        adapter: Any,
+        store_id: str,
+        biz_date: str,
+        page_size: int,
+    ) -> List[Dict[str, Any]]:
+        """
+        兼容不同版本品智适配器订单查询方法名。
+        """
+        if hasattr(adapter, "query_orders"):
+            return await adapter.query_orders(
+                ognid=store_id,
+                begin_date=biz_date,
+                end_date=biz_date,
+                page_index=1,
+                page_size=page_size,
+            )
+        if hasattr(adapter, "query_order_list"):
+            return await adapter.query_order_list(
+                ognid=store_id,
+                begin_date=biz_date,
+                end_date=biz_date,
+                page_index=1,
+                page_size=page_size,
+            )
+        raise ValueError("品智适配器缺少订单查询接口(query_orders/query_order_list)")
 
     # ==================== 菜品同步 ====================
 
@@ -291,6 +318,43 @@ class AdapterIntegrationService:
 
         except Exception as e:
             logger.error("美团菜品同步失败", error=str(e))
+            raise
+
+    async def sync_dishes_from_pinzhi(
+        self,
+        store_id: str,
+    ) -> Dict[str, Any]:
+        """从品智同步菜品到智链OS。"""
+        adapter = self.get_adapter("pinzhi")
+        if not adapter:
+            raise ValueError("品智适配器未注册")
+
+        try:
+            if hasattr(adapter, "get_dishes"):
+                dishes = await adapter.get_dishes(updatetime=0)
+            elif hasattr(adapter, "query_dishes"):
+                dishes = await adapter.query_dishes()
+            else:
+                raise ValueError("品智适配器缺少菜品查询接口(get_dishes/query_dishes)")
+
+            synced_count = 0
+            for dish in dishes or []:
+                standard_dish = self._convert_pinzhi_dish(dish)
+                if self.neural_system:
+                    await self.neural_system.emit_event(
+                        event_type="dish.updated",
+                        event_source="pinzhi",
+                        data=standard_dish,
+                        store_id=store_id,
+                        priority=0,
+                    )
+                synced_count += 1
+
+            logger.info("品智菜品同步成功", count=synced_count, store_id=store_id)
+            return {"status": "success", "synced_count": synced_count}
+
+        except Exception as e:
+            logger.error("品智菜品同步失败", error=str(e), store_id=store_id)
             raise
 
     # ==================== 库存同步 ====================
@@ -504,6 +568,19 @@ class AdapterIntegrationService:
             "is_sold_out": food_data.get("is_sold_out"),
         }
 
+    def _convert_pinzhi_dish(self, dish_data: Dict[str, Any]) -> Dict[str, Any]:
+        """转换品智菜品为标准格式。"""
+        return {
+            "dish_id": str(dish_data.get("dishId", dish_data.get("id", ""))),
+            "dish_name": dish_data.get("dishName") or dish_data.get("name"),
+            "source_system": "pinzhi",
+            "category_id": dish_data.get("categoryId") or dish_data.get("category_id"),
+            "category_name": dish_data.get("categoryName") or dish_data.get("category_name"),
+            "price": (dish_data.get("dishPrice", dish_data.get("price", 0)) or 0) / 100,
+            "unit": dish_data.get("unit"),
+            "status": dish_data.get("status", dish_data.get("onSale")),
+        }
+
     # ==================== 批量同步 ====================
 
     async def sync_all_from_tiancai(self, store_id: str) -> Dict[str, Any]:
@@ -552,6 +629,20 @@ class AdapterIntegrationService:
 
         except Exception as e:
             logger.error("美团全量同步失败", store_id=store_id, error=str(e))
+            raise
+
+    async def sync_all_from_pinzhi(self, store_id: str) -> Dict[str, Any]:
+        """从品智执行全量同步（当前包含菜品同步）。"""
+        results = {}
+
+        try:
+            dish_result = await self.sync_dishes_from_pinzhi(store_id)
+            results["dishes"] = dish_result
+
+            logger.info("品智全量同步完成", store_id=store_id)
+            return {"status": "success", "results": results}
+        except Exception as e:
+            logger.error("品智全量同步失败", store_id=store_id, error=str(e))
             raise
 
     async def close(self):

@@ -33,7 +33,7 @@ class DishSyncRequest(BaseModel):
     """菜品同步请求"""
 
     store_id: str
-    source_system: str  # tiancai, meituan
+    source_system: str  # tiancai, meituan, pinzhi
 
 
 class InventorySyncRequest(BaseModel):
@@ -187,6 +187,10 @@ async def sync_dishes(request: DishSyncRequest):
             result = await integration_service.sync_dishes_from_meituan(
                 store_id=request.store_id,
             )
+        elif source_system == "pinzhi":
+            result = await integration_service.sync_dishes_from_pinzhi(
+                store_id=request.store_id,
+            )
         else:
             raise HTTPException(status_code=400, detail=f"不支持的来源系统: {source_system}")
 
@@ -250,7 +254,7 @@ async def sync_all(source_system: str, store_id: str):
     全量同步
 
     Args:
-        source_system: 来源系统 (tiancai, meituan)
+        source_system: 来源系统 (tiancai, meituan, pinzhi)
         store_id: 门店ID
 
     Returns:
@@ -263,6 +267,8 @@ async def sync_all(source_system: str, store_id: str):
             result = await integration_service.sync_all_from_tiancai(store_id=store_id)
         elif source_system == "meituan":
             result = await integration_service.sync_all_from_meituan(store_id=store_id)
+        elif source_system == "pinzhi":
+            result = await integration_service.sync_all_from_pinzhi(store_id=store_id)
         else:
             raise HTTPException(status_code=400, detail=f"不支持的来源系统: {source_system}")
 
