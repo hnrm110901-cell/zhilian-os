@@ -6,24 +6,23 @@
 
 ## [Claude] 当前状态
 
-**更新时间**: 2026-03-08
-**状态**: ✅ 握手就绪
+**更新时间**: 2026-03-08 握手测试
+**状态**: ✅ 握手测试通过，发现并修复 1 个契约不符 bug
 
-**已完成（本次握手）**:
-- 整理并发布 Phase 8 全部 Workforce API 接口契约 → `tasks/api-contracts.md`
-- 确认 `employee-health` 接口已包含 `replacement_cost_yuan` 字段（¥离职成本，月薪×50%）
-- 后端 Phase 8 Month 1/2/3 全部 [x] 完成
+**已完成（握手测试）**:
+- ✅ 验证 workforce router 已注册到 main.py（11条路由全部就位）
+- ✅ 验证 `api-contracts.md` 中 employee-health 接口与后端代码一致
+- 🔧 **发现并修复 BUG** → `WorkforcePage.tsx` 前端缺少 `'critical'` 风险等级
+  - `risk_level` 类型 `'high'|'medium'|'low'` → `'critical'|'high'|'medium'|'low'`
+  - 高风险计数过滤器漏掉 critical 员工 → 已修复
+  - 风险等级渲染缺少极高(magenta) → 已补充
+- ✅ 更新 `api-contracts.md` risk_level 四级定义已正确记录
 
-**正在做**:
-- 等待 Codex 接入，准备协同开发 Phase 8 前端
-
-**接口变更说明**:
-- `/api/v1/workforce/stores/{id}/employee-health` 响应包含完整 TypeScript Schema，见 `tasks/api-contracts.md`
-- 所有¥字段均已是**元（float）**，前端直接展示，无需÷100
+**正在做**: 等待 Codex 跑前端测试 + 接管后续前端任务
 
 **需要 Codex 的任务**:
 
-### 🔴 P0 — WorkforcePage 员工健康 Tab（Phase 8 Month 2 遗留）
+### 🔴 P0 — 验收 WorkforcePage 员工健康 Tab（握手后首个任务）
 > 文件: `apps/web/src/pages/WorkforcePage.tsx`
 > 接口: `GET /api/v1/workforce/stores/{store_id}/employee-health`
 
@@ -77,3 +76,4 @@
 | 日期 | Claude动作 | Codex动作 | 备注 |
 |------|-----------|----------|------|
 | 2026-03-08 | 握手初始化，整理接口契约 | 待接入 | Phase 8 后端完成 |
+| 2026-03-08 | **握手测试**：发现+修复 WorkforcePage risk_level 缺 critical 级别 | 需跑前端测试验收 | BUG来源：契约与实现不一致 |

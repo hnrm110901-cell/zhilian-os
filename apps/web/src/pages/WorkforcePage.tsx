@@ -68,7 +68,7 @@ interface EmployeeHealthItem {
   name: string;
   position?: string;
   risk_score_90d: number;
-  risk_level: 'high' | 'medium' | 'low';
+  risk_level: 'critical' | 'high' | 'medium' | 'low';
   replacement_cost_yuan: number;
   major_risk_factors: Array<{ name: string; score: number }>;
   unfavorable_ratio: number;
@@ -456,7 +456,7 @@ const WorkforcePage: React.FC = () => {
         <>
           <div className={styles.kpiGrid}>
             <ZCard><ZKpi label="员工总数" value={employeeHealth?.total ?? 0} unit="人" /></ZCard>
-            <ZCard><ZKpi label="高风险流失" value={employeeHealth?.items.filter(x => x.risk_level === 'high').length ?? 0} unit="人" /></ZCard>
+            <ZCard><ZKpi label="高风险流失" value={employeeHealth?.items.filter(x => x.risk_level === 'high' || x.risk_level === 'critical').length ?? 0} unit="人" /></ZCard>
             <ZCard><ZKpi label="门店公平性指数" value={employeeHealth?.fairness_index ?? 100} unit="" /></ZCard>
             <ZCard><ZKpi label="潜在替换成本" value={employeeHealth?.items.reduce((s, x) => s + (x.replacement_cost_yuan || 0), 0) ?? 0} unit="¥" /></ZCard>
           </div>
@@ -480,8 +480,8 @@ const WorkforcePage: React.FC = () => {
                   {
                     title: '风险等级',
                     dataIndex: 'risk_level',
-                    render: (v: 'high' | 'medium' | 'low') =>
-                      v === 'high' ? <Tag color="red">高</Tag> : v === 'medium' ? <Tag color="orange">中</Tag> : <Tag color="green">低</Tag>,
+                    render: (v: 'critical' | 'high' | 'medium' | 'low') =>
+                      v === 'critical' ? <Tag color="magenta">极高</Tag> : v === 'high' ? <Tag color="red">高</Tag> : v === 'medium' ? <Tag color="orange">中</Tag> : <Tag color="green">低</Tag>,
                   },
                   {
                     title: '班次不公平占比',
