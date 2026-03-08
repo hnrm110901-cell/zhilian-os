@@ -19,6 +19,7 @@ FCTService — 业财税资金一体化服务
 from __future__ import annotations
 
 import os
+import inspect
 from calendar import monthrange
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
@@ -1125,6 +1126,50 @@ class StandaloneFCTService:
     def _flag_to_bool(value: Any) -> bool:
         return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
+    async def _resolve_budget_policy(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        entity_id: str,
+        budget_type: str,
+        category: str,
+    ) -> Dict[str, bool]:
+        candidates = [
+            (entity_id or "", category or ""),
+            (entity_id or "", ""),
+            ("", category or ""),
+            ("", ""),
+        ]
+        for cand_entity, cand_category in candidates:
+            stmt = select(FCTBudgetControl).where(
+                and_(
+                    FCTBudgetControl.tenant_id == tenant_id,
+                    FCTBudgetControl.entity_id == cand_entity,
+                    FCTBudgetControl.budget_type == budget_type,
+                    FCTBudgetControl.category == cand_category,
+                )
+            )
+            try:
+                result = await session.execute(stmt)
+                scalars = None
+                if hasattr(result, "scalars"):
+                    maybe_scalars = result.scalars()
+                    scalars = await maybe_scalars if inspect.isawaitable(maybe_scalars) else maybe_scalars
+                row = None
+                if scalars is not None and hasattr(scalars, "first"):
+                    maybe_row = scalars.first()
+                    row = await maybe_row if inspect.isawaitable(maybe_row) else maybe_row
+                if inspect.isawaitable(row):
+                    row = await row
+            except Exception:
+                row = None
+            if isinstance(row, FCTBudgetControl):
+                return {
+                    "enforce_check": self._flag_to_bool(row.enforce_check),
+                    "auto_occupy": self._flag_to_bool(row.auto_occupy),
+                }
+        return {"enforce_check": False, "auto_occupy": False}
+
     @staticmethod
     def _shift_month(dt: date, months: int) -> date:
         total = (dt.year * 12 + (dt.month - 1)) + months
@@ -1229,6 +1274,31 @@ class StandaloneFCTService:
         if abs(debit_total - credit_total) > 0.01:
             raise ValueError(f"借贷不平衡：借方 {debit_total} ≠ 贷方 {credit_total}")
         effective_date = biz_date or date.today()
+        period = effective_date.strftime("%Y%m")
+        policy = {"enforce_check": False, "auto_occupy": False}
+        if budget_check is None or budget_occupy is None:
+            policy = await self._resolve_budget_policy(
+                session=session,
+                tenant_id=tenant_id,
+                entity_id=entity_id,
+                budget_type="period",
+                category="voucher",
+            )
+        use_budget_check = policy["enforce_check"] if budget_check is None else bool(budget_check)
+        use_budget_occupy = policy["auto_occupy"] if budget_occupy is None else bool(budget_occupy)
+        voucher_amount = float(debit_total)
+        if use_budget_check:
+            check = await self.check_budget(
+                session=session,
+                tenant_id=tenant_id,
+                entity_id=entity_id,
+                budget_type="period",
+                period=period,
+                category="voucher",
+                amount_to_use=voucher_amount,
+            )
+            if not check.get("within_budget", True):
+                raise ValueError("预算不足，凭证创建被拦截")
         voucher_no = self._gen_voucher_no(effective_date)
         voucher = Voucher(
             id=uuid4(),
@@ -1253,6 +1323,19 @@ class StandaloneFCTService:
             ))
         await session.flush()
         await session.refresh(voucher)
+        if use_budget_occupy:
+            occupy = await self.occupy_budget(
+                session=session,
+                tenant_id=tenant_id,
+                entity_id=entity_id,
+                budget_type="period",
+                period=period,
+                category="voucher",
+                amount=voucher_amount,
+                ref_id=voucher.voucher_no,
+            )
+            if not occupy.get("success", False):
+                raise ValueError("预算占用失败，凭证创建被拦截")
         return {
             "success": True,
             "voucher_id": str(voucher.id),
@@ -1298,9 +1381,65 @@ class StandaloneFCTService:
         if status != current and status not in transitions.get(current, set()):
             raise ValueError(f"不允许的状态流转: {current} -> {status}")
 
+        voucher_amount = 0.0
+        period = (voucher.biz_date or date.today()).strftime("%Y%m")
+        if status == "posted" and current != "posted":
+            policy = {"enforce_check": False, "auto_occupy": False}
+            if budget_check is None or budget_occupy is None:
+                policy = await self._resolve_budget_policy(
+                    session=session,
+                    tenant_id=voucher.store_id,
+                    entity_id=voucher.store_id,
+                    budget_type="period",
+                    category="voucher",
+                )
+            use_budget_check = policy["enforce_check"] if budget_check is None else bool(budget_check)
+            use_budget_occupy = policy["auto_occupy"] if budget_occupy is None else bool(budget_occupy)
+            amount_stmt = select(func.sum(func.coalesce(VoucherLine.debit, 0))).where(
+                VoucherLine.voucher_id == voucher.id
+            )
+            voucher_amount = float((await session.execute(amount_stmt)).scalar() or 0)
+            if use_budget_check and voucher_amount > 0:
+                check = await self.check_budget(
+                    session=session,
+                    tenant_id=voucher.store_id,
+                    entity_id=voucher.store_id,
+                    budget_type="period",
+                    period=period,
+                    category="voucher",
+                    amount_to_use=voucher_amount,
+                )
+                if not check.get("within_budget", True):
+                    raise ValueError("预算不足，凭证过账被拦截")
+
         voucher.status = status
         await session.flush()
         await session.refresh(voucher)
+
+        if status == "posted" and current != "posted":
+            policy = {"enforce_check": False, "auto_occupy": False}
+            if budget_check is None or budget_occupy is None:
+                policy = await self._resolve_budget_policy(
+                    session=session,
+                    tenant_id=voucher.store_id,
+                    entity_id=voucher.store_id,
+                    budget_type="period",
+                    category="voucher",
+                )
+            use_budget_occupy = policy["auto_occupy"] if budget_occupy is None else bool(budget_occupy)
+            if use_budget_occupy and voucher_amount > 0:
+                occupy = await self.occupy_budget(
+                    session=session,
+                    tenant_id=voucher.store_id,
+                    entity_id=voucher.store_id,
+                    budget_type="period",
+                    period=period,
+                    category="voucher",
+                    amount=voucher_amount,
+                    ref_id=voucher.voucher_no,
+                )
+                if not occupy.get("success", False):
+                    raise ValueError("预算占用失败，凭证过账被拦截")
 
         return {
             "voucher_id": str(voucher.id),
@@ -1647,9 +1786,36 @@ class StandaloneFCTService:
         budget_check: Optional[bool] = None,
         budget_occupy: Optional[bool] = None,
     ) -> Dict[str, Any]:
+        effective_date = tx_date or date.today()
+        period = effective_date.strftime("%Y%m")
+        policy = {"enforce_check": False, "auto_occupy": False}
+        if budget_check is None or budget_occupy is None:
+            policy = await self._resolve_budget_policy(
+                session=session,
+                tenant_id=tenant_id,
+                entity_id=entity_id,
+                budget_type="period",
+                category="cash",
+            )
+        use_budget_check = policy["enforce_check"] if budget_check is None else bool(budget_check)
+        use_budget_occupy = policy["auto_occupy"] if budget_occupy is None else bool(budget_occupy)
+        is_expense = direction != "in"
+        if is_expense and use_budget_check:
+            check = await self.check_budget(
+                session=session,
+                tenant_id=tenant_id,
+                entity_id=entity_id,
+                budget_type="period",
+                period=period,
+                category="cash",
+                amount_to_use=float(amount),
+            )
+            if not check.get("within_budget", True):
+                raise ValueError("预算不足，资金交易创建被拦截")
+
         txn = FinancialTransaction(
             store_id=entity_id,
-            transaction_date=tx_date or date.today(),
+            transaction_date=effective_date,
             transaction_type="income" if direction == "in" else "expense",
             category="cash",
             amount=int(amount),
@@ -1657,10 +1823,23 @@ class StandaloneFCTService:
         )
         session.add(txn)
         await session.flush()
+        if is_expense and use_budget_occupy:
+            occupy = await self.occupy_budget(
+                session=session,
+                tenant_id=tenant_id,
+                entity_id=entity_id,
+                budget_type="period",
+                period=period,
+                category="cash",
+                amount=float(amount),
+                ref_id=ref_id or str(txn.id),
+            )
+            if not occupy.get("success", False):
+                raise ValueError("预算占用失败，资金交易创建被拦截")
         return {
             "id": str(txn.id),
             "entity_id": entity_id,
-            "tx_date": (tx_date or date.today()).isoformat(),
+            "tx_date": effective_date.isoformat(),
             "amount": int(amount),
             "direction": direction,
             "status": "unmatched",

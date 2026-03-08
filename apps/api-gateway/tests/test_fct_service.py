@@ -800,6 +800,48 @@ class TestCreateManualVoucherPersist:
                 biz_date=date(2026, 3, 1), lines=lines,
             )
 
+    @pytest.mark.asyncio
+    async def test_budget_check_blocks_creation_when_exceeded(self):
+        db = _mock_db()
+        svc = StandaloneFCTService()
+        with patch.object(
+            svc,
+            "check_budget",
+            AsyncMock(return_value={"within_budget": False}),
+        ):
+            with pytest.raises(ValueError, match="预算不足"):
+                await svc.create_manual_voucher(
+                    db,
+                    tenant_id="T1",
+                    entity_id="S001",
+                    biz_date=date(2026, 3, 1),
+                    lines=self._balanced_lines(),
+                    budget_check=True,
+                    budget_occupy=False,
+                )
+
+    @pytest.mark.asyncio
+    async def test_budget_policy_enforce_check_takes_effect_when_params_omitted(self):
+        db = _mock_db()
+        svc = StandaloneFCTService()
+        with patch.object(
+            svc,
+            "_resolve_budget_policy",
+            AsyncMock(return_value={"enforce_check": True, "auto_occupy": False}),
+        ), patch.object(
+            svc,
+            "check_budget",
+            AsyncMock(return_value={"within_budget": False}),
+        ):
+            with pytest.raises(ValueError, match="预算不足"):
+                await svc.create_manual_voucher(
+                    db,
+                    tenant_id="T1",
+                    entity_id="S001",
+                    biz_date=date(2026, 3, 1),
+                    lines=self._balanced_lines(),
+                )
+
 
 class TestGetVoucherById:
     """测试 get_voucher_by_id"""
@@ -915,6 +957,41 @@ class TestUpdateVoucherStatus:
         with pytest.raises(ValueError, match="凭证不存在"):
             await svc.update_voucher_status(db, voucher_id="missing", target_status="approved")
 
+    @pytest.mark.asyncio
+    async def test_posted_with_budget_occupy_calls_occupy_budget(self):
+        db = _mock_db()
+        db.refresh = AsyncMock()
+        v = MagicMock()
+        v.id = "vid-200"
+        v.voucher_no = "MV-200"
+        v.store_id = "S001"
+        v.biz_date = date(2026, 3, 1)
+        v.status = "approved"
+
+        voucher_result = MagicMock()
+        voucher_result.scalar_one_or_none.return_value = v
+        amount_result = MagicMock()
+        amount_result.scalar.return_value = 1000
+        db.execute = AsyncMock(side_effect=[voucher_result, amount_result])
+
+        svc = StandaloneFCTService()
+        with patch.object(
+            svc,
+            "occupy_budget",
+            AsyncMock(return_value={"success": True}),
+        ) as occupy_mock:
+            result = await svc.update_voucher_status(
+                db,
+                voucher_id="vid-200",
+                target_status="posted",
+                budget_check=False,
+                budget_occupy=True,
+            )
+
+        assert result["success"] is True
+        assert result["status"] == "posted"
+        occupy_mock.assert_awaited_once()
+
 
 class TestVoucherReverseAndVoid:
     """测试凭证作废与红冲"""
@@ -997,6 +1074,52 @@ class TestVoucherReverseAndVoid:
         assert result["red_voucher_no"].startswith("RF-20260308-")
         assert original.status == "reversed"
         assert db.add.call_count >= 3  # 1 红冲凭证 + 2 红冲分录
+
+
+class TestCreateCashTransaction:
+    @pytest.mark.asyncio
+    async def test_budget_check_blocks_expense_transaction(self):
+        db = _mock_db()
+        svc = StandaloneFCTService()
+        with patch.object(
+            svc,
+            "check_budget",
+            AsyncMock(return_value={"within_budget": False}),
+        ):
+            with pytest.raises(ValueError, match="预算不足"):
+                await svc.create_cash_transaction(
+                    db,
+                    tenant_id="T1",
+                    entity_id="S001",
+                    tx_date=date(2026, 3, 1),
+                    amount=500,
+                    direction="out",
+                    budget_check=True,
+                    budget_occupy=False,
+                )
+
+    @pytest.mark.asyncio
+    async def test_budget_occupy_called_for_expense_when_enabled(self):
+        db = _mock_db()
+        svc = StandaloneFCTService()
+        with patch.object(
+            svc,
+            "occupy_budget",
+            AsyncMock(return_value={"success": True}),
+        ) as occupy_mock:
+            result = await svc.create_cash_transaction(
+                db,
+                tenant_id="T1",
+                entity_id="S001",
+                tx_date=date(2026, 3, 1),
+                amount=200,
+                direction="out",
+                budget_check=False,
+                budget_occupy=True,
+                ref_id="TX-1",
+            )
+        assert result["success"] is True
+        occupy_mock.assert_awaited_once()
 
 
 class TestListTaxDeclarations:
