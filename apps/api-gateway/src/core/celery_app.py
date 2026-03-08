@@ -6,10 +6,55 @@ from celery.schedules import crontab
 from kombu import Exchange, Queue
 import os
 import structlog
+from typing import Optional, Tuple
 
 from .config import settings
 
 logger = structlog.get_logger()
+
+
+def _env_int(
+    keys: Tuple[str, ...],
+    default: int,
+    *,
+    min_value: Optional[int] = None,
+    max_value: Optional[int] = None,
+) -> int:
+    """从多个环境变量名中取第一个有效整数；非法值回退到默认值。"""
+    for key in keys:
+        raw = os.getenv(key)
+        if raw is None:
+            continue
+        try:
+            value = int(raw)
+        except ValueError:
+            logger.warning("invalid_env_int_fallback", key=key, raw=raw, default=default)
+            return default
+        if min_value is not None and value < min_value:
+            logger.warning("env_int_below_min_fallback", key=key, raw=raw, default=default, min_value=min_value)
+            return default
+        if max_value is not None and value > max_value:
+            logger.warning("env_int_above_max_fallback", key=key, raw=raw, default=default, max_value=max_value)
+            return default
+        return value
+    return default
+
+
+def _env_bool(key: str, default: bool) -> bool:
+    raw = os.getenv(key)
+    if raw is None:
+        return default
+    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+
+_celery_timezone = os.getenv("CELERY_TIMEZONE", "Asia/Shanghai")
+_celery_enable_utc = _env_bool("CELERY_ENABLE_UTC", True)
+
+# 07:00 人力任务：支持 L8_*（历史）和 CELERY_*（通用）两套变量名
+_workforce_hour = _env_int(("L8_WORKFORCE_HOUR", "CELERY_WORKFORCE_HOUR"), 7, min_value=0, max_value=23)
+_workforce_minute = _env_int(("L8_WORKFORCE_MINUTE", "CELERY_WORKFORCE_MINUTE"), 0, min_value=0, max_value=59)
+_auto_schedule_hour = _env_int(("L8_AUTO_SCHEDULE_HOUR", "CELERY_AUTO_SCHEDULE_HOUR"), 7, min_value=0, max_value=23)
+_auto_schedule_minute = _env_int(("L8_AUTO_SCHEDULE_MINUTE", "CELERY_AUTO_SCHEDULE_MINUTE"), 0, min_value=0, max_value=59)
 
 # 创建Celery应用实例
 celery_app = Celery(
@@ -24,8 +69,8 @@ celery_app.conf.update(
     task_serializer="json",
     accept_content=["json"],
     result_serializer="json",
-    timezone="Asia/Shanghai",
-    enable_utc=True,
+    timezone=_celery_timezone,
+    enable_utc=_celery_enable_utc,
 
     # 任务结果配置
     result_expires=int(os.getenv("CELERY_RESULT_EXPIRES", "3600")),  # 结果保留N秒
@@ -295,8 +340,8 @@ celery_app.conf.update(
         "daily-workforce-advice": {
             "task": "tasks.push_daily_workforce_advice",
             "schedule": crontab(
-                hour=int(os.getenv("L8_WORKFORCE_HOUR", "7")),
-                minute=int(os.getenv("L8_WORKFORCE_MINUTE", "0")),
+                hour=_workforce_hour,
+                minute=_workforce_minute,
             ),
             "args": (),
             "options": {
@@ -308,8 +353,8 @@ celery_app.conf.update(
         "daily-auto-workforce-schedule": {
             "task": "tasks.auto_generate_workforce_schedule",
             "schedule": crontab(
-                hour=int(os.getenv("L8_AUTO_SCHEDULE_HOUR", "7")),
-                minute=int(os.getenv("L8_AUTO_SCHEDULE_MINUTE", "0")),
+                hour=_auto_schedule_hour,
+                minute=_auto_schedule_minute,
             ),
             "args": (),
             "options": {
@@ -509,4 +554,8 @@ logger.info(
     "Celery应用初始化完成",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND,
+    timezone=_celery_timezone,
+    enable_utc=_celery_enable_utc,
+    workforce_schedule=f"{_workforce_hour:02d}:{_workforce_minute:02d}",
+    auto_schedule=f"{_auto_schedule_hour:02d}:{_auto_schedule_minute:02d}",
 )
