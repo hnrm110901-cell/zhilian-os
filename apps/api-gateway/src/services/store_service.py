@@ -291,6 +291,10 @@ class StoreService:
                         metric_value = stats.get("today_orders", 0)
                     elif metric == "monthly_revenue":
                         metric_value = stats.get("monthly_revenue", 0)
+                    elif metric == "avg_order_value":
+                        orders = stats.get("today_orders", 0)
+                        revenue = stats.get("today_revenue", 0)
+                        metric_value = (revenue / orders) if orders else 0
 
                     comparison["data"][metric][store_id] = metric_value
 

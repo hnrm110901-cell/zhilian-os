@@ -61,7 +61,9 @@ class CompareStoresRequest(BaseModel):
     """门店对比请求"""
 
     store_ids: List[str] = Field(..., description="门店ID列表")
-    metrics: List[str] = Field(..., description="对比指标列表")
+    metrics: Optional[List[str]] = Field(None, description="对比指标列表")
+    start_date: Optional[str] = Field(None, description="起始日期")
+    end_date: Optional[str] = Field(None, description="结束日期")
 
 
 # ==================== API Endpoints ====================
@@ -281,10 +283,33 @@ async def compare_stores(
     需要权限: store:read
     """
     try:
-        comparison = await store_service.compare_stores(
-            request.store_ids, request.metrics
-        )
-        return comparison
+        metrics = request.metrics or ["revenue", "orders", "customers", "avg_order_value"]
+        comparison = await store_service.compare_stores(request.store_ids, metrics)
+
+        # 前端兼容：补齐 stores[].metrics 结构
+        stores_out = []
+        for s in comparison.get("stores", []):
+            sid = s.get("id")
+            stores_out.append({
+                "id": sid,
+                "name": s.get("name"),
+                "region": s.get("region"),
+                "metrics": {
+                    "revenue": comparison.get("data", {}).get("revenue", {}).get(sid, 0),
+                    "orders": comparison.get("data", {}).get("orders", {}).get(sid, 0),
+                    "customers": comparison.get("data", {}).get("customers", {}).get(sid, 0),
+                    "avg_order_value": comparison.get("data", {}).get("avg_order_value", {}).get(sid, 0),
+                },
+            })
+
+        # 兼容老结构（metrics/data）+ 新结构（stores[].metrics）
+        return {
+            "stores": stores_out,
+            "metrics": metrics,
+            "data": comparison.get("data", {}),
+            "start_date": request.start_date,
+            "end_date": request.end_date,
+        }
     except Exception as e:
         logger.error("门店对比失败", error=str(e))
         raise HTTPException(status_code=500, detail=f"门店对比失败: {str(e)}")
@@ -307,6 +332,58 @@ async def get_regional_summary(
         raise HTTPException(status_code=500, detail=f"获取区域汇总失败: {str(e)}")
 
 
+@router.get("/stores", summary="获取门店列表（兼容路径）")
+async def get_stores_compat(
+    region: Optional[str] = Query(None, description="大区"),
+    city: Optional[str] = Query(None, description="城市"),
+    status: Optional[str] = Query(None, description="状态"),
+    is_active: Optional[bool] = Query(None, description="是否激活"),
+    limit: int = Query(100, ge=1, le=1000, description="每页数量"),
+    offset: int = Query(0, ge=0, description="偏移量"),
+    current_user: User = Depends(get_current_active_user),
+):
+    """兼容前端历史路径 /stores。"""
+    return await get_stores(
+        region=region,
+        city=city,
+        status=status,
+        is_active=is_active,
+        limit=limit,
+        offset=offset,
+        current_user=current_user,
+    )
+
+
+@router.get("/regional-summary", summary="获取区域汇总（兼容路径）")
+async def get_regional_summary_compat(
+    current_user: User = Depends(get_current_active_user),
+):
+    """兼容前端历史路径 /regional-summary，返回 regions 数组结构。"""
+    try:
+        stores_by_region = await store_service.get_stores_by_region()
+        regions = []
+        for region, stores in stores_by_region.items():
+            total_revenue = 0
+            total_orders = 0
+            total_customers = 0
+            for store in stores:
+                stats = await store_service.get_store_stats(store.id)
+                total_revenue += stats.get("today_revenue", 0)
+                total_orders += stats.get("today_orders", 0)
+                total_customers += stats.get("today_customers", 0)
+            regions.append({
+                "region": region,
+                "store_count": len(stores),
+                "total_revenue": total_revenue,
+                "total_orders": total_orders,
+                "total_customers": total_customers,
+            })
+        return {"regions": regions}
+    except Exception as e:
+        logger.error("获取区域汇总失败(compat)", error=str(e))
+        raise HTTPException(status_code=500, detail=f"获取区域汇总失败: {str(e)}")
+
+
 @router.get("/ranking/performance", summary="获取业绩排名")
 async def get_performance_ranking(
     metric: str = Query("revenue", description="排名指标"),
@@ -323,6 +400,27 @@ async def get_performance_ranking(
         return {"metric": metric, "ranking": ranking}
     except Exception as e:
         logger.error("获取业绩排名失败", error=str(e))
+        raise HTTPException(status_code=500, detail=f"获取业绩排名失败: {str(e)}")
+
+
+@router.get("/performance-ranking", summary="获取业绩排名（兼容路径）")
+async def get_performance_ranking_compat(
+    metric: str = Query("revenue", description="排名指标"),
+    limit: int = Query(10, ge=1, le=100, description="返回数量"),
+    current_user: User = Depends(get_current_active_user),
+):
+    """兼容前端历史路径 /performance-ranking。"""
+    try:
+        ranking = await store_service.get_performance_ranking(metric, limit)
+        normalized = []
+        for item in ranking:
+            normalized.append({
+                **item,
+                "growth_rate": float(item.get("growth_rate") or 0.0),
+            })
+        return {"metric": metric, "ranking": normalized}
+    except Exception as e:
+        logger.error("获取业绩排名失败(compat)", error=str(e))
         raise HTTPException(status_code=500, detail=f"获取业绩排名失败: {str(e)}")
 
 

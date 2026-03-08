@@ -30,6 +30,11 @@
   - 去除 `any`，补齐接口类型（门店列表/区域汇总/绩效排名/对比响应）
   - 对比查询改为选择事件驱动，避免 effect 中级联 setState
   - Select 选项改为 `options` 模式，修复标签渲染与可维护性问题
+- [x] 多门店 API 兼容层补齐（`multi_store.py` + `store_service.py`）
+  - 新增兼容路径：`/stores`、`/regional-summary`、`/performance-ranking`
+  - `POST /compare` 兼容前端 payload（metrics 可选，支持 start/end）
+  - 对比结果兼容双结构：保留 `metrics/data`，新增 `stores[].metrics`
+  - `avg_order_value` 指标补齐映射，避免前端图表空值
 
 ## P2
 - [x] 角色权限管理体验优化（页面入口可见性与无权限提示一致性）
@@ -57,7 +62,7 @@
 - status: completed
 - owner: Codex
 - task: FCT 账期持久化收尾（`fct_periods` 落库 + 兼容修复）
-- task: 多门店管理页类型化与交互稳定性修复
+- task: 多门店 API 兼容层补齐（路径 + 响应结构）
 - files:
   - `apps/api-gateway/src/api/blindbox.py`
   - `apps/api-gateway/src/api/federated.py`
@@ -93,4 +98,6 @@
   - `python3 -m pytest -q apps/api-gateway/tests/test_fct_public_voucher_api.py apps/api-gateway/tests/test_fct_public_periods_api.py`（6 passed）
   - `python3 -m pytest -q apps/api-gateway/tests/test_fct_service.py -k "PeriodCloseReopen or CreateManualVoucherPersist or UpdateVoucherStatus or VoucherReverseAndVoid"`（21 passed）
   - `pnpm --filter @zhilian-os/web exec eslint src/pages/MultiStoreManagement.tsx`（通过）
+  - `python3 -m py_compile apps/api-gateway/src/api/multi_store.py apps/api-gateway/src/services/store_service.py`（通过）
+  - `python3 -m pytest -q apps/api-gateway/tests/test_multi_store_api_routes.py`（4 passed）
 - note: 已消除 `src.main` 的 blindbox/federated 缺失模块阻断；mobile 上传接口已返回 `file_url`

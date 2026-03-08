@@ -1,0 +1,128 @@
+"""Multi-store API compatibility routes tests."""
+import os
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
+
+import pytest
+
+for _k, _v in {
+    "DATABASE_URL": "postgresql+asyncpg://test:test@localhost/test",
+    "REDIS_URL": "redis://localhost:6379/0",
+    "CELERY_BROKER_URL": "redis://localhost:6379/0",
+    "CELERY_RESULT_BACKEND": "redis://localhost:6379/0",
+    "SECRET_KEY": "test-secret-key",
+    "JWT_SECRET": "test-jwt-secret",
+}.items():
+    os.environ.setdefault(_k, _v)
+
+from src.api.multi_store import (  # noqa: E402
+    CompareStoresRequest,
+    compare_stores,
+    get_performance_ranking_compat,
+    get_regional_summary_compat,
+    get_stores_compat,
+)
+
+
+@pytest.mark.asyncio
+async def test_get_stores_compat_returns_list_shape():
+    store = SimpleNamespace(
+        id="S001",
+        name="岳麓店",
+        code="YL01",
+        address="长沙市岳麓区",
+        city="长沙",
+        district="岳麓",
+        region="华中",
+        status="active",
+        is_active=True,
+        manager_id="U001",
+        area=300,
+        seats=120,
+        phone="123456",
+        created_at=None,
+    )
+
+    with patch("src.api.multi_store.store_service.get_stores", new=AsyncMock(return_value=[store])):
+        out = await get_stores_compat(
+            region=None,
+            city=None,
+            status=None,
+            is_active=None,
+            limit=100,
+            offset=0,
+            current_user=None,
+        )
+
+    assert out["total"] == 1
+    assert out["stores"][0]["id"] == "S001"
+    assert out["stores"][0]["region"] == "华中"
+
+
+@pytest.mark.asyncio
+async def test_compare_stores_accepts_frontend_payload_and_returns_metrics():
+    request = CompareStoresRequest(
+        store_ids=["S001", "S002"],
+        start_date="2026-03-01",
+        end_date="2026-03-08",
+    )
+
+    service_result = {
+        "stores": [
+            {"id": "S001", "name": "岳麓店", "region": "华中"},
+            {"id": "S002", "name": "芙蓉店", "region": "华中"},
+        ],
+        "metrics": ["revenue", "orders", "customers"],
+        "data": {
+            "revenue": {"S001": 100000, "S002": 90000},
+            "orders": {"S001": 100, "S002": 80},
+            "customers": {"S001": 160, "S002": 130},
+        },
+    }
+
+    with patch("src.api.multi_store.store_service.compare_stores", new=AsyncMock(return_value=service_result)):
+        out = await compare_stores(request, current_user=None)
+
+    assert out["metrics"] == ["revenue", "orders", "customers", "avg_order_value"]
+    assert out["start_date"] == "2026-03-01"
+    assert out["stores"][0]["metrics"]["revenue"] == 100000
+    assert out["stores"][0]["metrics"]["avg_order_value"] == 0
+    assert out["data"]["orders"]["S002"] == 80
+
+
+@pytest.mark.asyncio
+async def test_get_regional_summary_compat_aggregates_stats():
+    s1 = SimpleNamespace(id="S001")
+    s2 = SimpleNamespace(id="S002")
+
+    with patch(
+        "src.api.multi_store.store_service.get_stores_by_region",
+        new=AsyncMock(return_value={"华中": [s1, s2]}),
+    ), patch(
+        "src.api.multi_store.store_service.get_store_stats",
+        new=AsyncMock(side_effect=[
+            {"today_revenue": 100000, "today_orders": 100, "today_customers": 150},
+            {"today_revenue": 80000, "today_orders": 90, "today_customers": 120},
+        ]),
+    ):
+        out = await get_regional_summary_compat(current_user=None)
+
+    assert out["regions"][0]["region"] == "华中"
+    assert out["regions"][0]["store_count"] == 2
+    assert out["regions"][0]["total_revenue"] == 180000
+    assert out["regions"][0]["total_orders"] == 190
+
+
+@pytest.mark.asyncio
+async def test_get_performance_ranking_compat_adds_growth_rate_default():
+    with patch(
+        "src.api.multi_store.store_service.get_performance_ranking",
+        new=AsyncMock(return_value=[
+            {"store_id": "S001", "store_name": "岳麓店", "region": "华中", "value": 100000, "rank": 1}
+        ]),
+    ):
+        out = await get_performance_ranking_compat(metric="revenue", limit=10, current_user=None)
+
+    assert out["metric"] == "revenue"
+    assert out["ranking"][0]["store_id"] == "S001"
+    assert out["ranking"][0]["growth_rate"] == 0.0
