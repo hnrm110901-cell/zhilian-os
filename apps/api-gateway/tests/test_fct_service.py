@@ -985,9 +985,11 @@ class TestUpdateVoucherStatus:
 
         voucher_result = MagicMock()
         voucher_result.scalar_one_or_none.return_value = v
+        period_result = MagicMock()
+        period_result.fetchone.return_value = None
         amount_result = MagicMock()
         amount_result.scalar.return_value = 1000
-        db.execute = AsyncMock(side_effect=[voucher_result, amount_result])
+        db.execute = AsyncMock(side_effect=[voucher_result, period_result, amount_result])
 
         svc = StandaloneFCTService()
         with patch.object(
@@ -1954,6 +1956,40 @@ class TestPeriodCloseReopen:
         assert p_reopen["2026-02"] == "open"
         assert p_reopen["2026-03"] == "closed"
         assert p_reopen["2026-01"] == "closed"
+
+    @pytest.mark.asyncio
+    async def test_list_periods_uses_persisted_status(self):
+        db = _mock_db()
+
+        tx_rows = self._month_rows(3, 2)
+        persisted_result = MagicMock()
+        persisted_result.fetchall.return_value = [("2026-03", "closed"), ("2026-02", "open")]
+
+        async def _exec(stmt, params=None):
+            sql = str(stmt)
+            if "FROM financial_transactions" in sql:
+                return tx_rows
+            if "FROM fct_periods" in sql:
+                return persisted_result
+            return MagicMock()
+
+        db.execute = AsyncMock(side_effect=_exec)
+        svc = StandaloneFCTService()
+        result = await svc.list_periods(db, tenant_id="S001")
+
+        by_key = {i["period_key"]: i["status"] for i in result["items"]}
+        assert by_key["2026-03"] == "closed"
+        assert by_key["2026-02"] == "open"
+
+    @pytest.mark.asyncio
+    async def test_close_period_persists_to_fct_periods(self):
+        db = _mock_db()
+        db.execute = AsyncMock(return_value=self._month_rows(3, 2))
+        svc = StandaloneFCTService()
+        await svc.close_period(db, tenant_id="S001", period_key="2026-03")
+
+        sql_calls = [str(c.args[0]) for c in db.execute.call_args_list]
+        assert any("INSERT INTO fct_periods" in s for s in sql_calls)
 
 
 class TestLedgerQueries:

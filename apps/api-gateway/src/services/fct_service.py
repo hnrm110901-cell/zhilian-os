@@ -1068,6 +1068,7 @@ class StandaloneFCTService:
     """
 
     PERIOD_KEY_RE = re.compile(r"^\d{4}-\d{2}$")
+    PERIOD_STATUS_VALUES = {"open", "closed"}
 
     def __init__(self):
         # 账期状态覆盖（运行时）：默认“最新 open，其余 closed”
@@ -1207,12 +1208,49 @@ class StandaloneFCTService:
     def _period_key(dt: date) -> str:
         return dt.strftime("%Y-%m")
 
-    def _is_period_explicitly_closed(self, tenant_id: str, period_key: str) -> bool:
-        return self._period_status_overrides.get((tenant_id, period_key)) == "closed"
+    @staticmethod
+    async def _resolve_maybe_await(value: Any) -> Any:
+        if inspect.isawaitable(value):
+            return await value
+        return value
 
-    def _ensure_period_open_for_voucher(self, tenant_id: str, effective_date: date) -> None:
+    async def _is_period_explicitly_closed(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        period_key: str,
+    ) -> bool:
+        # 先读进程内覆盖（当前进程 close/reopen 后立即生效）
+        mem = self._period_status_overrides.get((tenant_id, period_key))
+        if mem is not None:
+            return mem == "closed"
+        # 再读数据库持久化状态（跨进程/重启生效）
+        try:
+            execute_result = await session.execute(
+                text("""
+                    SELECT status
+                    FROM fct_periods
+                    WHERE tenant_id = :sid AND period_key = :pkey
+                    LIMIT 1
+                """),
+                {"sid": tenant_id, "pkey": period_key},
+            )
+            row = await self._resolve_maybe_await(execute_result.fetchone())
+        except Exception:
+            return False
+        if not row:
+            return False
+        status = row[0] if isinstance(row, (tuple, list)) else getattr(row, "status", None)
+        return str(status or "").strip().lower() == "closed"
+
+    async def _ensure_period_open_for_voucher(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        effective_date: date,
+    ) -> None:
         period_key = self._period_key(effective_date)
-        if self._is_period_explicitly_closed(tenant_id, period_key):
+        if await self._is_period_explicitly_closed(session, tenant_id, period_key):
             raise ValueError(f"会计期间 {period_key} 已结账，禁止新增或过账凭证")
 
     @staticmethod
@@ -1305,7 +1343,7 @@ class StandaloneFCTService:
         if abs(debit_total - credit_total) > 0.01:
             raise ValueError(f"借贷不平衡：借方 {debit_total} ≠ 贷方 {credit_total}")
         effective_date = biz_date or date.today()
-        self._ensure_period_open_for_voucher(tenant_id, effective_date)
+        await self._ensure_period_open_for_voucher(session, tenant_id, effective_date)
         period = effective_date.strftime("%Y%m")
         policy = {"enforce_check": False, "auto_occupy": False}
         if budget_check is None or budget_occupy is None:
@@ -1416,7 +1454,7 @@ class StandaloneFCTService:
         voucher_amount = 0.0
         period = (voucher.biz_date or date.today()).strftime("%Y%m")
         if status == "posted" and current != "posted":
-            self._ensure_period_open_for_voucher(voucher.store_id, voucher.biz_date or date.today())
+            await self._ensure_period_open_for_voucher(session, voucher.store_id, voucher.biz_date or date.today())
             policy = {"enforce_check": False, "auto_occupy": False}
             if budget_check is None or budget_occupy is None:
                 policy = await self._resolve_budget_policy(
@@ -1527,7 +1565,7 @@ class StandaloneFCTService:
             raise ValueError("仅已过账凭证支持红冲")
 
         red_biz_date = biz_date or date.today()
-        self._ensure_period_open_for_voucher(original.store_id, red_biz_date)
+        await self._ensure_period_open_for_voucher(session, original.store_id, red_biz_date)
 
         red_no = f"RF-{red_biz_date.strftime('%Y%m%d')}-{str(uuid4())[:8].upper()}"
         red_voucher = Voucher(
@@ -1577,24 +1615,74 @@ class StandaloneFCTService:
         start_key: Optional[str] = None,
         end_key: Optional[str] = None,
     ) -> Dict[str, Any]:
-        stmt = text("""
+        tx_stmt = text("""
             SELECT DISTINCT DATE_TRUNC('month', transaction_date) AS month
             FROM financial_transactions
             WHERE store_id = :sid
             ORDER BY 1 DESC
         """)
-        rows = (await session.execute(stmt, {"sid": tenant_id})).fetchall()
-        if not rows:
-            return {"items": [], "total": 0}
-        items = []
-        for i, row in enumerate(rows):
+        tx_result = await session.execute(tx_stmt, {"sid": tenant_id})
+        rows = await self._resolve_maybe_await(tx_result.fetchall())
+
+        # 交易月份
+        tx_keys: List[str] = []
+        for row in rows:
             period_dt = row[0]
             period_key = period_dt.strftime("%Y-%m") if hasattr(period_dt, "strftime") else str(period_dt)[:7]
+            tx_keys.append(period_key)
+
+        # 持久化月份状态（fct_periods）
+        persisted_stmt = text("""
+            SELECT period_key, status
+            FROM fct_periods
+            WHERE tenant_id = :sid
+        """)
+        try:
+            persisted_result = await session.execute(persisted_stmt, {"sid": tenant_id})
+            persisted_rows = await self._resolve_maybe_await(persisted_result.fetchall())
+        except Exception:
+            persisted_rows = []
+        persisted_status: Dict[str, str] = {}
+        for row in persisted_rows:
+            pkey = ""
+            status = ""
+            try:
+                if isinstance(row, (tuple, list)):
+                    if len(row) >= 1:
+                        pkey = row[0]
+                    if len(row) >= 2:
+                        status = row[1]
+                else:
+                    pkey = getattr(row, "period_key", "")
+                    status = getattr(row, "status", "")
+            except Exception:
+                continue
+            pkey_str = str(pkey or "").strip()
+            status_str = str(status or "").strip().lower()
+            if not self.PERIOD_KEY_RE.match(pkey_str):
+                continue
+            if status_str not in self.PERIOD_STATUS_VALUES:
+                continue
+            persisted_status[pkey_str] = status_str
+
+        all_keys = sorted(set(tx_keys) | set(persisted_status.keys()), reverse=True)
+        if start_key:
+            all_keys = [k for k in all_keys if k >= start_key]
+        if end_key:
+            all_keys = [k for k in all_keys if k <= end_key]
+        if not all_keys:
+            return {"items": [], "total": 0}
+
+        items = []
+        for i, period_key in enumerate(all_keys):
+            # 默认规则：最新月份 open，其余 closed
+            status = "open" if i == 0 else "closed"
+            if period_key in persisted_status:
+                status = "open" if persisted_status[period_key] == "open" else "closed"
             override = self._period_status_overrides.get((tenant_id, period_key))
-            items.append({
-                "period_key": period_key,
-                "status": override or ("open" if i == 0 else "closed"),
-            })
+            if override:
+                status = override
+            items.append({"period_key": period_key, "status": status})
         return {"items": items, "total": len(items)}
 
     async def close_period(
@@ -1609,6 +1697,34 @@ class StandaloneFCTService:
         if target["status"] == "closed":
             raise ValueError("该期间已结账")
 
+        y, m = int(period_key[:4]), int(period_key[5:7])
+        start_date = date(y, m, 1)
+        end_date = date(y, m, monthrange(y, m)[1])
+        now = datetime.utcnow()
+        await session.execute(
+            text("""
+                INSERT INTO fct_periods
+                (id, tenant_id, period_key, start_date, end_date, status, closed_at, extra, created_at, updated_at)
+                VALUES
+                (:id, :sid, :pkey, :start_date, :end_date, 'closed', :closed_at, :extra, :created_at, :updated_at)
+                ON CONFLICT (tenant_id, period_key)
+                DO UPDATE SET
+                    status = 'closed',
+                    closed_at = EXCLUDED.closed_at,
+                    updated_at = EXCLUDED.updated_at
+            """),
+            {
+                "id": str(uuid4()),
+                "sid": tenant_id,
+                "pkey": period_key,
+                "start_date": start_date,
+                "end_date": end_date,
+                "closed_at": now.isoformat(),
+                "extra": None,
+                "created_at": now,
+                "updated_at": now,
+            },
+        )
         self._period_status_overrides[(tenant_id, period_key)] = "closed"
         return {"tenant_id": tenant_id, "period_key": period_key, "status": "closed"}
 
@@ -1625,7 +1741,38 @@ class StandaloneFCTService:
         if target and target["status"] == "open":
             raise ValueError("该期间已是打开状态")
 
+        now = datetime.utcnow()
         for key in keys:
+            y, m = int(key[:4]), int(key[5:7])
+            start_date = date(y, m, 1)
+            end_date = date(y, m, monthrange(y, m)[1])
+            status = "open" if key == period_key else "closed"
+            closed_at = None if status == "open" else now.isoformat()
+            await session.execute(
+                text("""
+                    INSERT INTO fct_periods
+                    (id, tenant_id, period_key, start_date, end_date, status, closed_at, extra, created_at, updated_at)
+                    VALUES
+                    (:id, :sid, :pkey, :start_date, :end_date, :status, :closed_at, :extra, :created_at, :updated_at)
+                    ON CONFLICT (tenant_id, period_key)
+                    DO UPDATE SET
+                        status = EXCLUDED.status,
+                        closed_at = EXCLUDED.closed_at,
+                        updated_at = EXCLUDED.updated_at
+                """),
+                {
+                    "id": str(uuid4()),
+                    "sid": tenant_id,
+                    "pkey": key,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "status": status,
+                    "closed_at": closed_at,
+                    "extra": None,
+                    "created_at": now,
+                    "updated_at": now,
+                },
+            )
             self._period_status_overrides[(tenant_id, key)] = "open" if key == period_key else "closed"
         return {"tenant_id": tenant_id, "period_key": period_key, "status": "open"}
 

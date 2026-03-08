@@ -39,6 +39,8 @@
   - 补齐单测：service 与 API 层期间端点
   - 关闭期间保护：禁止新增凭证、凭证过账、红冲过账（返回明确错误）
   - 补齐 API 映射测试：关闭期间错误统一映射为 400
+  - 账期持久化落库：新增 `FCTPeriod` 模型，`close/reopen/list` 读写 `fct_periods`
+  - 兼容修复：增强 `AsyncMock`/非标准行解析，避免测试环境误判已结账
 
 ---
 
@@ -50,7 +52,7 @@
 ## [Codex] 状态
 - status: completed
 - owner: Codex
-- task: 移动端 mobile API 收尾（测试 + 兼容修复）
+- task: FCT 账期持久化收尾（`fct_periods` 落库 + 兼容修复）
 - files:
   - `apps/api-gateway/src/api/blindbox.py`
   - `apps/api-gateway/src/api/federated.py`
@@ -84,4 +86,5 @@
   - `python3 -m pytest -q apps/api-gateway/tests/test_fct_public_periods_api.py`（3 passed）
   - `python3 -m pytest -q apps/api-gateway/tests/test_fct_service.py -k "CreateManualVoucherPersist or UpdateVoucherStatus or VoucherReverseAndVoid"`（16 passed）
   - `python3 -m pytest -q apps/api-gateway/tests/test_fct_public_voucher_api.py apps/api-gateway/tests/test_fct_public_periods_api.py`（6 passed）
+  - `python3 -m pytest -q apps/api-gateway/tests/test_fct_service.py -k "PeriodCloseReopen or CreateManualVoucherPersist or UpdateVoucherStatus or VoucherReverseAndVoid"`（21 passed）
 - note: 已消除 `src.main` 的 blindbox/federated 缺失模块阻断；mobile 上传接口已返回 `file_url`

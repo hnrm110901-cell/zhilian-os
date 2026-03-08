@@ -225,6 +225,25 @@ class FCTApprovalRecord(Base, TimestampMixin):
     extra = Column(JSON)
 
 
+class FCTPeriod(Base, TimestampMixin):
+    """会计期间状态（open/closed）。"""
+
+    __tablename__ = "fct_periods"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    period_key = Column(String(16), nullable=False, index=True)  # YYYY-MM
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=False)
+    status = Column(String(20), nullable=False, default="open")
+    closed_at = Column(String(32))
+    extra = Column(JSON)
+
+    __table_args__ = (
+        Index("ix_fct_periods_tenant_period", "tenant_id", "period_key", unique=True),
+    )
+
+
 # ── 会计凭证（双分录）───────────────────────────────────────────────────────
 
 class Voucher(Base, TimestampMixin):
