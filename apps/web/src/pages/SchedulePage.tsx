@@ -61,6 +61,7 @@ const SchedulePage: React.FC = () => {
   const [historyItems, setHistoryItems] = useState<any[]>([]);
   const [historyActionFilter, setHistoryActionFilter] = useState<string>('all');
   const [historyKeyword, setHistoryKeyword] = useState<string>('');
+  const [historyOrder, setHistoryOrder] = useState<'desc' | 'asc'>('desc');
 
   const [weekDate, setWeekDate] = useState<Dayjs>(dayjs().startOf('isoWeek'));
   const [statsRange, setStatsRange] = useState<[Dayjs, Dayjs]>([dayjs().subtract(7, 'day'), dayjs()]);
@@ -213,6 +214,7 @@ const SchedulePage: React.FC = () => {
       setHistoryDrawer(true);
       setHistoryActionFilter('all');
       setHistoryKeyword('');
+      setHistoryOrder('desc');
       setHistoryLoading(true);
       const res = await apiClient.get(`/api/v1/schedules/${schedule.id}/history?limit=100`);
       setHistoryItems(res || []);
@@ -358,6 +360,13 @@ const SchedulePage: React.FC = () => {
         return haystack.includes(keyword);
       })
     : actionFilteredHistoryItems;
+  const orderedHistoryItems = [...filteredHistoryItems].sort((a: any, b: any) => {
+    const ta = a?.created_at ? dayjs(a.created_at).valueOf() : 0;
+    const tb = b?.created_at ? dayjs(b.created_at).valueOf() : 0;
+    return historyOrder === 'desc' ? tb - ta : ta - tb;
+  });
+  const historyCreateCount = historyItems.filter((item: any) => item.action === 'create').length;
+  const historyUpdateCount = historyItems.filter((item: any) => item.action === 'update').length;
 
   const handleExportHistory = () => {
     const payload = {
@@ -598,11 +607,18 @@ const SchedulePage: React.FC = () => {
       >
         <div style={{ marginBottom: 12 }}>
           <Space wrap>
+            <Tag color="green">创建 {historyCreateCount}</Tag>
+            <Tag color="blue">更新 {historyUpdateCount}</Tag>
+            <Tag>总计 {historyItems.length}</Tag>
             <span style={{ color: '#666', fontSize: 12 }}>操作类型</span>
             <Select size="small" value={historyActionFilter} onChange={setHistoryActionFilter} style={{ width: 140 }}>
               <Option value="all">全部</Option>
               <Option value="create">创建</Option>
               <Option value="update">更新</Option>
+            </Select>
+            <Select size="small" value={historyOrder} onChange={setHistoryOrder} style={{ width: 120 }}>
+              <Option value="desc">最新优先</Option>
+              <Option value="asc">最早优先</Option>
             </Select>
             <Input
               size="small"
@@ -612,15 +628,25 @@ const SchedulePage: React.FC = () => {
               onChange={(e) => setHistoryKeyword(e.target.value)}
               style={{ width: 180 }}
             />
+            <Button
+              size="small"
+              onClick={() => {
+                setHistoryActionFilter('all');
+                setHistoryKeyword('');
+                setHistoryOrder('desc');
+              }}
+            >
+              清空筛选
+            </Button>
           </Space>
         </div>
         {historyLoading ? (
           <div style={{ textAlign: 'center', padding: 40 }}>加载中...</div>
-        ) : filteredHistoryItems.length === 0 ? (
+        ) : orderedHistoryItems.length === 0 ? (
           <Empty description="暂无历史记录" />
         ) : (
           <Timeline
-            items={filteredHistoryItems.map((item: any) => ({
+            items={orderedHistoryItems.map((item: any) => ({
               color: item.action === 'create' ? 'green' : 'blue',
               children: (
                 <div>
