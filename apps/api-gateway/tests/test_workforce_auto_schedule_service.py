@@ -111,6 +111,11 @@ class TestWorkforceAutoScheduleService:
                 new_callable=AsyncMock,
                 return_value=[],
             ),
+            patch(
+                "src.services.workforce_auto_schedule_service.StaffingPatternService.build_shifts_from_best_pattern",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
         ):
             with pytest.raises(ValueError, match="暂无在职员工"):
                 await WorkforceAutoScheduleService.generate_schedule_with_constraints(
@@ -160,6 +165,11 @@ class TestWorkforceAutoScheduleService:
                 "src.services.workforce_auto_schedule_service.EmployeeRepository.get_by_store",
                 new_callable=AsyncMock,
                 return_value=employees,
+            ),
+            patch(
+                "src.services.workforce_auto_schedule_service.StaffingPatternService.build_shifts_from_best_pattern",
+                new_callable=AsyncMock,
+                return_value=[],
             ),
             patch.object(
                 WorkforceAutoScheduleService,

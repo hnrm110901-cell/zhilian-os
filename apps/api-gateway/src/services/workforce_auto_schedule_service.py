@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.schedule import Schedule, Shift
 from src.repositories import EmployeeRepository, ScheduleRepository
+from src.services.staffing_pattern_service import StaffingPatternService
 from src.services.wechat_service import wechat_service
 
 logger = structlog.get_logger()
@@ -141,11 +142,19 @@ class WorkforceAutoScheduleService:
         if not active_employees:
             raise ValueError("该门店暂无在职员工，无法自动排班")
 
-        shifts_payload = await WorkforceAutoScheduleService._generate_shifts_from_agent(
+        shifts_payload = await StaffingPatternService.build_shifts_from_best_pattern(
             store_id=store_id,
-            schedule_date=schedule_date,
-            employees=active_employees,
+            target_date=schedule_date,
+            db=db,
         )
+        source = "staffing_pattern"
+        if not shifts_payload:
+            shifts_payload = await WorkforceAutoScheduleService._generate_shifts_from_agent(
+                store_id=store_id,
+                schedule_date=schedule_date,
+                employees=active_employees,
+            )
+            source = "schedule_agent"
         if not shifts_payload:
             raise ValueError("自动排班失败：未生成任何班次")
 
@@ -208,6 +217,7 @@ class WorkforceAutoScheduleService:
             "anomalies": anomalies,
             "notified": notified,
             "shift_count": len(shifts_payload),
+            "source": source,
         }
 
     @staticmethod

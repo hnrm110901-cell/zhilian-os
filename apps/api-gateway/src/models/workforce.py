@@ -293,3 +293,40 @@ class LaborCostRanking(Base):
             f"date='{self.ranking_date}', rank={self.rank_in_group}"
             f"/{self.total_stores_in_group})>"
         )
+
+
+# ─────────────────────────────────────────────────────────
+# 7. staffing_patterns — 历史最优排班模板库
+# ─────────────────────────────────────────────────────────
+class StaffingPattern(Base, TimestampMixin):
+    """
+    从历史最优排班中抽取的模板，按 weekday/weekend/holiday 分组。
+    快速用于相似日期排班。
+    """
+    __tablename__ = "staffing_patterns"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    store_id = Column(String(50), ForeignKey("stores.id"), nullable=False, index=True)
+    pattern_name = Column(String(100), nullable=False)
+    day_type = Column(String(20), nullable=False, index=True)  # weekday/weekend/holiday
+    meal_period = Column(String(20), nullable=False, default="all_day")
+
+    # 模板内容：
+    # [
+    #   {"shift_type":"morning","position":"waiter","required_count":3,"start":"08:00","end":"14:00"},
+    #   ...
+    # ]
+    shifts_template = Column(JSON, nullable=False, default=list)
+
+    source_start_date = Column(Date, nullable=True)
+    source_end_date = Column(Date, nullable=True)
+    sample_days = Column(Integer, nullable=False, default=0)
+    avg_labor_cost_rate = Column(Numeric(6, 2), nullable=True)
+    performance_score = Column(Numeric(6, 2), nullable=True)  # 越高越优先
+    is_active = Column(Boolean, default=True, nullable=False)
+
+    def __repr__(self):
+        return (
+            f"<StaffingPattern(store='{self.store_id}', name='{self.pattern_name}', "
+            f"day_type='{self.day_type}', score={self.performance_score})>"
+        )

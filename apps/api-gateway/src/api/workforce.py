@@ -20,6 +20,7 @@ from src.models.user import User, UserRole
 from src.services.labor_cost_service import LaborCostService
 from src.services.labor_demand_service import LaborDemandService
 from src.services.shift_fairness_service import ShiftFairnessService
+from src.services.staffing_pattern_service import StaffingPatternService
 from src.services.turnover_prediction_service import TurnoverPredictionService
 from src.services.workforce_auto_schedule_service import WorkforceAutoScheduleService
 
@@ -48,6 +49,11 @@ class AutoScheduleRequest(BaseModel):
     auto_publish: bool = Field(True, description="是否自动发布排班")
     notify_on_anomaly: bool = Field(True, description="发现异常时是否发送企微提醒")
     recipient_user_id: Optional[str] = Field(None, description="企微接收人，默认 store_{store_id}")
+
+
+class LearnPatternRequest(BaseModel):
+    start_date: str = Field(..., description="学习窗口开始日期 YYYY-MM-DD")
+    end_date: str = Field(..., description="学习窗口结束日期 YYYY-MM-DD")
 
 
 def _risk_level(score: float) -> str:
@@ -465,3 +471,40 @@ async def auto_generate_schedule_with_constraints(
     if not result.get("created"):
         raise HTTPException(status_code=409, detail="该日期排班已存在，请勿重复生成")
     return result
+
+
+@router.post("/stores/{store_id}/staffing-patterns/learn")
+async def learn_staffing_patterns(
+    store_id: str,
+    body: LearnPatternRequest,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_role(UserRole.STORE_MANAGER)),
+):
+    start_date = _parse_iso_date(body.start_date, "start_date")
+    end_date = _parse_iso_date(body.end_date, "end_date")
+    if end_date < start_date:
+        raise HTTPException(status_code=400, detail="end_date 不能早于 start_date")
+    return await StaffingPatternService.learn_from_history(
+        store_id=store_id,
+        start_date=start_date,
+        end_date=end_date,
+        db=db,
+    )
+
+
+@router.get("/stores/{store_id}/staffing-patterns/best")
+async def get_best_staffing_pattern(
+    store_id: str,
+    date_str: Optional[str] = Query(None, alias="date", description="目标日期 YYYY-MM-DD，默认今天"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    target_date = _parse_iso_date(date_str, "date") if date_str else date.today()
+    pattern = await StaffingPatternService.get_best_pattern(
+        store_id=store_id,
+        target_date=target_date,
+        db=db,
+    )
+    if not pattern:
+        return {"store_id": store_id, "date": target_date.isoformat(), "exists": False}
+    return {"store_id": store_id, "date": target_date.isoformat(), "exists": True, **pattern}

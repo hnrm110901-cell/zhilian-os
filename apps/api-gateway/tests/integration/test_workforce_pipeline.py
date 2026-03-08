@@ -26,14 +26,17 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key-for-workforce-pipeline-32!!
 from src.api.workforce import (  # noqa: E402
     AutoScheduleRequest,
     LaborBudgetUpsertRequest,
+    LearnPatternRequest,
     StaffingAdviceConfirmRequest,
     _parse_iso_date,
     _parse_yyyymm,
     _risk_level,
     auto_generate_schedule_with_constraints,
     confirm_staffing_advice,
+    get_best_staffing_pattern,
     get_employee_health,
     get_labor_budget,
+    learn_staffing_patterns,
     upsert_labor_budget,
 )
 from src.services.workforce_push_service import WorkforcePushService  # noqa: E402
@@ -301,6 +304,41 @@ class TestWorkforceAutoScheduleAPI:
                     _=_mock_user(),
                 )
         assert exc.value.status_code == 409
+
+
+class TestWorkforceStaffingPatternAPI:
+    @pytest.mark.asyncio
+    async def test_learn_staffing_patterns_success(self):
+        db = AsyncMock()
+        body = LearnPatternRequest(start_date="2026-03-01", end_date="2026-03-08")
+        with patch(
+            "src.api.workforce.StaffingPatternService.learn_from_history",
+            new_callable=AsyncMock,
+            return_value={"stored_count": 2, "patterns": [{"day_type": "weekday"}, {"day_type": "weekend"}]},
+        ):
+            resp = await learn_staffing_patterns(
+                store_id="S001",
+                body=body,
+                db=db,
+                _=_mock_user(),
+            )
+        assert resp["stored_count"] == 2
+
+    @pytest.mark.asyncio
+    async def test_get_best_staffing_pattern_none(self):
+        db = AsyncMock()
+        with patch(
+            "src.api.workforce.StaffingPatternService.get_best_pattern",
+            new_callable=AsyncMock,
+            return_value=None,
+        ):
+            resp = await get_best_staffing_pattern(
+                store_id="S001",
+                date_str="2026-03-09",
+                db=db,
+                _=_mock_user(),
+            )
+        assert resp["exists"] is False
 
     @pytest.mark.asyncio
     async def test_confirm_staffing_advice_invalid_meal_period(self):

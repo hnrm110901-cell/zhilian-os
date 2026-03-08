@@ -162,7 +162,7 @@
 - [x] 自动排班 Agent：从「建议+手动确认」→「自动生成+异常提醒」
   - 集成 packages/agents/schedule/ 的班次生成能力
   - 增加人工成本约束：排班方案在 LaborBudget 硬约束内
-- [ ] `StaffingPattern` 模板库：从历史最优排班中学习，快速应用到相似日期
+- [x] `StaffingPattern` 模板库：从历史最优排班中学习，快速应用到相似日期
 
 ---
 
