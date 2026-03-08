@@ -222,6 +222,29 @@ class TestOrdering:
         assert "reason" in dish
 
     @pytest.mark.asyncio
+    async def test_recommend_dishes_multilingual_en_us(self, agent):
+        """测试多语言菜单支持（英文）"""
+        recent_orders = [
+            {
+                "store_id": "STORE001",
+                "dishes": [
+                    {"dish_id": "D001", "dish_name": "宫保鸡丁", "price": 48.0, "quantity": 3},
+                    {"dish_id": "D002", "dish_name": "米饭", "price": 3.0, "quantity": 2},
+                ],
+            }
+        ]
+        result = await agent.recommend_dishes(
+            store_id="STORE001",
+            recent_orders=recent_orders,
+            locale="en-US",
+        )
+        assert result["success"] is True
+        assert result["locale"] == "en-US"
+        assert result["recommendations"][0]["dish_name"] in {"Kung Pao Chicken", "Steamed Rice"}
+        assert "dish_name_zh" in result["recommendations"][0]
+        assert "Recommended" in result["message"]
+
+    @pytest.mark.asyncio
     async def test_modify_order_update_quantity_and_total(self, agent):
         """测试订单改数量后金额重算"""
         order = {

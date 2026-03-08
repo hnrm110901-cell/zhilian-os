@@ -544,12 +544,25 @@ class OrderAgent(BaseAgent):
             "message": f"拼桌成功：{primary_id} + {secondary_id}",
         }
 
+    def _translate_dish_name(self, dish_name: str, locale: str) -> str:
+        """多语言菜名映射（MVP 内置词典，可后续接入真实 i18n 服务）。"""
+        if locale == "zh-CN":
+            return dish_name
+        translations = {
+            "宫保鸡丁": {"en-US": "Kung Pao Chicken"},
+            "米饭": {"en-US": "Steamed Rice"},
+            "招牌菜": {"en-US": "Signature Dish"},
+            "鱼香肉丝": {"en-US": "Fish-Fragrant Shredded Pork"},
+        }
+        return translations.get(dish_name, {}).get(locale, dish_name)
+
     async def recommend_dishes(
         self,
         store_id: str,
         recent_orders: Optional[List[Dict[str, Any]]] = None,
         customer_id: Optional[str] = None,
         party_size: Optional[int] = None,
+        locale: str = "zh-CN",
     ) -> Dict[str, Any]:
         """
         推荐菜品
@@ -557,7 +570,13 @@ class OrderAgent(BaseAgent):
         Args:
             recent_orders: 近期订单列表（由调用方从DB查询后传入，用于统计热门菜品）
         """
-        logger.info("推荐菜品", store_id=store_id, customer_id=customer_id, party_size=party_size)
+        logger.info(
+            "推荐菜品",
+            store_id=store_id,
+            customer_id=customer_id,
+            party_size=party_size,
+            locale=locale,
+        )
 
         dish_counts: Dict[str, Dict[str, Any]] = {}
         for order in (recent_orders or []):
@@ -576,15 +595,24 @@ class OrderAgent(BaseAgent):
         recommendations = [
             {
                 "dish_id": d["dish_id"],
-                "dish_name": d["dish_name"],
+                "dish_name": self._translate_dish_name(d["dish_name"], locale),
+                "dish_name_zh": d["dish_name"],
                 "price": d["price"],
-                "reason": f"本店热销，已点 {d['count']} 次" if d["count"] > 0 else "本店推荐",
+                "reason": (
+                    f"Hot seller, ordered {d['count']} times"
+                    if locale == "en-US" and d["count"] > 0
+                    else ("Recommended by store" if locale == "en-US" else ("本店热销，已点 %s 次" % d["count"] if d["count"] > 0 else "本店推荐"))
+                ),
                 "popularity_rank": i + 1,
             }
             for i, d in enumerate(sorted_dishes)
         ]
-        return {"success": True, "recommendations": recommendations,
-                "message": f"为您推荐{len(recommendations)}道菜品"}
+        message = (
+            f"Recommended {len(recommendations)} dishes for you"
+            if locale == "en-US"
+            else f"为您推荐{len(recommendations)}道菜品"
+        )
+        return {"success": True, "recommendations": recommendations, "message": message, "locale": locale}
 
     # ==================== 结账管理 ====================
 
