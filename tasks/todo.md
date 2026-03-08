@@ -123,7 +123,7 @@
   - _format_staffing_recommendation：格式合规（含¥/置信度/推理链）
   - push_daily_staffing_advice：正常/企微失败降级
   - push_labor_cost_alert：超阈值触发/未超阈值不推送
-- [ ] 新建 `tests/integration/test_workforce_pipeline.py`：≥15个测试
+- [x] 新建 `tests/integration/test_workforce_pipeline.py`：≥15个测试
   - 客流预测→人力需求→推送全链路
   - 采纳行为记录闭环
   - 跨店排名结构验证
