@@ -304,6 +304,7 @@ class ScheduleAgent(BaseAgent):
         requirements = state["requirements"]
         employees = state["employees"]
         date = state["date"]
+        use_ml_optimizer = bool(self.config.get("use_ml_optimizer", False))
         logger.info("生成排班表", date=date, employee_count=len(employees))
 
         schedule = []
@@ -315,6 +316,12 @@ class ScheduleAgent(BaseAgent):
                     emp for emp in employees
                     if skill in emp.get("skills", []) and emp["id"] not in assigned_employees
                 ]
+                if use_ml_optimizer:
+                    available = sorted(
+                        available,
+                        key=lambda emp: self._score_employee_ml(emp=emp, shift_name=shift_name, skill=skill),
+                        reverse=True,
+                    )
                 for emp in available[:count]:
                     schedule.append({
                         "employee_id": emp["id"],
@@ -416,6 +423,30 @@ class ScheduleAgent(BaseAgent):
             "cost_breakdown_by_skill": breakdown,
             "hourly_cost_config": hourly_cost,
         }
+
+    def _score_employee_ml(self, emp: Dict[str, Any], shift_name: str, skill: str) -> float:
+        """
+        轻量 ML 风格排班打分：
+        - 偏好匹配（preferred_shifts）
+        - 技能等级（skill_levels[skill] 或 skill_level）
+        - 历史表现（historical_performance 0-1）
+        - 近期工时惩罚（recent_hours）
+        """
+        preferences = emp.get("preferences", {})
+        preferred_shifts = preferences.get("preferred_shifts", []) if isinstance(preferences, dict) else []
+        preference_score = 1.0 if shift_name in preferred_shifts else 0.0
+
+        skill_levels = emp.get("skill_levels", {})
+        if isinstance(skill_levels, dict) and skill in skill_levels:
+            skill_score = float(skill_levels.get(skill, 0.8))
+        else:
+            skill_score = float(emp.get("skill_level", 0.8))
+
+        historical_score = float(emp.get("historical_performance", 0.7))
+        recent_hours = float(emp.get("recent_hours", 0.0))
+        fatigue_penalty = min(1.0, recent_hours / 40.0)
+
+        return round(preference_score * 0.35 + skill_score * 0.35 + historical_score * 0.25 - fatigue_penalty * 0.15, 6)
 
     def _build_auto_scheduling_actions(
         self,

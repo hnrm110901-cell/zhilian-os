@@ -171,6 +171,51 @@ class TestScheduleAgent:
             assert "end_time" in shift
 
     @pytest.mark.asyncio
+    async def test_generate_schedule_ml_optimizer_prefers_high_score_employee(self):
+        """测试ML优化器优先选择高评分员工"""
+        agent = ScheduleAgent(
+            {
+                "min_shift_hours": 4,
+                "max_shift_hours": 8,
+                "max_weekly_hours": 40,
+                "use_ml_optimizer": True,
+            }
+        )
+        state = ScheduleState(
+            store_id="STORE001",
+            date="2024-01-15",
+            traffic_data={},
+            employees=[
+                {
+                    "id": "E_LOW",
+                    "name": "低分员工",
+                    "skills": ["waiter"],
+                    "preferences": {"preferred_shifts": []},
+                    "skill_level": 0.6,
+                    "historical_performance": 0.6,
+                    "recent_hours": 30,
+                },
+                {
+                    "id": "E_HIGH",
+                    "name": "高分员工",
+                    "skills": ["waiter"],
+                    "preferences": {"preferred_shifts": ["morning"]},
+                    "skill_level": 0.95,
+                    "historical_performance": 0.9,
+                    "recent_hours": 5,
+                },
+            ],
+            requirements={"morning": {"waiter": 1}},
+            schedule=[],
+            labor_cost_summary={},
+            auto_scheduling_actions=[],
+            optimization_suggestions=[],
+            errors=[],
+        )
+        result = await agent.generate_schedule(state)
+        assert result["schedule"][0]["employee_id"] == "E_HIGH"
+
+    @pytest.mark.asyncio
     async def test_optimize_schedule(self, agent, initial_state):
         """测试排班优化"""
         # 执行完整流程
