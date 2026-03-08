@@ -37,6 +37,7 @@ export default function SmTasks() {
   const [evidenceUploading, setEvidenceUploading] = useState(false);
   const [evidenceNote, setEvidenceNote] = useState('');
   const [evidenceFileName, setEvidenceFileName] = useState('');
+  const [evidenceFileUrl, setEvidenceFileUrl] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -83,6 +84,7 @@ export default function SmTasks() {
     setSelectedTask(null);
     setEvidenceNote('');
     setEvidenceFileName('');
+    setEvidenceFileUrl('');
     load();
   };
 
@@ -94,6 +96,7 @@ export default function SmTasks() {
       .finally(() => setDetailLoading(false));
     setEvidenceNote('');
     setEvidenceFileName('');
+    setEvidenceFileUrl('');
   };
 
   const onUploadEvidence = async (file?: File) => {
@@ -103,6 +106,7 @@ export default function SmTasks() {
     setEvidenceUploading(false);
     if (!result.ok) return showError(result.message);
     setEvidenceFileName(result.file_name || file.name);
+    setEvidenceFileUrl(result.file_url || '');
     showSuccess(result.message);
   };
 
@@ -207,6 +211,11 @@ export default function SmTasks() {
               />
               {evidenceUploading && <div className={styles.uploading}>上传中...</div>}
               {evidenceFileName && <div className={styles.fileName}>已选择：{evidenceFileName}</div>}
+              {evidenceFileUrl && (
+                <a className={styles.fileLink} href={evidenceFileUrl} target="_blank" rel="noreferrer">
+                  查看已上传证据
+                </a>
+              )}
             </div>
           </div>
         )}

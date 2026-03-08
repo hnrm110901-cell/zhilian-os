@@ -160,6 +160,14 @@
   color: var(--text-secondary);
 }
 
+.fileLink {
+  margin-top: 6px;
+  display: inline-block;
+  font-size: 12px;
+  color: var(--accent);
+  text-decoration: underline;
+}
+
 .uploading {
   margin-top: 6px;
   font-size: 12px;

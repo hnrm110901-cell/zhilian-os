@@ -18,6 +18,7 @@
   - 证据上传调用化：新增 `uploadTaskEvidence`（FormData）+ mock 回退 + 上传状态展示
   - 后端 `mobile` API 补齐：`home/shifts/tasks` 查询 + check-in/out + start/submit + evidence 上传
   - mobile API 收尾：上传接口返回 `file_url`；补齐 `/mobile` 新端点专项测试（直测路由函数）
+  - 前端证据链路收尾：上传后展示可点击 `file_url` 预览链接
 
 ## P1
 - [x] 核心页面移动端适配补强（`WorkforcePage`、`ActionPlansPage`）
@@ -55,6 +56,9 @@
   - `apps/web/src/pages/sm/Tasks.module.css`
   - `apps/web/src/layouts/StoreManagerLayout.tsx`
   - `apps/web/src/services/mobile.types.ts`
+  - `apps/web/src/services/mobile.mutation.service.ts`
+  - `apps/web/src/pages/sm/Tasks.tsx`
+  - `apps/web/src/pages/sm/Tasks.module.css`
   - `apps/web/src/services/mobile.mock.ts`
   - `apps/web/src/services/mobile.query.service.ts`
   - `apps/web/src/services/mobile.mutation.service.ts`
@@ -64,4 +68,5 @@
   - `python3 -m py_compile apps/api-gateway/src/api/mobile.py`（通过）
   - `python3 -m py_compile apps/api-gateway/src/api/blindbox.py apps/api-gateway/src/api/federated.py`（通过）
   - `python3 -m pytest -q apps/api-gateway/tests/test_mobile_api_v1_routes.py`（3 passed）
+  - `pnpm --filter @zhilian-os/web exec eslint src/services/mobile.types.ts src/services/mobile.mutation.service.ts src/pages/sm/Tasks.tsx`（通过）
 - note: 已消除 `src.main` 的 blindbox/federated 缺失模块阻断；mobile 上传接口已返回 `file_url`

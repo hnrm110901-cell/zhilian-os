@@ -74,4 +74,5 @@ export interface TaskSubmitPayload {
 
 export interface MobileUploadResult extends MobileActionResult {
   file_name?: string;
+  file_url?: string;
 }

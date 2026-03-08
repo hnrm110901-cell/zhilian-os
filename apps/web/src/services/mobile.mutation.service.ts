@@ -42,14 +42,19 @@ export async function uploadTaskEvidence(taskId: string, file: File): Promise<Mo
   try {
     const formData = new FormData();
     formData.append('file', file);
-    const resp = await apiClient.post<{ file_name?: string }>(
+    const resp = await apiClient.post<{ message?: string; file_name?: string; file_url?: string }>(
       `/api/v1/mobile/tasks/${taskId}/evidence`,
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' } }
     );
-    return { ok: true, message: '证据上传成功', file_name: resp.file_name || file.name };
+    return {
+      ok: true,
+      message: resp.message || '证据上传成功',
+      file_name: resp.file_name || file.name,
+      file_url: resp.file_url,
+    };
   } catch {
     const fallback = mockUploadTaskEvidence(taskId, file.name);
-    return { ...fallback, file_name: fallback.ok ? file.name : undefined };
+    return { ...fallback, file_name: fallback.ok ? file.name : undefined, file_url: undefined };
   }
 }
