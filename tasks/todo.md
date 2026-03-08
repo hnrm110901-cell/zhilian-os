@@ -135,12 +135,12 @@
 > 核心目标：将员工纳入系统闭环，形成「系统-店长-员工」三方协同
 
 - [x] 员工偏好管理 API（CRUD EmployeePreference）
-- [ ] 换班申请流（申请→技能检查→店长审批→企微通知）
-- [ ] `src/services/shift_fairness_service.py`：班次公平性评分
+- [x] 换班申请流（申请→技能检查→店长审批→企微通知）
+- [x] `src/services/shift_fairness_service.py`：班次公平性评分
   - 统计每员工月均差班（深夜/早班）分配比例
   - 公平性指数计算（基尼系数思路）
   - 异常员工自动预警（连续3周分配最差班次）
-- [ ] `src/services/turnover_prediction_service.py`：员工流失风险预测
+- [x] `src/services/turnover_prediction_service.py`：员工流失风险预测
   - 特征：考勤异常次数 + 班次公平性得分 + 连续工作天数 + 工资波动率
   - 输出：90天内离职风险分（0-1）+ 主要风险因子
   - 高风险（>0.7）触发企微提醒店长介入
