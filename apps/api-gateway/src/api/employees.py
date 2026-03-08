@@ -4,7 +4,7 @@ Employee Management API
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import date
 import structlog
 
@@ -146,6 +146,20 @@ class RecordPerformanceRequest(BaseModel):
     notes: Optional[str] = None
 
 
+class EmployeePreferenceUpsertRequest(BaseModel):
+    preferences: Dict[str, Any]
+
+
+class EmployeePreferencePatchRequest(BaseModel):
+    preferences: Dict[str, Any]
+
+
+class EmployeePreferenceResponse(BaseModel):
+    employee_id: str
+    store_id: str
+    preferences: Dict[str, Any]
+
+
 @router.post("/employees/{employee_id}/performance", status_code=201)
 async def record_performance(
     employee_id: str,
@@ -211,6 +225,99 @@ async def get_performance_leaderboard(
             }
             for idx, e in enumerate(ranked)
         ],
+    }
+
+
+@router.get("/employees/{employee_id}/preferences", response_model=EmployeePreferenceResponse)
+async def get_employee_preferences(
+    employee_id: str,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """获取员工排班偏好。"""
+    emp = await EmployeeRepository.get_by_id(session, employee_id)
+    if not emp:
+        raise HTTPException(status_code=404, detail="员工不存在")
+    return EmployeePreferenceResponse(
+        employee_id=emp.id,
+        store_id=emp.store_id,
+        preferences=emp.preferences or {},
+    )
+
+
+@router.put("/employees/{employee_id}/preferences", response_model=EmployeePreferenceResponse)
+async def put_employee_preferences(
+    employee_id: str,
+    req: EmployeePreferenceUpsertRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.STORE_MANAGER)),
+):
+    """全量覆盖员工排班偏好。"""
+    emp = await EmployeeRepository.get_by_id(session, employee_id)
+    if not emp:
+        raise HTTPException(status_code=404, detail="员工不存在")
+    emp.preferences = req.preferences
+    await session.commit()
+    await session.refresh(emp)
+    return EmployeePreferenceResponse(
+        employee_id=emp.id,
+        store_id=emp.store_id,
+        preferences=emp.preferences or {},
+    )
+
+
+@router.patch("/employees/{employee_id}/preferences", response_model=EmployeePreferenceResponse)
+async def patch_employee_preferences(
+    employee_id: str,
+    req: EmployeePreferencePatchRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.STORE_MANAGER)),
+):
+    """局部更新员工排班偏好（merge）。"""
+    emp = await EmployeeRepository.get_by_id(session, employee_id)
+    if not emp:
+        raise HTTPException(status_code=404, detail="员工不存在")
+    merged = dict(emp.preferences or {})
+    merged.update(req.preferences)
+    emp.preferences = merged
+    await session.commit()
+    await session.refresh(emp)
+    return EmployeePreferenceResponse(
+        employee_id=emp.id,
+        store_id=emp.store_id,
+        preferences=emp.preferences or {},
+    )
+
+
+@router.delete("/employees/{employee_id}/preferences")
+async def delete_employee_preferences(
+    employee_id: str,
+    key: Optional[str] = Query(None, description="可选，删除指定偏好键"),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.STORE_MANAGER)),
+):
+    """
+    删除员工偏好。
+    - 未提供 key：清空全部偏好
+    - 提供 key：仅删除指定字段
+    """
+    emp = await EmployeeRepository.get_by_id(session, employee_id)
+    if not emp:
+        raise HTTPException(status_code=404, detail="员工不存在")
+
+    current = dict(emp.preferences or {})
+    if key:
+        current.pop(key, None)
+        emp.preferences = current
+    else:
+        emp.preferences = {}
+
+    await session.commit()
+    await session.refresh(emp)
+    return {
+        "ok": True,
+        "employee_id": emp.id,
+        "preferences": emp.preferences or {},
     }
 
 

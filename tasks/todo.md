@@ -134,7 +134,7 @@
 
 > 核心目标：将员工纳入系统闭环，形成「系统-店长-员工」三方协同
 
-- [ ] 员工偏好管理 API（CRUD EmployeePreference）
+- [x] 员工偏好管理 API（CRUD EmployeePreference）
 - [ ] 换班申请流（申请→技能检查→店长审批→企微通知）
 - [ ] `src/services/shift_fairness_service.py`：班次公平性评分
   - 统计每员工月均差班（深夜/早班）分配比例
