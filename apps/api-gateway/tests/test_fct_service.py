@@ -1349,6 +1349,50 @@ class TestGetPlanVsActual:
         assert result["items"] == []
 
 
+class TestUpsertPlan:
+    @pytest.mark.asyncio
+    async def test_updates_existing_category_and_inserts_missing(self):
+        db = _mock_db()
+        existing = MagicMock()
+        existing.category = "revenue"
+        existing.budgeted_amount = 100_000
+        db.execute = AsyncMock(return_value=_scalars_all([existing]))
+
+        svc = StandaloneFCTService()
+        result = await svc.upsert_plan(
+            db,
+            tenant_id="T1",
+            entity_id="S001",
+            plan_year=2026,
+            targets={"revenue": 200000, "labor_cost": 50000},
+        )
+
+        assert result["targets"]["revenue"] == 200000
+        assert existing.budgeted_amount == 200000
+        assert db.add.call_count == 1
+        inserted = db.add.call_args[0][0]
+        assert inserted.category == "labor_cost"
+        assert inserted.budgeted_amount == 50000
+
+    @pytest.mark.asyncio
+    async def test_empty_targets_no_db_write(self):
+        db = _mock_db()
+        svc = StandaloneFCTService()
+
+        result = await svc.upsert_plan(
+            db,
+            tenant_id="T1",
+            entity_id="S001",
+            plan_year=2026,
+            targets={},
+        )
+
+        assert result["targets"] == {}
+        db.execute.assert_not_called()
+        db.add.assert_not_called()
+        db.flush.assert_not_called()
+
+
 # ── list_periods ─────────────────────────────────────────────────────────────
 
 class TestListPeriods:

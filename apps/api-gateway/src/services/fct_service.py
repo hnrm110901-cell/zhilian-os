@@ -2029,24 +2029,45 @@ class StandaloneFCTService:
         extra: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         # 映射到 Budget 模型（month=0 表示年度计划）
-        for category, amount in targets.items():
-            budget = Budget(
-                store_id=entity_id or tenant_id,
-                year=plan_year,
-                month=0,
-                category=category,
-                budgeted_amount=int(float(amount)),
+        store_id = entity_id or tenant_id
+        normalized_targets = {
+            str(category): int(float(amount))
+            for category, amount in (targets or {}).items()
+        }
+        if normalized_targets:
+            stmt = select(Budget).where(
+                and_(
+                    Budget.store_id == store_id,
+                    Budget.year == plan_year,
+                    Budget.month == 0,
+                    Budget.category.in_(list(normalized_targets.keys())),
+                )
             )
-            session.add(budget)
-        try:
+            existing_rows = (await session.execute(stmt)).scalars().all()
+            existing_by_category: Dict[str, Budget] = {}
+            for row in existing_rows:
+                existing_by_category.setdefault(row.category, row)
+
+            for category, amount in normalized_targets.items():
+                existing = existing_by_category.get(category)
+                if existing:
+                    existing.budgeted_amount = amount
+                else:
+                    session.add(
+                        Budget(
+                            store_id=store_id,
+                            year=plan_year,
+                            month=0,
+                            category=category,
+                            budgeted_amount=amount,
+                        )
+                    )
             await session.flush()
-        except Exception:
-            pass
         return {
             "tenant_id": tenant_id,
             "entity_id": entity_id,
             "plan_year": plan_year,
-            "targets": targets,
+            "targets": normalized_targets,
             "success": True,
         }
 
