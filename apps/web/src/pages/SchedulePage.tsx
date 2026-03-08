@@ -7,7 +7,7 @@ import {
 import {
   PlusOutlined, UserOutlined, CalendarOutlined, ReloadOutlined,
   ThunderboltOutlined, CheckCircleOutlined, SendOutlined,
-  BarChartOutlined, ClockCircleOutlined,
+  BarChartOutlined, ClockCircleOutlined, DownloadOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs, { Dayjs } from 'dayjs';
@@ -350,6 +350,27 @@ const SchedulePage: React.FC = () => {
     ? historyItems
     : historyItems.filter((item: any) => item.action === historyActionFilter);
 
+  const handleExportHistory = () => {
+    const payload = {
+      schedule_id: historySchedule?.id || null,
+      schedule_date: historySchedule?.schedule_date || null,
+      filter: historyActionFilter,
+      exported_at: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+      items: filteredHistoryItems,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const suffix = historySchedule?.schedule_date || dayjs().format('YYYYMMDD');
+    a.href = url;
+    a.download = `schedule-history-${suffix}-${historyActionFilter}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showSuccess('历史记录已导出');
+  };
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
@@ -555,6 +576,16 @@ const SchedulePage: React.FC = () => {
         open={historyDrawer}
         onClose={() => setHistoryDrawer(false)}
         width={520}
+        extra={
+          <Button
+            size="small"
+            icon={<DownloadOutlined />}
+            onClick={handleExportHistory}
+            disabled={historyLoading || filteredHistoryItems.length === 0}
+          >
+            导出 JSON
+          </Button>
+        }
       >
         <div style={{ marginBottom: 12 }}>
           <Space>
