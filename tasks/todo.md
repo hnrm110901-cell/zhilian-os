@@ -55,50 +55,21 @@
 
 #### Step 1：数据模型 + Alembic Migration
 
-- [ ] 新建 `src/models/workforce.py`：
-  - `LaborBudget`（门店月度人工预算，含 budget_yuan / actual_yuan / variance_pct）
-  - `StaffingPattern`（历史最优排班模板，按星期×节假日类型建立模式库）
-  - `EmployeePreference`（员工偏好班次 + 不可用时段，驱动排班满意度）
-  - `TurnoverEvent`（离职事件标注，含离职原因/时间/替换成本，训练留存模型）
-  - `ShiftFairnessScore`（每员工每月差班分配比例，异常时触发预警）
-  - `LaborDemandForecast`（客流预测结果持久化，action_date / predicted_customers / predicted_revenue / confidence）
-- [ ] 新建 Alembic migration `w01_workforce_models.py`（5张新表）
-- [ ] 在 `src/models/__init__.py` 注册新模型
+- [x] 新建 `src/models/workforce.py`：6张表（LaborDemandForecast / LaborCostSnapshot / StaffingAdvice / StaffingAdviceConfirmation / StoreLaborBudget / LaborCostRanking）+ 5个 Enum
+- [x] 新建 Alembic migration `wf01_workforce_tables.py`（6张表 + 5种 PG Enum，down_revision=z34）
+- [x] 在 `src/models/__init__.py` 注册新模型（11个符号）
 
 #### Step 2：客流预测 Service（Agent 1 + 2 核心）
 
-- [ ] 新建 `src/services/labor_demand_service.py`：`LaborDemandService`
-  - 纯函数：`_compute_weekday_factor(date) → float`（星期系数，周五=1.3，周一=0.85）
-  - 纯函数：`_compute_holiday_factor(date) → float`（节假日系数，含湖南本地节日权重）
-  - 纯函数：`_compute_weather_factor(weather_code) → float`（雨天客流-15%，晴天+5%）
-  - `forecast_customer_flow(store_id, target_date, db) → LaborDemandForecast`：
-    - 读取近30天历史日销售均值作为基线
-    - 叠加星期/节假日/天气三个因子
-    - 精度目标：±15%（Phase 1），存入 `labor_demand_forecasts` 表
-  - `compute_staffing_needs(forecast, store_id, db) → dict`：
-    - 基于该店历史人效比（元/人/天）计算岗位人数
-    - 输出：`{kitchen: 3, waiter: 5, cashier: 1, total: 9}`
-    - 与上周同日对比，标注增减量
-  - `get_labor_efficiency(store_id, date_range, db) → dict`：
-    - 人效 = 当日营收 / 实际出勤人数
-    - 返回趋势数据 + 对标建议
+- [x] 新建 `src/services/labor_demand_service.py`：`LaborDemandService`（三档降级：rule_based/statistical/weighted；含 CN 节假日表；`compute_position_requirements` + `get_holiday_weight` 纯函数；离线 db=None 自动降级）
 
 #### Step 3：人工成本监控 Service（Agent 5）
 
-- [ ] 新建 `src/services/labor_cost_service.py`：`LaborCostService`
-  - 纯函数：`compute_labor_cost_rate(labor_cost, revenue) → float`（人工成本率）
-  - 纯函数：`classify_labor_cost_status(rate, budget_rate) → str`（ok/warning/critical）
-  - 纯函数：`compute_daily_saving(actual_count, recommended_count, avg_wage_per_day) → float`（节省¥）
-  - `get_store_labor_summary(store_id, date, db) → dict`：
-    - 实际人工成本¥ / 建议人工成本¥ / 节省或超支¥
-    - 人工成本率% + 状态（含预算对比）
-    - 与建议人数差距（+N人/-N人）
-  - `get_multi_store_labor_ranking(store_ids, month, db) → list`：
-    - 跨店人工成本率排名（供运营负责人横向对标）
+- [x] 新建 `src/services/labor_cost_service.py`：`LaborCostService`（快照计算+持久化 / 成本率趋势 / 跨店排名；`compute_labor_cost_rate` + `compute_variance` + `compute_overtime_cost` 纯函数；4级成本来源降级；`_build_rank_insight` 含¥文案）
 
 #### Step 4：今日人力建议推送（Rippling 主动推送理念）
 
-- [ ] 新建 `src/services/workforce_push_service.py`：`WorkforcePushService`
+- [x] 新建 `src/services/workforce_push_service.py`：`WorkforcePushService`
   - 纯函数：`_format_staffing_recommendation(forecast, staffing, cost_summary) → str`：
     - 格式：明日客流预测N人 / 建议排班X人（厨房N/前厅N/收银N）/ 较昨日同比±N / 预计节省¥
     - 附 3条推理链（如：「预计客流+20%，历史周六均值N人，节假日系数×1.2」）
@@ -106,8 +77,8 @@
   - `push_daily_staffing_advice(store_id, db)`：组装建议 + 调用 WeChatService 推送 → 记录推送日志
   - `push_labor_cost_alert(store_id, db)`：人工成本率超 warning 阈值时触发（Rule 7 合规）
 
-- [ ] `src/core/celery_tasks.py`：新增 `push_daily_workforce_advice` 任务（遍历活跃门店）
-- [ ] `src/core/celery_app.py`：Beat 新增 `daily-workforce-advice`（07:00，L8_WORKFORCE_HOUR/MINUTE 可覆盖，priority=9）
+- [x] `src/core/celery_tasks.py`：新增 `push_daily_workforce_advice` 任务（遍历活跃门店）
+- [x] `src/core/celery_app.py`：Beat 新增 `daily-workforce-advice`（07:00，L8_WORKFORCE_HOUR/MINUTE 可覆盖，priority=9）
 
 #### Step 5：API 端点
 
@@ -148,7 +119,7 @@
   - 纯函数：cost_rate×3 / classify_status×3 / compute_saving×2
   - get_store_labor_summary：正常/无预算数据
   - get_multi_store_labor_ranking：多店排序
-- [ ] 新建 `tests/test_workforce_push_service.py`：≥10个测试
+- [x] 新建 `tests/test_workforce_push_service.py`：≥10个测试
   - _format_staffing_recommendation：格式合规（含¥/置信度/推理链）
   - push_daily_staffing_advice：正常/企微失败降级
   - push_labor_cost_alert：超阈值触发/未超阈值不推送
