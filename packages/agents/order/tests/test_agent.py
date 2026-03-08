@@ -270,6 +270,38 @@ class TestOrdering:
         assert "Recommended" in result["message"]
 
     @pytest.mark.asyncio
+    async def test_recommend_dishes_ml_ranking(self, agent):
+        """测试机器学习排序推荐"""
+        recent_orders = [
+            {
+                "store_id": "STORE001",
+                "created_at": "2026-03-08T12:00:00",
+                "dishes": [
+                    {"dish_id": "D001", "dish_name": "宫保鸡丁", "price": 48.0, "quantity": 4},
+                    {"dish_id": "D002", "dish_name": "米饭", "price": 3.0, "quantity": 1},
+                ],
+            },
+            {
+                "store_id": "STORE001",
+                "created_at": "2026-03-07T18:00:00",
+                "dishes": [
+                    {"dish_id": "D001", "dish_name": "宫保鸡丁", "price": 48.0, "quantity": 2},
+                    {"dish_id": "D003", "dish_name": "鱼香肉丝", "price": 38.0, "quantity": 3},
+                ],
+            },
+        ]
+        result = await agent.recommend_dishes(
+            store_id="STORE001",
+            recent_orders=recent_orders,
+            party_size=8,
+            use_ml=True,
+        )
+        assert result["success"] is True
+        assert "机器学习排序" in result["message"]
+        assert result["recommendations"][0]["dish_id"] == "D001"
+        assert result["recommendations"][0]["ml_score"] is not None
+
+    @pytest.mark.asyncio
     async def test_modify_order_update_quantity_and_total(self, agent):
         """测试订单改数量后金额重算"""
         order = {

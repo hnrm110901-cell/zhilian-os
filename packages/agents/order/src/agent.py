@@ -617,6 +617,32 @@ class OrderAgent(BaseAgent):
         }
         return translations.get(dish_name, {}).get(locale, dish_name)
 
+    def _score_dish_ml(
+        self,
+        dish: Dict[str, Any],
+        now: datetime,
+        party_size: Optional[int],
+    ) -> float:
+        """
+        轻量 ML 风格打分（MVP）：
+        score = 频次权重 + 近期性权重 + 客群匹配权重
+        """
+        count = float(dish.get("count", 0))
+        latest_ts = dish.get("latest_order_ts")
+        recency_score = 0.0
+        if isinstance(latest_ts, datetime):
+            delta_days = max(0.0, (now - latest_ts).total_seconds() / 86400)
+            recency_score = 1.0 / (1.0 + delta_days)
+
+        party_fit = 0.0
+        if party_size:
+            if party_size >= 6 and float(dish.get("price", 0)) >= 40:
+                party_fit = 1.0
+            elif party_size <= 2 and float(dish.get("price", 0)) <= 30:
+                party_fit = 1.0
+
+        return round(count * 0.6 + recency_score * 0.3 + party_fit * 0.1, 6)
+
     async def recommend_dishes(
         self,
         store_id: str,
@@ -624,6 +650,7 @@ class OrderAgent(BaseAgent):
         customer_id: Optional[str] = None,
         party_size: Optional[int] = None,
         locale: str = "zh-CN",
+        use_ml: bool = False,
     ) -> Dict[str, Any]:
         """
         推荐菜品
@@ -637,19 +664,37 @@ class OrderAgent(BaseAgent):
             customer_id=customer_id,
             party_size=party_size,
             locale=locale,
+            use_ml=use_ml,
         )
 
         dish_counts: Dict[str, Dict[str, Any]] = {}
+        now = datetime.now()
         for order in (recent_orders or []):
             if order.get("store_id") == store_id:
+                created_at_raw = order.get("created_at")
+                created_at = None
+                if isinstance(created_at_raw, str):
+                    try:
+                        created_at = datetime.fromisoformat(created_at_raw)
+                    except ValueError:
+                        created_at = None
                 for dish in order.get("dishes", []):
                     did = dish["dish_id"]
                     if did not in dish_counts:
                         dish_counts[did] = {"dish_id": did, "dish_name": dish["dish_name"],
-                                            "price": dish["price"], "count": 0}
+                                            "price": dish["price"], "count": 0, "latest_order_ts": None}
                     dish_counts[did]["count"] += dish["quantity"]
+                    if created_at:
+                        prev = dish_counts[did].get("latest_order_ts")
+                        if not isinstance(prev, datetime) or created_at > prev:
+                            dish_counts[did]["latest_order_ts"] = created_at
 
-        sorted_dishes = sorted(dish_counts.values(), key=lambda d: d["count"], reverse=True)[:5]
+        if use_ml and dish_counts:
+            for d in dish_counts.values():
+                d["ml_score"] = self._score_dish_ml(d, now=now, party_size=party_size)
+            sorted_dishes = sorted(dish_counts.values(), key=lambda d: d["ml_score"], reverse=True)[:5]
+        else:
+            sorted_dishes = sorted(dish_counts.values(), key=lambda d: d["count"], reverse=True)[:5]
         if not sorted_dishes:
             sorted_dishes = [{"dish_id": "D001", "dish_name": "招牌菜", "price": 48.0, "count": 0}]
 
@@ -660,18 +705,31 @@ class OrderAgent(BaseAgent):
                 "dish_name_zh": d["dish_name"],
                 "price": d["price"],
                 "reason": (
-                    f"Hot seller, ordered {d['count']} times"
+                    (
+                        f"ML score {d.get('ml_score', 0):.2f}, ordered {d['count']} times"
+                        if locale == "en-US" and use_ml
+                        else f"Hot seller, ordered {d['count']} times"
+                    )
                     if locale == "en-US" and d["count"] > 0
-                    else ("Recommended by store" if locale == "en-US" else ("本店热销，已点 %s 次" % d["count"] if d["count"] > 0 else "本店推荐"))
+                    else (
+                        "Recommended by store"
+                        if locale == "en-US"
+                        else (
+                            (f"机器学习评分 {d.get('ml_score', 0):.2f}，本店热销，已点 {d['count']} 次" if use_ml else "本店热销，已点 %s 次" % d["count"])
+                            if d["count"] > 0
+                            else "本店推荐"
+                        )
+                    )
                 ),
                 "popularity_rank": i + 1,
+                "ml_score": d.get("ml_score") if use_ml else None,
             }
             for i, d in enumerate(sorted_dishes)
         ]
         message = (
-            f"Recommended {len(recommendations)} dishes for you"
+            (f"Recommended {len(recommendations)} dishes for you (ML ranking)" if use_ml else f"Recommended {len(recommendations)} dishes for you")
             if locale == "en-US"
-            else f"为您推荐{len(recommendations)}道菜品"
+            else (f"为您推荐{len(recommendations)}道菜品（机器学习排序）" if use_ml else f"为您推荐{len(recommendations)}道菜品")
         )
         return {"success": True, "recommendations": recommendations, "message": message, "locale": locale}
 
