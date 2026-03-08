@@ -1414,3 +1414,52 @@ class TestGetReportConsolidated:
         db = _mock_db()
         with pytest.raises(ValueError, match="YYYYMM"):
             await svc.get_report_consolidated(db, tenant_id="T1", period="2026-03")
+
+
+class TestGetReportByRegion:
+    """测试 by_region 报表（按区域聚合）"""
+
+    @staticmethod
+    def _row(region: str, income_fen: int, expense_fen: int):
+        row = MagicMock()
+        row.__getitem__ = lambda self, i: [region, income_fen, expense_fen][i]
+        return row
+
+    @pytest.mark.asyncio
+    async def test_multiple_regions(self):
+        db = _mock_db()
+        result_mock = MagicMock()
+        result_mock.fetchall.return_value = [
+            self._row("华东", 1_000_000, 700_000),
+            self._row("华南", 800_000, 500_000),
+        ]
+        db.execute = AsyncMock(return_value=result_mock)
+        svc = StandaloneFCTService()
+        result = await svc.get_report_by_region(db, tenant_id="T1")
+        assert result["report_type"] == "by_region"
+        assert len(result["data"]) == 2
+        assert result["data"][0]["region"] == "华东"
+        assert result["data"][1]["region"] == "华南"
+
+    @pytest.mark.asyncio
+    async def test_region_amount_fields(self):
+        db = _mock_db()
+        result_mock = MagicMock()
+        result_mock.fetchall.return_value = [self._row("华东", 500_000, 300_000)]
+        db.execute = AsyncMock(return_value=result_mock)
+        svc = StandaloneFCTService()
+        result = await svc.get_report_by_region(db, tenant_id="T1")
+        item = result["data"][0]
+        assert item["income_yuan"] == pytest.approx(5000.00, abs=0.01)
+        assert item["expense_yuan"] == pytest.approx(3000.00, abs=0.01)
+        assert item["net_yuan"] == pytest.approx(2000.00, abs=0.01)
+
+    @pytest.mark.asyncio
+    async def test_empty_returns_empty_list(self):
+        db = _mock_db()
+        result_mock = MagicMock()
+        result_mock.fetchall.return_value = []
+        db.execute = AsyncMock(return_value=result_mock)
+        svc = StandaloneFCTService()
+        result = await svc.get_report_by_region(db, tenant_id="T1")
+        assert result["data"] == []

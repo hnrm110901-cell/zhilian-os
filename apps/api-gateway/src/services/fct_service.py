@@ -25,13 +25,14 @@ from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 import structlog
-from sqlalchemy import and_, func, select, text
+from sqlalchemy import and_, case, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.models.finance import FinancialTransaction, Budget
 from src.models.reconciliation import ReconciliationRecord, ReconciliationStatus
 from src.models.fct import FCTTaxRecord, FCTCashFlowItem, TaxpayerType, Voucher, VoucherLine
+from src.models.store import Store
 
 logger = structlog.get_logger()
 
@@ -2265,7 +2266,52 @@ class StandaloneFCTService:
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
     ) -> Dict[str, Any]:
-        return {"report_type": "by_region", "tenant_id": tenant_id, "data": []}
+        filters = []
+        if start_date:
+            filters.append(FinancialTransaction.transaction_date >= start_date)
+        if end_date:
+            filters.append(FinancialTransaction.transaction_date <= end_date)
+
+        stmt = (
+            select(
+                func.coalesce(Store.region, "unknown").label("region"),
+                func.sum(
+                    case(
+                        (FinancialTransaction.transaction_type == "income", FinancialTransaction.amount),
+                        else_=0,
+                    )
+                ).label("income"),
+                func.sum(
+                    case(
+                        (FinancialTransaction.transaction_type == "expense", FinancialTransaction.amount),
+                        else_=0,
+                    )
+                ).label("expense"),
+            )
+            .select_from(FinancialTransaction)
+            .join(Store, Store.id == FinancialTransaction.store_id, isouter=True)
+            .where(and_(*filters) if filters else text("1=1"))
+            .group_by(func.coalesce(Store.region, "unknown"))
+            .order_by(func.coalesce(Store.region, "unknown"))
+        )
+        rows = (await session.execute(stmt)).fetchall()
+        data: List[Dict[str, Any]] = []
+        for row in rows:
+            income = int(row[1] or 0)
+            expense = int(row[2] or 0)
+            net = income - expense
+            data.append(
+                {
+                    "region": row[0],
+                    "income": income,
+                    "income_yuan": self._y(income),
+                    "expense": expense,
+                    "expense_yuan": self._y(expense),
+                    "net": net,
+                    "net_yuan": self._y(net),
+                }
+            )
+        return {"report_type": "by_region", "tenant_id": tenant_id, "data": data}
 
     async def get_report_comparison(
         self,
