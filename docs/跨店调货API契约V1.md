@@ -12,6 +12,7 @@
 - `pending`：已提交，待审批
 - `executed`：审批通过并已执行库存调拨
 - `rejected`：审批拒绝，不执行库存变更
+- `pending_approval`：创建接口兼容返回值，语义等同 `pending`（建议前端统一归一为 `pending`）
 
 状态流转：
 
@@ -62,7 +63,7 @@
 - `GET /api/v1/inventory/transfer-requests?store_id=&status=&limit=`
 - Query：
   - `store_id`（可选）：按来源或目标门店过滤
-  - `status`（可选）：`pending|executed|rejected`
+  - `status`（可选）：`pending|executed|rejected`（兼容 `pending_approval` 别名）
   - `limit`（可选）：默认 `50`
 
 - Response `200`：

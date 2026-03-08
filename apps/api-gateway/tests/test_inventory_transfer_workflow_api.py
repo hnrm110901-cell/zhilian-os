@@ -230,6 +230,44 @@ async def test_list_transfer_requests_accepts_pending_approval_alias():
 
 
 @pytest.mark.asyncio
+async def test_list_transfer_requests_returns_empty_for_unknown_status_filter():
+    row1 = SimpleNamespace(
+        id="dec-1",
+        store_id="S001",
+        ai_suggestion={"source_store_id": "S001", "target_store_id": "S002"},
+        decision_status=DecisionStatus.PENDING,
+        manager_feedback=None,
+        created_at=datetime(2026, 3, 8, 9, 0, 0),
+        approved_at=None,
+        executed_at=None,
+    )
+    row2 = SimpleNamespace(
+        id="dec-2",
+        store_id="S001",
+        ai_suggestion={"source_store_id": "S001", "target_store_id": "S003"},
+        decision_status=DecisionStatus.REJECTED,
+        manager_feedback="不通过",
+        created_at=datetime(2026, 3, 8, 10, 0, 0),
+        approved_at=datetime(2026, 3, 8, 10, 5, 0),
+        executed_at=None,
+    )
+
+    session = AsyncMock()
+    session.execute = AsyncMock(return_value=_ScalarsAllResult([row1, row2]))
+
+    out = await list_transfer_requests(
+        store_id="S001",
+        status="unknown_status",
+        limit=50,
+        session=session,
+        current_user=SimpleNamespace(id="u-1"),
+    )
+
+    assert out["total"] == 0
+    assert out["items"] == []
+
+
+@pytest.mark.asyncio
 async def test_approve_transfer_request_executes_stock_move_and_transactions():
     decision = SimpleNamespace(
         id="dec-1",

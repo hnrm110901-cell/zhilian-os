@@ -58,6 +58,7 @@
   - 多门店 anti-shadow 回归扩展：新增 `/list` 真实路由防吞用例 + 单段静态 GET 路由顺序断言
   - 调货状态契约收敛：前端 service 标准化 `pending_approval -> pending`，统一状态类型枚举
   - 调货状态契约续补：HTTP 层增加 `pending_approval` 筛选别名回归；前端 approve/reject 响应状态统一标准化
+  - 筛选边界补齐：无效状态筛选返回空列表；契约文档补充 `pending_approval` 别名语义
 
 ## P2
 - [x] 角色权限管理体验优化（页面入口可见性与无权限提示一致性）
@@ -125,6 +126,8 @@
   - `python3 -m pytest -q tests/test_multi_store_api_routes.py`（11 passed）
   - `pnpm --filter @zhilian-os/web exec eslint src/services/inventoryData.ts src/pages/MultiStoreManagement.tsx`（通过）
   - `python3 -m pytest -q tests/test_inventory_transfer_routes_http.py tests/test_inventory_transfer_workflow_api.py`（15 passed）
+  - `python3 -m pytest -q tests/test_inventory_transfer_workflow_api.py tests/test_inventory_transfer_routes_http.py`（16 passed）
+  - 文档校对：`docs/跨店调货API契约V1.md`（已补 `pending_approval` 别名说明）
   - `python3 -m pytest -q apps/api-gateway/tests/test_inventory_transfer_workflow_api.py apps/api-gateway/tests/test_multi_store_api_routes.py`（14 passed）
   - 文档校对：`docs/跨店调货API契约V1.md`（已添加接口、状态机、规则、错误语义）
   - `python3 -m pytest -q apps/api-gateway/tests/test_multi_store_api_routes.py`（9 passed，含动态路由顺序防吞断言）
