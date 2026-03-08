@@ -946,6 +946,67 @@ class TestApprovalVoucherSync:
         assert v.status == "approved"
 
 
+class TestPettyCashPlaceholders:
+    """测试备用金占位接口参数兼容与返回结构"""
+
+    @pytest.mark.asyncio
+    async def test_upsert_petty_cash_accepts_public_api_params(self):
+        svc = StandaloneFCTService()
+        db = _mock_db()
+        result = await svc.upsert_petty_cash(
+            db,
+            tenant_id="T1",
+            petty_cash_id="PC-001",
+            entity_id="S001",
+            cash_type="store",
+            amount_limit=5000,
+            currency="CNY",
+            owner="EMP001",
+            status="active",
+            extra={"note": "seed"},
+        )
+        assert result["success"] is True
+        assert result["petty_cash_id"] == "PC-001"
+        assert result["amount_limit"] == 5000.0
+        assert result["extra"]["note"] == "seed"
+
+    @pytest.mark.asyncio
+    async def test_add_petty_cash_record_accepts_public_api_params(self):
+        svc = StandaloneFCTService()
+        db = _mock_db()
+        result = await svc.add_petty_cash_record(
+            db,
+            petty_cash_id="PC-001",
+            record_type="expense",
+            amount=128.5,
+            biz_date=date(2026, 3, 8),
+            ref_type="manual",
+            ref_id="R-1",
+            description="snacks",
+        )
+        assert result["success"] is True
+        assert result["petty_cash_id"] == "PC-001"
+        assert result["biz_date"] == "2026-03-08"
+
+    @pytest.mark.asyncio
+    async def test_list_petty_cash_records_supports_petty_cash_id_and_dates(self):
+        svc = StandaloneFCTService()
+        db = _mock_db()
+        result = await svc.list_petty_cash_records(
+            db,
+            petty_cash_id="PC-001",
+            start_date=date(2026, 3, 1),
+            end_date=date(2026, 3, 31),
+            skip=5,
+            limit=20,
+        )
+        assert result["petty_cash_id"] == "PC-001"
+        assert result["start_date"] == "2026-03-01"
+        assert result["end_date"] == "2026-03-31"
+        assert result["skip"] == 5
+        assert result["limit"] == 20
+
+
 # ── get_report_trend ─────────────────────────────────────────────────────────
 
 class TestGetReportTrend:

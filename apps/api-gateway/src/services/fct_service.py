@@ -1834,9 +1834,30 @@ class StandaloneFCTService:
     # ── 备用金 ────────────────────────────────────────────────────────────────
 
     async def upsert_petty_cash(
-        self, session: AsyncSession, **kwargs
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        petty_cash_id: str,
+        entity_id: Optional[str] = None,
+        cash_type: str = "general",
+        amount_limit: float = 0,
+        currency: str = "CNY",
+        owner: Optional[str] = None,
+        status: str = "active",
+        extra: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        return {"success": True, **kwargs}
+        return {
+            "success": True,
+            "tenant_id": tenant_id,
+            "petty_cash_id": petty_cash_id,
+            "entity_id": entity_id,
+            "cash_type": cash_type,
+            "amount_limit": float(amount_limit),
+            "currency": currency,
+            "owner": owner,
+            "status": status,
+            "extra": extra or {},
+        }
 
     async def list_petty_cash(
         self,
@@ -1850,19 +1871,49 @@ class StandaloneFCTService:
         return {"items": [], "total": 0, "skip": skip, "limit": limit}
 
     async def add_petty_cash_record(
-        self, session: AsyncSession, **kwargs
+        self,
+        session: AsyncSession,
+        petty_cash_id: str,
+        record_type: str,
+        amount: float,
+        biz_date: Optional[date] = None,
+        ref_type: Optional[str] = None,
+        ref_id: Optional[str] = None,
+        description: Optional[str] = None,
     ) -> Dict[str, Any]:
-        return {"success": True, **kwargs}
+        return {
+            "success": True,
+            "petty_cash_id": petty_cash_id,
+            "record_type": record_type,
+            "amount": float(amount),
+            "biz_date": biz_date.isoformat() if isinstance(biz_date, date) else None,
+            "ref_type": ref_type,
+            "ref_id": ref_id,
+            "description": description,
+        }
 
     async def list_petty_cash_records(
         self,
         session: AsyncSession,
-        tenant_id: str,
+        petty_cash_id: Optional[str] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        tenant_id: Optional[str] = None,
         cash_id: Optional[str] = None,
         skip: int = 0,
         limit: int = 100,
     ) -> Dict[str, Any]:
-        return {"items": [], "total": 0, "skip": skip, "limit": limit}
+        normalized_cash_id = petty_cash_id or cash_id
+        return {
+            "items": [],
+            "total": 0,
+            "skip": skip,
+            "limit": limit,
+            "petty_cash_id": normalized_cash_id,
+            "tenant_id": tenant_id,
+            "start_date": start_date.isoformat() if isinstance(start_date, date) else None,
+            "end_date": end_date.isoformat() if isinstance(end_date, date) else None,
+        }
 
     # ── 审批流 ────────────────────────────────────────────────────────────────
 
