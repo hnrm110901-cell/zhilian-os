@@ -5,14 +5,21 @@ Employee Management API
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
-from datetime import date
+from datetime import date, datetime
+import json
+import uuid
 import structlog
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user, require_role
 from ..models.employee import Employee
+from ..models.schedule import Shift, Schedule
+from ..models.store import Store
+from ..models.task import Task, TaskStatus, TaskPriority
 from ..models.user import User, UserRole
 from ..repositories import EmployeeRepository
+from ..services.wechat_service import wechat_service
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
@@ -160,6 +167,17 @@ class EmployeePreferenceResponse(BaseModel):
     preferences: Dict[str, Any]
 
 
+class ShiftSwapRequestCreate(BaseModel):
+    shift_id: str
+    target_employee_id: str
+    reason: Optional[str] = None
+
+
+class ShiftSwapApprovalRequest(BaseModel):
+    approved: bool
+    comment: Optional[str] = None
+
+
 @router.post("/employees/{employee_id}/performance", status_code=201)
 async def record_performance(
     employee_id: str,
@@ -197,6 +215,206 @@ async def record_performance(
         "composite_score": composite,
         "notes": req.notes,
     }
+
+
+@router.post("/employees/{employee_id}/shift-swaps", status_code=201)
+async def create_shift_swap_request(
+    employee_id: str,
+    req: ShiftSwapRequestCreate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """创建换班申请（申请 -> 技能检查 -> 通知店长审批）"""
+    requester = await EmployeeRepository.get_by_id(session, employee_id)
+    if not requester or not requester.is_active:
+        raise HTTPException(status_code=404, detail="申请员工不存在或已停用")
+
+    target = await EmployeeRepository.get_by_id(session, req.target_employee_id)
+    if not target or not target.is_active:
+        raise HTTPException(status_code=404, detail="目标员工不存在或已停用")
+    if requester.store_id != target.store_id:
+        raise HTTPException(status_code=400, detail="仅支持同门店员工换班")
+
+    try:
+        shift_uuid = uuid.UUID(req.shift_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="shift_id 格式错误") from exc
+
+    shift = await session.get(Shift, shift_uuid)
+    if not shift:
+        raise HTTPException(status_code=404, detail="班次不存在")
+    if shift.employee_id != employee_id:
+        raise HTTPException(status_code=400, detail="仅可申请自己的班次换班")
+
+    schedule = await session.get(Schedule, shift.schedule_id)
+    if not schedule or schedule.store_id != requester.store_id:
+        raise HTTPException(status_code=400, detail="班次与门店不匹配")
+
+    if shift.position and shift.position not in (target.skills or []):
+        raise HTTPException(
+            status_code=400,
+            detail=f"目标员工技能不匹配，缺少岗位技能: {shift.position}",
+        )
+
+    store = await session.get(Store, requester.store_id)
+    if not store or not store.manager_id:
+        raise HTTPException(status_code=400, detail="门店未配置店长，无法发起审批")
+
+    payload = {
+        "shift_id": str(shift.id),
+        "schedule_id": str(schedule.id),
+        "schedule_date": schedule.schedule_date.isoformat() if schedule.schedule_date else None,
+        "from_employee_id": employee_id,
+        "to_employee_id": req.target_employee_id,
+        "position": shift.position,
+        "reason": req.reason,
+    }
+
+    task = Task(
+        title=f"换班申请: {requester.name} -> {target.name}",
+        content=json.dumps(payload, ensure_ascii=False),
+        category="shift_swap",
+        status=TaskStatus.PENDING,
+        priority=TaskPriority.NORMAL,
+        store_id=requester.store_id,
+        creator_id=current_user.id,
+        assignee_id=store.manager_id,
+    )
+    session.add(task)
+    await session.commit()
+    await session.refresh(task)
+
+    message = (
+        f"【换班审批】\n"
+        f"门店: {requester.store_id}\n"
+        f"申请人: {requester.name}({employee_id})\n"
+        f"目标员工: {target.name}({req.target_employee_id})\n"
+        f"班次日期: {payload['schedule_date']}\n"
+        f"岗位: {shift.position or '-'}\n"
+        f"原因: {req.reason or '-'}\n"
+        f"申请单号: {task.id}"
+    )
+    try:
+        await wechat_service.send_text_message(content=message, touser=str(store.manager_id))
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("shift_swap_notify_manager_failed", task_id=str(task.id), error=str(exc))
+
+    return {"request_id": str(task.id), "status": task.status, "store_id": requester.store_id}
+
+
+@router.post("/shift-swaps/{request_id}/approve")
+async def approve_shift_swap_request(
+    request_id: str,
+    req: ShiftSwapApprovalRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.STORE_MANAGER)),
+):
+    """店长审批换班申请（通过后重排班次并通知双方）"""
+    try:
+        req_uuid = uuid.UUID(request_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="request_id 格式错误") from exc
+
+    task = await session.get(Task, req_uuid)
+    if not task or task.category != "shift_swap":
+        raise HTTPException(status_code=404, detail="换班申请不存在")
+    if task.status != TaskStatus.PENDING:
+        raise HTTPException(status_code=400, detail="该换班申请已处理")
+
+    store = await session.get(Store, task.store_id)
+    if store and store.manager_id and current_user.id != store.manager_id:
+        raise HTTPException(status_code=403, detail="仅店长可审批本门店换班")
+
+    try:
+        payload = json.loads(task.content or "{}")
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=500, detail="换班申请数据损坏") from exc
+
+    try:
+        shift_uuid = uuid.UUID(str(payload.get("shift_id", "")))
+    except ValueError as exc:
+        raise HTTPException(status_code=500, detail="换班申请班次ID损坏") from exc
+
+    shift = await session.get(Shift, shift_uuid)
+    if not shift:
+        raise HTTPException(status_code=404, detail="申请对应班次不存在")
+
+    from_employee_id = payload.get("from_employee_id")
+    to_employee_id = payload.get("to_employee_id")
+    if not from_employee_id or not to_employee_id:
+        raise HTTPException(status_code=500, detail="换班申请员工信息缺失")
+
+    if req.approved:
+        shift.employee_id = to_employee_id
+        task.status = TaskStatus.COMPLETED
+        task.result = req.comment or "approved"
+    else:
+        task.status = TaskStatus.CANCELLED
+        task.result = req.comment or "rejected"
+
+    payload["approved"] = req.approved
+    payload["approved_by"] = str(current_user.id)
+    payload["approval_comment"] = req.comment
+    task.content = json.dumps(payload, ensure_ascii=False)
+    task.completed_at = datetime.utcnow()
+
+    await session.commit()
+    await session.refresh(task)
+
+    decision = "通过" if req.approved else "驳回"
+    notify_message = (
+        f"【换班审批结果】\n"
+        f"申请单号: {task.id}\n"
+        f"审批结果: {decision}\n"
+        f"备注: {req.comment or '-'}"
+    )
+    try:
+        await wechat_service.send_text_message(content=notify_message, touser=str(from_employee_id))
+        await wechat_service.send_text_message(content=notify_message, touser=str(to_employee_id))
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("shift_swap_notify_employee_failed", task_id=str(task.id), error=str(exc))
+
+    return {"request_id": str(task.id), "status": task.status, "approved": req.approved}
+
+
+@router.get("/shift-swaps")
+async def list_shift_swap_requests(
+    store_id: str = Query(..., description="门店ID"),
+    status: Optional[str] = Query(None, description="审批状态 pending/completed/cancelled"),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """查询门店换班申请列表"""
+    stmt = select(Task).where(
+        Task.category == "shift_swap",
+        Task.store_id == store_id,
+    )
+    if status:
+        stmt = stmt.where(Task.status == status)
+
+    result = await session.execute(stmt.order_by(Task.created_at.desc()))
+    tasks = result.scalars().all()
+
+    records = []
+    for item in tasks:
+        try:
+            content = json.loads(item.content or "{}")
+        except json.JSONDecodeError:
+            content = {}
+        records.append(
+            {
+                "request_id": str(item.id),
+                "title": item.title,
+                "status": item.status,
+                "store_id": item.store_id,
+                "created_at": item.created_at.isoformat() if item.created_at else None,
+                "completed_at": item.completed_at.isoformat() if item.completed_at else None,
+                "content": content,
+                "result": item.result,
+            }
+        )
+
+    return {"store_id": store_id, "total": len(records), "items": records}
 
 
 @router.get("/employees/performance/leaderboard")
