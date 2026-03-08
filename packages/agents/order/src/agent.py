@@ -103,7 +103,7 @@ class OrderAgent(BaseAgent):
     def get_supported_actions(self) -> List[str]:
         return [
             "create_reservation", "join_queue", "get_queue_status",
-            "create_order", "add_dish", "calculate_dynamic_price", "recommend_dishes",
+            "create_order", "add_dish", "calculate_dynamic_price", "recommend_dishes", "personalize_dining_suggestions",
             "calculate_bill", "process_payment", "get_order",
             "modify_order", "merge_table_orders", "update_order_status", "cancel_order",
         ]
@@ -170,6 +170,8 @@ class OrderAgent(BaseAgent):
                 result = await self.calculate_dynamic_price(**params)
             elif action == "recommend_dishes":
                 result = await self.recommend_dishes(**params)
+            elif action == "personalize_dining_suggestions":
+                result = await self.personalize_dining_suggestions(**params)
             elif action == "calculate_bill":
                 result = await self.calculate_bill(**params)
             elif action == "process_payment":
@@ -732,6 +734,78 @@ class OrderAgent(BaseAgent):
             else (f"为您推荐{len(recommendations)}道菜品（机器学习排序）" if use_ml else f"为您推荐{len(recommendations)}道菜品")
         )
         return {"success": True, "recommendations": recommendations, "message": message, "locale": locale}
+
+    async def personalize_dining_suggestions(
+        self,
+        store_id: str,
+        customer_profile: Dict[str, Any],
+        candidate_dishes: List[Dict[str, Any]],
+        locale: str = "zh-CN",
+    ) -> Dict[str, Any]:
+        """
+        个性化用餐建议：
+        - 偏好标签匹配（taste_tags）
+        - 预算匹配（budget_per_person）
+        - 忌口过滤（avoid_ingredients）
+        - 场景加权（scenario: business/family/date）
+        """
+        prefer_tags = set(customer_profile.get("taste_preferences", []))
+        avoid_ingredients = set(customer_profile.get("avoid_ingredients", []))
+        budget = float(customer_profile.get("budget_per_person", 0) or 0)
+        scenario = str(customer_profile.get("scenario", "normal"))
+
+        scored: List[Dict[str, Any]] = []
+        for dish in candidate_dishes:
+            ingredients = set(dish.get("ingredients", []))
+            if avoid_ingredients.intersection(ingredients):
+                continue
+
+            score = 0.0
+            reasons: List[str] = []
+
+            dish_tags = set(dish.get("taste_tags", []))
+            tag_hits = len(prefer_tags.intersection(dish_tags))
+            if tag_hits > 0:
+                score += tag_hits * 0.5
+                reasons.append(f"口味匹配{tag_hits}项")
+
+            price = float(dish.get("price", 0))
+            if budget > 0:
+                if price <= budget:
+                    score += 0.4
+                    reasons.append("符合预算")
+                else:
+                    score -= 0.2
+                    reasons.append("略超预算")
+
+            if scenario == "business" and dish.get("premium", False):
+                score += 0.3
+                reasons.append("商务场景加权")
+            elif scenario == "family" and dish.get("shareable", False):
+                score += 0.3
+                reasons.append("家庭分享场景加权")
+            elif scenario == "date" and dish.get("light", False):
+                score += 0.3
+                reasons.append("约会轻食场景加权")
+
+            scored.append(
+                {
+                    **dish,
+                    "personalization_score": round(score, 4),
+                    "personalization_reason": "；".join(reasons) if locale != "en-US" else "; ".join(reasons),
+                }
+            )
+
+        scored.sort(key=lambda x: x.get("personalization_score", 0), reverse=True)
+        top = scored[:5]
+        message = "已生成个性化用餐建议" if locale != "en-US" else "Personalized dining suggestions generated"
+        return {
+            "success": True,
+            "store_id": store_id,
+            "recommendations": top,
+            "message": message,
+            "locale": locale,
+        }
 
     # ==================== 结账管理 ====================
 

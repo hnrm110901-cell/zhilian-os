@@ -302,6 +302,43 @@ class TestOrdering:
         assert result["recommendations"][0]["ml_score"] is not None
 
     @pytest.mark.asyncio
+    async def test_personalize_dining_suggestions(self, agent):
+        """测试个性化用餐建议"""
+        customer_profile = {
+            "taste_preferences": ["spicy", "savory"],
+            "avoid_ingredients": ["peanut"],
+            "budget_per_person": 50,
+            "scenario": "business",
+        }
+        candidate_dishes = [
+            {
+                "dish_id": "D001",
+                "dish_name": "宫保鸡丁",
+                "price": 48,
+                "taste_tags": ["spicy", "savory"],
+                "ingredients": ["chicken", "chili"],
+                "premium": True,
+            },
+            {
+                "dish_id": "D002",
+                "dish_name": "花生小炒",
+                "price": 32,
+                "taste_tags": ["savory"],
+                "ingredients": ["peanut", "pork"],
+                "premium": False,
+            },
+        ]
+        result = await agent.personalize_dining_suggestions(
+            store_id="STORE001",
+            customer_profile=customer_profile,
+            candidate_dishes=candidate_dishes,
+        )
+        assert result["success"] is True
+        assert len(result["recommendations"]) == 1
+        assert result["recommendations"][0]["dish_id"] == "D001"
+        assert result["recommendations"][0]["personalization_score"] > 0
+
+    @pytest.mark.asyncio
     async def test_modify_order_update_quantity_and_total(self, agent):
         """测试订单改数量后金额重算"""
         order = {
