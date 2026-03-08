@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import math
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 import structlog
 from sqlalchemy import text
@@ -270,8 +270,39 @@ class LaborDemandService:
             hist_avg_int = round(hist_avg)
 
             holiday_weight, holiday_label = _get_holiday_info(forecast_date)
-            predicted = max(1, round(hist_avg * holiday_weight * weather_score))
-            confidence = 0.65 if history_days < 28 else 0.72
+            predicted_base = hist_avg * holiday_weight * weather_score
+
+            recent_result = await db.execute(
+                text("""
+                    SELECT DATE(created_at) AS d, COUNT(DISTINCT id) AS c
+                    FROM orders
+                    WHERE store_id = :sid
+                      AND created_at >= :start
+                      AND created_at < :end
+                      AND EXTRACT(HOUR FROM created_at) >= :ph_start
+                      AND EXTRACT(HOUR FROM created_at) <  :ph_end
+                    GROUP BY DATE(created_at)
+                    ORDER BY d DESC
+                    LIMIT 14
+                """),
+                {
+                    "sid": store_id,
+                    "start": forecast_date - timedelta(days=14),
+                    "end": forecast_date,
+                    "ph_start": period_start_h,
+                    "ph_end": period_end_h,
+                },
+            )
+            recent_rows = recent_result.fetchall()
+            recent_series = [int(r.c) for r in recent_rows]
+            recent7 = recent_series[:7]
+            prev7 = recent_series[7:14]
+            momentum = compute_momentum_factor(recent7, prev7)
+            volatility_penalty = compute_volatility_penalty(recent_series)
+            adjusted = apply_micro_event_adjustment(predicted_base, momentum, volatility_penalty)
+
+            predicted = max(1, round(adjusted))
+            confidence = 0.68 if history_days < 28 else 0.75
 
             weekday_cn = _weekday_cn(dow)
             reason_1 = (
@@ -285,7 +316,8 @@ class LaborDemandService:
             )
             reason_3 = (
                 f"节假日权重 {holiday_weight:.2f}（{holiday_label}），"
-                f"天气系数 {weather_score:.2f}，最终预测 {predicted} 人"
+                f"天气系数 {weather_score:.2f}，短期动量×{momentum:.2f}，"
+                f"波动惩罚×{volatility_penalty:.2f}，最终预测 {predicted} 人"
             )
 
             return _build_result(
@@ -397,8 +429,39 @@ class LaborDemandService:
                 blended = hist_avg * 0.70 + monthly_avg * 0.30
 
             holiday_weight, holiday_label = _get_holiday_info(forecast_date)
-            predicted = max(1, round(blended * holiday_weight * weather_score))
-            confidence = 0.82
+            predicted_base = blended * holiday_weight * weather_score
+
+            recent_result = await db.execute(
+                text("""
+                    SELECT DATE(created_at) AS d, COUNT(DISTINCT id) AS c
+                    FROM orders
+                    WHERE store_id = :sid
+                      AND created_at >= :start
+                      AND created_at < :end
+                      AND EXTRACT(HOUR FROM created_at) >= :ph_start
+                      AND EXTRACT(HOUR FROM created_at) <  :ph_end
+                    GROUP BY DATE(created_at)
+                    ORDER BY d DESC
+                    LIMIT 14
+                """),
+                {
+                    "sid": store_id,
+                    "start": forecast_date - timedelta(days=14),
+                    "end": forecast_date,
+                    "ph_start": period_start_h,
+                    "ph_end": period_end_h,
+                },
+            )
+            recent_rows = recent_result.fetchall()
+            recent_series = [int(r.c) for r in recent_rows]
+            recent7 = recent_series[:7]
+            prev7 = recent_series[7:14]
+            momentum = compute_momentum_factor(recent7, prev7)
+            volatility_penalty = compute_volatility_penalty(recent_series)
+            adjusted = apply_micro_event_adjustment(predicted_base, momentum, volatility_penalty)
+
+            predicted = max(1, round(adjusted))
+            confidence = 0.85
 
             weekday_cn = _weekday_cn(dow)
             hist_avg_int = round(hist_avg)
@@ -412,14 +475,15 @@ class LaborDemandService:
             )
             reason_3 = (
                 f"节假日权重 {holiday_weight:.2f}（{holiday_label}），"
-                f"天气系数 {weather_score:.2f}，最终预测 {predicted} 人"
+                f"天气系数 {weather_score:.2f}，短期动量×{momentum:.2f}，"
+                f"波动惩罚×{volatility_penalty:.2f}，最终预测 {predicted} 人"
             )
 
             return _build_result(
                 store_id, forecast_date, meal_period,
                 predicted, confidence, weather_score, holiday_weight, hist_avg_int,
                 reason_1, reason_2, reason_3,
-                basis="weighted", model_version="v1.0-weighted",
+                basis="weighted", model_version="v1.1-weighted-micro",
             )
 
         except Exception as exc:
@@ -592,6 +656,48 @@ def get_holiday_weight(target_date: date) -> tuple:
     未命中节假日表时：周末 1.10，工作日 1.00。
     """
     return _get_holiday_info(target_date)
+
+
+def compute_momentum_factor(recent_counts: List[int], previous_counts: List[int]) -> float:
+    """
+    计算短期动量因子，限制在 [0.85, 1.15] 之间。
+    recent 均值高于 previous 均值 -> >1.0，反之 <1.0。
+    """
+    if not recent_counts or not previous_counts:
+        return 1.0
+
+    recent_avg = sum(recent_counts) / len(recent_counts)
+    prev_avg = sum(previous_counts) / len(previous_counts)
+    if prev_avg <= 0:
+        return 1.0
+
+    raw = recent_avg / prev_avg
+    return round(max(0.85, min(1.15, raw)), 3)
+
+
+def compute_volatility_penalty(counts: List[int]) -> float:
+    """
+    基于样本波动率生成惩罚因子，范围 [0.90, 1.00]。
+    波动越大，惩罚越强，避免过拟合尖峰。
+    """
+    if len(counts) < 4:
+        return 1.0
+
+    avg = sum(counts) / len(counts)
+    if avg <= 0:
+        return 1.0
+
+    variance = sum((c - avg) ** 2 for c in counts) / len(counts)
+    std = math.sqrt(variance)
+    cv = std / avg  # 变异系数
+    penalty = 1.0 - min(0.10, cv * 0.12)
+    return round(max(0.90, min(1.00, penalty)), 3)
+
+
+def apply_micro_event_adjustment(base_prediction: float, momentum_factor: float, volatility_penalty: float) -> float:
+    """应用微事件修正。"""
+    adjusted = float(base_prediction) * float(momentum_factor) * float(volatility_penalty)
+    return max(1.0, adjusted)
 
 
 # ─── 私有工具函数 ──────────────────────────────────────────────────────────────

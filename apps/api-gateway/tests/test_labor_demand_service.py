@@ -13,7 +13,10 @@ from src.services.labor_demand_service import (
     _period_hours,
     _pg_dow,
     _weekday_cn,
+    apply_micro_event_adjustment,
+    compute_momentum_factor,
     compute_position_requirements,
+    compute_volatility_penalty,
     get_holiday_weight,
 )
 
@@ -97,6 +100,29 @@ class TestPureFunctions:
         assert result["confidence_score"] == 0.723
         assert result["basis"] == "statistical"
         assert result["total_headcount_needed"] == sum(result["position_requirements"].values())
+
+    def test_compute_momentum_factor_normal(self):
+        factor = compute_momentum_factor([110, 120, 100], [100, 100, 100])
+        assert factor == 1.1
+
+    def test_compute_momentum_factor_clamped(self):
+        factor_high = compute_momentum_factor([300, 300, 300], [100, 100, 100])
+        factor_low = compute_momentum_factor([10, 10, 10], [100, 100, 100])
+        assert factor_high == 1.15
+        assert factor_low == 0.85
+
+    def test_compute_momentum_factor_empty(self):
+        assert compute_momentum_factor([], [1, 2, 3]) == 1.0
+
+    def test_compute_volatility_penalty(self):
+        low_vol = compute_volatility_penalty([100, 101, 99, 100, 100])
+        high_vol = compute_volatility_penalty([20, 200, 30, 180, 25, 170])
+        assert low_vol >= high_vol
+        assert 0.9 <= high_vol <= 1.0
+
+    def test_apply_micro_event_adjustment(self):
+        adjusted = apply_micro_event_adjustment(100, 1.1, 0.95)
+        assert adjusted == pytest.approx(104.5)
 
 
 class TestServiceRouting:
@@ -247,4 +273,3 @@ class TestInternalDbPaths:
         with pytest.raises(RuntimeError, match="insert failed"):
             await LaborDemandService._upsert_forecast(payload, db)
         db.rollback.assert_awaited_once()
-
