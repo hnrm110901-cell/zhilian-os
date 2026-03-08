@@ -189,7 +189,7 @@ def test_reject_transfer_request_route_marks_rejected():
     assert data["status"] == "rejected"
 
 
-def test_transfer_static_routes_declared_before_inventory_dynamic_item_route():
+def test_inventory_single_segment_static_get_routes_precede_dynamic_item_route():
     get_paths = []
     for route in router.routes:
         methods = getattr(route, "methods", set()) or set()
@@ -199,5 +199,18 @@ def test_transfer_static_routes_declared_before_inventory_dynamic_item_route():
 
     assert "/inventory/{item_id}" in get_paths
     dynamic_index = get_paths.index("/inventory/{item_id}")
-    assert "/inventory/transfer-requests" in get_paths
-    assert get_paths.index("/inventory/transfer-requests") < dynamic_index
+
+    single_segment_static_paths = []
+    for path in get_paths:
+        if not path.startswith("/inventory/"):
+            continue
+        suffix = path[len("/inventory/") :]
+        if "{" in suffix:
+            continue
+        if "/" in suffix:
+            continue
+        single_segment_static_paths.append(path)
+
+    assert "/inventory/transfer-requests" in single_segment_static_paths
+    for static_path in single_segment_static_paths:
+        assert get_paths.index(static_path) < dynamic_index
