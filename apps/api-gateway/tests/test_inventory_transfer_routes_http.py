@@ -110,6 +110,40 @@ def test_create_transfer_request_route_returns_pending():
     assert data["transfer"]["target_store_id"] == "S002"
 
 
+def test_create_transfer_request_rejects_non_positive_quantity():
+    session = _FakeSession([])
+    client = _build_client(session)
+
+    response = client.post(
+        "/api/v1/inventory/transfer-request?store_id=S001",
+        json={
+            "source_item_id": "inv-src-1",
+            "target_store_id": "S002",
+            "quantity": 0,
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "调货数量必须大于0"
+
+
+def test_create_transfer_request_rejects_same_source_and_target_store():
+    session = _FakeSession([])
+    client = _build_client(session)
+
+    response = client.post(
+        "/api/v1/inventory/transfer-request?store_id=S001",
+        json={
+            "source_item_id": "inv-src-1",
+            "target_store_id": "S001",
+            "quantity": 2,
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "目标门店不能与来源门店相同"
+
+
 def test_list_transfer_requests_route_filters_status():
     row1 = SimpleNamespace(
         id="dec-1",
@@ -187,6 +221,24 @@ def test_reject_transfer_request_route_marks_rejected():
     data = response.json()
     assert data["success"] is True
     assert data["status"] == "rejected"
+
+
+def test_approve_transfer_request_route_rejects_non_pending_decision():
+    decision = SimpleNamespace(
+        id="dec-1",
+        decision_status=DecisionStatus.REJECTED,
+        ai_suggestion={"source_item_id": "inv-src-1", "target_item_id": "inv-tgt-1", "quantity": 8},
+        approval_chain=[],
+    )
+    session = _FakeSession([_ScalarOneResult(decision)])
+    client = _build_client(session)
+
+    response = client.post(
+        "/api/v1/inventory/transfer-requests/dec-1/approve",
+        json={"manager_feedback": "同意"},
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"] == "仅待审批的调货申请可批准"
 
 
 def test_inventory_single_segment_static_get_routes_precede_dynamic_item_route():

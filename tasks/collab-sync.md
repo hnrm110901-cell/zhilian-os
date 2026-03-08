@@ -52,6 +52,7 @@
   - HTTP 回归补齐：新增 `TestClient` 路由级用例（创建/列表/批准/驳回）
   - 路由顺序修复：`/inventory/{item_id}` 后置，避免吞掉 `/inventory/transfer-requests`
   - 路由回归增强：单段静态 GET 路由统一断言需声明在 `/inventory/{item_id}` 之前，防后续新增静态路径被动态路由吞掉
+  - 输入/状态回归补齐：新增同店调货拦截、非正数量拦截、非 pending 申请禁止批准用例
 
 ## P2
 - [x] 角色权限管理体验优化（页面入口可见性与无权限提示一致性）
@@ -112,6 +113,7 @@
   - `python3 -m pytest -q apps/api-gateway/tests/test_inventory_transfer_routes_http.py`（4 passed）
   - `python3 -m pytest -q apps/api-gateway/tests/test_inventory_transfer_routes_http.py`（5 passed，新增静态路由声明顺序断言）
   - `python3 -m pytest -q tests/test_inventory_transfer_routes_http.py`（5 passed，通用单段静态 GET 防吞断言）
+  - `python3 -m pytest -q tests/test_inventory_transfer_routes_http.py`（8 passed，新增输入与审批状态校验回归）
   - `python3 -m pytest -q apps/api-gateway/tests/test_inventory_transfer_workflow_api.py apps/api-gateway/tests/test_multi_store_api_routes.py`（14 passed）
   - 文档校对：`docs/跨店调货API契约V1.md`（已添加接口、状态机、规则、错误语义）
   - `python3 -m pytest -q apps/api-gateway/tests/test_multi_store_api_routes.py`（9 passed，含动态路由顺序防吞断言）
