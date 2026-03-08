@@ -289,6 +289,106 @@ class TestEdgeCases:
         assert result["date"] == future_date
 
 
+class TestAdjustSchedule:
+    """排班调整测试"""
+
+    @pytest.mark.asyncio
+    async def test_adjust_schedule_leave_remove_only(self, agent):
+        schedule = {
+            "schedule": [
+                {
+                    "employee_id": "E001",
+                    "employee_name": "张三",
+                    "skill": "waiter",
+                    "shift": "morning",
+                    "date": "2024-01-15",
+                    "start_time": "06:00",
+                    "end_time": "14:00",
+                },
+                {
+                    "employee_id": "E002",
+                    "employee_name": "李四",
+                    "skill": "chef",
+                    "shift": "morning",
+                    "date": "2024-01-15",
+                    "start_time": "06:00",
+                    "end_time": "14:00",
+                },
+            ]
+        }
+        result = await agent.adjust_schedule(
+            schedule_id="SCH001",
+            schedule=schedule,
+            adjustments=[{"action": "leave", "employee_id": "E001"}],
+        )
+        assert result["success"] is True
+        assert all(s["employee_id"] != "E001" for s in result["updated_schedule"])
+        assert any("请假" in msg for msg in result["applied_adjustments"])
+
+    @pytest.mark.asyncio
+    async def test_adjust_schedule_leave_with_replacement(self, agent):
+        schedule = {
+            "schedule": [
+                {
+                    "employee_id": "E001",
+                    "employee_name": "张三",
+                    "skill": "waiter",
+                    "shift": "evening",
+                    "date": "2024-01-15",
+                    "start_time": "18:00",
+                    "end_time": "02:00",
+                }
+            ]
+        }
+        result = await agent.adjust_schedule(
+            schedule_id="SCH002",
+            schedule=schedule,
+            adjustments=[
+                {
+                    "action": "leave",
+                    "employee_id": "E001",
+                    "replacement_employee_id": "E009",
+                    "replacement_employee_name": "替补员",
+                    "replacement_skills": ["waiter", "cashier"],
+                }
+            ],
+        )
+        assert result["success"] is True
+        assert any(s["employee_id"] == "E009" for s in result["updated_schedule"])
+        assert any("顶班" in msg for msg in result["applied_adjustments"])
+
+    @pytest.mark.asyncio
+    async def test_adjust_schedule_leave_replacement_skill_mismatch(self, agent):
+        schedule = {
+            "schedule": [
+                {
+                    "employee_id": "E001",
+                    "employee_name": "张三",
+                    "skill": "chef",
+                    "shift": "afternoon",
+                    "date": "2024-01-15",
+                    "start_time": "14:00",
+                    "end_time": "22:00",
+                }
+            ]
+        }
+        result = await agent.adjust_schedule(
+            schedule_id="SCH003",
+            schedule=schedule,
+            adjustments=[
+                {
+                    "action": "leave",
+                    "employee_id": "E001",
+                    "replacement_employee_id": "E010",
+                    "replacement_skills": ["waiter"],
+                }
+            ],
+        )
+        assert result["success"] is True
+        assert all(s["employee_id"] != "E010" for s in result["updated_schedule"])
+        assert any("技能不匹配" in msg for msg in result["applied_adjustments"])
+
+
 class TestEnums:
     """枚举类型测试"""
 

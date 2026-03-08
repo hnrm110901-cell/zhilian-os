@@ -350,7 +350,7 @@ class ScheduleAgent(BaseAgent):
         Args:
             schedule_id: 排班ID
             schedule: 当前排班数据（由调用方从DB查询后传入）
-            adjustments: 调整列表，支持 action: swap/add/remove/change_shift
+            adjustments: 调整列表，支持 action: swap/add/remove/change_shift/leave
         """
         logger.info("调整排班", schedule_id=schedule_id, adjustments=adjustments)
 
@@ -379,6 +379,40 @@ class ScheduleAgent(BaseAgent):
                         s["start_time"] = self._get_shift_start_time(new_shift)
                         s["end_time"] = self._get_shift_end_time(new_shift)
                 applied.append(f"调整员工 {emp_id} 班次为 {new_shift}")
+
+            elif action == "leave" and emp_id:
+                # 员工请假：移除原排班，可选自动补位
+                leave_entries = [s for s in entries if s["employee_id"] == emp_id]
+                if not leave_entries:
+                    applied.append(f"请假失败：员工 {emp_id} 不在排班中")
+                    continue
+
+                entries = [s for s in entries if s["employee_id"] != emp_id]
+                applied.append(f"员工 {emp_id} 请假，移除 {len(leave_entries)} 个班次")
+
+                replacement_id = adj.get("replacement_employee_id")
+                if replacement_id:
+                    replacement_name = adj.get("replacement_employee_name", replacement_id)
+                    replacement_skills = set(adj.get("replacement_skills", []))
+                    replaced_count = 0
+                    for leave_entry in leave_entries:
+                        needed_skill = leave_entry.get("skill")
+                        if replacement_skills and needed_skill not in replacement_skills:
+                            continue
+                        entries.append({
+                            "employee_id": replacement_id,
+                            "employee_name": replacement_name,
+                            "skill": needed_skill,
+                            "shift": leave_entry.get("shift"),
+                            "date": leave_entry.get("date"),
+                            "start_time": leave_entry.get("start_time"),
+                            "end_time": leave_entry.get("end_time"),
+                        })
+                        replaced_count += 1
+                    if replaced_count > 0:
+                        applied.append(f"替补员工 {replacement_id} 顶班 {replaced_count} 个班次")
+                    else:
+                        applied.append(f"替补员工 {replacement_id} 技能不匹配，未成功顶班")
 
             elif action == "swap":
                 # 互换两名员工的班次
@@ -441,4 +475,3 @@ class ScheduleAgent(BaseAgent):
             "schedules": matched,
             "total": len(matched),
         }
-
