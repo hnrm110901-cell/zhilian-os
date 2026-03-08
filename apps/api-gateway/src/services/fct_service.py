@@ -1725,24 +1725,41 @@ class StandaloneFCTService:
         session: AsyncSession,
         tenant_id: str,
         entity_id: Optional[str] = None,
+        budget_type: Optional[str] = None,
         skip: int = 0,
         limit: int = 100,
     ) -> Dict[str, Any]:
-        return {"items": [], "total": 0, "skip": skip, "limit": limit}
+        return {
+            "items": [],
+            "total": 0,
+            "skip": skip,
+            "limit": limit,
+            "tenant_id": tenant_id,
+            "entity_id": entity_id,
+            "budget_type": budget_type,
+        }
 
     async def check_budget(
         self,
         session: AsyncSession,
         tenant_id: str,
-        entity_id: str,
-        account_code: str,
-        amount: float,
+        entity_id: str = "",
+        account_code: Optional[str] = None,
+        amount: Optional[float] = None,
+        budget_type: Optional[str] = None,
+        category: Optional[str] = None,
+        amount_to_use: Optional[float] = None,
         period: Optional[str] = None,
     ) -> Dict[str, Any]:
+        normalized_account = account_code or category or ""
+        requested_amount = float(amount_to_use if amount_to_use is not None else (amount or 0))
         return {
             "tenant_id": tenant_id,
-            "account_code": account_code,
-            "requested": amount,
+            "entity_id": entity_id,
+            "budget_type": budget_type or "period",
+            "account_code": normalized_account,
+            "category": category or normalized_account,
+            "requested": requested_amount,
             "available": None,
             "within_budget": True,
             "note": "预算控制模型待上线",
@@ -1752,13 +1769,26 @@ class StandaloneFCTService:
         self,
         session: AsyncSession,
         tenant_id: str,
-        entity_id: str,
-        account_code: str,
-        amount: float,
+        entity_id: str = "",
+        account_code: Optional[str] = None,
+        amount: float = 0,
+        budget_type: Optional[str] = None,
+        category: Optional[str] = None,
         ref_id: Optional[str] = None,
         period: Optional[str] = None,
     ) -> Dict[str, Any]:
-        return {"success": True, "occupied": amount, "ref_id": ref_id}
+        normalized_account = account_code or category or ""
+        return {
+            "success": True,
+            "tenant_id": tenant_id,
+            "entity_id": entity_id,
+            "budget_type": budget_type or "period",
+            "account_code": normalized_account,
+            "category": category or normalized_account,
+            "period": period,
+            "occupied": float(amount),
+            "ref_id": ref_id,
+        }
 
     # ── 年度计划 ──────────────────────────────────────────────────────────────
 

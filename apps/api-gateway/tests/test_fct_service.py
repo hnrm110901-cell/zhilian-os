@@ -1007,6 +1007,65 @@ class TestPettyCashPlaceholders:
         assert result["limit"] == 20
 
 
+class TestBudgetPlaceholderCompatibility:
+    """测试预算占位接口参数兼容（public API 与 legacy 参数）"""
+
+    @pytest.mark.asyncio
+    async def test_check_budget_accepts_public_api_params(self):
+        svc = StandaloneFCTService()
+        db = _mock_db()
+        result = await svc.check_budget(
+            db,
+            tenant_id="T1",
+            entity_id="S001",
+            budget_type="monthly",
+            period="202603",
+            category="food_cost",
+            amount_to_use=1888.5,
+        )
+        assert result["tenant_id"] == "T1"
+        assert result["budget_type"] == "monthly"
+        assert result["category"] == "food_cost"
+        assert result["requested"] == 1888.5
+
+    @pytest.mark.asyncio
+    async def test_occupy_budget_accepts_public_api_params(self):
+        svc = StandaloneFCTService()
+        db = _mock_db()
+        result = await svc.occupy_budget(
+            db,
+            tenant_id="T1",
+            entity_id="S001",
+            budget_type="monthly",
+            period="202603",
+            category="food_cost",
+            amount=200.0,
+            ref_id="PAY-1",
+        )
+        assert result["success"] is True
+        assert result["budget_type"] == "monthly"
+        assert result["category"] == "food_cost"
+        assert result["occupied"] == 200.0
+
+    @pytest.mark.asyncio
+    async def test_list_budget_controls_accepts_budget_type_filter(self):
+        svc = StandaloneFCTService()
+        db = _mock_db()
+        result = await svc.list_budget_controls(
+            db,
+            tenant_id="T1",
+            entity_id="S001",
+            budget_type="monthly",
+            skip=2,
+            limit=8,
+        )
+        assert result["tenant_id"] == "T1"
+        assert result["entity_id"] == "S001"
+        assert result["budget_type"] == "monthly"
+        assert result["skip"] == 2
+        assert result["limit"] == 8
+
+
 # ── get_report_trend ─────────────────────────────────────────────────────────
 
 class TestGetReportTrend:
