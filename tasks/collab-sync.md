@@ -35,6 +35,7 @@
   - `POST /compare` 兼容前端 payload（metrics 可选，支持 start/end）
   - 对比结果兼容双结构：保留 `metrics/data`，新增 `stores[].metrics`
   - `avg_order_value` 指标补齐映射，避免前端图表空值
+  - 路由稳定性修复：将 `/{store_id}` 动态路由后置，避免吞掉 `/count` 等静态路由
 
 ## P2
 - [x] 角色权限管理体验优化（页面入口可见性与无权限提示一致性）
@@ -63,6 +64,7 @@
 - owner: Codex
 - task: FCT 账期持久化收尾（`fct_periods` 落库 + 兼容修复）
 - task: 多门店 API 兼容层补齐（路径 + 响应结构）
+- task: 多门店路由稳定性修复（静态路由优先）
 - files:
   - `apps/api-gateway/src/api/blindbox.py`
   - `apps/api-gateway/src/api/federated.py`
@@ -99,5 +101,5 @@
   - `python3 -m pytest -q apps/api-gateway/tests/test_fct_service.py -k "PeriodCloseReopen or CreateManualVoucherPersist or UpdateVoucherStatus or VoucherReverseAndVoid"`（21 passed）
   - `pnpm --filter @zhilian-os/web exec eslint src/pages/MultiStoreManagement.tsx`（通过）
   - `python3 -m py_compile apps/api-gateway/src/api/multi_store.py apps/api-gateway/src/services/store_service.py`（通过）
-  - `python3 -m pytest -q apps/api-gateway/tests/test_multi_store_api_routes.py`（4 passed）
+  - `python3 -m pytest -q apps/api-gateway/tests/test_multi_store_api_routes.py`（5 passed，含 /count 路由回归）
 - note: 已消除 `src.main` 的 blindbox/federated 缺失模块阻断；mobile 上传接口已返回 `file_url`

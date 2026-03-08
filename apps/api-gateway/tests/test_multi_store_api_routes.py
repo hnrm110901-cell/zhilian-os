@@ -4,6 +4,8 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 for _k, _v in {
     "DATABASE_URL": "postgresql+asyncpg://test:test@localhost/test",
@@ -17,6 +19,8 @@ for _k, _v in {
 
 from src.api.multi_store import (  # noqa: E402
     CompareStoresRequest,
+    get_current_active_user,
+    router,
     compare_stores,
     get_performance_ranking_compat,
     get_regional_summary_compat,
@@ -126,3 +130,18 @@ async def test_get_performance_ranking_compat_adds_growth_rate_default():
     assert out["metric"] == "revenue"
     assert out["ranking"][0]["store_id"] == "S001"
     assert out["ranking"][0]["growth_rate"] == 0.0
+
+
+def test_static_count_route_not_captured_by_dynamic_store_id_route():
+    app = FastAPI()
+    app.include_router(router, prefix="/api/v1/multi-store")
+    app.dependency_overrides[get_current_active_user] = lambda: SimpleNamespace(id="u1", role="admin")
+
+    with patch("src.api.multi_store.store_service.get_store_count", new=AsyncMock(return_value=7)), patch(
+        "src.api.multi_store.store_service.get_store", new=AsyncMock(return_value=None)
+    ):
+        client = TestClient(app)
+        response = client.get("/api/v1/multi-store/count")
+
+    assert response.status_code == 200
+    assert response.json()["count"] == 7

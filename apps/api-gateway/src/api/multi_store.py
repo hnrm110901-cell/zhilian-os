@@ -148,130 +148,6 @@ async def get_stores(
         raise HTTPException(status_code=500, detail=f"获取门店列表失败: {str(e)}")
 
 
-@router.get("/{store_id}", summary="获取门店详情")
-async def get_store(
-    store_id: str,
-    current_user: User = Depends(get_current_active_user),
-):
-    """
-    获取门店详情
-
-    需要权限: store:read
-    """
-    try:
-        store = await store_service.get_store(store_id)
-        if not store:
-            raise HTTPException(status_code=404, detail="门店不存在")
-
-        return {
-            "id": store.id,
-            "name": store.name,
-            "code": store.code,
-            "address": store.address,
-            "city": store.city,
-            "district": store.district,
-            "region": store.region,
-            "status": store.status,
-            "is_active": store.is_active,
-            "manager_id": store.manager_id,
-            "area": store.area,
-            "seats": store.seats,
-            "floors": store.floors,
-            "phone": store.phone,
-            "email": store.email,
-            "opening_date": store.opening_date,
-            "business_hours": store.business_hours,
-            "monthly_revenue_target": store.monthly_revenue_target,
-            "created_at": store.created_at.isoformat() if store.created_at else None,
-            "updated_at": store.updated_at.isoformat() if store.updated_at else None,
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("获取门店详情失败", error=str(e))
-        raise HTTPException(status_code=500, detail=f"获取门店详情失败: {str(e)}")
-
-
-@router.put("/{store_id}", summary="更新门店信息")
-async def update_store(
-    store_id: str,
-    request: UpdateStoreRequest,
-    current_user: User = Depends(get_current_active_user),
-):
-    """
-    更新门店信息
-
-    需要权限: store:write
-    """
-    try:
-        update_data = request.dict(exclude_none=True)
-        store = await store_service.update_store(store_id, **update_data)
-
-        if not store:
-            raise HTTPException(status_code=404, detail="门店不存在")
-
-        return {
-            "success": True,
-            "message": "门店信息更新成功",
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("更新门店信息失败", error=str(e))
-        raise HTTPException(status_code=500, detail=f"更新门店信息失败: {str(e)}")
-
-
-@router.delete("/{store_id}", summary="删除门店")
-async def delete_store(
-    store_id: str,
-    current_user: User = Depends(get_current_active_user),
-):
-    """
-    删除门店（软删除）
-
-    需要权限: store:delete
-    """
-    try:
-        success = await store_service.delete_store(store_id)
-
-        if not success:
-            raise HTTPException(status_code=404, detail="门店不存在")
-
-        return {
-            "success": True,
-            "message": "门店已删除",
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("删除门店失败", error=str(e))
-        raise HTTPException(status_code=500, detail=f"删除门店失败: {str(e)}")
-
-
-@router.get("/{store_id}/stats", summary="获取门店统计")
-async def get_store_stats(
-    store_id: str,
-    current_user: User = Depends(get_current_active_user),
-):
-    """
-    获取门店统计信息
-
-    需要权限: store:read
-    """
-    try:
-        stats = await store_service.get_store_stats(store_id)
-
-        if not stats:
-            raise HTTPException(status_code=404, detail="门店不存在")
-
-        return stats
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("获取门店统计失败", error=str(e))
-        raise HTTPException(status_code=500, detail=f"获取门店统计失败: {str(e)}")
-
-
 @router.post("/compare", summary="门店对比")
 async def compare_stores(
     request: CompareStoresRequest,
@@ -442,3 +318,127 @@ async def get_store_count(
     except Exception as e:
         logger.error("获取门店数量失败", error=str(e))
         raise HTTPException(status_code=500, detail=f"获取门店数量失败: {str(e)}")
+
+
+@router.get("/{store_id}/stats", summary="获取门店统计")
+async def get_store_stats(
+    store_id: str,
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    获取门店统计信息
+
+    需要权限: store:read
+    """
+    try:
+        stats = await store_service.get_store_stats(store_id)
+
+        if not stats:
+            raise HTTPException(status_code=404, detail="门店不存在")
+
+        return stats
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("获取门店统计失败", error=str(e))
+        raise HTTPException(status_code=500, detail=f"获取门店统计失败: {str(e)}")
+
+
+@router.get("/{store_id}", summary="获取门店详情")
+async def get_store(
+    store_id: str,
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    获取门店详情
+
+    需要权限: store:read
+    """
+    try:
+        store = await store_service.get_store(store_id)
+        if not store:
+            raise HTTPException(status_code=404, detail="门店不存在")
+
+        return {
+            "id": store.id,
+            "name": store.name,
+            "code": store.code,
+            "address": store.address,
+            "city": store.city,
+            "district": store.district,
+            "region": store.region,
+            "status": store.status,
+            "is_active": store.is_active,
+            "manager_id": store.manager_id,
+            "area": store.area,
+            "seats": store.seats,
+            "floors": store.floors,
+            "phone": store.phone,
+            "email": store.email,
+            "opening_date": store.opening_date,
+            "business_hours": store.business_hours,
+            "monthly_revenue_target": store.monthly_revenue_target,
+            "created_at": store.created_at.isoformat() if store.created_at else None,
+            "updated_at": store.updated_at.isoformat() if store.updated_at else None,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("获取门店详情失败", error=str(e))
+        raise HTTPException(status_code=500, detail=f"获取门店详情失败: {str(e)}")
+
+
+@router.put("/{store_id}", summary="更新门店信息")
+async def update_store(
+    store_id: str,
+    request: UpdateStoreRequest,
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    更新门店信息
+
+    需要权限: store:write
+    """
+    try:
+        update_data = request.dict(exclude_none=True)
+        store = await store_service.update_store(store_id, **update_data)
+
+        if not store:
+            raise HTTPException(status_code=404, detail="门店不存在")
+
+        return {
+            "success": True,
+            "message": "门店信息更新成功",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("更新门店信息失败", error=str(e))
+        raise HTTPException(status_code=500, detail=f"更新门店信息失败: {str(e)}")
+
+
+@router.delete("/{store_id}", summary="删除门店")
+async def delete_store(
+    store_id: str,
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    删除门店（软删除）
+
+    需要权限: store:delete
+    """
+    try:
+        success = await store_service.delete_store(store_id)
+
+        if not success:
+            raise HTTPException(status_code=404, detail="门店不存在")
+
+        return {
+            "success": True,
+            "message": "门店已删除",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("删除门店失败", error=str(e))
+        raise HTTPException(status_code=500, detail=f"删除门店失败: {str(e)}")
