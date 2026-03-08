@@ -388,21 +388,31 @@ const filterMenuItemsByAccess = (
   items: MenuProps['items'],
   isAdmin: boolean,
   allowedRoutes: Set<string>
-): MenuProps['items'] =>
-  (items || []).flatMap((item) => {
-    if (!item) return [];
-    if ('type' in item && item.type === 'divider') return [item];
+): MenuProps['items'] => {
+  const result: NonNullable<MenuProps['items']>[number][] = [];
+
+  (items || []).forEach((item) => {
+    if (!item) return;
+    if ('type' in item && item.type === 'divider') {
+      result.push(item);
+      return;
+    }
     const menuItem = item as NonNullable<MenuProps['items']>[number] & { children?: MenuProps['items'] };
     if (menuItem.children) {
       const children = filterMenuItemsByAccess(menuItem.children, isAdmin, allowedRoutes);
-      if (!children || children.length === 0) return [];
-      return [{ ...menuItem, children }];
+      if (!children || children.length === 0) return;
+      result.push({ ...menuItem, children } as NonNullable<MenuProps['items']>[number]);
+      return;
     }
     const key = String((menuItem as { key?: string }).key || '');
-    if (!key) return [];
-    if (isAdmin || allowedRoutes.has(key)) return [menuItem];
-    return [];
+    if (!key) return;
+    if (isAdmin || allowedRoutes.has(key)) {
+      result.push(menuItem);
+    }
   });
+
+  return result;
+};
 
 const MainLayout: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);

@@ -26,6 +26,9 @@
   - 表格开启横向滚动
   - 抽屉宽度改为 `92vw`（移动端）
   - 工具栏与操作按钮优化换行
+- [x] 前端构建阻塞修复（`MainLayout.tsx` 菜单过滤类型收敛）
+  - 修复 `MenuProps['items']` + `flatMap` 联合类型推断冲突
+  - 改为显式收集数组并补齐类型断言，恢复 `npm run build` 通过
 - [x] 多门店管理页稳定性修复（`MultiStoreManagement.tsx`）
   - 去除 `any`，补齐接口类型（门店列表/区域汇总/绩效排名/对比响应）
   - 对比查询改为选择事件驱动，避免 effect 中级联 setState
@@ -98,6 +101,7 @@
   - `apps/web/src/App.tsx`
   - `tasks/collab-sync.md`
 - verify:
+  - `npm run build --workspace @zhilian-os/web`（通过）
   - `python3 -m py_compile apps/api-gateway/src/api/inventory.py`（通过）
   - `python3 -m pytest -q apps/api-gateway/tests/test_inventory_transfer_workflow_api.py`（5 passed）
   - `npm run build --workspace @zhilian-os/web`（失败：`MainLayout.tsx` 既有类型错误，非本次改动引入）
