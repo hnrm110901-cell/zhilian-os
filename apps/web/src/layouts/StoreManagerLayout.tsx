@@ -1,11 +1,11 @@
 import React from 'react';
-import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import { Outlet, NavLink } from 'react-router-dom';
 import styles from './StoreManagerLayout.module.css';
 
 const NAV_ITEMS = [
   { to: '/sm',          label: '首页',   icon: '🏠' },
-  { to: '/sm/business', label: '经营',   icon: '📊' },
-  { to: '/sm/decisions',label: '决策',   icon: '🎯' },
+  { to: '/sm/shifts',   label: '班次',   icon: '🕒' },
+  { to: '/sm/tasks',    label: '任务',   icon: '✅' },
   { to: '/sm/alerts',   label: '告警',   icon: '🔔' },
 ];
 

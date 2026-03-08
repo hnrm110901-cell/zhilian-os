@@ -3,10 +3,14 @@
 更新时间：2026-03-08
 
 ## P0（优先执行）
-- [ ] 前端实时通知系统增强（`apps/web/src/pages/NotificationCenter.tsx`）
+- [x] 前端实时通知系统增强（`apps/web/src/pages/NotificationCenter.tsx`）
   - 自动刷新（默认开启）
   - 前台激活立即刷新
   - 刷新状态可见（最近刷新时间）
+- [x] 移动端核心三页骨架落地（`/sm`：首页/班次/任务）
+  - 新增 `sm/Shifts.tsx`、`sm/Tasks.tsx`
+  - 新增 `mobile.query.service.ts`、`mobile.mutation.service.ts`、`mobile.mock.ts`、`mobile.types.ts`
+  - 底部导航切换为 首页/班次/任务/告警，保留原 `business/decisions` 路由兼容
 
 ## P1
 - [x] 核心页面移动端适配补强（`WorkforcePage`、`ActionPlansPage`）
@@ -31,12 +35,19 @@
 ## [Codex] 状态
 - status: completed
 - owner: Codex
-- task: P2 角色权限体验一致性修复
+- task: 移动端首页/班次/任务 V1 骨架接入
 - files:
-  - `apps/web/src/components/ProtectedRoute.tsx`
-  - `apps/web/src/layouts/MainLayout.tsx`
-  - `apps/web/src/pages/UnauthorizedPage.tsx`
+  - `apps/web/src/pages/sm/Shifts.tsx`
+  - `apps/web/src/pages/sm/Shifts.module.css`
+  - `apps/web/src/pages/sm/Tasks.tsx`
+  - `apps/web/src/pages/sm/Tasks.module.css`
+  - `apps/web/src/layouts/StoreManagerLayout.tsx`
+  - `apps/web/src/services/mobile.types.ts`
+  - `apps/web/src/services/mobile.mock.ts`
+  - `apps/web/src/services/mobile.query.service.ts`
+  - `apps/web/src/services/mobile.mutation.service.ts`
+  - `apps/web/src/App.tsx`
   - `tasks/collab-sync.md`
 - verify:
-  - `pnpm --filter @zhilian-os/web exec eslint src/components/ProtectedRoute.tsx src/layouts/MainLayout.tsx src/pages/UnauthorizedPage.tsx`（通过）
-- note: 已完成入口可见性与403提示一致性修复
+  - `pnpm --filter @zhilian-os/web exec eslint src/pages/sm/Shifts.tsx src/pages/sm/Tasks.tsx src/layouts/StoreManagerLayout.tsx src/services/mobile.types.ts src/services/mobile.mock.ts src/services/mobile.query.service.ts src/services/mobile.mutation.service.ts`（通过）
+- note: 基于 Desktop/Downloads 文档完成首批可运行骨架，下一步可补 Home/Tasks/Shifts 状态机细节与接口映射

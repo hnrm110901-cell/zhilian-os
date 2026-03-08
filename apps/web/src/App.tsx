@@ -164,6 +164,8 @@ const OpsMonitoringPage = lazy(() => import('./pages/OpsMonitoringPage'));
 // Role-based views (Phase 1 — Store Manager /sm)
 const StoreManagerLayout = lazy(() => import('./layouts/StoreManagerLayout'));
 const SmHome      = lazy(() => import('./pages/sm/Home'));
+const SmShifts    = lazy(() => import('./pages/sm/Shifts'));
+const SmTasks     = lazy(() => import('./pages/sm/Tasks'));
 const SmBusiness  = lazy(() => import('./pages/sm/Business'));
 const SmDecisions = lazy(() => import('./pages/sm/Decisions'));
 const SmAlerts    = lazy(() => import('./pages/sm/Alerts'));
@@ -632,6 +634,8 @@ const AppContent: React.FC = () => {
                 }>
                   <Route index element={<SmHome />} />
                   <Route path="home"      element={<SmHome />} />
+                  <Route path="shifts"    element={<SmShifts />} />
+                  <Route path="tasks"     element={<SmTasks />} />
                   <Route path="business"  element={<SmBusiness />} />
                   <Route path="decisions" element={<SmDecisions />} />
                   <Route path="alerts"    element={<SmAlerts />} />
