@@ -1242,7 +1242,43 @@ class StandaloneFCTService:
         budget_check: Optional[bool] = None,
         budget_occupy: Optional[bool] = None,
     ) -> Dict[str, Any]:
-        return {"voucher_id": voucher_id, "status": target_status, "success": True}
+        status = (target_status or "").strip().lower()
+        allowed_statuses = {"draft", "approved", "posted", "reversed", "voided"}
+        if status not in allowed_statuses:
+            raise ValueError(f"无效凭证状态: {target_status}")
+
+        stmt = select(Voucher).where(Voucher.id == voucher_id)
+        voucher = (await session.execute(stmt)).scalar_one_or_none()
+        if not voucher:
+            raise ValueError("凭证不存在")
+
+        current = (voucher.status or "").strip().lower()
+        if not current:
+            current = "draft"
+
+        # 最小可用状态机：draft -> approved -> posted -> reversed
+        # 允许在 draft/approved 时作废（voided），同状态重复设置视为幂等成功。
+        transitions = {
+            "draft": {"approved", "posted", "voided"},
+            "approved": {"draft", "posted", "voided"},
+            "posted": {"reversed"},
+            "reversed": set(),
+            "voided": set(),
+        }
+        if status != current and status not in transitions.get(current, set()):
+            raise ValueError(f"不允许的状态流转: {current} -> {status}")
+
+        voucher.status = status
+        await session.flush()
+        await session.refresh(voucher)
+
+        return {
+            "voucher_id": str(voucher.id),
+            "voucher_no": voucher.voucher_no,
+            "from_status": current,
+            "status": status,
+            "success": True,
+        }
 
     async def void_voucher(
         self, session: AsyncSession, voucher_id: str
@@ -1840,14 +1876,25 @@ class StandaloneFCTService:
         status: str = "pending",
         extra: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        return {
+        status_l = (status or "pending").strip().lower()
+        result: Dict[str, Any] = {
             "tenant_id": tenant_id,
             "ref_type": ref_type,
             "ref_id": ref_id,
             "step": step,
-            "status": status,
+            "status": status_l,
             "success": True,
         }
+
+        # 最小联动：凭证审批通过后，驱动凭证 draft -> approved。
+        if ref_type in {"voucher", "fct_voucher"} and status_l == "approved":
+            sync = await self.update_voucher_status(
+                session,
+                voucher_id=ref_id,
+                target_status="approved",
+            )
+            result["voucher_sync"] = sync
+        return result
 
     async def get_approval_by_ref(
         self,
@@ -1856,7 +1903,20 @@ class StandaloneFCTService:
         ref_type: str,
         ref_id: str,
     ) -> Dict[str, Any]:
-        return {"tenant_id": tenant_id, "ref_type": ref_type, "ref_id": ref_id, "records": []}
+        records: List[Dict[str, Any]] = []
+        if ref_type in {"voucher", "fct_voucher"}:
+            stmt = select(Voucher).where(Voucher.id == ref_id)
+            voucher = (await session.execute(stmt)).scalar_one_or_none()
+            if voucher:
+                v_status = (voucher.status or "").lower()
+                approval_status = "approved" if v_status in {"approved", "posted", "reversed"} else "pending"
+                records.append({
+                    "step": 1,
+                    "status": approval_status,
+                    "ref_status": v_status,
+                    "extra": {"voucher_no": voucher.voucher_no},
+                })
+        return {"tenant_id": tenant_id, "ref_type": ref_type, "ref_id": ref_id, "records": records}
 
     # ── 报表 ──────────────────────────────────────────────────────────────────
 

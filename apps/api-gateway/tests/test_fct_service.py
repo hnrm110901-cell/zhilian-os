@@ -865,6 +865,87 @@ class TestGetVoucherById:
         assert result["lines"] == []
 
 
+class TestUpdateVoucherStatus:
+    """测试凭证状态机流转"""
+
+    @pytest.mark.asyncio
+    async def test_draft_to_approved_success(self):
+        db = _mock_db()
+        db.refresh = AsyncMock()
+        v = MagicMock()
+        v.id = "vid-100"
+        v.voucher_no = "MV-100"
+        v.status = "draft"
+        result_mock = MagicMock()
+        result_mock.scalar_one_or_none.return_value = v
+        db.execute = AsyncMock(return_value=result_mock)
+
+        svc = StandaloneFCTService()
+        result = await svc.update_voucher_status(db, voucher_id="vid-100", target_status="approved")
+
+        assert result["success"] is True
+        assert result["from_status"] == "draft"
+        assert result["status"] == "approved"
+        assert v.status == "approved"
+
+    @pytest.mark.asyncio
+    async def test_reversed_to_posted_invalid(self):
+        db = _mock_db()
+        db.refresh = AsyncMock()
+        v = MagicMock()
+        v.id = "vid-101"
+        v.voucher_no = "MV-101"
+        v.status = "reversed"
+        result_mock = MagicMock()
+        result_mock.scalar_one_or_none.return_value = v
+        db.execute = AsyncMock(return_value=result_mock)
+
+        svc = StandaloneFCTService()
+        with pytest.raises(ValueError, match="不允许的状态流转"):
+            await svc.update_voucher_status(db, voucher_id="vid-101", target_status="posted")
+
+    @pytest.mark.asyncio
+    async def test_unknown_voucher_raises(self):
+        db = _mock_db()
+        result_mock = MagicMock()
+        result_mock.scalar_one_or_none.return_value = None
+        db.execute = AsyncMock(return_value=result_mock)
+
+        svc = StandaloneFCTService()
+        with pytest.raises(ValueError, match="凭证不存在"):
+            await svc.update_voucher_status(db, voucher_id="missing", target_status="approved")
+
+
+class TestApprovalVoucherSync:
+    """测试审批与凭证状态联动"""
+
+    @pytest.mark.asyncio
+    async def test_create_approval_record_syncs_voucher_status(self):
+        db = _mock_db()
+        db.refresh = AsyncMock()
+        v = MagicMock()
+        v.id = "vid-201"
+        v.voucher_no = "MV-201"
+        v.status = "draft"
+        result_mock = MagicMock()
+        result_mock.scalar_one_or_none.return_value = v
+        db.execute = AsyncMock(return_value=result_mock)
+
+        svc = StandaloneFCTService()
+        result = await svc.create_approval_record(
+            db,
+            tenant_id="T1",
+            ref_type="voucher",
+            ref_id="vid-201",
+            status="approved",
+        )
+
+        assert result["success"] is True
+        assert result["status"] == "approved"
+        assert result["voucher_sync"]["status"] == "approved"
+        assert v.status == "approved"
+
+
 # ── get_report_trend ─────────────────────────────────────────────────────────
 
 class TestGetReportTrend:
