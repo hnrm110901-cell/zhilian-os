@@ -18,6 +18,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
 
+from ..services.schedule_conflict_service import detect_schedule_conflicts
+
 logger = structlog.get_logger()
 router = APIRouter()
 
@@ -104,6 +106,21 @@ async def create_schedule(
     existing = await ScheduleRepository.get_by_date(session, req.store_id, req.schedule_date)
     if existing:
         raise HTTPException(status_code=409, detail="该日期排班已存在")
+
+    conflicts = detect_schedule_conflicts(
+        [
+            {
+                "employee_id": s.employee_id,
+                "start_time": s.start_time,
+                "end_time": s.end_time,
+                "shift_type": s.shift_type,
+                "position": s.position,
+            }
+            for s in req.shifts
+        ]
+    )
+    if conflicts:
+        raise HTTPException(status_code=400, detail=f"排班冲突: {conflicts[0]['message']}")
 
     schedule = Schedule(
         store_id=req.store_id,
@@ -208,6 +225,21 @@ async def auto_generate_schedule(
                 end_time=dtime(end_h, end_m),
                 position=needed_skill,
             ))
+
+    conflicts = detect_schedule_conflicts(
+        [
+            {
+                "employee_id": s.employee_id,
+                "start_time": s.start_time,
+                "end_time": s.end_time,
+                "shift_type": s.shift_type,
+                "position": s.position,
+            }
+            for s in shifts_data
+        ]
+    )
+    if conflicts:
+        raise HTTPException(status_code=400, detail=f"自动排班冲突: {conflicts[0]['message']}")
 
     schedule = Schedule(
         store_id=req.store_id,

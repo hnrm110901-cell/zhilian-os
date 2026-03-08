@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.schedule import Schedule, Shift
 from src.repositories import EmployeeRepository, ScheduleRepository
+from src.services.schedule_conflict_service import detect_schedule_conflicts
 from src.services.staffing_pattern_service import StaffingPatternService
 from src.services.wechat_service import wechat_service
 
@@ -157,6 +158,10 @@ class WorkforceAutoScheduleService:
             source = "schedule_agent"
         if not shifts_payload:
             raise ValueError("自动排班失败：未生成任何班次")
+
+        conflicts = detect_schedule_conflicts(shifts_payload)
+        if conflicts:
+            raise ValueError(f"自动排班冲突: {conflicts[0]['message']}")
 
         daily_budget = await WorkforceAutoScheduleService._fetch_daily_budget_yuan(
             store_id=store_id,
