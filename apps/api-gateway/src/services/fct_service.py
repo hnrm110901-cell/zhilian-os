@@ -1393,7 +1393,54 @@ class StandaloneFCTService:
         period: Optional[str] = None,
         posted_only: bool = True,
     ) -> Dict[str, Any]:
-        return {"tenant_id": tenant_id, "entity_id": entity_id, "balances": [], "as_of": (as_of_date or date.today()).isoformat()}
+        target_entity = entity_id or tenant_id
+        effective_as_of = as_of_date
+        if period and len(period) == 6 and period.isdigit():
+            p_year, p_month = int(period[:4]), int(period[4:6])
+            effective_as_of = date(p_year, p_month, monthrange(p_year, p_month)[1])
+
+        filters = [Voucher.store_id == target_entity]
+        if effective_as_of:
+            filters.append(Voucher.biz_date <= effective_as_of)
+        if posted_only:
+            filters.append(Voucher.status == "posted")
+
+        stmt = (
+            select(
+                VoucherLine.account_code,
+                func.max(VoucherLine.account_name),
+                func.sum(func.coalesce(VoucherLine.debit, 0)),
+                func.sum(func.coalesce(VoucherLine.credit, 0)),
+            )
+            .select_from(VoucherLine)
+            .join(Voucher, Voucher.id == VoucherLine.voucher_id)
+            .where(and_(*filters))
+            .group_by(VoucherLine.account_code)
+            .order_by(VoucherLine.account_code)
+        )
+        rows = (await session.execute(stmt)).fetchall()
+        balances: List[Dict[str, Any]] = []
+        for row in rows:
+            debit_total = float(row[2] or 0)
+            credit_total = float(row[3] or 0)
+            balances.append(
+                {
+                    "account_code": row[0],
+                    "account_name": row[1],
+                    "debit_total": debit_total,
+                    "credit_total": credit_total,
+                    "balance": round(debit_total - credit_total, 2),
+                }
+            )
+
+        return {
+            "tenant_id": tenant_id,
+            "entity_id": target_entity,
+            "as_of": (effective_as_of or date.today()).isoformat(),
+            "period": period,
+            "posted_only": posted_only,
+            "balances": balances,
+        }
 
     async def get_ledger_entries(
         self,
@@ -1408,7 +1455,61 @@ class StandaloneFCTService:
         skip: int = 0,
         limit: int = 500,
     ) -> Dict[str, Any]:
-        return {"items": [], "total": 0, "skip": skip, "limit": limit}
+        target_entity = entity_id or tenant_id
+        effective_start = start_date
+        effective_end = end_date
+        if period and len(period) == 6 and period.isdigit():
+            p_year, p_month = int(period[:4]), int(period[4:6])
+            effective_start = date(p_year, p_month, 1)
+            effective_end = date(p_year, p_month, monthrange(p_year, p_month)[1])
+
+        filters = [Voucher.store_id == target_entity]
+        if effective_start:
+            filters.append(Voucher.biz_date >= effective_start)
+        if effective_end:
+            filters.append(Voucher.biz_date <= effective_end)
+        if posted_only:
+            filters.append(Voucher.status == "posted")
+        if account_code:
+            filters.append(VoucherLine.account_code == account_code)
+
+        count_stmt = (
+            select(func.count(VoucherLine.id))
+            .select_from(VoucherLine)
+            .join(Voucher, Voucher.id == VoucherLine.voucher_id)
+            .where(and_(*filters))
+        )
+        total = int((await session.execute(count_stmt)).scalar() or 0)
+
+        stmt = (
+            select(Voucher, VoucherLine)
+            .select_from(VoucherLine)
+            .join(Voucher, Voucher.id == VoucherLine.voucher_id)
+            .where(and_(*filters))
+            .order_by(Voucher.biz_date.desc(), Voucher.voucher_no.desc(), VoucherLine.line_no.asc())
+            .offset(skip)
+            .limit(limit)
+        )
+        rows = (await session.execute(stmt)).all()
+        items: List[Dict[str, Any]] = []
+        for voucher, line in rows:
+            debit = float(line.debit) if line.debit is not None else 0.0
+            credit = float(line.credit) if line.credit is not None else 0.0
+            items.append(
+                {
+                    "voucher_id": str(voucher.id),
+                    "voucher_no": voucher.voucher_no,
+                    "biz_date": voucher.biz_date.isoformat() if voucher.biz_date else None,
+                    "voucher_status": voucher.status,
+                    "line_no": line.line_no,
+                    "account_code": line.account_code,
+                    "account_name": line.account_name,
+                    "debit": debit,
+                    "credit": credit,
+                    "summary": line.summary,
+                }
+            )
+        return {"items": items, "total": total, "skip": skip, "limit": limit}
 
     # ── 资金流水与对账 ────────────────────────────────────────────────────────
 

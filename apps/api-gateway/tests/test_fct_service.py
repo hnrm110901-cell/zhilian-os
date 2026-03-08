@@ -1263,6 +1263,72 @@ class TestListPeriods:
         assert result["items"][2]["period_key"] == "2026-01"
 
 
+class TestLedgerQueries:
+    """测试总账明细与余额查询"""
+
+    @pytest.mark.asyncio
+    async def test_get_ledger_entries_returns_rows(self):
+        db = _mock_db()
+        count_result = MagicMock()
+        count_result.scalar.return_value = 1
+        voucher = MagicMock()
+        voucher.id = "v-1"
+        voucher.voucher_no = "MV-001"
+        voucher.biz_date = date(2026, 3, 8)
+        voucher.status = "posted"
+        line = MagicMock()
+        line.line_no = 1
+        line.account_code = "1001"
+        line.account_name = "库存现金"
+        line.debit = 100.0
+        line.credit = None
+        line.summary = "测试分录"
+        data_result = MagicMock()
+        data_result.all.return_value = [(voucher, line)]
+        db.execute = AsyncMock(side_effect=[count_result, data_result])
+
+        svc = StandaloneFCTService()
+        result = await svc.get_ledger_entries(
+            db, tenant_id="T1", entity_id="S001", start_date=date(2026, 3, 1), end_date=date(2026, 3, 31)
+        )
+        assert result["total"] == 1
+        assert len(result["items"]) == 1
+        assert result["items"][0]["voucher_no"] == "MV-001"
+        assert result["items"][0]["account_code"] == "1001"
+
+    @pytest.mark.asyncio
+    async def test_get_ledger_entries_period_override(self):
+        db = _mock_db()
+        count_result = MagicMock()
+        count_result.scalar.return_value = 0
+        data_result = MagicMock()
+        data_result.all.return_value = []
+        db.execute = AsyncMock(side_effect=[count_result, data_result])
+
+        svc = StandaloneFCTService()
+        result = await svc.get_ledger_entries(db, tenant_id="T1", period="202603")
+        assert result["total"] == 0
+        assert result["items"] == []
+
+    @pytest.mark.asyncio
+    async def test_get_ledger_balances_returns_aggregates(self):
+        db = _mock_db()
+        row = MagicMock()
+        row.__getitem__ = lambda self, i: ["1001", "库存现金", 300.0, 120.0][i]
+        result_mock = MagicMock()
+        result_mock.fetchall.return_value = [row]
+        db.execute = AsyncMock(return_value=result_mock)
+
+        svc = StandaloneFCTService()
+        result = await svc.get_ledger_balances(db, tenant_id="T1", entity_id="S001")
+        assert len(result["balances"]) == 1
+        bal = result["balances"][0]
+        assert bal["account_code"] == "1001"
+        assert bal["debit_total"] == 300.0
+        assert bal["credit_total"] == 120.0
+        assert bal["balance"] == 180.0
+
+
 # ── get_report_by_entity ──────────────────────────────────────────────────────
 
 class TestGetReportByEntity:
