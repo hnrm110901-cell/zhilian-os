@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Card,
   Table,
@@ -20,6 +20,7 @@ import {
   MessageOutlined,
   WechatOutlined,
   MobileOutlined,
+  SyncOutlined,
 } from '@ant-design/icons';
 import { apiClient } from '../services/api';
 import { showSuccess, handleApiError } from '../utils/message';
@@ -34,44 +35,84 @@ const NotificationCenter: React.FC = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [sendModalVisible, setSendModalVisible] = useState(false);
   const [templateModalVisible, setTemplateModalVisible] = useState(false);
+  const [liveRefreshEnabled, setLiveRefreshEnabled] = useState(true);
+  const [lastRefreshAt, setLastRefreshAt] = useState<string>('');
   const [form] = Form.useForm();
   const [templateForm] = Form.useForm();
 
-  useEffect(() => {
-    loadNotifications();
-    loadTemplates();
-    loadUnreadCount();
-  }, []);
-
-  const loadNotifications = async () => {
+  const loadNotifications = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const response = await apiClient.get('/api/v1/notifications');
       setNotifications(response || []);
+      return true;
     } catch (err: any) {
-      handleApiError(err, '加载通知列表失败');
+      if (!silent) handleApiError(err, '加载通知列表失败');
+      return false;
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  };
+  }, []);
 
-  const loadTemplates = async () => {
+  const loadTemplates = useCallback(async (silent = false) => {
     try {
       const response = await apiClient.get('/api/v1/notifications/templates');
       setTemplates(response.templates || {});
+      return true;
     } catch (err: any) {
-      handleApiError(err, '加载通知模板失败');
+      if (!silent) handleApiError(err, '加载通知模板失败');
+      return false;
     }
-  };
+  }, []);
 
-  const loadUnreadCount = async () => {
+  const loadUnreadCount = useCallback(async (silent = false) => {
     try {
       const response = await apiClient.get('/api/v1/notifications/unread-count');
       setUnreadCount(response.unread_count || 0);
+      return true;
     } catch (err: any) {
-      handleApiError(err, '加载未读数量失败');
+      if (!silent) handleApiError(err, '加载未读数量失败');
+      return false;
     }
-  };
+  }, []);
+
+  const refreshAll = useCallback(async (silent = false) => {
+    const [okList, okTemplates, okUnread] = await Promise.all([
+      loadNotifications(silent),
+      loadTemplates(silent),
+      loadUnreadCount(silent),
+    ]);
+    if (okList || okTemplates || okUnread) {
+      setLastRefreshAt(new Date().toLocaleTimeString('zh-CN', { hour12: false }));
+    }
+  }, [loadNotifications, loadTemplates, loadUnreadCount]);
+
+  useEffect(() => {
+    refreshAll();
+  }, [refreshAll]);
+
+  useEffect(() => {
+    if (!liveRefreshEnabled) return;
+    const intervalId = window.setInterval(() => {
+      refreshAll(true);
+    }, 30_000);
+    return () => window.clearInterval(intervalId);
+  }, [liveRefreshEnabled, refreshAll]);
+
+  useEffect(() => {
+    if (!liveRefreshEnabled) return;
+    const handleVisibleRefresh = () => {
+      if (document.visibilityState === 'visible') {
+        refreshAll(true);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibleRefresh);
+    window.addEventListener('focus', handleVisibleRefresh);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibleRefresh);
+      window.removeEventListener('focus', handleVisibleRefresh);
+    };
+  }, [liveRefreshEnabled, refreshAll]);
 
   const handleSendMultiChannel = async (values: any) => {
     try {
@@ -79,6 +120,7 @@ const NotificationCenter: React.FC = () => {
       showSuccess('多渠道通知发送成功');
       setSendModalVisible(false);
       form.resetFields();
+      refreshAll(true);
     } catch (err: any) {
       handleApiError(err, '发送通知失败');
     }
@@ -90,6 +132,7 @@ const NotificationCenter: React.FC = () => {
       showSuccess('模板通知发送成功');
       setTemplateModalVisible(false);
       templateForm.resetFields();
+      refreshAll(true);
     } catch (err: any) {
       handleApiError(err, '发送模板通知失败');
     }
@@ -99,8 +142,7 @@ const NotificationCenter: React.FC = () => {
     try {
       await apiClient.put(`/api/v1/notifications/${notificationId}/read`);
       showSuccess('已标记为已读');
-      loadNotifications();
-      loadUnreadCount();
+      refreshAll(true);
     } catch (err: any) {
       handleApiError(err, '标记失败');
     }
@@ -110,8 +152,7 @@ const NotificationCenter: React.FC = () => {
     try {
       await apiClient.put('/api/v1/notifications/read-all');
       showSuccess('已全部标记为已读');
-      loadNotifications();
-      loadUnreadCount();
+      refreshAll(true);
     } catch (err: any) {
       handleApiError(err, '标记失败');
     }
@@ -121,8 +162,7 @@ const NotificationCenter: React.FC = () => {
     try {
       await apiClient.delete(`/api/v1/notifications/${notificationId}`);
       showSuccess('通知已删除');
-      loadNotifications();
-      loadUnreadCount();
+      refreshAll(true);
     } catch (err: any) {
       handleApiError(err, '删除失败');
     }
@@ -261,6 +301,18 @@ const NotificationCenter: React.FC = () => {
                       发送模板通知
                     </Button>
                     <Button onClick={handleMarkAllAsRead}>全部标记为已读</Button>
+                    <Button icon={<SyncOutlined />} onClick={() => refreshAll(true)}>
+                      立即刷新
+                    </Button>
+                    <Checkbox
+                      checked={liveRefreshEnabled}
+                      onChange={(e) => setLiveRefreshEnabled(e.target.checked)}
+                    >
+                      实时刷新（30秒）
+                    </Checkbox>
+                    <span style={{ color: '#666', fontSize: 12 }}>
+                      上次刷新：{lastRefreshAt || '--'}
+                    </span>
                   </Space>
 
                   <Table
