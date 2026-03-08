@@ -15,7 +15,7 @@
 | **API 网关 · 注册** | 通过接口注册品智适配器 | ✅ 已实现 | `POST /api/adapters/register`，adapter_name=pinzhi + config |
 | **API 网关 · POS 服务** | 门店/菜品/订单/收入等 | ✅ 已实现 | `pos_service` 使用 PinzhiAdapter（需配置 PINZHI_*） |
 | **API 网关 · 健康检查** | 品智状态 | ⚠ 部分 | `pinzhi_service.health_check()` 请求 `{base_url}/api/health`，非品智 .do；与脚本用的 .do 非同一套 |
-| **订单同步** | 从品智同步订单到智链OS | ❌ 未实现 | `sync_order` 仅支持 tiancai/meituan，未接 pinzhi |
+| **订单同步** | 从品智同步订单到智链OS | ✅ 已实现 | `POST /api/adapters/sync/order` 已支持 `source_system=pinzhi`（按门店+日期范围匹配 `billId/billNo`） |
 
 **尝在一起**：品智按 **Token 区分主体**。配置尝在一起对应的 `PINZHI_BASE_URL` 与 `PINZHI_TOKEN` 后，上述适配器与脚本拉取到的即为尝在一起数据，无需在代码里再按品牌名过滤。
 

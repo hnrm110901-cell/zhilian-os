@@ -6,6 +6,8 @@ from typing import Dict, Any, Optional, List
 import structlog
 from datetime import datetime
 import asyncio
+import os
+from datetime import timedelta
 
 logger = structlog.get_logger()
 
@@ -143,6 +145,64 @@ class AdapterIntegrationService:
 
         except Exception as e:
             logger.error("美团订单同步失败", order_id=order_id, error=str(e))
+            raise
+
+    async def sync_order_from_pinzhi(
+        self,
+        order_id: str,
+        store_id: str,
+    ) -> Dict[str, Any]:
+        """
+        从品智同步订单到智链OS
+
+        说明：
+        - 品智适配器当前提供按日期范围查询列表接口，未提供单号直查接口；
+        - 这里按门店 + 最近 N 天列表拉取后匹配 billId/billNo。
+        """
+        adapter = self.get_adapter("pinzhi")
+        if not adapter:
+            raise ValueError("品智适配器未注册")
+
+        lookback_days = int(os.getenv("PINZHI_SYNC_LOOKBACK_DAYS", "3"))
+        target_id = str(order_id)
+        matched_order: Optional[Dict[str, Any]] = None
+
+        try:
+            for offset in range(lookback_days + 1):
+                biz_date = (datetime.now() - timedelta(days=offset)).strftime("%Y-%m-%d")
+                order_rows = await adapter.query_order_list(
+                    ognid=store_id,
+                    begin_date=biz_date,
+                    end_date=biz_date,
+                    page_index=1,
+                    page_size=int(os.getenv("PINZHI_SYNC_PAGE_SIZE", "200")),
+                )
+                for row in order_rows or []:
+                    if str(row.get("billId", "")) == target_id or str(row.get("billNo", "")) == target_id:
+                        matched_order = row
+                        break
+                if matched_order:
+                    break
+
+            if not matched_order:
+                raise ValueError(f"品智订单不存在: {order_id}")
+
+            standard_order = self._convert_pinzhi_order(matched_order, store_id=store_id)
+
+            if self.neural_system:
+                await self.neural_system.emit_event(
+                    event_type="order.created",
+                    event_source="pinzhi",
+                    data=standard_order,
+                    store_id=store_id,
+                    priority=1,
+                )
+
+            logger.info("品智订单同步成功", order_id=order_id, store_id=store_id)
+            return {"status": "success", "order": standard_order}
+
+        except Exception as e:
+            logger.error("品智订单同步失败", order_id=order_id, error=str(e))
             raise
 
     # ==================== 菜品同步 ====================
@@ -370,6 +430,34 @@ class AdapterIntegrationService:
                     "box_price": item.get("box_price", 0) / 100,
                 }
                 for item in order_data.get("detail", [])
+            ],
+        }
+
+    def _convert_pinzhi_order(self, order_data: Dict[str, Any], store_id: str) -> Dict[str, Any]:
+        """转换品智订单为标准格式（轻量映射，金额单位分->元）"""
+        bill_status = int(order_data.get("billStatus", 0) or 0)
+        status_map = {1: "completed", 0: "pending", 2: "cancelled"}
+        return {
+            "order_id": str(order_data.get("billId", "")),
+            "order_no": str(order_data.get("billNo", "")),
+            "source_system": "pinzhi",
+            "store_id": store_id,
+            "table_no": order_data.get("tableNo"),
+            "order_time": order_data.get("openTime"),
+            "pay_time": order_data.get("payTime"),
+            "total_amount": (order_data.get("dishPriceTotal", 0) or 0) / 100,
+            "discount_amount": (order_data.get("specialOfferPrice", 0) or 0) / 100,
+            "real_amount": (order_data.get("realPrice", 0) or 0) / 100,
+            "status": status_map.get(bill_status, "pending"),
+            "dishes": [
+                {
+                    "dish_id": item.get("dishId"),
+                    "dish_name": item.get("dishName"),
+                    "price": (item.get("dishPrice", 0) or 0) / 100,
+                    "quantity": item.get("dishNum", 1),
+                    "amount": ((item.get("dishPrice", 0) or 0) * (item.get("dishNum", 1) or 1)) / 100,
+                }
+                for item in (order_data.get("dishList") or [])
             ],
         }
 

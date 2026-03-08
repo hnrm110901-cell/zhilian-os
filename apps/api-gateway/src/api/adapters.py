@@ -26,7 +26,7 @@ class OrderSyncRequest(BaseModel):
 
     order_id: str
     store_id: str
-    source_system: str  # tiancai, meituan
+    source_system: str  # tiancai, meituan, pinzhi
 
 
 class DishSyncRequest(BaseModel):
@@ -144,6 +144,11 @@ async def sync_order(request: OrderSyncRequest):
                 order_id=request.order_id,
                 store_id=request.store_id,
             )
+        elif source_system == "pinzhi":
+            result = await integration_service.sync_order_from_pinzhi(
+                order_id=request.order_id,
+                store_id=request.store_id,
+            )
         else:
             raise HTTPException(status_code=400, detail=f"不支持的来源系统: {source_system}")
 
@@ -153,6 +158,8 @@ async def sync_order(request: OrderSyncRequest):
             data=result,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("订单同步失败", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
@@ -189,6 +196,8 @@ async def sync_dishes(request: DishSyncRequest):
             data=result,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("菜品同步失败", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
@@ -228,6 +237,8 @@ async def sync_inventory(request: InventorySyncRequest):
             data=result,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("库存同步失败", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
@@ -261,6 +272,8 @@ async def sync_all(source_system: str, store_id: str):
             data=result,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("全量同步失败", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
