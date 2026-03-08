@@ -466,6 +466,42 @@ class TestAdjustSchedule:
         assert any("技能不匹配" in msg for msg in result["applied_adjustments"])
 
 
+class TestMultiStoreSchedule:
+    """多门店协同排班测试"""
+
+    @pytest.mark.asyncio
+    async def test_plan_multi_store_schedule_returns_transfer_suggestions(self, agent):
+        stores = [
+            {
+                "store_id": "STORE_A",
+                "employees": [
+                    {
+                        "id": "A_E1",
+                        "name": "跨店厨师",
+                        "skills": ["chef"],
+                        "multi_store_available": True,
+                        "allowed_stores": ["STORE_B"],
+                    }
+                ],
+            },
+            {
+                "store_id": "STORE_B",
+                "employees": [
+                    {
+                        "id": "B_E1",
+                        "name": "收银",
+                        "skills": ["cashier"],
+                        "multi_store_available": False,
+                    }
+                ],
+            },
+        ]
+        result = await agent.plan_multi_store_schedule(date="2024-01-15", stores=stores)
+        assert result["success"] is True
+        assert len(result["store_results"]) == 2
+        assert any(s["to_store_id"] == "STORE_B" for s in result["transfer_suggestions"])
+
+
 class TestEnums:
     """枚举类型测试"""
 

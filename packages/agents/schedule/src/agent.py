@@ -175,7 +175,7 @@ class ScheduleAgent(BaseAgent):
         }
 
     def get_supported_actions(self) -> List[str]:
-        return ["run", "adjust_schedule", "get_schedule"]
+        return ["run", "plan_multi_store_schedule", "adjust_schedule", "get_schedule"]
 
     async def execute(self, action: str, params: Dict[str, Any]) -> AgentResponse:
         try:
@@ -184,6 +184,11 @@ class ScheduleAgent(BaseAgent):
                     store_id=params["store_id"],
                     date=params["date"],
                     employees=params["employees"],
+                )
+            elif action == "plan_multi_store_schedule":
+                result = await self.plan_multi_store_schedule(
+                    date=params["date"],
+                    stores=params["stores"],
                 )
             elif action == "adjust_schedule":
                 result = await self.adjust_schedule(
@@ -520,6 +525,82 @@ class ScheduleAgent(BaseAgent):
         except Exception as e:
             logger.error("排班失败", exc_info=e)
             return {"success": False, "error": str(e), "store_id": store_id, "date": date}
+
+    async def plan_multi_store_schedule(
+        self,
+        date: str,
+        stores: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """
+        多门店协同排班：
+        - 逐门店生成排班结果
+        - 根据缺口与可跨店员工，生成调配建议
+        """
+        per_store_results: List[Dict[str, Any]] = []
+        for store in stores:
+            store_id = store["store_id"]
+            employees = store.get("employees", [])
+            result = await self.run(store_id=store_id, date=date, employees=employees)
+            per_store_results.append(result)
+
+        # 聚合缺口：来自结构化自动建议
+        gaps: List[Dict[str, Any]] = []
+        for result in per_store_results:
+            if not result.get("success"):
+                continue
+            for action in result.get("auto_scheduling_actions", []):
+                if action.get("type") == "fill_gap":
+                    payload = action.get("payload", {})
+                    gaps.append(
+                        {
+                            "target_store_id": result.get("store_id"),
+                            "shift": payload.get("shift"),
+                            "skill": payload.get("skill"),
+                            "count": int(payload.get("count", 0)),
+                        }
+                    )
+
+        # 候选可跨店员工池
+        transfer_suggestions: List[Dict[str, Any]] = []
+        for gap in gaps:
+            needed = gap["count"]
+            if needed <= 0:
+                continue
+            for store in stores:
+                from_store_id = store["store_id"]
+                if from_store_id == gap["target_store_id"]:
+                    continue
+                for emp in store.get("employees", []):
+                    if needed <= 0:
+                        break
+                    if gap["skill"] not in emp.get("skills", []):
+                        continue
+                    if not emp.get("multi_store_available", False):
+                        continue
+                    allowed_stores = emp.get("allowed_stores")
+                    if isinstance(allowed_stores, list) and gap["target_store_id"] not in allowed_stores:
+                        continue
+                    transfer_suggestions.append(
+                        {
+                            "employee_id": emp.get("id"),
+                            "employee_name": emp.get("name"),
+                            "from_store_id": from_store_id,
+                            "to_store_id": gap["target_store_id"],
+                            "shift": gap["shift"],
+                            "skill": gap["skill"],
+                            "reason": "目标门店该班次存在技能缺口，建议跨店支援",
+                        }
+                    )
+                    needed -= 1
+                if needed <= 0:
+                    break
+
+        return {
+            "success": True,
+            "date": date,
+            "store_results": per_store_results,
+            "transfer_suggestions": transfer_suggestions,
+        }
 
     async def adjust_schedule(
         self,
