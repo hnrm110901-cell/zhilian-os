@@ -40,6 +40,7 @@
   - `avg_order_value` 指标补齐映射，避免前端图表空值
   - 路由稳定性修复：将 `/{store_id}` 动态路由后置，避免吞掉 `/count` 等静态路由
   - 路由回归补强：新增 `/stores`、`/regional-summary`、`/performance-ranking` 静态路由防吞用例
+  - 路由自动防吞回归：新增“`/{store_id}` 必须声明在所有静态 GET 路由之后”的顺序校验
 - [x] 跨店调货申请/审批最小闭环（API + 页面 + 回归测试）
   - 后端新增：`/inventory/transfer-request`、`/inventory/transfer-requests`、`/inventory/transfer-requests/{decision_id}/approve|reject`
   - 审批执行补齐：来源/目标库存变更 + 双向 `TRANSFER` 流水 + 审批链落库
@@ -103,6 +104,7 @@
   - `apps/web/src/App.tsx`
   - `tasks/collab-sync.md`
 - verify:
+  - `python3 -m pytest -q apps/api-gateway/tests/test_multi_store_api_routes.py`（9 passed，含动态路由顺序防吞断言）
   - `python3 -m py_compile apps/api-gateway/src/api/inventory.py`（通过）
   - `npx eslint apps/web/src/pages/MultiStoreManagement.tsx apps/web/src/services/inventoryData.ts`（通过）
   - `npm run build --workspace @zhilian-os/web`（通过）

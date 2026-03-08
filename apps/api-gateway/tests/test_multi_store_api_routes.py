@@ -214,3 +214,20 @@ def test_static_regional_summary_route_not_captured_by_dynamic_store_id_route():
 
     assert response.status_code == 200
     assert response.json()["regions"][0]["region"] == "华中"
+
+
+def test_dynamic_store_id_route_declared_after_all_static_get_routes():
+    get_routes = []
+    for route in router.routes:
+        methods = getattr(route, "methods", set()) or set()
+        if "GET" not in methods:
+            continue
+        get_routes.append(route.path)
+
+    assert "/{store_id}" in get_routes
+    dynamic_index = get_routes.index("/{store_id}")
+
+    # 约束：任何新增静态 GET 路由都必须在 /{store_id} 前声明，防止被动态路由吞掉。
+    static_get_routes = [path for path in get_routes if "{" not in path]
+    for static_path in static_get_routes:
+        assert get_routes.index(static_path) < dynamic_index, f"static route {static_path} must be before /{{store_id}}"
