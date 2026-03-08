@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git *)",
+      "Bash(make *)",
+      "Bash(pytest *)",
+      "Bash(python3 *)",
+      "Bash(pip *)",
+      "Bash(pip3 *)",
+      "Bash(pnpm *)",
+      "Bash(npm *)",
+      "Bash(alembic *)",
+      "Bash(docker *)",
+      "Bash(docker-compose *)",
+      "Bash(uvicorn *)",
+      "Bash(ls *)",
+      "Bash(find *)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(tail *)"
+    ],
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git reset --hard*)",
+      "Bash(rm -rf /)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "file=\"${CLAUDE_TOOL_INPUT_FILE_PATH:-}\"; if [[ \"$file\" == *\".py\" && \"$file\" == *\"apps/api-gateway\"* ]]; then echo \"[提示] Python后端文件已修改，如有必要运行: cd ~/Desktop/zhilian-os && pytest apps/api-gateway/tests/ -q\"; fi; if [[ \"$file\" == *\".py\" && \"$file\" == *\"packages/agents\"* ]]; then echo \"[提示] Agent文件已修改，记得在各agent目录单独运行pytest (见L001)\"; fi"
+          }
+        ]
+      }
+    ]
+  }
+}

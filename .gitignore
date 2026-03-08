@@ -75,3 +75,7 @@ ssl/*.pem
 ssl/*.key
 ssl/*.crt
 ssl/*.p12
+
+# Claude Code 本地配置
+CLAUDE.local.md
+.claude/settings.local.json
