@@ -89,7 +89,7 @@ export interface TransferRequestPayload {
 
 export interface TransferRequestRecord {
   decision_id: string;
-  status: 'pending' | 'approved' | 'rejected' | 'executed' | string;
+  status: TransferRequestStatus;
   source_store_id: string | null;
   target_store_id: string | null;
   source_item_id: string | null;
@@ -112,10 +112,12 @@ export interface TransferRequestListResult {
 export interface TransferActionResult {
   success: boolean;
   decision_id: string;
-  status: string;
+  status: TransferRequestStatus;
   source_new_quantity?: number;
   target_new_quantity?: number;
 }
+
+export type TransferRequestStatus = 'pending' | 'approved' | 'rejected' | 'executed' | 'unknown';
 
 class InventoryDataService {
   private readonly basePath = '/api/v1/inventory';
@@ -125,6 +127,15 @@ class InventoryDataService {
       return (value as { data: T }).data;
     }
     return value ?? undefined;
+  }
+
+  private normalizeTransferStatus(status: string | null | undefined): TransferRequestStatus {
+    if (!status) return 'unknown';
+    if (status === 'pending_approval') return 'pending';
+    if (status === 'pending' || status === 'approved' || status === 'rejected' || status === 'executed') {
+      return status;
+    }
+    return 'unknown';
   }
 
   async getAll(storeId?: string, lowStockOnly: boolean = false): Promise<InventoryItem[]> {
@@ -202,12 +213,16 @@ class InventoryDataService {
 
   async createTransferRequest(storeId: string, payload: TransferRequestPayload): Promise<{
     decision_id: string;
-    status: string;
+    status: TransferRequestStatus;
   }> {
-    return apiClient.post<{ decision_id: string; status: string }>(
+    const response = await apiClient.post<{ decision_id: string; status: string }>(
       `/api/v1/inventory/transfer-request?store_id=${encodeURIComponent(storeId)}`,
       payload
     );
+    return {
+      decision_id: response.decision_id,
+      status: this.normalizeTransferStatus(response.status),
+    };
   }
 
   async listTransferRequests(params?: {
@@ -218,7 +233,16 @@ class InventoryDataService {
     const query = new URLSearchParams({ limit: String(params?.limit ?? 30) });
     if (params?.storeId) query.set('store_id', params.storeId);
     if (params?.status) query.set('status', params.status);
-    return apiClient.get<TransferRequestListResult>(`/api/v1/inventory/transfer-requests?${query.toString()}`);
+    const response = await apiClient.get<TransferRequestListResult>(
+      `/api/v1/inventory/transfer-requests?${query.toString()}`
+    );
+    return {
+      total: response.total,
+      items: (response.items || []).map((item) => ({
+        ...item,
+        status: this.normalizeTransferStatus(item.status),
+      })),
+    };
   }
 
   async approveTransferRequest(decisionId: string, managerFeedback?: string): Promise<TransferActionResult> {

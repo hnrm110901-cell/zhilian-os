@@ -179,6 +179,38 @@ def test_static_stores_route_not_captured_by_dynamic_store_id_route():
     assert response.json()["stores"][0]["id"] == "S001"
 
 
+def test_static_list_route_not_captured_by_dynamic_store_id_route():
+    app = FastAPI()
+    app.include_router(router, prefix="/api/v1/multi-store")
+    app.dependency_overrides[get_current_active_user] = lambda: SimpleNamespace(id="u1", role="admin")
+
+    store = SimpleNamespace(
+        id="S001",
+        name="岳麓店",
+        code="YL01",
+        address="长沙市岳麓区",
+        city="长沙",
+        district="岳麓",
+        region="华中",
+        status="active",
+        is_active=True,
+        manager_id="U001",
+        area=300,
+        seats=120,
+        phone="123456",
+        created_at=None,
+    )
+
+    with patch("src.api.multi_store.store_service.get_stores", new=AsyncMock(return_value=[store])), patch(
+        "src.api.multi_store.store_service.get_store", new=AsyncMock(return_value=None)
+    ):
+        client = TestClient(app)
+        response = client.get("/api/v1/multi-store/list")
+
+    assert response.status_code == 200
+    assert response.json()["stores"][0]["id"] == "S001"
+
+
 def test_static_performance_ranking_route_not_captured_by_dynamic_store_id_route():
     app = FastAPI()
     app.include_router(router, prefix="/api/v1/multi-store")
@@ -231,3 +263,28 @@ def test_dynamic_store_id_route_declared_after_all_static_get_routes():
     static_get_routes = [path for path in get_routes if "{" not in path]
     for static_path in static_get_routes:
         assert get_routes.index(static_path) < dynamic_index, f"static route {static_path} must be before /{{store_id}}"
+
+
+def test_single_segment_static_get_routes_are_all_before_dynamic_store_id_route():
+    get_routes = []
+    for route in router.routes:
+        methods = getattr(route, "methods", set()) or set()
+        if "GET" not in methods:
+            continue
+        get_routes.append(route.path)
+
+    assert "/{store_id}" in get_routes
+    dynamic_index = get_routes.index("/{store_id}")
+
+    single_segment_static = []
+    for path in get_routes:
+        if "{" in path:
+            continue
+        if path == "/":
+            continue
+        if path.count("/") != 1:
+            continue
+        single_segment_static.append(path)
+
+    for static_path in single_segment_static:
+        assert get_routes.index(static_path) < dynamic_index, f"single-segment static route {static_path} must be before /{{store_id}}"
