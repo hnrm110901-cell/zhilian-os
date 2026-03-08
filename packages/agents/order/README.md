@@ -387,7 +387,7 @@ pytest tests/ -v --cov=src --cov-report=html
 - [ ] AR菜单展示
 - [ ] 语音点单
 - [x] 个性化用餐建议
-- [ ] 跨门店预定
+- [x] 跨门店预定
 
 ## 许可证
 

@@ -104,6 +104,7 @@ class OrderAgent(BaseAgent):
         return [
             "create_reservation", "join_queue", "get_queue_status",
             "create_order", "add_dish", "calculate_dynamic_price", "recommend_dishes", "personalize_dining_suggestions",
+            "suggest_cross_store_reservation",
             "calculate_bill", "process_payment", "get_order",
             "modify_order", "merge_table_orders", "update_order_status", "cancel_order",
         ]
@@ -172,6 +173,8 @@ class OrderAgent(BaseAgent):
                 result = await self.recommend_dishes(**params)
             elif action == "personalize_dining_suggestions":
                 result = await self.personalize_dining_suggestions(**params)
+            elif action == "suggest_cross_store_reservation":
+                result = await self.suggest_cross_store_reservation(**params)
             elif action == "calculate_bill":
                 result = await self.calculate_bill(**params)
             elif action == "process_payment":
@@ -805,6 +808,65 @@ class OrderAgent(BaseAgent):
             "recommendations": top,
             "message": message,
             "locale": locale,
+        }
+
+    async def suggest_cross_store_reservation(
+        self,
+        primary_store_id: str,
+        reservation_time: str,
+        party_size: int,
+        store_candidates: List[Dict[str, Any]],
+        customer_name: Optional[str] = None,
+        customer_mobile: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        跨门店预定建议：
+        - 当主门店冲突时，筛选可用门店
+        - 按距离与容量余量排序
+        """
+        available: List[Dict[str, Any]] = []
+        for store in store_candidates:
+            store_id = store.get("store_id")
+            if not store_id or store_id == primary_store_id:
+                continue
+            reservations = store.get("existing_reservations", [])
+            if not self._check_time_availability(store_id, reservation_time, reservations):
+                continue
+
+            load = self._count_confirmed_reservations(store_id, reservation_time, reservations)
+            max_concurrent = int(store.get("max_concurrent_reservations", os.getenv("ORDER_MAX_CONCURRENT_RESERVATIONS", "10")))
+            capacity_left = max(0, max_concurrent - load)
+            available.append(
+                {
+                    "store_id": store_id,
+                    "store_name": store.get("store_name", store_id),
+                    "distance_km": float(store.get("distance_km", 999)),
+                    "capacity_left": capacity_left,
+                    "reservation_time": reservation_time,
+                    "party_size": party_size,
+                }
+            )
+
+        available.sort(key=lambda x: (x["distance_km"], -x["capacity_left"]))
+        top = available[:3]
+        redirect_payload = None
+        if top and customer_name and customer_mobile:
+            best = top[0]
+            redirect_payload = {
+                "store_id": best["store_id"],
+                "customer_name": customer_name,
+                "customer_mobile": customer_mobile,
+                "party_size": party_size,
+                "reservation_time": reservation_time,
+                "redirected_from": primary_store_id,
+            }
+
+        return {
+            "success": True,
+            "primary_store_id": primary_store_id,
+            "cross_store_options": top,
+            "redirect_reservation_payload": redirect_payload,
+            "message": "已生成跨门店预定建议" if top else "暂无可用门店可供预定",
         }
 
     # ==================== 结账管理 ====================

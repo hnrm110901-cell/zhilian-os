@@ -339,6 +339,44 @@ class TestOrdering:
         assert result["recommendations"][0]["personalization_score"] > 0
 
     @pytest.mark.asyncio
+    async def test_suggest_cross_store_reservation(self, agent):
+        """测试跨门店预定建议"""
+        store_candidates = [
+            {
+                "store_id": "STORE001",
+                "store_name": "主门店",
+                "distance_km": 0.2,
+                "existing_reservations": [
+                    {"store_id": "STORE001", "reservation_time": "2024-01-20 18:00", "status": "confirmed"},
+                ],
+            },
+            {
+                "store_id": "STORE002",
+                "store_name": "二店",
+                "distance_km": 1.5,
+                "existing_reservations": [],
+            },
+            {
+                "store_id": "STORE003",
+                "store_name": "三店",
+                "distance_km": 0.8,
+                "existing_reservations": [],
+            },
+        ]
+        result = await agent.suggest_cross_store_reservation(
+            primary_store_id="STORE001",
+            reservation_time="2024-01-20 18:00",
+            party_size=4,
+            customer_name="张三",
+            customer_mobile="13800138000",
+            store_candidates=store_candidates,
+        )
+        assert result["success"] is True
+        assert len(result["cross_store_options"]) >= 1
+        assert result["cross_store_options"][0]["store_id"] == "STORE003"
+        assert result["redirect_reservation_payload"]["redirected_from"] == "STORE001"
+
+    @pytest.mark.asyncio
     async def test_modify_order_update_quantity_and_total(self, agent):
         """测试订单改数量后金额重算"""
         order = {
