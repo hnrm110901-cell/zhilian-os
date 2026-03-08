@@ -104,7 +104,7 @@ class OrderAgent(BaseAgent):
             "create_reservation", "join_queue", "get_queue_status",
             "create_order", "add_dish", "recommend_dishes",
             "calculate_bill", "process_payment", "get_order",
-            "modify_order", "update_order_status", "cancel_order",
+            "modify_order", "merge_table_orders", "update_order_status", "cancel_order",
         ]
 
     def get_valid_next_statuses(self, current_status: str) -> List[str]:
@@ -133,6 +133,8 @@ class OrderAgent(BaseAgent):
                 result = await self.get_order(**params)
             elif action == "modify_order":
                 result = await self.modify_order(**params)
+            elif action == "merge_table_orders":
+                result = await self.merge_table_orders(**params)
             elif action == "update_order_status":
                 result = await self.update_order_status(**params)
             elif action == "cancel_order":
@@ -423,6 +425,49 @@ class OrderAgent(BaseAgent):
             "updated_order": updated_order,
             "applied_modifications": applied,
             "message": f"订单修改完成，共处理 {len(modifications)} 项",
+        }
+
+    async def merge_table_orders(
+        self,
+        primary_order: Dict[str, Any],
+        secondary_order: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """
+        拼桌合单：将 secondary_order 合并到 primary_order，返回 merged_order。
+        """
+        primary_id = primary_order.get("order_id")
+        secondary_id = secondary_order.get("order_id")
+        logger.info("拼桌合单", primary_order_id=primary_id, secondary_order_id=secondary_id)
+
+        if not primary_id or not secondary_id:
+            return {"success": False, "message": "缺少订单ID，无法拼桌"}
+        if primary_id == secondary_id:
+            return {"success": False, "message": "同一订单不能拼桌"}
+        if primary_order.get("store_id") != secondary_order.get("store_id"):
+            return {"success": False, "message": "跨门店订单不能拼桌"}
+
+        merged_dishes = [dict(d) for d in primary_order.get("dishes", [])]
+        merged_dishes.extend([dict(d) for d in secondary_order.get("dishes", [])])
+        total_amount = round(sum(float(d.get("subtotal", 0)) for d in merged_dishes), 2)
+
+        table_ids: List[str] = []
+        for table_id in [primary_order.get("table_id"), secondary_order.get("table_id")]:
+            if table_id and table_id not in table_ids:
+                table_ids.append(table_id)
+
+        merged_order = dict(primary_order)
+        merged_order["dishes"] = merged_dishes
+        merged_order["total_amount"] = total_amount
+        merged_order["merged_from_order_ids"] = [primary_id, secondary_id]
+        merged_order["table_ids"] = table_ids
+        merged_order["is_merged_table"] = True
+        merged_order["updated_at"] = datetime.now().isoformat()
+
+        return {
+            "success": True,
+            "merged_order": merged_order,
+            "closed_order_id": secondary_id,
+            "message": f"拼桌成功：{primary_id} + {secondary_id}",
         }
 
     async def recommend_dishes(

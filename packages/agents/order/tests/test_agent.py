@@ -234,6 +234,46 @@ class TestOrdering:
         assert updated["dishes"][0]["special_instructions"] == "少盐"
         assert any("数量非法" in msg for msg in result["applied_modifications"])
 
+    @pytest.mark.asyncio
+    async def test_merge_table_orders_success(self, agent):
+        """测试拼桌合单成功"""
+        primary_order = {
+            "order_id": "ORD100",
+            "store_id": "STORE001",
+            "table_id": "T001",
+            "dishes": [
+                {"dish_id": "D001", "dish_name": "宫保鸡丁", "price": 48.0, "quantity": 1, "subtotal": 48.0}
+            ],
+            "total_amount": 48.0,
+            "status": OrderStatus.ORDERING.value,
+        }
+        secondary_order = {
+            "order_id": "ORD101",
+            "store_id": "STORE001",
+            "table_id": "T002",
+            "dishes": [
+                {"dish_id": "D002", "dish_name": "米饭", "price": 3.0, "quantity": 2, "subtotal": 6.0}
+            ],
+            "total_amount": 6.0,
+            "status": OrderStatus.ORDERING.value,
+        }
+        result = await agent.merge_table_orders(primary_order=primary_order, secondary_order=secondary_order)
+        assert result["success"] is True
+        merged = result["merged_order"]
+        assert merged["is_merged_table"] is True
+        assert merged["total_amount"] == 54.0
+        assert merged["table_ids"] == ["T001", "T002"]
+        assert result["closed_order_id"] == "ORD101"
+
+    @pytest.mark.asyncio
+    async def test_merge_table_orders_reject_cross_store(self, agent):
+        """测试跨门店拼桌被拒绝"""
+        primary_order = {"order_id": "ORD200", "store_id": "STORE001", "table_id": "T001", "dishes": []}
+        secondary_order = {"order_id": "ORD201", "store_id": "STORE002", "table_id": "T002", "dishes": []}
+        result = await agent.merge_table_orders(primary_order=primary_order, secondary_order=secondary_order)
+        assert result["success"] is False
+        assert "跨门店订单不能拼桌" in result["message"]
+
 
 class TestPayment:
     """结账管理测试"""
