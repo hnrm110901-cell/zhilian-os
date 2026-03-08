@@ -34,7 +34,7 @@
 
 | 项 | 说明 | 状态 |
 |----|------|------|
-| 前端 inventoryData 等 | 逐步替换为 L1 真实数据（POS/Excel）；Excel 导入与 POS Webhook→图谱已打通 | 可选、低优先级 |
+| 前端 inventoryData 等 | inventoryData 服务与 InventoryPage 已切换到 L1 真实库存接口；Excel 导入与 POS Webhook→图谱通路已打通 | 已完成 |
 
 ---
 

@@ -13,6 +13,11 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import ReactECharts from 'echarts-for-react';
 import apiClient from '../services/api';
+import {
+  inventoryDataService,
+  type InventoryItem,
+  type InventoryStats,
+} from '../services/inventoryData';
 import { handleApiError, showSuccess } from '../utils/message';
 
 const { Option } = Select;
@@ -32,24 +37,11 @@ const TXN_CONFIG: Record<string, { color: string; text: string }> = {
   transfer:   { color: 'cyan',   text: '调拨' },
 };
 
-interface InventoryItem {
-  id: string;
-  store_id: string;
-  name: string;
-  category: string | null;
-  unit: string | null;
-  current_quantity: number;
-  min_quantity: number;
-  max_quantity: number | null;
-  unit_cost: number | null;
-  status: string | null;
-}
-
 const InventoryPage: React.FC = () => {
-  const [storeId, setStoreId] = useState('STORE001');
+  const [storeId, setStoreId] = useState(localStorage.getItem('store_id') || 'STORE001');
   const [stores, setStores] = useState<any[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<InventoryStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -86,16 +78,16 @@ const InventoryPage: React.FC = () => {
   const loadInventory = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await apiClient.get(`/api/v1/inventory?store_id=${storeId}`);
-      setInventory(Array.isArray(res) ? res : (res || []));
+      const items = await inventoryDataService.getAll(storeId);
+      setInventory(items);
     } catch (err: any) { handleApiError(err, '加载库存失败'); }
     finally { setLoading(false); }
   }, [storeId]);
 
   const loadStats = useCallback(async () => {
     try {
-      const res = await apiClient.get(`/api/v1/inventory-stats?store_id=${storeId}`);
-      setStats(res);
+      const nextStats = await inventoryDataService.getStats(storeId);
+      setStats(nextStats);
     } catch { /* ignore */ }
   }, [storeId]);
 
@@ -107,7 +99,7 @@ const InventoryPage: React.FC = () => {
 
   const handleAddItem = async (values: any) => {
     try {
-      await apiClient.post('/api/v1/inventory', {
+      await inventoryDataService.create({
         id: `INV_${Date.now()}`,
         store_id: storeId,
         ...values,
@@ -123,7 +115,7 @@ const InventoryPage: React.FC = () => {
   const handleEditItem = async (values: any) => {
     if (!editItem) return;
     try {
-      await apiClient.patch(`/api/v1/inventory/${editItem.id}`, values);
+      await inventoryDataService.update(editItem.id, values);
       showSuccess('已更新');
       setEditDrawer(false);
       editForm.resetFields();
@@ -135,7 +127,7 @@ const InventoryPage: React.FC = () => {
   const handleTransaction = async (values: any) => {
     if (!txnItem) return;
     try {
-      await apiClient.post(`/api/v1/inventory/${txnItem.id}/transaction`, {
+      await inventoryDataService.recordTransaction(txnItem.id, {
         transaction_type: values.transaction_type,
         quantity: values.quantity,
         notes: values.notes,
@@ -153,15 +145,15 @@ const InventoryPage: React.FC = () => {
     setTxnHistoryModal(true);
     setTxnHistoryLoading(true);
     try {
-      const res = await apiClient.get(`/api/v1/inventory/${item.id}/transactions?limit=50`);
-      setTxnHistory(res || []);
+      const txns = await inventoryDataService.getTransactions(item.id, 50);
+      setTxnHistory(txns || []);
     } catch (err: any) { handleApiError(err, '加载流水失败'); }
     finally { setTxnHistoryLoading(false); }
   };
 
   const handleBatchRestock = async () => {
     try {
-      const res = await apiClient.post(`/api/v1/inventory/batch-restock?store_id=${storeId}`, { item_ids: null });
+      const res = await inventoryDataService.batchRestock(storeId, null);
       showSuccess(`批量补货完成，共补货 ${res?.restocked} 个物品`);
       loadInventory();
       loadStats();
@@ -171,6 +163,7 @@ const InventoryPage: React.FC = () => {
   // ── Charts ──
   const categoryDist = stats?.category_distribution || {};
   const statusDist = stats?.status_distribution || {};
+  const alertItems = stats?.alert_items ?? [];
 
   const categoryPieOption = {
     tooltip: { trigger: 'item' },
@@ -275,7 +268,14 @@ const InventoryPage: React.FC = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <h1 style={{ margin: 0 }}>库存预警Agent</h1>
         <Space>
-          <Select value={storeId} onChange={v => setStoreId(v)} style={{ width: 160 }}>
+          <Select
+            value={storeId}
+            onChange={(v) => {
+              setStoreId(v);
+              localStorage.setItem('store_id', v);
+            }}
+            style={{ width: 160 }}
+          >
             {stores.length > 0 ? stores.map((s: any) => (
               <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
             )) : <Option value="STORE001">STORE001</Option>}
@@ -357,10 +357,10 @@ const InventoryPage: React.FC = () => {
               </Card>
             </Col>
           </Row>
-          {stats?.alert_items?.length > 0 && (
+          {alertItems.length > 0 && (
             <Card size="small" title={<span><WarningOutlined style={{ color: '#faad14' }} /> 预警物品清单</span>} style={{ marginTop: 16 }}>
               <Table
-                dataSource={stats.alert_items}
+                dataSource={alertItems}
                 rowKey="id"
                 size="small"
                 pagination={false}
