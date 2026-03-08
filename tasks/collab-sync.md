@@ -16,7 +16,10 @@
   - 工具栏与操作按钮优化换行
 
 ## P2
-- [ ] 角色权限管理体验优化（页面入口可见性与无权限提示一致性）
+- [x] 角色权限管理体验优化（页面入口可见性与无权限提示一致性）
+  - 非 admin 侧边栏按角色白名单过滤可见页面
+  - `store_manager` 可见并可进入 `L5 行动计划`
+  - 无权限跳转携带来源路径与角色信息，403 页面展示上下文
 
 ---
 
@@ -28,13 +31,12 @@
 ## [Codex] 状态
 - status: completed
 - owner: Codex
-- task: P1 核心页面移动端适配（Workforce + ActionPlans）
+- task: P2 角色权限体验一致性修复
 - files:
-  - `apps/web/src/pages/WorkforcePage.tsx`
-  - `apps/web/src/pages/WorkforcePage.module.css`
-  - `apps/web/src/pages/ActionPlansPage.tsx`
-  - `apps/web/src/pages/ActionPlansPage.module.css`
+  - `apps/web/src/components/ProtectedRoute.tsx`
+  - `apps/web/src/layouts/MainLayout.tsx`
+  - `apps/web/src/pages/UnauthorizedPage.tsx`
   - `tasks/collab-sync.md`
 - verify:
-  - `pnpm --filter @zhilian-os/web exec eslint src/pages/WorkforcePage.tsx src/pages/ActionPlansPage.tsx`（通过）
-- note: 已按“移动端五域”需求源完成首批高频页面适配，下一步可进入 P2 权限体验一致性
+  - `pnpm --filter @zhilian-os/web exec eslint src/components/ProtectedRoute.tsx src/layouts/MainLayout.tsx src/pages/UnauthorizedPage.tsx`（通过）
+- note: 已完成入口可见性与403提示一致性修复

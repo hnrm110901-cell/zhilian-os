@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Layout, Menu, theme, Dropdown, Avatar, Space, Tag, Breadcrumb, Badge, Tooltip, Button } from 'antd';
 import type { MenuProps } from 'antd';
 import {
@@ -352,6 +352,58 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   '/notifications': '通知中心',
 };
 
+const PUBLIC_ROLE_ROUTES = new Set<string>([
+  '/',
+  '/daily-hub',
+  '/schedule',
+  '/reservation',
+  '/notifications',
+  '/my-schedule',
+  '/ops-hub',
+  '/products-hub',
+  '/crm-hub',
+  '/order-analytics',
+  '/dashboard-preferences',
+  '/notification-preferences',
+  '/menu-recommendation',
+]);
+
+const STORE_MANAGER_EXTRA_ROUTES = new Set<string>([
+  '/recommendations',
+  '/dish-cost',
+  '/channel-profit',
+  '/employee-performance',
+  '/waste-reasoning',
+  '/bom-management',
+  '/waste-events',
+  '/banquet-lifecycle',
+  '/marketing',
+  '/fct',
+  '/action-plans',
+  '/workforce',
+  '/alert-thresholds',
+]);
+
+const filterMenuItemsByAccess = (
+  items: MenuProps['items'],
+  isAdmin: boolean,
+  allowedRoutes: Set<string>
+): MenuProps['items'] =>
+  (items || []).flatMap((item) => {
+    if (!item) return [];
+    if ('type' in item && item.type === 'divider') return [item];
+    const menuItem = item as NonNullable<MenuProps['items']>[number] & { children?: MenuProps['items'] };
+    if (menuItem.children) {
+      const children = filterMenuItemsByAccess(menuItem.children, isAdmin, allowedRoutes);
+      if (!children || children.length === 0) return [];
+      return [{ ...menuItem, children }];
+    }
+    const key = String((menuItem as { key?: string }).key || '');
+    if (!key) return [];
+    if (isAdmin || allowedRoutes.has(key)) return [menuItem];
+    return [];
+  });
+
 const MainLayout: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [searchVisible, setSearchVisible] = useState(false);
@@ -362,6 +414,14 @@ const MainLayout: React.FC = () => {
   const { token: { colorBgContainer, borderRadiusLG } } = theme.useToken();
 
   const isAdmin = user?.role === 'admin';
+  const userRole = user?.role || 'staff';
+  const allowedRoutes = useMemo(() => {
+    const routes = new Set<string>(PUBLIC_ROLE_ROUTES);
+    if (userRole === 'store_manager') {
+      STORE_MANAGER_EXTRA_ROUTES.forEach((route) => routes.add(route));
+    }
+    return routes;
+  }, [userRole]);
 
   // 当前路由对应的分组 key
   const currentGroup = ROUTE_TO_GROUP[location.pathname] ?? '';
@@ -369,12 +429,6 @@ const MainLayout: React.FC = () => {
   const [openKeys, setOpenKeys] = useState<string[]>(() =>
     currentGroup ? [currentGroup] : []
   );
-
-  useEffect(() => {
-    if (currentGroup) {
-      setOpenKeys(prev => prev.includes(currentGroup) ? prev : [...prev, currentGroup]);
-    }
-  }, [currentGroup]);
 
   // ── 全局快捷键 ──────────────────────────────────────────────────────────────
   useKeyboardShortcuts([
@@ -482,6 +536,7 @@ const MainLayout: React.FC = () => {
         { key: '/compliance',        icon: <SafetyOutlined />,        label: '合规管理' },
         { key: '/human-in-the-loop', icon: <CheckCircleOutlined />,   label: '人工审批' },
         { key: '/tasks',             icon: <FileTextOutlined />,      label: '任务管理' },
+        { key: '/action-plans',      icon: <CheckCircleOutlined />,   label: 'L5 行动计划' },
         { key: '/ops-agent',         icon: <ToolOutlined />,          label: 'IT运维Agent' },
         { key: '/voice-devices',     icon: <SoundOutlined />,         label: '语音设备' },
       ],
@@ -568,7 +623,6 @@ const MainLayout: React.FC = () => {
         { key: '/multi-store',      icon: <ShopOutlined />,       label: '多门店管理' },
         { key: '/approval',         icon: <CheckCircleOutlined />,label: '审批管理' },
         { key: '/approval-list',    icon: <UnorderedListOutlined />,label: '审批列表' },
-        { key: '/action-plans',     icon: <CheckCircleOutlined />, label: 'L5 行动计划' },
         { key: '/audit',            icon: <FileTextOutlined />,   label: '审计日志' },
         { key: '/data-security',    icon: <SafetyOutlined />,     label: '数据安全' },
         // 集成与适配
@@ -607,6 +661,7 @@ const MainLayout: React.FC = () => {
       ],
     }] as NonNullable<MenuProps['items']>) : []),
   ];
+  const visibleMenuItems = filterMenuItemsByAccess(menuItems, isAdmin, allowedRoutes);
 
   const handleMenuClick = ({ key }: { key: string }) => {
     navigate(key);
@@ -666,7 +721,7 @@ const MainLayout: React.FC = () => {
           openKeys={collapsed ? [] : openKeys}
           onOpenChange={setOpenKeys}
           mode="inline"
-          items={menuItems}
+          items={visibleMenuItems}
           onClick={handleMenuClick}
           style={{ borderRight: 0, paddingBottom: 24 }}
         />
