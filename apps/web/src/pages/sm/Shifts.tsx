@@ -5,7 +5,7 @@ import { ZBadge, ZButton, ZCard, ZEmpty, ZSkeleton } from '../../design-system/c
 import { checkInShift, checkOutShift } from '../../services/mobile.mutation.service';
 import { queryShiftSummary } from '../../services/mobile.query.service';
 import type { MobileShift, ShiftSummaryResponse } from '../../services/mobile.types';
-import { showSuccess, handleApiError } from '../../utils/message';
+import { showError, showSuccess, handleApiError } from '../../utils/message';
 import styles from './Shifts.module.css';
 
 const ATTENDANCE_TEXT: Record<string, string> = {
@@ -41,22 +41,20 @@ export default function SmShifts() {
 
   const doCheckIn = async (item: MobileShift) => {
     setActionLoadingId(item.shift_id);
-    const ok = await checkInShift(item.shift_id);
+    const result = await checkInShift(item.shift_id);
     setActionLoadingId(null);
-    if (ok) {
-      showSuccess('打卡成功');
-      load();
-    }
+    if (!result.ok) return showError(result.message);
+    showSuccess(result.message);
+    load();
   };
 
   const doCheckOut = async (item: MobileShift) => {
     setActionLoadingId(item.shift_id);
-    const ok = await checkOutShift(item.shift_id);
+    const result = await checkOutShift(item.shift_id);
     setActionLoadingId(null);
-    if (ok) {
-      showSuccess('下班打卡成功');
-      load();
-    }
+    if (!result.ok) return showError(result.message);
+    showSuccess(result.message);
+    load();
   };
 
   return (

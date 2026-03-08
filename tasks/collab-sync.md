@@ -12,6 +12,7 @@
   - 新增 `sm/Shifts.tsx`、`sm/Tasks.tsx`
   - 新增 `mobile.query.service.ts`、`mobile.mutation.service.ts`、`mobile.mock.ts`、`mobile.types.ts`
   - 底部导航切换为 首页/班次/任务/告警，保留原 `business/decisions` 路由兼容
+  - 状态机补齐：打卡/下班打卡、任务开始/提交均有状态转移校验与错误提示
 
 ## P1
 - [x] 核心页面移动端适配补强（`WorkforcePage`、`ActionPlansPage`）
@@ -51,5 +52,5 @@
   - `apps/web/src/App.tsx`
   - `tasks/collab-sync.md`
 - verify:
-  - `pnpm --filter @zhilian-os/web exec eslint src/pages/sm/Home.tsx src/pages/sm/Shifts.tsx src/pages/sm/Tasks.tsx src/layouts/StoreManagerLayout.tsx src/services/mobile.types.ts src/services/mobile.mock.ts src/services/mobile.query.service.ts src/services/mobile.mutation.service.ts`（通过）
-- note: 三页已同源 DTO 化；下一步补充状态机转移校验和任务详情抽屉
+  - `pnpm --filter @zhilian-os/web exec eslint src/services/mobile.types.ts src/services/mobile.mock.ts src/services/mobile.query.service.ts src/services/mobile.mutation.service.ts src/pages/sm/Home.tsx src/pages/sm/Shifts.tsx src/pages/sm/Tasks.tsx`（通过）
+- note: 已完成状态机转移校验，下一步可补任务详情抽屉与证据上传占位

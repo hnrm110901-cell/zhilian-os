@@ -58,3 +58,8 @@ export interface MobileHomeSummaryResponse {
   today_shift: MobileShift | null;
   top_tasks: MobileTask[];
 }
+
+export interface MobileActionResult {
+  ok: boolean;
+  message: string;
+}

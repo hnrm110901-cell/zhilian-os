@@ -5,7 +5,7 @@ import { ZBadge, ZButton, ZCard, ZEmpty, ZSkeleton } from '../../design-system/c
 import { startTask, submitTask } from '../../services/mobile.mutation.service';
 import { queryTaskSummary } from '../../services/mobile.query.service';
 import type { MobileTask, TaskSummaryResponse } from '../../services/mobile.types';
-import { showSuccess, handleApiError } from '../../utils/message';
+import { showError, showSuccess, handleApiError } from '../../utils/message';
 import styles from './Tasks.module.css';
 
 const PRIORITY_MAP: Record<string, { text: string; type: 'critical' | 'warning' | 'info' | 'success' | 'default' }> = {
@@ -59,22 +59,20 @@ export default function SmTasks() {
 
   const doStart = async (item: MobileTask) => {
     setActionLoadingId(item.task_id);
-    const ok = await startTask(item.task_id);
+    const result = await startTask(item.task_id);
     setActionLoadingId(null);
-    if (ok) {
-      showSuccess('任务已开始');
-      load();
-    }
+    if (!result.ok) return showError(result.message);
+    showSuccess(result.message);
+    load();
   };
 
   const doSubmit = async (item: MobileTask) => {
     setActionLoadingId(item.task_id);
-    const ok = await submitTask(item.task_id);
+    const result = await submitTask(item.task_id);
     setActionLoadingId(null);
-    if (ok) {
-      showSuccess('任务已提交');
-      load();
-    }
+    if (!result.ok) return showError(result.message);
+    showSuccess(result.message);
+    load();
   };
 
   return (

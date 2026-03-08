@@ -1,5 +1,5 @@
 import { apiClient } from './api';
-import { mobileHomeSummaryMock, mobileShiftsMock, mobileTasksMock } from './mobile.mock';
+import { getMockHomeSummary, getMockShiftSummary, getMockTaskSummary } from './mobile.mock';
 import type { MobileHomeSummaryResponse, ShiftSummaryResponse, TaskSummaryResponse } from './mobile.types';
 
 const STORE_ID = localStorage.getItem('store_id') || 'STORE001';
@@ -11,7 +11,7 @@ export async function queryHomeSummary(): Promise<MobileHomeSummaryResponse> {
     });
     return resp;
   } catch {
-    return mobileHomeSummaryMock;
+    return getMockHomeSummary();
   }
 }
 
@@ -22,7 +22,7 @@ export async function queryShiftSummary(date: string): Promise<ShiftSummaryRespo
     });
     return resp;
   } catch {
-    return { ...mobileShiftsMock, date };
+    return getMockShiftSummary(date);
   }
 }
 
@@ -33,6 +33,6 @@ export async function queryTaskSummary(): Promise<TaskSummaryResponse> {
     });
     return resp;
   } catch {
-    return mobileTasksMock;
+    return getMockTaskSummary();
   }
 }
