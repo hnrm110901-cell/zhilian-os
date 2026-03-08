@@ -37,6 +37,12 @@ CELERY_BROKER_URL=redis://localhost:6379/1
 
 # Celery结果存储
 CELERY_RESULT_BACKEND=redis://localhost:6379/2
+
+# Celery时区（建议与门店运营时区一致）
+CELERY_TIMEZONE=Asia/Shanghai
+
+# 是否启用UTC（本地07:00定时任务建议关闭）
+CELERY_ENABLE_UTC=false
 ```
 
 **说明**:
@@ -374,6 +380,8 @@ DATABASE_URL=postgresql+asyncpg://zhilian:zhilian@localhost:5432/zhilian_os_dev
 REDIS_URL=redis://localhost:6379/0
 CELERY_BROKER_URL=redis://localhost:6379/1
 CELERY_RESULT_BACKEND=redis://localhost:6379/2
+CELERY_TIMEZONE=Asia/Shanghai
+CELERY_ENABLE_UTC=false
 
 SECRET_KEY=dev-secret-key-change-in-production
 JWT_SECRET=dev-jwt-secret-change-in-production
@@ -397,6 +405,8 @@ DATABASE_URL=postgresql+asyncpg://zhilian:strong_password@db.example.com:5432/zh
 REDIS_URL=redis://:redis_password@redis.example.com:6379/0
 CELERY_BROKER_URL=redis://:redis_password@redis.example.com:6379/1
 CELERY_RESULT_BACKEND=redis://:redis_password@redis.example.com:6379/2
+CELERY_TIMEZONE=Asia/Shanghai
+CELERY_ENABLE_UTC=false
 
 SECRET_KEY=production-secret-key-32-chars-minimum
 JWT_SECRET=production-jwt-secret-32-chars-minimum
