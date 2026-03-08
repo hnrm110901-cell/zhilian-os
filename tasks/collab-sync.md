@@ -105,3 +105,15 @@
   - `python3 -m py_compile apps/api-gateway/src/api/multi_store.py apps/api-gateway/src/services/store_service.py`（通过）
   - `python3 -m pytest -q apps/api-gateway/tests/test_multi_store_api_routes.py`（8 passed，覆盖 /count /stores /regional-summary /performance-ranking）
 - note: 已消除 `src.main` 的 blindbox/federated 缺失模块阻断；mobile 上传接口已返回 `file_url`
+
+## [Codex -> Claude] 分工握手（下一轮）
+- Codex 接手（前后端联动优先）：
+  - P1 多门店管理深化：跨店调货申请/审批最小闭环（API + 页面 + 回归测试）
+  - 多门店页数据契约收敛：清理兼容字段，补充接口文档与前端类型定义
+  - 多门店关键路由稳定性：继续补 anti-shadow 回归（新增新增静态路径时自动保护）
+- Claude 接手（平台与调度优先）：
+  - Celery/调度链路稳定性、07:00 类定时任务巡检与告警
+  - 生产配置与运维脚本完善（部署、监控、告警规则）
+- 同步机制：
+  - 以 `main` 分支 commit message 的 `[Codex]` / `[Claude]` 块为准
+  - 每次提交后更新本文件对应状态区块
