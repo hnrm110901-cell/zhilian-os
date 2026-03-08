@@ -17,6 +17,7 @@
   - 任务详情接口化：新增 `queryTaskDetail`，提交改为 `submitTask(payload)`（说明/文件名）
   - 证据上传调用化：新增 `uploadTaskEvidence`（FormData）+ mock 回退 + 上传状态展示
   - 后端 `mobile` API 补齐：`home/shifts/tasks` 查询 + check-in/out + start/submit + evidence 上传
+  - mobile API 收尾：上传接口返回 `file_url`；补齐 `/mobile` 新端点专项测试（直测路由函数）
 
 ## P1
 - [x] 核心页面移动端适配补强（`WorkforcePage`、`ActionPlansPage`）
@@ -41,9 +42,12 @@
 ## [Codex] 状态
 - status: completed
 - owner: Codex
-- task: 移动端后端 API 补齐（/api/v1/mobile）
+- task: 移动端 mobile API 收尾（测试 + 兼容修复）
 - files:
+  - `apps/api-gateway/src/api/blindbox.py`
+  - `apps/api-gateway/src/api/federated.py`
   - `apps/api-gateway/src/api/mobile.py`
+  - `apps/api-gateway/tests/test_mobile_api_v1_routes.py`
   - `apps/web/src/pages/sm/Home.tsx`
   - `apps/web/src/pages/sm/Shifts.tsx`
   - `apps/web/src/pages/sm/Shifts.module.css`
@@ -58,5 +62,6 @@
   - `tasks/collab-sync.md`
 - verify:
   - `python3 -m py_compile apps/api-gateway/src/api/mobile.py`（通过）
-  - `python3 -m pytest -q apps/api-gateway/tests -k "mobile and (api or task or shift)"`（被现有 `blindbox` 导入错误阻断，非本次改动引入）
-- note: 前后端 `/api/v1/mobile` 链路已对齐，下一步可加 mobile API 专项测试与附件 URL 返回
+  - `python3 -m py_compile apps/api-gateway/src/api/blindbox.py apps/api-gateway/src/api/federated.py`（通过）
+  - `python3 -m pytest -q apps/api-gateway/tests/test_mobile_api_v1_routes.py`（3 passed）
+- note: 已消除 `src.main` 的 blindbox/federated 缺失模块阻断；mobile 上传接口已返回 `file_url`

@@ -1034,4 +1034,6 @@ async def mobile_task_upload_evidence(
     task.attachments = json.dumps(existing, ensure_ascii=False)
     await db.commit()
 
-    return {"ok": True, "message": "证据上传成功", "file_name": filename}
+    media_base_url = os.getenv("MOBILE_EVIDENCE_BASE_URL", "/uploads/evidence")
+    file_url = f"{media_base_url.rstrip('/')}/{filename}"
+    return {"ok": True, "message": "证据上传成功", "file_name": filename, "file_url": file_url}
