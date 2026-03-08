@@ -100,6 +100,36 @@ from .workforce import (
     BudgetPeriodType,
     RankingPeriodType,
 )
+# Phase 9 — Banquet Agent
+from .banquet import (
+    BanquetHall,
+    BanquetHallType,
+    BanquetCustomer,
+    BanquetLead,
+    LeadFollowupRecord,
+    BanquetQuote,
+    MenuPackage,
+    MenuPackageItem,
+    BanquetOrder,
+    BanquetHallBooking,
+    ExecutionTemplate,
+    ExecutionTask,
+    ExecutionException,
+    BanquetPaymentRecord,
+    BanquetContract,
+    BanquetProfitSnapshot,
+    BanquetKpiDaily,
+    BanquetAgentRule,
+    BanquetAgentActionLog,
+    BanquetTypeEnum,
+    LeadStageEnum,
+    OrderStatusEnum,
+    DepositStatusEnum,
+    TaskStatusEnum,
+    TaskOwnerRoleEnum,
+    PaymentTypeEnum,
+    BanquetAgentTypeEnum,
+)
 
 __all__ = [
     "Base",

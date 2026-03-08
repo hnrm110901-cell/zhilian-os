@@ -57,6 +57,7 @@ from src.api import ops
 from src.api import daily_hub
 from src.api import banquet
 from src.api import banquet_lifecycle
+from src.api import banquet_agent
 from src.api import external_factors
 from src.api import pos_webhook
 from src.api import bulk_import
@@ -552,6 +553,8 @@ app.include_router(workforce.router, tags=["workforce"])
 app.include_router(banquet.router, tags=["banquet"])
 # Banquet Lifecycle — 7 阶段销售漏斗 + 锁台冲突 + 销控日历
 app.include_router(banquet_lifecycle.router, tags=["banquet_lifecycle"])
+# Banquet Agent Phase 9 — CRM+线索+订单+5个Agent（跟进/报价/排期/执行/复盘）
+app.include_router(banquet_agent.router, tags=["banquet-agent"])
 # External Factors — 统一外部因子查询（天气/节假日/吉日/商圈事件）
 app.include_router(external_factors.router, tags=["external_factors"])
 app.include_router(pos_webhook.router, tags=["pos_webhook"])

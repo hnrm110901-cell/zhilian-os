@@ -328,3 +328,80 @@ interface SmBffResponse {
 
 - `GET /api/v1/workforce/stores/{store_id}/shift-fairness-detail` — 班次公平性详细分布图数据
 - `POST /api/v1/workforce/employees/{employee_id}/preference` — 员工班次偏好更新
+
+---
+
+## Banquet Agent（宴会管理 Phase 9）接口
+
+> 路由前缀：`/api/v1/banquet-agent`
+> Claude 已实现，Codex 据此构建前端
+
+### 驾驶舱
+
+**GET `/api/v1/banquet-agent/stores/{store_id}/dashboard`**
+```typescript
+// Query: month?: string (YYYY-MM)
+interface BanquetDashboard {
+  store_id: string;
+  year: number;
+  month: number;
+  revenue_yuan: number;           // ¥本月宴会收入
+  gross_profit_yuan: number;      // ¥毛利润
+  order_count: number;
+  lead_count: number;
+  conversion_rate_pct: number;    // 转化率 %
+  hall_utilization_pct: number;   // 档期利用率 %
+  summary: string;                // AI生成的摘要文本
+}
+```
+
+### 线索漏斗
+
+**GET `/api/v1/banquet-agent/stores/{store_id}/leads`**
+```typescript
+// Query: stage?: LeadStage, owner_user_id?: string
+type LeadStage = 'new'|'contacted'|'visit_scheduled'|'quoted'|'waiting_decision'|'deposit_pending'|'won'|'lost'
+interface LeadListResponse { total: number; items: LeadItem[] }
+interface LeadItem {
+  id: string; banquet_type: string;
+  expected_date: string | null; expected_people_count: number | null;
+  expected_budget_yuan: number; current_stage: LeadStage;
+  owner_user_id: string | null; last_followup_at: string | null;
+}
+```
+
+**POST `/api/v1/banquet-agent/stores/{store_id}/leads`** — 创建线索
+
+### 宴会订单
+
+**GET `/api/v1/banquet-agent/stores/{store_id}/orders`**
+```typescript
+// Query: order_status?, date_from?, date_to?
+type OrderStatus = 'draft'|'confirmed'|'preparing'|'in_progress'|'completed'|'settled'|'closed'|'cancelled'
+interface OrderItem {
+  id: string; banquet_type: string; banquet_date: string;
+  people_count: number; table_count: number;
+  order_status: OrderStatus; deposit_status: 'unpaid'|'partial'|'paid';
+  total_amount_yuan: number; paid_yuan: number; balance_yuan: number;
+}
+```
+
+**POST `/api/v1/banquet-agent/stores/{store_id}/orders/{order_id}/confirm`** — 确认订单（触发ExecutionAgent生成任务）
+
+**POST `/api/v1/banquet-agent/stores/{store_id}/orders/{order_id}/payment`** — 收款登记
+
+### Agent 接口（Codex 负责配套UI）
+
+**GET `.../agent/followup-scan?dry_run=true`** — 停滞线索扫描（返回提醒文本列表）
+
+**GET `.../agent/quote-recommend?people_count=50&budget_yuan=30000`** — 套餐推荐（含¥毛利）
+
+**GET `.../agent/hall-recommend?target_date=2026-03-15&slot_name=dinner&people_count=50`** — 可用厅房推荐
+
+**POST `.../orders/{id}/review`** — 宴会复盘草稿生成（含¥收入/利润分析）
+
+### 宴会类型枚举
+```typescript
+type BanquetType = 'wedding'|'birthday'|'business'|'full_moon'|'graduation'|'anniversary'|'other'
+type BanquetHallType = 'main_hall'|'vip_room'|'garden'|'outdoor'
+```

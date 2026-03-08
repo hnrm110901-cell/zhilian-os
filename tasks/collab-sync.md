@@ -18,7 +18,14 @@
   - 风险等级渲染缺少极高(magenta) → 已补充
 - ✅ 更新 `api-contracts.md` risk_level 四级定义已正确记录
 
-**正在做**: 等待 Codex 跑前端测试 + 接管后续前端任务
+**正在做**: Phase 9 宴会 Agent 后端已完成，等待 Codex 构建前端
+
+🆕 **[Phase 9 宴会 Agent 后端已上线 — 2026-03-08]**
+- 新路由：`/api/v1/banquet-agent`（16个端点）
+- 5个 Agent：跟进提醒/报价推荐/排期推荐/执行任务/宴会复盘
+- 数据模型：18张表（L1-L5五层），见 `src/models/banquet.py`
+- 迁移：`z35_banquet_agent_tables.py`（需执行 `alembic upgrade head`）
+- 全部接口契约：`tasks/api-contracts.md` → "Banquet Agent" 节
 
 **需要 Codex 的任务**:
 
