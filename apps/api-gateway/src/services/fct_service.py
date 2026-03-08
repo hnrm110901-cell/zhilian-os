@@ -1298,7 +1298,27 @@ class StandaloneFCTService:
     async def void_voucher(
         self, session: AsyncSession, voucher_id: str
     ) -> Dict[str, Any]:
-        return {"voucher_id": voucher_id, "status": "voided", "success": True}
+        stmt = select(Voucher).where(Voucher.id == voucher_id)
+        voucher = (await session.execute(stmt)).scalar_one_or_none()
+        if not voucher:
+            raise ValueError("凭证不存在")
+
+        current = (voucher.status or "").lower()
+        if current == "posted":
+            raise ValueError("已过账凭证不允许直接作废，请使用红冲")
+        if current == "reversed":
+            raise ValueError("已红冲凭证不允许作废")
+
+        voucher.status = "voided"
+        await session.flush()
+        await session.refresh(voucher)
+        return {
+            "voucher_id": str(voucher.id),
+            "voucher_no": voucher.voucher_no,
+            "from_status": current,
+            "status": "voided",
+            "success": True,
+        }
 
     async def red_flush_voucher(
         self,
@@ -1306,9 +1326,53 @@ class StandaloneFCTService:
         voucher_id: str,
         biz_date: Optional[date] = None,
     ) -> Dict[str, Any]:
-        red_no = f"RF-{voucher_id[:8]}"
+        stmt = (
+            select(Voucher)
+            .where(Voucher.id == voucher_id)
+            .options(selectinload(Voucher.lines))
+        )
+        original = (await session.execute(stmt)).scalar_one_or_none()
+        if not original:
+            raise ValueError("原凭证不存在")
+
+        original_status = (original.status or "").lower()
+        if original_status != "posted":
+            raise ValueError("仅已过账凭证支持红冲")
+
+        red_no = f"RF-{(biz_date or date.today()).strftime('%Y%m%d')}-{str(uuid4())[:8].upper()}"
+        red_voucher = Voucher(
+            voucher_no=red_no,
+            store_id=original.store_id,
+            event_type="red_flush",
+            event_id=str(original.id),
+            biz_date=biz_date or date.today(),
+            status="posted",
+            description=f"红冲凭证，冲销原凭证 {original.voucher_no}",
+        )
+        session.add(red_voucher)
+        await session.flush()
+
+        for idx, line in enumerate(original.lines or [], start=1):
+            red_line = VoucherLine(
+                voucher_id=red_voucher.id,
+                line_no=idx,
+                account_code=line.account_code,
+                account_name=line.account_name,
+                debit=line.credit,
+                credit=line.debit,
+                auxiliary=line.auxiliary,
+                summary=f"红冲：{line.summary or ''}".strip(),
+            )
+            session.add(red_line)
+
+        original.status = "reversed"
+        await session.flush()
+        await session.refresh(original)
+
         return {
-            "original_voucher_id": voucher_id,
+            "original_voucher_id": str(original.id),
+            "original_voucher_no": original.voucher_no,
+            "red_voucher_id": str(red_voucher.id),
             "red_voucher_no": red_no,
             "biz_date": (biz_date or date.today()).isoformat(),
             "success": True,

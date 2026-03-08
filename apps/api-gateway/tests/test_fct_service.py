@@ -916,6 +916,89 @@ class TestUpdateVoucherStatus:
             await svc.update_voucher_status(db, voucher_id="missing", target_status="approved")
 
 
+class TestVoucherReverseAndVoid:
+    """测试凭证作废与红冲"""
+
+    @pytest.mark.asyncio
+    async def test_void_voucher_success_for_draft(self):
+        db = _mock_db()
+        db.refresh = AsyncMock()
+        v = MagicMock()
+        v.id = "vid-301"
+        v.voucher_no = "MV-301"
+        v.status = "draft"
+        result_mock = MagicMock()
+        result_mock.scalar_one_or_none.return_value = v
+        db.execute = AsyncMock(return_value=result_mock)
+
+        svc = StandaloneFCTService()
+        result = await svc.void_voucher(db, voucher_id="vid-301")
+
+        assert result["success"] is True
+        assert result["from_status"] == "draft"
+        assert result["status"] == "voided"
+        assert v.status == "voided"
+
+    @pytest.mark.asyncio
+    async def test_void_voucher_posted_rejected(self):
+        db = _mock_db()
+        v = MagicMock()
+        v.status = "posted"
+        result_mock = MagicMock()
+        result_mock.scalar_one_or_none.return_value = v
+        db.execute = AsyncMock(return_value=result_mock)
+
+        svc = StandaloneFCTService()
+        with pytest.raises(ValueError, match="请使用红冲"):
+            await svc.void_voucher(db, voucher_id="vid-302")
+
+    @pytest.mark.asyncio
+    async def test_red_flush_voucher_creates_reverse_lines_and_marks_original(self):
+        db = _mock_db()
+        db.refresh = AsyncMock()
+        original = MagicMock()
+        original.id = "vid-303"
+        original.voucher_no = "MV-303"
+        original.store_id = "S001"
+        original.status = "posted"
+        l1 = MagicMock()
+        l1.account_code = "1001"
+        l1.account_name = "库存现金"
+        l1.debit = 200.0
+        l1.credit = None
+        l1.auxiliary = None
+        l1.summary = "原分录1"
+        l2 = MagicMock()
+        l2.account_code = "6001"
+        l2.account_name = "主营业务收入"
+        l2.debit = None
+        l2.credit = 200.0
+        l2.auxiliary = None
+        l2.summary = "原分录2"
+        original.lines = [l1, l2]
+        result_mock = MagicMock()
+        result_mock.scalar_one_or_none.return_value = original
+        db.execute = AsyncMock(return_value=result_mock)
+
+        # flush 后给红冲凭证补一个 id，便于返回 red_voucher_id
+        async def _flush_side_effect():
+            for call in db.add.call_args_list:
+                obj = call.args[0]
+                if obj.__class__.__name__ == "Voucher" and str(getattr(obj, "voucher_no", "")).startswith("RF-"):
+                    if not getattr(obj, "id", None):
+                        obj.id = "red-303"
+        db.flush = AsyncMock(side_effect=_flush_side_effect)
+
+        svc = StandaloneFCTService()
+        result = await svc.red_flush_voucher(db, voucher_id="vid-303", biz_date=date(2026, 3, 8))
+
+        assert result["success"] is True
+        assert result["original_voucher_id"] == "vid-303"
+        assert result["red_voucher_no"].startswith("RF-20260308-")
+        assert original.status == "reversed"
+        assert db.add.call_count >= 3  # 1 红冲凭证 + 2 红冲分录
+
+
 class TestApprovalVoucherSync:
     """测试审批与凭证状态联动"""
 
