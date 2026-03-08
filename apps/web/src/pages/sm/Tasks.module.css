@@ -160,6 +160,12 @@
   color: var(--text-secondary);
 }
 
+.uploading {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--accent);
+}
+
 .modalActions {
   display: flex;
   justify-content: flex-end;

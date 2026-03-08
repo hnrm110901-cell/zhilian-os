@@ -15,6 +15,7 @@
   - 状态机补齐：打卡/下班打卡、任务开始/提交均有状态转移校验与错误提示
   - 任务详情弹窗：补齐任务详情展示 + 证据上传占位 + 提交前证据校验
   - 任务详情接口化：新增 `queryTaskDetail`，提交改为 `submitTask(payload)`（说明/文件名）
+  - 证据上传调用化：新增 `uploadTaskEvidence`（FormData）+ mock 回退 + 上传状态展示
 
 ## P1
 - [x] 核心页面移动端适配补强（`WorkforcePage`、`ActionPlansPage`）
@@ -54,5 +55,5 @@
   - `apps/web/src/App.tsx`
   - `tasks/collab-sync.md`
 - verify:
-  - `pnpm --filter @zhilian-os/web exec eslint src/services/mobile.types.ts src/services/mobile.mock.ts src/services/mobile.query.service.ts src/services/mobile.mutation.service.ts src/pages/sm/Tasks.tsx`（通过）
-- note: 已实现详情查询与 payload 提交，下一步可接真实附件上传 API
+  - `pnpm --filter @zhilian-os/web exec eslint src/services/mobile.types.ts src/services/mobile.mock.ts src/services/mobile.mutation.service.ts src/pages/sm/Tasks.tsx`（通过）
+- note: 上传链路前端已接通，下一步可让后端返回文件 URL 并展示预览

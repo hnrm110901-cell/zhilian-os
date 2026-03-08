@@ -219,3 +219,11 @@ export function mockSubmitTaskWithPayload(
   task.reject_reason = undefined;
   return { ok: true, message: task.need_review ? '任务已提交，等待审核' : '任务已完成' };
 }
+
+export function mockUploadTaskEvidence(taskId: string, fileName: string): MobileActionResult {
+  const task = mockState.tasks.find((t) => t.task_id === taskId);
+  if (!task) return { ok: false, message: '任务不存在' };
+  if (!fileName) return { ok: false, message: '文件名无效' };
+  task.evidence_count = (task.evidence_count || 0) + 1;
+  return { ok: true, message: '证据上传成功' };
+}

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 import { ClockCircleOutlined } from '@ant-design/icons';
 import { ZBadge, ZButton, ZCard, ZEmpty, ZModal, ZSkeleton } from '../../design-system/components';
-import { startTask, submitTask } from '../../services/mobile.mutation.service';
+import { startTask, submitTask, uploadTaskEvidence } from '../../services/mobile.mutation.service';
 import { queryTaskDetail, queryTaskSummary } from '../../services/mobile.query.service';
 import type { MobileTask, TaskSummaryResponse } from '../../services/mobile.types';
 import { showError, showSuccess, handleApiError } from '../../utils/message';
@@ -34,6 +34,7 @@ export default function SmTasks() {
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<MobileTask | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [evidenceUploading, setEvidenceUploading] = useState(false);
   const [evidenceNote, setEvidenceNote] = useState('');
   const [evidenceFileName, setEvidenceFileName] = useState('');
 
@@ -93,6 +94,16 @@ export default function SmTasks() {
       .finally(() => setDetailLoading(false));
     setEvidenceNote('');
     setEvidenceFileName('');
+  };
+
+  const onUploadEvidence = async (file?: File) => {
+    if (!file || !selectedTask) return;
+    setEvidenceUploading(true);
+    const result = await uploadTaskEvidence(selectedTask.task_id, file);
+    setEvidenceUploading(false);
+    if (!result.ok) return showError(result.message);
+    setEvidenceFileName(result.file_name || file.name);
+    showSuccess(result.message);
   };
 
   return (
@@ -192,8 +203,9 @@ export default function SmTasks() {
                 className={styles.fileInput}
                 type="file"
                 accept="image/*"
-                onChange={(e) => setEvidenceFileName(e.target.files?.[0]?.name || '')}
+                onChange={(e) => onUploadEvidence(e.target.files?.[0])}
               />
+              {evidenceUploading && <div className={styles.uploading}>上传中...</div>}
               {evidenceFileName && <div className={styles.fileName}>已选择：{evidenceFileName}</div>}
             </div>
           </div>

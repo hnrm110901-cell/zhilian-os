@@ -71,3 +71,7 @@ export interface TaskSubmitPayload {
   evidence_note?: string;
   evidence_files?: string[];
 }
+
+export interface MobileUploadResult extends MobileActionResult {
+  file_name?: string;
+}
