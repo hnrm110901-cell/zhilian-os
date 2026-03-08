@@ -166,6 +166,10 @@ celery_app.conf.update(
             "queue": "high_priority",   # P0/P1 走高优先队列；fire_and_forget 本身按 priority 选队列
             "routing_key": "high_priority",
         },
+        "tasks.push_daily_workforce_advice": {
+            "queue": "default",
+            "routing_key": "default",
+        },
     },
 
     # Celery Beat定时任务调度
@@ -285,6 +289,19 @@ celery_app.conf.update(
             "options": {
                 "queue": "default",
                 "priority": 5,
+            },
+        },
+        # L8: 每日 07:00 推送今日人力建议（可通过环境变量覆盖）
+        "daily-workforce-advice": {
+            "task": "tasks.push_daily_workforce_advice",
+            "schedule": crontab(
+                hour=int(os.getenv("L8_WORKFORCE_HOUR", "7")),
+                minute=int(os.getenv("L8_WORKFORCE_MINUTE", "0")),
+            ),
+            "args": (),
+            "options": {
+                "queue": "default",
+                "priority": 9,
             },
         },
         # 每日 17:00 启动晚间多阶段规划工作流（为所有门店规划 Day N+1）

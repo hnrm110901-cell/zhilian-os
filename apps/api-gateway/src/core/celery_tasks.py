@@ -2774,6 +2774,65 @@ def push_daily_forecast(self, store_id: str = None):
 
 
 # ============================================================
+# L8: 07:00 今日人力建议推送任务
+# ============================================================
+
+@celery_app.task(
+    bind=True,
+    max_retries=3,
+    default_retry_delay=300,
+    name="tasks.push_daily_workforce_advice",
+)
+def push_daily_workforce_advice(self, store_id: str = None):
+    """每日 07:00 推送人力建议（默认遍历所有活跃门店）。"""
+    import asyncio
+
+    async def _run():
+        from sqlalchemy import select
+        from src.core.database import get_db_session
+        from src.models.store import Store, StoreStatus
+        from src.services.workforce_push_service import WorkforcePushService
+
+        async with get_db_session() as db:
+            if store_id:
+                stores = [(store_id, "")]
+            else:
+                active_rows = (
+                    await db.execute(
+                        select(Store.id, Store.name).where(
+                            Store.is_active.is_(True),
+                            Store.status == StoreStatus.ACTIVE.value,
+                        )
+                    )
+                ).all()
+                if active_rows:
+                    stores = [(str(r.id), r.name or "") for r in active_rows]
+                else:
+                    rows = (await db.execute(select(Store.id, Store.name))).all()
+                    stores = [(str(r.id), r.name or "") for r in rows]
+
+            for sid, sname in stores:
+                try:
+                    await WorkforcePushService.push_daily_staffing_advice(
+                        store_id=sid,
+                        db=db,
+                        store_name=sname,
+                        recipient_user_id=_get_store_recipient(sid),
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "push_daily_workforce_advice.store_failed",
+                        store_id=sid,
+                        error=str(exc),
+                    )
+
+    try:
+        asyncio.run(_run())
+    except Exception as exc:
+        raise self.retry(exc=exc)
+
+
+# ============================================================
 # INFRA-002: 企微消息重试任务
 # ============================================================
 

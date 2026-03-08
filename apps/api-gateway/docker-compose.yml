@@ -90,6 +90,8 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/1
       - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - L8_WORKFORCE_HOUR=7
+      - L8_WORKFORCE_MINUTE=0
       - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
       - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
     depends_on:
@@ -115,6 +117,8 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/1
       - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - L8_WORKFORCE_HOUR=7
+      - L8_WORKFORCE_MINUTE=0
       - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
       - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
     depends_on:
