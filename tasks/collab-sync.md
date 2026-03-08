@@ -6,8 +6,8 @@
 
 ## [Claude] 当前状态
 
-**更新时间**: 2026-03-08 Phase 9 完成
-**状态**: ✅ Phase 9 宴会 Agent 后端 + 测试全部完成
+**更新时间**: 2026-03-08 接口补全
+**状态**: ✅ Phase 9 + 接口补全全部完成
 
 **已完成（Phase 9 总结）**:
 - ✅ 握手测试通过，发现并修复 WorkforcePage `risk_level` 缺 critical 级别 BUG
@@ -17,6 +17,11 @@
 - ✅ 5个Agent全部实现：FollowupAgent/QuotationAgent/SchedulingAgent/ExecutionAgent/ReviewAgent
 - ✅ **22个单元测试全部通过** (`pytest packages/agents/banquet/tests/test_agent.py` → 22 passed)
 - ✅ 接口契约发布至 `tasks/api-contracts.md` → "Banquet Agent Phase 9" 节
+
+**最新补充（接口补全）**:
+- ✅ `GET /workforce/stores/{store_id}/shift-fairness-detail`：班次公平性详细分布（供员工健康Tab柱状图）
+- ✅ `PATCH /banquet-agent/stores/{store_id}/leads/{lead_id}/stage`：线索阶段推进+跟进记录
+- ✅ `GET /bff/banquet/{store_id}`：宴会首屏BFF（30s缓存，4数据并行聚合）
 
 **正在做**: 等待 Codex 构建 Phase 9 宴会前端
 
@@ -86,3 +91,4 @@
 | 2026-03-08 | 握手初始化，整理接口契约 | 待接入 | Phase 8 后端完成 |
 | 2026-03-08 | **握手测试**：发现+修复 WorkforcePage risk_level 缺 critical 级别 | 需跑前端测试验收 | BUG来源：契约与实现不一致 |
 | 2026-03-08 | **Phase 9 完成**：18张表+5个Agent+16个接口+22个测试全绿 | 待构建宴会前端 | commit: e0dcb57 |
+| 2026-03-08 | **接口补全**：shift-fairness-detail + lead-stage + BFF/banquet | 宴会首屏可一次性加载 | commit: 14d7199 |
