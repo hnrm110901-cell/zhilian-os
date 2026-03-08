@@ -73,6 +73,9 @@ test-training:
 test-decision:
 	pytest packages/agents/decision/tests -v
 
+test-banquet:
+	python3 -m pytest packages/agents/banquet/tests/test_agent.py -q
+
 # 代码检查
 lint:
 	ruff check packages/ apps/

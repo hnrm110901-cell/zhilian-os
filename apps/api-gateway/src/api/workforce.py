@@ -58,8 +58,10 @@ class LearnPatternRequest(BaseModel):
 
 def _risk_level(score: float) -> str:
     if score >= 0.7:
+        return "critical"
+    if score >= 0.5:
         return "high"
-    if score >= 0.4:
+    if score >= 0.3:
         return "medium"
     return "low"
 

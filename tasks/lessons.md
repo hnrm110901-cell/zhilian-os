@@ -85,3 +85,16 @@
 
 **问题**：`os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost/zhilian")` 在未配置环境变量时会静默使用弱默认密码，若意外部署至生产环境将造成数据泄露。
 **规则**：必须配置的环境变量用 `os.environ["DATABASE_URL"]`（无默认值），启动时即刻崩溃并提示缺失配置，优于运行时出现意外行为。
+
+### L018 — 后端 risk_level 与 api-contracts.md 不一致
+**问题**：api-contracts.md 定义4级风险（low/medium/high/critical），前端 WorkforcePage.tsx 也实现了4级，但后端 `_risk_level()` 函数只返回3级（low/medium/high），≥0.7 应为 critical 却被标为 high。
+导致前端 critical 分支永远不触发，高危员工被低报。
+**规则**：修改前端类型定义或添加新枚举值时，必须同步检查并修复后端对应的分类函数（`_risk_level` / `classify_health` 等）。合约变更 → 前后端同步修改。
+**正确分类**（对应 api-contracts.md）：
+```python
+def _risk_level(score: float) -> str:
+    if score >= 0.7: return "critical"
+    if score >= 0.5: return "high"
+    if score >= 0.3: return "medium"
+    return "low"
+```
