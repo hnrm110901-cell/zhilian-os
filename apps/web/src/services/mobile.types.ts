@@ -42,3 +42,19 @@ export interface TaskSummaryResponse {
   expired_count: number;
   tasks: MobileTask[];
 }
+
+export interface MobileHomeSummaryResponse {
+  store_id: string;
+  as_of: string;
+  role_name: string;
+  unread_alerts_count: number;
+  pending_approvals_count: number;
+  today_revenue_yuan: number;
+  food_cost_pct: number;
+  waiting_count: number;
+  health_score: number;
+  health_level: 'excellent' | 'good' | 'warning' | 'critical';
+  weakest_dimension?: string;
+  today_shift: MobileShift | null;
+  top_tasks: MobileTask[];
+}

@@ -1,4 +1,4 @@
-import type { ShiftSummaryResponse, TaskSummaryResponse } from './mobile.types';
+import type { MobileHomeSummaryResponse, ShiftSummaryResponse, TaskSummaryResponse } from './mobile.types';
 
 export const mobileShiftsMock: ShiftSummaryResponse = {
   store_id: localStorage.getItem('store_id') || 'STORE001',
@@ -84,4 +84,20 @@ export const mobileTasksMock: TaskSummaryResponse = {
       need_review: false,
     },
   ],
+};
+
+export const mobileHomeSummaryMock: MobileHomeSummaryResponse = {
+  store_id: localStorage.getItem('store_id') || 'STORE001',
+  as_of: new Date().toISOString(),
+  role_name: '店长',
+  unread_alerts_count: 2,
+  pending_approvals_count: 1,
+  today_revenue_yuan: 28650,
+  food_cost_pct: 31.8,
+  waiting_count: 7,
+  health_score: 82,
+  health_level: 'good',
+  weakest_dimension: '成本率',
+  today_shift: mobileShiftsMock.shifts[0],
+  top_tasks: mobileTasksMock.tasks.slice(0, 3),
 };

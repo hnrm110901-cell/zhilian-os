@@ -8,6 +8,7 @@
   - 前台激活立即刷新
   - 刷新状态可见（最近刷新时间）
 - [x] 移动端核心三页骨架落地（`/sm`：首页/班次/任务）
+  - 首页已接入 mobile query service（不再直连旧 BFF 结构）
   - 新增 `sm/Shifts.tsx`、`sm/Tasks.tsx`
   - 新增 `mobile.query.service.ts`、`mobile.mutation.service.ts`、`mobile.mock.ts`、`mobile.types.ts`
   - 底部导航切换为 首页/班次/任务/告警，保留原 `business/decisions` 路由兼容
@@ -37,6 +38,7 @@
 - owner: Codex
 - task: 移动端首页/班次/任务 V1 骨架接入
 - files:
+  - `apps/web/src/pages/sm/Home.tsx`
   - `apps/web/src/pages/sm/Shifts.tsx`
   - `apps/web/src/pages/sm/Shifts.module.css`
   - `apps/web/src/pages/sm/Tasks.tsx`
@@ -49,5 +51,5 @@
   - `apps/web/src/App.tsx`
   - `tasks/collab-sync.md`
 - verify:
-  - `pnpm --filter @zhilian-os/web exec eslint src/pages/sm/Shifts.tsx src/pages/sm/Tasks.tsx src/layouts/StoreManagerLayout.tsx src/services/mobile.types.ts src/services/mobile.mock.ts src/services/mobile.query.service.ts src/services/mobile.mutation.service.ts`（通过）
-- note: 基于 Desktop/Downloads 文档完成首批可运行骨架，下一步可补 Home/Tasks/Shifts 状态机细节与接口映射
+  - `pnpm --filter @zhilian-os/web exec eslint src/pages/sm/Home.tsx src/pages/sm/Shifts.tsx src/pages/sm/Tasks.tsx src/layouts/StoreManagerLayout.tsx src/services/mobile.types.ts src/services/mobile.mock.ts src/services/mobile.query.service.ts src/services/mobile.mutation.service.ts`（通过）
+- note: 三页已同源 DTO 化；下一步补充状态机转移校验和任务详情抽屉
