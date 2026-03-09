@@ -101,6 +101,16 @@ export default function SmBanquetLeadDetail() {
   const [lostNote,    setLostNote]    = useState('');
   const [marking,     setMarking]     = useState(false);
 
+  // 新建报价 Modal state
+  const [quoteOpen,      setQuoteOpen]      = useState(false);
+  const [qPeople,        setQPeople]        = useState('');
+  const [qTables,        setQTables]        = useState('');
+  const [qAmount,        setQAmount]        = useState('');
+  const [qValidDays,     setQValidDays]     = useState('7');
+  const [qPackageId,     setQPackageId]     = useState('');
+  const [packages,       setPackages]       = useState<{ id: string; name: string }[]>([]);
+  const [creatingQuote,  setCreatingQuote]  = useState(false);
+
   const loadLead = useCallback(async () => {
     if (!leadId) return;
     setLoading(true);
@@ -117,6 +127,13 @@ export default function SmBanquetLeadDetail() {
   }, [leadId]);
 
   useEffect(() => { loadLead(); }, [loadLead]);
+
+  // 加载套餐选项
+  useEffect(() => {
+    apiClient.get(`/api/v1/banquet-agent/stores/${STORE_ID}/packages`)
+      .then(r => setPackages(r.data?.packages ?? r.data ?? []))
+      .catch(() => setPackages([]));
+  }, []);
 
   const acceptQuote = async (quoteId: string) => {
     setAccepting(quoteId);
@@ -187,6 +204,39 @@ export default function SmBanquetLeadDetail() {
       handleApiError(e, '标记流失失败');
     } finally {
       setMarking(false);
+    }
+  };
+
+  const openQuoteModal = () => {
+    if (!lead) return;
+    setQPeople(lead.expected_people_count ? String(lead.expected_people_count) : '');
+    setQTables(lead.expected_people_count ? String(Math.ceil(lead.expected_people_count / 10)) : '');
+    setQAmount(lead.expected_budget_yuan > 0 ? String(lead.expected_budget_yuan) : '');
+    setQValidDays('7');
+    setQPackageId('');
+    setQuoteOpen(true);
+  };
+
+  const handleCreateQuote = async () => {
+    if (!qPeople || !qTables || !qAmount) return;
+    setCreatingQuote(true);
+    try {
+      await apiClient.post(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/leads/${leadId}/quotes`,
+        {
+          people_count:       parseInt(qPeople, 10),
+          table_count:        parseInt(qTables, 10),
+          quoted_amount_yuan: parseFloat(qAmount),
+          valid_days:         parseInt(qValidDays, 10) || 7,
+          package_id:         qPackageId || null,
+        },
+      );
+      setQuoteOpen(false);
+      await loadLead();
+    } catch (e) {
+      handleApiError(e, '创建报价失败');
+    } finally {
+      setCreatingQuote(false);
     }
   };
 
@@ -309,7 +359,12 @@ export default function SmBanquetLeadDetail() {
 
         {/* 报价记录 */}
         <ZCard>
-          <div className={styles.sectionTitle}>报价记录</div>
+          <div className={styles.sectionHeader}>
+            <div className={styles.sectionTitle}>报价记录</div>
+            {lead.current_stage !== 'won' && lead.current_stage !== 'lost' && (
+              <ZButton variant="ghost" size="sm" onClick={openQuoteModal}>＋ 新建报价</ZButton>
+            )}
+          </div>
           {lead.quotes.length === 0 ? (
             <ZEmpty title="暂无报价" description="尚未生成报价单" />
           ) : (
@@ -505,6 +560,80 @@ export default function SmBanquetLeadDetail() {
               placeholder="补充说明…"
             />
           </div>
+        </div>
+      </ZModal>
+      {/* 新建报价 Modal */}
+      <ZModal
+        open={quoteOpen}
+        title="新建报价"
+        onClose={() => setQuoteOpen(false)}
+        footer={
+          <div className={styles.modalFooter}>
+            <ZButton variant="ghost" onClick={() => setQuoteOpen(false)}>取消</ZButton>
+            <ZButton
+              variant="primary"
+              onClick={handleCreateQuote}
+              disabled={creatingQuote || !qPeople || !qTables || !qAmount}
+            >
+              {creatingQuote ? '创建中…' : '创建报价'}
+            </ZButton>
+          </div>
+        }
+      >
+        <div className={styles.modalBody}>
+          <div className={styles.fieldRow}>
+            <div className={styles.field}>
+              <label className={styles.label}>人数</label>
+              <ZInput
+                type="number"
+                value={qPeople}
+                onChange={e => setQPeople(e.target.value)}
+                placeholder="如：200"
+              />
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label}>桌数</label>
+              <ZInput
+                type="number"
+                value={qTables}
+                onChange={e => setQTables(e.target.value)}
+                placeholder="如：20"
+              />
+            </div>
+          </div>
+          <div className={styles.fieldRow}>
+            <div className={styles.field}>
+              <label className={styles.label}>报价金额（元）</label>
+              <ZInput
+                type="number"
+                value={qAmount}
+                onChange={e => setQAmount(e.target.value)}
+                placeholder="如：50000"
+              />
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label}>有效天数</label>
+              <ZInput
+                type="number"
+                value={qValidDays}
+                onChange={e => setQValidDays(e.target.value)}
+                placeholder="如：7"
+              />
+            </div>
+          </div>
+          {packages.length > 0 && (
+            <div className={styles.field}>
+              <label className={styles.label}>套餐（选填）</label>
+              <ZSelect
+                value={qPackageId}
+                onChange={e => setQPackageId(e.target.value)}
+                options={[
+                  { value: '', label: '不绑定套餐' },
+                  ...packages.map(p => ({ value: p.id, label: p.name })),
+                ]}
+              />
+            </div>
+          )}
         </div>
       </ZModal>
     </div>

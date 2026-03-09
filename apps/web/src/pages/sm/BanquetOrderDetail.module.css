@@ -246,6 +246,7 @@
   margin-top: 14px;
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
 }
 
 .settleForm {
@@ -285,3 +286,67 @@
   gap: 8px;
 }
 
+
+/* BEO Modal */
+.beoBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.beoAlert {
+  padding: 10px 12px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 6px;
+  color: #c2410c;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.beoMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border, #eee);
+  font-size: 13px;
+  color: var(--text-secondary, #666);
+}
+
+.beoRoleGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.beoRoleTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #111);
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border, #eee);
+}
+
+.beoTaskRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+}
+
+.beoTaskName {
+  font-size: 13px;
+  color: var(--text-primary, #111);
+}
+
+.beoTaskRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.beoTaskTime {
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+}

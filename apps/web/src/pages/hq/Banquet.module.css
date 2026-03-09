@@ -136,7 +136,9 @@
 
 .tabHeader {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: 8px;
 }
 
 .calHeader {
@@ -736,4 +738,100 @@
   font-size: 12px;
   color: var(--text-secondary, #888);
   text-align: right;
+}
+
+/* AR 应收账款 */
+.arSummary {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border, #eee);
+}
+
+.arKpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.arKpiValue {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--accent, #ff6b2c);
+}
+
+.arKpiLabel {
+  font-size: 12px;
+  color: var(--text-secondary, #888);
+}
+
+.arList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.arRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: var(--bg-secondary, #f9f9f9);
+  border-radius: 6px;
+}
+
+.arUrgent {
+  background: #fff7ed;
+  border-left: 3px solid #f97316;
+}
+
+.arLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.arType {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary, #111);
+}
+
+.arContact {
+  font-size: 12px;
+  color: var(--text-secondary, #888);
+}
+
+.arDate {
+  font-size: 12px;
+  color: var(--text-secondary, #888);
+}
+
+.arDaysTag {
+  font-size: 11px;
+  padding: 1px 6px;
+  background: #fee2e2;
+  color: #dc2626;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.arRight {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.arBalance {
+  font-size: 14px;
+  font-weight: 600;
+  color: #dc2626;
+}
+
+.arTotal {
+  font-size: 12px;
+  color: var(--text-secondary, #888);
 }

@@ -120,6 +120,25 @@ export default function SmBanquetOrderDetail() {
   // 确认订单
   const [confirming,     setConfirming]     = useState(false);
 
+  // BEO 执行单 Modal state
+  const [beoOpen,    setBeoOpen]    = useState(false);
+  const [beoData,    setBeoData]    = useState<{
+    order_id: string;
+    banquet_type: string;
+    banquet_date: string;
+    contact_name: string | null;
+    contact_phone: string | null;
+    people_count: number;
+    table_count: number;
+    hall_name: string | null;
+    package_name: string | null;
+    total_amount_yuan: number;
+    paid_yuan: number;
+    balance_yuan: number;
+    tasks_by_role: Record<string, { task_id: string; task_name: string; due_time: string | null; status: string }[]>;
+  } | null>(null);
+  const [beoLoading, setBeoLoading] = useState(false);
+
   const loadOrder = useCallback(async () => {
     if (!orderId) return;
     setLoading(true);
@@ -218,6 +237,22 @@ export default function SmBanquetOrderDetail() {
       handleApiError(e, '确认订单失败');
     } finally {
       setConfirming(false);
+    }
+  };
+
+  const openBeo = async () => {
+    setBeoOpen(true);
+    if (beoData) return;  // already loaded
+    setBeoLoading(true);
+    try {
+      const resp = await apiClient.get(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/orders/${orderId}/beo`,
+      );
+      setBeoData(resp.data);
+    } catch (e) {
+      handleApiError(e, '加载 BEO 失败');
+    } finally {
+      setBeoLoading(false);
     }
   };
 
@@ -335,8 +370,8 @@ export default function SmBanquetOrderDetail() {
             </div>
           </div>
           {order.remark && <div className={styles.remark}>{order.remark}</div>}
-          {order.status === 'draft' && (
-            <div className={styles.settleRow}>
+          <div className={styles.settleRow}>
+            {order.status === 'draft' && (
               <ZButton
                 variant="primary"
                 size="sm"
@@ -345,15 +380,18 @@ export default function SmBanquetOrderDetail() {
               >
                 {confirming ? '确认中…' : '确认订单'}
               </ZButton>
-            </div>
-          )}
-          {order.status === 'completed' && (
-            <div className={styles.settleRow}>
+            )}
+            {order.status === 'completed' && (
               <ZButton variant="primary" size="sm" onClick={openSettleModal}>
                 结算确认
               </ZButton>
-            </div>
-          )}
+            )}
+            {['confirmed', 'preparing', 'in_progress', 'completed'].includes(order.status) && (
+              <ZButton variant="ghost" size="sm" onClick={openBeo}>
+                查看 BEO
+              </ZButton>
+            )}
+          </div>
         </ZCard>
 
         {/* 执行任务 */}
@@ -547,6 +585,63 @@ export default function SmBanquetOrderDetail() {
           </ZModal>
         );
       })()}
+
+      {/* BEO 执行单 Modal */}
+      <ZModal
+        open={beoOpen}
+        title="BEO 执行单"
+        onClose={() => setBeoOpen(false)}
+        footer={
+          <div className={styles.settleFooter}>
+            <ZButton variant="ghost" onClick={() => setBeoOpen(false)}>关闭</ZButton>
+          </div>
+        }
+      >
+        {beoLoading ? (
+          <ZSkeleton rows={5} />
+        ) : beoData ? (
+          <div className={styles.beoBody}>
+            {beoData.balance_yuan > 0 && (
+              <div className={styles.beoAlert}>
+                ⚠️ 未收尾款：¥{beoData.balance_yuan.toLocaleString()}
+              </div>
+            )}
+            <div className={styles.beoMeta}>
+              <span>{beoData.banquet_type} · {dayjs(beoData.banquet_date).format('YYYY-MM-DD')}</span>
+              <span>{beoData.table_count}桌 · {beoData.people_count}人</span>
+              {beoData.hall_name && <span>宴会厅：{beoData.hall_name}</span>}
+              {beoData.package_name && <span>套餐：{beoData.package_name}</span>}
+            </div>
+            {Object.keys(beoData.tasks_by_role).length === 0 ? (
+              <ZEmpty title="暂无任务" description="确认订单后自动生成" />
+            ) : (
+              Object.entries(beoData.tasks_by_role).map(([role, tasks]) => (
+                <div key={role} className={styles.beoRoleGroup}>
+                  <div className={styles.beoRoleTitle}>
+                    {ROLE_LABELS[role] ?? role}（{tasks.length}）
+                  </div>
+                  {tasks.map(t => {
+                    const tb = TASK_STATUS_BADGE[t.status] ?? { text: t.status, type: 'default' as const };
+                    return (
+                      <div key={t.task_id} className={styles.beoTaskRow}>
+                        <span className={styles.beoTaskName}>{t.task_name}</span>
+                        <div className={styles.beoTaskRight}>
+                          {t.due_time && (
+                            <span className={styles.beoTaskTime}>{dayjs(t.due_time).format('HH:mm')}</span>
+                          )}
+                          <ZBadge type={tb.type} text={tb.text} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))
+            )}
+          </div>
+        ) : (
+          <ZEmpty title="加载失败" description="请关闭后重试" />
+        )}
+      </ZModal>
     </div>
   );
 }

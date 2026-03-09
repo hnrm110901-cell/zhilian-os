@@ -2088,6 +2088,239 @@ async def list_push_records(
     return {"records": records, "total": len(records)}
 
 
+# ────────── BEO / 应收账款 / KPI 同步 ─────────────────────────────────────────
+
+@router.get("/stores/{store_id}/orders/{order_id}/beo")
+async def get_order_beo(
+    store_id: str,
+    order_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """生成宴会执行单（BEO）：订单 + 任务（按角色分组）+ 厅房 + 套餐"""
+    result = await db.execute(
+        select(BanquetOrder).options(
+            selectinload(BanquetOrder.tasks),
+            selectinload(BanquetOrder.package),
+            selectinload(BanquetOrder.bookings),
+        ).where(
+            and_(BanquetOrder.id == order_id, BanquetOrder.store_id == store_id)
+        )
+    )
+    order = result.scalars().first()
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+
+    # group tasks by owner_role
+    tasks_by_role: dict = {}
+    for task in order.tasks:
+        role = task.owner_role or "other"
+        if role not in tasks_by_role:
+            tasks_by_role[role] = []
+        tasks_by_role[role].append({
+            "task_id":   task.id,
+            "task_name": task.task_name,
+            "due_time":  task.due_time.isoformat() if task.due_time else None,
+            "status":    task.task_status.value if hasattr(task.task_status, "value") else str(task.task_status),
+        })
+
+    # hall name from first booking
+    hall_name = None
+    if order.bookings:
+        booking = order.bookings[0]
+        hall_result = await db.execute(
+            select(BanquetHall).where(BanquetHall.id == booking.hall_id)
+        )
+        hall = hall_result.scalars().first()
+        hall_name = hall.name if hall else None
+
+    package_name = order.package.name if order.package else None
+
+    balance_fen = order.total_amount_fen - order.paid_fen
+
+    return {
+        "order_id":          order.id,
+        "banquet_type":      order.banquet_type.value,
+        "banquet_date":      order.banquet_date.isoformat(),
+        "hall_name":         hall_name,
+        "people_count":      order.people_count,
+        "table_count":       order.table_count,
+        "contact_name":      order.contact_name,
+        "contact_phone":     order.contact_phone,
+        "package_name":      package_name,
+        "total_amount_yuan": round(order.total_amount_fen / 100, 2),
+        "paid_yuan":         round(order.paid_fen / 100, 2),
+        "balance_yuan":      round(balance_fen / 100, 2),
+        "tasks_by_role":     tasks_by_role,
+        "remark":            order.remark,
+    }
+
+
+@router.get("/stores/{store_id}/receivables")
+async def get_receivables(
+    store_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """应收账款：已确认且存在未收余款的订单"""
+    from datetime import date as _date
+    active_statuses = [
+        OrderStatusEnum.CONFIRMED,
+        OrderStatusEnum.PREPARING,
+        OrderStatusEnum.IN_PROGRESS,
+    ]
+    result = await db.execute(
+        select(BanquetOrder).where(
+            and_(
+                BanquetOrder.store_id == store_id,
+                BanquetOrder.order_status.in_(active_statuses),
+                BanquetOrder.total_amount_fen > BanquetOrder.paid_fen,
+            )
+        ).order_by(BanquetOrder.banquet_date)
+    )
+    orders = result.scalars().all()
+
+    today = _date.today()
+    items = []
+    total_outstanding_fen = 0
+    for o in orders:
+        balance_fen = o.total_amount_fen - o.paid_fen
+        total_outstanding_fen += balance_fen
+        days_until = (o.banquet_date - today).days
+        items.append({
+            "order_id":          o.id,
+            "banquet_type":      o.banquet_type.value,
+            "banquet_date":      o.banquet_date.isoformat(),
+            "contact_name":      o.contact_name,
+            "total_amount_yuan": round(o.total_amount_fen / 100, 2),
+            "paid_yuan":         round(o.paid_fen / 100, 2),
+            "balance_yuan":      round(balance_fen / 100, 2),
+            "deposit_status":    o.deposit_status.value,
+            "days_until_event":  days_until,
+        })
+
+    return {
+        "total_outstanding_yuan": round(total_outstanding_fen / 100, 2),
+        "order_count":            len(items),
+        "orders":                 items,
+    }
+
+
+@router.post("/stores/{store_id}/kpi/sync")
+async def sync_kpi(
+    store_id: str,
+    sync_date: Optional[str] = Query(None, description="YYYY-MM-DD，默认今天"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """将当日宴会真实数据聚合写入 BanquetKpiDaily（upsert）"""
+    from datetime import date as _date
+    if sync_date:
+        try:
+            target_date = _date.fromisoformat(sync_date)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="date 格式应为 YYYY-MM-DD")
+    else:
+        target_date = _date.today()
+
+    # order_count + revenue for target_date
+    order_result = await db.execute(
+        select(func.count(BanquetOrder.id), func.sum(BanquetOrder.total_amount_fen)).where(
+            and_(
+                BanquetOrder.store_id == store_id,
+                BanquetOrder.banquet_date == target_date,
+                BanquetOrder.order_status.in_([
+                    OrderStatusEnum.CONFIRMED,
+                    OrderStatusEnum.PREPARING,
+                    OrderStatusEnum.IN_PROGRESS,
+                    OrderStatusEnum.COMPLETED,
+                    OrderStatusEnum.SETTLED,
+                ]),
+            )
+        )
+    )
+    order_row = order_result.first()
+    order_count = order_row[0] or 0
+    revenue_fen = order_row[1] or 0
+
+    # gross_profit from profit snapshots joined to orders on target_date
+    from src.models.banquet import BanquetProfitSnapshot
+    profit_result = await db.execute(
+        select(func.sum(BanquetProfitSnapshot.gross_profit_fen)).join(
+            BanquetOrder, BanquetProfitSnapshot.banquet_order_id == BanquetOrder.id
+        ).where(
+            and_(
+                BanquetOrder.store_id == store_id,
+                BanquetOrder.banquet_date == target_date,
+            )
+        )
+    )
+    gross_profit_fen = profit_result.scalar() or 0
+
+    # lead_count: leads created in last 30 days
+    from datetime import timedelta
+    month_ago = datetime.utcnow() - timedelta(days=30)
+    lead_result = await db.execute(
+        select(func.count(BanquetLead.id)).where(
+            and_(
+                BanquetLead.store_id == store_id,
+                BanquetLead.created_at >= month_ago,
+            )
+        )
+    )
+    lead_count = lead_result.scalar() or 0
+
+    # conversion_rate: won / total (last 30 days)
+    won_result = await db.execute(
+        select(func.count(BanquetLead.id)).where(
+            and_(
+                BanquetLead.store_id == store_id,
+                BanquetLead.created_at >= month_ago,
+                BanquetLead.current_stage == LeadStageEnum.WON,
+            )
+        )
+    )
+    won_count = won_result.scalar() or 0
+    conversion_rate_pct = round(won_count / lead_count * 100, 1) if lead_count > 0 else 0.0
+
+    # upsert
+    existing_result = await db.execute(
+        select(BanquetKpiDaily).where(
+            and_(BanquetKpiDaily.store_id == store_id, BanquetKpiDaily.stat_date == target_date)
+        )
+    )
+    kpi = existing_result.scalars().first()
+    if kpi:
+        kpi.order_count          = order_count
+        kpi.revenue_fen          = revenue_fen
+        kpi.gross_profit_fen     = gross_profit_fen
+        kpi.lead_count           = lead_count
+        kpi.conversion_rate_pct  = conversion_rate_pct
+    else:
+        kpi = BanquetKpiDaily(
+            id=str(uuid.uuid4()),
+            store_id=store_id,
+            stat_date=target_date,
+            order_count=order_count,
+            revenue_fen=revenue_fen,
+            gross_profit_fen=gross_profit_fen,
+            lead_count=lead_count,
+            conversion_rate_pct=conversion_rate_pct,
+        )
+        db.add(kpi)
+    await db.commit()
+
+    return {
+        "synced":               True,
+        "date":                 target_date.isoformat(),
+        "order_count":          order_count,
+        "revenue_yuan":         round(revenue_fen / 100, 2),
+        "gross_profit_yuan":    round(gross_profit_fen / 100, 2),
+        "lead_count":           lead_count,
+        "conversion_rate_pct":  conversion_rate_pct,
+    }
+
+
 # ────────── Agent 接口 ────────────────────────────────────────────────────────
 
 @router.get("/stores/{store_id}/agent/followup-scan")

@@ -97,6 +97,7 @@ function DashboardTab() {
   const [loadingKpi,    setLoadingKpi]    = useState(true);
   const [loadingFunnel, setLoadingFunnel] = useState(true);
   const [loadingOrders, setLoadingOrders] = useState(true);
+  const [syncing,       setSyncing]       = useState(false);
 
   const loadDashboard = useCallback(async (m: string) => {
     setLoadingKpi(true);
@@ -145,6 +146,22 @@ function DashboardTab() {
   useEffect(() => { loadDashboard(month); }, [loadDashboard, month]);
   useEffect(() => { loadFunnel(); loadOrders(); }, [loadFunnel, loadOrders]);
 
+  const syncKpi = async () => {
+    setSyncing(true);
+    try {
+      await apiClient.post(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/kpi/sync`,
+        null,
+        { params: { sync_date: dayjs().format('YYYY-MM-DD') } },
+      );
+      await loadDashboard(month);
+    } catch (e) {
+      handleApiError(e, 'KPI 同步失败');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const d = dashboard;
 
   return (
@@ -156,6 +173,9 @@ function DashboardTab() {
           onChange={(v) => setMonth(v as string)}
           style={{ width: 120 }}
         />
+        <ZButton variant="ghost" size="sm" onClick={syncKpi} disabled={syncing}>
+          {syncing ? '同步中…' : '同步今日 KPI'}
+        </ZButton>
       </div>
 
       {loadingKpi ? (
@@ -1271,7 +1291,7 @@ function ResourceTab() {
 
 /* ─── Tab8: 转化分析 ─── */
 
-interface FunnelStage {
+interface AnalyticsFunnelStage {
   stage:           string;
   label:           string;
   count:           number;
@@ -1280,7 +1300,7 @@ interface FunnelStage {
 
 interface FunnelResp {
   period:                   string;
-  stages:                   FunnelStage[];
+  stages:                   AnalyticsFunnelStage[];
   total_leads:              number;
   won_count:                number;
   lost_count:               number;
@@ -1299,28 +1319,48 @@ interface LostReason {
   pct:    number;
 }
 
+interface AROrder {
+  order_id:            string;
+  banquet_type:        string;
+  banquet_date:        string;
+  total_amount_yuan:   number;
+  paid_yuan:           number;
+  balance_yuan:        number;
+  days_until_event:    number;
+  contact_name:        string | null;
+}
+
+interface ReceivablesData {
+  order_count:             number;
+  total_outstanding_yuan:  number;
+  orders:                  AROrder[];
+}
+
 function AnalyticsTab() {
   const [month,    setMonth]    = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
-  const [funnel,    setFunnel]    = useState<FunnelResp | null>(null);
-  const [forecast,  setForecast]  = useState<ForecastBucket[]>([]);
-  const [lostData,  setLostData]  = useState<LostReason[]>([]);
-  const [loading,   setLoading]   = useState(false);
+  const [funnel,       setFunnel]       = useState<FunnelResp | null>(null);
+  const [forecast,     setForecast]     = useState<ForecastBucket[]>([]);
+  const [lostData,     setLostData]     = useState<LostReason[]>([]);
+  const [receivables,  setReceivables]  = useState<ReceivablesData | null>(null);
+  const [loading,      setLoading]      = useState(false);
 
   const load = useCallback(async (m: string) => {
     setLoading(true);
     try {
       const STORE = localStorage.getItem('store_id') || 'S001';
-      const [funnelR, forecastR, lostR] = await Promise.allSettled([
+      const [funnelR, forecastR, lostR, arR] = await Promise.allSettled([
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/funnel`, { params: { month: m } }),
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/revenue-forecast`, { params: { months: 3 } }),
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/lost-analysis`, { params: { month: m } }),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/receivables`),
       ]);
       if (funnelR.status === 'fulfilled')   setFunnel(funnelR.value.data);
       if (forecastR.status === 'fulfilled') setForecast(forecastR.value.data?.forecast ?? []);
       if (lostR.status === 'fulfilled')     setLostData(lostR.value.data?.reasons ?? []);
+      if (arR.status === 'fulfilled')       setReceivables(arR.value.data);
     } finally {
       setLoading(false);
     }
@@ -1445,6 +1485,48 @@ function AnalyticsTab() {
                   </div>
                 ))}
               </div>
+            )}
+          </ZCard>
+
+          {/* 应收账款 */}
+          <ZCard title="应收账款（未结清）">
+            {!receivables || receivables.order_count === 0 ? (
+              <ZEmpty title="暂无应收账款" description="所有订单均已全额付款" />
+            ) : (
+              <>
+                <div className={styles.arSummary}>
+                  <div className={styles.arKpi}>
+                    <span className={styles.arKpiValue}>{receivables.order_count}</span>
+                    <span className={styles.arKpiLabel}>待收订单</span>
+                  </div>
+                  <div className={styles.arKpi}>
+                    <span className={styles.arKpiValue}>
+                      ¥{(receivables.total_outstanding_yuan / 10000).toFixed(1)}万
+                    </span>
+                    <span className={styles.arKpiLabel}>应收合计</span>
+                  </div>
+                </div>
+                <div className={styles.arList}>
+                  {receivables.orders.map(o => (
+                    <div key={o.order_id} className={`${styles.arRow} ${o.days_until_event <= 7 ? styles.arUrgent : ''}`}>
+                      <div className={styles.arLeft}>
+                        <span className={styles.arType}>{o.banquet_type}</span>
+                        {o.contact_name && <span className={styles.arContact}>{o.contact_name}</span>}
+                        <span className={styles.arDate}>{dayjs(o.banquet_date).format('MM-DD')}</span>
+                        {o.days_until_event <= 7 && (
+                          <span className={styles.arDaysTag}>
+                            {o.days_until_event <= 0 ? '已过期' : `${o.days_until_event}天`}
+                          </span>
+                        )}
+                      </div>
+                      <div className={styles.arRight}>
+                        <span className={styles.arBalance}>¥{o.balance_yuan.toLocaleString()}</span>
+                        <span className={styles.arTotal}>/ ¥{o.total_amount_yuan.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </ZCard>
         </>
