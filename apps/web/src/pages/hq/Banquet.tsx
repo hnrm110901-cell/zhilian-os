@@ -15,6 +15,7 @@ import {
 import apiClient from '../../services/api';
 import { handleApiError } from '../../utils/message';
 import styles from './Banquet.module.css';
+import ReactECharts from 'echarts-for-react';
 
 const STORE_ID = localStorage.getItem('store_id') || 'S001';
 
@@ -98,6 +99,7 @@ function DashboardTab() {
   const [loadingFunnel, setLoadingFunnel] = useState(true);
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [syncing,       setSyncing]       = useState(false);
+  const [trend,         setTrend]         = useState<{ month: string; revenue_yuan: number; order_count: number; gross_profit_yuan: number }[]>([]);
 
   const loadDashboard = useCallback(async (m: string) => {
     setLoadingKpi(true);
@@ -144,7 +146,13 @@ function DashboardTab() {
   }, []);
 
   useEffect(() => { loadDashboard(month); }, [loadDashboard, month]);
-  useEffect(() => { loadFunnel(); loadOrders(); }, [loadFunnel, loadOrders]);
+  useEffect(() => {
+    loadFunnel();
+    loadOrders();
+    apiClient.get(`/api/v1/banquet-agent/stores/${STORE_ID}/analytics/monthly-trend`, { params: { months: 6 } })
+      .then(r => setTrend(r.data?.months ?? []))
+      .catch(() => setTrend([]));
+  }, [loadFunnel, loadOrders]);
 
   const syncKpi = async () => {
     setSyncing(true);
@@ -253,6 +261,53 @@ function DashboardTab() {
           </div>
         )}
       </ZCard>
+
+      {/* 6 个月营收走势 */}
+      {trend.length > 0 && (() => {
+        const trendOption = {
+          tooltip: { trigger: 'axis' as const },
+          legend: { data: ['营收（万）', '毛利（万）', '订单数'], bottom: 0, textStyle: { fontSize: 11 } },
+          grid: { left: 50, right: 20, top: 20, bottom: 50 },
+          xAxis: { type: 'category' as const, data: trend.map(t => t.month.slice(5)) },
+          yAxis: [
+            { type: 'value' as const, name: '万元', axisLabel: { formatter: (v: number) => `${(v / 10000).toFixed(0)}` } },
+            { type: 'value' as const, name: '单', min: 0 },
+          ],
+          series: [
+            {
+              name: '营收（万）',
+              type: 'line' as const,
+              yAxisIndex: 0,
+              data: trend.map(t => t.revenue_yuan),
+              smooth: true,
+              itemStyle: { color: '#ff6b2c' },
+              lineStyle: { width: 2 },
+            },
+            {
+              name: '毛利（万）',
+              type: 'line' as const,
+              yAxisIndex: 0,
+              data: trend.map(t => t.gross_profit_yuan),
+              smooth: true,
+              itemStyle: { color: '#3b82f6' },
+              lineStyle: { width: 2, type: 'dashed' as const },
+            },
+            {
+              name: '订单数',
+              type: 'bar' as const,
+              yAxisIndex: 1,
+              data: trend.map(t => t.order_count),
+              itemStyle: { color: 'rgba(100,180,100,0.4)' },
+              barMaxWidth: 24,
+            },
+          ],
+        };
+        return (
+          <ZCard title="近 6 个月营收走势">
+            <ReactECharts option={trendOption} style={{ height: 220 }} />
+          </ZCard>
+        );
+      })()}
     </div>
   );
 }
@@ -1108,6 +1163,29 @@ function PackagesSection() {
   const [modalOpen, setModalOpen]     = useState(false);
   const [editing,   setEditing]       = useState<PackageItem | null>(null);
   const [saving,    setSaving]        = useState(false);
+  const [perfMap,   setPerfMap]       = useState<Record<string, { usage_count: number; avg_gross_margin_pct: number | null }>>({});
+
+  // Load performance data for all packages
+  useEffect(() => {
+    if (!packages.length) return;
+    Promise.allSettled(
+      packages.map(p =>
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE_ID}/packages/${p.package_id}/performance`)
+          .then(r => ({ id: p.package_id, data: r.data }))
+      )
+    ).then(results => {
+      const map: typeof perfMap = {};
+      results.forEach(r => {
+        if (r.status === 'fulfilled') {
+          map[r.value.id] = {
+            usage_count:         r.value.data.usage_count,
+            avg_gross_margin_pct: r.value.data.avg_gross_margin_pct,
+          };
+        }
+      });
+      setPerfMap(map);
+    });
+  }, [packages]);
 
   const [fName,     setFName]         = useState('');
   const [fType,     setFType]         = useState('');
@@ -1198,6 +1276,18 @@ function PackagesSection() {
                   {p.gross_margin_pct != null ? ` · 毛利率${p.gross_margin_pct}%` : ''}
                 </div>
               </div>
+              {perfMap[p.package_id] !== undefined ? (
+                perfMap[p.package_id].usage_count > 0 ? (
+                  <span className={styles.perfBadge}>
+                    {perfMap[p.package_id].usage_count}单
+                    {perfMap[p.package_id].avg_gross_margin_pct != null
+                      ? ` · ${perfMap[p.package_id].avg_gross_margin_pct}%毛利`
+                      : ''}
+                  </span>
+                ) : (
+                  <span className={styles.perfBadgeEmpty}>未使用</span>
+                )
+              ) : null}
               <ZBadge type={p.is_active ? 'success' : 'default'} text={p.is_active ? '上架' : '已下架'} />
               <div className={styles.resActions}>
                 <ZButton variant="ghost" size="sm" onClick={() => openEdit(p)}>编辑</ZButton>

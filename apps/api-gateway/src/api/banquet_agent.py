@@ -2321,6 +2321,218 @@ async def sync_kpi(
     }
 
 
+# ────────── Phase 9 端点 ───────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/monthly-trend")
+async def get_monthly_trend(
+    store_id: str,
+    months: int = Query(6, ge=1, le=24, description="返回最近 N 个月"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """近 N 月营收/订单数/毛利走势（按宴会日期聚合）"""
+    from datetime import date as _date
+    from dateutil.relativedelta import relativedelta  # type: ignore
+
+    today = _date.today()
+    # Build list of (year, month) from oldest → newest
+    month_list = []
+    for i in range(months - 1, -1, -1):
+        d = today - relativedelta(months=i)
+        month_list.append((d.year, d.month))
+
+    # Revenue + order count per month
+    revenue_rows = await db.execute(
+        select(
+            func.extract("year",  BanquetOrder.banquet_date).label("yr"),
+            func.extract("month", BanquetOrder.banquet_date).label("mo"),
+            func.count(BanquetOrder.id).label("cnt"),
+            func.sum(BanquetOrder.total_amount_fen).label("rev"),
+        ).where(
+            and_(
+                BanquetOrder.store_id == store_id,
+                BanquetOrder.order_status.in_([
+                    OrderStatusEnum.CONFIRMED,
+                    OrderStatusEnum.PREPARING,
+                    OrderStatusEnum.IN_PROGRESS,
+                    OrderStatusEnum.COMPLETED,
+                    OrderStatusEnum.SETTLED,
+                ]),
+            )
+        ).group_by("yr", "mo")
+    )
+    rev_map: dict[tuple, tuple] = {}
+    for row in revenue_rows.all():
+        rev_map[(int(row.yr), int(row.mo))] = (int(row.cnt), int(row.rev or 0))
+
+    # Gross profit per month via BanquetProfitSnapshot → BanquetOrder
+    from src.models.banquet import BanquetProfitSnapshot as _BPS
+    profit_rows = await db.execute(
+        select(
+            func.extract("year",  BanquetOrder.banquet_date).label("yr"),
+            func.extract("month", BanquetOrder.banquet_date).label("mo"),
+            func.sum(_BPS.gross_profit_fen).label("gp"),
+        ).join(
+            BanquetOrder, _BPS.banquet_order_id == BanquetOrder.id
+        ).where(
+            BanquetOrder.store_id == store_id,
+        ).group_by("yr", "mo")
+    )
+    gp_map: dict[tuple, int] = {}
+    for row in profit_rows.all():
+        gp_map[(int(row.yr), int(row.mo))] = int(row.gp or 0)
+
+    result = []
+    for (yr, mo) in month_list:
+        month_str = f"{yr:04d}-{mo:02d}"
+        cnt, rev = rev_map.get((yr, mo), (0, 0))
+        gp = gp_map.get((yr, mo), 0)
+        result.append({
+            "month":              month_str,
+            "order_count":        cnt,
+            "revenue_yuan":       round(rev / 100, 2),
+            "gross_profit_yuan":  round(gp / 100, 2),
+        })
+
+    return {"months": result}
+
+
+@router.get("/stores/{store_id}/packages/{pkg_id}/performance")
+async def get_package_performance(
+    store_id: str,
+    pkg_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """套餐效益分析：使用次数 / 总营收 / 平均毛利率"""
+    # Validate package exists
+    pkg_result = await db.execute(
+        select(MenuPackage).where(MenuPackage.id == pkg_id)
+    )
+    pkg = pkg_result.scalars().first()
+    if not pkg:
+        raise HTTPException(status_code=404, detail="套餐不存在")
+
+    # Usage count + total revenue
+    usage_result = await db.execute(
+        select(
+            func.count(BanquetOrder.id).label("cnt"),
+            func.sum(BanquetOrder.total_amount_fen).label("rev"),
+            func.max(BanquetOrder.banquet_date).label("last_date"),
+        ).where(
+            and_(
+                BanquetOrder.store_id == store_id,
+                BanquetOrder.package_id == pkg_id,
+                BanquetOrder.order_status.in_([
+                    OrderStatusEnum.CONFIRMED,
+                    OrderStatusEnum.PREPARING,
+                    OrderStatusEnum.IN_PROGRESS,
+                    OrderStatusEnum.COMPLETED,
+                    OrderStatusEnum.SETTLED,
+                ]),
+            )
+        )
+    )
+    usage_row = usage_result.first()
+    usage_count = int(usage_row.cnt or 0)
+    total_revenue_fen = int(usage_row.rev or 0)
+    last_used_date = usage_row.last_date
+
+    # Average gross margin from profit snapshots
+    from src.models.banquet import BanquetProfitSnapshot as _BPS
+    margin_result = await db.execute(
+        select(func.avg(_BPS.gross_margin_pct)).join(
+            BanquetOrder, _BPS.banquet_order_id == BanquetOrder.id
+        ).where(
+            and_(
+                BanquetOrder.store_id == store_id,
+                BanquetOrder.package_id == pkg_id,
+            )
+        )
+    )
+    avg_margin = margin_result.scalar()
+
+    return {
+        "package_id":          pkg_id,
+        "package_name":        pkg.name,
+        "usage_count":         usage_count,
+        "total_revenue_yuan":  round(total_revenue_fen / 100, 2),
+        "avg_gross_margin_pct": round(float(avg_margin), 1) if avg_margin else None,
+        "last_used_date":      last_used_date.isoformat() if last_used_date else None,
+    }
+
+
+@router.get("/stores/{store_id}/tasks/upcoming")
+async def get_upcoming_tasks(
+    store_id: str,
+    days: int = Query(7, ge=1, le=30, description="未来 N 天"),
+    owner_role: Optional[str] = Query(None, description="kitchen/service/decor/purchase/manager"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """未来 N 天执行任务，按日期分组（SM 任务看板）"""
+    from datetime import date as _date, timedelta as _td
+    from src.models.banquet import TaskOwnerRoleEnum
+
+    now = datetime.utcnow()
+    end_dt = now + _td(days=days)
+
+    stmt = (
+        select(ExecutionTask, BanquetOrder.banquet_type)
+        .join(BanquetOrder, ExecutionTask.banquet_order_id == BanquetOrder.id)
+        .where(
+            and_(
+                BanquetOrder.store_id == store_id,
+                ExecutionTask.due_time >= now,
+                ExecutionTask.due_time <= end_dt,
+            )
+        )
+        .order_by(ExecutionTask.due_time)
+    )
+    if owner_role:
+        try:
+            stmt = stmt.where(ExecutionTask.owner_role == TaskOwnerRoleEnum(owner_role))
+        except ValueError:
+            pass
+
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    # Group by date
+    from collections import defaultdict
+    date_groups: dict[str, list] = defaultdict(list)
+    total_pending = 0
+    total_done = 0
+
+    for task, banquet_type in rows:
+        date_str = task.due_time.date().isoformat() if task.due_time else "unknown"
+        is_done = task.task_status.value in ("done", "verified")
+        if is_done:
+            total_done += 1
+        else:
+            total_pending += 1
+        date_groups[date_str].append({
+            "task_id":      task.id,
+            "task_name":    task.task_name,
+            "owner_role":   task.owner_role.value,
+            "order_id":     task.banquet_order_id,
+            "banquet_type": banquet_type.value if banquet_type else None,
+            "due_time":     task.due_time.isoformat() if task.due_time else None,
+            "status":       task.task_status.value,
+        })
+
+    days_list = [
+        {"date": dt, "tasks": tasks}
+        for dt, tasks in sorted(date_groups.items())
+    ]
+
+    return {
+        "days":          days_list,
+        "total_pending": total_pending,
+        "total_done":    total_done,
+    }
+
+
 # ────────── Agent 接口 ────────────────────────────────────────────────────────
 
 @router.get("/stores/{store_id}/agent/followup-scan")

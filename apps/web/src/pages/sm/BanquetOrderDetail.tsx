@@ -11,7 +11,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
-  ZCard, ZBadge, ZButton, ZSkeleton, ZEmpty, ZModal, ZInput,
+  ZCard, ZBadge, ZButton, ZSkeleton, ZEmpty, ZModal, ZInput, ZSelect,
 } from '../../design-system/components';
 import apiClient from '../../services/api';
 import { handleApiError } from '../../utils/message';
@@ -139,6 +139,13 @@ export default function SmBanquetOrderDetail() {
   } | null>(null);
   const [beoLoading, setBeoLoading] = useState(false);
 
+  // 登记收款 Modal state
+  const [payOpen,    setPayOpen]    = useState(false);
+  const [payAmount,  setPayAmount]  = useState('');
+  const [payType,    setPayType]    = useState('balance');
+  const [payMethod,  setPayMethod]  = useState('');
+  const [paying,     setPaying]     = useState(false);
+
   const loadOrder = useCallback(async () => {
     if (!orderId) return;
     setLoading(true);
@@ -253,6 +260,49 @@ export default function SmBanquetOrderDetail() {
       handleApiError(e, '加载 BEO 失败');
     } finally {
       setBeoLoading(false);
+    }
+  };
+
+  const PAYMENT_TYPE_OPTIONS = [
+    { value: 'deposit', label: '定金' },
+    { value: 'balance', label: '尾款' },
+    { value: 'extra',   label: '附加款' },
+  ];
+
+  const PAYMENT_METHOD_OPTIONS = [
+    { value: '',        label: '不指定' },
+    { value: '现金',    label: '现金' },
+    { value: '转账',    label: '转账' },
+    { value: '微信',    label: '微信' },
+    { value: '支付宝',  label: '支付宝' },
+  ];
+
+  const openPayModal = () => {
+    setPayAmount(order?.balance_yuan ? String(order.balance_yuan) : '');
+    setPayType('balance');
+    setPayMethod('');
+    setPayOpen(true);
+  };
+
+  const handlePayment = async () => {
+    if (!payAmount) return;
+    setPaying(true);
+    try {
+      await apiClient.post(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/orders/${orderId}/payment`,
+        {
+          amount_yuan:    parseFloat(payAmount),
+          payment_type:   payType,
+          payment_method: payMethod || null,
+        },
+      );
+      setPayOpen(false);
+      setBeoData(null);  // invalidate cached BEO
+      await loadOrder();
+    } catch (e) {
+      handleApiError(e, '登记收款失败');
+    } finally {
+      setPaying(false);
     }
   };
 
@@ -453,7 +503,12 @@ export default function SmBanquetOrderDetail() {
 
         {/* 付款记录 */}
         <ZCard>
-          <div className={styles.sectionTitle}>付款记录</div>
+          <div className={styles.sectionHeader}>
+            <div className={styles.sectionTitle}>付款记录</div>
+            {['confirmed', 'preparing', 'in_progress', 'completed'].includes(order.status) && order.balance_yuan > 0 && (
+              <ZButton variant="ghost" size="sm" onClick={openPayModal}>＋ 登记收款</ZButton>
+            )}
+          </div>
           {order.payments.length === 0 ? (
             <ZEmpty title="暂无付款记录" description="登记收款后显示" />
           ) : (
@@ -641,6 +696,53 @@ export default function SmBanquetOrderDetail() {
         ) : (
           <ZEmpty title="加载失败" description="请关闭后重试" />
         )}
+      </ZModal>
+
+      {/* 登记收款 Modal */}
+      <ZModal
+        open={payOpen}
+        title="登记收款"
+        onClose={() => setPayOpen(false)}
+        footer={
+          <div className={styles.settleFooter}>
+            <ZButton variant="ghost" onClick={() => setPayOpen(false)}>取消</ZButton>
+            <ZButton
+              variant="primary"
+              onClick={handlePayment}
+              disabled={paying || !payAmount}
+            >
+              {paying ? '提交中…' : '确认收款'}
+            </ZButton>
+          </div>
+        }
+      >
+        <div className={styles.settleForm}>
+          <div className={styles.settleField}>
+            <label className={styles.settleLabel}>收款金额（元）</label>
+            <ZInput
+              type="number"
+              value={payAmount}
+              onChange={e => setPayAmount(e.target.value)}
+              placeholder="如：10000"
+            />
+          </div>
+          <div className={styles.settleField}>
+            <label className={styles.settleLabel}>收款类型</label>
+            <ZSelect
+              value={payType}
+              options={PAYMENT_TYPE_OPTIONS}
+              onChange={v => setPayType(v as string)}
+            />
+          </div>
+          <div className={styles.settleField}>
+            <label className={styles.settleLabel}>支付方式（选填）</label>
+            <ZSelect
+              value={payMethod}
+              options={PAYMENT_METHOD_OPTIONS}
+              onChange={v => setPayMethod(v as string)}
+            />
+          </div>
+        </div>
       </ZModal>
     </div>
   );

@@ -1,7 +1,7 @@
 /**
- * SM 执行任务总览页
+ * SM 任务看板页（7天日历视图）
  * 路由：/sm/banquet-tasks
- * 数据：GET /api/v1/banquet-agent/stores/{id}/tasks?status=&owner_role=
+ * 数据：GET /api/v1/banquet-agent/stores/{id}/tasks/upcoming?days=7&owner_role=
  *      PATCH /api/v1/banquet-agent/stores/{id}/orders/{order_id}/tasks/{task_id}
  */
 import React, { useCallback, useEffect, useState } from 'react';
@@ -16,16 +16,8 @@ import styles from './BanquetTasks.module.css';
 
 const STORE_ID = localStorage.getItem('store_id') || 'S001';
 
-const STATUS_FILTERS = [
-  { value: '',            label: '全部' },
-  { value: 'pending',     label: '待处理' },
-  { value: 'in_progress', label: '进行中' },
-  { value: 'done',        label: '已完成' },
-  { value: 'overdue',     label: '已逾期' },
-];
-
-const ROLE_FILTERS = [
-  { value: '',         label: '全部角色' },
+const ROLE_CHIPS = [
+  { value: '',         label: '全部' },
   { value: 'kitchen',  label: '厨房' },
   { value: 'service',  label: '服务' },
   { value: 'decor',    label: '布置' },
@@ -42,66 +34,73 @@ const TASK_STATUS_BADGE: Record<string, { text: string; type: 'success' | 'info'
   closed:      { text: '已关闭', type: 'default' },
 };
 
-const ROLE_LABELS: Record<string, string> = {
-  kitchen:  '厨房',
-  service:  '服务',
-  decor:    '布置',
-  purchase: '采购',
-  manager:  '店长',
+const BANQUET_TYPE_LABELS: Record<string, string> = {
+  wedding:    '婚宴',
+  birthday:   '寿宴',
+  business:   '商务宴',
+  full_moon:  '满月酒',
+  graduation: '升学宴',
+  other:      '其他',
 };
+
+const WEEK_NAMES = ['日', '一', '二', '三', '四', '五', '六'];
 
 interface TaskItem {
   task_id:      string;
   task_name:    string;
-  task_type:    string;
   owner_role:   string;
+  order_id:     string;
+  banquet_type: string | null;
   due_time:     string | null;
   status:       string;
-  completed_at: string | null;
-  order_id:     string;
-  banquet_date: string | null;
-  banquet_type: string | null;
+}
+
+interface DayGroup {
+  date:  string;
+  tasks: TaskItem[];
 }
 
 export default function SmBanquetTasks() {
   const navigate = useNavigate();
+  const [role,       setRole]       = useState('');
+  const [days,       setDays]       = useState<DayGroup[]>([]);
+  const [summary,    setSummary]    = useState({ total_pending: 0, total_done: 0 });
+  const [loading,    setLoading]    = useState(true);
+  const [completing, setCompleting] = useState<string | null>(null);
+  const [showDone,   setShowDone]   = useState(false);
 
-  const [statusFilter, setStatusFilter] = useState('pending');
-  const [roleFilter,   setRoleFilter]   = useState('');
-  const [tasks,        setTasks]        = useState<TaskItem[]>([]);
-  const [loading,      setLoading]      = useState(true);
-  const [completing,   setCompleting]   = useState<string | null>(null);
-
-  const loadTasks = useCallback(async (status: string, role: string) => {
+  const load = useCallback(async (r: string) => {
     setLoading(true);
     try {
-      const params: Record<string, string> = {};
-      if (status) params.status = status;
-      if (role)   params.owner_role = role;
+      const params: Record<string, string | number> = { days: 7 };
+      if (r) params.owner_role = r;
       const resp = await apiClient.get(
-        `/api/v1/banquet-agent/stores/${STORE_ID}/tasks`,
+        `/api/v1/banquet-agent/stores/${STORE_ID}/tasks/upcoming`,
         { params },
       );
-      const raw = resp.data;
-      setTasks(Array.isArray(raw) ? raw : []);
+      setDays(resp.data?.days ?? []);
+      setSummary({
+        total_pending: resp.data?.total_pending ?? 0,
+        total_done:    resp.data?.total_done    ?? 0,
+      });
     } catch {
-      setTasks([]);
+      setDays([]);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { loadTasks(statusFilter, roleFilter); }, [loadTasks, statusFilter, roleFilter]);
+  useEffect(() => { load(role); }, [load, role]);
 
-  const completeTask = async (task: TaskItem) => {
-    const newStatus = task.status === 'done' ? 'pending' : 'done';
+  const toggleTask = async (task: TaskItem) => {
+    const newStatus = (task.status === 'done' || task.status === 'verified') ? 'pending' : 'done';
     setCompleting(task.task_id);
     try {
       await apiClient.patch(
         `/api/v1/banquet-agent/stores/${STORE_ID}/orders/${task.order_id}/tasks/${task.task_id}`,
         { status: newStatus },
       );
-      await loadTasks(statusFilter, roleFilter);
+      await load(role);
     } catch (e) {
       handleApiError(e, '更新任务失败');
     } finally {
@@ -109,82 +108,105 @@ export default function SmBanquetTasks() {
     }
   };
 
+  const totalTasks = summary.total_pending + summary.total_done;
+
   return (
     <div className={styles.page}>
       <div className={styles.header}>
         <button className={styles.back} onClick={() => navigate('/sm/banquet')}>← 返回</button>
-        <div className={styles.title}>执行任务</div>
+        <div className={styles.title}>任务看板（未来7天）</div>
       </div>
 
-      {/* 状态 Chip */}
+      {/* 角色筛选 */}
       <div className={styles.chipBar}>
-        {STATUS_FILTERS.map(f => (
+        {ROLE_CHIPS.map(c => (
           <button
-            key={f.value}
-            className={`${styles.chip} ${statusFilter === f.value ? styles.chipActive : ''}`}
-            onClick={() => setStatusFilter(f.value)}
+            key={c.value}
+            className={`${styles.chip} ${role === c.value ? styles.chipActive : ''}`}
+            onClick={() => setRole(c.value)}
           >
-            {f.label}
+            {c.label}
           </button>
         ))}
       </div>
 
-      {/* 角色 Chip */}
-      <div className={`${styles.chipBar} ${styles.chipBarSecondary}`}>
-        {ROLE_FILTERS.map(f => (
-          <button
-            key={f.value}
-            className={`${styles.chip} ${styles.chipSm} ${roleFilter === f.value ? styles.chipActive : ''}`}
-            onClick={() => setRoleFilter(f.value)}
-          >
-            {f.label}
+      {/* 摘要栏 */}
+      {!loading && totalTasks > 0 && (
+        <div className={styles.summary}>
+          <span className={styles.sumPending}>{summary.total_pending} 待处理</span>
+          <span className={styles.sumDone}>{summary.total_done} 已完成</span>
+          <button className={styles.toggleDone} onClick={() => setShowDone(v => !v)}>
+            {showDone ? '隐藏已完成' : '显示已完成'}
           </button>
-        ))}
-      </div>
+        </div>
+      )}
 
       <div className={styles.body}>
-        <ZCard>
-          {loading ? (
-            <ZSkeleton rows={5} />
-          ) : !tasks.length ? (
-            <ZEmpty title="暂无任务" description="当前筛选条件下没有执行任务" />
-          ) : (
-            <div className={styles.list}>
-              {tasks.map(task => {
-                const tb = TASK_STATUS_BADGE[task.status] ?? { text: task.status, type: 'default' as const };
-                const isDone = task.status === 'done' || task.status === 'verified';
-                const isOverdue = !isDone && task.due_time && dayjs(task.due_time).isBefore(dayjs());
-                return (
-                  <div key={task.task_id} className={`${styles.row} ${isDone ? styles.rowDone : ''}`}>
-                    <div className={styles.info}>
-                      <div className={styles.taskName}>{task.task_name}</div>
-                      <div className={styles.meta}>
-                        {task.banquet_date ? dayjs(task.banquet_date).format('MM-DD') : ''}
-                        {task.banquet_type ? ` · ${task.banquet_type}` : ''}
-                        {task.due_time ? ` · 截止${dayjs(task.due_time).format('MM-DD HH:mm')}` : ''}
-                        {isOverdue ? ' ⚠️' : ''}
+        {loading ? (
+          <ZSkeleton rows={6} />
+        ) : days.length === 0 ? (
+          <ZEmpty title="未来 7 天暂无执行任务" description="确认订单后自动生成" />
+        ) : (
+          days.map(day => {
+            const visibleTasks = showDone
+              ? day.tasks
+              : day.tasks.filter(t => t.status !== 'done' && t.status !== 'verified');
+            if (visibleTasks.length === 0) return null;
+            const pendingCount = day.tasks.filter(
+              t => t.status !== 'done' && t.status !== 'verified'
+            ).length;
+            return (
+              <ZCard key={day.date}>
+                <div className={styles.dayHeader}>
+                  <span className={styles.dayDate}>
+                    {dayjs(day.date).format('MM月DD日')}
+                    <span className={styles.dayWeek}>
+                      （{WEEK_NAMES[dayjs(day.date).day()]}）
+                    </span>
+                  </span>
+                  {pendingCount > 0 && (
+                    <ZBadge type="warning" text={`${pendingCount} 待处理`} />
+                  )}
+                </div>
+                <div className={styles.list}>
+                  {visibleTasks.map(task => {
+                    const isDone = task.status === 'done' || task.status === 'verified';
+                    const tb = TASK_STATUS_BADGE[task.status] ?? { text: task.status, type: 'default' as const };
+                    return (
+                      <div
+                        key={task.task_id}
+                        className={`${styles.row} ${isDone ? styles.rowDone : ''}`}
+                      >
+                        <div className={styles.info}>
+                          <div className={styles.taskName}>{task.task_name}</div>
+                          <div className={styles.meta}>
+                            {task.banquet_type
+                              ? (BANQUET_TYPE_LABELS[task.banquet_type] ?? task.banquet_type)
+                              : ''}
+                            {task.due_time
+                              ? ` · ${dayjs(task.due_time).format('HH:mm')}`
+                              : ''}
+                          </div>
+                        </div>
+                        <div className={styles.right}>
+                          <ZBadge type={tb.type} text={tb.text} />
+                          <ZButton
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => toggleTask(task)}
+                            disabled={completing === task.task_id}
+                          >
+                            {completing === task.task_id ? '…' : isDone ? '撤销' : '完成'}
+                          </ZButton>
+                        </div>
                       </div>
-                    </div>
-                    <div className={styles.right}>
-                      <ZBadge type="default" text={ROLE_LABELS[task.owner_role] ?? task.owner_role} />
-                      <ZBadge type={tb.type} text={tb.text} />
-                      {!isDone && (
-                        <ZButton
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => completeTask(task)}
-                          disabled={completing === task.task_id}
-                        >
-                          {completing === task.task_id ? '…' : '完成'}
-                        </ZButton>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </ZCard>
+                    );
+                  })}
+                </div>
+              </ZCard>
+            );
+          })
+        )}
       </div>
     </div>
   );

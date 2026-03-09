@@ -835,3 +835,26 @@
   font-size: 12px;
   color: var(--text-secondary, #888);
 }
+
+/* 套餐效益角标 */
+.perfBadge {
+  flex-shrink: 0;
+  font-size: 11px;
+  padding: 2px 8px;
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.perfBadgeEmpty {
+  flex-shrink: 0;
+  font-size: 11px;
+  padding: 2px 8px;
+  background: var(--bg-secondary, #f5f5f5);
+  color: var(--text-secondary, #aaa);
+  border: 1px solid var(--border, #ddd);
+  border-radius: 12px;
+}

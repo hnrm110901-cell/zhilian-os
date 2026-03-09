@@ -129,3 +129,54 @@
   gap: 6px;
   flex-shrink: 0;
 }
+
+/* 摘要栏 */
+.summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: #fff;
+  border-bottom: 1px solid var(--border, #eee);
+  font-size: 13px;
+}
+
+.sumPending {
+  color: #f97316;
+  font-weight: 500;
+}
+
+.sumDone {
+  color: #16a34a;
+  font-weight: 500;
+}
+
+.toggleDone {
+  margin-left: auto;
+  background: none;
+  border: none;
+  font-size: 12px;
+  color: var(--accent, #ff6b2c);
+  cursor: pointer;
+  padding: 0;
+}
+
+/* 日期分组 */
+.dayHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.dayDate {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #111);
+}
+
+.dayWeek {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-secondary, #888);
+}
