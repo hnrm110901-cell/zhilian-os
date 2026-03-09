@@ -146,6 +146,11 @@ const BanquetAgentPage: React.FC = () => {
   const [orderCreateModal, setOrderCreateModal] = useState(false);
   const [orderCreateSubmitting, setOrderCreateSubmitting] = useState(false);
   const [orderCreateForm] = Form.useForm();
+  const [orderActionLoading, setOrderActionLoading] = useState<Record<string, boolean>>({});
+  const [paymentModal, setPaymentModal] = useState(false);
+  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
+  const [paymentTarget, setPaymentTarget] = useState<OrderItem | null>(null);
+  const [paymentForm] = Form.useForm();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -296,6 +301,45 @@ const BanquetAgentPage: React.FC = () => {
     }
   }, [load, orderCreateForm]);
 
+  const submitConfirmOrder = useCallback(async (order: OrderItem) => {
+    setOrderActionLoading((prev) => ({ ...prev, [order.id]: true }));
+    try {
+      const resp = await apiClient.post<{ message?: string }>(`/api/v1/banquet-agent/stores/${STORE_ID}/orders/${order.id}/confirm`);
+      showSuccess(resp?.message || '订单已确认');
+      load();
+    } catch (err) {
+      handleApiError(err, '确认订单失败');
+    } finally {
+      setOrderActionLoading((prev) => ({ ...prev, [order.id]: false }));
+    }
+  }, [load]);
+
+  const submitPayment = useCallback(async () => {
+    if (!paymentTarget) return;
+    try {
+      const values = await paymentForm.validateFields();
+      setPaymentSubmitting(true);
+      const resp = await apiClient.post<{ paid_yuan?: number; balance_yuan?: number }>(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/orders/${paymentTarget.id}/payment`,
+        {
+          payment_type: values.payment_type,
+          amount_yuan: values.amount_yuan,
+          payment_method: values.payment_method || undefined,
+          receipt_no: values.receipt_no || undefined,
+        }
+      );
+      showSuccess(`收款成功：已收 ¥${Math.round(Number(resp?.paid_yuan || 0)).toLocaleString()}，待收 ¥${Math.round(Number(resp?.balance_yuan || 0)).toLocaleString()}`);
+      setPaymentModal(false);
+      paymentForm.resetFields();
+      setPaymentTarget(null);
+      load();
+    } catch (err) {
+      handleApiError(err, '登记收款失败');
+    } finally {
+      setPaymentSubmitting(false);
+    }
+  }, [load, paymentForm, paymentTarget]);
+
   const kpis = useMemo(() => [
     { label: '本月宴会收入', value: dashboard ? `¥${Math.round(dashboard.revenue_yuan).toLocaleString()}` : '—' },
     { label: '本月毛利', value: dashboard ? `¥${Math.round(dashboard.gross_profit_yuan).toLocaleString()}` : '—' },
@@ -348,6 +392,46 @@ const BanquetAgentPage: React.FC = () => {
     { title: '总金额', dataIndex: 'total_amount_yuan', key: 'total_amount_yuan', width: 120, render: (v: number) => `¥${Math.round(v || 0).toLocaleString()}` },
     { title: '已支付', dataIndex: 'paid_yuan', key: 'paid_yuan', width: 120, render: (v: number) => `¥${Math.round(v || 0).toLocaleString()}` },
     { title: '待支付', dataIndex: 'balance_yuan', key: 'balance_yuan', width: 120, render: (v: number) => `¥${Math.round(v || 0).toLocaleString()}` },
+    {
+      title: '操作',
+      key: 'actions',
+      width: 210,
+      render: (_: unknown, row: OrderItem) => (
+        <Space>
+          {row.order_status === 'draft' ? (
+            <ZButton
+              size="sm"
+              variant="ghost"
+              loading={!!orderActionLoading[row.id]}
+              onClick={() => submitConfirmOrder(row)}
+            >
+              确认订单
+            </ZButton>
+          ) : (
+            <Tag color="green">已确认</Tag>
+          )}
+          {row.balance_yuan > 0 ? (
+            <ZButton
+              size="sm"
+              variant="primary"
+              onClick={() => {
+                setPaymentTarget(row);
+                paymentForm.setFieldsValue({
+                  payment_type: row.deposit_status === 'unpaid' ? 'deposit' : 'balance',
+                  amount_yuan: Math.max(1, Math.round(row.balance_yuan)),
+                  payment_method: 'bank_transfer',
+                });
+                setPaymentModal(true);
+              }}
+            >
+              登记收款
+            </ZButton>
+          ) : (
+            <Tag>已结清</Tag>
+          )}
+        </Space>
+      ),
+    },
   ];
 
   const body = loading ? <ZSkeleton rows={8} /> : (
@@ -628,6 +712,41 @@ const BanquetAgentPage: React.FC = () => {
           </Form.Item>
           <Form.Item label="联系电话" name="contact_phone">
             <Input />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={`登记收款${paymentTarget ? ` · ${paymentTarget.id.slice(0, 8)}` : ''}`}
+        open={paymentModal}
+        onCancel={() => {
+          setPaymentModal(false);
+          setPaymentTarget(null);
+        }}
+        onOk={submitPayment}
+        confirmLoading={paymentSubmitting}
+      >
+        <Form form={paymentForm} layout="vertical">
+          <Form.Item label="收款类型" name="payment_type" rules={[{ required: true }]}>
+            <Select>
+              <Select.Option value="deposit">定金</Select.Option>
+              <Select.Option value="balance">尾款</Select.Option>
+              <Select.Option value="extra">追加消费</Select.Option>
+            </Select>
+          </Form.Item>
+          <Form.Item label="收款金额（¥）" name="amount_yuan" rules={[{ required: true, message: '请输入金额' }]}>
+            <InputNumber min={0.01} precision={2} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item label="收款方式" name="payment_method">
+            <Select allowClear>
+              <Select.Option value="bank_transfer">银行转账</Select.Option>
+              <Select.Option value="wechat">微信</Select.Option>
+              <Select.Option value="alipay">支付宝</Select.Option>
+              <Select.Option value="cash">现金</Select.Option>
+            </Select>
+          </Form.Item>
+          <Form.Item label="收据号" name="receipt_no">
+            <Input placeholder="可选" />
           </Form.Item>
         </Form>
       </Modal>
