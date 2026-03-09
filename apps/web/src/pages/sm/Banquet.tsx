@@ -8,7 +8,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
-  ZCard, ZKpi, ZBadge, ZButton, ZSkeleton, ZEmpty,
+  ZCard, ZKpi, ZBadge, ZButton, ZSkeleton, ZEmpty, ZModal,
 } from '../../design-system/components';
 import apiClient from '../../services/api';
 import { handleApiError } from '../../utils/message';
@@ -54,6 +54,29 @@ export default function SmBanquet() {
   }
   const [atRiskOrders, setAtRiskOrders] = useState<AtRiskOrder[]>([]);
 
+  // Phase 16: 客户触达
+  interface AnniversaryItem {
+    customer_id:       string;
+    name:              string;
+    phone:             string | null;
+    last_banquet_type: string;
+    anniversary_date:  string;
+    days_until:        number;
+  }
+  interface WinBackItem {
+    customer_id:    string;
+    name:           string;
+    phone:          string | null;
+    last_order_date: string;
+    days_since:     number;
+    total_orders:   number;
+    total_yuan:     number;
+  }
+  const [anniversaries,     setAnniversaries]     = useState<AnniversaryItem[]>([]);
+  const [winBackCandidates, setWinBackCandidates] = useState<WinBackItem[]>([]);
+  const [outreachMsg,       setOutreachMsg]       = useState<string | null>(null);
+  const [sendingOutreach,   setSendingOutreach]   = useState<string | null>(null);
+
   const loadTodayCheck = useCallback(async () => {
     setLoadingToday(true);
     try {
@@ -89,9 +112,44 @@ export default function SmBanquet() {
     apiClient.get(`/api/v1/banquet-agent/stores/${STORE_ID}/orders/at-risk`)
       .then(r => setAtRiskOrders(Array.isArray(r.data) ? r.data : []))
       .catch(() => {});
+    // Phase 16: 周年提醒 + 赢回候选
+    apiClient.get(`/api/v1/banquet-agent/stores/${STORE_ID}/customers/upcoming-anniversaries`, { params: { days: 7 } })
+      .then(r => setAnniversaries(r.data?.items ?? []))
+      .catch(() => {});
+    apiClient.get(`/api/v1/banquet-agent/stores/${STORE_ID}/customers/win-back-candidates`, { params: { months: 12 } })
+      .then(r => setWinBackCandidates((r.data?.items ?? []).slice(0, 3)))
+      .catch(() => {});
   }, [loadTodayCheck, loadLeads]);
 
   const tc = todayCheck;
+
+  const handleAnniversary = async (cid: string) => {
+    setSendingOutreach(cid);
+    try {
+      const r = await apiClient.post(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/customers/${cid}/anniversary-message`,
+      );
+      setOutreachMsg(r.data?.message ?? '话术已生成');
+    } catch (e) {
+      handleApiError(e, '生成话术失败');
+    } finally {
+      setSendingOutreach(null);
+    }
+  };
+
+  const handleWinBack = async (cid: string) => {
+    setSendingOutreach(cid);
+    try {
+      const r = await apiClient.post(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/customers/${cid}/win-back-message`,
+      );
+      setOutreachMsg(r.data?.message ?? '话术已生成');
+    } catch (e) {
+      handleApiError(e, '生成赢回话术失败');
+    } finally {
+      setSendingOutreach(null);
+    }
+  };
 
   return (
     <div className={styles.page}>
@@ -189,6 +247,58 @@ export default function SmBanquet() {
           )}
         </ZCard>
 
+        {/* Phase 16: 客户触达 */}
+        {(anniversaries.length > 0 || winBackCandidates.length > 0) && (
+          <ZCard title="客户触达提醒">
+            {anniversaries.length > 0 && (
+              <div className={styles.outreachSection}>
+                <div className={styles.outreachLabel}>周年/生日 · 近7天</div>
+                {anniversaries.map(a => (
+                  <div key={a.customer_id} className={styles.outreachRow}>
+                    <div className={styles.outreachInfo}>
+                      <div className={styles.outreachName}>{a.name}</div>
+                      <div className={styles.outreachMeta}>
+                        {a.last_banquet_type} · {a.days_until === 0 ? '今天' : `${a.days_until}天后`}
+                      </div>
+                    </div>
+                    <ZButton
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleAnniversary(a.customer_id)}
+                      disabled={sendingOutreach === a.customer_id}
+                    >
+                      {sendingOutreach === a.customer_id ? '…' : '发送祝福'}
+                    </ZButton>
+                  </div>
+                ))}
+              </div>
+            )}
+            {winBackCandidates.length > 0 && (
+              <div className={styles.outreachSection}>
+                <div className={styles.outreachLabel}>流失预警 · Top3</div>
+                {winBackCandidates.map(c => (
+                  <div key={c.customer_id} className={styles.outreachRow}>
+                    <div className={styles.outreachInfo}>
+                      <div className={styles.outreachName}>{c.name}</div>
+                      <div className={styles.outreachMeta}>
+                        失联 {c.days_since} 天 · 历史消费 ¥{c.total_yuan.toLocaleString()}
+                      </div>
+                    </div>
+                    <ZButton
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleWinBack(c.customer_id)}
+                      disabled={sendingOutreach === c.customer_id}
+                    >
+                      {sendingOutreach === c.customer_id ? '…' : '发送话术'}
+                    </ZButton>
+                  </div>
+                ))}
+              </div>
+            )}
+          </ZCard>
+        )}
+
         {/* 快捷入口 */}
         <ZCard title="快捷操作">
           <div className={styles.actionRow}>
@@ -225,6 +335,20 @@ export default function SmBanquet() {
           </div>
         </ZCard>
       </div>
+
+      {/* 话术展示 Modal */}
+      <ZModal
+        open={!!outreachMsg}
+        title="触达话术"
+        onClose={() => setOutreachMsg(null)}
+        footer={
+          <div className={styles.modalFooter}>
+            <ZButton variant="primary" onClick={() => setOutreachMsg(null)}>关闭</ZButton>
+          </div>
+        }
+      >
+        <div className={styles.outreachMsgBody}>{outreachMsg}</div>
+      </ZModal>
     </div>
   );
 }

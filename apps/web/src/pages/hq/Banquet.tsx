@@ -1852,6 +1852,7 @@ function AnalyticsTab() {
   const [leadTime,     setLeadTime]     = useState<LeadTimeData | null>(null);
   const [retention,    setRetention]    = useState<RetentionData | null>(null);
   const [cancellation, setCancellation] = useState<CancellationData | null>(null);
+  const [execSummary,  setExecSummary]  = useState<ExecSummaryData | null>(null);
   const [loading,      setLoading]      = useState(false);
 
   const load = useCallback(async (m: string) => {
@@ -1861,7 +1862,7 @@ function AnalyticsTab() {
       const [y, mo] = m.split('-');
       const [
         funnelR, forecastR, lostR, arR, excR, excStatsR,
-        agingR, quoteStatsR, svcR, ltR, retR, cancelR,
+        agingR, quoteStatsR, svcR, ltR, retR, cancelR, execR,
       ] = await Promise.allSettled([
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/funnel`, { params: { month: m } }),
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/revenue-forecast`, { params: { months: 3 } }),
@@ -1875,6 +1876,7 @@ function AnalyticsTab() {
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/booking-lead-time`),
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/customer-retention`),
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/cancellation-analysis`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/executive-summary`, { params: { year: Number(y), month: Number(mo) } }),
       ]);
       if (funnelR.status === 'fulfilled')     setFunnel(funnelR.value.data);
       if (forecastR.status === 'fulfilled')   setForecast(forecastR.value.data?.forecast ?? []);
@@ -1888,6 +1890,7 @@ function AnalyticsTab() {
       if (ltR.status === 'fulfilled')         setLeadTime(ltR.value.data);
       if (retR.status === 'fulfilled')        setRetention(retR.value.data);
       if (cancelR.status === 'fulfilled')     setCancellation(cancelR.value.data);
+      if (execR.status === 'fulfilled')       setExecSummary(execR.value.data);
     } finally {
       setLoading(false);
     }
@@ -2340,13 +2343,51 @@ function AnalyticsTab() {
               </div>
             )}
           </ZCard>
+          {/* Phase 16: 月度执行摘要 */}
+          <ZCard title={`月度执行摘要（${month}）`}>
+            {!execSummary || execSummary.metrics.order_count === 0 ? (
+              <ZEmpty title="本月暂无宴会数据" description="" />
+            ) : (
+              <div className={styles.execSummaryBody}>
+                <div className={styles.execMetricGrid}>
+                  {([
+                    { key: 'revenue_yuan',           label: '营收',       fmt: (v: number) => `¥${v.toLocaleString()}` },
+                    { key: 'order_count',             label: '订单数',     fmt: (v: number) => `${v} 单` },
+                    { key: 'avg_order_yuan',          label: '客单价',     fmt: (v: number) => `¥${v.toLocaleString()}` },
+                    { key: 'conversion_rate_pct',     label: '转化率',     fmt: (v: number) => `${v}%` },
+                    { key: 'task_completion_pct',     label: '任务完成',   fmt: (v: number) => `${v}%` },
+                    { key: 'exception_rate_pct',      label: '异常率',     fmt: (v: number) => `${v}%` },
+                    { key: 'repeat_rate_pct',         label: '复购率',     fmt: (v: number) => `${v}%` },
+                    { key: 'cancellation_rate_pct',   label: '取消率',     fmt: (v: number) => `${v}%` },
+                    { key: 'revenue_lost_yuan',       label: '损失收入',   fmt: (v: number) => `¥${v.toLocaleString()}` },
+                    { key: 'target_achievement_pct',  label: '目标达成',   fmt: (v: number | null) => v != null ? `${v}%` : '—' },
+                  ] as { key: keyof ExecSummaryMetrics; label: string; fmt: (v: number | null) => string }[]).map(item => (
+                    <div key={item.key} className={styles.execMetricItem}>
+                      <span className={styles.execMetricLabel}>{item.label}</span>
+                      <span className={styles.execMetricValue}>
+                        {item.fmt(execSummary.metrics[item.key] as number | null)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                {execSummary.highlights.length > 0 && (
+                  <div className={styles.execInsights}>
+                    {execSummary.highlights.map((h, i) => (
+                      <div key={i} className={styles.execHighlight}>✅ {h}</div>
+                    ))}
+                    {execSummary.risks.map((r, i) => (
+                      <div key={i} className={styles.execRisk}>⚠️ {r}</div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </ZCard>
         </>
       )}
     </div>
   );
-}
-
-/* ─── Tab7: 客户档案 ─── */
+} */
 
 interface CustomerItem {
   id:                       string;
@@ -2765,29 +2806,74 @@ function HallScheduleTab() {
 }
 
 /* ─── 跨店对比 Tab ─── */
+/* ─── Phase 16: interfaces ─── */
+interface BenchmarkMetric {
+  metric:       string;
+  label:        string;
+  store_value:  number;
+  brand_avg:    number;
+  delta_pct:    number;
+  status:       'above' | 'below' | 'on_par';
+  rank:         number;
+  total_stores: number;
+}
+
+interface StoreComparisonRow {
+  store_id:             string;
+  store_name:           string;
+  revenue_yuan:         number;
+  order_count:          number;
+  conversion_rate_pct:  number;
+  repeat_rate_pct:      number;
+  is_self:              boolean;
+  rank:                 number | null;
+}
+
+interface ExecSummaryMetrics {
+  revenue_yuan:             number;
+  order_count:              number;
+  avg_order_yuan:           number;
+  conversion_rate_pct:      number;
+  task_completion_pct:      number;
+  exception_rate_pct:       number;
+  repeat_rate_pct:          number;
+  cancellation_rate_pct:    number;
+  revenue_lost_yuan:        number;
+  target_achievement_pct:   number | null;
+}
+
+interface ExecSummaryData {
+  year:       number;
+  month:      number;
+  metrics:    ExecSummaryMetrics;
+  highlights: string[];
+  risks:      string[];
+}
+
 function CrossStoreTab() {
-  const [month,  setMonth]  = useState(() => {
+  const [month,     setMonth]     = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
-  const [rows,    setRows]    = useState<{
-    store_id: string; revenue_yuan: number; gross_profit_yuan: number;
-    gross_margin_pct: number; order_count: number; lead_count: number;
-    hall_utilization_pct: number;
-  }[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [benchmark,   setBenchmark]   = useState<{ self_rank: number; total_stores: number; metrics: BenchmarkMetric[] } | null>(null);
+  const [comparison,  setComparison]  = useState<StoreComparisonRow[]>([]);
+  const [brandAvg,    setBrandAvg]    = useState<Partial<StoreComparisonRow> | null>(null);
+  const [loading,     setLoading]     = useState(false);
 
   const load = useCallback(async (m: string) => {
     setLoading(true);
     const [y, mo] = m.split('-').map(Number);
+    const STORE = localStorage.getItem('store_id') || 'S001';
     try {
-      const resp = await apiClient.get(
-        '/api/v1/banquet-agent/multi-store/banquet-summary',
-        { params: { year: y, month: mo } },
-      );
-      setRows(Array.isArray(resp.data) ? resp.data : []);
-    } catch {
-      setRows([]);
+      const [bmR, compR] = await Promise.allSettled([
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/benchmark`, { params: { year: y, month: mo } }),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/brand-comparison`, { params: { year: y, month: mo } }),
+      ]);
+      if (bmR.status === 'fulfilled')   setBenchmark(bmR.value.data);
+      if (compR.status === 'fulfilled') {
+        setComparison(compR.value.data?.stores ?? []);
+        setBrandAvg(compR.value.data?.brand_avg ?? null);
+      }
     } finally {
       setLoading(false);
     }
@@ -2800,25 +2886,61 @@ function CrossStoreTab() {
       <div className={styles.analyticsPicker}>
         <ZInput type="month" value={month} onChange={e => setMonth(e.target.value)} />
       </div>
-      <ZCard title="跨店宴会 KPI 对比">
+
+      {/* Benchmark 卡 */}
+      <ZCard title="本店 vs 品牌均值">
+        {loading ? (
+          <ZSkeleton rows={3} />
+        ) : !benchmark || benchmark.metrics.length === 0 ? (
+          <ZEmpty title="暂无对比数据" description="品牌下暂无其他门店数据" />
+        ) : (
+          <div className={styles.benchmarkBody}>
+            <div className={styles.benchmarkRank}>
+              排名 <strong>{benchmark.self_rank}/{benchmark.total_stores}</strong> 家门店
+            </div>
+            <div className={styles.benchmarkGrid}>
+              {benchmark.metrics.map(m2 => (
+                <div key={m2.metric} className={styles.benchmarkCard}>
+                  <div className={styles.benchmarkLabel}>{m2.label}</div>
+                  <div className={styles.benchmarkValue}>
+                    {typeof m2.store_value === 'number' && m2.metric === 'revenue_yuan'
+                      ? `¥${m2.store_value.toLocaleString()}`
+                      : `${m2.store_value}${m2.metric.endsWith('pct') ? '%' : ''}`
+                    }
+                  </div>
+                  <div className={`${styles.benchmarkDelta} ${
+                    m2.status === 'above' ? styles.deltaAbove :
+                    m2.status === 'below' ? styles.deltaBelow : styles.deltaOnPar
+                  }`}>
+                    {m2.delta_pct > 0 ? '+' : ''}{m2.delta_pct}% vs 均值
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      {/* 全店对比表 */}
+      <ZCard title="全店 KPI 排名">
         {loading ? (
           <ZSkeleton rows={4} />
-        ) : rows.length === 0 ? (
+        ) : comparison.length === 0 ? (
           <ZEmpty title="暂无跨店数据" description="当前品牌下暂无门店记录" />
         ) : (
           <div className={styles.crossStoreList}>
-            {rows.map((r, i) => (
-              <div key={r.store_id} className={styles.crossStoreRow}>
-                <div className={styles.crossStoreRank}>{i + 1}</div>
+            {[...comparison, ...(brandAvg ? [{ ...brandAvg, rank: null, is_self: false }] : [])].map((r, i) => (
+              <div key={r.store_id ?? `avg-${i}`} className={`${styles.crossStoreRow} ${r.is_self ? styles.crossStoreSelf : ''}`}>
+                <div className={styles.crossStoreRank}>{r.rank ?? '—'}</div>
                 <div className={styles.crossStoreInfo}>
-                  <div className={styles.crossStoreId}>{r.store_id}</div>
+                  <div className={styles.crossStoreId}>{(r as StoreComparisonRow).store_name ?? r.store_id}</div>
                   <div className={styles.crossStoreMeta}>
-                    {r.order_count} 单 · 利用率 {r.hall_utilization_pct}%
+                    {(r as StoreComparisonRow).order_count} 单 · 转化 {(r as StoreComparisonRow).conversion_rate_pct}%
                   </div>
                 </div>
                 <div className={styles.crossStoreRight}>
-                  <div className={styles.crossStoreRevenue}>¥{r.revenue_yuan.toLocaleString()}</div>
-                  <div className={styles.crossStoreMargin}>{r.gross_margin_pct}% 毛利率</div>
+                  <div className={styles.crossStoreRevenue}>¥{(r as StoreComparisonRow).revenue_yuan?.toLocaleString()}</div>
+                  <div className={styles.crossStoreMargin}>复购 {(r as StoreComparisonRow).repeat_rate_pct}%</div>
                 </div>
               </div>
             ))}

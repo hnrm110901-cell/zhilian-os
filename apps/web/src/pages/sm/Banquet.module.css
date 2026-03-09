@@ -136,3 +136,18 @@
 }
 .riskIcon { font-size: 16px; flex-shrink: 0; }
 .riskText { flex: 1; line-height: 1.4; }
+
+/* ── Phase 16: 客户触达 ── */
+.outreachSection  { display: flex; flex-direction: column; gap: 0; margin-bottom: 8px; }
+.outreachSection:last-child { margin-bottom: 0; }
+.outreachLabel    { font-size: 11px; font-weight: 600; color: var(--text-secondary, #888);
+                    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.outreachRow      { display: flex; align-items: center; justify-content: space-between;
+                    gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border, #eee); }
+.outreachRow:last-child { border-bottom: none; }
+.outreachInfo     { flex: 1; min-width: 0; }
+.outreachName     { font-size: 14px; font-weight: 600; }
+.outreachMeta     { font-size: 12px; color: var(--text-secondary, #888); margin-top: 2px; }
+.modalFooter      { display: flex; justify-content: flex-end; }
+.outreachMsgBody  { font-size: 14px; line-height: 1.7; color: var(--text-primary, #111);
+                    padding: 4px 0; white-space: pre-wrap; }

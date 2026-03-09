@@ -1191,3 +1191,29 @@
 .cancelLtItem   { display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .cancelLtLabel  { font-size: 11px; color: var(--text-secondary, #888); }
 .cancelLtCount  { font-size: 18px; font-weight: 700; line-height: 1; }
+
+/* ── Phase 16: Benchmark / CrossStore ── */
+.benchmarkBody   { display: flex; flex-direction: column; gap: 12px; }
+.benchmarkRank   { font-size: 13px; color: var(--text-secondary, #888); }
+.benchmarkGrid   { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.benchmarkCard   { background: var(--surface-2, #f8f9fa); border-radius: 8px; padding: 10px 12px;
+                   border: 1px solid var(--border, #eee); }
+.benchmarkLabel  { font-size: 11px; color: var(--text-secondary, #888); margin-bottom: 4px; }
+.benchmarkValue  { font-size: 18px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+.benchmarkDelta  { font-size: 12px; font-weight: 600; }
+.deltaAbove      { color: #22c55e; }
+.deltaBelow      { color: #dc2626; }
+.deltaOnPar      { color: var(--text-secondary, #888); }
+.crossStoreSelf  { background: rgba(255, 107, 44, 0.06); border-left: 3px solid var(--accent, #FF6B2C); }
+
+/* ── Phase 16: 月度执行摘要 ── */
+.execSummaryBody  { display: flex; flex-direction: column; gap: 12px; }
+.execMetricGrid   { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+.execMetricItem   { background: var(--surface-2, #f8f9fa); border-radius: 6px; padding: 8px 10px;
+                    display: flex; flex-direction: column; gap: 2px; border: 1px solid var(--border, #eee); }
+.execMetricLabel  { font-size: 11px; color: var(--text-secondary, #888); }
+.execMetricValue  { font-size: 16px; font-weight: 700; line-height: 1; }
+.execInsights     { display: flex; flex-direction: column; gap: 6px; padding-top: 8px;
+                    border-top: 1px solid var(--border, #eee); }
+.execHighlight    { font-size: 13px; color: #15803d; line-height: 1.4; }
+.execRisk         { font-size: 13px; color: #b45309; line-height: 1.4; }

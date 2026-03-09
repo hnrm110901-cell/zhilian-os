@@ -4706,3 +4706,1245 @@ async def list_pending_sign_contracts(
         "total":    len(items),
         "items":    items,
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Phase 15 — 服务品质看板·客户保留分析·智能排班建议
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── 1. GET /stores/{id}/analytics/service-quality ───────────────────────────
+
+@router.get("/stores/{store_id}/analytics/service-quality")
+async def get_service_quality(
+    store_id: str,
+    month:    str = Query(default=None, description="YYYY-MM, default=current month"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """服务品质看板：任务完成率、平均延误、异常率（按宴会类型分解）。"""
+    import calendar as _cal
+    from datetime import timedelta
+
+    today = date_type.today()
+    _month = month or today.strftime("%Y-%m")
+    y, m = int(_month[:4]), int(_month[5:7])
+    first_day = date_type(y, m, 1)
+    last_day  = date_type(y, m, _cal.monthrange(y, m)[1])
+
+    # Orders in month
+    orders_res = await db.execute(
+        select(BanquetOrder).where(
+            BanquetOrder.store_id == store_id,
+            BanquetOrder.banquet_date >= first_day,
+            BanquetOrder.banquet_date <= last_day,
+        )
+    )
+    orders = orders_res.scalars().all()
+    order_ids = [o.id for o in orders]
+    order_map = {o.id: o for o in orders}
+
+    if not order_ids:
+        return {
+            "store_id": store_id, "month": _month,
+            "task_completion_pct": 0.0, "avg_delay_hours": 0.0,
+            "exception_rate_pct": 0.0, "order_count": 0,
+            "by_banquet_type": [],
+        }
+
+    # Tasks for those orders
+    tasks_res = await db.execute(
+        select(ExecutionTask).where(ExecutionTask.banquet_order_id.in_(order_ids))
+    )
+    tasks = tasks_res.scalars().all()
+
+    # Exceptions for those orders
+    exc_res = await db.execute(
+        select(ExecutionException).where(ExecutionException.banquet_order_id.in_(order_ids))
+    )
+    exceptions = exc_res.scalars().all()
+
+    done_statuses = {TaskStatusEnum.DONE, TaskStatusEnum.VERIFIED, TaskStatusEnum.CLOSED}
+    total_tasks = len(tasks)
+    done_tasks  = sum(1 for t in tasks if t.task_status in done_statuses)
+    completion_pct = round(done_tasks / total_tasks * 100, 1) if total_tasks > 0 else 0.0
+
+    # Avg delay (hours): tasks completed after due_time
+    delay_hours_list = []
+    for t in tasks:
+        if t.task_status in done_statuses and t.completed_at and t.due_time:
+            diff = (t.completed_at - t.due_time).total_seconds() / 3600
+            if diff > 0:
+                delay_hours_list.append(diff)
+    avg_delay = round(sum(delay_hours_list) / len(delay_hours_list), 1) if delay_hours_list else 0.0
+
+    exception_rate = round(len(exceptions) / len(order_ids) * 100, 1)
+
+    # By banquet type
+    type_stats: dict = {}
+    for o in orders:
+        btype = o.banquet_type.value if hasattr(o.banquet_type, "value") else str(o.banquet_type)
+        if btype not in type_stats:
+            type_stats[btype] = {"task_count": 0, "done_count": 0, "exception_count": 0, "order_count": 0}
+        type_stats[btype]["order_count"] += 1
+
+    for t in tasks:
+        o = order_map.get(t.banquet_order_id)
+        if not o:
+            continue
+        btype = o.banquet_type.value if hasattr(o.banquet_type, "value") else str(o.banquet_type)
+        type_stats[btype]["task_count"] += 1
+        if t.task_status in done_statuses:
+            type_stats[btype]["done_count"] += 1
+
+    for e in exceptions:
+        o = order_map.get(e.banquet_order_id)
+        if not o:
+            continue
+        btype = o.banquet_type.value if hasattr(o.banquet_type, "value") else str(o.banquet_type)
+        type_stats[btype]["exception_count"] += 1
+
+    by_type = [
+        {
+            "banquet_type":     btype,
+            "order_count":      v["order_count"],
+            "task_count":       v["task_count"],
+            "completion_pct":   round(v["done_count"] / v["task_count"] * 100, 1) if v["task_count"] > 0 else 0.0,
+            "exception_count":  v["exception_count"],
+        }
+        for btype, v in sorted(type_stats.items())
+    ]
+
+    return {
+        "store_id":            store_id,
+        "month":               _month,
+        "order_count":         len(order_ids),
+        "task_completion_pct": completion_pct,
+        "avg_delay_hours":     avg_delay,
+        "exception_rate_pct":  exception_rate,
+        "by_banquet_type":     by_type,
+    }
+
+
+# ── 2. GET /stores/{id}/analytics/booking-lead-time ─────────────────────────
+
+@router.get("/stores/{store_id}/analytics/booking-lead-time")
+async def get_booking_lead_time(
+    store_id: str,
+    months:   int = Query(6, ge=1, le=24),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """预订提前量分布（<30d / 30-60d / 60-90d / >90d）及均值。"""
+    from datetime import timedelta
+
+    cutoff = date_type.today() - timedelta(days=months * 30)
+
+    res = await db.execute(
+        select(BanquetOrder).where(
+            BanquetOrder.store_id == store_id,
+            BanquetOrder.banquet_date >= cutoff,
+            BanquetOrder.order_status != OrderStatusEnum.CANCELLED,
+        )
+    )
+    orders = res.scalars().all()
+
+    if not orders:
+        return {
+            "store_id": store_id, "months": months, "total": 0,
+            "avg_lead_time_days": 0,
+            "buckets": {"under_30": 0, "d30_60": 0, "d60_90": 0, "over_90": 0},
+        }
+
+    buckets: dict = {"under_30": 0, "d30_60": 0, "d60_90": 0, "over_90": 0}
+    lead_times = []
+
+    for o in orders:
+        created_date = o.created_at.date() if hasattr(o.created_at, "date") else o.created_at
+        lead_days = (o.banquet_date - created_date).days
+        if lead_days < 0:
+            lead_days = 0
+        lead_times.append(lead_days)
+        if lead_days < 30:
+            buckets["under_30"] += 1
+        elif lead_days <= 60:
+            buckets["d30_60"] += 1
+        elif lead_days <= 90:
+            buckets["d60_90"] += 1
+        else:
+            buckets["over_90"] += 1
+
+    avg = round(sum(lead_times) / len(lead_times)) if lead_times else 0
+    total = len(orders)
+    bucket_pcts = {k: round(v / total * 100, 1) for k, v in buckets.items()}
+
+    return {
+        "store_id":           store_id,
+        "months":             months,
+        "total":              total,
+        "avg_lead_time_days": avg,
+        "buckets":            buckets,
+        "bucket_pcts":        bucket_pcts,
+    }
+
+
+# ── 3. GET /stores/{id}/analytics/customer-retention ────────────────────────
+
+@router.get("/stores/{store_id}/analytics/customer-retention")
+async def get_customer_retention(
+    store_id: str,
+    months:   int = Query(12, ge=1, le=36),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """客户保留分析：复购率、客户终身价值均值、Top 复购客户。"""
+    from datetime import timedelta
+
+    cutoff = date_type.today() - timedelta(days=months * 30)
+
+    res = await db.execute(
+        select(BanquetOrder).where(
+            BanquetOrder.store_id == store_id,
+            BanquetOrder.banquet_date >= cutoff,
+            BanquetOrder.order_status.in_([
+                OrderStatusEnum.COMPLETED,
+                OrderStatusEnum.SETTLED if hasattr(OrderStatusEnum, "SETTLED") else OrderStatusEnum.COMPLETED,
+            ]),
+        )
+    )
+    orders = res.scalars().all()
+
+    cust_map: dict = {}
+    for o in orders:
+        cid = o.customer_id
+        if cid not in cust_map:
+            cust_map[cid] = {"order_count": 0, "total_fen": 0}
+        cust_map[cid]["order_count"] += 1
+        cust_map[cid]["total_fen"] += o.total_amount_fen
+
+    total_customers = len(cust_map)
+    repeat_customers = sum(1 for v in cust_map.values() if v["order_count"] > 1)
+    repeat_rate = round(repeat_customers / total_customers * 100, 1) if total_customers > 0 else 0.0
+
+    all_values = [v["total_fen"] for v in cust_map.values()]
+    avg_ltv_yuan = round(sum(all_values) / len(all_values) / 100, 2) if all_values else 0.0
+
+    # Top 5 by order count then by value
+    top_raw = sorted(cust_map.items(), key=lambda x: (-x[1]["order_count"], -x[1]["total_fen"]))[:5]
+
+    # Fetch names for top customers
+    top_ids = [cid for cid, _ in top_raw]
+    names_map: dict = {}
+    if top_ids:
+        cust_res = await db.execute(
+            select(BanquetCustomer).where(BanquetCustomer.id.in_(top_ids))
+        )
+        for c in cust_res.scalars().all():
+            names_map[c.id] = c.customer_name
+
+    top_customers = [
+        {
+            "customer_id":   cid,
+            "name":          names_map.get(cid, "—"),
+            "order_count":   v["order_count"],
+            "total_yuan":    round(v["total_fen"] / 100, 2),
+        }
+        for cid, v in top_raw
+    ]
+
+    return {
+        "store_id":            store_id,
+        "months":              months,
+        "total_customers":     total_customers,
+        "repeat_customers":    repeat_customers,
+        "repeat_rate_pct":     repeat_rate,
+        "avg_ltv_yuan":        avg_ltv_yuan,
+        "top_customers":       top_customers,
+    }
+
+
+# ── 4. POST /stores/{id}/orders/{oid}/staffing-plan ─────────────────────────
+
+_STAFFING_RULES: dict = {
+    "wedding":  {"kitchen": 0.15, "service": 0.30, "decor": 0.05, "manager": 0.03},
+    "birthday": {"kitchen": 0.12, "service": 0.25, "decor": 0.03, "manager": 0.02},
+    "business": {"kitchen": 0.10, "service": 0.20, "decor": 0.02, "manager": 0.04},
+    "other":    {"kitchen": 0.10, "service": 0.20, "decor": 0.02, "manager": 0.02},
+}
+_MIN_STAFF = 1
+
+def _compute_staffing(table_count: int, banquet_type: str) -> dict:
+    btype = banquet_type.lower() if banquet_type else "other"
+    rules = _STAFFING_RULES.get(btype, _STAFFING_RULES["other"])
+    people = table_count * 10   # est. ~10 guests per table
+    staffing = {}
+    for role, factor in rules.items():
+        staffing[role] = max(_MIN_STAFF, round(people * factor))
+    staffing["total"] = sum(v for k, v in staffing.items() if k != "total")
+    return staffing
+
+
+@router.post("/stores/{store_id}/orders/{order_id}/staffing-plan")
+async def create_staffing_plan(
+    store_id:  str,
+    order_id:  str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """生成并持久化排班建议（规则引擎：桌数×宴会类型）。"""
+    order_res = await db.execute(
+        select(BanquetOrder).where(
+            BanquetOrder.id == order_id,
+            BanquetOrder.store_id == store_id,
+        )
+    )
+    order = order_res.scalars().first()
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+
+    btype = order.banquet_type.value if hasattr(order.banquet_type, "value") else str(order.banquet_type)
+    staffing = _compute_staffing(order.table_count, btype)
+
+    result = {
+        "order_id":     order_id,
+        "banquet_type": btype,
+        "table_count":  order.table_count,
+        "staffing":     staffing,
+    }
+
+    log = BanquetAgentActionLog(
+        id=str(__import__("uuid").uuid4()),
+        agent_type=BanquetAgentTypeEnum.SCHEDULING,
+        action_type="staffing_plan",
+        related_object_type="order",
+        related_object_id=order_id,
+        action_result=result,
+        suggestion_text=f"建议配置：{staffing.get('total', 0)} 人",
+        is_human_approved=None,
+    )
+    db.add(log)
+    await db.commit()
+
+    return result
+
+
+# ── 5. GET /stores/{id}/orders/{oid}/staffing-plan ───────────────────────────
+
+@router.get("/stores/{store_id}/orders/{order_id}/staffing-plan")
+async def get_staffing_plan(
+    store_id:  str,
+    order_id:  str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """读取最新排班建议（ActionLog），或实时计算。"""
+    order_res = await db.execute(
+        select(BanquetOrder).where(
+            BanquetOrder.id == order_id,
+            BanquetOrder.store_id == store_id,
+        )
+    )
+    order = order_res.scalars().first()
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+
+    log_res = await db.execute(
+        select(BanquetAgentActionLog).where(
+            BanquetAgentActionLog.related_object_type == "order",
+            BanquetAgentActionLog.related_object_id   == order_id,
+            BanquetAgentActionLog.action_type         == "staffing_plan",
+        ).order_by(BanquetAgentActionLog.created_at.desc()).limit(1)
+    )
+    log = log_res.scalars().first()
+
+    if log and log.action_result:
+        return {**log.action_result, "generated_at": log.created_at.isoformat() if log.created_at else None}
+
+    # Live calculation (no persist)
+    btype = order.banquet_type.value if hasattr(order.banquet_type, "value") else str(order.banquet_type)
+    staffing = _compute_staffing(order.table_count, btype)
+    return {
+        "order_id":     order_id,
+        "banquet_type": btype,
+        "table_count":  order.table_count,
+        "staffing":     staffing,
+        "generated_at": None,
+    }
+
+
+# ── 6. GET /stores/{id}/analytics/yield-by-hall ──────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/yield-by-hall")
+async def get_yield_by_hall(
+    store_id: str,
+    year:     int = Query(default=None),
+    month:    int = Query(default=None, ge=1, le=12),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """各厅房月收益：使用率 × 均单价，识别高/低效厅。"""
+    import calendar as _cal
+
+    today   = date_type.today()
+    _year   = year  or today.year
+    _month  = month or today.month
+    first_day = date_type(_year, _month, 1)
+    last_day  = date_type(_year, _month, _cal.monthrange(_year, _month)[1])
+    total_days = (_last := (last_day - first_day).days + 1)
+    total_slots = total_days * 2   # lunch + dinner
+
+    halls_res = await db.execute(
+        select(BanquetHall).where(
+            BanquetHall.store_id == store_id,
+            BanquetHall.is_active == True,
+        )
+    )
+    halls = halls_res.scalars().all()
+    if not halls:
+        return {"store_id": store_id, "year": _year, "month": _month, "halls": []}
+
+    hall_ids = [h.id for h in halls]
+
+    bookings_res = await db.execute(
+        select(BanquetHallBooking, BanquetOrder).join(
+            BanquetOrder, BanquetHallBooking.banquet_order_id == BanquetOrder.id
+        ).where(
+            BanquetHallBooking.hall_id.in_(hall_ids),
+            BanquetHallBooking.slot_date >= first_day,
+            BanquetHallBooking.slot_date <= last_day,
+        )
+    )
+    rows = bookings_res.all()
+
+    hall_stats: dict = {h.id: {"booked_slots": 0, "revenue_fen": 0, "order_ids": set()} for h in halls}
+    for booking, order in rows:
+        hid = booking.hall_id
+        if hid in hall_stats:
+            hall_stats[hid]["booked_slots"] += 1
+            if order.id not in hall_stats[hid]["order_ids"]:
+                hall_stats[hid]["order_ids"].add(order.id)
+                hall_stats[hid]["revenue_fen"] += order.total_amount_fen
+
+    hall_map = {h.id: h for h in halls}
+    result_halls = []
+    for hid, stats in hall_stats.items():
+        h = hall_map[hid]
+        booked = stats["booked_slots"]
+        revenue_yuan = round(stats["revenue_fen"] / 100, 2)
+        utilization_pct = round(booked / total_slots * 100, 1) if total_slots > 0 else 0.0
+        result_halls.append({
+            "hall_id":         hid,
+            "hall_name":       h.name,
+            "hall_type":       h.hall_type.value if hasattr(h.hall_type, "value") else str(h.hall_type),
+            "booked_slots":    booked,
+            "total_slots":     total_slots,
+            "utilization_pct": utilization_pct,
+            "revenue_yuan":    revenue_yuan,
+            "order_count":     len(stats["order_ids"]),
+        })
+    result_halls.sort(key=lambda x: -x["revenue_yuan"])
+
+    return {"store_id": store_id, "year": _year, "month": _month, "halls": result_halls}
+
+
+# ── 7. GET /stores/{id}/analytics/cancellation-analysis ─────────────────────
+
+@router.get("/stores/{store_id}/analytics/cancellation-analysis")
+async def get_cancellation_analysis(
+    store_id: str,
+    months:   int = Query(3, ge=1, le=12),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """取消分析：数量、预估损失¥、按类型/提前量分桶。"""
+    from datetime import timedelta
+
+    cutoff = date_type.today() - timedelta(days=months * 30)
+
+    res = await db.execute(
+        select(BanquetOrder).where(
+            BanquetOrder.store_id == store_id,
+            BanquetOrder.order_status == OrderStatusEnum.CANCELLED,
+            BanquetOrder.created_at >= cutoff,
+        )
+    )
+    orders = res.scalars().all()
+
+    if not orders:
+        return {
+            "store_id": store_id, "months": months,
+            "total": 0, "revenue_lost_yuan": 0.0,
+            "by_banquet_type": [], "by_lead_time": {},
+        }
+
+    revenue_lost_fen = sum(o.total_amount_fen for o in orders)
+    type_map: dict = {}
+    lead_buckets: dict = {"urgent_7d": 0, "d7_30": 0, "over_30d": 0}
+
+    for o in orders:
+        btype = o.banquet_type.value if hasattr(o.banquet_type, "value") else str(o.banquet_type)
+        type_map[btype] = type_map.get(btype, 0) + 1
+
+        created_date = o.created_at.date() if hasattr(o.created_at, "date") else date_type.today()
+        lead_days = (o.banquet_date - created_date).days
+        if lead_days < 7:
+            lead_buckets["urgent_7d"] += 1
+        elif lead_days <= 30:
+            lead_buckets["d7_30"] += 1
+        else:
+            lead_buckets["over_30d"] += 1
+
+    by_type = [{"banquet_type": k, "count": v} for k, v in sorted(type_map.items(), key=lambda x: -x[1])]
+
+    return {
+        "store_id":          store_id,
+        "months":            months,
+        "total":             len(orders),
+        "revenue_lost_yuan": round(revenue_lost_fen / 100, 2),
+        "by_banquet_type":   by_type,
+        "by_lead_time":      lead_buckets,
+    }
+
+
+# ── 8. GET /stores/{id}/analytics/peak-capacity ──────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/peak-capacity")
+async def get_peak_capacity(
+    store_id: str,
+    months:   int = Query(3, ge=1, le=6),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """峰值容量：最忙日期、月利用率分布、溢价建议。"""
+    import calendar as _cal
+    from datetime import timedelta
+
+    today = date_type.today()
+    start = date_type(today.year, today.month, 1)
+
+    halls_res = await db.execute(
+        select(BanquetHall).where(
+            BanquetHall.store_id == store_id,
+            BanquetHall.is_active == True,
+        )
+    )
+    halls = halls_res.scalars().all()
+    hall_count = len(halls)
+
+    if not hall_count:
+        return {"store_id": store_id, "months": months,
+                "busiest_days": [], "monthly_utilization": [],
+                "surge_threshold_pct": 80, "premium_suggestion": "暂无厅房数据"}
+
+    # Gather bookings for next `months` months
+    end_month = start + timedelta(days=months * 31)
+    end = date_type(end_month.year, end_month.month,
+                    _cal.monthrange(end_month.year, end_month.month)[1])
+
+    hall_ids = [h.id for h in halls]
+    bookings_res = await db.execute(
+        select(BanquetHallBooking).where(
+            BanquetHallBooking.hall_id.in_(hall_ids),
+            BanquetHallBooking.slot_date >= start,
+            BanquetHallBooking.slot_date <= end,
+        )
+    )
+    bookings = bookings_res.scalars().all()
+
+    # Day-level count
+    day_count: dict = {}
+    month_count: dict = {}
+    for b in bookings:
+        dstr = b.slot_date.isoformat()
+        day_count[dstr] = day_count.get(dstr, 0) + 1
+        mkey = dstr[:7]
+        month_count[mkey] = month_count.get(mkey, 0) + 1
+
+    busiest_days = sorted(day_count.items(), key=lambda x: -x[1])[:5]
+
+    # Monthly utilization
+    monthly_util = []
+    for i in range(months):
+        mm = (start.month - 1 + i) % 12 + 1
+        yy = start.year + (start.month - 1 + i) // 12
+        days_in = _cal.monthrange(yy, mm)[1]
+        total_slots = days_in * 2 * hall_count
+        mkey = f"{yy:04d}-{mm:02d}"
+        booked = month_count.get(mkey, 0)
+        util_pct = round(booked / total_slots * 100, 1) if total_slots > 0 else 0.0
+        monthly_util.append({
+            "month": mkey,
+            "booked_slots":     booked,
+            "total_slots":      total_slots,
+            "utilization_pct":  util_pct,
+        })
+
+    # Premium suggestion
+    high_util_months = [r for r in monthly_util if r["utilization_pct"] >= 80]
+    if high_util_months:
+        months_str = "、".join(r["month"] for r in high_util_months)
+        premium_suggestion = f"建议对 {months_str} 档期宴会加价 15–20%（利用率≥80%）"
+    elif any(r["utilization_pct"] >= 60 for r in monthly_util):
+        premium_suggestion = "当前利用率适中，可对吉日档期适当加价 5–10%"
+    else:
+        premium_suggestion = "当前档期充裕，建议推出早鸟优惠促进预订"
+
+    return {
+        "store_id":            store_id,
+        "months":              months,
+        "busiest_days":        [{"date": d, "booking_count": c} for d, c in busiest_days],
+        "monthly_utilization": monthly_util,
+        "surge_threshold_pct": 80,
+        "premium_suggestion":  premium_suggestion,
+    }
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# Phase 16 — 多店对标分析 · 客户赢回营销
+# ════════════════════════════════════════════════════════════════════════════════
+
+_ANNIVERSARY_TEMPLATES: dict[str, str] = {
+    "wedding":  "尊敬的{name}，时光飞逝，您的婚宴周年纪念日即将到来！衷心感谢您当年选择我们共同见证这美好时刻。期待再次为您服务，如有宴会需求欢迎随时联系我们！",
+    "birthday": "尊敬的{name}，您好！距您上次在我们这里举办生日宴已届一年。祝您生日快乐、万事如意，期待再次为您打造难忘的生日庆典！",
+    "default":  "尊敬的{name}，您好！距您上次光临已届一年，感谢您对我们的信任。如有宴会、庆典需求，我们随时恭候，欢迎联系预约！",
+}
+
+_WIN_BACK_TEMPLATE = (
+    "尊敬的{name}，好久不见！您上次在我们这里办宴会是{last_date}，至今已有{days}天。"
+    "我们最近推出了全新套餐，期待能再次为您提供优质的宴会服务。如有需求欢迎随时联系，我们将为您提供专属优惠！"
+)
+
+
+# ── 1. 多店 KPI 对比 ─────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/brand-comparison")
+async def get_brand_comparison(
+    store_id: str,
+    year:  int = Query(default=None),
+    month: int = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+    _: "User" = Depends(get_current_user),
+):
+    """品牌旗下所有门店宴会 KPI 对比（营收/订单数/转化率），标注本店排名。"""
+    from datetime import timedelta
+    from src.models.store import Store as _Store
+
+    today = date_type.today()
+    if not year:
+        year = today.year
+    if not month:
+        month = today.month
+
+    brand_id = getattr(_, "brand_id", None)
+    if not brand_id:
+        brand_id = store_id  # fallback: treat as single-store brand
+
+    # Get all store IDs in brand
+    stores_res = await db.execute(
+        select(_Store.id, _Store.name).where(_Store.brand_id == brand_id)
+    )
+    stores = stores_res.all()
+    if not stores:
+        # Fallback to just the requested store
+        stores = [(store_id, store_id)]
+
+    store_map = {s[0]: s[1] for s in stores}
+    store_ids = list(store_map.keys())
+
+    # Aggregate per store for the given month
+    first_day = date_type(year, month, 1)
+    import calendar as _cal2
+    last_day = date_type(year, month, _cal2.monthrange(year, month)[1])
+
+    rows = []
+    for sid in store_ids:
+        # Revenue + order count from BanquetOrder
+        orders_res = await db.execute(
+            select(BanquetOrder).where(
+                and_(
+                    BanquetOrder.store_id == sid,
+                    BanquetOrder.banquet_date >= first_day,
+                    BanquetOrder.banquet_date <= last_day,
+                    BanquetOrder.order_status.in_([
+                        OrderStatusEnum.CONFIRMED,
+                        OrderStatusEnum.COMPLETED,
+                    ]),
+                )
+            )
+        )
+        orders = orders_res.scalars().all()
+
+        # Leads (for conversion rate)
+        leads_res = await db.execute(
+            select(func.count(BanquetLead.id)).where(
+                BanquetLead.store_id == sid
+            )
+        )
+        lead_count = leads_res.scalar() or 0
+
+        revenue = sum(o.total_amount_fen for o in orders) / 100
+        order_count = len(orders)
+        conversion_rate = round(order_count / lead_count * 100, 1) if lead_count > 0 else 0.0
+
+        # Repeat rate: customers with >1 order
+        from datetime import timedelta
+        cutoff = date_type(year, month, 1) - timedelta(days=365)
+        hist_res = await db.execute(
+            select(BanquetOrder.customer_id, func.count(BanquetOrder.id).label("cnt")).where(
+                and_(
+                    BanquetOrder.store_id == sid,
+                    BanquetOrder.banquet_date >= cutoff,
+                    BanquetOrder.order_status.in_([
+                        OrderStatusEnum.CONFIRMED,
+                        OrderStatusEnum.COMPLETED,
+                    ]),
+                )
+            ).group_by(BanquetOrder.customer_id)
+        )
+        hist = hist_res.all()
+        total_c = len(hist)
+        repeat_c = sum(1 for h in hist if h[1] > 1)
+        repeat_rate = round(repeat_c / total_c * 100, 1) if total_c > 0 else 0.0
+
+        rows.append({
+            "store_id":       sid,
+            "store_name":     store_map.get(sid, sid),
+            "revenue_yuan":   revenue,
+            "order_count":    order_count,
+            "conversion_rate_pct": conversion_rate,
+            "repeat_rate_pct":    repeat_rate,
+            "is_self":        (sid == store_id),
+        })
+
+    # Sort by revenue desc, assign rank
+    rows.sort(key=lambda r: -r["revenue_yuan"])
+    for i, r in enumerate(rows):
+        r["rank"] = i + 1
+    self_rank = next((r["rank"] for r in rows if r["is_self"]), None)
+
+    # Brand averages
+    n = len(rows)
+    brand_avg = {
+        "store_id":           "brand_avg",
+        "store_name":         "品牌均值",
+        "revenue_yuan":       round(sum(r["revenue_yuan"] for r in rows) / n, 2) if n else 0,
+        "order_count":        round(sum(r["order_count"] for r in rows) / n, 1) if n else 0,
+        "conversion_rate_pct": round(sum(r["conversion_rate_pct"] for r in rows) / n, 1) if n else 0,
+        "repeat_rate_pct":    round(sum(r["repeat_rate_pct"] for r in rows) / n, 1) if n else 0,
+        "is_self":            False,
+        "rank":               None,
+    }
+
+    return {
+        "year":        year,
+        "month":       month,
+        "total_stores": n,
+        "self_rank":   self_rank,
+        "stores":      rows,
+        "brand_avg":   brand_avg,
+    }
+
+
+# ── 2. 单店 vs 品牌均值 Benchmark ────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/benchmark")
+async def get_benchmark(
+    store_id: str,
+    year:  int = Query(default=None),
+    month: int = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+    _: "User" = Depends(get_current_user),
+):
+    """本店各 KPI 指标 vs 品牌均值的 delta 卡片（含排名）。"""
+    comp = await get_brand_comparison(store_id=store_id, year=year, month=month, db=db, _=_)
+
+    self_row = next((r for r in comp["stores"] if r["is_self"]), None)
+    avg = comp["brand_avg"]
+    total = comp["total_stores"]
+
+    if not self_row:
+        return {"year": comp["year"], "month": comp["month"], "metrics": [], "total_stores": total}
+
+    metrics = []
+    for key, label in [
+        ("revenue_yuan",        "营收"),
+        ("order_count",         "订单数"),
+        ("conversion_rate_pct", "转化率"),
+        ("repeat_rate_pct",     "复购率"),
+    ]:
+        store_val = self_row[key]
+        avg_val   = avg[key]
+        delta_pct = round((store_val - avg_val) / avg_val * 100, 1) if avg_val else 0.0
+        status = "above" if delta_pct > 2 else ("below" if delta_pct < -2 else "on_par")
+        metrics.append({
+            "metric":      key,
+            "label":       label,
+            "store_value": store_val,
+            "brand_avg":   avg_val,
+            "delta_pct":   delta_pct,
+            "status":      status,
+            "rank":        self_row["rank"],
+            "total_stores": total,
+        })
+
+    return {
+        "year":        comp["year"],
+        "month":       comp["month"],
+        "self_rank":   comp["self_rank"],
+        "total_stores": total,
+        "metrics":     metrics,
+    }
+
+
+# ── 3. 周年/生日提醒 ─────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/customers/upcoming-anniversaries")
+async def get_upcoming_anniversaries(
+    store_id: str,
+    days: int = Query(default=30),
+    db: AsyncSession = Depends(get_db),
+    _: "User" = Depends(get_current_user),
+):
+    """近 N 天内将至宴会周年/生日的老客户列表。"""
+    from datetime import timedelta
+
+    today = date_type.today()
+    end   = today + timedelta(days=days)
+
+    # Get all completed orders for the store, grouped by customer
+    orders_res = await db.execute(
+        select(BanquetOrder).where(
+            and_(
+                BanquetOrder.store_id == store_id,
+                BanquetOrder.order_status.in_([
+                    OrderStatusEnum.COMPLETED,
+                ]),
+            )
+        ).order_by(BanquetOrder.banquet_date.desc())
+    )
+    orders = orders_res.scalars().all()
+
+    # Find orders whose anniversary (same month+day) falls in [today, today+days]
+    items = []
+    seen_customers: set = set()
+    for o in orders:
+        if not o.banquet_date or not o.customer_id:
+            continue
+        if o.customer_id in seen_customers:
+            continue
+        bd = o.banquet_date
+        # Compute this year's anniversary
+        try:
+            anniversary = date_type(today.year, bd.month, bd.day)
+        except ValueError:
+            continue  # Feb 29 on non-leap year
+        if anniversary < today:
+            # Check next year
+            try:
+                anniversary = date_type(today.year + 1, bd.month, bd.day)
+            except ValueError:
+                continue
+        if today <= anniversary <= end:
+            days_until = (anniversary - today).days
+            seen_customers.add(o.customer_id)
+
+            # Load customer name
+            cust_res = await db.execute(
+                select(BanquetCustomer).where(BanquetCustomer.id == o.customer_id)
+            )
+            cust = cust_res.scalars().first()
+
+            items.append({
+                "customer_id":        o.customer_id,
+                "name":               cust.customer_name if cust else "客户",
+                "phone":              cust.phone if cust else None,
+                "last_banquet_type":  o.banquet_type.value if hasattr(o.banquet_type, "value") else str(o.banquet_type),
+                "last_banquet_date":  bd.isoformat(),
+                "anniversary_date":   anniversary.isoformat(),
+                "days_until":         days_until,
+            })
+
+    items.sort(key=lambda x: x["days_until"])
+    return {"total": len(items), "items": items, "days": days}
+
+
+# ── 4. 赢回候选客户 ──────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/customers/win-back-candidates")
+async def get_win_back_candidates(
+    store_id: str,
+    months: int = Query(default=12),
+    db: AsyncSession = Depends(get_db),
+    _: "User" = Depends(get_current_user),
+):
+    """N 个月以上未复购的老客户列表（至少有 1 笔历史订单）。"""
+    from datetime import timedelta
+
+    today   = date_type.today()
+    cutoff  = today - timedelta(days=months * 30)
+
+    # Get all customers who have at least one order
+    orders_res = await db.execute(
+        select(BanquetOrder).where(
+            and_(
+                BanquetOrder.store_id == store_id,
+                BanquetOrder.order_status.in_([
+                    OrderStatusEnum.COMPLETED,
+                    OrderStatusEnum.CONFIRMED,
+                ]),
+            )
+        ).order_by(BanquetOrder.banquet_date.desc())
+    )
+    orders = orders_res.scalars().all()
+
+    # Group by customer: find last order date
+    from collections import defaultdict
+    cust_orders: dict = defaultdict(list)
+    for o in orders:
+        if o.customer_id:
+            cust_orders[o.customer_id].append(o)
+
+    candidates = []
+    for cid, c_orders in cust_orders.items():
+        last_order = max(c_orders, key=lambda o: o.banquet_date)
+        if last_order.banquet_date >= cutoff:
+            continue  # Active customer, skip
+        days_since = (today - last_order.banquet_date).days
+        total_yuan = sum(o.total_amount_fen for o in c_orders) / 100
+
+        cust_res = await db.execute(
+            select(BanquetCustomer).where(BanquetCustomer.id == cid)
+        )
+        cust = cust_res.scalars().first()
+
+        candidates.append({
+            "customer_id":    cid,
+            "name":           cust.customer_name if cust else "客户",
+            "phone":          cust.phone if cust else None,
+            "last_order_date": last_order.banquet_date.isoformat(),
+            "days_since":     days_since,
+            "total_orders":   len(c_orders),
+            "total_yuan":     total_yuan,
+        })
+
+    candidates.sort(key=lambda x: x["days_since"])
+    return {"total": len(candidates), "items": candidates, "months": months}
+
+
+# ── 5. 生成周年话术 ──────────────────────────────────────────────────────────
+
+class _OutreachBody(BaseModel):
+    channel: str = Field(default="wechat")
+
+@router.post("/stores/{store_id}/customers/{customer_id}/anniversary-message")
+async def generate_anniversary_message(
+    store_id:    str,
+    customer_id: str,
+    body: _OutreachBody = Body(default_factory=_OutreachBody),
+    db: AsyncSession = Depends(get_db),
+    current_user: "User" = Depends(get_current_user),
+):
+    """生成宴会周年/生日触达话术并记录到 ActionLog。"""
+    cust_res = await db.execute(
+        select(BanquetCustomer).where(BanquetCustomer.id == customer_id)
+    )
+    cust = cust_res.scalars().first()
+    if not cust:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    # Get last order for type info
+    ord_res = await db.execute(
+        select(BanquetOrder).where(
+            and_(
+                BanquetOrder.customer_id == customer_id,
+                BanquetOrder.store_id == store_id,
+                BanquetOrder.order_status == OrderStatusEnum.COMPLETED,
+            )
+        ).order_by(BanquetOrder.banquet_date.desc())
+    )
+    last_order = ord_res.scalars().first()
+
+    btype = "default"
+    if last_order and hasattr(last_order.banquet_type, "value"):
+        btype = last_order.banquet_type.value
+    template = _ANNIVERSARY_TEMPLATES.get(btype, _ANNIVERSARY_TEMPLATES["default"])
+    message  = template.format(name=cust.customer_name)
+
+    result = {
+        "customer_id":   customer_id,
+        "customer_name": cust.customer_name,
+        "outreach_type": "anniversary",
+        "channel":       body.channel,
+        "message":       message,
+    }
+
+    log = BanquetAgentActionLog(
+        id=str(uuid.uuid4()),
+        agent_type=BanquetAgentTypeEnum.FOLLOWUP,
+        action_type="anniversary_message",
+        related_object_type="customer",
+        related_object_id=customer_id,
+        action_result=result,
+    )
+    db.add(log)
+    await db.commit()
+    return result
+
+
+# ── 6. 生成赢回话术 ──────────────────────────────────────────────────────────
+
+@router.post("/stores/{store_id}/customers/{customer_id}/win-back-message")
+async def generate_win_back_message(
+    store_id:    str,
+    customer_id: str,
+    body: _OutreachBody = Body(default_factory=_OutreachBody),
+    db: AsyncSession = Depends(get_db),
+    current_user: "User" = Depends(get_current_user),
+):
+    """生成客户赢回话术并记录到 ActionLog。"""
+    cust_res = await db.execute(
+        select(BanquetCustomer).where(BanquetCustomer.id == customer_id)
+    )
+    cust = cust_res.scalars().first()
+    if not cust:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    ord_res = await db.execute(
+        select(BanquetOrder).where(
+            and_(
+                BanquetOrder.customer_id == customer_id,
+                BanquetOrder.store_id == store_id,
+            )
+        ).order_by(BanquetOrder.banquet_date.desc())
+    )
+    last_order = ord_res.scalars().first()
+
+    from datetime import timedelta
+    today = date_type.today()
+    if last_order and last_order.banquet_date:
+        days_since = (today - last_order.banquet_date).days
+        last_date  = last_order.banquet_date.strftime("%Y年%m月%d日")
+    else:
+        days_since = 0
+        last_date  = "不久前"
+
+    message = _WIN_BACK_TEMPLATE.format(
+        name=cust.customer_name,
+        last_date=last_date,
+        days=days_since,
+    )
+
+    result = {
+        "customer_id":   customer_id,
+        "customer_name": cust.customer_name,
+        "outreach_type": "win_back",
+        "channel":       body.channel,
+        "message":       message,
+        "days_since":    days_since,
+    }
+
+    log = BanquetAgentActionLog(
+        id=str(uuid.uuid4()),
+        agent_type=BanquetAgentTypeEnum.FOLLOWUP,
+        action_type="win_back_message",
+        related_object_type="customer",
+        related_object_id=customer_id,
+        action_result=result,
+    )
+    db.add(log)
+    await db.commit()
+    return result
+
+
+# ── 7. 客户触达历史 ──────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/customers/{customer_id}/outreach-history")
+async def get_outreach_history(
+    store_id:    str,
+    customer_id: str,
+    limit: int = Query(default=20),
+    db: AsyncSession = Depends(get_db),
+    _: "User" = Depends(get_current_user),
+):
+    """客户所有触达记录（followup / anniversary / win_back）。"""
+    logs_res = await db.execute(
+        select(BanquetAgentActionLog).where(
+            and_(
+                BanquetAgentActionLog.related_object_type == "customer",
+                BanquetAgentActionLog.related_object_id   == customer_id,
+                BanquetAgentActionLog.action_type.in_([
+                    "followup_message",
+                    "anniversary_message",
+                    "win_back_message",
+                ]),
+            )
+        ).order_by(BanquetAgentActionLog.created_at.desc()).limit(limit)
+    )
+    logs = logs_res.scalars().all()
+
+    items = []
+    for log in logs:
+        result = log.action_result or {}
+        items.append({
+            "log_id":       log.id,
+            "action_type":  log.action_type,
+            "outreach_type": result.get("outreach_type", log.action_type),
+            "channel":      result.get("channel"),
+            "message":      result.get("message"),
+            "created_at":   log.created_at.isoformat() if log.created_at else None,
+        })
+
+    return {"total": len(items), "items": items}
+
+
+# ── 8. 月度执行摘要 ──────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/executive-summary")
+async def get_executive_summary(
+    store_id: str,
+    year:  int = Query(default=None),
+    month: int = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+    _: "User" = Depends(get_current_user),
+):
+    """月度经营执行摘要：10 个核心指标 + 亮点/风险规则文字。"""
+    import calendar as _cal3
+    from datetime import timedelta
+
+    today = date_type.today()
+    if not year:
+        year = today.year
+    if not month:
+        month = today.month
+
+    first_day = date_type(year, month, 1)
+    last_day  = date_type(year, month, _cal3.monthrange(year, month)[1])
+
+    # All orders for month
+    orders_res = await db.execute(
+        select(BanquetOrder).where(
+            and_(
+                BanquetOrder.store_id == store_id,
+                BanquetOrder.banquet_date >= first_day,
+                BanquetOrder.banquet_date <= last_day,
+            )
+        )
+    )
+    orders = orders_res.scalars().all()
+
+    active   = [o for o in orders if o.order_status in (OrderStatusEnum.CONFIRMED, OrderStatusEnum.COMPLETED)]
+    cancelled= [o for o in orders if o.order_status == OrderStatusEnum.CANCELLED]
+
+    revenue_yuan      = sum(o.total_amount_fen for o in active) / 100
+    order_count       = len(active)
+    avg_order_yuan    = round(revenue_yuan / order_count, 2) if order_count else 0.0
+    cancel_count      = len(cancelled)
+    cancel_rate_pct   = round(cancel_count / len(orders) * 100, 1) if orders else 0.0
+
+    # Revenue lost
+    revenue_lost_yuan = sum(o.total_amount_fen for o in cancelled) / 100
+
+    # Leads for conversion
+    leads_res = await db.execute(
+        select(func.count(BanquetLead.id)).where(BanquetLead.store_id == store_id)
+    )
+    lead_count      = leads_res.scalar() or 0
+    conversion_rate = round(order_count / lead_count * 100, 1) if lead_count > 0 else 0.0
+
+    # Tasks
+    from datetime import timedelta
+    tasks_res = await db.execute(
+        select(ExecutionTask).where(
+            and_(
+                ExecutionTask.banquet_order_id.in_([o.id for o in active]) if active else False,
+            )
+        )
+    )
+    tasks = tasks_res.scalars().all() if active else []
+    done_tasks  = [t for t in tasks if t.task_status == TaskStatusEnum.DONE]
+    task_compl  = round(len(done_tasks) / len(tasks) * 100, 1) if tasks else 0.0
+
+    # Exceptions
+    exc_res = await db.execute(
+        select(ExecutionException).where(
+            ExecutionException.banquet_order_id.in_([o.id for o in active]) if active else False,
+        )
+    )
+    exceptions = exc_res.scalars().all() if active else []
+    exc_rate = round(len(exceptions) / order_count * 100, 1) if order_count else 0.0
+
+    # Repeat rate (customers with >1 order in last year)
+    cutoff = first_day - timedelta(days=365)
+    hist_res = await db.execute(
+        select(BanquetOrder.customer_id, func.count(BanquetOrder.id).label("cnt")).where(
+            and_(
+                BanquetOrder.store_id == store_id,
+                BanquetOrder.banquet_date >= cutoff,
+                BanquetOrder.order_status.in_([
+                    OrderStatusEnum.CONFIRMED,
+                    OrderStatusEnum.COMPLETED,
+                ]),
+            )
+        ).group_by(BanquetOrder.customer_id)
+    )
+    hist = hist_res.all()
+    total_c  = len(hist)
+    repeat_c = sum(1 for h in hist if h[1] > 1)
+    repeat_rate = round(repeat_c / total_c * 100, 1) if total_c > 0 else 0.0
+
+    # Revenue target achievement
+    target_res = await db.execute(
+        select(BanquetRevenueTarget).where(
+            and_(
+                BanquetRevenueTarget.store_id == store_id,
+                BanquetRevenueTarget.year  == year,
+                BanquetRevenueTarget.month == month,
+            )
+        )
+    )
+    target = target_res.scalars().first()
+    target_yuan = target.target_amount_fen / 100 if target and target.target_amount_fen else None
+    achievement_pct = round(revenue_yuan / target_yuan * 100, 1) if target_yuan else None
+
+    metrics = {
+        "revenue_yuan":          revenue_yuan,
+        "order_count":           order_count,
+        "avg_order_yuan":        avg_order_yuan,
+        "conversion_rate_pct":   conversion_rate,
+        "task_completion_pct":   task_compl,
+        "exception_rate_pct":    exc_rate,
+        "repeat_rate_pct":       repeat_rate,
+        "cancellation_rate_pct": cancel_rate_pct,
+        "revenue_lost_yuan":     revenue_lost_yuan,
+        "target_achievement_pct": achievement_pct,
+    }
+
+    # Rule-based highlights & risks
+    highlights = []
+    risks      = []
+
+    if order_count > 0:
+        highlights.append(f"本月共 {order_count} 单宴会，营收 ¥{revenue_yuan:,.0f}")
+    if repeat_rate >= 30:
+        highlights.append(f"客户复购率 {repeat_rate}%，留存表现优秀")
+    if task_compl >= 90:
+        highlights.append(f"任务完成率 {task_compl}%，执行团队表现出色")
+    if achievement_pct and achievement_pct >= 100:
+        highlights.append(f"月度目标达成率 {achievement_pct}%，超额完成！")
+
+    if cancel_rate_pct > 15:
+        risks.append(f"取消率 {cancel_rate_pct}% 偏高（损失 ¥{revenue_lost_yuan:,.0f}），建议加强签约跟进")
+    if exc_rate > 10:
+        risks.append(f"异常率 {exc_rate}%，建议复盘服务流程")
+    if conversion_rate < 20 and lead_count > 0:
+        risks.append(f"线索转化率仅 {conversion_rate}%，建议强化跟进话术")
+    if achievement_pct and achievement_pct < 80:
+        risks.append(f"目标达成率 {achievement_pct}%，距目标仍有差距")
+
+    return {
+        "year":       year,
+        "month":      month,
+        "store_id":   store_id,
+        "metrics":    metrics,
+        "highlights": highlights[:3],
+        "risks":      risks[:3],
+    }
