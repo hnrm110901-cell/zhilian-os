@@ -123,6 +123,12 @@ make prod-alert-test
 ALERT_WEBHOOK_TOKEN=<token> make prod-alert-webhook-smoke
 ```
 
+端到端告警链路检查（API webhook + Alertmanager 注入/查询）：
+
+```bash
+ALERT_WEBHOOK_TOKEN=<token> make prod-alert-e2e
+```
+
 停止监控栈：
 
 ```bash
