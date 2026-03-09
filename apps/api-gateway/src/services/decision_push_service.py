@@ -26,6 +26,7 @@ import structlog
 from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.services.decision_flow_state import DecisionFlowState
 from src.services.decision_priority_engine import DecisionPriorityEngine
 from src.services.waste_guard_service import WasteGuardService
 
@@ -189,9 +190,11 @@ class DecisionPushService:
         08:00晨推：今日 Top3 决策卡片。
 
         Returns:
-            {"sent": bool, "decision_count": int, "message_id": str | None}
+            {"sent": bool, "decision_count": int, "message_id": str | None, "flow_id": str}
         """
         from src.services.wechat_service import wechat_service
+
+        state = DecisionFlowState.new(store_id=store_id, push_window="08:00晨推")
 
         engine = DecisionPriorityEngine(store_id=store_id)
         try:
@@ -205,7 +208,9 @@ class DecisionPushService:
 
         if not decisions:
             logger.info("decision_push.morning.no_decisions", store_id=store_id)
-            return {"sent": False, "decision_count": 0, "message_id": None}
+            return {"sent": False, "decision_count": 0, "message_id": None, "flow_id": state.flow_id}
+
+        state.set_decisions_from_engine(decisions)
 
         title = f"【晨推·Top{len(decisions)}决策】{store_name or store_id}"
         description = _format_card_description(decisions)
@@ -219,16 +224,25 @@ class DecisionPushService:
             to_user_id=recipient_user_id,
         )
 
+        state.push_sent = result.get("status") == "sent"
+        state.push_message_id = result.get("message_id")
+        if not state.push_sent:
+            state.push_error = result.get("error") or result.get("status")
+        state.mark_completed()
+        await state.save_to_redis()
+
         logger.info(
             "decision_push.morning.sent",
             store_id=store_id,
             decision_count=len(decisions),
             status=result.get("status"),
+            flow_id=state.flow_id,
         )
         return {
-            "sent": result.get("status") == "sent",
+            "sent": state.push_sent,
             "decision_count": len(decisions),
-            "message_id": result.get("message_id"),
+            "message_id": state.push_message_id,
+            "flow_id": state.flow_id,
         }
 
     @staticmethod
@@ -245,6 +259,8 @@ class DecisionPushService:
         仅当存在 warning/critical 异常时推送（纯信息不推）。
         """
         from src.services.wechat_service import wechat_service
+
+        state = DecisionFlowState.new(store_id=store_id, push_window="12:00午推")
 
         today = date.today()
         start  = today.replace(day=1)   # 本月1日
@@ -276,7 +292,9 @@ class DecisionPushService:
         )
         if not has_anomaly:
             logger.info("decision_push.noon.no_anomaly", store_id=store_id)
-            return {"sent": False, "decision_count": 0, "message_id": None}
+            return {"sent": False, "decision_count": 0, "message_id": None, "flow_id": state.flow_id}
+
+        state.set_decisions_from_engine(decisions)
 
         title = f"【12:00异常推送】{store_name or store_id}"
         description = _format_anomaly_description(waste_summary, decisions)
@@ -290,15 +308,24 @@ class DecisionPushService:
             to_user_id=recipient_user_id,
         )
 
+        state.push_sent = result.get("status") == "sent"
+        state.push_message_id = result.get("message_id")
+        if not state.push_sent:
+            state.push_error = result.get("error") or result.get("status")
+        state.mark_completed()
+        await state.save_to_redis()
+
         logger.info(
             "decision_push.noon.sent",
             store_id=store_id,
             status=result.get("status"),
+            flow_id=state.flow_id,
         )
         return {
-            "sent": result.get("status") == "sent",
+            "sent": state.push_sent,
             "decision_count": len(decisions),
-            "message_id": result.get("message_id"),
+            "message_id": state.push_message_id,
+            "flow_id": state.flow_id,
         }
 
     @staticmethod
@@ -317,6 +344,8 @@ class DecisionPushService:
         """
         from src.services.wechat_service import wechat_service
 
+        state = DecisionFlowState.new(store_id=store_id, push_window="17:30战前")
+
         engine = DecisionPriorityEngine(store_id=store_id)
         try:
             decisions = await engine.get_top3(
@@ -332,7 +361,9 @@ class DecisionPushService:
                       or d.get("urgency_hours", 99) < 4]
         if not actionable:
             logger.info("decision_push.prebattle.no_actionable", store_id=store_id)
-            return {"sent": False, "decision_count": 0, "message_id": None}
+            return {"sent": False, "decision_count": 0, "message_id": None, "flow_id": state.flow_id}
+
+        state.set_decisions_from_engine(decisions)
 
         title = f"【17:30战前核查】{store_name or store_id}"
         description = _format_prebattle_description(decisions, store_name or store_id)
@@ -346,15 +377,24 @@ class DecisionPushService:
             to_user_id=recipient_user_id,
         )
 
+        state.push_sent = result.get("status") == "sent"
+        state.push_message_id = result.get("message_id")
+        if not state.push_sent:
+            state.push_error = result.get("error") or result.get("status")
+        state.mark_completed()
+        await state.save_to_redis()
+
         logger.info(
             "decision_push.prebattle.sent",
             store_id=store_id,
             actionable_count=len(actionable),
+            flow_id=state.flow_id,
         )
         return {
-            "sent": result.get("status") == "sent",
+            "sent": state.push_sent,
             "decision_count": len(decisions),
-            "message_id": result.get("message_id"),
+            "message_id": state.push_message_id,
+            "flow_id": state.flow_id,
         }
 
     @staticmethod
@@ -377,8 +417,11 @@ class DecisionPushService:
         from src.services.wechat_service import wechat_service
         from src.services.narrative_engine import NarrativeEngine
 
+        state = DecisionFlowState.new(store_id=store_id, push_window="20:30晚推")
+
         # 查询该门店待审批决策数
         pending_count = await _count_pending_approvals(store_id, db)
+        state.pending_count = pending_count
 
         engine = DecisionPriorityEngine(store_id=store_id)
         try:
@@ -392,7 +435,9 @@ class DecisionPushService:
 
         if pending_count == 0 and not decisions:
             logger.info("decision_push.evening.nothing_to_push", store_id=store_id)
-            return {"sent": False, "decision_count": 0, "message_id": None}
+            return {"sent": False, "decision_count": 0, "message_id": None, "flow_id": state.flow_id}
+
+        state.set_decisions_from_engine(decisions)
 
         title = f"【20:30晚推·经营简报】{store_name or store_id}"
 
@@ -410,6 +455,7 @@ class DecisionPushService:
             logger.warning("decision_push.evening.narrative_failed", store_id=store_id, error=str(exc))
             description = _format_evening_description(decisions, pending_count)
 
+        state.narrative = description
         action_url = f"{_APPROVAL_BASE_URL}?store_id={store_id}&window=evening"
 
         result = await wechat_service.send_decision_card(
@@ -420,17 +466,26 @@ class DecisionPushService:
             to_user_id=recipient_user_id,
         )
 
+        state.push_sent = result.get("status") == "sent"
+        state.push_message_id = result.get("message_id")
+        if not state.push_sent:
+            state.push_error = result.get("error") or result.get("status")
+        state.mark_completed()
+        await state.save_to_redis()
+
         logger.info(
             "decision_push.evening.sent",
             store_id=store_id,
             pending_count=pending_count,
             decision_count=len(decisions),
+            flow_id=state.flow_id,
         )
         return {
-            "sent": result.get("status") == "sent",
+            "sent": state.push_sent,
             "pending_approvals": pending_count,
             "decision_count": len(decisions),
-            "message_id": result.get("message_id"),
+            "message_id": state.push_message_id,
+            "flow_id": state.flow_id,
         }
 
 
