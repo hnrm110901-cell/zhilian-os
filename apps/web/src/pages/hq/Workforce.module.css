@@ -1,0 +1,97 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+  background: var(--bg);
+  min-height: 100%;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.kpiRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 960px) {
+  .kpiRow { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Ranking list */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.row:last-child { border-bottom: none; }
+
+.rank {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--surface-hover);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.row:first-child .rank { background: var(--accent); color: #fff; }
+.row:nth-child(2) .rank { background: var(--yellow); color: var(--text-primary); }
+.row:nth-child(3) .rank { background: var(--surface-hover); color: var(--text-secondary); }
+
+.info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.storeId {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.pct {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rate {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  min-width: 52px;
+  text-align: right;
+}

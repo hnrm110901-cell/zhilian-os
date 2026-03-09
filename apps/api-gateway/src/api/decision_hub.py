@@ -61,6 +61,19 @@ class TriggerPushRequest(BaseModel):
     monthly_revenue_yuan: float = 0.0
 
 
+class FlowWindowState(BaseModel):
+    window:      str
+    slug:        str
+    state:       Optional[Dict[str, Any]] = None   # DecisionFlowState.summary() or null
+
+
+class FlowHistoryResponse(BaseModel):
+    store_id:     str
+    date:         str
+    windows:      List[FlowWindowState]
+    pushed_count: int   # 今日实际成功推送次数
+
+
 class ScenarioResponse(BaseModel):
     store_id:       str
     scenario_type:  str
@@ -156,6 +169,66 @@ async def trigger_decision_push(
     except Exception as exc:
         logger.error("manual_push_failed", store_id=req.store_id, error=str(exc))
         raise HTTPException(status_code=500, detail=f"推送失败: {exc}")
+
+
+# ── GET /api/v1/decisions/flow-history ───────────────────────────────────────
+
+_PUSH_WINDOWS = [
+    ("08:00晨推", "morning"),
+    ("12:00午推", "noon"),
+    ("17:30战前", "prebattle"),
+    ("20:30晚推", "evening"),
+]
+
+
+@router.get("/flow-history", response_model=FlowHistoryResponse)
+async def get_flow_history(
+    store_id:    str,
+    target_date: Optional[date] = Query(None, alias="date", description="查询日期 YYYY-MM-DD，默认今天"),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    查询指定门店某日四个时间点的推送流程状态。
+
+    每次推送成功后 DecisionFlowState 会写入 Redis（24h TTL），
+    本端点将四个窗口的状态聚合返回，供运营人员核查「今天推了什么」。
+
+    state 字段为 null 表示该时间点尚未推送或 Redis 中已过期。
+    """
+    from src.services.decision_flow_state import DecisionFlowState
+
+    query_date = target_date or date.today()
+    windows: List[FlowWindowState] = []
+
+    for window_name, slug in _PUSH_WINDOWS:
+        state = await DecisionFlowState.load_from_redis(
+            store_id=store_id,
+            push_window=window_name,
+            target_date=query_date,
+        )
+        windows.append(FlowWindowState(
+            window=window_name,
+            slug=slug,
+            state=state.summary() if state else None,
+        ))
+
+    pushed_count = sum(
+        1 for w in windows
+        if w.state and w.state.get("push_sent")
+    )
+
+    logger.info(
+        "flow_history_queried",
+        store_id=store_id,
+        date=query_date.isoformat(),
+        pushed_count=pushed_count,
+    )
+    return FlowHistoryResponse(
+        store_id=store_id,
+        date=query_date.isoformat(),
+        windows=windows,
+        pushed_count=pushed_count,
+    )
 
 
 # ── GET /api/v1/decisions/pending ────────────────────────────────────────────

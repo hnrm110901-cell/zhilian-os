@@ -116,6 +116,31 @@
   color: var(--text-secondary);
 }
 
-.invStock strong {
-  color: var(--accent);
+/* Push flow list */
+.flowList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.flowItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.flowItem:last-child { border-bottom: none; }
+
+.flowWindow {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.flowMeta {
+  font-size: 12px;
+  color: var(--text-secondary);
 }

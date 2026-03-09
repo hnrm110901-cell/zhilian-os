@@ -3,10 +3,11 @@ import { Outlet, NavLink } from 'react-router-dom';
 import styles from './HQLayout.module.css';
 
 const NAV_ITEMS = [
-  { to: '/hq',            label: '总览',   icon: '🏢' },
-  { to: '/hq/stores',     label: '门店',   icon: '🏪' },
-  { to: '/hq/decisions',  label: '决策',   icon: '🎯' },
-  { to: '/hq/finance',    label: '财务',   icon: '💰' },
+  { to: '/hq',             label: '总览',   icon: '🏢' },
+  { to: '/hq/stores',      label: '门店',   icon: '🏪' },
+  { to: '/hq/decisions',   label: '决策',   icon: '🎯' },
+  { to: '/hq/finance',     label: '财务',   icon: '💰' },
+  { to: '/hq/workforce',   label: '人力',   icon: '👥' },
 ];
 
 export default function HQLayout() {

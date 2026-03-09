@@ -169,6 +169,7 @@ const SmTasks     = lazy(() => import('./pages/sm/Tasks'));
 const SmBusiness  = lazy(() => import('./pages/sm/Business'));
 const SmDecisions = lazy(() => import('./pages/sm/Decisions'));
 const SmAlerts    = lazy(() => import('./pages/sm/Alerts'));
+const SmWorkforce = lazy(() => import('./pages/sm/Workforce'));
 
 // Role-based views (Phase 2 — Chef /chef, Floor /floor, HQ /hq)
 const ChefLayout      = lazy(() => import('./layouts/ChefLayout'));
@@ -184,6 +185,7 @@ const HQHome          = lazy(() => import('./pages/hq/Home'));
 const HQStores        = lazy(() => import('./pages/hq/Stores'));
 const HQDecisions     = lazy(() => import('./pages/hq/Decisions'));
 const HQFinance       = lazy(() => import('./pages/hq/Finance'));
+const HQWorkforce     = lazy(() => import('./pages/hq/Workforce'));
 
 const PageLoader = (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
@@ -639,6 +641,7 @@ const AppContent: React.FC = () => {
                   <Route path="business"  element={<SmBusiness />} />
                   <Route path="decisions" element={<SmDecisions />} />
                   <Route path="alerts"    element={<SmAlerts />} />
+                  <Route path="workforce" element={<SmWorkforce />} />
                 </Route>
 
                 {/* Role-based views — Chef (手机) */}
@@ -673,6 +676,7 @@ const AppContent: React.FC = () => {
                   <Route path="stores"    element={<HQStores />} />
                   <Route path="decisions" element={<HQDecisions />} />
                   <Route path="finance"   element={<HQFinance />} />
+                  <Route path="workforce" element={<HQWorkforce />} />
                 </Route>
               </Routes>
             </Suspense>
