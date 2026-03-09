@@ -15,6 +15,7 @@ from fastapi import APIRouter, Header, HTTPException, Request
 
 from ..core.database import get_db_session
 from ..models.ops import OpsEvent, OpsEventStatus
+from ..services.redis_cache_service import redis_cache
 from ..services.wechat_alert_service import wechat_alert_service
 
 logger = structlog.get_logger()
@@ -95,6 +96,13 @@ def _dedupe_ttl_seconds() -> int:
     return max(1, value)
 
 
+def _dedupe_backend() -> str:
+    backend = os.getenv("ALERT_DEDUPE_BACKEND", "memory").strip().lower()
+    if backend not in {"memory", "redis", "hybrid"}:
+        return "memory"
+    return backend
+
+
 def _alert_dedupe_key(alert: Dict[str, Any], channel: str, status: str) -> str:
     labels = alert.get("labels") or {}
     name = str(labels.get("alertname") or alert.get("alertname") or "unknown")
@@ -104,7 +112,7 @@ def _alert_dedupe_key(alert: Dict[str, Any], channel: str, status: str) -> str:
     return f"{channel}|{status}|{store_id}|{name}|{severity}|{instance}"
 
 
-def _filter_deduplicated_alerts(
+async def _filter_deduplicated_alerts(
     alerts: List[Dict[str, Any]],
     *,
     channel: str,
@@ -117,6 +125,7 @@ def _filter_deduplicated_alerts(
 
     now = time.time()
     ttl = _dedupe_ttl_seconds()
+    backend = _dedupe_backend()
     fresh: List[Dict[str, Any]] = []
     suppressed = 0
 
@@ -127,11 +136,30 @@ def _filter_deduplicated_alerts(
 
     for alert in alerts:
         key = _alert_dedupe_key(alert, channel, status)
-        expires_at = _DEDUP_CACHE.get(key, 0.0)
-        if expires_at > now:
+        cache_key = f"alert_dedupe:{key}"
+
+        # 1) in-process memory dedupe
+        mem_hit = False
+        if backend in {"memory", "hybrid"}:
+            expires_at = _DEDUP_CACHE.get(key, 0.0)
+            if expires_at > now:
+                mem_hit = True
+            else:
+                _DEDUP_CACHE[key] = now + ttl
+
+        # 2) cross-instance redis dedupe (best effort)
+        redis_hit = False
+        if backend in {"redis", "hybrid"}:
+            try:
+                redis_hit = await redis_cache.exists(cache_key)
+                if not redis_hit:
+                    await redis_cache.set(cache_key, "1", expire=ttl)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("alert_dedupe_redis_failed", error=str(exc), key=cache_key)
+
+        if mem_hit or redis_hit:
             suppressed += 1
             continue
-        _DEDUP_CACHE[key] = now + ttl
         fresh.append(alert)
 
     return fresh, suppressed
@@ -208,7 +236,7 @@ async def _handle_alert_payload(
     forced_severity: Optional[str] = None,
 ) -> Dict[str, Any]:
     alerts, status = _extract_alerts(payload)
-    deduped_alerts, suppressed = _filter_deduplicated_alerts(alerts, channel=channel, status=status)
+    deduped_alerts, suppressed = await _filter_deduplicated_alerts(alerts, channel=channel, status=status)
     severity = (forced_severity or _pick_severity(deduped_alerts or alerts, "warning")).lower()
 
     logger.info(

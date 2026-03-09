@@ -129,6 +129,11 @@ ALERT_WEBHOOK_TOKEN=<token> make prod-alert-webhook-smoke
 ALERT_WEBHOOK_TOKEN=<token> make prod-alert-e2e
 ```
 
+告警去重后端可配置：
+- `ALERT_DEDUPE_BACKEND=memory`：单进程内存去重（默认）
+- `ALERT_DEDUPE_BACKEND=redis`：跨实例 Redis 去重
+- `ALERT_DEDUPE_BACKEND=hybrid`：内存 + Redis 双重去重
+
 停止监控栈：
 
 ```bash
