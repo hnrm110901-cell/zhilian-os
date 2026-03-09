@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>智链OS 原型导航</title>
+  <style>
+    :root{--bg:#0b1220;--panel:#111b31;--line:#2a3a63;--text:#f3f7ff;--sub:#9db0d8;--brand:#3b82f6}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;background:radial-gradient(900px 500px at -10% -10%,rgba(59,130,246,.25),transparent 55%),var(--bg);font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:var(--text);display:flex;align-items:center;justify-content:center;padding:16px}
+    .wrap{width:min(920px,100%)}
+    .head{margin-bottom:12px}
+    h1{margin:0 0 6px;font-size:30px}
+    .sub{color:var(--sub)}
+    .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px}
+    .card h2{margin:0;font-size:17px}
+    .desc{color:var(--sub);font-size:13px;line-height:1.6;min-height:64px}
+    .btn{display:inline-block;text-align:center;padding:9px 10px;border-radius:8px;background:var(--brand);color:#fff;text-decoration:none;font-size:13px}
+    .tips{margin-top:12px;padding:10px 12px;background:rgba(255,255,255,.03);border:1px dashed rgba(255,255,255,.2);border-radius:10px;color:#c8d6f6;font-size:12px}
+    code{font-family:ui-monospace,Menlo,Consolas,monospace}
+    @media(max-width:860px){.grid{grid-template-columns:1fr}h1{font-size:24px}}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="head">
+      <h1>智链OS 原型导航</h1>
+      <div class="sub">一键进入三种演示口径：普通演示、汇报演讲、投资人沟通</div>
+    </div>
+
+    <div class="grid">
+      <section class="card">
+        <h2>产品原型（标准版）</h2>
+        <div class="desc">适合日常需求评审，包含 SM / Workforce / HQ / Ops 四大演示模块。</div>
+        <a class="btn" href="./zhilian-os-product-prototype.html" target="_blank" rel="noopener">打开标准版</a>
+      </section>
+
+      <section class="card">
+        <h2>产品原型（汇报版）</h2>
+        <div class="desc">适合现场路演，支持自动播放、讲解备注、方向键切页与全屏模式。</div>
+        <a class="btn" href="./zhilian-os-product-prototype-presentation.html" target="_blank" rel="noopener">打开汇报版</a>
+      </section>
+
+      <section class="card">
+        <h2>产品原型（投资人版）</h2>
+        <div class="desc">强调商业价值、ROI、风险对策和 12 个月里程碑，适合融资沟通场景。</div>
+        <a class="btn" href="./zhilian-os-product-prototype-investor.html" target="_blank" rel="noopener">打开投资人版</a>
+      </section>
+    </div>
+
+    <div class="tips">
+      建议入口：先用 <code>汇报版</code> 讲功能，再切 <code>投资人版</code> 讲商业化。<br/>
+      汇报版快捷键：<code>←/→</code> 切页，<code>A</code> 自动播放，<code>F</code> 全屏。
+    </div>
+  </main>
+</body>
+</html>

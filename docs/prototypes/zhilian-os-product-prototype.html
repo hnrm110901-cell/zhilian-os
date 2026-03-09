@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>智链OS 产品原型演示</title>
+  <style>
+    :root {
+      --bg: #f4f6fb;
+      --panel: #ffffff;
+      --line: #e6eaf2;
+      --text: #1a2233;
+      --sub: #667085;
+      --brand: #1f6fff;
+      --ok: #12b76a;
+      --warn: #f79009;
+      --danger: #f04438;
+      --violet: #7a5af8;
+      --shadow: 0 8px 24px rgba(16, 24, 40, 0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: radial-gradient(1200px 500px at 5% -10%, #d8e6ff 0%, #f4f6fb 40%), var(--bg);
+      color: var(--text);
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      min-height: 100vh;
+    }
+    .sidebar {
+      border-right: 1px solid var(--line);
+      background: #f8faff;
+      padding: 20px 16px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+    }
+    .logo {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: 0.4px;
+      margin-bottom: 6px;
+    }
+    .tagline {
+      color: var(--sub);
+      font-size: 12px;
+      line-height: 1.4;
+      margin-bottom: 18px;
+    }
+    .menu button {
+      width: 100%;
+      text-align: left;
+      padding: 11px 12px;
+      border: 1px solid transparent;
+      background: transparent;
+      border-radius: 10px;
+      margin-bottom: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #334155;
+    }
+    .menu button.active {
+      background: #e8f0ff;
+      border-color: #c9dcff;
+      color: #1746a2;
+      font-weight: 600;
+    }
+    .api {
+      margin-top: 18px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+    }
+    .api h4 { margin: 0 0 8px; font-size: 13px; }
+    .api li { margin: 4px 0; color: var(--sub); font-size: 12px; }
+    .main { padding: 22px; }
+    .hero {
+      background: linear-gradient(135deg, #1f6fff 0%, #7a5af8 100%);
+      color: #fff;
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: var(--shadow);
+    }
+    .hero h1 { margin: 0 0 8px; font-size: 24px; }
+    .hero p { margin: 0; opacity: 0.92; }
+    .chips { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .chip {
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.28);
+      font-size: 12px;
+      background: rgba(255,255,255,.12);
+    }
+    .section { display: none; margin-top: 16px; }
+    .section.active { display: block; }
+    .grid { display: grid; gap: 12px; }
+    .grid.kpi { grid-template-columns: repeat(4, minmax(0,1fr)); }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow: 0 2px 8px rgba(16,24,40,.04);
+    }
+    .card h3 { margin: 0 0 10px; font-size: 15px; }
+    .kpi .card b { font-size: 24px; display: block; margin: 6px 0 2px; }
+    .muted { color: var(--sub); font-size: 12px; }
+    .flex { display: flex; gap: 10px; align-items: center; }
+    .space { justify-content: space-between; }
+    .badge {
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .b-critical { background: #fee4e2; color: #b42318; }
+    .b-high { background: #ffedd5; color: #c2410c; }
+    .b-medium { background: #fef3c7; color: #a16207; }
+    .b-low { background: #dcfce7; color: #166534; }
+    .btn {
+      border: 1px solid var(--line);
+      background: #fff;
+      padding: 7px 10px;
+      border-radius: 9px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td {
+      font-size: 13px;
+      padding: 9px 8px;
+      border-bottom: 1px solid #edf1f7;
+      text-align: left;
+      vertical-align: top;
+    }
+    tr:last-child td { border-bottom: none; }
+    .trend-up { color: var(--ok); font-weight: 700; }
+    .trend-down { color: var(--danger); font-weight: 700; }
+    .bar-row { display: grid; grid-template-columns: 120px 1fr 50px; gap: 8px; align-items: center; margin: 8px 0; }
+    .bar { height: 12px; border-radius: 999px; background: #edf2ff; overflow: hidden; }
+    .bar > i { display: block; height: 100%; }
+    .i-red { background: var(--danger); }
+    .i-orange { background: var(--warn); }
+    .i-green { background: var(--ok); }
+    .timeline { border-left: 2px solid #dbe4ff; margin-left: 6px; padding-left: 14px; }
+    .timeline .item { margin: 10px 0; position: relative; }
+    .timeline .item:before {
+      content: "";
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--brand);
+      position: absolute;
+      left: -20px;
+      top: 5px;
+    }
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(16,24,40,.45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 30;
+    }
+    .modal.show { display: flex; }
+    .dialog {
+      width: 460px;
+      max-width: 100%;
+      background: #fff;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      padding: 16px;
+    }
+    .dialog h3 { margin: 0 0 10px; }
+    .dialog label { display: block; margin: 8px 0 4px; font-size: 13px; color: #344054; }
+    .dialog select, .dialog input {
+      width: 100%;
+      padding: 9px;
+      border: 1px solid #d0d7e2;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    .footer {
+      margin-top: 12px;
+      color: #475467;
+      font-size: 12px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+    }
+    @media (max-width: 1080px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { position: static; height: auto; }
+      .grid.kpi { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    }
+    @media (max-width: 680px) {
+      .grid.kpi { grid-template-columns: 1fr; }
+      .main { padding: 12px; }
+      .hero h1 { font-size: 20px; }
+      th, td { font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="logo">智链OS 原型</div>
+      <div class="tagline">连锁餐饮智能运营操作系统<br/>Demo Prototype (HTML)</div>
+      <div class="menu">
+        <button class="tab active" data-tab="overview">01 总览架构</button>
+        <button class="tab" data-tab="sm">02 店长端 P1 人力建议卡</button>
+        <button class="tab" data-tab="workforce">03 人力管理 P0 员工健康</button>
+        <button class="tab" data-tab="hq">04 总部端 P2 人工成本排名</button>
+        <button class="tab" data-tab="ops">05 生产运维与告警链路</button>
+      </div>
+      <div class="api">
+        <h4>已对齐接口</h4>
+        <ul>
+          <li>GET /workforce/.../employee-health</li>
+          <li>GET /workforce/.../shift-fairness-detail</li>
+          <li>POST /workforce/.../staffing-advice/confirm</li>
+          <li>GET /workforce/multi-store/labor-ranking</li>
+          <li>POST /alerts/webhook</li>
+        </ul>
+      </div>
+    </aside>
+
+    <main class="main">
+      <section class="hero">
+        <h1>智链OS 产品原型演示</h1>
+        <p>覆盖门店经营、人力管理、总部管控、生产运维四条主链路，基于当前已开发接口和页面能力构建。</p>
+        <div class="chips">
+          <span class="chip">Store Manager</span>
+          <span class="chip">Workforce AI</span>
+          <span class="chip">HQ Ranking</span>
+          <span class="chip">Prometheus + Alertmanager</span>
+          <span class="chip">Webhook Dedupe (memory/redis/hybrid)</span>
+        </div>
+      </section>
+
+      <section id="overview" class="section active">
+        <div class="grid kpi">
+          <div class="card"><div class="muted">接入门店</div><b>132</b><div class="muted">多品牌连锁</div></div>
+          <div class="card"><div class="muted">活跃 Agent</div><b>7</b><div class="muted">覆盖核心运营链路</div></div>
+          <div class="card"><div class="muted">今日告警处理率</div><b>93.4%</b><div class="muted">Webhook 去重已开启</div></div>
+          <div class="card"><div class="muted">自动巡检任务</div><b>11</b><div class="muted">Systemd + Cron 双模式</div></div>
+        </div>
+        <div class="card" style="margin-top:12px;">
+          <h3>业务架构（演示视图）</h3>
+          <div class="timeline">
+            <div class="item"><b>门店触点层</b>：企微/飞书消息、移动端店长操作、Web工作台</div>
+            <div class="item"><b>智链OS 智能中间层</b>：排班建议、员工健康风险、总部多店排名、协同决策</div>
+            <div class="item"><b>业务系统层</b>：POS/预定/排班/财务数据接入与回传</div>
+            <div class="item"><b>运维与稳定性层</b>：监控栈、告警 webhook、去重、日常巡检报告</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="sm" class="section">
+        <div class="grid kpi">
+          <div class="card"><div class="muted">今日营收</div><b>¥126,980</b><div class="muted">较昨日 +6.1%</div></div>
+          <div class="card"><div class="muted">食材成本率</div><b>31.2%</b><div class="muted">略高于目标</div></div>
+          <div class="card"><div class="muted">待审批</div><b>5</b><div class="muted">含 2 项高优先</div></div>
+          <div class="card"><div class="muted">未读告警</div><b>3</b><div class="muted">建议 2h 内处理</div></div>
+        </div>
+
+        <div class="card" style="margin-top:12px;">
+          <div class="flex space">
+            <h3>明日人力建议（P1 最小闭环）</h3>
+            <span class="badge b-medium">午餐时段 · 置信度 84%</span>
+          </div>
+          <table>
+            <tr><td>建议排班人数</td><td><b>18 人</b></td></tr>
+            <tr><td>岗位明细</td><td>后厨 8 · 前厅 7 · 收银 3</td></tr>
+            <tr><td>预估人工成本</td><td>¥9,680</td></tr>
+          </table>
+          <div style="margin-top:10px;" class="flex">
+            <button class="btn primary" onclick="openAdvice('confirmed')">✅ 一键确认</button>
+            <button class="btn" onclick="openAdvice('modified')">✏️ 修改人数</button>
+            <button class="btn" onclick="openAdvice('rejected')">❌ 拒绝并填写原因</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="workforce" class="section">
+        <div class="grid kpi">
+          <div class="card"><div class="muted">员工总数</div><b>86</b><div class="muted">本月统计</div></div>
+          <div class="card"><div class="muted">高风险流失</div><b>12</b><div class="muted">含 critical 4 人</div></div>
+          <div class="card"><div class="muted">公平性指数</div><b>78.6</b><div class="muted"><span class="trend-up">↑ +3.2</span> 环比上月</div></div>
+          <div class="card"><div class="muted">潜在替换成本</div><b>¥246,000</b><div class="muted">按 Top20 估算</div></div>
+        </div>
+
+        <div class="card" style="margin-top:12px;">
+          <h3>流失风险排名（P0）</h3>
+          <table>
+            <thead><tr><th>员工</th><th>岗位</th><th>风险分</th><th>风险等级</th><th>替换成本</th><th>展开详情</th></tr></thead>
+            <tbody>
+              <tr><td>李明</td><td>后厨主管</td><td>0.82</td><td><span class="badge b-critical">critical</span></td><td>¥30,000</td><td><button class="btn" onclick="toggleDetail('d1')">查看</button></td></tr>
+              <tr id="d1" style="display:none;"><td colspan="6">主要因子：夜班过密、连续差班、近30天缺勤上升；公平性：差班 11/18（61.1%）</td></tr>
+              <tr><td>王芳</td><td>前厅领班</td><td>0.68</td><td><span class="badge b-high">high</span></td><td>¥24,000</td><td><button class="btn" onclick="toggleDetail('d2')">查看</button></td></tr>
+              <tr id="d2" style="display:none;"><td colspan="6">主要因子：周末高峰班集中、工时波动大；公平性：差班 8/17（47.1%）</td></tr>
+              <tr><td>赵杰</td><td>收银</td><td>0.44</td><td><span class="badge b-medium">medium</span></td><td>¥18,000</td><td><button class="btn" onclick="toggleDetail('d3')">查看</button></td></tr>
+              <tr id="d3" style="display:none;"><td colspan="6">主要因子：绩效下降、培训完成率偏低；公平性：差班 5/19（26.3%）</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card" style="margin-top:12px;">
+          <h3>班次公平性分布（水平条形图）</h3>
+          <div class="bar-row"><span>高不公平 (>=50%)</span><div class="bar"><i class="i-red" style="width:35%"></i></div><span>14人</span></div>
+          <div class="bar-row"><span>中不公平 (25-50%)</span><div class="bar"><i class="i-orange" style="width:47%"></i></div><span>19人</span></div>
+          <div class="bar-row"><span>低不公平 (<25%)</span><div class="bar"><i class="i-green" style="width:100%"></i></div><span>41人</span></div>
+        </div>
+      </section>
+
+      <section id="hq" class="section">
+        <div class="grid kpi">
+          <div class="card"><div class="muted">全链总营收</div><b>¥2,468,800</b><div class="muted">T+0 聚合</div></div>
+          <div class="card"><div class="muted">门店均值人工成本率</div><b>27.8%</b><div class="muted">品牌基准</div></div>
+          <div class="card"><div class="muted">告警门店</div><b>9</b><div class="muted">critical 3 / warning 6</div></div>
+          <div class="card"><div class="muted">待审批决策</div><b>17</b><div class="muted">总部协同池</div></div>
+        </div>
+
+        <div class="card" style="margin-top:12px;">
+          <h3>多店人工成本率排名（P2）</h3>
+          <table>
+            <thead><tr><th>排名</th><th>门店</th><th>成本率</th><th>较品牌均值</th><th>排名变化</th><th>状态</th></tr></thead>
+            <tbody>
+              <tr><td>#1</td><td>上海静安店</td><td>22.4%</td><td class="trend-up">-5.4%</td><td class="trend-up">↑ 2</td><td><span class="badge b-low">excellent</span></td></tr>
+              <tr><td>#4</td><td>杭州西湖店</td><td>27.1%</td><td class="trend-up">-0.7%</td><td>→ 0</td><td><span class="badge b-low">normal</span></td></tr>
+              <tr><td>#10</td><td>深圳南山店</td><td>30.8%</td><td class="trend-down">+3.0%</td><td class="trend-down">↓ 3</td><td><span class="badge b-high">warning</span></td></tr>
+              <tr><td>#13</td><td>广州天河店</td><td>32.7%</td><td class="trend-down">+4.9%</td><td class="trend-down">↓ 1</td><td><span class="badge b-critical">critical</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="ops" class="section">
+        <div class="grid" style="grid-template-columns:1.2fr 1fr;">
+          <div class="card">
+            <h3>生产配置与运维自动化</h3>
+            <div class="timeline">
+              <div class="item"><b>prod-env-check</b>：校验 DB/Redis/Secret 与告警去重配置</div>
+              <div class="item"><b>prod-deploy</b>：Compose 拉起 API/Web/Worker/Beat/Nginx</div>
+              <div class="item"><b>prod-health + scheduler-patrol</b>：健康检查与关键任务巡检</div>
+              <div class="item"><b>prod-monitor-up</b>：Prometheus + Grafana + Alertmanager</div>
+              <div class="item"><b>prod-alert-e2e</b>：告警注入 -> webhook -> 去重 -> 通知链路校验</div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>告警去重策略</h3>
+            <table>
+              <tr><td>memory</td><td>单实例内存去重，部署简单</td></tr>
+              <tr><td>redis</td><td>跨实例去重，适合多副本</td></tr>
+              <tr><td>hybrid</td><td>内存 + Redis 双重兜底</td></tr>
+            </table>
+            <div class="footer">演示建议：先触发 `OpsSmokeAlert`，再重复触发同 key 告警，观察 suppressed 数增加。</div>
+          </div>
+        </div>
+      </section>
+
+      <div class="footer">说明：这是用于汇报和评审的高保真业务原型（HTML），数据为演示样本；交互已映射到当前已开发接口与页面职责。</div>
+    </main>
+  </div>
+
+  <div class="modal" id="adviceModal">
+    <div class="dialog">
+      <h3>处理人力建议</h3>
+      <label>动作</label>
+      <select id="actionSel" onchange="onActionChange()">
+        <option value="confirmed">直接确认</option>
+        <option value="modified">修改后确认</option>
+        <option value="rejected">拒绝</option>
+      </select>
+      <div id="modifiedBox" style="display:none;">
+        <label>修改后人数</label>
+        <input id="modifiedCount" type="number" min="1" value="18" />
+      </div>
+      <div id="rejectBox" style="display:none;">
+        <label>拒绝原因</label>
+        <input id="rejectReason" type="text" placeholder="如：临时闭店检修，延后执行" />
+      </div>
+      <div class="flex" style="justify-content:flex-end; margin-top:14px;">
+        <button class="btn" onclick="closeAdvice()">取消</button>
+        <button class="btn primary" onclick="submitAdvice()">提交</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const tabs = document.querySelectorAll('.tab');
+    const sections = document.querySelectorAll('.section');
+    tabs.forEach(btn => {
+      btn.addEventListener('click', () => {
+        tabs.forEach(b => b.classList.remove('active'));
+        sections.forEach(s => s.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.tab).classList.add('active');
+      });
+    });
+
+    function toggleDetail(id) {
+      const el = document.getElementById(id);
+      el.style.display = el.style.display === 'none' ? 'table-row' : 'none';
+    }
+
+    function openAdvice(action) {
+      document.getElementById('adviceModal').classList.add('show');
+      document.getElementById('actionSel').value = action;
+      onActionChange();
+    }
+
+    function closeAdvice() {
+      document.getElementById('adviceModal').classList.remove('show');
+    }
+
+    function onActionChange() {
+      const action = document.getElementById('actionSel').value;
+      document.getElementById('modifiedBox').style.display = action === 'modified' ? 'block' : 'none';
+      document.getElementById('rejectBox').style.display = action === 'rejected' ? 'block' : 'none';
+    }
+
+    function submitAdvice() {
+      const action = document.getElementById('actionSel').value;
+      const msg = action === 'confirmed'
+        ? '已提交：直接确认人力建议'
+        : action === 'modified'
+          ? '已提交：修改后确认（人数=' + document.getElementById('modifiedCount').value + '）'
+          : '已提交：拒绝建议（原因=' + (document.getElementById('rejectReason').value || '未填写') + '）';
+      alert(msg + '\n\n映射接口：POST /api/v1/workforce/stores/{store_id}/staffing-advice/confirm');
+      closeAdvice();
+    }
+  </script>
+</body>
+</html>

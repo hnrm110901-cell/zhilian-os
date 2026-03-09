@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>智链OS 汇报版原型</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #111833;
+      --line: #233159;
+      --text: #f8fbff;
+      --sub: #b7c3e0;
+      --brand: #4f8cff;
+      --ok: #2dd4bf;
+      --warn: #f59e0b;
+      --danger: #fb7185;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(900px 500px at 20% -10%, rgba(79,140,255,.25), transparent 55%),
+        radial-gradient(700px 500px at 100% 0%, rgba(122,90,248,.2), transparent 60%),
+        var(--bg);
+      color: var(--text);
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    .topbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 20;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 18px;
+      background: rgba(8, 13, 28, .76);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid rgba(255,255,255,.08);
+    }
+    .title { font-size: 14px; color: var(--sub); }
+    .controls { display: flex; gap: 8px; align-items: center; }
+    .btn {
+      border: 1px solid #2e3d6d;
+      background: #152149;
+      color: #dbe8ff;
+      border-radius: 8px;
+      padding: 7px 11px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+    .container {
+      height: 100vh;
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      padding-top: 52px;
+    }
+    .stage {
+      padding: 20px;
+      height: calc(100vh - 52px);
+      overflow: auto;
+    }
+    .slides { height: 100%; }
+    .slide {
+      display: none;
+      height: 100%;
+      animation: fade .3s ease;
+    }
+    .slide.active { display: block; }
+    @keyframes fade { from { opacity: .2; transform: translateY(6px);} to {opacity:1; transform:none;} }
+
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border: 1px solid rgba(255,255,255,.10);
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.18);
+    }
+    .hero {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    h1,h2,h3 { margin: 0; }
+    h1 { font-size: 30px; margin-bottom: 8px; }
+    h2 { font-size: 22px; margin-bottom: 10px; }
+    h3 { font-size: 16px; margin-bottom: 8px; color: #d9e6ff; }
+    .muted { color: var(--sub); font-size: 13px; }
+    .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+    .chip { padding:4px 10px; border-radius:999px; border:1px solid #35518f; color:#d0e0ff; font-size:12px; }
+
+    .grid4 { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-bottom:12px; }
+    .kpi b { font-size: 26px; display:block; margin:4px 0; }
+    .kpi span { color: var(--sub); font-size: 12px; }
+
+    table { width:100%; border-collapse: collapse; }
+    th,td { padding:10px 8px; border-bottom:1px solid rgba(255,255,255,.08); font-size:13px; }
+    th { color:#c9d9ff; text-align:left; }
+
+    .badge { border-radius:999px; padding:2px 8px; font-size:12px; font-weight:700; }
+    .critical { background:#4b1a2a; color:#ffb7c7; }
+    .warning { background:#4a3413; color:#ffd7a3; }
+    .normal { background:#123a34; color:#99f6e4; }
+
+    .bar { background:#1a2448; border-radius:999px; height:10px; overflow:hidden; }
+    .bar i { display:block; height:100%; }
+
+    .speaker {
+      border-left: 1px solid rgba(255,255,255,.1);
+      background: rgba(9, 14, 32, .85);
+      padding: 14px;
+      height: calc(100vh - 52px);
+      overflow: auto;
+    }
+    .speaker h3 { margin-bottom: 10px; }
+    .speaker .meta { font-size: 12px; color: var(--sub); margin-bottom: 8px; }
+    .speaker .note {
+      font-size: 13px;
+      line-height: 1.65;
+      color: #d7e4ff;
+      white-space: pre-line;
+      padding: 10px;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 10px;
+      background: rgba(255,255,255,.02);
+    }
+
+    .timeline { border-left:2px solid #385497; padding-left:12px; }
+    .timeline div { margin:9px 0; }
+
+    .progress {
+      margin-top: 10px;
+      height: 6px;
+      border-radius: 999px;
+      background: #1d2a54;
+      overflow: hidden;
+    }
+    .progress i { display:block; height:100%; background: linear-gradient(90deg, #4f8cff, #7a5af8); }
+
+    @media (max-width: 1100px) {
+      .container { grid-template-columns: 1fr; }
+      .speaker { display:none; }
+      .hero { grid-template-columns:1fr; }
+      .grid4 { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      body { overflow: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="title">智链OS · 汇报版产品原型（按方向键切页）</div>
+    <div class="controls">
+      <button class="btn" id="prevBtn">上一页</button>
+      <button class="btn" id="nextBtn">下一页</button>
+      <button class="btn" id="autoBtn">自动播放</button>
+      <button class="btn primary" id="fsBtn">全屏</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="stage">
+      <div class="slides">
+        <section class="slide active" data-title="封面与目标" data-note="开场 30 秒\n1) 这是智链OS的汇报版原型，覆盖业务与运维闭环。\n2) 重点强调我们不是只做界面，而是接口、流程、告警、运维一体化。\n3) 本次汇报按 P1/P0/P2 + Ops 四条线展开。">
+          <div class="hero">
+            <div class="card">
+              <h1>智链OS 产品原型汇报</h1>
+              <p class="muted">连锁餐饮智能运营系统 · Store + HQ + Ops 全链路</p>
+              <div class="chips">
+                <span class="chip">P1 人力建议确认卡</span>
+                <span class="chip">P0 员工健康与公平性</span>
+                <span class="chip">P2 总部人工成本排名</span>
+                <span class="chip">Alert Webhook + Dedupe</span>
+              </div>
+            </div>
+            <div class="card">
+              <h3>本轮交付聚焦</h3>
+              <div class="timeline">
+                <div>门店端：建议可执行，可反馈，可追溯</div>
+                <div>人力页：风险可解释，公平可量化</div>
+                <div>总部页：排名可对比，变化可跟踪</div>
+                <div>运维面：告警可去重，链路可验收</div>
+              </div>
+            </div>
+          </div>
+          <div class="grid4">
+            <div class="card kpi"><span>已开发页面能力</span><b>3</b><span>SM / Workforce / HQ</span></div>
+            <div class="card kpi"><span>核心接口</span><b>5</b><span>覆盖建议、健康、排名、告警</span></div>
+            <div class="card kpi"><span>运维脚本</span><b>10+</b><span>部署、巡检、监控、E2E</span></div>
+            <div class="card kpi"><span>目标</span><b>闭环</b><span>业务动作直接回写系统</span></div>
+          </div>
+        </section>
+
+        <section class="slide" data-title="店长端 P1" data-note="讲解重点 60 秒\n1) 店长首页新增“明日人力建议卡”。\n2) 三动作直接映射 confirm 接口：confirmed / modified / rejected。\n3) 这保证建议不只是展示，而是可执行决策。">
+          <div class="card">
+            <h2>门店端：P1 人力建议确认卡</h2>
+            <div class="grid4">
+              <div class="card kpi"><span>建议人数</span><b>18</b><span>午餐时段</span></div>
+              <div class="card kpi"><span>岗位明细</span><b>8/7/3</b><span>后厨/前厅/收银</span></div>
+              <div class="card kpi"><span>置信度</span><b>84%</b><span>模型输出</span></div>
+              <div class="card kpi"><span>预估成本</span><b>¥9,680</b><span>可用于审批判断</span></div>
+            </div>
+            <table>
+              <thead><tr><th>动作</th><th>用户意图</th><th>接口映射</th><th>状态闭环</th></tr></thead>
+              <tbody>
+                <tr><td>✅ 直接确认</td><td>接受 AI 建议</td><td>action=confirmed</td><td>建议状态转 confirmed</td></tr>
+                <tr><td>✏️ 修改后确认</td><td>局部调整后采纳</td><td>action=modified + modified_headcount</td><td>保留人工决策痕迹</td></tr>
+                <tr><td>❌ 拒绝</td><td>本日条件不适用</td><td>action=rejected + rejection_reason</td><td>用于后续策略回溯</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="slide" data-title="人力页 P0" data-note="讲解重点 75 秒\n1) 员工健康从“分数”升级到“可解释风险”。\n2) 排名可展开，直接看到风险因子和公平性细项。\n3) 公平性用水平条形图表达，管理者更容易识别风险桶。">
+          <div class="card">
+            <h2>人力管理：P0 员工健康与公平性</h2>
+            <div class="grid4">
+              <div class="card kpi"><span>员工总数</span><b>86</b><span>本月统计</span></div>
+              <div class="card kpi"><span>高风险流失</span><b>12</b><span>critical 4</span></div>
+              <div class="card kpi"><span>公平指数</span><b>78.6</b><span style="color:#67e8f9;">环比 +3.2</span></div>
+              <div class="card kpi"><span>潜在替换成本</span><b>¥246k</b><span>Top20 估算</span></div>
+            </div>
+            <table>
+              <thead><tr><th>员工</th><th>风险分</th><th>等级</th><th>关键因子</th><th>公平性</th></tr></thead>
+              <tbody>
+                <tr><td>李明</td><td>0.82</td><td><span class="badge critical">critical</span></td><td>夜班过密、连续差班</td><td>11/18 (61.1%)</td></tr>
+                <tr><td>王芳</td><td>0.68</td><td><span class="badge warning">high</span></td><td>周末高峰班集中</td><td>8/17 (47.1%)</td></tr>
+                <tr><td>赵杰</td><td>0.44</td><td><span class="badge normal">medium</span></td><td>绩效下降、培训不足</td><td>5/19 (26.3%)</td></tr>
+              </tbody>
+            </table>
+            <div style="margin-top:10px;">
+              <div style="display:grid;grid-template-columns:170px 1fr 40px;gap:10px;align-items:center;margin:8px 0;"><span>高不公平 (>=50%)</span><div class="bar"><i style="width:35%;background:var(--danger)"></i></div><span>14</span></div>
+              <div style="display:grid;grid-template-columns:170px 1fr 40px;gap:10px;align-items:center;margin:8px 0;"><span>中不公平 (25-50%)</span><div class="bar"><i style="width:47%;background:var(--warn)"></i></div><span>19</span></div>
+              <div style="display:grid;grid-template-columns:170px 1fr 40px;gap:10px;align-items:center;margin:8px 0;"><span>低不公平 (<25%)</span><div class="bar"><i style="width:100%;background:var(--ok)"></i></div><span>41</span></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="slide" data-title="总部页 P2" data-note="讲解重点 60 秒\n1) HQ 视角新增人工成本率排名卡。\n2) 同时展示与品牌均值差值，以及环比排名变化。\n3) 总部可以快速聚焦最偏离门店，推动经营动作。">
+          <div class="card">
+            <h2>总部端：P2 人工成本率排名与变化</h2>
+            <div class="grid4">
+              <div class="card kpi"><span>门店数</span><b>132</b><span>同品牌可比</span></div>
+              <div class="card kpi"><span>品牌均值</span><b>27.8%</b><span>月度口径</span></div>
+              <div class="card kpi"><span>警戒门店</span><b>9</b><span>需干预</span></div>
+              <div class="card kpi"><span>关键动作</span><b>17</b><span>待总部审批</span></div>
+            </div>
+            <table>
+              <thead><tr><th>排名</th><th>门店</th><th>成本率</th><th>较均值</th><th>排名变化</th><th>状态</th></tr></thead>
+              <tbody>
+                <tr><td>#1</td><td>上海静安店</td><td>22.4%</td><td style="color:var(--ok)">-5.4%</td><td style="color:var(--ok)">↑2</td><td><span class="badge normal">excellent</span></td></tr>
+                <tr><td>#10</td><td>深圳南山店</td><td>30.8%</td><td style="color:var(--danger)">+3.0%</td><td style="color:var(--danger)">↓3</td><td><span class="badge warning">warning</span></td></tr>
+                <tr><td>#13</td><td>广州天河店</td><td>32.7%</td><td style="color:var(--danger)">+4.9%</td><td style="color:var(--danger)">↓1</td><td><span class="badge critical">critical</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="slide" data-title="生产运维闭环" data-note="讲解重点 60 秒\n1) 生产脚本化，保证配置、部署、巡检可重复。\n2) 告警从 Alertmanager 入站，经 webhook 去重后推送。\n3) 支持 memory/redis/hybrid，满足单实例到多副本演进。">
+          <div class="card">
+            <h2>生产配置与运维脚本（已落地）</h2>
+            <div class="timeline">
+              <div><b>Step 1 预检</b>：`make prod-env-check`（含 dedupe backend/TTL 校验）</div>
+              <div><b>Step 2 部署</b>：`make prod-deploy`（api/web/worker/beat/nginx）</div>
+              <div><b>Step 3 巡检</b>：`make prod-health` + `make prod-scheduler-patrol`</div>
+              <div><b>Step 4 监控</b>：`make prod-monitor-up` + `make prod-monitor-lint`</div>
+              <div><b>Step 5 告警验收</b>：`make prod-alert-webhook-smoke` + `make prod-alert-e2e`</div>
+            </div>
+            <table style="margin-top:10px;">
+              <thead><tr><th>去重后端</th><th>适用场景</th><th>要求</th></tr></thead>
+              <tbody>
+                <tr><td>memory</td><td>单进程</td><td>默认可用</td></tr>
+                <tr><td>redis</td><td>多实例跨副本</td><td>需 REDIS_URL / SENTINEL</td></tr>
+                <tr><td>hybrid</td><td>高可用兜底</td><td>内存 + Redis 双重判重</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="slide" data-title="收口与下一步" data-note="结束 30 秒\n1) 本轮已形成业务-接口-运维闭环。\n2) 下一步进入可视化增强与全链路压测。\n3) 建议先做试点门店 A/B。">
+          <div class="card">
+            <h2>阶段结论与下一步计划</h2>
+            <div class="grid4">
+              <div class="card kpi"><span>业务闭环</span><b>已达成</b><span>P1/P0/P2 全联通</span></div>
+              <div class="card kpi"><span>接口对齐</span><b>稳定</b><span>契约驱动开发</span></div>
+              <div class="card kpi"><span>运维成熟度</span><b>提升</b><span>E2E 告警可验证</span></div>
+              <div class="card kpi"><span>建议</span><b>试点上线</b><span>先 5-10 家门店</span></div>
+            </div>
+            <div class="card" style="margin-top:8px;">
+              <h3>下阶段建议</h3>
+              <div class="timeline">
+                <div>1. 建立门店级 A/B：建议采纳率、人员稳定度、成本率变化</div>
+                <div>2. 增加“拒绝原因”分析面板，反哺排班模型</div>
+                <div>3. 做压力演练：高频告警 + Redis抖动 + 去重一致性验证</div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <aside class="speaker">
+      <h3>讲解备注</h3>
+      <div class="meta" id="meta"></div>
+      <div class="note" id="note"></div>
+      <div class="progress"><i id="progressBar" style="width:0%"></i></div>
+      <div class="meta" style="margin-top:8px;">快捷键：← → 切页，A 自动播放，F 全屏</div>
+    </aside>
+  </div>
+
+  <script>
+    const slides = [...document.querySelectorAll('.slide')];
+    const noteEl = document.getElementById('note');
+    const metaEl = document.getElementById('meta');
+    const progress = document.getElementById('progressBar');
+    const autoBtn = document.getElementById('autoBtn');
+    let idx = 0;
+    let timer = null;
+
+    function render() {
+      slides.forEach((s, i) => s.classList.toggle('active', i === idx));
+      const title = slides[idx].dataset.title || '';
+      const note = slides[idx].dataset.note || '';
+      noteEl.textContent = note;
+      metaEl.textContent = `第 ${idx + 1} / ${slides.length} 页 · ${title}`;
+      progress.style.width = `${((idx + 1) / slides.length) * 100}%`;
+    }
+    function next() { idx = (idx + 1) % slides.length; render(); }
+    function prev() { idx = (idx - 1 + slides.length) % slides.length; render(); }
+
+    function toggleAuto() {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+        autoBtn.textContent = '自动播放';
+        return;
+      }
+      timer = setInterval(next, 10000);
+      autoBtn.textContent = '停止播放';
+    }
+
+    document.getElementById('nextBtn').onclick = next;
+    document.getElementById('prevBtn').onclick = prev;
+    autoBtn.onclick = toggleAuto;
+    document.getElementById('fsBtn').onclick = () => {
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+      else document.exitFullscreen?.();
+    };
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') next();
+      if (e.key === 'ArrowLeft') prev();
+      if (e.key.toLowerCase() === 'a') toggleAuto();
+      if (e.key.toLowerCase() === 'f') {
+        if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+        else document.exitFullscreen?.();
+      }
+    });
+
+    render();
+  </script>
+</body>
+</html>

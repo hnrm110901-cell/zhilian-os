@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>智链OS 投资人汇报原型</title>
+  <style>
+    :root{--bg:#0c111d;--panel:#121a2b;--line:#273453;--text:#f5f8ff;--sub:#a9b7d6;--brand:#3b82f6;--ok:#22c55e;--warn:#f59e0b;--danger:#ef4444}
+    *{box-sizing:border-box}body{margin:0;background:radial-gradient(900px 450px at 0% 0%,rgba(59,130,246,.22),transparent 55%),var(--bg);color:var(--text);font-family:"PingFang SC","Microsoft YaHei",sans-serif}
+    .wrap{max-width:1200px;margin:0 auto;padding:20px}
+    .hero{background:linear-gradient(135deg,#1d4ed8,#2563eb 45%,#7c3aed);border:1px solid rgba(255,255,255,.15);border-radius:16px;padding:22px}
+    h1,h2,h3{margin:0}h1{font-size:30px;margin-bottom:8px}h2{font-size:22px;margin-bottom:10px}.muted{color:var(--sub)}
+    .grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:14px}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+    .kpi b{display:block;font-size:28px;margin:6px 0}.kpi span{font-size:12px;color:var(--sub)}
+    .sec{margin-top:14px}
+    table{width:100%;border-collapse:collapse}th,td{padding:10px 8px;border-bottom:1px solid rgba(255,255,255,.08);font-size:13px;text-align:left}th{color:#cbd8ff}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700}
+    .p-ok{background:#123722;color:#9ff0bc}.p-warn{background:#4b3714;color:#ffd89e}.p-danger{background:#4a1f28;color:#ffc0cb}
+    .timeline{border-left:2px solid #35518f;padding-left:12px}.timeline div{margin:8px 0}
+    .toolbar{position:sticky;top:0;background:rgba(12,17,29,.9);backdrop-filter:blur(8px);padding:8px 0;margin-bottom:10px;border-bottom:1px solid rgba(255,255,255,.08)}
+    .toolbar a{color:#d6e3ff;text-decoration:none;margin-right:14px;font-size:13px}
+    @media(max-width:960px){.grid4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    @media(max-width:640px){.grid4{grid-template-columns:1fr}.wrap{padding:12px}h1{font-size:24px}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="toolbar">
+      <a href="#value">价值主张</a>
+      <a href="#traction">落地进展</a>
+      <a href="#unit">单位经济模型</a>
+      <a href="#risk">风险与对策</a>
+      <a href="#plan">12个月计划</a>
+    </div>
+
+    <section class="hero" id="value">
+      <h1>智链OS · 投资人汇报原型</h1>
+      <p class="muted">定位：连锁餐饮的 AI 运营系统（门店执行 + 总部管控 + 运维稳定性）</p>
+      <div class="grid4">
+        <div class="card kpi"><span>目标客户</span><b>中大型连锁</b><span>多门店、多角色协同</span></div>
+        <div class="card kpi"><span>核心产品形态</span><b>SaaS + Agent</b><span>人机协同运营闭环</span></div>
+        <div class="card kpi"><span>价值方向</span><b>降本增效</b><span>人力成本、流失风险、决策速度</span></div>
+        <div class="card kpi"><span>技术护城河</span><b>接口+运维闭环</b><span>非纯看板，具备执行与反馈链路</span></div>
+      </div>
+    </section>
+
+    <section class="sec" id="traction">
+      <div class="card">
+        <h2>已开发落地进展（与代码一致）</h2>
+        <table>
+          <thead><tr><th>模块</th><th>状态</th><th>能力</th><th>业务意义</th></tr></thead>
+          <tbody>
+            <tr><td>门店端 P1 人力建议卡</td><td><span class="pill p-ok">已完成</span></td><td>确认/修改/拒绝 + 原因回写</td><td>AI建议可执行，形成可追踪行为数据</td></tr>
+            <tr><td>人力管理 P0 员工健康</td><td><span class="pill p-ok">已完成</span></td><td>风险排名、可解释因子、公平性分布</td><td>提前识别流失风险，降低替换成本</td></tr>
+            <tr><td>总部端 P2 成本排名</td><td><span class="pill p-ok">已完成</span></td><td>多店人工成本率排名、均值偏差、排名变化</td><td>总部快速定位偏离门店并干预</td></tr>
+            <tr><td>生产运维与告警链路</td><td><span class="pill p-ok">已完成</span></td><td>部署脚本、监控、告警E2E、去重后端</td><td>保证线上稳定，支撑规模化复制</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="sec" id="unit">
+      <div class="card">
+        <h2>单位经济模型（演示口径）</h2>
+        <div class="grid4">
+          <div class="card kpi"><span>单店年化订阅</span><b>¥3.6万</b><span>按 ¥3,000 / 月示例</span></div>
+          <div class="card kpi"><span>单店年节省</span><b>¥12-24万</b><span>人力与流失优化区间</span></div>
+          <div class="card kpi"><span>客户 ROI</span><b>3.3x - 6.6x</b><span>按单店年化口径</span></div>
+          <div class="card kpi"><span>回本周期</span><b>2-4月</b><span>若建议采纳率稳定</span></div>
+        </div>
+        <div class="timeline" style="margin-top:10px">
+          <div><b>成本侧</b>：通过 P1 建议确认与 P2 偏离门店干预，降低不必要人力浪费。</div>
+          <div><b>稳定侧</b>：P0 风险预警 + 公平性监控，降低核心岗位流失与替换损失。</div>
+          <div><b>交付侧</b>：运维脚本化 + 告警去重，降低故障恢复时间与运维人力投入。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="sec" id="risk">
+      <div class="card">
+        <h2>关键风险与应对</h2>
+        <table>
+          <thead><tr><th>风险</th><th>表现</th><th>应对机制</th></tr></thead>
+          <tbody>
+            <tr><td>一线采纳率不足</td><td>建议被忽略，ROI不达预期</td><td>P1 增加拒绝原因沉淀，按门店做策略迭代与教练机制</td></tr>
+            <tr><td>多系统接入复杂</td><td>品牌异构系统导致集成慢</td><td>采用 API 合同驱动，优先接高价值最小接口集</td></tr>
+            <tr><td>告警噪音</td><td>重复推送导致疲劳</td><td>Webhook 去重支持 memory/redis/hybrid 并可调 TTL</td></tr>
+            <tr><td>扩店后稳定性压力</td><td>并发与运维复杂度上升</td><td>监控栈 + E2E 告警演练 + 脚本化巡检</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="sec" id="plan">
+      <div class="card">
+        <h2>未来 12 个月里程碑（建议）</h2>
+        <div class="timeline">
+          <div><b>Q1</b>：5-10 家试点，跑通采纳率/成本率/流失率三指标闭环。</div>
+          <div><b>Q2</b>：30 家规模化复制，完善总部策略中心与多门店运营模板。</div>
+          <div><b>Q3</b>：100 家级别稳定性优化，重点做告警治理与自动化巡检。</div>
+          <div><b>Q4</b>：形成行业标杆案例，输出产品化交付标准与伙伴生态。</div>
+        </div>
+      </div>
+    </section>
+
+    <p class="muted" style="margin:14px 4px 30px;">注：本页为投资人沟通原型，数据为演示口径，核心依据为当前已开发功能与接口能力。</p>
+  </div>
+</body>
+</html>
