@@ -45,7 +45,7 @@ export default function SmAlerts() {
     setError(null);
     try {
       const resp = await apiClient.get('/api/v1/stores/health');
-      const stores: StoreHealth[] = resp.data.stores ?? [];
+      const stores: StoreHealth[] = resp.stores ?? [];
       setHealth(stores.find(s => s.store_id === STORE_ID) ?? null);
     } catch (e: any) {
       setError(e?.response?.data?.detail || '数据加载失败');

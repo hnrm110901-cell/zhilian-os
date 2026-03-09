@@ -56,7 +56,7 @@ export default function HQWorkforce() {
       const resp = await apiClient.get('/api/v1/workforce/multi-store/labor-ranking', {
         params: { month: m },
       });
-      setData(resp.data);
+      setData(resp);
     } catch (e) {
       handleApiError(e, '人工成本排名加载失败');
     } finally {

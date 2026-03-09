@@ -48,7 +48,7 @@ export default function HQFinance() {
   // Load store list from BFF hq
   useEffect(() => {
     apiClient.get('/api/v1/bff/hq').then(resp => {
-      const ranking = resp.data.stores_health_ranking ?? [];
+      const ranking = resp.stores_health_ranking ?? [];
       if (ranking.length > 0) {
         const opts: StoreOption[] = ranking.map((s: any) => ({
           value: s.store_id,
@@ -66,7 +66,7 @@ export default function HQFinance() {
     setError(null);
     try {
       const resp = await apiClient.get(`/api/v1/fct/${storeId}/dashboard`);
-      setData(resp.data);
+      setData(resp);
     } catch (e: any) {
       setError(e?.response?.data?.detail || '数据加载失败');
     } finally {

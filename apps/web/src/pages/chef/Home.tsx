@@ -50,7 +50,7 @@ export default function ChefHome() {
       const resp = await apiClient.get(
         `/api/v1/bff/chef/${STORE_ID}${refresh ? '?refresh=true' : ''}`
       );
-      setData(resp.data);
+      setData(resp);
     } catch (e: any) {
       setError(e?.response?.data?.detail || '数据加载失败');
     } finally {

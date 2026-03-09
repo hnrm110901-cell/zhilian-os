@@ -34,7 +34,7 @@ export default function HQDecisions() {
     try {
       const resp = await apiClient.get('/api/v1/approvals', { params: { status: 'pending' } });
       // DecisionLogResponse uses ai_suggestion / ai_confidence — map to our interface
-      const raw: any[] = resp.data.items ?? resp.data ?? [];
+      const raw: any[] = resp.items ?? resp ?? [];
       setItems(raw.map(d => ({
         id:                   d.id,
         store_id:             d.store_id,

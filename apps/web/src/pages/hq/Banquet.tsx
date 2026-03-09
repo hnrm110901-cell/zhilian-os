@@ -120,7 +120,7 @@ function DashboardTab() {
         `/api/v1/banquet-agent/stores/${STORE_ID}/dashboard`,
         { params: { year, month: mon } },
       );
-      setDashboard(resp.data);
+      setDashboard(resp);
     } catch (e) {
       handleApiError(e, '宴会仪表盘加载失败');
       setDashboard(null);
@@ -133,7 +133,7 @@ function DashboardTab() {
     setLoadingFunnel(true);
     try {
       const resp = await apiClient.get(`/api/v1/banquet-lifecycle/${STORE_ID}/funnel`);
-      setFunnel(resp.data);
+      setFunnel(resp);
     } catch {
       setFunnel(null);
     } finally {
@@ -148,7 +148,7 @@ function DashboardTab() {
         `/api/v1/banquet-agent/stores/${STORE_ID}/orders`,
         { params: { status: 'confirmed' } },
       );
-      setOrders(Array.isArray(resp.data) ? resp.data : (resp.data?.items ?? []));
+      setOrders(Array.isArray(resp) ? resp : (resp?.items ?? []));
     } catch {
       setOrders([]);
     } finally {

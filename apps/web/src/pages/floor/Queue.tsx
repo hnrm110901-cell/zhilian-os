@@ -45,7 +45,7 @@ export default function FloorQueue() {
       const resp = await apiClient.get(
         `/api/v1/bff/floor/${STORE_ID}${refresh ? '?refresh=true' : ''}`,
       );
-      setQueue(resp.data.queue_status ?? null);
+      setQueue(resp.queue_status ?? null);
     } catch (e: any) {
       setError(e?.response?.data?.detail || '数据加载失败');
     } finally {

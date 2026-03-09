@@ -39,7 +39,7 @@ export default function ChefInventory() {
       const resp = await apiClient.get(
         `/api/v1/bff/chef/${STORE_ID}${refresh ? '?refresh=true' : ''}`,
       );
-      setAlerts(resp.data.inventory_alerts ?? []);
+      setAlerts(resp.inventory_alerts ?? []);
     } catch (e: any) {
       setError(e?.response?.data?.detail || '数据加载失败');
     } finally {

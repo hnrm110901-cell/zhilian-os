@@ -61,7 +61,7 @@ export default function ChefWaste() {
       const resp = await apiClient.get('/api/v1/waste/report', {
         params: { store_id: STORE_ID, start_date: start, end_date: end },
       });
-      setReport(resp.data);
+      setReport(resp);
     } catch (e: any) {
       setError(e?.response?.data?.detail || '数据加载失败');
     } finally {

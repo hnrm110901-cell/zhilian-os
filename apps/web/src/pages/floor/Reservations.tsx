@@ -42,7 +42,7 @@ export default function FloorReservations() {
       const resp = await apiClient.get(
         `/api/v1/bff/floor/${STORE_ID}${refresh ? '?refresh=true' : ''}`,
       );
-      setItems(resp.data.today_reservations ?? []);
+      setItems(resp.today_reservations ?? []);
     } catch (e: any) {
       setError(e?.response?.data?.detail || '数据加载失败');
     } finally {
