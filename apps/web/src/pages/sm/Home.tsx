@@ -265,6 +265,9 @@ export default function SmHome() {
     rejected: 'critical',
   };
   const canSubmitAdvice = !!selectedAdvice && selectedAdvice.source === 'advice' && selectedAdvice.status === 'pending';
+  const todayAdvice = adviceMap.today;
+  const todayAdvicePending = !!todayAdvice && todayAdvice.source === 'advice' && todayAdvice.status === 'pending';
+  const todayAdviceHandled = !!todayAdvice && todayAdvice.source === 'advice' && todayAdvice.status !== 'pending';
   const rejectionBreakdown = (() => {
     const list = (adviceHistory?.items || [])
       .filter((x) => x.action === 'rejected')
@@ -315,6 +318,27 @@ export default function SmHome() {
               <span className={styles.alertText}>{data?.unread_alerts_count} 条运营告警待处理，点击查看</span>
               <span className={styles.alertArrow}>›</span>
             </button>
+          )}
+
+          {todayAdvicePending && (
+            <button
+              className={styles.adviceBannerPending}
+              onClick={() => setAdviceKey('today')}
+              type="button"
+            >
+              <span className={styles.alertIcon}>🧭</span>
+              <span className={styles.alertText}>今日人力建议待处理，点击跳转处理</span>
+              <span className={styles.alertArrow}>›</span>
+            </button>
+          )}
+
+          {todayAdviceHandled && (
+            <div className={styles.adviceBannerDone}>
+              <span className={styles.alertIcon}>✅</span>
+              <span className={styles.alertText}>
+                今日人力建议已{todayAdvice?.status === 'confirmed' ? '确认' : todayAdvice?.status === 'rejected' ? '拒绝' : '处理'}
+              </span>
+            </div>
           )}
 
           <div className={styles.kpiGrid}>

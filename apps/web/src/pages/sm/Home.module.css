@@ -81,6 +81,40 @@
   flex-shrink: 0;
 }
 
+.adviceBannerPending {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 14px;
+  background: #fff7e6;
+  border: 1px solid #ffd591;
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
+.adviceBannerPending .alertText,
+.adviceBannerPending .alertArrow {
+  color: #ad6800;
+}
+
+.adviceBannerDone {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  background: #f6ffed;
+  border: 1px solid #b7eb8f;
+  border-radius: 10px;
+}
+
+.adviceBannerDone .alertText {
+  color: #237804;
+}
+
 /* ── KPI grid ─────────────────────────────────────────────────────────────── */
 
 .kpiGrid {
