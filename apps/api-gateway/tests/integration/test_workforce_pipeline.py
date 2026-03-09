@@ -323,7 +323,7 @@ class TestWorkforceConfirmLoop:
         row2.recommended_headcount = 9
         row2.action = "rejected"
         row2.modified_headcount = None
-        row2.rejection_reason = "临时闭店检修"
+        row2.rejection_reason = "{\"code\":\"special_event\",\"text\":\"临时闭店检修\"}"
         row2.confirmed_at = datetime(2026, 3, 8, 8, 20)
 
         result = MagicMock()
@@ -340,6 +340,8 @@ class TestWorkforceConfirmLoop:
         assert resp.modified_count == 1
         assert resp.rejected_count == 1
         assert "临时闭店检修" in resp.rejection_reasons_top
+        assert resp.items[1].rejection_reason_code == "special_event"
+        assert resp.items[1].rejection_reason_text == "临时闭店检修"
 
     @pytest.mark.asyncio
     async def test_get_staffing_advice_history_empty(self):
@@ -356,6 +358,37 @@ class TestWorkforceConfirmLoop:
         )
         assert resp.total == 0
         assert resp.items == []
+
+    @pytest.mark.asyncio
+    async def test_confirm_staffing_advice_rejected_with_reason_code_only(self):
+        db = AsyncMock()
+        advice_row = MagicMock()
+        advice_row.id = "advice-002"
+        advice_row.created_at = datetime.utcnow() - timedelta(minutes=5)
+        advice_row.recommended_headcount = 10
+        advice_row.current_scheduled_headcount = 10
+        db.execute = AsyncMock(
+            side_effect=[
+                _result_with_row(advice_row),  # select advice
+                _result_with_row(None),        # update advice
+                _result_with_row(None),        # insert confirmation
+            ]
+        )
+        db.commit = AsyncMock()
+        body = StaffingAdviceConfirmRequest(
+            advice_date="2026-03-09",
+            meal_period="all_day",
+            action="rejected",
+            rejection_reason_code="budget_control",
+        )
+        resp = await confirm_staffing_advice(
+            store_id="S001",
+            body=body,
+            db=db,
+            user=_mock_user("manager-2"),
+        )
+        assert resp["ok"] is True
+        assert resp["status"] == "rejected"
 
     @pytest.mark.asyncio
     async def test_confirm_staffing_advice_modified_requires_count(self):

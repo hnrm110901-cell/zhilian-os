@@ -57,6 +57,8 @@ interface AdviceCardData {
 interface AdviceHistoryItem {
   advice_date: string;
   action?: 'confirmed' | 'modified' | 'rejected';
+  rejection_reason_code?: string;
+  rejection_reason_text?: string;
   rejection_reason?: string;
 }
 
@@ -68,6 +70,14 @@ interface AdviceHistoryResp {
   rejection_reasons_top: string[];
   items: AdviceHistoryItem[];
 }
+
+const REJECT_REASON_OPTIONS = [
+  { value: 'traffic_drop', label: '客流低于预期' },
+  { value: 'budget_control', label: '预算压缩' },
+  { value: 'staff_unavailable', label: '人手临时不可用' },
+  { value: 'special_event', label: '临时活动调整' },
+  { value: 'other', label: '其他' },
+];
 
 export default function SmHome() {
   const navigate = useNavigate();
@@ -84,7 +94,6 @@ export default function SmHome() {
   });
   const [adviceHistory, setAdviceHistory] = useState<AdviceHistoryResp | null>(null);
   const [adviceKey, setAdviceKey] = useState<'today' | 'tomorrow'>('tomorrow');
-
   const normalizePositionRequirements = (raw: Record<string, any> | undefined): Record<string, number> => {
     if (!raw) return {};
     const keys = ['morning', 'lunch', 'dinner'];
@@ -210,7 +219,12 @@ export default function SmHome() {
         meal_period: advice.meal_period,
         action: values.action,
         modified_headcount: values.action === 'modified' ? values.modified_headcount : undefined,
-        rejection_reason: values.action === 'rejected' ? values.rejection_reason : undefined,
+        rejection_reason_code: values.action === 'rejected' ? values.rejection_reason_code : undefined,
+        rejection_reason: values.action === 'rejected'
+          ? values.rejection_reason_code === 'other'
+            ? values.rejection_reason
+            : REJECT_REASON_OPTIONS.find((x) => x.value === values.rejection_reason_code)?.label
+          : undefined,
       });
       const impact = Number(resp?.cost_impact_yuan || 0);
       const impactLabel = impact === 0 ? '无额外成本影响' : impact > 0 ? `成本 +¥${Math.abs(impact).toFixed(0)}` : `成本 -¥${Math.abs(impact).toFixed(0)}`;
@@ -422,7 +436,9 @@ export default function SmHome() {
                     <div key={`${x.advice_date}-${i}`} className={styles.historyItem}>
                       <span>{x.advice_date}</span>
                       <span>{x.action === 'confirmed' ? '已确认' : x.action === 'modified' ? '已修改确认' : x.action === 'rejected' ? '已拒绝' : '待处理'}</span>
-                      {x.action === 'rejected' && x.rejection_reason ? <span className={styles.historyReasonTag}>{x.rejection_reason}</span> : <span>-</span>}
+                      {x.action === 'rejected' && (x.rejection_reason_text || x.rejection_reason)
+                        ? <span className={styles.historyReasonTag}>{x.rejection_reason_text || x.rejection_reason}</span>
+                        : <span>-</span>}
                     </div>
                   ))}
                 </div>
@@ -491,9 +507,20 @@ export default function SmHome() {
                   </>
                 ) : null}
                 {getFieldValue('action') === 'rejected' ? (
-                  <Form.Item label="拒绝原因" name="rejection_reason" rules={[{ required: true, message: '请输入拒绝原因' }]}>
-                    <Input placeholder="请输入原因" />
-                  </Form.Item>
+                  <>
+                    <Form.Item label="拒绝原因类型" name="rejection_reason_code" rules={[{ required: true, message: '请选择拒绝原因' }]}>
+                      <Select placeholder="请选择原因">
+                        {REJECT_REASON_OPTIONS.map((x) => (
+                          <Select.Option key={x.value} value={x.value}>{x.label}</Select.Option>
+                        ))}
+                      </Select>
+                    </Form.Item>
+                    {getFieldValue('rejection_reason_code') === 'other' ? (
+                      <Form.Item label="补充说明" name="rejection_reason" rules={[{ required: true, message: '请输入补充说明' }]}>
+                        <Input placeholder="请输入原因" />
+                      </Form.Item>
+                    ) : null}
+                  </>
                 ) : null}
               </>
             )}

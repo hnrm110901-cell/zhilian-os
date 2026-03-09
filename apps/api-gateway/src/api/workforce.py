@@ -5,6 +5,7 @@ Workforce API — Phase 8 Step 5
 from __future__ import annotations
 
 import calendar
+import json
 import os
 from datetime import date, datetime, timedelta
 from typing import Optional
@@ -33,6 +34,7 @@ class StaffingAdviceConfirmRequest(BaseModel):
     meal_period: str = Field("all_day", description="morning/lunch/dinner/all_day")
     action: str = Field(..., description="confirmed/rejected/modified")
     modified_headcount: Optional[int] = Field(None, ge=1)
+    rejection_reason_code: Optional[str] = Field(None, description="拒绝原因编码")
     rejection_reason: Optional[str] = None
 
 
@@ -64,6 +66,8 @@ class StaffingAdviceHistoryItem(BaseModel):
     action: Optional[str] = None
     recommended_headcount: Optional[int] = None
     modified_headcount: Optional[int] = None
+    rejection_reason_code: Optional[str] = None
+    rejection_reason_text: Optional[str] = None
     rejection_reason: Optional[str] = None
     cost_impact_yuan: Optional[float] = None
     confirmed_at: Optional[str] = None
@@ -133,6 +137,40 @@ def _parse_yyyymm(month: str) -> tuple[int, int]:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"month 格式错误，需为 YYYY-MM，实际值: {month}",
         )
+
+
+def _build_rejection_reason_payload(
+    code: Optional[str],
+    text: Optional[str],
+) -> Optional[str]:
+    code = (code or "").strip()
+    text = (text or "").strip()
+    if not code and not text:
+        return None
+    payload = {"code": code or "other", "text": text}
+    return json.dumps(payload, ensure_ascii=False)
+
+
+def _parse_rejection_reason_payload(raw: Optional[str]) -> tuple[Optional[str], Optional[str], Optional[str]]:
+    """
+    Parse stored rejection_reason text.
+    Returns (code, text, display).
+    """
+    if not raw:
+        return None, None, None
+    raw = str(raw).strip()
+    if not raw:
+        return None, None, None
+    try:
+        obj = json.loads(raw)
+        if isinstance(obj, dict):
+            code = str(obj.get("code") or "").strip() or None
+            text = str(obj.get("text") or "").strip() or None
+            display = text or code
+            return code, text, display
+    except Exception:
+        pass
+    return None, raw, raw
 
 
 @router.get("/stores/{store_id}/staffing-advice", response_model=StaffingAdviceQueryResponse)
@@ -254,13 +292,15 @@ async def get_staffing_advice_history(
             modified_count += 1
         elif action == "rejected":
             rejected_count += 1
-            if row.rejection_reason:
-                reasons.append(str(row.rejection_reason))
+            _, _, display_reason = _parse_rejection_reason_payload(row.rejection_reason)
+            if display_reason:
+                reasons.append(display_reason)
 
         effective = modified if action == "modified" and modified is not None else recommended
         cost_impact = None
         if effective is not None and recommended is not None:
             cost_impact = float((effective - recommended) * avg_wage_per_day)
+        reason_code, reason_text, reason_display = _parse_rejection_reason_payload(row.rejection_reason)
 
         items.append(
             StaffingAdviceHistoryItem(
@@ -270,7 +310,9 @@ async def get_staffing_advice_history(
                 action=action,
                 recommended_headcount=recommended,
                 modified_headcount=modified,
-                rejection_reason=row.rejection_reason,
+                rejection_reason_code=reason_code,
+                rejection_reason_text=reason_text,
+                rejection_reason=reason_display,
                 cost_impact_yuan=round(cost_impact, 2) if cost_impact is not None else None,
                 confirmed_at=row.confirmed_at.isoformat() if hasattr(row.confirmed_at, "isoformat") and row.confirmed_at else None,
             )
@@ -473,6 +515,8 @@ async def confirm_staffing_advice(
         raise HTTPException(status_code=400, detail="action 必须是 confirmed/rejected/modified")
     if action == "modified" and body.modified_headcount is None:
         raise HTTPException(status_code=400, detail="modified 动作必须提供 modified_headcount")
+    if action == "rejected" and not ((body.rejection_reason or "").strip() or (body.rejection_reason_code or "").strip()):
+        raise HTTPException(status_code=400, detail="rejected 动作必须提供 rejection_reason 或 rejection_reason_code")
 
     advice_result = await db.execute(
         text(
@@ -505,6 +549,11 @@ async def confirm_staffing_advice(
     effective_headcount = int(body.modified_headcount) if action == "modified" and body.modified_headcount is not None else baseline_recommended
     cost_impact_yuan = float((effective_headcount - baseline_current) * avg_wage_per_day)
 
+    rejection_reason_payload = _build_rejection_reason_payload(
+        body.rejection_reason_code if action == "rejected" else None,
+        body.rejection_reason if action == "rejected" else None,
+    )
+
     await db.execute(
         text(
             """
@@ -535,7 +584,7 @@ async def confirm_staffing_advice(
             "confirmed_by": str(user.id),
             "action": action,
             "modified_headcount": body.modified_headcount,
-            "rejection_reason": body.rejection_reason,
+            "rejection_reason": rejection_reason_payload,
             "response_time_seconds": response_seconds,
         },
     )
