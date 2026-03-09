@@ -106,6 +106,11 @@ function DashboardTab() {
   const [targetOpen,    setTargetOpen]    = useState(false);
   const [targetInput,   setTargetInput]   = useState('');
   const [savingTarget,  setSavingTarget]  = useState(false);
+  const [targetProgress, setTargetProgress] = useState<{
+    achievement_pct: number; gap_yuan: number;
+    daily_needed_yuan: number; run_rate_yuan: number; on_track: boolean;
+  } | null>(null);
+  const [targetTrend, setTargetTrend] = useState<{ month: string; target_yuan: number; actual_yuan: number }[]>([]);
 
   const loadDashboard = useCallback(async (m: string) => {
     setLoadingKpi(true);
@@ -165,6 +170,12 @@ function DashboardTab() {
     apiClient.get(`/api/v1/banquet-agent/stores/${STORE_ID}/revenue-targets/${y}/${m}`)
       .then(r => setTargetYuan(r.data?.target_yuan ?? null))
       .catch(() => setTargetYuan(null));
+    apiClient.get(`/api/v1/banquet-agent/stores/${STORE_ID}/analytics/target-progress`, { params: { year: y, month: m } })
+      .then(r => setTargetProgress(r.data))
+      .catch(() => setTargetProgress(null));
+    apiClient.get(`/api/v1/banquet-agent/stores/${STORE_ID}/analytics/target-trend`, { params: { months: 6 } })
+      .then(r => setTargetTrend(r.data?.months ?? []))
+      .catch(() => setTargetTrend([]));
   }, [month]);
 
   const syncKpi = async () => {
@@ -354,19 +365,50 @@ function DashboardTab() {
         ) : (() => {
           const actual = dashboard?.revenue_yuan ?? 0;
           const pct = Math.min(100, targetYuan > 0 ? (actual / targetYuan) * 100 : 0);
+          const barColor = pct >= 80 ? '#22c55e' : pct >= 60 ? '#f97316' : '#ef4444';
           return (
             <div className={styles.targetBody}>
               <div className={styles.targetMeta}>
                 <span>目标：¥{(targetYuan / 10000).toFixed(1)}万</span>
                 <span>实际：¥{(actual / 10000).toFixed(1)}万</span>
-                <span className={pct >= 100 ? styles.targetDone : styles.targetPct}>{pct.toFixed(1)}%</span>
+                <span style={{ color: barColor, fontWeight: 700 }}>{pct.toFixed(1)}%</span>
               </div>
               <div className={styles.targetBarBg}>
-                <div className={`${styles.targetBarFill} ${pct >= 100 ? styles.targetBarDone : ''}`} style={{ width: `${pct}%` }} />
+                <div className={styles.targetBarFill} style={{ width: `${pct}%`, background: barColor }} />
               </div>
+              {targetProgress && (
+                <div className={styles.targetInsights}>
+                  <span className={targetProgress.on_track ? styles.onTrack : styles.offTrack}>
+                    {targetProgress.on_track ? '✓ 按目标进行' : '⚠ 低于目标进度'}
+                  </span>
+                  {!targetProgress.on_track && targetProgress.daily_needed_yuan > 0 && (
+                    <span className={styles.dailyNeeded}>
+                      需每日完成 ¥{(targetProgress.daily_needed_yuan / 10000).toFixed(1)}万
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           );
         })()}
+        {targetTrend.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <ReactECharts
+              style={{ height: 140 }}
+              option={{
+                tooltip: { trigger: 'axis' as const },
+                legend: { data: ['目标', '实际'], top: 0, right: 0, itemWidth: 12, itemHeight: 8, textStyle: { fontSize: 11 } },
+                grid: { left: 50, right: 12, top: 28, bottom: 24 },
+                xAxis: { type: 'category' as const, data: targetTrend.map(r => r.month.slice(5)), axisLabel: { fontSize: 11 } },
+                yAxis: { type: 'value' as const, axisLabel: { fontSize: 11, formatter: (v: number) => `${(v / 10000).toFixed(0)}万` } },
+                series: [
+                  { name: '目标', type: 'line' as const, data: targetTrend.map(r => r.target_yuan), itemStyle: { color: '#94a3b8' }, lineStyle: { type: 'dashed' as const } },
+                  { name: '实际', type: 'bar' as const,  data: targetTrend.map(r => r.actual_yuan), itemStyle: { color: 'var(--accent, #FF6B2C)' } },
+                ],
+              }}
+            />
+          </div>
+        )}
       </ZCard>
 
       {/* 月度目标设置 Modal */}
@@ -2211,6 +2253,116 @@ function CustomerTab() {
 
 /* ─── 主组件 ─── */
 
+/* ─── 报价管理 Tab ─── */
+const QUOTE_STATUS_FILTERS = [
+  { value: 'all',      label: '全部'   },
+  { value: 'active',   label: '有效'   },
+  { value: 'accepted', label: '已接受' },
+  { value: 'expired',  label: '已过期' },
+];
+
+function QuoteManagementTab() {
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [quotes, setQuotes] = useState<{
+    quote_id: string; lead_id: string; quoted_amount_yuan: number;
+    valid_until: string | null; is_accepted: boolean; is_expired: boolean;
+    created_at: string | null;
+  }[]>([]);
+  const [total,   setTotal]   = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [revoking, setRevoking] = useState<string | null>(null);
+
+  const load = useCallback(async (status: string) => {
+    setLoading(true);
+    try {
+      const resp = await apiClient.get(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/quotes`,
+        { params: { status, page: 1, page_size: 30 } },
+      );
+      setQuotes(resp.data?.items ?? []);
+      setTotal(resp.data?.total ?? 0);
+    } catch {
+      setQuotes([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(statusFilter); }, [load, statusFilter]);
+
+  const handleRevoke = async (leadId: string, quoteId: string) => {
+    setRevoking(quoteId);
+    try {
+      await apiClient.delete(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/leads/${leadId}/quotes/${quoteId}`,
+      );
+      load(statusFilter);
+    } catch (e) {
+      handleApiError(e, '撤销失败');
+    } finally {
+      setRevoking(null);
+    }
+  };
+
+  return (
+    <div className={styles.quoteTab}>
+      <div className={styles.chipBar}>
+        {QUOTE_STATUS_FILTERS.map(f => (
+          <button
+            key={f.value}
+            className={`${styles.chip} ${statusFilter === f.value ? styles.chipActive : ''}`}
+            onClick={() => setStatusFilter(f.value)}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+      <ZCard>
+        {loading ? (
+          <ZSkeleton rows={4} />
+        ) : quotes.length === 0 ? (
+          <ZEmpty title="暂无报价" description="当前过滤条件下没有报价记录" />
+        ) : (
+          <>
+            <div className={styles.quoteTotal}>共 {total} 条</div>
+            <div className={styles.quoteList}>
+              {quotes.map(q => (
+                <div key={q.quote_id} className={styles.quoteRow}>
+                  <div className={styles.quoteLeft}>
+                    <div className={styles.quoteAmount}>¥{q.quoted_amount_yuan.toLocaleString()}</div>
+                    <div className={styles.quoteMeta}>
+                      {q.valid_until ? `有效至 ${q.valid_until}` : '无截止日期'}
+                    </div>
+                  </div>
+                  <div className={styles.quoteRight}>
+                    {q.is_accepted ? (
+                      <ZBadge type="success" text="已接受" />
+                    ) : q.is_expired ? (
+                      <ZBadge type="default" text="已过期" />
+                    ) : (
+                      <>
+                        <ZBadge type="info" text="有效" />
+                        <ZButton
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRevoke(q.lead_id, q.quote_id)}
+                          disabled={revoking === q.quote_id}
+                        >
+                          {revoking === q.quote_id ? '…' : '撤销'}
+                        </ZButton>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
 /* ─── 跨店对比 Tab ─── */
 function CrossStoreTab() {
   const [month,  setMonth]  = useState(() => {
@@ -2292,6 +2444,7 @@ export default function HQBanquet() {
           { key: 'resource',  label: '资源配置', children: <ResourceTab /> },
           { key: 'customers', label: '客户档案', children: <CustomerTab /> },
           { key: 'analytics', label: '转化分析', children: <AnalyticsTab /> },
+          { key: 'quotes',    label: '报价管理',  children: <QuoteManagementTab /> },
           { key: 'crossstore', label: '跨店对比',  children: <CrossStoreTab /> },
         ]}
       />

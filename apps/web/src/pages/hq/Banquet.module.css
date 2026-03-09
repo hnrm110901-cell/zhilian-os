@@ -1052,3 +1052,59 @@
 .crossStoreRight { text-align: right; }
 .crossStoreRevenue { font-size: 15px; font-weight: 700; color: var(--accent, #FF6B2C); }
 .crossStoreMargin { font-size: 12px; color: var(--text-secondary, #888); margin-top: 2px; }
+
+/* ── Phase 13: 目标进度增强 ─────────────────────────────── */
+.targetInsights {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+.onTrack    { color: #16a34a; font-weight: 600; }
+.offTrack   { color: #dc2626; font-weight: 600; }
+.dailyNeeded { color: var(--text-secondary, #888); }
+
+/* ── Phase 13: 报价管理 Tab ─────────────────────────────── */
+.quoteTab { display: flex; flex-direction: column; gap: 12px; padding: 12px 0; }
+
+.chipBar {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+.chip {
+  flex-shrink: 0;
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  border: 1px solid var(--border, #e5e7eb);
+  background: var(--bg-subtle, #f9fafb);
+  color: var(--text-primary, #111);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.chipActive {
+  background: var(--accent, #FF6B2C);
+  border-color: var(--accent, #FF6B2C);
+  color: #fff;
+}
+
+.quoteTotal { font-size: 12px; color: var(--text-secondary, #888); margin-bottom: 8px; }
+.quoteList  { display: flex; flex-direction: column; gap: 0; }
+.quoteRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border, #eee);
+}
+.quoteRow:last-child { border-bottom: none; }
+.quoteLeft  { flex: 1; min-width: 0; }
+.quoteAmount { font-size: 15px; font-weight: 700; color: var(--accent, #FF6B2C); }
+.quoteMeta   { font-size: 12px; color: var(--text-secondary, #888); margin-top: 2px; }
+.quoteRight  { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }

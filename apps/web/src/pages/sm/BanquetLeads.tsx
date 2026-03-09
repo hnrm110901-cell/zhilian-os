@@ -70,6 +70,10 @@ export default function SmBanquetLeads() {
   const [leads,       setLeads]         = useState<LeadItem[]>([]);
   const [loading,     setLoading]       = useState(true);
 
+  // 转化评分
+  const [scores,     setScores]         = useState<Record<string, { score: number; grade: string }>>({});
+  const [scoring,    setScoring]        = useState(false);
+
   // 推进阶段 Modal state
   const [modalLead,   setModalLead]     = useState<LeadItem | null>(null);
   const [targetStage, setTargetStage]   = useState('');
@@ -140,8 +144,25 @@ export default function SmBanquetLeads() {
     setNlRemark('');
   };
 
-  const handleCreateLead = async () => {
-    if (!nlName.trim() || !nlPhone.trim() || !nlBanquetType) return;
+  const handleScoreLeads = async () => {
+    setScoring(true);
+    try {
+      const resp = await apiClient.post(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/agent/score-leads`,
+      );
+      const map: Record<string, { score: number; grade: string }> = {};
+      for (const item of (resp.data?.items ?? [])) {
+        map[item.lead_id] = { score: item.score, grade: item.grade };
+      }
+      setScores(map);
+    } catch (e) {
+      handleApiError(e, '评分刷新失败');
+    } finally {
+      setScoring(false);
+    }
+  };
+
+  const handleCreateLead = async () => {    if (!nlName.trim() || !nlPhone.trim() || !nlBanquetType) return;
     setNlSubmitting(true);
     try {
       await apiClient.post(
@@ -172,6 +193,9 @@ export default function SmBanquetLeads() {
         <div className={styles.title}>全部线索</div>
         <ZButton variant="primary" size="sm" onClick={openNewLead} style={{ marginLeft: 'auto' }}>
           ＋ 新建线索
+        </ZButton>
+        <ZButton variant="ghost" size="sm" onClick={handleScoreLeads} disabled={scoring}>
+          {scoring ? '评分中…' : '📊 评分'}
         </ZButton>
       </div>
 
@@ -208,6 +232,11 @@ export default function SmBanquetLeads() {
                   <div className={styles.right}>
                     {lead.budget_yuan != null && (
                       <span className={styles.budget}>¥{lead.budget_yuan.toLocaleString()}</span>
+                    )}
+                    {scores[lead.banquet_id] && (
+                      <span className={`${styles.grade} ${styles[`grade${scores[lead.banquet_id].grade}`]}`}>
+                        {scores[lead.banquet_id].grade}
+                      </span>
                     )}
                     <ZBadge
                       type={STAGE_BADGE_TYPE[lead.stage] ?? 'default'}

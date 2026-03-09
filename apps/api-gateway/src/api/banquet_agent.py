@@ -3752,3 +3752,456 @@ async def get_exception_stats(
         "by_severity":           [{"severity": k, "count": v} for k, v in by_severity.items()],
         "avg_resolution_hours":  avg_resolution_hours,
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Phase 13 — 报价闭环 / 目标仪表盘 / 线索转化评分
+# ═══════════════════════════════════════════════════════════════════════════
+
+import calendar as _calendar
+from datetime import date as _date_cls
+
+
+# ── Pydantic Schemas ─────────────────────────────────────────────────────────
+
+class _QuotePatchBody(BaseModel):
+    quoted_amount_yuan: Optional[float] = None
+    valid_until:        Optional[str]   = None   # YYYY-MM-DD
+    remark:             Optional[str]   = None
+
+
+# ── helpers ──────────────────────────────────────────────────────────────────
+
+def _quote_to_dict(q) -> dict:
+    return {
+        "quote_id":           q.id,
+        "lead_id":            q.lead_id,
+        "store_id":           q.store_id,
+        "people_count":       q.people_count,
+        "table_count":        q.table_count,
+        "quoted_amount_yuan": q.quoted_amount_fen / 100,
+        "valid_until":        str(q.valid_until) if q.valid_until else None,
+        "is_accepted":        q.is_accepted,
+        "is_expired":         bool(q.valid_until and q.valid_until < _date_cls.today()),
+        "created_at":         q.created_at.isoformat() if q.created_at else None,
+    }
+
+
+def _compute_lead_score(lead) -> dict:
+    """规则式线索转化评分（0–100）"""
+    # stage_score (0–40)
+    stage_map = {
+        "new": 5, "contacted": 10, "visit_scheduled": 20,
+        "quoted": 30, "waiting_decision": 35, "deposit_pending": 40,
+        "won": 40, "lost": 0,
+    }
+    stage_val = lead.current_stage.value if hasattr(lead.current_stage, "value") else str(lead.current_stage)
+    stage_score = stage_map.get(stage_val, 0)
+
+    # budget_score (0–25)
+    budget_yuan = (lead.expected_budget_fen / 100) if lead.expected_budget_fen else None
+    if budget_yuan is None:
+        budget_score = 0
+    elif budget_yuan >= 80000:
+        budget_score = 25
+    elif budget_yuan >= 40000:
+        budget_score = 20
+    elif budget_yuan >= 20000:
+        budget_score = 10
+    else:
+        budget_score = 5
+
+    # recency_score (0–20)
+    if lead.last_followup_at:
+        days_since = (_date_cls.today() - lead.last_followup_at.date()).days
+        if days_since <= 2:
+            recency_score = 20
+        elif days_since <= 7:
+            recency_score = 15
+        elif days_since <= 14:
+            recency_score = 10
+        elif days_since <= 30:
+            recency_score = 5
+        else:
+            recency_score = 0
+    else:
+        recency_score = 0
+
+    # completeness_score (0–15)
+    completeness_score = (
+        (5 if lead.expected_date else 0) +
+        (5 if lead.expected_people_count else 0) +
+        (5 if lead.expected_budget_fen else 0)
+    )
+
+    total = stage_score + budget_score + recency_score + completeness_score
+
+    if total >= 75:
+        grade = "A"
+    elif total >= 50:
+        grade = "B"
+    elif total >= 25:
+        grade = "C"
+    else:
+        grade = "D"
+
+    return {
+        "score": total,
+        "grade": grade,
+        "breakdown": {
+            "stage_score":        stage_score,
+            "budget_score":       budget_score,
+            "recency_score":      recency_score,
+            "completeness_score": completeness_score,
+        },
+    }
+
+
+# ── 1. GET /stores/{id}/quotes ───────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/quotes")
+async def list_store_quotes(
+    store_id: str,
+    status:   str = Query("all"),    # all / active / expired / accepted / declined
+    page:     int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """全店报价列表（可按状态过滤）。"""
+    today = _date_cls.today()
+    q = select(BanquetQuote).where(BanquetQuote.store_id == store_id)
+
+    if status == "accepted":
+        q = q.where(BanquetQuote.is_accepted == True)
+    elif status == "declined":
+        q = q.where(
+            BanquetQuote.is_accepted == False,
+            BanquetQuote.valid_until < today,
+        )
+    elif status == "active":
+        q = q.where(
+            BanquetQuote.is_accepted == False,
+            BanquetQuote.valid_until >= today,
+        )
+    elif status == "expired":
+        q = q.where(
+            BanquetQuote.is_accepted == False,
+            BanquetQuote.valid_until < today,
+        )
+
+    q = q.order_by(BanquetQuote.created_at.desc())
+    offset = (page - 1) * page_size
+
+    count_res = await db.execute(select(func.count()).select_from(q.subquery()))
+    total = count_res.scalar() or 0
+
+    items_res = await db.execute(q.offset(offset).limit(page_size))
+    items = items_res.scalars().all()
+
+    return {
+        "total":    total,
+        "page":     page,
+        "page_size": page_size,
+        "items":    [_quote_to_dict(qr) for qr in items],
+    }
+
+
+# ── 2. GET /stores/{id}/leads/{lid}/quotes/{qid} ────────────────────────────
+
+@router.get("/stores/{store_id}/leads/{lead_id}/quotes/{quote_id}")
+async def get_single_quote(
+    store_id: str,
+    lead_id:  str,
+    quote_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """读取单条报价详情。"""
+    res = await db.execute(
+        select(BanquetQuote).where(
+            BanquetQuote.id == quote_id,
+            BanquetQuote.lead_id == lead_id,
+            BanquetQuote.store_id == store_id,
+        )
+    )
+    q = res.scalars().first()
+    if not q:
+        raise HTTPException(status_code=404, detail="报价不存在")
+    return _quote_to_dict(q)
+
+
+# ── 3. PATCH /stores/{id}/leads/{lid}/quotes/{qid} ──────────────────────────
+
+@router.patch("/stores/{store_id}/leads/{lead_id}/quotes/{quote_id}")
+async def patch_quote(
+    store_id: str,
+    lead_id:  str,
+    quote_id: str,
+    body: _QuotePatchBody,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """更新报价金额 / 有效期。已接受的报价不可修改。"""
+    res = await db.execute(
+        select(BanquetQuote).where(
+            BanquetQuote.id == quote_id,
+            BanquetQuote.lead_id == lead_id,
+            BanquetQuote.store_id == store_id,
+        )
+    )
+    q = res.scalars().first()
+    if not q:
+        raise HTTPException(status_code=404, detail="报价不存在")
+    if q.is_accepted:
+        raise HTTPException(status_code=400, detail="已接受的报价不可修改")
+
+    if body.quoted_amount_yuan is not None:
+        q.quoted_amount_fen = int(body.quoted_amount_yuan * 100)
+    if body.valid_until is not None:
+        from datetime import datetime as _dt
+        q.valid_until = _dt.strptime(body.valid_until, "%Y-%m-%d").date()
+
+    await db.commit()
+    return _quote_to_dict(q)
+
+
+# ── 4. DELETE /stores/{id}/leads/{lid}/quotes/{qid} ─────────────────────────
+
+@router.delete("/stores/{store_id}/leads/{lead_id}/quotes/{quote_id}",
+               status_code=200)
+async def delete_quote(
+    store_id: str,
+    lead_id:  str,
+    quote_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """撤销报价（软删除：is_accepted=False，valid_until=今天）。"""
+    res = await db.execute(
+        select(BanquetQuote).where(
+            BanquetQuote.id == quote_id,
+            BanquetQuote.lead_id == lead_id,
+            BanquetQuote.store_id == store_id,
+        )
+    )
+    q = res.scalars().first()
+    if not q:
+        raise HTTPException(status_code=404, detail="报价不存在")
+    if q.is_accepted:
+        raise HTTPException(status_code=400, detail="已接受的报价不可撤销")
+
+    q.valid_until = _date_cls.today()
+    await db.commit()
+    return {"quote_id": q.id, "revoked": True}
+
+
+# ── 5. GET /stores/{id}/analytics/target-progress ───────────────────────────
+
+@router.get("/stores/{store_id}/analytics/target-progress")
+async def get_target_progress(
+    store_id: str,
+    year:  int = Query(None),
+    month: int = Query(None),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """月度营收目标达成率（target / actual / gap / daily_needed / on_track）。"""
+    today = _date_cls.today()
+    y = year  or today.year
+    m = month or today.month
+
+    # 目标
+    target_res = await db.execute(
+        select(BanquetRevenueTarget).where(
+            BanquetRevenueTarget.store_id == store_id,
+            BanquetRevenueTarget.year  == y,
+            BanquetRevenueTarget.month == m,
+        )
+    )
+    target = target_res.scalars().first()
+    if not target:
+        raise HTTPException(status_code=404, detail="当月尚未设置目标")
+
+    target_yuan = target.target_fen / 100
+
+    # 实际（从 BanquetKpiDaily 聚合）
+    kpi_res = await db.execute(
+        select(func.sum(BanquetKpiDaily.revenue_fen)).where(
+            BanquetKpiDaily.store_id == store_id,
+            func.extract("year",  BanquetKpiDaily.stat_date) == y,
+            func.extract("month", BanquetKpiDaily.stat_date) == m,
+        )
+    )
+    actual_yuan = (kpi_res.scalar() or 0) / 100
+
+    days_in_month  = _calendar.monthrange(y, m)[1]
+    days_elapsed   = today.day if (y == today.year and m == today.month) else days_in_month
+    days_remaining = max(days_in_month - days_elapsed, 0)
+
+    gap_yuan     = max(target_yuan - actual_yuan, 0)
+    run_rate     = (actual_yuan / days_elapsed * days_in_month) if days_elapsed > 0 else 0
+    daily_needed = (gap_yuan / days_remaining) if days_remaining > 0 else 0
+    achievement  = round(actual_yuan / target_yuan * 100, 1) if target_yuan > 0 else 0
+    on_track     = run_rate >= target_yuan
+
+    return {
+        "store_id":          store_id,
+        "year":              y,
+        "month":             m,
+        "target_yuan":       target_yuan,
+        "actual_yuan":       actual_yuan,
+        "achievement_pct":   achievement,
+        "gap_yuan":          gap_yuan,
+        "run_rate_yuan":     round(run_rate, 2),
+        "daily_needed_yuan": round(daily_needed, 2),
+        "days_elapsed":      days_elapsed,
+        "days_remaining":    days_remaining,
+        "on_track":          on_track,
+    }
+
+
+# ── 6. GET /stores/{id}/analytics/target-trend ──────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/target-trend")
+async def get_target_trend(
+    store_id: str,
+    months:   int = Query(6, ge=1, le=24),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """近 N 个月目标 vs 实际折线数据。"""
+    today = _date_cls.today()
+
+    # 构造最近 N 个月的 (year, month) 列表
+    month_list = []
+    y, m = today.year, today.month
+    for _ in range(months):
+        month_list.append((y, m))
+        m -= 1
+        if m == 0:
+            m = 12
+            y -= 1
+    month_list.reverse()
+
+    # 批量查目标
+    targets_res = await db.execute(
+        select(BanquetRevenueTarget).where(
+            BanquetRevenueTarget.store_id == store_id,
+            BanquetRevenueTarget.year.in_([r[0] for r in month_list]),
+            BanquetRevenueTarget.month.in_([r[1] for r in month_list]),
+        )
+    )
+    target_map = {(t.year, t.month): t.target_fen / 100 for t in targets_res.scalars().all()}
+
+    # 批量查实际
+    kpi_res = await db.execute(
+        select(
+            func.extract("year",  BanquetKpiDaily.stat_date).label("y"),
+            func.extract("month", BanquetKpiDaily.stat_date).label("m"),
+            func.sum(BanquetKpiDaily.revenue_fen).label("revenue_fen"),
+        ).where(
+            BanquetKpiDaily.store_id == store_id,
+        ).group_by("y", "m")
+    )
+    actual_map = {(int(r.y), int(r.m)): (r.revenue_fen or 0) / 100 for r in kpi_res.all()}
+
+    result = []
+    for (yr, mo) in month_list:
+        result.append({
+            "month":        f"{yr}-{mo:02d}",
+            "target_yuan":  target_map.get((yr, mo), 0),
+            "actual_yuan":  actual_map.get((yr, mo), 0),
+        })
+
+    return {"months": result}
+
+
+# ── 7. POST /stores/{id}/agent/score-leads ──────────────────────────────────
+
+@router.post("/stores/{store_id}/agent/score-leads", status_code=201)
+async def score_leads(
+    store_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """批量计算当前活跃线索转化评分，写入 BanquetAgentActionLog。"""
+    # 查所有非 won/lost 线索
+    leads_res = await db.execute(
+        select(BanquetLead).where(
+            BanquetLead.store_id == store_id,
+            BanquetLead.current_stage.notin_([LeadStageEnum.WON, LeadStageEnum.LOST]),
+        )
+    )
+    leads = leads_res.scalars().all()
+
+    scored = []
+    for lead in leads:
+        result = _compute_lead_score(lead)
+        log = BanquetAgentActionLog(
+            id=str(uuid.uuid4()),
+            agent_type="followup",
+            related_object_type="lead",
+            related_object_id=lead.id,
+            rule_id=None,
+            action_type="conversion_score",
+            action_result=result,
+            suggestion_text=f"线索评分 {result['score']} 分（{result['grade']}）",
+            is_human_approved=None,
+        )
+        db.add(log)
+        scored.append({"lead_id": lead.id, **result})
+
+    await db.commit()
+    return {"scored_count": len(scored), "items": scored}
+
+
+# ── 8. GET /stores/{id}/leads/{lid}/score ───────────────────────────────────
+
+@router.get("/stores/{store_id}/leads/{lead_id}/score")
+async def get_lead_score(
+    store_id: str,
+    lead_id:  str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """读取线索最新转化评分（取 BanquetAgentActionLog 最新一条 conversion_score）。"""
+    # 验证线索存在
+    lead_res = await db.execute(
+        select(BanquetLead).where(
+            BanquetLead.id == lead_id,
+            BanquetLead.store_id == store_id,
+        )
+    )
+    lead = lead_res.scalars().first()
+    if not lead:
+        raise HTTPException(status_code=404, detail="线索不存在")
+
+    # 取最新一条 conversion_score log
+    log_res = await db.execute(
+        select(BanquetAgentActionLog).where(
+            BanquetAgentActionLog.related_object_type == "lead",
+            BanquetAgentActionLog.related_object_id   == lead_id,
+            BanquetAgentActionLog.action_type         == "conversion_score",
+        ).order_by(BanquetAgentActionLog.created_at.desc()).limit(1)
+    )
+    log = log_res.scalars().first()
+
+    if log and log.action_result:
+        return {
+            "lead_id":    lead_id,
+            "score":      log.action_result.get("score"),
+            "grade":      log.action_result.get("grade"),
+            "breakdown":  log.action_result.get("breakdown"),
+            "scored_at":  log.created_at.isoformat() if log.created_at else None,
+        }
+
+    # 没有历史记录 → 实时计算（不持久化）
+    result = _compute_lead_score(lead)
+    return {
+        "lead_id":    lead_id,
+        "score":      result["score"],
+        "grade":      result["grade"],
+        "breakdown":  result["breakdown"],
+        "scored_at":  None,
+    }
