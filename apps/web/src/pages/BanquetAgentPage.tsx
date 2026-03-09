@@ -74,6 +74,16 @@ interface FollowupScanResp {
   items: Array<{ lead_id: string; summary?: string; suggestion?: string }>;
 }
 
+interface QuoteRecommendResp {
+  items?: Array<{ package_id?: string; package_name?: string; total_amount_yuan?: number; gross_profit_yuan?: number }>;
+  [key: string]: unknown;
+}
+
+interface HallRecommendResp {
+  items?: Array<{ hall_id?: string; hall_name?: string; slot_name?: string; score?: number; reason?: string }>;
+  [key: string]: unknown;
+}
+
 const STAGE_LABEL: Record<LeadStage, string> = {
   new: '新建',
   contacted: '已联系',
@@ -105,6 +115,16 @@ const BanquetAgentPage: React.FC = () => {
   const [leadStageFilter, setLeadStageFilter] = useState<LeadStage | 'all'>('all');
   const [scanLoading, setScanLoading] = useState(false);
   const [scanResult, setScanResult] = useState<FollowupScanResp | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteResult, setQuoteResult] = useState<QuoteRecommendResp | null>(null);
+  const [quotePeople, setQuotePeople] = useState<number>(12);
+  const [quoteBudget, setQuoteBudget] = useState<number>(12000);
+  const [quoteType, setQuoteType] = useState<string | undefined>(undefined);
+  const [hallLoading, setHallLoading] = useState(false);
+  const [hallResult, setHallResult] = useState<HallRecommendResp | null>(null);
+  const [hallDate, setHallDate] = useState<Dayjs>(dayjs().add(7, 'day'));
+  const [hallSlot, setHallSlot] = useState<'lunch' | 'dinner' | 'all_day'>('all_day');
+  const [hallPeople, setHallPeople] = useState<number>(12);
 
   const [advanceModal, setAdvanceModal] = useState(false);
   const [advanceTarget, setAdvanceTarget] = useState<LeadItem | null>(null);
@@ -154,6 +174,42 @@ const BanquetAgentPage: React.FC = () => {
       setScanLoading(false);
     }
   }, []);
+
+  const runQuoteRecommend = useCallback(async () => {
+    setQuoteLoading(true);
+    try {
+      const resp = await apiClient.get<QuoteRecommendResp>(`/api/v1/banquet-agent/stores/${STORE_ID}/agent/quote-recommend`, {
+        params: {
+          people_count: quotePeople,
+          budget_yuan: quoteBudget,
+          banquet_type: quoteType || undefined,
+        },
+      });
+      setQuoteResult(resp);
+    } catch (err) {
+      handleApiError(err, '报价推荐失败');
+    } finally {
+      setQuoteLoading(false);
+    }
+  }, [quotePeople, quoteBudget, quoteType]);
+
+  const runHallRecommend = useCallback(async () => {
+    setHallLoading(true);
+    try {
+      const resp = await apiClient.get<HallRecommendResp>(`/api/v1/banquet-agent/stores/${STORE_ID}/agent/hall-recommend`, {
+        params: {
+          target_date: hallDate.format('YYYY-MM-DD'),
+          slot_name: hallSlot,
+          people_count: hallPeople,
+        },
+      });
+      setHallResult(resp);
+    } catch (err) {
+      handleApiError(err, '排期推荐失败');
+    } finally {
+      setHallLoading(false);
+    }
+  }, [hallDate, hallPeople, hallSlot]);
 
   const submitAdvance = useCallback(async () => {
     if (!advanceTarget) return;
@@ -262,31 +318,97 @@ const BanquetAgentPage: React.FC = () => {
           )}
         </ZCard>
 
-        <ZCard
-          title="Followup Agent"
-          subtitle="停滞线索扫描（dry-run）"
-          extra={<ZButton loading={scanLoading} onClick={runFollowupScan}>执行扫描</ZButton>}
-        >
-          {!scanResult ? (
-            <Text type="secondary">点击“执行扫描”查看停滞线索提醒结果。</Text>
-          ) : (
-            <>
-              <div style={{ marginBottom: 8 }}>
-                <Tag color={scanResult.stale_lead_count > 0 ? 'orange' : 'green'}>
-                  停滞线索 {scanResult.stale_lead_count}
-                </Tag>
+        <div style={{ display: 'grid', gridTemplateRows: 'auto auto auto', gap: 12 }}>
+          <ZCard
+            title="Quotation Agent"
+            subtitle="报价推荐"
+            extra={<ZButton loading={quoteLoading} onClick={runQuoteRecommend}>生成推荐</ZButton>}
+          >
+            <Space wrap style={{ marginBottom: 8 }}>
+              <InputNumber min={1} value={quotePeople} onChange={(v) => setQuotePeople(Number(v || 1))} addonBefore="人数" />
+              <InputNumber min={1} value={quoteBudget} onChange={(v) => setQuoteBudget(Number(v || 1))} addonBefore="预算¥" />
+              <Select allowClear placeholder="类型(可选)" value={quoteType} onChange={setQuoteType} style={{ width: 140 }}>
+                <Select.Option value="birthday">生日宴</Select.Option>
+                <Select.Option value="wedding">婚宴</Select.Option>
+                <Select.Option value="business">商务宴</Select.Option>
+              </Select>
+            </Space>
+            {!quoteResult ? (
+              <Text type="secondary">填写人数与预算后点击“生成推荐”。</Text>
+            ) : (
+              <div style={{ maxHeight: 180, overflow: 'auto' }}>
+                {(quoteResult.items || []).length > 0 ? (
+                  (quoteResult.items || []).slice(0, 3).map((x, i) => (
+                    <div key={`${x.package_id || i}`} style={{ padding: '6px 0', borderBottom: '1px solid var(--border-color, #f0f0f0)' }}>
+                      <div><Text strong>{x.package_name || x.package_id || `套餐${i + 1}`}</Text></div>
+                      <div><Text type="secondary">总价 ¥{Math.round(Number(x.total_amount_yuan || 0)).toLocaleString()} · 预估毛利 ¥{Math.round(Number(x.gross_profit_yuan || 0)).toLocaleString()}</Text></div>
+                    </div>
+                  ))
+                ) : (
+                  <Text type="secondary">暂无可推荐套餐</Text>
+                )}
               </div>
-              <div style={{ maxHeight: 240, overflow: 'auto' }}>
-                {(scanResult.items || []).slice(0, 6).map((x, i) => (
-                  <div key={`${x.lead_id}-${i}`} style={{ padding: '6px 0', borderBottom: '1px solid var(--border-color, #f0f0f0)' }}>
-                    <div><Text strong>{x.lead_id}</Text></div>
-                    <div><Text type="secondary">{x.summary || x.suggestion || '建议尽快跟进'}</Text></div>
-                  </div>
-                ))}
+            )}
+          </ZCard>
+
+          <ZCard
+            title="Scheduling Agent"
+            subtitle="排期推荐"
+            extra={<ZButton loading={hallLoading} onClick={runHallRecommend}>查询可用厅房</ZButton>}
+          >
+            <Space wrap style={{ marginBottom: 8 }}>
+              <DatePicker value={hallDate} onChange={(d) => d && setHallDate(d)} />
+              <Select value={hallSlot} onChange={setHallSlot} style={{ width: 120 }}>
+                <Select.Option value="lunch">午市</Select.Option>
+                <Select.Option value="dinner">晚市</Select.Option>
+                <Select.Option value="all_day">全天</Select.Option>
+              </Select>
+              <InputNumber min={1} value={hallPeople} onChange={(v) => setHallPeople(Number(v || 1))} addonBefore="人数" />
+            </Space>
+            {!hallResult ? (
+              <Text type="secondary">选择日期与人数后点击“查询可用厅房”。</Text>
+            ) : (
+              <div style={{ maxHeight: 180, overflow: 'auto' }}>
+                {(hallResult.items || []).length > 0 ? (
+                  (hallResult.items || []).slice(0, 3).map((x, i) => (
+                    <div key={`${x.hall_id || i}`} style={{ padding: '6px 0', borderBottom: '1px solid var(--border-color, #f0f0f0)' }}>
+                      <div><Text strong>{x.hall_name || x.hall_id || `厅房${i + 1}`}</Text></div>
+                      <div><Text type="secondary">档期 {x.slot_name || hallSlot} · 匹配分 {Number(x.score || 0).toFixed(2)}</Text></div>
+                    </div>
+                  ))
+                ) : (
+                  <Text type="secondary">当前暂无可用推荐厅房</Text>
+                )}
               </div>
-            </>
-          )}
-        </ZCard>
+            )}
+          </ZCard>
+
+          <ZCard
+            title="Followup Agent"
+            subtitle="停滞线索扫描（dry-run）"
+            extra={<ZButton loading={scanLoading} onClick={runFollowupScan}>执行扫描</ZButton>}
+          >
+            {!scanResult ? (
+              <Text type="secondary">点击“执行扫描”查看停滞线索提醒结果。</Text>
+            ) : (
+              <>
+                <div style={{ marginBottom: 8 }}>
+                  <Tag color={scanResult.stale_lead_count > 0 ? 'orange' : 'green'}>
+                    停滞线索 {scanResult.stale_lead_count}
+                  </Tag>
+                </div>
+                <div style={{ maxHeight: 180, overflow: 'auto' }}>
+                  {(scanResult.items || []).slice(0, 4).map((x, i) => (
+                    <div key={`${x.lead_id}-${i}`} style={{ padding: '6px 0', borderBottom: '1px solid var(--border-color, #f0f0f0)' }}>
+                      <div><Text strong>{x.lead_id}</Text></div>
+                      <div><Text type="secondary">{x.summary || x.suggestion || '建议尽快跟进'}</Text></div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </ZCard>
+        </div>
       </div>
 
       <ZCard title="宴会订单列表" subtitle={`共 ${orders.length} 条`}>
