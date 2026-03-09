@@ -3,12 +3,13 @@
  * 路由：/sm/banquet-leads/:leadId
  * 数据：GET /api/v1/banquet-agent/stores/{id}/leads/{lead_id}
  *      PATCH /api/v1/banquet-agent/stores/{id}/leads/{lead_id}/quotes/{quote_id}/accept
+ *      POST /api/v1/banquet-agent/stores/{id}/orders  (转为订单)
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
-  ZCard, ZBadge, ZButton, ZSkeleton, ZEmpty,
+  ZCard, ZBadge, ZButton, ZSkeleton, ZEmpty, ZModal, ZInput, ZSelect,
 } from '../../design-system/components';
 import apiClient from '../../services/api';
 import { handleApiError } from '../../utils/message';
@@ -58,6 +59,7 @@ interface QuoteRecord {
 
 interface LeadDetail {
   lead_id:                string;
+  customer_id:            string;
   banquet_type:           string;
   expected_date:          string | null;
   expected_people_count:  number | null;
@@ -82,6 +84,17 @@ export default function SmBanquetLeadDetail() {
   const [lead,       setLead]       = useState<LeadDetail | null>(null);
   const [loading,    setLoading]    = useState(true);
   const [accepting,  setAccepting]  = useState<string | null>(null);
+
+  // 转为订单 Modal state
+  const [convertOpen,    setConvertOpen]    = useState(false);
+  const [cvBanquetDate,  setCvBanquetDate]  = useState('');
+  const [cvTableCount,   setCvTableCount]   = useState('');
+  const [cvTotalAmount,  setCvTotalAmount]  = useState('');
+  const [cvDeposit,      setCvDeposit]      = useState('');
+  const [cvContactName,  setCvContactName]  = useState('');
+  const [cvContactPhone, setCvContactPhone] = useState('');
+  const [cvRemark,       setCvRemark]       = useState('');
+  const [converting,     setConverting]     = useState(false);
 
   const loadLead = useCallback(async () => {
     if (!leadId) return;
@@ -111,6 +124,47 @@ export default function SmBanquetLeadDetail() {
       handleApiError(e, '接受报价失败');
     } finally {
       setAccepting(null);
+    }
+  };
+
+  const openConvertModal = () => {
+    if (!lead) return;
+    setCvBanquetDate(lead.expected_date ?? '');
+    setCvTableCount(lead.expected_people_count ? String(Math.ceil(lead.expected_people_count / 10)) : '');
+    setCvTotalAmount(lead.expected_budget_yuan > 0 ? String(lead.expected_budget_yuan) : '');
+    setCvDeposit('');
+    setCvContactName(lead.contact_name ?? '');
+    setCvContactPhone(lead.contact_phone ?? '');
+    setCvRemark('');
+    setConvertOpen(true);
+  };
+
+  const handleConvertToOrder = async () => {
+    if (!lead || !cvBanquetDate || !cvTableCount || !cvTotalAmount) return;
+    setConverting(true);
+    try {
+      const resp = await apiClient.post(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/orders`,
+        {
+          lead_id:           leadId,
+          customer_id:       lead.customer_id,
+          banquet_type:      lead.banquet_type,
+          banquet_date:      cvBanquetDate,
+          people_count:      lead.expected_people_count ?? parseInt(cvTableCount, 10) * 10,
+          table_count:       parseInt(cvTableCount, 10),
+          total_amount_yuan: parseFloat(cvTotalAmount),
+          deposit_yuan:      cvDeposit ? parseFloat(cvDeposit) : null,
+          contact_name:      cvContactName || null,
+          contact_phone:     cvContactPhone || null,
+          remark:            cvRemark || null,
+        },
+      );
+      setConvertOpen(false);
+      navigate(`/sm/banquet-orders/${resp.data.id}`);
+    } catch (e) {
+      handleApiError(e, '转化订单失败');
+    } finally {
+      setConverting(false);
     }
   };
 
@@ -211,6 +265,13 @@ export default function SmBanquetLeadDetail() {
               </button>
             </div>
           )}
+          {lead.current_stage === 'won' && !lead.converted_order_id && (
+            <div className={styles.convertRow}>
+              <ZButton variant="primary" size="sm" onClick={openConvertModal}>
+                转为订单
+              </ZButton>
+            </div>
+          )}
         </ZCard>
 
         {/* 报价记录 */}
@@ -287,6 +348,95 @@ export default function SmBanquetLeadDetail() {
           )}
         </ZCard>
       </div>
+
+      {/* 转为订单 Modal */}
+      <ZModal
+        open={convertOpen}
+        title="转为订单"
+        onClose={() => setConvertOpen(false)}
+        footer={
+          <div className={styles.modalFooter}>
+            <ZButton variant="ghost" onClick={() => setConvertOpen(false)}>取消</ZButton>
+            <ZButton
+              variant="primary"
+              onClick={handleConvertToOrder}
+              disabled={converting || !cvBanquetDate || !cvTableCount || !cvTotalAmount}
+            >
+              {converting ? '创建中…' : '创建订单'}
+            </ZButton>
+          </div>
+        }
+      >
+        <div className={styles.modalBody}>
+          <div className={styles.fieldRow}>
+            <div className={styles.field}>
+              <label className={styles.label}>宴会日期</label>
+              <ZInput
+                type="date"
+                value={cvBanquetDate}
+                onChange={e => setCvBanquetDate(e.target.value)}
+                placeholder="YYYY-MM-DD"
+              />
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label}>桌数</label>
+              <ZInput
+                type="number"
+                value={cvTableCount}
+                onChange={e => setCvTableCount(e.target.value)}
+                placeholder="如：20"
+              />
+            </div>
+          </div>
+          <div className={styles.fieldRow}>
+            <div className={styles.field}>
+              <label className={styles.label}>合同总额（元）</label>
+              <ZInput
+                type="number"
+                value={cvTotalAmount}
+                onChange={e => setCvTotalAmount(e.target.value)}
+                placeholder="如：50000"
+              />
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label}>定金（元，选填）</label>
+              <ZInput
+                type="number"
+                value={cvDeposit}
+                onChange={e => setCvDeposit(e.target.value)}
+                placeholder="如：10000"
+              />
+            </div>
+          </div>
+          <div className={styles.fieldRow}>
+            <div className={styles.field}>
+              <label className={styles.label}>联系人</label>
+              <ZInput
+                value={cvContactName}
+                onChange={e => setCvContactName(e.target.value)}
+                placeholder="姓名"
+              />
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label}>联系电话</label>
+              <ZInput
+                type="tel"
+                value={cvContactPhone}
+                onChange={e => setCvContactPhone(e.target.value)}
+                placeholder="手机号"
+              />
+            </div>
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>备注（选填）</label>
+            <ZInput
+              value={cvRemark}
+              onChange={e => setCvRemark(e.target.value)}
+              placeholder="特殊要求…"
+            />
+          </div>
+        </div>
+      </ZModal>
     </div>
   );
 }

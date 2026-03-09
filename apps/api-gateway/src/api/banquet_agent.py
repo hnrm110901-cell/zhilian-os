@@ -242,6 +242,76 @@ async def create_customer(
     return {"id": customer.id, "name": customer.name}
 
 
+@router.get("/stores/{store_id}/customers/{customer_id}")
+async def get_customer_detail(
+    store_id: str,
+    customer_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """客户详情：基本信息 + 全部线索 + 全部订单"""
+    result = await db.execute(
+        select(BanquetCustomer).where(
+            and_(BanquetCustomer.id == customer_id, BanquetCustomer.store_id == store_id)
+        )
+    )
+    customer = result.scalars().first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="客户不存在")
+
+    leads_result = await db.execute(
+        select(BanquetLead)
+        .where(BanquetLead.customer_id == customer_id)
+        .order_by(BanquetLead.created_at.desc())
+    )
+    leads = leads_result.scalars().all()
+
+    orders_result = await db.execute(
+        select(BanquetOrder)
+        .where(BanquetOrder.customer_id == customer_id)
+        .order_by(BanquetOrder.banquet_date.desc())
+    )
+    orders = orders_result.scalars().all()
+
+    return {
+        "customer": {
+            "id":                        customer.id,
+            "name":                      customer.name,
+            "phone":                     customer.phone,
+            "wechat_id":                 customer.wechat_id,
+            "customer_type":             customer.customer_type,
+            "company_name":              customer.company_name,
+            "vip_level":                 customer.vip_level,
+            "total_banquet_count":       customer.total_banquet_count,
+            "total_banquet_amount_yuan": customer.total_banquet_amount_fen / 100,
+            "source":                    customer.source,
+            "tags":                      customer.tags,
+            "remark":                    customer.remark,
+        },
+        "leads": [
+            {
+                "lead_id":       l.id,
+                "banquet_type":  l.banquet_type.value,
+                "expected_date": l.expected_date.isoformat() if l.expected_date else None,
+                "current_stage": l.current_stage.value,
+                "stage_label":   _LEAD_STAGE_LABELS.get(l.current_stage.value, l.current_stage.value),
+                "converted_order_id": l.converted_order_id,
+            }
+            for l in leads
+        ],
+        "orders": [
+            {
+                "order_id":          o.id,
+                "banquet_type":      o.banquet_type.value,
+                "banquet_date":      o.banquet_date.isoformat() if o.banquet_date else None,
+                "order_status":      o.order_status.value,
+                "total_amount_yuan": o.total_amount_fen / 100,
+            }
+            for o in orders
+        ],
+    }
+
+
 # ────────── 宴会线索 ──────────────────────────────────────────────────────────
 
 @router.get("/stores/{store_id}/leads")
@@ -303,6 +373,7 @@ async def create_lead(
         store_id=store_id,
         customer_id=body.customer_id,
         banquet_type=body.banquet_type,
+        current_stage=LeadStageEnum.NEW,
         expected_date=body.expected_date,
         expected_people_count=body.expected_people_count,
         expected_budget_fen=int(body.expected_budget_yuan * 100) if body.expected_budget_yuan else None,
@@ -434,8 +505,9 @@ async def create_order(
         people_count=body.people_count,
         table_count=body.table_count,
         package_id=body.package_id,
+        order_status=OrderStatusEnum.DRAFT,
         total_amount_fen=int(body.total_amount_yuan * 100),
-        deposit_fen=int(body.deposit_yuan * 100),
+        deposit_fen=int(body.deposit_yuan * 100) if body.deposit_yuan else 0,
         contact_name=body.contact_name,
         contact_phone=body.contact_phone,
         remark=body.remark,
@@ -465,6 +537,7 @@ async def confirm_order(
         raise HTTPException(status_code=400, detail=f"当前状态 {order.order_status.value} 不可确认")
 
     order.order_status = OrderStatusEnum.CONFIRMED
+    await db.commit()
     tasks = await _execution.generate_tasks_for_order(order=order, db=db)
     return {
         "order_id": order_id,

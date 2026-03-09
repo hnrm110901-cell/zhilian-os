@@ -117,6 +117,9 @@ export default function SmBanquetOrderDetail() {
   const [settleOther,    setSettleOther]    = useState('');
   const [settling,       setSettling]       = useState(false);
 
+  // 确认订单
+  const [confirming,     setConfirming]     = useState(false);
+
   const loadOrder = useCallback(async () => {
     if (!orderId) return;
     setLoading(true);
@@ -202,6 +205,20 @@ export default function SmBanquetOrderDetail() {
     setSettleLabor('');
     setSettleOther('');
     setSettleOpen(true);
+  };
+
+  const confirmOrder = async () => {
+    setConfirming(true);
+    try {
+      await apiClient.post(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/orders/${orderId}/confirm`,
+      );
+      await loadOrder();
+    } catch (e) {
+      handleApiError(e, '确认订单失败');
+    } finally {
+      setConfirming(false);
+    }
   };
 
   const handleSettle = async () => {
@@ -318,6 +335,18 @@ export default function SmBanquetOrderDetail() {
             </div>
           </div>
           {order.remark && <div className={styles.remark}>{order.remark}</div>}
+          {order.status === 'draft' && (
+            <div className={styles.settleRow}>
+              <ZButton
+                variant="primary"
+                size="sm"
+                onClick={confirmOrder}
+                disabled={confirming}
+              >
+                {confirming ? '确认中…' : '确认订单'}
+              </ZButton>
+            </div>
+          )}
           {order.status === 'completed' && (
             <div className={styles.settleRow}>
               <ZButton variant="primary" size="sm" onClick={openSettleModal}>

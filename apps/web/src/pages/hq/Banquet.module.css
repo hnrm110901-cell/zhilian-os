@@ -546,3 +546,109 @@
   opacity: 0.5;
 }
 
+
+/* ── Tab7: 客户档案 ── */
+.customerTab {
+  padding: 0;
+}
+
+.customerSearch {
+  padding: 12px 0 8px;
+}
+
+.customerList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.customerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border, #eee);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.customerRow:last-child { border-bottom: none; }
+.customerRow:hover { background: var(--surface-hover, #f9f9f9); margin: 0 -8px; padding: 10px 8px; }
+
+.customerLeft {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.customerName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #111);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.vipTag { font-size: 11px; }
+
+.customerMeta {
+  font-size: 12px;
+  color: var(--text-secondary, #888);
+}
+
+.customerRight {
+  flex-shrink: 0;
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.customerStat {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #333);
+}
+
+.customerAmount {
+  font-size: 12px;
+  color: var(--accent, #ff6b2c);
+}
+
+.detailBody { display: flex; flex-direction: column; gap: 16px; }
+.detailSection { display: flex; flex-direction: column; gap: 8px; }
+
+.detailSectionTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.detailItem { display: flex; flex-direction: column; gap: 2px; }
+.detailLabel { font-size: 11px; color: var(--text-secondary, #999); }
+.detailValue { font-size: 13px; color: var(--text-primary, #333); }
+.detailEmpty { font-size: 13px; color: var(--text-secondary, #bbb); padding: 4px 0; }
+
+.detailLeadRow, .detailOrderRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-primary, #333);
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border, #eee);
+}
+
+.detailLeadRow:last-child, .detailOrderRow:last-child { border-bottom: none; }
+

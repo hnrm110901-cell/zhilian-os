@@ -1269,6 +1269,197 @@ function ResourceTab() {
   );
 }
 
+/* ─── Tab7: 客户档案 ─── */
+
+interface CustomerItem {
+  id:                       string;
+  name:                     string;
+  phone:                    string;
+  customer_type:            string | null;
+  vip_level:                number | null;
+  total_banquet_count:      number;
+  total_banquet_amount_yuan: number;
+  source:                   string | null;
+}
+
+interface CustomerDetailResp {
+  customer: CustomerItem & { wechat_id?: string | null; company_name?: string | null; tags?: string | null; remark?: string | null };
+  leads:    Array<{ lead_id: string; banquet_type: string; expected_date: string | null; stage_label: string }>;
+  orders:   Array<{ order_id: string; banquet_type: string; banquet_date: string; order_status: string; total_amount_yuan: number }>;
+}
+
+const HQ_STORE_ID = localStorage.getItem('store_id') || 'S001';
+
+function CustomerTab() {
+  const [q,           setQ]           = useState('');
+  const [debouncedQ,  setDebouncedQ]  = useState('');
+  const [customers,   setCustomers]   = useState<CustomerItem[]>([]);
+  const [loading,     setLoading]     = useState(false);
+  const [detailId,    setDetailId]    = useState<string | null>(null);
+  const [detail,      setDetail]      = useState<CustomerDetailResp | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(q), 350);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  useEffect(() => {
+    setLoading(true);
+    apiClient.get(
+      `/api/v1/banquet-agent/stores/${HQ_STORE_ID}/customers`,
+      debouncedQ ? { params: { q: debouncedQ } } : undefined,
+    ).then(r => {
+      const raw = r.data;
+      setCustomers(Array.isArray(raw) ? raw : (raw?.items ?? []));
+    }).catch(() => setCustomers([])).finally(() => setLoading(false));
+  }, [debouncedQ]);
+
+  const openDetail = async (id: string) => {
+    setDetailId(id);
+    setDetail(null);
+    setDetailLoading(true);
+    try {
+      const r = await apiClient.get(
+        `/api/v1/banquet-agent/stores/${HQ_STORE_ID}/customers/${id}`,
+      );
+      setDetail(r.data);
+    } catch {
+      setDetail(null);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const VIP_LABELS = ['', '⭐', '⭐⭐', '⭐⭐⭐'];
+
+  return (
+    <div className={styles.customerTab}>
+      <div className={styles.customerSearch}>
+        <ZInput
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          placeholder="搜索客户姓名 / 手机号…"
+        />
+      </div>
+
+      {loading ? (
+        <ZSkeleton rows={5} />
+      ) : !customers.length ? (
+        <ZEmpty title="暂无客户" description="尚未录入客户档案" />
+      ) : (
+        <div className={styles.customerList}>
+          {customers.map(c => (
+            <div key={c.id} className={styles.customerRow} onClick={() => openDetail(c.id)}>
+              <div className={styles.customerLeft}>
+                <div className={styles.customerName}>
+                  {c.name}
+                  {c.vip_level ? <span className={styles.vipTag}>{VIP_LABELS[c.vip_level] ?? ''}</span> : null}
+                </div>
+                <div className={styles.customerMeta}>
+                  {c.phone}
+                  {c.customer_type ? ` · ${c.customer_type}` : ''}
+                  {c.source ? ` · ${c.source}` : ''}
+                </div>
+              </div>
+              <div className={styles.customerRight}>
+                <div className={styles.customerStat}>{c.total_banquet_count} 场</div>
+                <div className={styles.customerAmount}>¥{c.total_banquet_amount_yuan.toLocaleString()}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 客户详情 Modal */}
+      <ZModal
+        open={!!detailId}
+        title={detail?.customer?.name ?? '客户档案'}
+        onClose={() => { setDetailId(null); setDetail(null); }}
+        footer={
+          <ZButton variant="ghost" onClick={() => { setDetailId(null); setDetail(null); }}>
+            关闭
+          </ZButton>
+        }
+      >
+        {detailLoading ? (
+          <ZSkeleton rows={6} />
+        ) : !detail ? (
+          <ZEmpty title="加载失败" description="请重试" />
+        ) : (
+          <div className={styles.detailBody}>
+            {/* 基本信息 */}
+            <div className={styles.detailSection}>
+              <div className={styles.detailSectionTitle}>基本信息</div>
+              <div className={styles.detailGrid}>
+                <div className={styles.detailItem}>
+                  <span className={styles.detailLabel}>手机</span>
+                  <span className={styles.detailValue}>{detail.customer.phone}</span>
+                </div>
+                {detail.customer.wechat_id && (
+                  <div className={styles.detailItem}>
+                    <span className={styles.detailLabel}>微信</span>
+                    <span className={styles.detailValue}>{detail.customer.wechat_id}</span>
+                  </div>
+                )}
+                {detail.customer.company_name && (
+                  <div className={styles.detailItem}>
+                    <span className={styles.detailLabel}>公司</span>
+                    <span className={styles.detailValue}>{detail.customer.company_name}</span>
+                  </div>
+                )}
+                <div className={styles.detailItem}>
+                  <span className={styles.detailLabel}>宴会总数</span>
+                  <span className={styles.detailValue}>{detail.customer.total_banquet_count} 场</span>
+                </div>
+                <div className={styles.detailItem}>
+                  <span className={styles.detailLabel}>累计金额</span>
+                  <span className={styles.detailValue}>¥{detail.customer.total_banquet_amount_yuan.toLocaleString()}</span>
+                </div>
+                {detail.customer.remark && (
+                  <div className={styles.detailItem} style={{ gridColumn: '1 / -1' }}>
+                    <span className={styles.detailLabel}>备注</span>
+                    <span className={styles.detailValue}>{detail.customer.remark}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 线索记录 */}
+            <div className={styles.detailSection}>
+              <div className={styles.detailSectionTitle}>线索记录（{detail.leads.length}）</div>
+              {detail.leads.length === 0 ? (
+                <div className={styles.detailEmpty}>暂无线索</div>
+              ) : detail.leads.map(l => (
+                <div key={l.lead_id} className={styles.detailLeadRow}>
+                  <span>{l.banquet_type}</span>
+                  {l.expected_date && <span>{dayjs(l.expected_date).format('YYYY-MM-DD')}</span>}
+                  <ZBadge type="info" text={l.stage_label} />
+                </div>
+              ))}
+            </div>
+
+            {/* 订单记录 */}
+            <div className={styles.detailSection}>
+              <div className={styles.detailSectionTitle}>订单记录（{detail.orders.length}）</div>
+              {detail.orders.length === 0 ? (
+                <div className={styles.detailEmpty}>暂无订单</div>
+              ) : detail.orders.map(o => (
+                <div key={o.order_id} className={styles.detailOrderRow}>
+                  <span>{o.banquet_type}</span>
+                  <span>{dayjs(o.banquet_date).format('YYYY-MM-DD')}</span>
+                  <span>¥{o.total_amount_yuan.toLocaleString()}</span>
+                  <ZBadge type="default" text={o.order_status} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZModal>
+    </div>
+  );
+}
+
 /* ─── 主组件 ─── */
 export default function HQBanquet() {
   return (
@@ -1284,6 +1475,7 @@ export default function HQBanquet() {
           { key: 'ai',        label: 'AI 建议',  children: <AITab /> },
           { key: 'profit',    label: '利润复盘', children: <ProfitTab /> },
           { key: 'resource',  label: '资源配置', children: <ResourceTab /> },
+          { key: 'customers', label: '客户档案', children: <CustomerTab /> },
         ]}
       />
     </div>
