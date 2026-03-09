@@ -3,6 +3,7 @@
  * 路由：/sm/banquet-orders
  * 数据：GET /api/v1/banquet-agent/stores/{id}/orders?status=
  *      POST /api/v1/banquet-agent/stores/{id}/orders/{order_id}/payment
+ *      GET /api/v1/banquet-agent/stores/{id}/contracts/pending-sign  (Phase 14)
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -48,15 +49,28 @@ interface OrderItem {
   banquet_date: string;
   table_count:  number;
   amount_yuan:  number;
+  paid_yuan?:   number;
   status:       string;
+}
+
+interface PendingContract {
+  contract_id:   string;
+  contract_no:   string;
+  order_id:      string;
+  banquet_date:  string;
+  banquet_type:  string;
+  total_yuan:    number;
+  contact_name:  string | null;
+  days_until:    number;
 }
 
 export default function SmBanquetOrders() {
   const navigate = useNavigate();
 
-  const [statusFilter, setStatusFilter] = useState('');
-  const [orders,       setOrders]       = useState<OrderItem[]>([]);
-  const [loading,      setLoading]      = useState(true);
+  const [statusFilter,      setStatusFilter]      = useState('');
+  const [orders,            setOrders]            = useState<OrderItem[]>([]);
+  const [loading,           setLoading]           = useState(true);
+  const [pendingContracts,  setPendingContracts]  = useState<PendingContract[]>([]);
 
   // Modal state
   const [modalOrder,   setModalOrder]   = useState<OrderItem | null>(null);
@@ -81,6 +95,12 @@ export default function SmBanquetOrders() {
   }, []);
 
   useEffect(() => { loadOrders(statusFilter); }, [loadOrders, statusFilter]);
+
+  useEffect(() => {
+    apiClient.get(`/api/v1/banquet-agent/stores/${STORE_ID}/contracts/pending-sign`)
+      .then(r => setPendingContracts(r.data?.items ?? []))
+      .catch(() => setPendingContracts([]));
+  }, []);
 
   const openPayModal = (order: OrderItem) => {
     setModalOrder(order);
@@ -117,6 +137,22 @@ export default function SmBanquetOrders() {
         <div className={styles.title}>全部订单</div>
       </div>
 
+      {/* 待签约合同横幅 */}
+      {pendingContracts.length > 0 && (
+        <div className={styles.pendingBanner}>
+          <span className={styles.pendingIcon}>📋</span>
+          <span className={styles.pendingText}>
+            {pendingContracts.length} 份合同待签约：
+            {pendingContracts.slice(0, 2).map(c => (
+              <span key={c.contract_id} className={styles.pendingItem}>
+                {c.banquet_type}（{dayjs(c.banquet_date).format('MM-DD')}，{c.days_until}天后）
+              </span>
+            ))}
+            {pendingContracts.length > 2 && `等${pendingContracts.length}份`}
+          </span>
+        </div>
+      )}
+
       {/* 状态 Chip 过滤行 */}
       <div className={styles.chipBar}>
         {STATUS_FILTERS.map(f => (
@@ -140,6 +176,9 @@ export default function SmBanquetOrders() {
             <div className={styles.list}>
               {orders.map(order => {
                 const s = STATUS_BADGE[order.status] ?? { text: order.status, type: 'default' as const };
+                const balance = order.paid_yuan != null
+                  ? order.amount_yuan - order.paid_yuan
+                  : null;
                 return (
                   <div key={order.banquet_id} className={styles.row}>
                     <div className={styles.info}>
@@ -150,7 +189,12 @@ export default function SmBanquetOrders() {
                       </div>
                     </div>
                     <div className={styles.right}>
-                      <span className={styles.amount}>¥{order.amount_yuan.toLocaleString()}</span>
+                      <div className={styles.amountBlock}>
+                        <span className={styles.amount}>¥{order.amount_yuan.toLocaleString()}</span>
+                        {balance != null && balance > 0 && (
+                          <span className={styles.balance}>待收¥{balance.toLocaleString()}</span>
+                        )}
+                      </div>
                       <ZBadge type={s.type} text={s.text} />
                       <ZButton variant="ghost" size="sm" onClick={() => navigate(`/sm/banquet-orders/${order.banquet_id}`)}>
                         详情

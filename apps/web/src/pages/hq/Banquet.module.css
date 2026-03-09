@@ -1108,3 +1108,33 @@
 .quoteAmount { font-size: 15px; font-weight: 700; color: var(--accent, #FF6B2C); }
 .quoteMeta   { font-size: 12px; color: var(--text-secondary, #888); margin-top: 2px; }
 .quoteRight  { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+/* ── Phase 14: Aging ── */
+.agingBody       { display: flex; flex-direction: column; gap: 12px; }
+.agingTotal      { font-size: 13px; color: var(--text-secondary, #888); }
+.agingBuckets    { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+.agingBucket     { background: var(--surface-2, #f8f9fa); border-radius: 8px; padding: 10px 12px; border: 1px solid var(--border, #eee); }
+.agingBucketUrgent { border-color: #fca5a5; background: #fff1f2; }
+.agingBucketLabel  { font-size: 11px; color: var(--text-secondary, #888); margin-bottom: 4px; }
+.agingBucketCount  { font-size: 18px; font-weight: 700; line-height: 1; }
+.agingBucketAmount { font-size: 12px; color: var(--text-secondary, #888); margin-top: 2px; }
+
+/* ── Phase 14: Quote Stats ── */
+.quoteStatsBody    { display: flex; flex-direction: column; gap: 12px; }
+.quoteStatsSummary { display: flex; gap: 20px; }
+.quoteStatItem     { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.quoteStatValue    { font-size: 22px; font-weight: 700; line-height: 1; }
+.quoteStatLabel    { font-size: 11px; color: var(--text-secondary, #888); }
+.quoteTypeList     { display: flex; flex-direction: column; gap: 0; }
+.quoteTypeRow      { display: flex; align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--border, #eee); font-size: 13px; }
+.quoteTypeRow:last-child { border-bottom: none; }
+.quoteTypeName     { flex: 1; font-weight: 600; }
+.quoteTypeCount    { color: var(--text-secondary, #888); width: 48px; }
+.quoteTypeAccepted { color: #22c55e; width: 56px; }
+.quoteTypeAmount   { font-weight: 600; }
+
+/* ── Phase 14: Hall Schedule ── */
+.hallSelector   { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.hallChip       { padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border, #eee); background: #fff; font-size: 13px; cursor: pointer; }
+.hallChipActive { background: var(--accent, #FF6B2C); border-color: var(--accent, #FF6B2C); color: #fff; }
+.hallBooked     { background: rgba(255, 107, 44, 0.12); border: 1px solid rgba(255, 107, 44, 0.4); }

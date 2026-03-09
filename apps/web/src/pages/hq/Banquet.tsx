@@ -1794,6 +1794,21 @@ interface ExceptionSummaryItem {
   banquet_type:   string | null;
 }
 
+interface AgingBucket {
+  count:        number;
+  balance_yuan: number;
+  items:        { order_id: string; banquet_date: string; balance_yuan: number; days_overdue: number; contact_name: string | null }[];
+}
+interface AgingData {
+  total_balance_yuan: number;
+  buckets: { '0_30': AgingBucket; '31_60': AgingBucket; '61_90': AgingBucket; over_90: AgingBucket };
+}
+interface QuoteStatItem { banquet_type: string; count: number; accepted: number; total_amount_yuan: number }
+interface QuoteStats {
+  total_quotes: number; accepted_quotes: number; acceptance_pct: number;
+  type_distribution: QuoteStatItem[];
+}
+
 function AnalyticsTab() {
   const [month,    setMonth]    = useState(() => {
     const d = new Date();
@@ -1810,26 +1825,33 @@ function AnalyticsTab() {
     by_severity: { severity: string; count: number }[];
     avg_resolution_hours: number | null;
   } | null>(null);
+  const [agingData,    setAgingData]    = useState<AgingData | null>(null);
+  const [quoteStats,   setQuoteStats]   = useState<QuoteStats | null>(null);
   const [loading,      setLoading]      = useState(false);
 
   const load = useCallback(async (m: string) => {
     setLoading(true);
     try {
       const STORE = localStorage.getItem('store_id') || 'S001';
-      const [funnelR, forecastR, lostR, arR, excR, excStatsR] = await Promise.allSettled([
+      const [y, mo] = m.split('-');
+      const [funnelR, forecastR, lostR, arR, excR, excStatsR, agingR, quoteStatsR] = await Promise.allSettled([
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/funnel`, { params: { month: m } }),
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/revenue-forecast`, { params: { months: 3 } }),
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/lost-analysis`, { params: { month: m } }),
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/receivables`),
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/exceptions`, { params: { status: 'open' } }),
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/exception-stats`, { params: { month: m } }),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/receivables-aging`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/quote-stats`, { params: { year: Number(y), month: Number(mo) } }),
       ]);
-      if (funnelR.status === 'fulfilled')    setFunnel(funnelR.value.data);
-      if (forecastR.status === 'fulfilled')  setForecast(forecastR.value.data?.forecast ?? []);
-      if (lostR.status === 'fulfilled')      setLostData(lostR.value.data?.reasons ?? []);
-      if (arR.status === 'fulfilled')        setReceivables(arR.value.data);
-      if (excR.status === 'fulfilled')       setOpenExc(Array.isArray(excR.value.data) ? excR.value.data : []);
-      if (excStatsR.status === 'fulfilled')  setExcStats(excStatsR.value.data);
+      if (funnelR.status === 'fulfilled')     setFunnel(funnelR.value.data);
+      if (forecastR.status === 'fulfilled')   setForecast(forecastR.value.data?.forecast ?? []);
+      if (lostR.status === 'fulfilled')       setLostData(lostR.value.data?.reasons ?? []);
+      if (arR.status === 'fulfilled')         setReceivables(arR.value.data);
+      if (excR.status === 'fulfilled')        setOpenExc(Array.isArray(excR.value.data) ? excR.value.data : []);
+      if (excStatsR.status === 'fulfilled')   setExcStats(excStatsR.value.data);
+      if (agingR.status === 'fulfilled')      setAgingData(agingR.value.data);
+      if (quoteStatsR.status === 'fulfilled') setQuoteStats(quoteStatsR.value.data);
     } finally {
       setLoading(false);
     }
@@ -2048,6 +2070,73 @@ function AnalyticsTab() {
                       <span className={styles.excStatTypeName}>{bt.type}</span>
                       <span className={styles.excStatTypeCount}>{bt.count} 次</span>
                       <span className={styles.excStatTypeResolved}>({bt.resolved} 已解决)</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </ZCard>
+
+          {/* 应收账款账龄 */}
+          <ZCard title="应收账款账龄分析">
+            {!agingData || agingData.total_balance_yuan === 0 ? (
+              <ZEmpty title="暂无逾期应收" description="所有订单均已结清" />
+            ) : (
+              <div className={styles.agingBody}>
+                <div className={styles.agingTotal}>
+                  合计应收 <strong>¥{agingData.total_balance_yuan.toLocaleString()}</strong>
+                </div>
+                <div className={styles.agingBuckets}>
+                  {([
+                    { key: '0_30',   label: '0–30天',  urgent: false },
+                    { key: '31_60',  label: '31–60天', urgent: false },
+                    { key: '61_90',  label: '61–90天', urgent: true  },
+                    { key: 'over_90', label: '90天以上', urgent: true  },
+                  ] as { key: keyof AgingData['buckets']; label: string; urgent: boolean }[]).map(b => {
+                    const bucket = agingData.buckets[b.key];
+                    if (bucket.count === 0) return null;
+                    return (
+                      <div key={b.key} className={`${styles.agingBucket} ${b.urgent ? styles.agingBucketUrgent : ''}`}>
+                        <div className={styles.agingBucketLabel}>{b.label}</div>
+                        <div className={styles.agingBucketCount}>{bucket.count} 单</div>
+                        <div className={styles.agingBucketAmount}>¥{bucket.balance_yuan.toLocaleString()}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </ZCard>
+
+          {/* 报价统计 */}
+          <ZCard title={`报价统计（${month}）`}>
+            {!quoteStats || quoteStats.total_quotes === 0 ? (
+              <ZEmpty title="本月暂无报价记录" description="" />
+            ) : (
+              <div className={styles.quoteStatsBody}>
+                <div className={styles.quoteStatsSummary}>
+                  <div className={styles.quoteStatItem}>
+                    <span className={styles.quoteStatValue}>{quoteStats.total_quotes}</span>
+                    <span className={styles.quoteStatLabel}>总报价</span>
+                  </div>
+                  <div className={styles.quoteStatItem}>
+                    <span className={styles.quoteStatValue}>{quoteStats.accepted_quotes}</span>
+                    <span className={styles.quoteStatLabel}>已接受</span>
+                  </div>
+                  <div className={styles.quoteStatItem}>
+                    <span className={styles.quoteStatValue} style={{ color: quoteStats.acceptance_pct >= 50 ? '#22c55e' : '#f97316' }}>
+                      {quoteStats.acceptance_pct}%
+                    </span>
+                    <span className={styles.quoteStatLabel}>接受率</span>
+                  </div>
+                </div>
+                <div className={styles.quoteTypeList}>
+                  {quoteStats.type_distribution.map(t => (
+                    <div key={t.banquet_type} className={styles.quoteTypeRow}>
+                      <span className={styles.quoteTypeName}>{t.banquet_type}</span>
+                      <span className={styles.quoteTypeCount}>{t.count} 份</span>
+                      <span className={styles.quoteTypeAccepted}>{t.accepted} 接受</span>
+                      <span className={styles.quoteTypeAmount}>¥{t.total_amount_yuan.toLocaleString()}</span>
                     </div>
                   ))}
                 </div>
@@ -2363,6 +2452,121 @@ function QuoteManagementTab() {
   );
 }
 
+/* ─── 厅房月历 Tab ─── */
+interface HallDayCell { date: string; booked: boolean; slots: { slot_name: string; banquet_type: string }[] }
+interface HallScheduleData { hall_id: string; hall_name: string; hall_type: string; days: HallDayCell[] }
+
+function HallScheduleTab() {
+  const [calMonth,  setCalMonth]  = useState(dayjs().format('YYYY-MM'));
+  const [halls,     setHalls]     = useState<HallScheduleData[]>([]);
+  const [loading,   setLoading]   = useState(false);
+  const [activeHall, setActiveHall] = useState<string | null>(null);
+
+  const loadSchedule = useCallback(async (m: string) => {
+    setLoading(true);
+    const [y, mo] = m.split('-').map(Number);
+    const STORE = localStorage.getItem('store_id') || 'S001';
+    try {
+      const resp = await apiClient.get(
+        `/api/v1/banquet-agent/stores/${STORE}/halls/monthly-schedule`,
+        { params: { year: y, month: mo } },
+      );
+      const rawHalls: HallScheduleData[] = resp.data?.halls ?? [];
+      setHalls(rawHalls);
+      if (rawHalls.length > 0 && !activeHall) setActiveHall(rawHalls[0].hall_id);
+    } catch {
+      setHalls([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [activeHall]);
+
+  useEffect(() => { loadSchedule(calMonth); }, [loadSchedule, calMonth]);
+
+  const firstDay  = dayjs(`${calMonth}-01`);
+  const startDow  = firstDay.day();
+  const daysInMonth = firstDay.daysInMonth();
+
+  const currentHall = halls.find(h => h.hall_id === activeHall) ?? halls[0];
+
+  const dayMap: Record<string, HallDayCell> = {};
+  (currentHall?.days ?? []).forEach(d => { dayMap[d.date] = d; });
+
+  const cells: (HallDayCell | null)[] = [
+    ...Array(startDow).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => {
+      const dateStr = firstDay.add(i, 'day').format('YYYY-MM-DD');
+      return dayMap[dateStr] ?? { date: dateStr, booked: false, slots: [] };
+    }),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  return (
+    <div className={styles.tabContent}>
+      <div className={styles.calHeader}>
+        <ZSelect
+          value={calMonth}
+          options={buildMonthOptions()}
+          onChange={v => setCalMonth(v as string)}
+          style={{ width: 120 }}
+        />
+      </div>
+
+      {/* Hall selector */}
+      {halls.length > 1 && (
+        <div className={styles.hallSelector}>
+          {halls.map(h => (
+            <button
+              key={h.hall_id}
+              className={`${styles.hallChip} ${activeHall === h.hall_id ? styles.hallChipActive : ''}`}
+              onClick={() => setActiveHall(h.hall_id)}
+            >
+              {h.hall_name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {loading ? (
+        <ZSkeleton rows={6} />
+      ) : !currentHall ? (
+        <ZEmpty title="暂无厅房数据" description="请先在资源配置中添加厅房" />
+      ) : (
+        <ZCard title={`${currentHall.hall_name} — ${calMonth} 档期`}>
+          <div className={styles.calGrid}>
+            {WEEK_DAYS.map(d => <div key={d} className={styles.calWeekday}>{d}</div>)}
+            {cells.map((cell, idx) => {
+              if (!cell) return <div key={`empty-${idx}`} className={styles.calEmpty} />;
+              return (
+                <div
+                  key={cell.date}
+                  className={`${styles.calCell} ${cell.booked ? styles.hallBooked : ''}`}
+                >
+                  <span className={styles.calDay}>{dayjs(cell.date).date()}</span>
+                  {cell.booked && (
+                    <div className={styles.calDots}>
+                      {cell.slots.map((s, si) => (
+                        <span
+                          key={si}
+                          className={styles.dotConfirmed}
+                          title={`${s.slot_name} · ${s.banquet_type}`}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div className={styles.calLegend}>
+            <span className={styles.legendItem}><span className={styles.dotConfirmed} />已预订</span>
+          </div>
+        </ZCard>
+      )}
+    </div>
+  );
+}
+
 /* ─── 跨店对比 Tab ─── */
 function CrossStoreTab() {
   const [month,  setMonth]  = useState(() => {
@@ -2445,6 +2649,7 @@ export default function HQBanquet() {
           { key: 'customers', label: '客户档案', children: <CustomerTab /> },
           { key: 'analytics', label: '转化分析', children: <AnalyticsTab /> },
           { key: 'quotes',    label: '报价管理',  children: <QuoteManagementTab /> },
+          { key: 'hallsched', label: '厅房月历',  children: <HallScheduleTab /> },
           { key: 'crossstore', label: '跨店对比',  children: <CrossStoreTab /> },
         ]}
       />

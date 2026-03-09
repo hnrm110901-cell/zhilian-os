@@ -7,7 +7,7 @@
 import uuid
 from datetime import date as date_type, datetime
 from typing import Optional
-from fastapi import APIRouter, Depends, Query, HTTPException, status
+from fastapi import APIRouter, Body, Depends, Query, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func
@@ -24,7 +24,7 @@ from src.models.banquet import (
     LeadStageEnum, OrderStatusEnum, BanquetTypeEnum,
     BanquetHallType, PaymentTypeEnum, DepositStatusEnum,
     TaskStatusEnum, TaskOwnerRoleEnum, BanquetAgentActionLog, BanquetRevenueTarget,
-    BanquetOrderReview,
+    BanquetOrderReview, BanquetAgentTypeEnum,
 )
 import sys
 from pathlib import Path as _Path
@@ -4204,4 +4204,505 @@ async def get_lead_score(
         "grade":      result["grade"],
         "breakdown":  result["breakdown"],
         "scored_at":  None,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Phase 14 — 应收账款预警·跟进话术生成·厅房月历看板
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── 1. GET /stores/{id}/analytics/receivables-aging ─────────────────────────
+
+@router.get("/stores/{store_id}/analytics/receivables-aging")
+async def get_receivables_aging(
+    store_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """应收账款账龄分析（按逾期天数分桶）。
+
+    逻辑：已确认/准备中/进行中的订单，paid_fen < total_amount_fen 视为有应收。
+    账龄基准 = banquet_date（宴会日期过去后应收）。
+    """
+    from datetime import timedelta
+    from src.models.banquet import OrderStatusEnum
+
+    today = date_type.today()
+    active_statuses = [
+        OrderStatusEnum.CONFIRMED,
+        OrderStatusEnum.PREPARING,
+        OrderStatusEnum.IN_PROGRESS,
+        OrderStatusEnum.COMPLETED,
+    ]
+
+    res = await db.execute(
+        select(BanquetOrder).where(
+            BanquetOrder.store_id == store_id,
+            BanquetOrder.order_status.in_(active_statuses),
+            BanquetOrder.paid_fen < BanquetOrder.total_amount_fen,
+            BanquetOrder.banquet_date < today,   # 宴会已过，仍有欠款
+        )
+    )
+    orders = res.scalars().all()
+
+    buckets = {"0_30": [], "31_60": [], "61_90": [], "over_90": []}
+    totals  = {"0_30": 0,  "31_60": 0,  "61_90": 0,  "over_90": 0}
+
+    for o in orders:
+        days_overdue = (today - o.banquet_date).days
+        balance_fen  = o.total_amount_fen - o.paid_fen
+        bucket_key   = (
+            "0_30"    if days_overdue <= 30  else
+            "31_60"   if days_overdue <= 60  else
+            "61_90"   if days_overdue <= 90  else
+            "over_90"
+        )
+        buckets[bucket_key].append({
+            "order_id":       o.id,
+            "banquet_date":   o.banquet_date.isoformat(),
+            "banquet_type":   o.banquet_type.value if hasattr(o.banquet_type, "value") else str(o.banquet_type),
+            "total_yuan":     round(o.total_amount_fen / 100, 2),
+            "paid_yuan":      round(o.paid_fen / 100, 2),
+            "balance_yuan":   round(balance_fen / 100, 2),
+            "days_overdue":   days_overdue,
+            "contact_name":   o.contact_name,
+        })
+        totals[bucket_key] += balance_fen
+
+    total_balance_fen = sum(totals.values())
+    return {
+        "store_id":           store_id,
+        "as_of":              today.isoformat(),
+        "total_balance_yuan": round(total_balance_fen / 100, 2),
+        "buckets": {
+            "0_30":    {"count": len(buckets["0_30"]),    "balance_yuan": round(totals["0_30"]    / 100, 2), "items": buckets["0_30"]},
+            "31_60":   {"count": len(buckets["31_60"]),   "balance_yuan": round(totals["31_60"]   / 100, 2), "items": buckets["31_60"]},
+            "61_90":   {"count": len(buckets["61_90"]),   "balance_yuan": round(totals["61_90"]   / 100, 2), "items": buckets["61_90"]},
+            "over_90": {"count": len(buckets["over_90"]), "balance_yuan": round(totals["over_90"] / 100, 2), "items": buckets["over_90"]},
+        },
+    }
+
+
+# ── 2. GET /stores/{id}/receivables/overdue ──────────────────────────────────
+
+@router.get("/stores/{store_id}/receivables/overdue")
+async def list_overdue_receivables(
+    store_id: str,
+    min_days: int = Query(1, ge=1),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """列出逾期 ≥ min_days 天、仍有欠款的订单。"""
+    from datetime import timedelta
+    from src.models.banquet import OrderStatusEnum
+
+    today    = date_type.today()
+    cutoff   = today - timedelta(days=min_days)
+    active_s = [
+        OrderStatusEnum.CONFIRMED,
+        OrderStatusEnum.PREPARING,
+        OrderStatusEnum.IN_PROGRESS,
+        OrderStatusEnum.COMPLETED,
+    ]
+
+    res = await db.execute(
+        select(BanquetOrder).where(
+            BanquetOrder.store_id == store_id,
+            BanquetOrder.order_status.in_(active_s),
+            BanquetOrder.paid_fen < BanquetOrder.total_amount_fen,
+            BanquetOrder.banquet_date <= cutoff,
+        ).order_by(BanquetOrder.banquet_date.asc())
+    )
+    orders = res.scalars().all()
+
+    items = []
+    for o in orders:
+        days_overdue = (today - o.banquet_date).days
+        items.append({
+            "order_id":     o.id,
+            "banquet_date": o.banquet_date.isoformat(),
+            "banquet_type": o.banquet_type.value if hasattr(o.banquet_type, "value") else str(o.banquet_type),
+            "total_yuan":   round(o.total_amount_fen / 100, 2),
+            "paid_yuan":    round(o.paid_fen / 100, 2),
+            "balance_yuan": round((o.total_amount_fen - o.paid_fen) / 100, 2),
+            "days_overdue": days_overdue,
+            "contact_name": o.contact_name,
+            "contact_phone": o.contact_phone,
+        })
+
+    return {"store_id": store_id, "min_days": min_days, "total": len(items), "items": items}
+
+
+# ── 3. POST /stores/{id}/leads/{lid}/followup-message ───────────────────────
+
+# 5 stage-based templates
+_FOLLOWUP_TEMPLATES = {
+    "new": "您好 {name}，感谢您对我们{store}宴会服务的关注！我们专业的宴会团队随时为您提供个性化方案，请问您方便安排一次看厅体验吗？",
+    "contacted": "您好 {name}，很高兴与您沟通！根据您的需求，我们已为您准备了{banquet_type}专属方案，可以约您来现场感受一下我们的环境和服务吗？",
+    "visit_scheduled": "您好 {name}，期待您{date}的到来！届时我们将为您详细介绍{banquet_type}套餐，并可安排现场品鉴。如有任何问题请随时联系我们。",
+    "quoted": "您好 {name}，已为您发送{banquet_type}报价方案，总额约¥{budget}。方案可根据需求灵活调整，不知您是否有其他疑虑？我们很乐意再为您详细解答。",
+    "waiting_decision": "您好 {name}，我们诚邀您确认{banquet_type}预订方案。考虑到{date}前后档期较为紧张，建议尽早锁定。如有任何顾虑，欢迎随时沟通！",
+    "deposit_pending": "您好 {name}，{banquet_type}档期已为您暂留，只需支付定金即可正式锁定。请问您方便在近期完成定金支付吗？",
+}
+
+class _FollowupMsgBody(BaseModel):
+    custom_hint: Optional[str] = None   # 额外提示词（可选）
+
+@router.post("/stores/{store_id}/leads/{lead_id}/followup-message")
+async def generate_followup_message(
+    store_id:  str,
+    lead_id:   str,
+    body:      _FollowupMsgBody = Body(default_factory=_FollowupMsgBody),
+    db:        AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """基于线索阶段生成个性化跟进话术，并记录到 ActionLog。"""
+    # 读取线索
+    lead_res = await db.execute(
+        select(BanquetLead).where(
+            BanquetLead.id == lead_id,
+            BanquetLead.store_id == store_id,
+        )
+    )
+    lead = lead_res.scalars().first()
+    if not lead:
+        raise HTTPException(status_code=404, detail="线索不存在")
+
+    # 读取客户
+    cust_res = await db.execute(
+        select(BanquetCustomer).where(BanquetCustomer.id == lead.customer_id)
+    )
+    customer = cust_res.scalars().first()
+
+    stage   = lead.current_stage.value if hasattr(lead.current_stage, "value") else str(lead.current_stage)
+    template = _FOLLOWUP_TEMPLATES.get(stage, _FOLLOWUP_TEMPLATES["new"])
+
+    budget_str = ""
+    if lead.expected_budget_fen:
+        budget_str = f"{lead.expected_budget_fen // 100:,}"
+
+    date_str = ""
+    if lead.expected_date:
+        date_str = lead.expected_date.strftime("%m月%d日")
+
+    banquet_type_str = lead.banquet_type.value if hasattr(lead.banquet_type, "value") else str(lead.banquet_type or "")
+
+    message = template.format(
+        name=customer.customer_name if customer else "客户",
+        store="智链酒楼",
+        banquet_type=banquet_type_str,
+        date=date_str or "预定日期",
+        budget=budget_str or "待定",
+    )
+
+    if body.custom_hint:
+        message = message.rstrip("！。") + f"。{body.custom_hint}"
+
+    result = {
+        "stage":    stage,
+        "message":  message,
+        "template": template,
+    }
+
+    log = BanquetAgentActionLog(
+        id=str(__import__("uuid").uuid4()),
+        agent_type=BanquetAgentTypeEnum.FOLLOWUP,
+        action_type="followup_message",
+        related_object_type="lead",
+        related_object_id=lead_id,
+        action_result=result,
+        suggestion_text=message[:100],
+        is_human_approved=None,
+    )
+    db.add(log)
+    await db.commit()
+
+    return {"lead_id": lead_id, **result}
+
+
+# ── 4. GET /stores/{id}/leads/{lid}/followup-messages ───────────────────────
+
+@router.get("/stores/{store_id}/leads/{lead_id}/followup-messages")
+async def list_followup_messages(
+    store_id: str,
+    lead_id:  str,
+    limit:    int = Query(10, ge=1, le=50),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """读取线索历史跟进话术记录。"""
+    res = await db.execute(
+        select(BanquetAgentActionLog).where(
+            BanquetAgentActionLog.related_object_type == "lead",
+            BanquetAgentActionLog.related_object_id   == lead_id,
+            BanquetAgentActionLog.action_type         == "followup_message",
+        ).order_by(BanquetAgentActionLog.created_at.desc()).limit(limit)
+    )
+    logs = res.scalars().all()
+
+    items = []
+    for log in logs:
+        r = log.action_result or {}
+        items.append({
+            "log_id":     log.id,
+            "stage":      r.get("stage"),
+            "message":    r.get("message"),
+            "created_at": log.created_at.isoformat() if log.created_at else None,
+        })
+
+    return {"lead_id": lead_id, "total": len(items), "items": items}
+
+
+# ── 5. GET /stores/{id}/halls/monthly-schedule ──────────────────────────────
+
+@router.get("/stores/{store_id}/halls/monthly-schedule")
+async def get_halls_monthly_schedule(
+    store_id: str,
+    year:     int = Query(...),
+    month:    int = Query(..., ge=1, le=12),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """厅房月历看板：hall × day 占用矩阵。"""
+    import calendar
+    from datetime import timedelta
+
+    first_day = date_type(year, month, 1)
+    last_day  = date_type(year, month, calendar.monthrange(year, month)[1])
+
+    # 获取所有厅房
+    halls_res = await db.execute(
+        select(BanquetHall).where(
+            BanquetHall.store_id == store_id,
+            BanquetHall.is_active == True,
+        ).order_by(BanquetHall.name)
+    )
+    halls = halls_res.scalars().all()
+
+    # 获取该月所有 bookings（含 order status）
+    bookings_res = await db.execute(
+        select(BanquetHallBooking, BanquetOrder).join(
+            BanquetOrder, BanquetHallBooking.banquet_order_id == BanquetOrder.id
+        ).where(
+            BanquetHallBooking.hall_id.in_([h.id for h in halls]),
+            BanquetHallBooking.slot_date >= first_day,
+            BanquetHallBooking.slot_date <= last_day,
+        )
+    )
+    booking_rows = bookings_res.all()
+
+    # 构建 hall_id → {date_str → [slot_info]}
+    hall_day_map: dict = {}
+    for booking, order in booking_rows:
+        hid  = booking.hall_id
+        dstr = booking.slot_date.isoformat()
+        if hid not in hall_day_map:
+            hall_day_map[hid] = {}
+        if dstr not in hall_day_map[hid]:
+            hall_day_map[hid][dstr] = []
+        hall_day_map[hid][dstr].append({
+            "slot_name":    booking.slot_name,
+            "is_locked":    booking.is_locked,
+            "order_id":     order.id,
+            "order_status": order.order_status.value if hasattr(order.order_status, "value") else str(order.order_status),
+            "banquet_type": order.banquet_type.value if hasattr(order.banquet_type, "value") else str(order.banquet_type),
+        })
+
+    # 生成日期列表
+    num_days = (last_day - first_day).days + 1
+    dates = [(first_day + timedelta(days=i)).isoformat() for i in range(num_days)]
+
+    halls_data = []
+    for h in halls:
+        day_cells = []
+        for d in dates:
+            slots = hall_day_map.get(h.id, {}).get(d, [])
+            day_cells.append({
+                "date":    d,
+                "booked":  len(slots) > 0,
+                "slots":   slots,
+            })
+        halls_data.append({
+            "hall_id":    h.id,
+            "hall_name":  h.name,
+            "hall_type":  h.hall_type.value if hasattr(h.hall_type, "value") else str(h.hall_type),
+            "max_tables": h.max_tables,
+            "days":       day_cells,
+        })
+
+    return {
+        "store_id": store_id,
+        "year":     year,
+        "month":    month,
+        "dates":    dates,
+        "halls":    halls_data,
+    }
+
+
+# ── 6. GET /stores/{id}/halls/{hall_id}/utilization ─────────────────────────
+
+@router.get("/stores/{store_id}/halls/{hall_id}/utilization")
+async def get_hall_utilization(
+    store_id: str,
+    hall_id:  str,
+    year:     int = Query(...),
+    month:    int = Query(..., ge=1, le=12),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """单厅房月利用率统计。"""
+    import calendar
+    from datetime import timedelta
+
+    # 验证厅房
+    hall_res = await db.execute(
+        select(BanquetHall).where(
+            BanquetHall.id == hall_id,
+            BanquetHall.store_id == store_id,
+        )
+    )
+    hall = hall_res.scalars().first()
+    if not hall:
+        raise HTTPException(status_code=404, detail="厅房不存在")
+
+    first_day = date_type(year, month, 1)
+    last_day  = date_type(year, month, calendar.monthrange(year, month)[1])
+    total_days = (last_day - first_day).days + 1
+
+    bookings_res = await db.execute(
+        select(BanquetHallBooking).where(
+            BanquetHallBooking.hall_id == hall_id,
+            BanquetHallBooking.slot_date >= first_day,
+            BanquetHallBooking.slot_date <= last_day,
+        )
+    )
+    bookings = bookings_res.scalars().all()
+
+    booked_slots = len(bookings)
+    # 每天理论可用 2 个时段（午/晚）
+    total_slots  = total_days * 2
+    utilization_pct = round(booked_slots / total_slots * 100, 1) if total_slots > 0 else 0.0
+
+    # 按日统计
+    day_map: dict = {}
+    for b in bookings:
+        dstr = b.slot_date.isoformat()
+        day_map[dstr] = day_map.get(dstr, 0) + 1
+
+    return {
+        "hall_id":           hall_id,
+        "hall_name":         hall.name,
+        "year":              year,
+        "month":             month,
+        "total_days":        total_days,
+        "booked_slots":      booked_slots,
+        "total_slots":       total_slots,
+        "utilization_pct":   utilization_pct,
+        "booked_days":       len(day_map),
+        "daily_breakdown":   [{"date": d, "slots": c} for d, c in sorted(day_map.items())],
+    }
+
+
+# ── 7. GET /stores/{id}/analytics/quote-stats ───────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/quote-stats")
+async def get_quote_stats(
+    store_id: str,
+    year:     int  = Query(default=None),
+    month:    int  = Query(default=None, ge=1, le=12),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """报价统计：接受率 + 按宴会类型分布。"""
+    today = date_type.today()
+    _year  = year  or today.year
+    _month = month or today.month
+
+    first_day = date_type(_year, _month, 1)
+    import calendar as _cal
+    last_day  = date_type(_year, _month, _cal.monthrange(_year, _month)[1])
+
+    quotes_res = await db.execute(
+        select(BanquetQuote, BanquetLead).join(
+            BanquetLead, BanquetQuote.lead_id == BanquetLead.id
+        ).where(
+            BanquetQuote.store_id == store_id,
+            BanquetQuote.created_at >= first_day,
+            BanquetQuote.created_at <= last_day,
+        )
+    )
+    rows = quotes_res.all()
+
+    total        = len(rows)
+    accepted     = sum(1 for q, _ in rows if q.is_accepted)
+    acceptance_pct = round(accepted / total * 100, 1) if total > 0 else 0.0
+
+    type_map: dict = {}
+    for q, lead in rows:
+        btype = lead.banquet_type.value if hasattr(lead.banquet_type, "value") else str(lead.banquet_type or "unknown")
+        if btype not in type_map:
+            type_map[btype] = {"total": 0, "accepted": 0, "total_amount_yuan": 0.0}
+        type_map[btype]["total"] += 1
+        type_map[btype]["total_amount_yuan"] += round(q.quoted_amount_fen / 100, 2)
+        if q.is_accepted:
+            type_map[btype]["accepted"] += 1
+
+    type_distribution = [
+        {
+            "banquet_type": btype,
+            "count": v["total"],
+            "accepted": v["accepted"],
+            "total_amount_yuan": round(v["total_amount_yuan"], 2),
+        }
+        for btype, v in sorted(type_map.items(), key=lambda x: -x[1]["total"])
+    ]
+
+    return {
+        "store_id":         store_id,
+        "year":             _year,
+        "month":            _month,
+        "total_quotes":     total,
+        "accepted_quotes":  accepted,
+        "acceptance_pct":   acceptance_pct,
+        "type_distribution": type_distribution,
+    }
+
+
+# ── 8. GET /stores/{id}/contracts/pending-sign ──────────────────────────────
+
+@router.get("/stores/{store_id}/contracts/pending-sign")
+async def list_pending_sign_contracts(
+    store_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """列出待签约（draft）合同，按宴会日期升序。"""
+    res = await db.execute(
+        select(BanquetContract, BanquetOrder).join(
+            BanquetOrder, BanquetContract.banquet_order_id == BanquetOrder.id
+        ).where(
+            BanquetOrder.store_id == store_id,
+            BanquetContract.contract_status == "draft",
+        ).order_by(BanquetOrder.banquet_date.asc())
+    )
+    rows = res.all()
+
+    items = []
+    for contract, order in rows:
+        items.append({
+            "contract_id":    contract.id,
+            "contract_no":    contract.contract_no,
+            "order_id":       order.id,
+            "banquet_date":   order.banquet_date.isoformat(),
+            "banquet_type":   order.banquet_type.value if hasattr(order.banquet_type, "value") else str(order.banquet_type),
+            "total_yuan":     round(order.total_amount_fen / 100, 2),
+            "contact_name":   order.contact_name,
+            "contact_phone":  order.contact_phone,
+            "days_until":     (order.banquet_date - date_type.today()).days,
+        })
+
+    return {
+        "store_id": store_id,
+        "total":    len(items),
+        "items":    items,
     }
