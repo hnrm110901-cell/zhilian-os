@@ -90,8 +90,40 @@ async def test_compare_stores_accepts_frontend_payload_and_returns_metrics():
     assert out["metrics"] == ["revenue", "orders", "customers", "avg_order_value"]
     assert out["start_date"] == "2026-03-01"
     assert out["stores"][0]["metrics"]["revenue"] == 100000
-    assert out["stores"][0]["metrics"]["avg_order_value"] == 0
+    assert out["stores"][0]["metrics"]["avg_order_value"] == 1000
     assert out["data"]["orders"]["S002"] == 80
+
+
+@pytest.mark.asyncio
+async def test_compare_stores_appends_avg_order_value_when_metrics_missing_and_fallback_computes():
+    request = CompareStoresRequest(
+        store_ids=["S001", "S002"],
+        metrics=["revenue", "orders", "customers"],
+        start_date="2026-03-01",
+        end_date="2026-03-08",
+    )
+
+    service_result = {
+        "stores": [
+            {"id": "S001", "name": "岳麓店", "region": "华中"},
+            {"id": "S002", "name": "芙蓉店", "region": "华中"},
+        ],
+        "metrics": ["revenue", "orders", "customers", "avg_order_value"],
+        "data": {
+            "revenue": {"S001": 100000, "S002": 90000},
+            "orders": {"S001": 100, "S002": 0},
+            "customers": {"S001": 160, "S002": 130},
+        },
+    }
+
+    with patch("src.api.multi_store.store_service.compare_stores", new=AsyncMock(return_value=service_result)) as mocked:
+        out = await compare_stores(request, current_user=None)
+
+    called_metrics = mocked.await_args.args[1]
+    assert called_metrics == ["revenue", "orders", "customers", "avg_order_value"]
+    assert out["metrics"] == ["revenue", "orders", "customers", "avg_order_value"]
+    assert out["stores"][0]["metrics"]["avg_order_value"] == 1000
+    assert out["stores"][1]["metrics"]["avg_order_value"] == 0
 
 
 @pytest.mark.asyncio

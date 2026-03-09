@@ -160,21 +160,28 @@ async def compare_stores(
     """
     try:
         metrics = request.metrics or ["revenue", "orders", "customers", "avg_order_value"]
+        if "avg_order_value" not in metrics:
+            metrics = [*metrics, "avg_order_value"]
         comparison = await store_service.compare_stores(request.store_ids, metrics)
 
         # 前端兼容：补齐 stores[].metrics 结构
         stores_out = []
         for s in comparison.get("stores", []):
             sid = s.get("id")
+            revenue = comparison.get("data", {}).get("revenue", {}).get(sid, 0)
+            orders = comparison.get("data", {}).get("orders", {}).get(sid, 0)
+            avg_order_value = comparison.get("data", {}).get("avg_order_value", {}).get(sid)
+            if avg_order_value is None:
+                avg_order_value = (revenue / orders) if orders else 0
             stores_out.append({
                 "id": sid,
                 "name": s.get("name"),
                 "region": s.get("region"),
                 "metrics": {
-                    "revenue": comparison.get("data", {}).get("revenue", {}).get(sid, 0),
-                    "orders": comparison.get("data", {}).get("orders", {}).get(sid, 0),
+                    "revenue": revenue,
+                    "orders": orders,
                     "customers": comparison.get("data", {}).get("customers", {}).get(sid, 0),
-                    "avg_order_value": comparison.get("data", {}).get("avg_order_value", {}).get(sid, 0),
+                    "avg_order_value": avg_order_value,
                 },
             })
 

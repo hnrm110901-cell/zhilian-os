@@ -59,6 +59,7 @@
   - 调货状态契约收敛：前端 service 标准化 `pending_approval -> pending`，统一状态类型枚举
   - 调货状态契约续补：HTTP 层增加 `pending_approval` 筛选别名回归；前端 approve/reject 响应状态统一标准化
   - 筛选边界补齐：无效状态筛选返回空列表；契约文档补充 `pending_approval` 别名语义
+  - 对比契约增强：`/multi-store/compare` 无论入参是否包含 `avg_order_value`，都保证返回该指标（缺失时按 `revenue/orders` 回算）
 
 ## P2
 - [x] 角色权限管理体验优化（页面入口可见性与无权限提示一致性）
@@ -128,6 +129,8 @@
   - `python3 -m pytest -q tests/test_inventory_transfer_routes_http.py tests/test_inventory_transfer_workflow_api.py`（15 passed）
   - `python3 -m pytest -q tests/test_inventory_transfer_workflow_api.py tests/test_inventory_transfer_routes_http.py`（16 passed）
   - 文档校对：`docs/跨店调货API契约V1.md`（已补 `pending_approval` 别名说明）
+  - `python3 -m py_compile src/api/multi_store.py`（通过）
+  - `python3 -m pytest -q tests/test_multi_store_api_routes.py`（12 passed）
   - `python3 -m pytest -q apps/api-gateway/tests/test_inventory_transfer_workflow_api.py apps/api-gateway/tests/test_multi_store_api_routes.py`（14 passed）
   - 文档校对：`docs/跨店调货API契约V1.md`（已添加接口、状态机、规则、错误语义）
   - `python3 -m pytest -q apps/api-gateway/tests/test_multi_store_api_routes.py`（9 passed，含动态路由顺序防吞断言）
