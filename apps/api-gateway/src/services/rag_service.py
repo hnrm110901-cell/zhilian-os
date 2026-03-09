@@ -7,6 +7,7 @@ Week 2核心功能：
 - 格式化上下文注入LLM
 - 生成增强的AI决策
 """
+import asyncio
 import os
 from typing import List, Dict, Any, Optional
 import structlog
@@ -15,6 +16,7 @@ from datetime import datetime
 from .vector_db_service import vector_db_service
 from .domain_vector_service import domain_vector_service, LEGACY_COLLECTION_MAP
 from ..core.llm import get_llm_client
+from .query_optimizer import query_optimizer
 from .rag_signal_router import classify_query, QuerySignal, route_numerical_query
 
 logger = structlog.get_logger()
@@ -53,6 +55,12 @@ class RAGService:
         """
         检索相关上下文
 
+        流程：
+          1. QueryOptimizer 将原始查询改写为 2-3 个语义变体
+          2. 并行对每个变体调用 domain_vector_service.search()
+          3. 合并去重（按 payload text），取 score 最高者，返回 top_k 条
+          4. 任何环节失败均降级到原始单查询
+
         优先使用领域分割索引（domain_vector_service），
         collection 参数映射到对应领域：
           events  → events
@@ -61,17 +69,52 @@ class RAGService:
           staff   → staff
         """
         try:
-            # 映射旧 collection 名称到新领域
             domain = LEGACY_COLLECTION_MAP.get(collection, collection)
 
-            results = await domain_vector_service.search(
-                domain=domain,
-                store_id=store_id,
-                query=query,
-                top_k=top_k,
-            )
+            # ── 1. 查询优化 ──────────────────────────────────────────────────
+            opt_result = await query_optimizer.optimize(query, domain_hint=domain)
+            queries = opt_result.optimized_queries  # 始终 ≥1 条
 
-            # 降级：领域索引无数据时回退到旧全局索引
+            # ── 2. 并行多查询检索 ─────────────────────────────────────────────
+            if len(queries) > 1:
+                tasks = [
+                    domain_vector_service.search(
+                        domain=domain, store_id=store_id, query=q, top_k=top_k
+                    )
+                    for q in queries
+                ]
+                multi_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+                # ── 3. 合并去重：相同 payload text 保留最高 score ──────────────
+                seen: Dict[str, float] = {}
+                best_hit: Dict[str, Dict] = {}
+                for batch in multi_results:
+                    if isinstance(batch, Exception):
+                        continue
+                    for hit in batch:
+                        text = (hit.get("payload") or {}).get("text", "")
+                        score = hit.get("score", 0.0)
+                        if text not in seen or score > seen[text]:
+                            seen[text] = score
+                            best_hit[text] = hit
+
+                results = sorted(
+                    best_hit.values(),
+                    key=lambda h: h.get("score", 0.0),
+                    reverse=True,
+                )[:top_k]
+
+                # 降级：合并结果为空时回退单查询
+                if not results:
+                    results = await domain_vector_service.search(
+                        domain=domain, store_id=store_id, query=query, top_k=top_k
+                    )
+            else:
+                results = await domain_vector_service.search(
+                    domain=domain, store_id=store_id, query=queries[0], top_k=top_k
+                )
+
+            # ── 4. 全局降级：领域索引无数据时回退旧全局索引 ──────────────────
             if not results:
                 if collection == "events":
                     results = await self.vector_db.search_events(query=query, store_id=store_id, limit=top_k)
@@ -81,10 +124,12 @@ class RAGService:
                     results = await self.vector_db.search_dishes(query=query, store_id=store_id, limit=top_k)
 
             logger.info(
-                "检索相关上下文",
+                "rag.search_completed",
                 query=query,
                 domain=domain,
-                results_count=len(results)
+                query_variants=len(queries),
+                results_count=len(results),
+                optimized=opt_result.optimized,
             )
             return results
 
