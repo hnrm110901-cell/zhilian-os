@@ -203,3 +203,40 @@
   font-weight: 600;
   color: var(--text-primary, #111);
 }
+
+/* 合同 */
+.contractEmpty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+}
+
+.contractHint {
+  font-size: 13px;
+  color: var(--text-secondary, #888);
+}
+
+.contractInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.contractRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.contractNo {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #111);
+  font-family: monospace;
+}
+
+.contractMeta {
+  font-size: 12px;
+  color: var(--text-secondary, #888);
+}

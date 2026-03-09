@@ -3,6 +3,8 @@
  * 路由：/sm/banquet-orders/:orderId
  * 数据：GET /api/v1/banquet-agent/stores/{id}/orders/{order_id}
  *      PATCH /api/v1/banquet-agent/stores/{id}/orders/{order_id}/tasks/{task_id}
+ *      GET/POST /api/v1/banquet-agent/stores/{id}/orders/{order_id}/contract
+ *      PATCH /api/v1/banquet-agent/stores/{id}/orders/{order_id}/contract/sign
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -98,7 +100,13 @@ export default function SmBanquetOrderDetail() {
 
   const [order,   setOrder]   = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [completing, setCompleting] = useState<string | null>(null);
+  const [completing,     setCompleting]     = useState<string | null>(null);
+  const [contract,       setContract]       = useState<{
+    contract_id: string; contract_no: string; contract_status: string;
+    signed_at: string | null; file_url: string | null;
+  } | null | undefined>(undefined);   // undefined = not loaded yet
+  const [contractLoading, setContractLoading] = useState(false);
+  const [contractWorking, setContractWorking] = useState(false);
 
   const loadOrder = useCallback(async () => {
     if (!orderId) return;
@@ -116,6 +124,51 @@ export default function SmBanquetOrderDetail() {
   }, [orderId]);
 
   useEffect(() => { loadOrder(); }, [loadOrder]);
+
+  const loadContract = useCallback(async () => {
+    if (!orderId) return;
+    setContractLoading(true);
+    try {
+      const resp = await apiClient.get(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/orders/${orderId}/contract`,
+      );
+      setContract(resp.data?.contract ?? null);
+    } catch {
+      setContract(null);
+    } finally {
+      setContractLoading(false);
+    }
+  }, [orderId]);
+
+  useEffect(() => { loadContract(); }, [loadContract]);
+
+  const createContract = async () => {
+    setContractWorking(true);
+    try {
+      await apiClient.post(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/orders/${orderId}/contract`,
+      );
+      await loadContract();
+    } catch (e) {
+      handleApiError(e, '创建合同失败');
+    } finally {
+      setContractWorking(false);
+    }
+  };
+
+  const signContract = async () => {
+    setContractWorking(true);
+    try {
+      await apiClient.patch(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/orders/${orderId}/contract/sign`,
+      );
+      await loadContract();
+    } catch (e) {
+      handleApiError(e, '签约失败');
+    } finally {
+      setContractWorking(false);
+    }
+  };
 
   const toggleTask = async (task: Task) => {
     const newStatus = task.status === 'done' ? 'pending' : 'done';
@@ -308,6 +361,41 @@ export default function SmBanquetOrderDetail() {
               ))}
             </div>
           )}
+        </ZCard>
+
+        {/* 合同管理 */}
+        <ZCard>
+          <div className={styles.sectionTitle}>合同</div>
+          {contractLoading ? (
+            <ZSkeleton rows={2} />
+          ) : contract === null ? (
+            <div className={styles.contractEmpty}>
+              <span className={styles.contractHint}>尚未创建合同</span>
+              <ZButton variant="primary" size="sm" onClick={createContract} disabled={contractWorking}>
+                {contractWorking ? '创建中…' : '创建合同'}
+              </ZButton>
+            </div>
+          ) : contract ? (
+            <div className={styles.contractInfo}>
+              <div className={styles.contractRow}>
+                <span className={styles.contractNo}>{contract.contract_no}</span>
+                <ZBadge
+                  type={contract.contract_status === 'signed' ? 'success' : 'warning'}
+                  text={contract.contract_status === 'signed' ? '已签约' : contract.contract_status === 'void' ? '已作废' : '草稿'}
+                />
+              </div>
+              {contract.signed_at && (
+                <div className={styles.contractMeta}>
+                  签约时间：{dayjs(contract.signed_at).format('YYYY-MM-DD HH:mm')}
+                </div>
+              )}
+              {contract.contract_status === 'draft' && (
+                <ZButton variant="primary" size="sm" onClick={signContract} disabled={contractWorking}>
+                  {contractWorking ? '签约中…' : '确认签约'}
+                </ZButton>
+              )}
+            </div>
+          ) : null}
         </ZCard>
       </div>
     </div>

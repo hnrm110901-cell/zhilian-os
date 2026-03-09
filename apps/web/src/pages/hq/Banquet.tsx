@@ -421,6 +421,16 @@ function AvailabilityTab() {
 }
 
 /* ─── Tab4：AI 建议 ─── */
+interface HallRec {
+  hall_id:        string | null;
+  hall_name?:     string;
+  name?:          string;
+  hall_type?:     string;
+  max_people?:    number | null;
+  min_spend_yuan?: number | null;
+  min_spend?:     number | null;
+}
+
 interface FollowupItem {
   lead_id:    string;
   days_stale: number;
@@ -447,6 +457,18 @@ function AITab() {
   const [recType,       setRecType]       = useState('');
   const [recommending,  setRecommending]  = useState(false);
   const [packages,      setPackages]      = useState<PackageRec[] | null>(null);
+
+  const [hallDate,      setHallDate]      = useState('');
+  const [hallPeople,    setHallPeople]    = useState('');
+  const [hallSlot,      setHallSlot]      = useState('all_day');
+  const [hallLoading,   setHallLoading]   = useState(false);
+  const [halls,         setHalls]         = useState<HallRec[] | null>(null);
+
+  const SLOT_OPTIONS = [
+    { value: 'all_day', label: '全天' },
+    { value: 'lunch',   label: '午宴' },
+    { value: 'dinner',  label: '晚宴' },
+  ];
 
   const BANQUET_TYPE_OPTIONS = [
     { value: '',         label: '不限类型' },
@@ -492,6 +514,23 @@ function AITab() {
       setRecommending(false);
     }
   }, [recPeople, recBudget, recType]);
+
+  const runHallRecommend = useCallback(async () => {
+    if (!hallDate || !hallPeople) return;
+    setHallLoading(true);
+    setHalls(null);
+    try {
+      const resp = await apiClient.get(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/agent/hall-recommend`,
+        { params: { target_date: hallDate, slot_name: hallSlot, people_count: parseInt(hallPeople, 10) } },
+      );
+      setHalls(resp.data?.available_halls ?? resp.data?.halls ?? resp.data ?? []);
+    } catch {
+      setHalls([]);
+    } finally {
+      setHallLoading(false);
+    }
+  }, [hallDate, hallPeople, hallSlot]);
 
   return (
     <div className={styles.tabContent}>
@@ -594,6 +633,193 @@ function AITab() {
           </div>
         )}
       </ZCard>
+
+      {/* 厅房推荐 */}
+      <ZCard>
+        <div className={styles.aiSectionTitle}>厅房推荐</div>
+        <div className={styles.aiForm}>
+          <div className={styles.aiFormRow}>
+            <div className={styles.aiField}>
+              <label className={styles.aiLabel}>目标日期</label>
+              <ZInput
+                type="date"
+                value={hallDate}
+                onChange={e => setHallDate(e.target.value)}
+              />
+            </div>
+            <div className={styles.aiField}>
+              <label className={styles.aiLabel}>用餐时段</label>
+              <ZSelect
+                value={hallSlot}
+                options={SLOT_OPTIONS}
+                onChange={v => setHallSlot(v as string)}
+              />
+            </div>
+          </div>
+          <div className={styles.aiFormRow}>
+            <div className={styles.aiField}>
+              <label className={styles.aiLabel}>用餐人数</label>
+              <ZInput
+                type="number"
+                value={hallPeople}
+                onChange={e => setHallPeople(e.target.value)}
+                placeholder="如：200"
+              />
+            </div>
+            <div className={styles.aiFieldAction}>
+              <ZButton
+                variant="primary"
+                onClick={runHallRecommend}
+                disabled={hallLoading || !hallDate || !hallPeople}
+              >
+                {hallLoading ? '查询中…' : '查询可用厅房'}
+              </ZButton>
+            </div>
+          </div>
+        </div>
+        {hallLoading && <ZSkeleton rows={3} />}
+        {halls !== null && !hallLoading && halls.length === 0 && (
+          <ZEmpty title="暂无可用厅房" description="请更换日期或时段后重试" />
+        )}
+        {halls !== null && halls.length > 0 && (
+          <div className={styles.packageList}>
+            {halls.map((h, i) => (
+              <div key={h.hall_id ?? i} className={styles.packageCard}>
+                <div className={styles.packageName}>{h.hall_name ?? h.name}</div>
+                <div className={styles.packageMeta}>
+                  <span>{h.hall_type ?? ''}</span>
+                  {h.max_people && <><span>·</span><span>最多{h.max_people}人</span></>}
+                </div>
+                {(h.min_spend_yuan ?? h.min_spend) != null && (
+                  <div className={styles.packageStats}>
+                    <span className={styles.packageTotal}>
+                      最低消费¥{((h.min_spend_yuan ?? h.min_spend ?? 0)).toLocaleString()}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+/* ─── Tab5：利润复盘 ─── */
+interface ProfitRow {
+  snapshot_id:          string;
+  order_id:             string;
+  banquet_date:         string | null;
+  banquet_type:         string | null;
+  revenue_yuan:         number;
+  ingredient_cost_yuan: number;
+  labor_cost_yuan:      number;
+  gross_profit_yuan:    number;
+  gross_margin_pct:     number;
+}
+
+function ProfitTab() {
+  const [month,       setMonth]       = useState(dayjs().format('YYYY-MM'));
+  const [rows,        setRows]        = useState<ProfitRow[]>([]);
+  const [loading,     setLoading]     = useState(true);
+  const [triggering,  setTriggering]  = useState<string | null>(null);
+
+  const loadSnapshots = useCallback(async (m: string) => {
+    setLoading(true);
+    try {
+      const resp = await apiClient.get(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/profit-snapshots`,
+        { params: { month: m } },
+      );
+      setRows(Array.isArray(resp.data) ? resp.data : []);
+    } catch {
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadSnapshots(month); }, [loadSnapshots, month]);
+
+  const triggerReview = async (orderId: string) => {
+    setTriggering(orderId);
+    try {
+      await apiClient.post(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/orders/${orderId}/review`,
+      );
+      await loadSnapshots(month);
+    } catch {
+      /* review generation errors are non-critical */
+    } finally {
+      setTriggering(null);
+    }
+  };
+
+  const totalRevenue = rows.reduce((s, r) => s + r.revenue_yuan, 0);
+  const totalProfit  = rows.reduce((s, r) => s + r.gross_profit_yuan, 0);
+  const avgMargin    = rows.length > 0
+    ? (rows.reduce((s, r) => s + r.gross_margin_pct, 0) / rows.length).toFixed(1)
+    : '0.0';
+
+  return (
+    <div className={styles.tabContent}>
+      <div className={styles.tabHeader}>
+        <ZSelect
+          value={month}
+          options={buildMonthOptions()}
+          onChange={v => setMonth(v as string)}
+        />
+      </div>
+      <ZCard>
+        {loading ? (
+          <ZSkeleton rows={4} />
+        ) : rows.length === 0 ? (
+          <ZEmpty title="暂无利润数据" description="宴会完成后录入利润快照" />
+        ) : (
+          <>
+            <div className={styles.profitTable}>
+              <div className={`${styles.profitRow} ${styles.profitHead}`}>
+                <span>日期</span>
+                <span>类型</span>
+                <span>收入¥</span>
+                <span>毛利¥</span>
+                <span>毛利率</span>
+                <span></span>
+              </div>
+              {rows.map(r => (
+                <div key={r.snapshot_id} className={styles.profitRow}>
+                  <span>{r.banquet_date ? dayjs(r.banquet_date).format('MM-DD') : '-'}</span>
+                  <span>{r.banquet_type ?? '-'}</span>
+                  <span>¥{r.revenue_yuan.toLocaleString()}</span>
+                  <span className={r.gross_profit_yuan >= 0 ? styles.profitPos : styles.profitNeg}>
+                    ¥{r.gross_profit_yuan.toLocaleString()}
+                  </span>
+                  <span>{r.gross_margin_pct.toFixed(1)}%</span>
+                  <span>
+                    <ZButton
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => triggerReview(r.order_id)}
+                      disabled={triggering === r.order_id}
+                    >
+                      {triggering === r.order_id ? '…' : '复盘'}
+                    </ZButton>
+                  </span>
+                </div>
+              ))}
+              <div className={`${styles.profitRow} ${styles.profitTotal}`}>
+                <span>合计</span>
+                <span></span>
+                <span>¥{totalRevenue.toLocaleString()}</span>
+                <span>¥{totalProfit.toLocaleString()}</span>
+                <span>{avgMargin}%</span>
+                <span></span>
+              </div>
+            </div>
+          </>
+        )}
+      </ZCard>
     </div>
   );
 }
@@ -611,6 +837,7 @@ export default function HQBanquet() {
           { key: 'pipeline',  label: '销售管道', children: <PipelineTab /> },
           { key: 'calendar',  label: '销控日历', children: <AvailabilityTab /> },
           { key: 'ai',        label: 'AI 建议',  children: <AITab /> },
+          { key: 'profit',    label: '利润复盘', children: <ProfitTab /> },
         ]}
       />
     </div>

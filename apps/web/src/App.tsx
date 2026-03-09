@@ -189,6 +189,7 @@ const HQWorkforce     = lazy(() => import('./pages/hq/Workforce'));
 const HQBanquet       = lazy(() => import('./pages/hq/Banquet'));
 const SmBanquet       = lazy(() => import('./pages/sm/Banquet'));
 const SmBanquetLeads       = lazy(() => import('./pages/sm/BanquetLeads'));
+const SmBanquetLeadDetail  = lazy(() => import('./pages/sm/BanquetLeadDetail'));
 const SmBanquetOrders      = lazy(() => import('./pages/sm/BanquetOrders'));
 const SmBanquetOrderDetail = lazy(() => import('./pages/sm/BanquetOrderDetail'));
 const SmBanquetTasks       = lazy(() => import('./pages/sm/BanquetTasks'));
@@ -650,6 +651,7 @@ const AppContent: React.FC = () => {
                   <Route path="workforce" element={<SmWorkforce />} />
                   <Route path="banquet"              element={<SmBanquet />} />
                   <Route path="banquet-leads"        element={<SmBanquetLeads />} />
+                  <Route path="banquet-leads/:leadId" element={<SmBanquetLeadDetail />} />
                   <Route path="banquet-orders"       element={<SmBanquetOrders />} />
                   <Route path="banquet-orders/:orderId" element={<SmBanquetOrderDetail />} />
                   <Route path="banquet-tasks"        element={<SmBanquetTasks />} />

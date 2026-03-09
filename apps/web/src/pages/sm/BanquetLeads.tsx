@@ -154,6 +154,9 @@ export default function SmBanquetLeads() {
                       type={STAGE_BADGE_TYPE[lead.stage] ?? 'default'}
                       text={lead.stage_label ?? lead.stage}
                     />
+                    <ZButton variant="ghost" size="sm" onClick={() => navigate(`/sm/banquet-leads/${lead.banquet_id}`)}>
+                      详情
+                    </ZButton>
                     <ZButton variant="ghost" size="sm" onClick={() => openModal(lead)}>
                       推进
                     </ZButton>

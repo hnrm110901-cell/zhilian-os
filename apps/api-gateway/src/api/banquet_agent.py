@@ -20,6 +20,7 @@ from src.models.banquet import (
     BanquetHall, BanquetCustomer, BanquetLead, BanquetOrder,
     MenuPackage, ExecutionTask, BanquetPaymentRecord,
     BanquetHallBooking, BanquetKpiDaily, BanquetQuote,
+    BanquetContract, BanquetProfitSnapshot, LeadFollowupRecord,
     LeadStageEnum, OrderStatusEnum, BanquetTypeEnum,
     BanquetHallType, PaymentTypeEnum, DepositStatusEnum,
     TaskStatusEnum,
@@ -840,6 +841,356 @@ async def create_lead_quote(
         "quote_id":           quote.id,
         "quoted_amount_yuan": body.quoted_amount_yuan,
         "valid_until":        valid_until.isoformat(),
+    }
+
+
+# ────────── 线索详情 ──────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/leads/{lead_id}")
+async def get_lead_detail(
+    store_id: str,
+    lead_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """线索详情：客户信息 + 跟进时间线 + 报价列表"""
+    result = await db.execute(
+        select(BanquetLead)
+        .options(
+            selectinload(BanquetLead.customer),
+            selectinload(BanquetLead.followups),
+        )
+        .where(and_(BanquetLead.id == lead_id, BanquetLead.store_id == store_id))
+    )
+    lead = result.scalars().first()
+    if not lead:
+        raise HTTPException(status_code=404, detail="线索不存在")
+
+    quotes_result = await db.execute(
+        select(BanquetQuote)
+        .where(BanquetQuote.lead_id == lead_id)
+        .order_by(BanquetQuote.created_at.desc())
+    )
+    quotes = quotes_result.scalars().all()
+
+    followups_data = [
+        {
+            "followup_id":    f.id,
+            "followup_type":  f.followup_type,
+            "content":        f.content,
+            "stage_before":   f.stage_before.value if f.stage_before else None,
+            "stage_after":    f.stage_after.value if f.stage_after else None,
+            "next_followup_at": f.next_followup_at.isoformat() if f.next_followup_at else None,
+            "created_at":     f.created_at.isoformat() if f.created_at else None,
+        }
+        for f in sorted(lead.followups, key=lambda x: x.created_at or datetime.min, reverse=True)
+    ]
+    quotes_data = [
+        {
+            "quote_id":           q.id,
+            "people_count":       q.people_count,
+            "table_count":        q.table_count,
+            "quoted_amount_yuan": q.quoted_amount_fen / 100,
+            "valid_until":        q.valid_until.isoformat() if q.valid_until else None,
+            "is_accepted":        q.is_accepted,
+            "package_id":         q.package_id,
+            "created_at":         q.created_at.isoformat() if q.created_at else None,
+        }
+        for q in quotes
+    ]
+
+    return {
+        "lead_id":       lead.id,
+        "store_id":      lead.store_id,
+        "banquet_type":  lead.banquet_type.value,
+        "expected_date": lead.expected_date.isoformat() if lead.expected_date else None,
+        "expected_people_count": lead.expected_people_count,
+        "expected_budget_yuan":  (lead.expected_budget_fen or 0) / 100,
+        "preferred_hall_type":   lead.preferred_hall_type.value if lead.preferred_hall_type else None,
+        "source_channel":        lead.source_channel,
+        "current_stage":         lead.current_stage.value,
+        "stage_label":           _LEAD_STAGE_LABELS.get(lead.current_stage.value, lead.current_stage.value),
+        "owner_user_id":         lead.owner_user_id,
+        "last_followup_at":      lead.last_followup_at.isoformat() if lead.last_followup_at else None,
+        "converted_order_id":    lead.converted_order_id,
+        "contact_name":          lead.customer.name if lead.customer else None,
+        "contact_phone":         lead.customer.phone if lead.customer else None,
+        "followups":             followups_data,
+        "quotes":                quotes_data,
+    }
+
+
+# ────────── 报价接受 ──────────────────────────────────────────────────────────
+
+@router.patch("/stores/{store_id}/leads/{lead_id}/quotes/{quote_id}/accept")
+async def accept_quote(
+    store_id: str,
+    lead_id: str,
+    quote_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """接受报价单（is_accepted=True）"""
+    result = await db.execute(
+        select(BanquetQuote)
+        .where(and_(BanquetQuote.id == quote_id, BanquetQuote.lead_id == lead_id))
+    )
+    quote = result.scalars().first()
+    if not quote:
+        raise HTTPException(status_code=404, detail="报价单不存在")
+    if quote.store_id != store_id:
+        raise HTTPException(status_code=403, detail="无权操作")
+
+    quote.is_accepted = True
+    await db.commit()
+    return {
+        "quote_id":   quote_id,
+        "is_accepted": True,
+        "lead_id":    lead_id,
+    }
+
+
+# ────────── 合同管理 ──────────────────────────────────────────────────────────
+
+class ContractSignReq(BaseModel):
+    signed_by: Optional[str] = None
+    file_url: Optional[str] = None
+
+
+@router.get("/stores/{store_id}/orders/{order_id}/contract")
+async def get_contract(
+    store_id: str,
+    order_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """查询订单合同"""
+    # verify order belongs to store
+    order_result = await db.execute(
+        select(BanquetOrder.id).where(
+            and_(BanquetOrder.id == order_id, BanquetOrder.store_id == store_id)
+        )
+    )
+    if not order_result.first():
+        raise HTTPException(status_code=404, detail="订单不存在")
+
+    result = await db.execute(
+        select(BanquetContract).where(BanquetContract.banquet_order_id == order_id)
+    )
+    contract = result.scalars().first()
+    if not contract:
+        return {"contract": None, "order_id": order_id}
+
+    return {
+        "contract": {
+            "contract_id":      contract.id,
+            "contract_no":      contract.contract_no,
+            "contract_status":  contract.contract_status,
+            "file_url":         contract.file_url,
+            "signed_at":        contract.signed_at.isoformat() if contract.signed_at else None,
+            "signed_by":        contract.signed_by,
+        },
+        "order_id": order_id,
+    }
+
+
+@router.post("/stores/{store_id}/orders/{order_id}/contract", status_code=201)
+async def create_contract(
+    store_id: str,
+    order_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """为订单创建合同（自动生成合同号，初始状态 draft）"""
+    order_result = await db.execute(
+        select(BanquetOrder).where(
+            and_(BanquetOrder.id == order_id, BanquetOrder.store_id == store_id)
+        )
+    )
+    order = order_result.scalars().first()
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+
+    # idempotent: return existing contract if already created
+    existing = await db.execute(
+        select(BanquetContract).where(BanquetContract.banquet_order_id == order_id)
+    )
+    if existing.scalars().first():
+        raise HTTPException(status_code=409, detail="合同已存在")
+
+    contract_no = f"BQ-{store_id}-{datetime.utcnow().strftime('%Y%m%d')}-{order_id[:6].upper()}"
+    contract = BanquetContract(
+        id=str(uuid.uuid4()),
+        banquet_order_id=order_id,
+        contract_no=contract_no,
+        contract_status="draft",
+    )
+    db.add(contract)
+    await db.commit()
+    return {
+        "contract_id":     contract.id,
+        "contract_no":     contract_no,
+        "contract_status": "draft",
+    }
+
+
+@router.patch("/stores/{store_id}/orders/{order_id}/contract/sign")
+async def sign_contract(
+    store_id: str,
+    order_id: str,
+    body: ContractSignReq,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """签约（draft → signed）"""
+    order_result = await db.execute(
+        select(BanquetOrder.id).where(
+            and_(BanquetOrder.id == order_id, BanquetOrder.store_id == store_id)
+        )
+    )
+    if not order_result.first():
+        raise HTTPException(status_code=404, detail="订单不存在")
+
+    result = await db.execute(
+        select(BanquetContract).where(BanquetContract.banquet_order_id == order_id)
+    )
+    contract = result.scalars().first()
+    if not contract:
+        raise HTTPException(status_code=404, detail="合同不存在，请先创建合同")
+    if contract.contract_status == "signed":
+        raise HTTPException(status_code=400, detail="合同已签约")
+
+    contract.contract_status = "signed"
+    contract.signed_at = datetime.utcnow()
+    contract.signed_by = body.signed_by or str(current_user.id)
+    if body.file_url:
+        contract.file_url = body.file_url
+    await db.commit()
+    return {
+        "contract_id":     contract.id,
+        "contract_no":     contract.contract_no,
+        "contract_status": "signed",
+        "signed_at":       contract.signed_at.isoformat(),
+    }
+
+
+# ────────── 利润快照 ──────────────────────────────────────────────────────────
+
+class ProfitSnapshotReq(BaseModel):
+    revenue_yuan:         float = Field(ge=0)
+    ingredient_cost_yuan: float = Field(ge=0, default=0)
+    labor_cost_yuan:      float = Field(ge=0, default=0)
+    material_cost_yuan:   float = Field(ge=0, default=0)
+    other_cost_yuan:      float = Field(ge=0, default=0)
+
+
+@router.get("/stores/{store_id}/profit-snapshots")
+async def list_profit_snapshots(
+    store_id: str,
+    month: Optional[str] = Query(None, description="YYYY-MM，过滤宴会月份"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """门店利润快照列表（含订单基本信息）"""
+    stmt = (
+        select(BanquetProfitSnapshot, BanquetOrder.banquet_date, BanquetOrder.banquet_type)
+        .join(BanquetOrder, BanquetProfitSnapshot.banquet_order_id == BanquetOrder.id)
+        .where(BanquetOrder.store_id == store_id)
+    )
+    if month:
+        try:
+            y, m = map(int, month.split("-"))
+            stmt = stmt.where(
+                and_(
+                    func.extract("year",  BanquetOrder.banquet_date) == y,
+                    func.extract("month", BanquetOrder.banquet_date) == m,
+                )
+            )
+        except (ValueError, AttributeError):
+            pass
+
+    stmt = stmt.order_by(BanquetOrder.banquet_date.desc())
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    return [
+        {
+            "snapshot_id":            snap.id,
+            "order_id":               snap.banquet_order_id,
+            "banquet_date":           banquet_date.isoformat() if banquet_date else None,
+            "banquet_type":           banquet_type.value if banquet_type else None,
+            "revenue_yuan":           snap.revenue_fen / 100,
+            "ingredient_cost_yuan":   snap.ingredient_cost_fen / 100,
+            "labor_cost_yuan":        snap.labor_cost_fen / 100,
+            "material_cost_yuan":     snap.material_cost_fen / 100,
+            "other_cost_yuan":        snap.other_cost_fen / 100,
+            "gross_profit_yuan":      snap.gross_profit_fen / 100,
+            "gross_margin_pct":       snap.gross_margin_pct,
+        }
+        for snap, banquet_date, banquet_type in rows
+    ]
+
+
+@router.post("/stores/{store_id}/orders/{order_id}/profit-snapshot", status_code=201)
+async def create_profit_snapshot(
+    store_id: str,
+    order_id: str,
+    body: ProfitSnapshotReq,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """录入/更新订单利润快照"""
+    order_result = await db.execute(
+        select(BanquetOrder.id).where(
+            and_(BanquetOrder.id == order_id, BanquetOrder.store_id == store_id)
+        )
+    )
+    if not order_result.first():
+        raise HTTPException(status_code=404, detail="订单不存在")
+
+    revenue_fen         = int(body.revenue_yuan * 100)
+    ingredient_cost_fen = int(body.ingredient_cost_yuan * 100)
+    labor_cost_fen      = int(body.labor_cost_yuan * 100)
+    material_cost_fen   = int(body.material_cost_yuan * 100)
+    other_cost_fen      = int(body.other_cost_yuan * 100)
+    total_cost_fen      = ingredient_cost_fen + labor_cost_fen + material_cost_fen + other_cost_fen
+    gross_profit_fen    = revenue_fen - total_cost_fen
+    gross_margin_pct    = round(gross_profit_fen / revenue_fen * 100, 1) if revenue_fen > 0 else 0.0
+
+    # upsert: update if exists, create otherwise
+    existing_result = await db.execute(
+        select(BanquetProfitSnapshot).where(BanquetProfitSnapshot.banquet_order_id == order_id)
+    )
+    snap = existing_result.scalars().first()
+    if snap:
+        snap.revenue_fen         = revenue_fen
+        snap.ingredient_cost_fen = ingredient_cost_fen
+        snap.labor_cost_fen      = labor_cost_fen
+        snap.material_cost_fen   = material_cost_fen
+        snap.other_cost_fen      = other_cost_fen
+        snap.gross_profit_fen    = gross_profit_fen
+        snap.gross_margin_pct    = gross_margin_pct
+    else:
+        snap = BanquetProfitSnapshot(
+            id=str(uuid.uuid4()),
+            banquet_order_id=order_id,
+            revenue_fen=revenue_fen,
+            ingredient_cost_fen=ingredient_cost_fen,
+            labor_cost_fen=labor_cost_fen,
+            material_cost_fen=material_cost_fen,
+            other_cost_fen=other_cost_fen,
+            gross_profit_fen=gross_profit_fen,
+            gross_margin_pct=gross_margin_pct,
+        )
+        db.add(snap)
+
+    await db.commit()
+    return {
+        "snapshot_id":       snap.id,
+        "order_id":          order_id,
+        "revenue_yuan":      body.revenue_yuan,
+        "gross_profit_yuan": gross_profit_fen / 100,
+        "gross_margin_pct":  gross_margin_pct,
     }
 
 
