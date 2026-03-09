@@ -405,3 +405,51 @@
   font-size: 11px;
   color: var(--text-secondary, #666);
 }
+
+/* ── Phase 11: 异常事件 ── */
+.excList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.excRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border, #eee);
+}
+
+.excRow:last-child { border-bottom: none; }
+
+.excHigh {
+  background: #fff7ed;
+  margin: 0 -4px;
+  padding: 10px 4px;
+  border-radius: 6px;
+}
+
+.excLeft {
+  flex: 1;
+  min-width: 0;
+}
+
+.excType {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #111);
+}
+
+.excDesc {
+  font-size: 12px;
+  color: var(--text-secondary, #555);
+  margin-top: 2px;
+}
+
+.excTime {
+  font-size: 11px;
+  color: var(--text-secondary, #aaa);
+  margin-top: 3px;
+}

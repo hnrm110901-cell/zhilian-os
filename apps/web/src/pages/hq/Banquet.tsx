@@ -1441,24 +1441,255 @@ function PackagesSection() {
   );
 }
 
+/* ─── Tab6c: 任务模板管理 ─── */
+
+interface TemplateItem {
+  template_id:   string;
+  template_name: string;
+  banquet_type:  string;
+  task_count:    number;
+  version:       number;
+  is_active:     boolean;
+}
+
+interface TaskDefRow {
+  task_name:  string;
+  owner_role: string;
+  days_before: number;
+}
+
+function TemplatesSection() {
+  const [templates,   setTemplates]   = useState<TemplateItem[]>([]);
+  const [loading,     setLoading]     = useState(true);
+  const [tplOpen,     setTplOpen]     = useState(false);
+  const [editingTpl,  setEditingTpl]  = useState<TemplateItem | null>(null);
+  const [saving,      setSaving]      = useState(false);
+
+  // form fields
+  const [fName,       setFName]       = useState('');
+  const [fType,       setFType]       = useState('wedding');
+  const [taskDefs,    setTaskDefs]    = useState<TaskDefRow[]>([
+    { task_name: '', owner_role: 'kitchen', days_before: 1 },
+  ]);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    try {
+      const resp = await apiClient.get(`/api/v1/banquet-agent/stores/${STORE_ID}/templates`);
+      setTemplates(Array.isArray(resp.data) ? resp.data : []);
+    } catch {
+      setTemplates([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { reload(); }, [reload]);
+
+  const openCreate = () => {
+    setEditingTpl(null);
+    setFName('');
+    setFType('wedding');
+    setTaskDefs([{ task_name: '', owner_role: 'kitchen', days_before: 1 }]);
+    setTplOpen(true);
+  };
+
+  const openEdit = async (tpl: TemplateItem) => {
+    setEditingTpl(tpl);
+    setFName(tpl.template_name);
+    setFType(tpl.banquet_type);
+    // Load full task_defs from detail endpoint (use template data if available)
+    setTaskDefs([{ task_name: '(加载中)', owner_role: 'kitchen', days_before: 1 }]);
+    setTplOpen(true);
+    try {
+      const resp = await apiClient.get(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/templates`,
+        { params: { banquet_type: tpl.banquet_type } },
+      );
+      const found = (resp.data as TemplateItem[]).find(t => t.template_id === tpl.template_id);
+      if (found && (found as unknown as { task_defs: TaskDefRow[] }).task_defs) {
+        setTaskDefs((found as unknown as { task_defs: TaskDefRow[] }).task_defs);
+      } else {
+        setTaskDefs([{ task_name: '', owner_role: 'kitchen', days_before: 1 }]);
+      }
+    } catch {
+      setTaskDefs([{ task_name: '', owner_role: 'kitchen', days_before: 1 }]);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!fName.trim()) return;
+    const validDefs = taskDefs.filter(d => d.task_name.trim());
+    setSaving(true);
+    try {
+      if (editingTpl) {
+        await apiClient.patch(
+          `/api/v1/banquet-agent/stores/${STORE_ID}/templates/${editingTpl.template_id}`,
+          { template_name: fName, banquet_type: fType, task_defs: validDefs },
+        );
+      } else {
+        await apiClient.post(
+          `/api/v1/banquet-agent/stores/${STORE_ID}/templates`,
+          { template_name: fName, banquet_type: fType, task_defs: validDefs },
+        );
+      }
+      setTplOpen(false);
+      reload();
+    } catch (e) {
+      handleApiError(e, editingTpl ? '更新模板失败' : '创建模板失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeactivate = async (tpl: TemplateItem) => {
+    try {
+      await apiClient.delete(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/templates/${tpl.template_id}`,
+      );
+      reload();
+    } catch (e) {
+      handleApiError(e, '停用模板失败');
+    }
+  };
+
+  const updateTaskDef = (idx: number, field: keyof TaskDefRow, val: string | number) => {
+    setTaskDefs(prev => prev.map((d, i) => i === idx ? { ...d, [field]: val } : d));
+  };
+
+  const addTaskDef = () => {
+    setTaskDefs(prev => [...prev, { task_name: '', owner_role: 'kitchen', days_before: 1 }]);
+  };
+
+  const removeTaskDef = (idx: number) => {
+    setTaskDefs(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  return (
+    <>
+      <div className={styles.resHeader}>
+        <div className={styles.resSectionTitle}>任务模板</div>
+        <ZButton variant="primary" size="sm" onClick={openCreate}>+ 新建模板</ZButton>
+      </div>
+      {loading ? <ZSkeleton rows={3} /> : templates.length === 0 ? (
+        <ZEmpty title="暂无模板" description="点击「新建模板」添加" />
+      ) : (
+        <div className={styles.resTable}>
+          {templates.map(tpl => (
+            <div
+              key={tpl.template_id}
+              className={`${styles.resRow} ${!tpl.is_active ? styles.resInactiveRow : ''}`}
+            >
+              <div className={styles.resMain}>
+                <div className={styles.resName}>{tpl.template_name}</div>
+                <div className={styles.resMeta}>
+                  {BANQUET_TYPE_LABELS[tpl.banquet_type] ?? tpl.banquet_type}
+                  {' · '}{tpl.task_count}个任务
+                  {' · '}v{tpl.version}
+                </div>
+              </div>
+              <ZBadge type={tpl.is_active ? 'success' : 'default'} text={tpl.is_active ? '启用' : '已停用'} />
+              <div className={styles.resActions}>
+                <ZButton variant="ghost" size="sm" onClick={() => openEdit(tpl)}>编辑</ZButton>
+                {tpl.is_active && (
+                  <ZButton variant="ghost" size="sm" onClick={() => handleDeactivate(tpl)}>停用</ZButton>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <ZModal
+        open={tplOpen}
+        title={editingTpl ? '编辑模板' : '新建模板'}
+        onClose={() => setTplOpen(false)}
+        footer={
+          <div className={styles.resModalFooter}>
+            <ZButton variant="ghost" onClick={() => setTplOpen(false)}>取消</ZButton>
+            <ZButton variant="primary" onClick={handleSave} disabled={saving || !fName.trim()}>
+              {saving ? '保存中…' : '保存'}
+            </ZButton>
+          </div>
+        }
+      >
+        <div className={styles.resForm}>
+          <div className={styles.resField}>
+            <label className={styles.resLabel}>模板名称</label>
+            <ZInput value={fName} onChange={e => setFName(e.target.value)} placeholder="如：婚宴标准执行模板" />
+          </div>
+          <div className={styles.resField}>
+            <label className={styles.resLabel}>适用宴会类型</label>
+            <ZSelect
+              value={fType}
+              options={[
+                { value: 'wedding',  label: '婚宴' },
+                { value: 'birthday', label: '生日宴' },
+                { value: 'business', label: '商务宴' },
+                { value: 'other',    label: '其他' },
+              ]}
+              onChange={v => setFType(v as string)}
+            />
+          </div>
+          <div className={styles.resField}>
+            <label className={styles.resLabel}>任务清单</label>
+            <div className={styles.tplTaskDefs}>
+              {taskDefs.map((d, i) => (
+                <div key={i} className={styles.tplTaskRow}>
+                  <ZInput
+                    value={d.task_name}
+                    onChange={e => updateTaskDef(i, 'task_name', e.target.value)}
+                    placeholder="任务名称"
+                  />
+                  <ZSelect
+                    value={d.owner_role}
+                    options={[
+                      { value: 'kitchen',  label: '厨房' },
+                      { value: 'service',  label: '服务' },
+                      { value: 'decor',    label: '布置' },
+                      { value: 'purchase', label: '采购' },
+                      { value: 'manager',  label: '店长' },
+                    ]}
+                    onChange={v => updateTaskDef(i, 'owner_role', v as string)}
+                  />
+                  <ZInput
+                    type="number"
+                    value={String(d.days_before)}
+                    onChange={e => updateTaskDef(i, 'days_before', parseInt(e.target.value, 10) || 1)}
+                    placeholder="提前天数"
+                  />
+                  <button className={styles.tplRemoveBtn} onClick={() => removeTaskDef(i)}>✕</button>
+                </div>
+              ))}
+            </div>
+            <button className={styles.tplAddBtn} onClick={addTaskDef}>＋ 添加任务</button>
+          </div>
+        </div>
+      </ZModal>
+    </>
+  );
+}
+
 function ResourceTab() {
-  const [subTab, setSubTab] = useState<'halls' | 'packages'>('halls');
+  const [subTab, setSubTab] = useState<'halls' | 'packages' | 'templates'>('halls');
 
   return (
     <div className={styles.tabContent}>
       <div className={styles.resChipBar}>
-        {(['halls', 'packages'] as const).map(t => (
+        {(['halls', 'packages', 'templates'] as const).map(t => (
           <button
             key={t}
             className={`${styles.resChip} ${subTab === t ? styles.resChipActive : ''}`}
             onClick={() => setSubTab(t)}
           >
-            {t === 'halls' ? '厅房' : '套餐'}
+            {t === 'halls' ? '厅房' : t === 'packages' ? '套餐' : '任务模板'}
           </button>
         ))}
       </div>
       <ZCard>
-        {subTab === 'halls' ? <HallsSection /> : <PackagesSection />}
+        {subTab === 'halls'     ? <HallsSection />     :
+         subTab === 'packages'  ? <PackagesSection />  :
+                                  <TemplatesSection />}
       </ZCard>
     </div>
   );
@@ -1511,6 +1742,16 @@ interface ReceivablesData {
   orders:                  AROrder[];
 }
 
+interface ExceptionSummaryItem {
+  id:             string;
+  exception_type: string;
+  severity:       string;
+  description:    string;
+  status:         string;
+  created_at:     string;
+  banquet_type:   string | null;
+}
+
 function AnalyticsTab() {
   const [month,    setMonth]    = useState(() => {
     const d = new Date();
@@ -1520,22 +1761,25 @@ function AnalyticsTab() {
   const [forecast,     setForecast]     = useState<ForecastBucket[]>([]);
   const [lostData,     setLostData]     = useState<LostReason[]>([]);
   const [receivables,  setReceivables]  = useState<ReceivablesData | null>(null);
+  const [openExc,      setOpenExc]      = useState<ExceptionSummaryItem[]>([]);
   const [loading,      setLoading]      = useState(false);
 
   const load = useCallback(async (m: string) => {
     setLoading(true);
     try {
       const STORE = localStorage.getItem('store_id') || 'S001';
-      const [funnelR, forecastR, lostR, arR] = await Promise.allSettled([
+      const [funnelR, forecastR, lostR, arR, excR] = await Promise.allSettled([
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/funnel`, { params: { month: m } }),
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/revenue-forecast`, { params: { months: 3 } }),
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/lost-analysis`, { params: { month: m } }),
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/receivables`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/exceptions`, { params: { status: 'open' } }),
       ]);
       if (funnelR.status === 'fulfilled')   setFunnel(funnelR.value.data);
       if (forecastR.status === 'fulfilled') setForecast(forecastR.value.data?.forecast ?? []);
       if (lostR.status === 'fulfilled')     setLostData(lostR.value.data?.reasons ?? []);
       if (arR.status === 'fulfilled')       setReceivables(arR.value.data);
+      if (excR.status === 'fulfilled')      setOpenExc(Array.isArray(excR.value.data) ? excR.value.data : []);
     } finally {
       setLoading(false);
     }
@@ -1702,6 +1946,31 @@ function AnalyticsTab() {
                   ))}
                 </div>
               </>
+            )}
+          </ZCard>
+
+          {/* 待处理异常 */}
+          <ZCard title={`待处理异常${openExc.length > 0 ? `（${openExc.length}）` : ''}`}>
+            {openExc.length === 0 ? (
+              <ZEmpty title="暂无待处理异常" description="各门店运营正常" />
+            ) : (
+              <div className={styles.excSummaryList}>
+                {openExc.map(exc => (
+                  <div
+                    key={exc.id}
+                    className={`${styles.excSummaryRow} ${exc.severity === 'high' ? styles.excSummaryHigh : ''}`}
+                  >
+                    <div className={styles.excSummaryLeft}>
+                      <span className={styles.excSummaryType}>{exc.exception_type}</span>
+                      <span className={styles.excSummaryDesc}>{exc.description}</span>
+                    </div>
+                    <ZBadge
+                      type={exc.severity === 'high' ? 'default' : 'warning'}
+                      text={exc.severity === 'high' ? '严重' : exc.severity === 'medium' ? '中度' : '轻微'}
+                    />
+                  </div>
+                ))}
+              </div>
             )}
           </ZCard>
         </>

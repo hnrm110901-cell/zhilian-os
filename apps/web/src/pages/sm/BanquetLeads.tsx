@@ -3,9 +3,7 @@
  * 路由：/sm/banquet-leads
  * 数据：GET /api/v1/banquet-agent/stores/{id}/leads?stage=
  *      PATCH /api/v1/banquet-agent/stores/{id}/leads/{lead_id}/stage
- *      POST /api/v1/banquet-agent/stores/{id}/customers  (新建客户)
- *      GET  /api/v1/banquet-agent/stores/{id}/customers?q= (搜索客户)
- *      POST /api/v1/banquet-agent/stores/{id}/leads       (新建线索)
+ *      POST /api/v1/banquet-agent/stores/{id}/customers-with-lead (原子新建)
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -65,13 +63,6 @@ interface LeadItem {
   stage_label:   string;
 }
 
-interface CustomerResult {
-  id:           string;
-  name:         string;
-  phone:        string;
-  customer_type?: string;
-}
-
 export default function SmBanquetLeads() {
   const navigate = useNavigate();
 
@@ -85,19 +76,15 @@ export default function SmBanquetLeads() {
   const [followup,    setFollowup]      = useState('');
   const [submitting,  setSubmitting]    = useState(false);
 
-  // 新建线索 Modal state
-  const [newLeadStep,    setNewLeadStep]    = useState<0 | 1 | 2>(0); // 0=closed,1=search,2=form
-  const [searchPhone,    setSearchPhone]    = useState('');
-  const [searchName,     setSearchName]     = useState('');
-  const [searching,      setSearching]      = useState(false);
-  const [foundCustomer,  setFoundCustomer]  = useState<CustomerResult | null>(null);
-  const [customerError,  setCustomerError]  = useState('');
-  // Step 2 fields
+  // 新建线索 Modal state (单步原子表单)
+  const [nlOpen,         setNlOpen]         = useState(false);
+  const [nlName,         setNlName]         = useState('');
+  const [nlPhone,        setNlPhone]        = useState('');
   const [nlBanquetType,  setNlBanquetType]  = useState('wedding');
   const [nlExpectedDate, setNlExpectedDate] = useState('');
-  const [nlPeople,       setNlPeople]       = useState('');
+  const [nlTables,       setNlTables]       = useState('');
   const [nlBudget,       setNlBudget]       = useState('');
-  const [nlSource,       setNlSource]       = useState('');
+  const [nlRemark,       setNlRemark]       = useState('');
   const [nlSubmitting,   setNlSubmitting]   = useState(false);
 
   const loadLeads = useCallback(async (stage: string) => {
@@ -141,97 +128,35 @@ export default function SmBanquetLeads() {
     }
   };
 
-  // ── 新建线索 ──────────────────────────────────────────────────────────────
+  // ── 新建线索（原子端点）────────────────────────────────────────────────────
   const openNewLead = () => {
-    setNewLeadStep(1);
-    setSearchPhone('');
-    setSearchName('');
-    setFoundCustomer(null);
-    setCustomerError('');
-  };
-
-  const closeNewLead = () => {
-    setNewLeadStep(0);
-    setFoundCustomer(null);
-    setCustomerError('');
+    setNlOpen(true);
+    setNlName('');
+    setNlPhone('');
     setNlBanquetType('wedding');
     setNlExpectedDate('');
-    setNlPeople('');
+    setNlTables('');
     setNlBudget('');
-    setNlSource('');
-  };
-
-  const handleSearchCustomer = async () => {
-    if (!searchPhone.trim() && !searchName.trim()) return;
-    setSearching(true);
-    setCustomerError('');
-    try {
-      const q = searchPhone.trim() || searchName.trim();
-      const resp = await apiClient.get(
-        `/api/v1/banquet-agent/stores/${STORE_ID}/customers`,
-        { params: { q } },
-      );
-      const items: CustomerResult[] = resp.data?.items ?? resp.data ?? [];
-      if (items.length > 0) {
-        setFoundCustomer(items[0]);
-      } else {
-        setFoundCustomer(null);
-        setCustomerError('未找到客户，将自动新建');
-      }
-    } catch {
-      setCustomerError('搜索失败，将自动新建');
-      setFoundCustomer(null);
-    } finally {
-      setSearching(false);
-    }
-  };
-
-  const handleProceedToStep2 = async () => {
-    // If no customer found, create one first
-    let customer = foundCustomer;
-    if (!customer) {
-      if (!searchPhone.trim()) {
-        setCustomerError('请输入手机号以新建客户');
-        return;
-      }
-      try {
-        setSearching(true);
-        const resp = await apiClient.post(
-          `/api/v1/banquet-agent/stores/${STORE_ID}/customers`,
-          {
-            name: searchName.trim() || searchPhone.trim(),
-            phone: searchPhone.trim(),
-            customer_type: 'individual',
-          },
-        );
-        customer = { id: resp.data.id, name: resp.data.name ?? searchName.trim(), phone: searchPhone.trim() };
-        setFoundCustomer(customer);
-      } catch (e) {
-        handleApiError(e, '新建客户失败');
-        return;
-      } finally {
-        setSearching(false);
-      }
-    }
-    setNewLeadStep(2);
+    setNlRemark('');
   };
 
   const handleCreateLead = async () => {
-    if (!foundCustomer || !nlBanquetType) return;
+    if (!nlName.trim() || !nlPhone.trim() || !nlBanquetType) return;
     setNlSubmitting(true);
     try {
       await apiClient.post(
-        `/api/v1/banquet-agent/stores/${STORE_ID}/leads`,
+        `/api/v1/banquet-agent/stores/${STORE_ID}/customers-with-lead`,
         {
-          customer_id:            foundCustomer.id,
-          banquet_type:           nlBanquetType,
-          expected_date:          nlExpectedDate || null,
-          expected_people_count:  nlPeople ? parseInt(nlPeople, 10) : null,
-          expected_budget_yuan:   nlBudget ? parseFloat(nlBudget) : null,
-          source_channel:         nlSource || null,
+          customer_name:    nlName.trim(),
+          phone:            nlPhone.trim(),
+          banquet_type:     nlBanquetType,
+          expected_date:    nlExpectedDate || null,
+          expected_tables:  nlTables ? parseInt(nlTables, 10) : null,
+          budget_yuan:      nlBudget ? parseFloat(nlBudget) : null,
+          remark:           nlRemark.trim() || null,
         },
       );
-      closeNewLead();
+      setNlOpen(false);
       loadLeads(stageFilter);
     } catch (e) {
       handleApiError(e, '创建线索失败');
@@ -341,74 +266,18 @@ export default function SmBanquetLeads() {
         </div>
       </ZModal>
 
-      {/* 新建线索 Step 1：搜索/新建客户 */}
+      {/* 新建线索 Modal（单步，原子端点） */}
       <ZModal
-        open={newLeadStep === 1}
-        title="新建线索 — 第 1 步：选择客户"
-        onClose={closeNewLead}
+        open={nlOpen}
+        title="新建线索"
+        onClose={() => setNlOpen(false)}
         footer={
           <div className={styles.modalFooter}>
-            <ZButton variant="ghost" onClick={closeNewLead}>取消</ZButton>
-            <ZButton
-              variant="primary"
-              onClick={handleProceedToStep2}
-              disabled={searching || (!searchPhone.trim() && !searchName.trim())}
-            >
-              {searching ? '处理中…' : '下一步'}
-            </ZButton>
-          </div>
-        }
-      >
-        <div className={styles.modalBody}>
-          <div className={styles.field}>
-            <label className={styles.label}>手机号</label>
-            <ZInput
-              value={searchPhone}
-              onChange={e => setSearchPhone(e.target.value)}
-              placeholder="输入手机号搜索客户"
-              type="tel"
-            />
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label}>姓名（选填）</label>
-            <ZInput
-              value={searchName}
-              onChange={e => setSearchName(e.target.value)}
-              placeholder="客户姓名"
-            />
-          </div>
-          <ZButton
-            variant="ghost"
-            size="sm"
-            onClick={handleSearchCustomer}
-            disabled={searching || (!searchPhone.trim() && !searchName.trim())}
-          >
-            {searching ? '搜索中…' : '搜索客户'}
-          </ZButton>
-          {foundCustomer && (
-            <div className={styles.customerFound}>
-              <span className={styles.customerFoundIcon}>✓</span>
-              找到客户：<strong>{foundCustomer.name}</strong>（{foundCustomer.phone}）
-            </div>
-          )}
-          {customerError && (
-            <div className={styles.customerHint}>{customerError}</div>
-          )}
-        </div>
-      </ZModal>
-
-      {/* 新建线索 Step 2：填写线索信息 */}
-      <ZModal
-        open={newLeadStep === 2}
-        title="新建线索 — 第 2 步：线索详情"
-        onClose={closeNewLead}
-        footer={
-          <div className={styles.modalFooter}>
-            <ZButton variant="ghost" onClick={() => setNewLeadStep(1)}>上一步</ZButton>
+            <ZButton variant="ghost" onClick={() => setNlOpen(false)}>取消</ZButton>
             <ZButton
               variant="primary"
               onClick={handleCreateLead}
-              disabled={nlSubmitting || !nlBanquetType}
+              disabled={nlSubmitting || !nlName.trim() || !nlPhone.trim() || !nlBanquetType}
             >
               {nlSubmitting ? '提交中…' : '创建线索'}
             </ZButton>
@@ -416,11 +285,25 @@ export default function SmBanquetLeads() {
         }
       >
         <div className={styles.modalBody}>
-          {foundCustomer && (
-            <div className={styles.customerFound}>
-              客户：<strong>{foundCustomer.name}</strong>（{foundCustomer.phone}）
+          <div className={styles.fieldRow}>
+            <div className={styles.field}>
+              <label className={styles.label}>客户姓名</label>
+              <ZInput
+                value={nlName}
+                onChange={e => setNlName(e.target.value)}
+                placeholder="如：张三"
+              />
             </div>
-          )}
+            <div className={styles.field}>
+              <label className={styles.label}>手机号</label>
+              <ZInput
+                value={nlPhone}
+                onChange={e => setNlPhone(e.target.value)}
+                placeholder="13800138000"
+                type="tel"
+              />
+            </div>
+          </div>
           <div className={styles.field}>
             <label className={styles.label}>宴会类型</label>
             <ZSelect
@@ -435,17 +318,16 @@ export default function SmBanquetLeads() {
             <ZInput
               value={nlExpectedDate}
               onChange={e => setNlExpectedDate(e.target.value)}
-              placeholder="YYYY-MM-DD"
               type="date"
             />
           </div>
           <div className={styles.fieldRow}>
             <div className={styles.field}>
-              <label className={styles.label}>预计人数</label>
+              <label className={styles.label}>预计桌数</label>
               <ZInput
-                value={nlPeople}
-                onChange={e => setNlPeople(e.target.value)}
-                placeholder="例：200"
+                value={nlTables}
+                onChange={e => setNlTables(e.target.value)}
+                placeholder="例：20"
                 type="number"
               />
             </div>
@@ -460,11 +342,11 @@ export default function SmBanquetLeads() {
             </div>
           </div>
           <div className={styles.field}>
-            <label className={styles.label}>来源渠道（选填）</label>
+            <label className={styles.label}>备注（选填）</label>
             <ZInput
-              value={nlSource}
-              onChange={e => setNlSource(e.target.value)}
-              placeholder="如：口碑推荐、美团、自然到访"
+              value={nlRemark}
+              onChange={e => setNlRemark(e.target.value)}
+              placeholder="如：口碑推荐，有特殊需求"
             />
           </div>
         </div>

@@ -163,6 +163,23 @@ export default function SmBanquetOrderDetail() {
   const [timeline,        setTimeline]        = useState<TimelineEvent[]>([]);
   const [timelineLoading, setTimelineLoading] = useState(false);
 
+  // 上报异常 state
+  interface ExceptionItem {
+    id:             string;
+    exception_type: string;
+    description:    string;
+    severity:       string;
+    status:         string;
+    created_at:     string;
+  }
+  const [exceptions,    setExceptions]    = useState<ExceptionItem[]>([]);
+  const [excLoading,    setExcLoading]    = useState(false);
+  const [excOpen,       setExcOpen]       = useState(false);
+  const [excType,       setExcType]       = useState('late');
+  const [excDesc,       setExcDesc]       = useState('');
+  const [excSeverity,   setExcSeverity]   = useState('medium');
+  const [reporting,     setReporting]     = useState(false);
+
   const loadOrder = useCallback(async () => {
     if (!orderId) return;
     setLoading(true);
@@ -196,6 +213,24 @@ export default function SmBanquetOrderDetail() {
   }, [orderId]);
 
   useEffect(() => { loadTimeline(); }, [loadTimeline]);
+
+  const loadExceptions = useCallback(async () => {
+    if (!orderId) return;
+    setExcLoading(true);
+    try {
+      const resp = await apiClient.get(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/exceptions`,
+        { params: { order_id: orderId } },
+      );
+      setExceptions(Array.isArray(resp.data) ? resp.data : []);
+    } catch {
+      setExceptions([]);
+    } finally {
+      setExcLoading(false);
+    }
+  }, [orderId]);
+
+  useEffect(() => { loadExceptions(); }, [loadExceptions]);
 
   const loadContract = useCallback(async () => {
     if (!orderId) return;
@@ -379,6 +414,26 @@ export default function SmBanquetOrderDetail() {
       handleApiError(e, '添加任务失败');
     } finally {
       setAddingTask(false);
+    }
+  };
+
+  const handleReportException = async () => {
+    if (!excDesc.trim()) return;
+    setReporting(true);
+    try {
+      await apiClient.post(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/orders/${orderId}/exceptions`,
+        { exception_type: excType, description: excDesc.trim(), severity: excSeverity },
+      );
+      setExcOpen(false);
+      setExcDesc('');
+      setExcType('late');
+      setExcSeverity('medium');
+      await loadExceptions();
+    } catch (e) {
+      handleApiError(e, '上报异常失败');
+    } finally {
+      setReporting(false);
     }
   };
 
@@ -651,6 +706,40 @@ export default function SmBanquetOrderDetail() {
             </div>
           )}
         </ZCard>
+
+        {/* 异常事件 */}
+        <ZCard>
+          <div className={styles.sectionHeader}>
+            <div className={styles.sectionTitle}>异常事件</div>
+            {['confirmed', 'preparing', 'in_progress'].includes(order.status) && (
+              <ZButton variant="ghost" size="sm" onClick={() => setExcOpen(true)}>上报异常</ZButton>
+            )}
+          </div>
+          {excLoading ? (
+            <ZSkeleton rows={2} />
+          ) : exceptions.length === 0 ? (
+            <ZEmpty title="暂无异常" description="发现问题可在此上报" />
+          ) : (
+            <div className={styles.excList}>
+              {exceptions.map(exc => (
+                <div
+                  key={exc.id}
+                  className={`${styles.excRow} ${exc.severity === 'high' ? styles.excHigh : ''}`}
+                >
+                  <div className={styles.excLeft}>
+                    <div className={styles.excType}>{exc.exception_type}</div>
+                    <div className={styles.excDesc}>{exc.description}</div>
+                    <div className={styles.excTime}>{dayjs(exc.created_at).format('MM-DD HH:mm')}</div>
+                  </div>
+                  <ZBadge
+                    type={exc.status === 'resolved' ? 'success' : exc.severity === 'high' ? 'default' : 'warning'}
+                    text={exc.status === 'resolved' ? '已处理' : exc.severity === 'high' ? '严重' : exc.severity === 'medium' ? '中度' : '轻微'}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </ZCard>
       </div>
 
       {/* 结算 Modal */}
@@ -878,6 +967,60 @@ export default function SmBanquetOrderDetail() {
               type="datetime-local"
               value={newTaskDueTime}
               onChange={e => setNewTaskDueTime(e.target.value)}
+            />
+          </div>
+        </div>
+      </ZModal>
+      {/* 上报异常 Modal */}
+      <ZModal
+        open={excOpen}
+        title="上报异常事件"
+        onClose={() => setExcOpen(false)}
+        footer={
+          <div className={styles.settleFooter}>
+            <ZButton variant="ghost" onClick={() => setExcOpen(false)}>取消</ZButton>
+            <ZButton
+              variant="primary"
+              onClick={handleReportException}
+              disabled={reporting || !excDesc.trim()}
+            >
+              {reporting ? '提交中…' : '上报'}
+            </ZButton>
+          </div>
+        }
+      >
+        <div className={styles.settleForm}>
+          <div className={styles.settleField}>
+            <label className={styles.settleLabel}>异常类型</label>
+            <ZSelect
+              value={excType}
+              options={[
+                { value: 'late',      label: '迟到/延误' },
+                { value: 'missing',   label: '物品缺失' },
+                { value: 'quality',   label: '质量问题' },
+                { value: 'complaint', label: '客诉' },
+              ]}
+              onChange={v => setExcType(v as string)}
+            />
+          </div>
+          <div className={styles.settleField}>
+            <label className={styles.settleLabel}>异常描述</label>
+            <ZInput
+              value={excDesc}
+              onChange={e => setExcDesc(e.target.value)}
+              placeholder="描述具体情况…"
+            />
+          </div>
+          <div className={styles.settleField}>
+            <label className={styles.settleLabel}>严重程度</label>
+            <ZSelect
+              value={excSeverity}
+              options={[
+                { value: 'low',    label: '轻微' },
+                { value: 'medium', label: '中度' },
+                { value: 'high',   label: '严重' },
+              ]}
+              onChange={v => setExcSeverity(v as string)}
             />
           </div>
         </div>

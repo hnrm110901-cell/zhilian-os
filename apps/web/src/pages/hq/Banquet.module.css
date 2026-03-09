@@ -920,3 +920,92 @@
 .targetBarDone {
   background: #16a34a;
 }
+
+/* ── Phase 11: 任务模板 ── */
+.tplTaskDefs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.tplTaskRow {
+  display: grid;
+  grid-template-columns: 1fr 100px 80px 24px;
+  gap: 6px;
+  align-items: center;
+}
+
+.tplRemoveBtn {
+  background: none;
+  border: none;
+  color: var(--text-secondary, #aaa);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+}
+
+.tplRemoveBtn:hover { color: #dc2626; }
+
+.tplAddBtn {
+  background: none;
+  border: 1px dashed var(--border, #ddd);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--accent, #ff6b2c);
+  cursor: pointer;
+  width: 100%;
+  text-align: center;
+}
+
+.tplAddBtn:hover { background: var(--surface-hover, #f9f9f9); }
+
+/* ── Phase 11: 异常汇总 ── */
+.excSummaryList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.excSummaryRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border, #eee);
+}
+
+.excSummaryRow:last-child { border-bottom: none; }
+
+.excSummaryHigh {
+  background: #fff7ed;
+  margin: 0 -4px;
+  padding: 8px 4px;
+  border-radius: 6px;
+  border-bottom: none;
+}
+
+.excSummaryLeft {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.excSummaryType {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #111);
+}
+
+.excSummaryDesc {
+  font-size: 12px;
+  color: var(--text-secondary, #555);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

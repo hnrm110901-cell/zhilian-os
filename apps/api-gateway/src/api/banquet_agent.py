@@ -18,7 +18,7 @@ from src.core.security import get_current_user
 from src.models.user import User
 from src.models.banquet import (
     BanquetHall, BanquetCustomer, BanquetLead, BanquetOrder,
-    MenuPackage, ExecutionTask, BanquetPaymentRecord,
+    MenuPackage, ExecutionTask, ExecutionTemplate, ExecutionException, BanquetPaymentRecord,
     BanquetHallBooking, BanquetKpiDaily, BanquetQuote,
     BanquetContract, BanquetProfitSnapshot, LeadFollowupRecord,
     LeadStageEnum, OrderStatusEnum, BanquetTypeEnum,
@@ -2789,6 +2789,353 @@ async def get_order_timeline(
 
     events.sort(key=lambda e: e["time"])
     return {"order_id": order_id, "events": events}
+
+
+# ────────── Phase 11：任务模板管理 · 异常事件 · 快速创建线索 ─────────────────────
+
+# ── 执行任务模板 ──────────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/templates")
+async def list_templates(
+    store_id: str,
+    banquet_type: Optional[str] = Query(None, description="按宴会类型过滤"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """列出执行任务模板（仅返回 is_active=True）"""
+    stmt = select(ExecutionTemplate).where(
+        and_(ExecutionTemplate.store_id == store_id, ExecutionTemplate.is_active == True)
+    )
+    if banquet_type:
+        try:
+            stmt = stmt.where(ExecutionTemplate.banquet_type == BanquetTypeEnum(banquet_type))
+        except ValueError:
+            pass
+    stmt = stmt.order_by(ExecutionTemplate.created_at.desc())
+    templates = (await db.execute(stmt)).scalars().all()
+    return [
+        {
+            "template_id":   t.id,
+            "template_name": t.template_name,
+            "banquet_type":  t.banquet_type.value if t.banquet_type else None,
+            "task_count":    len(t.task_defs) if isinstance(t.task_defs, list) else 0,
+            "version":       t.version,
+            "is_active":     t.is_active,
+        }
+        for t in templates
+    ]
+
+
+class _TemplateBody(BaseModel):
+    template_name: str = Field(..., min_length=1, max_length=200)
+    banquet_type:  Optional[str] = Field(None, description="wedding/birthday/business/... 或留空=通用")
+    task_defs:     list = Field(..., description="任务定义列表：[{task_name, owner_role, days_before}]")
+
+
+@router.post("/stores/{store_id}/templates", status_code=201)
+async def create_template(
+    store_id: str,
+    body: _TemplateBody,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """创建执行任务模板"""
+    bt = None
+    if body.banquet_type:
+        try:
+            bt = BanquetTypeEnum(body.banquet_type)
+        except ValueError:
+            raise HTTPException(status_code=422, detail=f"无效宴会类型: {body.banquet_type}")
+
+    tpl = ExecutionTemplate(
+        id=str(uuid.uuid4()),
+        store_id=store_id,
+        template_name=body.template_name,
+        banquet_type=bt,
+        task_defs=body.task_defs,
+        version=1,
+        is_active=True,
+    )
+    db.add(tpl)
+    await db.commit()
+    await db.refresh(tpl)
+    return {
+        "template_id":   tpl.id,
+        "template_name": tpl.template_name,
+        "banquet_type":  tpl.banquet_type.value if tpl.banquet_type else None,
+        "task_count":    len(tpl.task_defs) if isinstance(tpl.task_defs, list) else 0,
+    }
+
+
+class _TemplatePatch(BaseModel):
+    template_name: Optional[str] = None
+    banquet_type:  Optional[str] = None
+    task_defs:     Optional[list] = None
+    is_active:     Optional[bool] = None
+
+
+@router.patch("/stores/{store_id}/templates/{template_id}", status_code=200)
+async def update_template(
+    store_id: str,
+    template_id: str,
+    body: _TemplatePatch,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """更新执行任务模板"""
+    stmt = select(ExecutionTemplate).where(
+        and_(ExecutionTemplate.id == template_id, ExecutionTemplate.store_id == store_id)
+    )
+    tpl = (await db.execute(stmt)).scalars().first()
+    if tpl is None:
+        raise HTTPException(status_code=404, detail="模板不存在")
+
+    if body.template_name is not None:
+        tpl.template_name = body.template_name
+    if body.banquet_type is not None:
+        try:
+            tpl.banquet_type = BanquetTypeEnum(body.banquet_type) if body.banquet_type else None
+        except ValueError:
+            raise HTTPException(status_code=422, detail=f"无效宴会类型: {body.banquet_type}")
+    if body.task_defs is not None:
+        tpl.task_defs = body.task_defs
+        tpl.version = (tpl.version or 1) + 1
+    if body.is_active is not None:
+        tpl.is_active = body.is_active
+
+    await db.commit()
+    return {
+        "template_id":   tpl.id,
+        "template_name": tpl.template_name,
+        "task_count":    len(tpl.task_defs) if isinstance(tpl.task_defs, list) else 0,
+        "version":       tpl.version,
+        "is_active":     tpl.is_active,
+    }
+
+
+@router.delete("/stores/{store_id}/templates/{template_id}", status_code=200)
+async def deactivate_template(
+    store_id: str,
+    template_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """软停用模板（is_active=False）"""
+    stmt = select(ExecutionTemplate).where(
+        and_(ExecutionTemplate.id == template_id, ExecutionTemplate.store_id == store_id)
+    )
+    tpl = (await db.execute(stmt)).scalars().first()
+    if tpl is None:
+        raise HTTPException(status_code=404, detail="模板不存在")
+    tpl.is_active = False
+    await db.commit()
+    return {"template_id": template_id, "is_active": False}
+
+
+# ── 异常事件 ──────────────────────────────────────────────────────────────────
+
+class _ExceptionBody(BaseModel):
+    exception_type: str = Field(..., description="late/missing/quality/complaint")
+    description:    str = Field(..., min_length=1)
+    severity:       str = Field("medium", description="low/medium/high")
+
+
+@router.post("/stores/{store_id}/orders/{order_id}/exceptions", status_code=201)
+async def report_exception(
+    store_id: str,
+    order_id: str,
+    body: _ExceptionBody,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """上报执行异常事件"""
+    order_stmt = select(BanquetOrder).where(
+        and_(BanquetOrder.id == order_id, BanquetOrder.store_id == store_id)
+    )
+    if (await db.execute(order_stmt)).scalars().first() is None:
+        raise HTTPException(status_code=404, detail="订单不存在")
+
+    if body.exception_type not in ("late", "missing", "quality", "complaint"):
+        raise HTTPException(status_code=422, detail=f"无效异常类型: {body.exception_type}")
+    if body.severity not in ("low", "medium", "high"):
+        raise HTTPException(status_code=422, detail=f"无效严重程度: {body.severity}")
+
+    exc = ExecutionException(
+        id=str(uuid.uuid4()),
+        banquet_order_id=order_id,
+        exception_type=body.exception_type,
+        description=body.description,
+        severity=body.severity,
+        owner_user_id=current_user.id,
+        status="open",
+    )
+    db.add(exc)
+    await db.commit()
+    await db.refresh(exc)
+    return {
+        "exception_id":  exc.id,
+        "exception_type": exc.exception_type,
+        "description":   exc.description,
+        "severity":      exc.severity,
+        "status":        exc.status,
+        "created_at":    exc.created_at.isoformat() if exc.created_at else None,
+    }
+
+
+@router.get("/stores/{store_id}/exceptions")
+async def list_exceptions(
+    store_id: str,
+    status: Optional[str] = Query(None, description="open|resolved"),
+    order_id: Optional[str] = Query(None, description="按订单过滤"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """查看全店异常事件列表"""
+    stmt = (
+        select(ExecutionException, BanquetOrder.banquet_type)
+        .join(BanquetOrder, ExecutionException.banquet_order_id == BanquetOrder.id)
+        .where(BanquetOrder.store_id == store_id)
+        .order_by(ExecutionException.created_at.desc())
+    )
+    if status in ("open", "resolved"):
+        stmt = stmt.where(ExecutionException.status == status)
+    if order_id:
+        stmt = stmt.where(ExecutionException.banquet_order_id == order_id)
+
+    rows = (await db.execute(stmt)).all()
+    return [
+        {
+            "exception_id":  exc.id,
+            "order_id":      exc.banquet_order_id,
+            "banquet_type":  bt.value if bt else None,
+            "exception_type": exc.exception_type,
+            "description":   exc.description,
+            "severity":      exc.severity,
+            "status":        exc.status,
+            "created_at":    exc.created_at.isoformat() if exc.created_at else None,
+            "resolved_at":   exc.resolved_at.isoformat() if exc.resolved_at else None,
+        }
+        for exc, bt in rows
+    ]
+
+
+@router.patch("/stores/{store_id}/exceptions/{exception_id}/resolve", status_code=200)
+async def resolve_exception(
+    store_id: str,
+    exception_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """解决异常事件"""
+    stmt = (
+        select(ExecutionException)
+        .join(BanquetOrder, ExecutionException.banquet_order_id == BanquetOrder.id)
+        .where(
+            and_(
+                ExecutionException.id == exception_id,
+                BanquetOrder.store_id == store_id,
+            )
+        )
+    )
+    exc = (await db.execute(stmt)).scalars().first()
+    if exc is None:
+        raise HTTPException(status_code=404, detail="异常记录不存在")
+
+    exc.status = "resolved"
+    exc.resolved_at = datetime.utcnow()
+    await db.commit()
+    return {
+        "exception_id": exc.id,
+        "status":       exc.status,
+        "resolved_at":  exc.resolved_at.isoformat(),
+    }
+
+
+# ── 快速创建客户 + 线索 ───────────────────────────────────────────────────────
+
+class _CustomerLeadBody(BaseModel):
+    customer_name:   str = Field(..., min_length=1, max_length=100)
+    phone:           Optional[str] = Field(None, max_length=20)
+    banquet_type:    str = Field(..., description="wedding/birthday/business/...")
+    expected_date:   Optional[str] = Field(None, description="YYYY-MM-DD")
+    expected_tables: Optional[int] = Field(None, ge=1)
+    budget_yuan:     Optional[float] = Field(None, gt=0)
+    remark:          Optional[str] = None
+
+
+@router.post("/stores/{store_id}/customers-with-lead", status_code=201)
+async def create_customer_with_lead(
+    store_id: str,
+    body: _CustomerLeadBody,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """原子创建客户+线索；同名同电话客户自动复用（幂等）"""
+    # Validate banquet_type
+    try:
+        bt = BanquetTypeEnum(body.banquet_type)
+    except ValueError:
+        raise HTTPException(status_code=422, detail=f"无效宴会类型: {body.banquet_type}")
+
+    # Find or create customer
+    customer: Optional[BanquetCustomer] = None
+    if body.phone:
+        cust_stmt = select(BanquetCustomer).where(
+            and_(
+                BanquetCustomer.store_id == store_id,
+                BanquetCustomer.phone == body.phone,
+            )
+        )
+        customer = (await db.execute(cust_stmt)).scalars().first()
+
+    if customer is None:
+        customer = BanquetCustomer(
+            id=str(uuid.uuid4()),
+            brand_id=getattr(current_user, "brand_id", store_id),
+            store_id=store_id,
+            name=body.customer_name,
+            phone=body.phone or "",
+        )
+        db.add(customer)
+        await db.flush()   # get customer.id
+
+    # Parse expected_date
+    exp_date = None
+    if body.expected_date:
+        try:
+            from datetime import date as _date
+            exp_date = _date.fromisoformat(body.expected_date)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="expected_date 格式错误，请用 YYYY-MM-DD")
+
+    # Create lead
+    lead = BanquetLead(
+        id=str(uuid.uuid4()),
+        customer_id=customer.id,
+        store_id=store_id,
+        banquet_type=bt,
+        expected_date=exp_date,
+        expected_people_count=(body.expected_tables * 10) if body.expected_tables else None,
+        expected_budget_fen=int(body.budget_yuan * 100) if body.budget_yuan else None,
+        current_stage=LeadStageEnum.NEW,
+        owner_user_id=current_user.id,
+    )
+    db.add(lead)
+    await db.flush()
+
+    # Optional initial followup note
+    if body.remark:
+        note = LeadFollowupRecord(
+            id=str(uuid.uuid4()),
+            lead_id=lead.id,
+            followup_type="remark",
+            content=body.remark,
+            created_by=current_user.id,
+        )
+        db.add(note)
+
+    await db.commit()
+    return {"customer_id": customer.id, "lead_id": lead.id}
 
 
 # ────────── Agent 接口 ────────────────────────────────────────────────────────
