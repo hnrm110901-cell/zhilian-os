@@ -10,10 +10,11 @@ interface ZKpiProps {
   changeLabel?: string;  // 如 "较昨日"
   size?: 'sm' | 'md' | 'lg';
   status?: 'good' | 'warning' | 'critical' | string;
+  color?: string;
 }
 
 export default function ZKpi({
-  value, label, unit, prefix, change, changeLabel, size = 'md',
+  value, label, unit, prefix, change, changeLabel, size = 'md', color,
 }: ZKpiProps) {
   const changeDir = change == null ? null : change > 0 ? 'up' : change < 0 ? 'down' : 'flat';
   const changeSymbol = change == null ? '' : change > 0 ? '↑' : change < 0 ? '↓' : '—';
@@ -22,7 +23,7 @@ export default function ZKpi({
     <div className={styles.kpi}>
       <div className={styles.label}>{label}</div>
       <div className={styles.valueRow}>
-        <span className={`${styles.value} ${styles[size]}`}>{prefix ?? ''}{value}</span>
+        <span className={`${styles.value} ${styles[size]}`} style={color ? { color } : undefined}>{prefix ?? ''}{value}</span>
         {unit && <span className={styles.unit}>{unit}</span>}
       </div>
       {change != null && (

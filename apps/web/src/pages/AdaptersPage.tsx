@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Card, Table, Button, Tag, Space, Form, Input, Select, Modal, Alert, InputNumber } from 'antd';
-import { PlusOutlined, SyncOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Card, Table, Button, Tag, Space, Form, Input, Select, Modal, Alert, InputNumber, Statistic, Row, Col, Tooltip } from 'antd';
+import { PlusOutlined, SyncOutlined, ReloadOutlined, PlayCircleOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { apiClient } from '../services/api';
 import { handleApiError, showSuccess } from '../utils/message';
 
@@ -16,9 +16,20 @@ interface AdapterItem {
   last_sync?: string;
 }
 
+interface AdapterStatusItem {
+  adapter: string;
+  status: string;
+  last_sync: string;
+  error_rate: number;
+  sync_count_today: number;
+  last_error: string | null;
+}
+
 const AdaptersPage: React.FC = () => {
   const [adapters, setAdapters] = useState<AdapterItem[]>([]);
+  const [adapterStatuses, setAdapterStatuses] = useState<AdapterStatusItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [triggeringSync, setTriggeringSync] = useState<Record<string, boolean>>({});
   const [registerVisible, setRegisterVisible] = useState(false);
   const [, setSyncLoading] = useState<Record<string, boolean>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -41,7 +52,29 @@ const AdaptersPage: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => { loadAdapters(); }, [loadAdapters]);
+  const loadAdapterStatuses = useCallback(async () => {
+    try {
+      const res = await apiClient.get<{ adapters: AdapterStatusItem[] }>('/api/v1/adapters/status');
+      setAdapterStatuses(res.adapters ?? []);
+    } catch {
+      // fail silently — status endpoint may not be available
+    }
+  }, []);
+
+  const triggerSync = async (adapterName: string, storeId = 'all') => {
+    setTriggeringSync((prev) => ({ ...prev, [adapterName]: true }));
+    try {
+      await apiClient.post(`/api/v1/adapters/${adapterName}/${storeId}/trigger-sync?sync_type=all`);
+      showSuccess(`${adapterName} 同步已触发`);
+      await loadAdapterStatuses();
+    } catch (err) {
+      handleApiError(err, '触发同步失败');
+    } finally {
+      setTriggeringSync((prev) => ({ ...prev, [adapterName]: false }));
+    }
+  };
+
+  useEffect(() => { loadAdapters(); loadAdapterStatuses(); }, [loadAdapters, loadAdapterStatuses]);
 
   const registerAdapter = async (values: Record<string, unknown>) => {
     setSubmitting(true);
@@ -141,17 +174,70 @@ const AdaptersPage: React.FC = () => {
     { title: '状态', dataIndex: 'status', key: 'status', render: (v: string) => <Tag color={v === 'active' ? 'green' : 'orange'}>{v === 'active' ? '已激活' : v || '-'}</Tag> },
     { title: '注册时间', dataIndex: 'registered_at', key: 'registered_at', ellipsis: true },
     { title: '最后同步', dataIndex: 'last_sync', key: 'last_sync', ellipsis: true },
+    {
+      title: '操作',
+      key: 'action',
+      render: (_: unknown, record: AdapterItem) => (
+        <Tooltip title="手动触发全量同步">
+          <Button
+            size="small"
+            icon={<PlayCircleOutlined />}
+            loading={triggeringSync[record.adapter_name]}
+            onClick={() => triggerSync(record.adapter_name)}
+          >
+            同步
+          </Button>
+        </Tooltip>
+      ),
+    },
+  ];
+
+  const statusColumns = [
+    { title: '适配器', dataIndex: 'adapter', key: 'adapter', render: (v: string) => <Tag>{systemLabel[v] || v}</Tag> },
+    {
+      title: '健康状态', dataIndex: 'status', key: 'status',
+      render: (v: string) => v === 'connected'
+        ? <Tag icon={<CheckCircleOutlined />} color="success">正常</Tag>
+        : <Tag icon={<ExclamationCircleOutlined />} color="error">异常</Tag>,
+    },
+    { title: '今日同步次数', dataIndex: 'sync_count_today', key: 'count' },
+    {
+      title: '错误率', dataIndex: 'error_rate', key: 'error',
+      render: (v: number) => <Tag color={v > 0.1 ? 'red' : v > 0 ? 'orange' : 'green'}>{(v * 100).toFixed(1)}%</Tag>,
+    },
+    { title: '最后同步', dataIndex: 'last_sync', key: 'last_sync', ellipsis: true, render: (v: string) => v ? new Date(v).toLocaleString('zh-CN') : '-' },
   ];
 
   const syncTitle: Record<string, string> = { order: '同步订单', dishes: '同步菜品', inventory: '同步库存', all: '全量同步' };
 
   return (
     <div>
+      {adapterStatuses.length > 0 && (
+        <Card title="适配器健康状态" size="small" style={{ marginBottom: 12 }}
+          extra={<Button size="small" icon={<ReloadOutlined />} onClick={loadAdapterStatuses}>刷新</Button>}
+        >
+          <Row gutter={12} style={{ marginBottom: 12 }}>
+            <Col span={6}>
+              <Statistic title="已连接" value={adapterStatuses.filter(a => a.status === 'connected').length} suffix={`/ ${adapterStatuses.length}`} />
+            </Col>
+            <Col span={6}>
+              <Statistic title="今日同步总次数" value={adapterStatuses.reduce((s, a) => s + a.sync_count_today, 0)} />
+            </Col>
+          </Row>
+          <Table
+            columns={statusColumns}
+            dataSource={adapterStatuses}
+            rowKey="adapter"
+            size="small"
+            pagination={false}
+          />
+        </Card>
+      )}
       <Card
         title="第三方适配器管理"
         extra={
           <Space>
-            <Button icon={<ReloadOutlined />} onClick={loadAdapters}>刷新</Button>
+            <Button icon={<ReloadOutlined />} onClick={() => { loadAdapters(); loadAdapterStatuses(); }}>刷新</Button>
             <Button icon={<SyncOutlined />} onClick={() => openSync('dishes')}>同步菜品</Button>
             <Button icon={<SyncOutlined />} onClick={() => openSync('all')}>全量同步</Button>
             <Button type="primary" icon={<PlusOutlined />} onClick={() => setRegisterVisible(true)}>注册适配器</Button>

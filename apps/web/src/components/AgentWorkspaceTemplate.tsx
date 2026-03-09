@@ -122,7 +122,7 @@ const AgentWorkspaceTemplate: React.FC<AgentWorkspaceTemplateProps> = ({
           <div className={styles.headerMeta}>
             <div className={styles.titleRow}>
               <span className={styles.agentName}>{agentName}</span>
-              <ZBadge type={statusCfg.type}>{statusCfg.label}</ZBadge>
+              <ZBadge type={statusCfg.type} text={statusCfg.label} />
             </div>
             {description && (
               <p className={styles.description}>{description}</p>
@@ -133,8 +133,7 @@ const AgentWorkspaceTemplate: React.FC<AgentWorkspaceTemplateProps> = ({
           {headerExtra}
           {onRefresh && (
             <ZButton
-              size="small"
-              icon={<ReloadOutlined />}
+              size="sm"
               loading={loading}
               onClick={onRefresh}
             >
@@ -150,7 +149,7 @@ const AgentWorkspaceTemplate: React.FC<AgentWorkspaceTemplateProps> = ({
           {isKpiLoading
             ? Array.from({ length: Math.min(kpis.length || 4, 6) }).map((_, i) => (
                 <div key={i} className={styles.kpiCard}>
-                  <ZSkeleton active rows={2} />
+                  <ZSkeleton rows={2} />
                 </div>
               ))
             : kpis.slice(0, 6).map((kpi, i) => (

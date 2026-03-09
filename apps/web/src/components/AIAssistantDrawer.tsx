@@ -16,7 +16,7 @@ import {
   SendOutlined,
   EnvironmentOutlined,
 } from '@ant-design/icons';
-import apiClient from '../api/apiClient';
+import { apiClient } from '../services/api';
 import AISuggestionCard from '../design-system/components/AISuggestionCard';
 
 const { Text, Paragraph } = Typography;

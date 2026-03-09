@@ -87,7 +87,7 @@ const MultiStoreManagement: React.FC = () => {
   const [transferSubmitting, setTransferSubmitting] = useState(false);
   const [transferActionLoadingId, setTransferActionLoadingId] = useState<string | null>(null);
   const [transferFilterStoreId, setTransferFilterStoreId] = useState<string | undefined>(undefined);
-  const [transferFilterStatus, setTransferFilterStatus] = useState<string | undefined>(undefined);
+  const [transferFilterStatus, setTransferFilterStatus] = useState<import('../services/inventoryData').TransferRequestQueryStatus | undefined>(undefined);
   const [transferActionModalVisible, setTransferActionModalVisible] = useState(false);
   const [pendingActionDecisionId, setPendingActionDecisionId] = useState<string | null>(null);
   const [pendingActionType, setPendingActionType] = useState<TransferActionType>('approve');

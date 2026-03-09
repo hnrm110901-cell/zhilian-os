@@ -8,6 +8,7 @@ import { queryHomeSummary } from '../../services/mobile.query.service';
 import type { MobileHomeSummaryResponse } from '../../services/mobile.types';
 import { apiClient } from '../../services/api';
 import { handleApiError, showInfo, showSuccess } from '../../utils/message';
+import RecommendationCard from '../../components/RecommendationCard';
 import styles from './Home.module.css';
 
 const STORE_ID = localStorage.getItem('store_id') || 'STORE001';
@@ -527,6 +528,11 @@ export default function SmHome() {
           </ZCard>
         </div>
       )}
+
+      {/* AI 经营推荐 */}
+      <div style={{ margin: '0 12px 12px' }}>
+        <RecommendationCard storeId={STORE_ID} compact maxItems={3} />
+      </div>
 
       <Modal
         title="处理人力建议"

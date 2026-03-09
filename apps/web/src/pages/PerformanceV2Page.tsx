@@ -212,7 +212,7 @@ function DashboardTab({ storeId, brandId, period }: { storeId: string; brandId: 
           <ZKpi
             label="总能量值（本周）"
             value={data.gamification.total_energy_store}
-            suffix="pts"
+            unit="pts"
             color="#faad14"
           />
         </Col>
@@ -220,7 +220,7 @@ function DashboardTab({ storeId, brandId, period }: { storeId: string; brandId: 
           <ZKpi
             label="高危预警"
             value={data.alert_summary.high}
-            suffix="条"
+            unit="条"
             color={data.alert_summary.high > 0 ? '#f5222d' : '#52c41a'}
           />
         </Col>
@@ -228,7 +228,7 @@ function DashboardTab({ storeId, brandId, period }: { storeId: string; brandId: 
           <ZKpi
             label="中等预警"
             value={data.alert_summary.medium}
-            suffix="条"
+            unit="条"
             color={data.alert_summary.medium > 0 ? '#fa8c16' : '#52c41a'}
           />
         </Col>
@@ -236,7 +236,7 @@ function DashboardTab({ storeId, brandId, period }: { storeId: string; brandId: 
           <ZKpi
             label="OKR整体进度"
             value={okr ? Math.round((okr.overall_progress || 0) * 100) : 0}
-            suffix="%"
+            unit="%"
             color="#1890ff"
           />
         </Col>

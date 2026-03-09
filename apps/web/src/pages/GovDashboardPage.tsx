@@ -219,27 +219,27 @@ const GovDashboardPage: React.FC = () => {
 
       {/* 图表行：饼 + 折线 */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12, marginBottom: 12 }}>
-        <ZCard title="决策状态分布" size="small">
+        <ZCard title="决策状态分布">
           {data && data.status_dist.length > 0
             ? <ReactECharts option={pieOption} style={{ height: 220 }} />
-            : <ZEmpty style={{ height: 220 }} />}
+            : <div style={{ height: 220 }}><ZEmpty /></div>}
         </ZCard>
-        <ZCard title="周度 AI 决策采纳率趋势" size="small">
+        <ZCard title="周度 AI 决策采纳率趋势">
           {data && data.weekly_trend.length > 0
             ? <ReactECharts option={lineOption} style={{ height: 220 }} />
-            : <ZEmpty style={{ height: 220 }} />}
+            : <div style={{ height: 220 }}><ZEmpty /></div>}
         </ZCard>
       </div>
 
       {/* 柱状图 */}
-      <ZCard title="各 Agent 决策分布" size="small" style={{ marginBottom: 12 }}>
+      <ZCard title="各 Agent 决策分布" style={{ marginBottom: 12 }}>
         {data && data.agent_stats.length > 0
           ? <ReactECharts option={barOption} style={{ height: 240 }} />
-          : <ZEmpty style={{ height: 240 }} />}
+          : <div style={{ height: 240 }}><ZEmpty /></div>}
       </ZCard>
 
       {/* 日志表 */}
-      <ZCard title="最近决策日志" size="small">
+      <ZCard title="最近决策日志">
         <Table
           dataSource={data?.recent_logs ?? []}
           columns={columns}

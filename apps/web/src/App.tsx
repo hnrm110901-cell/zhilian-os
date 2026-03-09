@@ -26,6 +26,7 @@ const ReservationPage = lazy(() => import('./pages/ReservationPage'));
 const UserManagementPage = lazy(() => import('./pages/UserManagementPage'));
 const EnterpriseIntegrationPage = lazy(() => import('./pages/EnterpriseIntegrationPage'));
 const MultiStoreManagement = lazy(() => import('./pages/MultiStoreManagement'));
+const CrossStoreConfigPage = lazy(() => import('./pages/CrossStoreConfigPage'));
 const SupplyChainManagement = lazy(() => import('./pages/SupplyChainManagement'));
 const DataVisualizationScreen = lazy(() => import('./pages/DataVisualizationScreen'));
 const MonitoringPage = lazy(() => import('./pages/MonitoringPage'));
@@ -108,6 +109,7 @@ const BenchmarkPage = lazy(() => import('./pages/BenchmarkPage'));
 const ApprovalManagementPage = lazy(() => import('./pages/ApprovalManagementPage'));
 const StoreManagementPage = lazy(() => import('./pages/StoreManagementPage'));
 const ExportJobsPage = lazy(() => import('./pages/ExportJobsPage'));
+const RoleManagementPage = lazy(() => import('./pages/RoleManagementPage'));
 const QueueManagementPage = lazy(() => import('./pages/QueueManagementPage'));
 const AgentMemoryPage = lazy(() => import('./pages/AgentMemoryPage'));
 const WeChatTriggersPage = lazy(() => import('./pages/WeChatTriggersPage'));
@@ -244,6 +246,9 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="multi-store" element={
                     <ProtectedRoute requiredRole="admin"><MultiStoreManagement /></ProtectedRoute>
+                  } />
+                  <Route path="cross-store-config" element={
+                    <ProtectedRoute requiredRole="admin"><CrossStoreConfigPage /></ProtectedRoute>
                   } />
                   <Route path="supply-chain" element={
                     <ProtectedRoute requiredRole="admin"><SupplyChainManagement /></ProtectedRoute>
@@ -484,6 +489,9 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="export-jobs" element={
                     <ProtectedRoute requiredRole="admin"><ExportJobsPage /></ProtectedRoute>
+                  } />
+                  <Route path="roles" element={
+                    <ProtectedRoute requiredRole="admin"><RoleManagementPage /></ProtectedRoute>
                   } />
                   <Route path="queue" element={
                     <ProtectedRoute requiredRole="admin"><QueueManagementPage /></ProtectedRoute>

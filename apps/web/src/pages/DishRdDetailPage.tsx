@@ -317,9 +317,9 @@ const RecipeBomTab: React.FC<{ dishId: string; brandId: string }> = ({ dishId, b
       const res = await apiClient.get<RecipeVersion[]>(
         `/api/v1/dish-rd/brands/${brandId}/dishes/${dishId}/recipe-versions`
       );
-      setVersions(res.data);
-      if (res.data.length > 0 && !selVersion) {
-        setSelVersion(res.data[0].id);
+      setVersions(res);
+      if (res.length > 0 && !selVersion) {
+        setSelVersion(res[0].id);
       }
     } catch (e) {
       handleApiError(e, '加载配方版本失败');
@@ -334,7 +334,7 @@ const RecipeBomTab: React.FC<{ dishId: string; brandId: string }> = ({ dishId, b
       const res = await apiClient.get<RecipeItem[]>(
         `/api/v1/dish-rd/brands/${brandId}/dishes/${dishId}/recipe-versions/${versionId}/items`
       );
-      setBom(res.data);
+      setBom(res);
     } catch (e) {
       handleApiError(e, '加载BOM失败');
     } finally {
@@ -486,8 +486,8 @@ const CostSimTab: React.FC<{ dishId: string; brandId: string }> = ({ dishId, bra
       const res = await apiClient.get<RecipeVersion[]>(
         `/api/v1/dish-rd/brands/${brandId}/dishes/${dishId}/recipe-versions`
       );
-      setVersions(res.data);
-      if (res.data.length > 0) setSelVersion(res.data[0].id);
+      setVersions(res);
+      if (res.length > 0) setSelVersion(res[0].id);
     } catch (e) {
       handleApiError(e, '加载配方版本失败');
     } finally {
@@ -506,7 +506,7 @@ const CostSimTab: React.FC<{ dishId: string; brandId: string }> = ({ dishId, bra
         null,
         { params: { recipe_version_id: selVersion, save: true } }
       );
-      setResult(res.data);
+      setResult(res);
     } catch (e) {
       handleApiError(e, '成本仿真失败');
     } finally {
@@ -654,7 +654,7 @@ const PilotTab: React.FC<{ dishId: string; brandId: string }> = ({ dishId, brand
       const res = await apiClient.get<PilotTest[]>(
         `/api/v1/dish-rd/brands/${brandId}/dishes/${dishId}/pilot-tests`
       );
-      setPilots(res.data);
+      setPilots(res);
     } catch (e) {
       handleApiError(e, '加载试点列表失败');
     } finally {
@@ -668,7 +668,7 @@ const PilotTab: React.FC<{ dishId: string; brandId: string }> = ({ dishId, brand
     setRecLoading(true);
     try {
       const res = await apiClient.get(`/api/v1/dish-rd/brands/${brandId}/dishes/${dishId}/agent/pilot-recommend`);
-      setRecResult(res.data);
+      setRecResult(res);
     } catch (e) {
       handleApiError(e, '获取推荐失败');
     } finally {
@@ -863,7 +863,7 @@ const LaunchTab: React.FC<{ dishId: string; brandId: string }> = ({ dishId, bran
       const res = await apiClient.get<LaunchReadiness>(
         `/api/v1/dish-rd/brands/${brandId}/dishes/${dishId}/agent/launch-readiness`
       );
-      setReadiness(res.data);
+      setReadiness(res);
     } catch (e) {
       handleApiError(e, '检查失败');
     } finally {
@@ -1027,7 +1027,7 @@ const ReviewTab: React.FC<{ dishId: string; brandId: string }> = ({ dishId, bran
       const res = await apiClient.get<FeedbackItem[]>(
         `/api/v1/dish-rd/brands/${brandId}/dishes/${dishId}/feedbacks`
       );
-      setFeedbacks(res.data);
+      setFeedbacks(res);
     } catch (e) {
       handleApiError(e, '加载反馈失败');
     } finally {
@@ -1041,7 +1041,7 @@ const ReviewTab: React.FC<{ dishId: string; brandId: string }> = ({ dishId, bran
       const res = await apiClient.get<any>(
         `/api/v1/dish-rd/brands/${brandId}/dishes/${dishId}/retrospective-reports`
       );
-      setReports(res.data?.items ?? res.data ?? []);
+      setReports(res?.items ?? res ?? []);
     } catch (e) {
       handleApiError(e, '加载复盘报告失败');
     } finally {
@@ -1059,7 +1059,7 @@ const ReviewTab: React.FC<{ dishId: string; brandId: string }> = ({ dishId, bran
         null,
         { params: { period, dry_run: false } }
       );
-      setReviewResult(res.data);
+      setReviewResult(res);
       loadReports();
     } catch (e) {
       handleApiError(e, '运行复盘失败');
@@ -1267,7 +1267,7 @@ export default function DishRdDetailPage() {
       const res = await apiClient.get<DishDetail>(
         `/api/v1/dish-rd/brands/${brandId}/dishes/${dishId}`
       );
-      setDish(res.data);
+      setDish(res);
     } catch (e) {
       handleApiError(e, '加载菜品失败');
     } finally {
