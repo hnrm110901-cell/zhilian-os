@@ -50,6 +50,19 @@ interface HQData {
   };
 }
 
+interface LaborRankingItem {
+  store_id: string;
+  rank_in_group?: number;
+  labor_cost_rate?: number;
+  labor_cost_rate_pct?: number;
+}
+
+interface LaborRankingResponse {
+  ranking_date?: string;
+  group_avg_rate?: number;
+  rankings?: LaborRankingItem[];
+}
+
 const DIM_LABEL: Record<string, string> = {
   revenue_completion: '营收完成率',
   table_turnover:     '翻台率',
@@ -72,6 +85,9 @@ const PALETTE = [
 
 export default function HQHome() {
   const [data,    setData]    = useState<HQData | null>(null);
+  const [laborRanking, setLaborRanking] = useState<LaborRankingItem[]>([]);
+  const [laborAvgRate, setLaborAvgRate] = useState<number>(0);
+  const [prevRankMap, setPrevRankMap] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState<string | null>(null);
 
@@ -79,8 +95,23 @@ export default function HQHome() {
     setLoading(true);
     setError(null);
     try {
-      const resp = await apiClient.get(`/api/v1/bff/hq${refresh ? '?refresh=true' : ''}`);
-      setData(resp.data);
+      const month = new Date().toISOString().slice(0, 7);
+      const d = new Date();
+      d.setMonth(d.getMonth() - 1);
+      const prevMonth = d.toISOString().slice(0, 7);
+
+      const [hqResp, laborResp, prevResp] = await Promise.all([
+        apiClient.get<HQData>(`/api/v1/bff/hq${refresh ? '?refresh=true' : ''}`),
+        apiClient.get<LaborRankingResponse>(`/api/v1/workforce/multi-store/labor-ranking`, { params: { month } }),
+        apiClient.get<LaborRankingResponse>(`/api/v1/workforce/multi-store/labor-ranking`, { params: { month: prevMonth } }),
+      ]);
+
+      setData(hqResp);
+      setLaborRanking(laborResp.rankings ?? []);
+      setLaborAvgRate(Number(laborResp.group_avg_rate ?? 0));
+      setPrevRankMap(
+        Object.fromEntries((prevResp.rankings ?? []).map((item) => [item.store_id, Number(item.rank_in_group ?? 0)]))
+      );
     } catch (e: any) {
       setError(e?.response?.data?.detail || '数据加载失败');
     } finally {
@@ -92,6 +123,9 @@ export default function HQHome() {
 
   const s = data?.hq_summary;
   const criticalStores = (data?.stores_health_ranking ?? []).filter(s => s.level === 'critical');
+  const storeNameMap = React.useMemo(() => (
+    Object.fromEntries((data?.stores_health_ranking ?? []).map((x) => [x.store_id, x.store_name]))
+  ), [data?.stores_health_ranking]);
 
   const trendOption = React.useMemo(() => {
     const trend = data?.revenue_trend;
@@ -208,32 +242,39 @@ export default function HQHome() {
             </ZCard>
           </div>
 
-          {/* 底部：成本排名 + 跨店决策 */}
+          {/* 底部：人工成本排名 + 跨店决策 */}
           <div className={styles.bottomGrid}>
-            <ZCard title="食材成本率排名" subtitle="近30天，按超标幅度降序">
+            <ZCard title="人工成本率排名" subtitle={`品牌均值 ${laborAvgRate.toFixed(2)}%`}>
               <div className={styles.fcList}>
-                {(data?.food_cost_ranking ?? []).map((fc, i) => {
-                  const status = fc.variance_status ?? (fc.variance_pct > 3 ? 'critical' : fc.variance_pct > 1 ? 'warning' : 'ok');
-                  const barColor = status === 'critical' ? '#ef4444' : status === 'warning' ? '#f97316' : '#10b981';
+                {(laborRanking ?? []).map((item, i) => {
+                  const rank = Number(item.rank_in_group ?? i + 1);
+                  const rate = Number(item.labor_cost_rate ?? item.labor_cost_rate_pct ?? 0);
+                  const delta = Number((rate - laborAvgRate).toFixed(2));
+                  const prevRank = prevRankMap[item.store_id];
+                  const rankDelta = prevRank ? prevRank - rank : 0;
+                  const barColor = delta > 2 ? '#ef4444' : delta > 0.5 ? '#f97316' : '#10b981';
                   return (
-                    <div key={fc.store_id} className={styles.fcRow}>
-                      <span className={styles.fcRank}>{i + 1}</span>
+                    <div key={item.store_id} className={styles.fcRow}>
+                      <span className={styles.fcRank}>{rank}</span>
                       <div className={styles.fcMeta}>
-                        <div className={styles.fcName}>{fc.store_name}</div>
+                        <div className={styles.fcName}>{storeNameMap[item.store_id] || item.store_id}</div>
                         <div className={styles.fcBarWrap}>
-                          <div className={styles.fcFill} style={{ width: `${Math.min(100, fc.actual_cost_pct)}%`, background: barColor }} />
+                          <div className={styles.fcFill} style={{ width: `${Math.min(100, rate)}%`, background: barColor }} />
                         </div>
                       </div>
                       <div className={styles.fcValues}>
-                        <span className={styles.fcActual}>{fc.actual_cost_pct.toFixed(1)}%</span>
-                        <span className={styles.fcVariance} style={{ color: fc.variance_pct > 0 ? '#ef4444' : '#10b981' }}>
-                          {fc.variance_pct > 0 ? '+' : ''}{fc.variance_pct.toFixed(1)}%
+                        <span className={styles.fcActual}>{rate.toFixed(2)}%</span>
+                        <span className={styles.fcVariance} style={{ color: delta > 0 ? '#ef4444' : '#10b981' }}>
+                          {delta > 0 ? '+' : ''}{delta.toFixed(2)}%
+                        </span>
+                        <span className={styles.fcRankTrend}>
+                          {rankDelta > 0 ? '↑' : rankDelta < 0 ? '↓' : '→'} {Math.abs(rankDelta)}
                         </span>
                       </div>
                     </div>
                   );
                 })}
-                {!(data?.food_cost_ranking?.length) && <ZEmpty title="暂无成本数据" />}
+                {!laborRanking.length && <ZEmpty title="暂无人工成本排名数据" />}
               </div>
             </ZCard>
 

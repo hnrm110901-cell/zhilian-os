@@ -227,3 +227,39 @@
   padding: 0 4px;
   line-height: 1;
 }
+
+.staffingCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.staffingMetaRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.positionChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.positionChip {
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: var(--bg);
+}
+
+.staffingActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 4px;
+}

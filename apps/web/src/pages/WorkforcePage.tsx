@@ -13,7 +13,7 @@ import {
 } from 'antd';
 import dayjs, { Dayjs } from 'dayjs';
 import ReactECharts from 'echarts-for-react';
-import { CheckCircleOutlined, EditOutlined, ReloadOutlined, TeamOutlined, RiseOutlined, FallOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { CheckCircleOutlined, EditOutlined, TeamOutlined, RiseOutlined, FallOutlined } from '@ant-design/icons';
 
 import { apiClient } from '../services/api';
 import { handleApiError, showSuccess } from '../utils/message';
@@ -70,7 +70,7 @@ interface EmployeeHealthItem {
   risk_score_90d: number;
   risk_level: 'critical' | 'high' | 'medium' | 'low';
   replacement_cost_yuan: number;
-  major_risk_factors: Array<{ name: string; score: number }>;
+  major_risk_factors: Array<string | { name: string; score?: number }>;
   unfavorable_ratio: number;
   unfavorable_shifts: number;
   total_shifts: number;
@@ -90,6 +90,26 @@ interface EmployeeHealthResp {
   items: EmployeeHealthItem[];
 }
 
+interface ShiftFairnessDetailResp {
+  store_id: string;
+  year: number;
+  month: number;
+  fairness_index: number;
+  total_employees: number;
+  distribution: {
+    high_unfairness_count: number;
+    medium_unfairness_count: number;
+    low_unfairness_count: number;
+  };
+  employee_stats: Array<{
+    employee_id: string;
+    total_shifts: number;
+    unfavorable_shifts: number;
+    unfavorable_ratio: number;
+  }>;
+  consecutive_alerts: string[];
+}
+
 const defaultStoreId = localStorage.getItem('store_id') || 'STORE001';
 
 const WorkforcePage: React.FC = () => {
@@ -105,6 +125,8 @@ const WorkforcePage: React.FC = () => {
   const [series, setSeries] = useState<SeriesPoint[]>([]);
   const [employeeHealthLoading, setEmployeeHealthLoading] = useState(false);
   const [employeeHealth, setEmployeeHealth] = useState<EmployeeHealthResp | null>(null);
+  const [fairnessDetail, setFairnessDetail] = useState<ShiftFairnessDetailResp | null>(null);
+  const [prevFairnessIndex, setPrevFairnessIndex] = useState<number | null>(null);
   const [confirmModal, setConfirmModal] = useState(false);
   const [confirmForm] = Form.useForm();
   const [confirmSubmitting, setConfirmSubmitting] = useState(false);
@@ -163,14 +185,24 @@ const WorkforcePage: React.FC = () => {
   const loadEmployeeHealth = useCallback(async () => {
     setEmployeeHealthLoading(true);
     try {
-      const res = await apiClient.get<EmployeeHealthResp>(`/api/v1/workforce/stores/${storeId}/employee-health`, {
-        params: {
-          year: date.year(),
-          month: date.month() + 1,
-          top_n: 20,
-        },
-      });
-      setEmployeeHealth(res);
+      const year = date.year();
+      const month = date.month() + 1;
+      const prev = date.subtract(1, 'month');
+
+      const [healthRes, fairnessRes, fairnessPrevRes] = await Promise.all([
+        apiClient.get<EmployeeHealthResp>(`/api/v1/workforce/stores/${storeId}/employee-health`, {
+          params: { year, month, top_n: 20 },
+        }),
+        apiClient.get<ShiftFairnessDetailResp>(`/api/v1/workforce/stores/${storeId}/shift-fairness-detail`, {
+          params: { year, month },
+        }),
+        apiClient.get<ShiftFairnessDetailResp>(`/api/v1/workforce/stores/${storeId}/shift-fairness-detail`, {
+          params: { year: prev.year(), month: prev.month() + 1 },
+        }),
+      ]);
+      setEmployeeHealth(healthRes);
+      setFairnessDetail(fairnessRes);
+      setPrevFairnessIndex(Number(fairnessPrevRes?.fairness_index ?? null));
     } catch (err) {
       handleApiError(err, '加载员工健康数据失败');
     } finally {
@@ -239,29 +271,43 @@ const WorkforcePage: React.FC = () => {
     };
   }, [series]);
 
-  const fairnessPieOption = useMemo(() => {
-    const dist = employeeHealth?.fairness_distribution || {
-      high_unfairness: 0,
-      medium_unfairness: 0,
-      low_unfairness: 0,
+  const fairnessBarOption = useMemo(() => {
+    const dist = fairnessDetail?.distribution || {
+      high_unfairness_count: 0,
+      medium_unfairness_count: 0,
+      low_unfairness_count: 0,
     };
     return {
-      tooltip: { trigger: 'item' },
-      legend: { bottom: 0 },
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      grid: { top: 16, right: 20, bottom: 10, left: 130 },
+      xAxis: {
+        type: 'value',
+        axisLabel: { formatter: '{value}人' },
+      },
+      yAxis: {
+        type: 'category',
+        data: ['高不公平 (>=50%)', '中不公平 (25-50%)', '低不公平 (<25%)'],
+      },
       series: [
         {
           name: '班次公平性分布',
-          type: 'pie',
-          radius: '65%',
+          type: 'bar',
+          barWidth: 20,
           data: [
-            { value: dist.high_unfairness, name: '高不公平(>=50%)' },
-            { value: dist.medium_unfairness, name: '中不公平(25-50%)' },
-            { value: dist.low_unfairness, name: '低不公平(<25%)' },
+            { value: dist.high_unfairness_count, itemStyle: { color: '#ef4444' } },
+            { value: dist.medium_unfairness_count, itemStyle: { color: '#f59e0b' } },
+            { value: dist.low_unfairness_count, itemStyle: { color: '#10b981' } },
           ],
+          label: { show: true, position: 'right', formatter: '{c}人' },
         },
       ],
     };
-  }, [employeeHealth]);
+  }, [fairnessDetail]);
+
+  const fairnessIndexDelta = useMemo(() => {
+    if (employeeHealth?.fairness_index == null || prevFairnessIndex == null) return null;
+    return Number((employeeHealth.fairness_index - prevFairnessIndex).toFixed(1));
+  }, [employeeHealth?.fairness_index, prevFairnessIndex]);
 
   const submitConfirm = useCallback(async () => {
     try {
@@ -453,6 +499,17 @@ const WorkforcePage: React.FC = () => {
         <ZCard><ZKpi label="门店公平性指数" value={employeeHealth?.fairness_index ?? 100} unit="" /></ZCard>
         <ZCard><ZKpi label="潜在替换成本" value={employeeHealth?.items.reduce((s, x) => s + (x.replacement_cost_yuan || 0), 0) ?? 0} unit="¥" /></ZCard>
       </div>
+      <div className={styles.fairnessTrendRow}>
+        <span className={styles.fairnessTrendTitle}>公平指数环比上月</span>
+        {fairnessIndexDelta == null ? (
+          <Tag>暂无数据</Tag>
+        ) : fairnessIndexDelta >= 0 ? (
+          <Tag color="green" icon={<RiseOutlined />}>+{fairnessIndexDelta}</Tag>
+        ) : (
+          <Tag color="red" icon={<FallOutlined />}>{fairnessIndexDelta}</Tag>
+        )}
+        <span className={styles.fairnessTrendSub}>当前 {Number(employeeHealth?.fairness_index ?? 0).toFixed(1)} / 100</span>
+      </div>
 
       <div className={styles.sectionGrid}>
         <ZCard title="流失风险排名（Top 20）">
@@ -461,6 +518,29 @@ const WorkforcePage: React.FC = () => {
             rowKey="employee_id"
             pagination={false}
             dataSource={employeeHealth?.items || []}
+            expandable={{
+              expandedRowRender: (record: EmployeeHealthItem) => {
+                const factors = (record.major_risk_factors || []).map((x) => (typeof x === 'string' ? x : x?.name || '未知因素'));
+                const isAlerted = !!fairnessDetail?.consecutive_alerts?.includes(record.employee_id);
+                return (
+                  <div className={styles.expandRow}>
+                    <div>
+                      <Text type="secondary">主要风险因子：</Text>
+                      <div className={styles.factorList}>
+                        {factors.length > 0 ? factors.map((f, i) => <Tag key={`${record.employee_id}-${i}`} color="orange">{f}</Tag>) : <Tag>暂无</Tag>}
+                      </div>
+                    </div>
+                    <div className={styles.expandFairnessRow}>
+                      <Text type="secondary">班次公平性：</Text>
+                      <Tag color={record.unfavorable_ratio >= 0.5 ? 'red' : record.unfavorable_ratio >= 0.25 ? 'orange' : 'green'}>
+                        差班 {record.unfavorable_shifts}/{record.total_shifts} · {(record.unfavorable_ratio * 100).toFixed(1)}%
+                      </Tag>
+                      {isAlerted && <Tag color="magenta">连续差班预警</Tag>}
+                    </div>
+                  </div>
+                );
+              },
+            }}
             columns={[
               { title: '员工', dataIndex: 'name' },
               { title: '岗位', dataIndex: 'position', render: (v?: string) => v || '-' },
@@ -481,6 +561,15 @@ const WorkforcePage: React.FC = () => {
                 render: (v: number) => `${(v * 100).toFixed(1)}%`,
               },
               {
+                title: '主要因子',
+                dataIndex: 'major_risk_factors',
+                render: (arr: EmployeeHealthItem['major_risk_factors']) => {
+                  const first = (arr || [])[0];
+                  const txt = typeof first === 'string' ? first : first?.name;
+                  return txt ? <span className={styles.firstFactor}>{txt}</span> : '-';
+                },
+              },
+              {
                 title: '替换成本',
                 dataIndex: 'replacement_cost_yuan',
                 render: (v: number) => `¥${Number(v || 0).toLocaleString()}`,
@@ -491,7 +580,7 @@ const WorkforcePage: React.FC = () => {
 
         <ZCard title="班次公平性分布">
           <div className={styles.chartBox}>
-            <ReactECharts option={fairnessPieOption} style={{ height: 340 }} />
+            <ReactECharts option={fairnessBarOption} style={{ height: 340 }} />
           </div>
         </ZCard>
       </div>

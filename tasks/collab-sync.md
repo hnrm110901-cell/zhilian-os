@@ -77,18 +77,37 @@
 
 ## [Codex] 当前状态
 
-**更新时间**: 待接入
-**状态**: ⏳ 等待 Codex 接入
+**更新时间**: 2026-03-09
+**状态**: 🚧 与 Claude 对齐后继续开发
 
-```
-# Codex 接入后请填写：
-## [Codex] 当前状态
-**更新时间**: YYYY-MM-DD
-**正在做**:
-**已完成**:
-**依赖Claude的接口**: （如有，列出接口路径 + 缺什么字段）
-**发现的接口问题**: （如有，@Claude 请修复）
-```
+**已完成（生产配置与运维链路）**:
+- ✅ 生产部署/巡检/监控/告警自动化脚本已落地（`scripts/ops/*` + `Makefile`）
+- ✅ 告警 webhook API 已支持落库、鉴权、去重、烟雾测试、E2E检查
+- ✅ 去重后端支持 `memory|redis|hybrid`，并补齐 runbook 与 `.env` 模板
+
+**与 Claude 对齐后的未开发任务明细（前端）**:
+- 🔴 P0 WorkforcePage 员工健康 Tab（`apps/web/src/pages/WorkforcePage.tsx`）
+  - 风险排名列表 + 风险等级 Badge + 展开详情
+  - 班次公平性分布图（high/medium/low_unfairness）
+  - 公平指数大数字 + 趋势箭头 + 骨架屏
+- 🟡 P1 人力建议确认卡（`apps/web/src/pages/sm/Home.tsx` 或新组件）
+  - 建议明细展示 + 确认/修改/拒绝动作
+- 🟡 P2 总部人工成本排名（`apps/web/src/pages/hq/Home.tsx` 或新组件）
+  - 多店成本率排名 + 品牌均值对比 + 变化箭头
+
+**Codex 本轮承接开发明细**:
+1. P0 WorkforcePage 员工健康 Tab 全量实现（含加载态与展开交互）
+2. P2 总部人工成本排名卡实现（含阈值色彩编码）
+3. P1 先实现「确认/拒绝」闭环，`修改人数` 先做最小可用交互（后续再增强）
+
+**依赖Claude的接口（已具备，开发中直接对接）**:
+- `GET /api/v1/workforce/stores/{store_id}/employee-health`
+- `GET /api/v1/workforce/stores/{store_id}/shift-fairness-detail`
+- `POST /api/v1/workforce/stores/{store_id}/staffing-advice/confirm`
+- `GET /api/v1/workforce/multi-store/labor-ranking`
+
+**发现的接口问题**:
+- 暂无阻塞问题；若前端联调发现字段差异，将在此处 @Claude 同步。
 
 ---
 
