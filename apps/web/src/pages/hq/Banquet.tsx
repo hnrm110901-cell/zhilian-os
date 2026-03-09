@@ -10,7 +10,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import dayjs from 'dayjs';
 import {
-  ZCard, ZKpi, ZBadge, ZSkeleton, ZEmpty, ZSelect, ZTabs, ZButton, ZInput,
+  ZCard, ZKpi, ZBadge, ZSkeleton, ZEmpty, ZSelect, ZTabs, ZButton, ZInput, ZModal,
 } from '../../design-system/components';
 import apiClient from '../../services/api';
 import { handleApiError } from '../../utils/message';
@@ -824,6 +824,451 @@ function ProfitTab() {
   );
 }
 
+/* ─── Tab6：资源配置 ─── */
+
+const HALL_TYPE_OPTIONS = [
+  { value: 'main_hall', label: '大厅' },
+  { value: 'vip_room',  label: '包间' },
+  { value: 'garden',    label: '花园/露台' },
+  { value: 'outdoor',   label: '户外场地' },
+];
+
+const HALL_TYPE_LABELS: Record<string, string> = {
+  main_hall: '大厅',
+  vip_room:  '包间',
+  garden:    '花园/露台',
+  outdoor:   '户外',
+};
+
+interface HallItem {
+  hall_id:        string;
+  name:           string;
+  hall_type:      string;
+  max_tables:     number;
+  max_people:     number;
+  min_spend_yuan: number;
+  floor_area_m2:  number | null;
+  description:    string | null;
+  is_active:      boolean;
+}
+
+interface PackageItem {
+  package_id:           string;
+  name:                 string;
+  banquet_type:         string | null;
+  suggested_price_yuan: number;
+  cost_yuan:            number | null;
+  gross_margin_pct:     number | null;
+  target_people_min:    number;
+  target_people_max:    number;
+  description:          string | null;
+  is_active:            boolean;
+}
+
+const BANQUET_TYPE_OPTIONS_WITH_EMPTY = [
+  { value: '',           label: '不限类型' },
+  { value: 'wedding',    label: '婚宴' },
+  { value: 'birthday',   label: '寿宴' },
+  { value: 'business',   label: '商务宴' },
+  { value: 'full_moon',  label: '满月酒' },
+  { value: 'graduation', label: '升学宴' },
+  { value: 'other',      label: '其他' },
+];
+
+const BANQUET_TYPE_LABELS: Record<string, string> = {
+  wedding:    '婚宴',
+  birthday:   '寿宴',
+  business:   '商务宴',
+  full_moon:  '满月酒',
+  graduation: '升学宴',
+  other:      '其他',
+};
+
+function useHalls() {
+  const [halls, setHalls]     = useState<HallItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const resp = await apiClient.get(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/halls`,
+        { params: { active_only: false } },
+      );
+      setHalls(Array.isArray(resp.data) ? resp.data : []);
+    } catch { setHalls([]); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+  return { halls, loading, reload: load };
+}
+
+function usePackages() {
+  const [packages, setPackages] = useState<PackageItem[]>([]);
+  const [loading, setLoading]   = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const resp = await apiClient.get(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/packages`,
+        { params: { active_only: false } },
+      );
+      setPackages(Array.isArray(resp.data) ? resp.data : []);
+    } catch { setPackages([]); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+  return { packages, loading, reload: load };
+}
+
+function HallsSection() {
+  const { halls, loading, reload } = useHalls();
+  const [modalOpen,   setModalOpen]   = useState(false);
+  const [editing,     setEditing]     = useState<HallItem | null>(null);
+  const [saving,      setSaving]      = useState(false);
+
+  const [fName,       setFName]       = useState('');
+  const [fType,       setFType]       = useState('main_hall');
+  const [fMaxTables,  setFMaxTables]  = useState('');
+  const [fMaxPeople,  setFMaxPeople]  = useState('');
+  const [fMinSpend,   setFMinSpend]   = useState('');
+  const [fArea,       setFArea]       = useState('');
+  const [fDesc,       setFDesc]       = useState('');
+
+  const openCreate = () => {
+    setEditing(null);
+    setFName(''); setFType('main_hall');
+    setFMaxTables(''); setFMaxPeople('');
+    setFMinSpend(''); setFArea(''); setFDesc('');
+    setModalOpen(true);
+  };
+
+  const openEdit = (h: HallItem) => {
+    setEditing(h);
+    setFName(h.name);
+    setFType(h.hall_type);
+    setFMaxTables(String(h.max_tables));
+    setFMaxPeople(String(h.max_people));
+    setFMinSpend(String(h.min_spend_yuan));
+    setFArea(h.floor_area_m2 != null ? String(h.floor_area_m2) : '');
+    setFDesc(h.description ?? '');
+    setModalOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!fName || !fMaxPeople) return;
+    setSaving(true);
+    const body = {
+      name:           fName,
+      hall_type:      fType,
+      max_tables:     parseInt(fMaxTables, 10) || 1,
+      max_people:     parseInt(fMaxPeople, 10),
+      min_spend_yuan: parseFloat(fMinSpend) || 0,
+      floor_area_m2:  fArea ? parseFloat(fArea) : null,
+      description:    fDesc || null,
+    };
+    try {
+      if (editing) {
+        await apiClient.patch(
+          `/api/v1/banquet-agent/stores/${STORE_ID}/halls/${editing.hall_id}`, body,
+        );
+      } else {
+        await apiClient.post(`/api/v1/banquet-agent/stores/${STORE_ID}/halls`, body);
+      }
+      setModalOpen(false);
+      reload();
+    } catch (e) {
+      handleApiError(e, editing ? '更新厅房失败' : '创建厅房失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeactivate = async (h: HallItem) => {
+    try {
+      await apiClient.delete(`/api/v1/banquet-agent/stores/${STORE_ID}/halls/${h.hall_id}`);
+      reload();
+    } catch (e) {
+      handleApiError(e, '停用厅房失败');
+    }
+  };
+
+  return (
+    <>
+      <div className={styles.resHeader}>
+        <div className={styles.resSectionTitle}>厅房管理</div>
+        <ZButton variant="primary" size="sm" onClick={openCreate}>+ 新增厅房</ZButton>
+      </div>
+      {loading ? <ZSkeleton rows={3} /> : halls.length === 0 ? (
+        <ZEmpty title="暂无厅房数据" description="点击「新增厅房」添加" />
+      ) : (
+        <div className={styles.resTable}>
+          {halls.map(h => (
+            <div
+              key={h.hall_id}
+              className={`${styles.resRow} ${!h.is_active ? styles.resInactiveRow : ''}`}
+            >
+              <div className={styles.resMain}>
+                <div className={styles.resName}>{h.name}</div>
+                <div className={styles.resMeta}>
+                  {HALL_TYPE_LABELS[h.hall_type] ?? h.hall_type}
+                  {' · '}最多{h.max_people}人
+                  {h.min_spend_yuan > 0 ? ` · 最低消费¥${h.min_spend_yuan.toLocaleString()}` : ''}
+                </div>
+              </div>
+              <ZBadge type={h.is_active ? 'success' : 'default'} text={h.is_active ? '在用' : '已停用'} />
+              <div className={styles.resActions}>
+                <ZButton variant="ghost" size="sm" onClick={() => openEdit(h)}>编辑</ZButton>
+                {h.is_active && (
+                  <ZButton variant="ghost" size="sm" onClick={() => handleDeactivate(h)}>停用</ZButton>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <ZModal
+        open={modalOpen}
+        title={editing ? '编辑厅房' : '新增厅房'}
+        onClose={() => setModalOpen(false)}
+        footer={
+          <div className={styles.resModalFooter}>
+            <ZButton variant="ghost" onClick={() => setModalOpen(false)}>取消</ZButton>
+            <ZButton variant="primary" onClick={handleSave} disabled={saving || !fName || !fMaxPeople}>
+              {saving ? '保存中…' : '保存'}
+            </ZButton>
+          </div>
+        }
+      >
+        <div className={styles.resForm}>
+          <div className={styles.resField}>
+            <label className={styles.resLabel}>厅房名称</label>
+            <ZInput value={fName} onChange={e => setFName(e.target.value)} placeholder="如：一号宴会厅" />
+          </div>
+          <div className={styles.resField}>
+            <label className={styles.resLabel}>厅房类型</label>
+            <ZSelect value={fType} options={HALL_TYPE_OPTIONS} onChange={v => setFType(v as string)} />
+          </div>
+          <div className={styles.resFieldRow}>
+            <div className={styles.resField}>
+              <label className={styles.resLabel}>最多桌数</label>
+              <ZInput type="number" value={fMaxTables} onChange={e => setFMaxTables(e.target.value)} placeholder="如：20" />
+            </div>
+            <div className={styles.resField}>
+              <label className={styles.resLabel}>最多人数</label>
+              <ZInput type="number" value={fMaxPeople} onChange={e => setFMaxPeople(e.target.value)} placeholder="如：200" />
+            </div>
+          </div>
+          <div className={styles.resFieldRow}>
+            <div className={styles.resField}>
+              <label className={styles.resLabel}>最低消费（元）</label>
+              <ZInput type="number" value={fMinSpend} onChange={e => setFMinSpend(e.target.value)} placeholder="如：20000" />
+            </div>
+            <div className={styles.resField}>
+              <label className={styles.resLabel}>面积（m²，选填）</label>
+              <ZInput type="number" value={fArea} onChange={e => setFArea(e.target.value)} placeholder="如：500" />
+            </div>
+          </div>
+          <div className={styles.resField}>
+            <label className={styles.resLabel}>备注（选填）</label>
+            <ZInput value={fDesc} onChange={e => setFDesc(e.target.value)} placeholder="厅房介绍…" />
+          </div>
+        </div>
+      </ZModal>
+    </>
+  );
+}
+
+function PackagesSection() {
+  const { packages, loading, reload } = usePackages();
+  const [modalOpen, setModalOpen]     = useState(false);
+  const [editing,   setEditing]       = useState<PackageItem | null>(null);
+  const [saving,    setSaving]        = useState(false);
+
+  const [fName,     setFName]         = useState('');
+  const [fType,     setFType]         = useState('');
+  const [fPrice,    setFPrice]        = useState('');
+  const [fCost,     setFCost]         = useState('');
+  const [fPeopleMin, setFPeopleMin]   = useState('');
+  const [fPeopleMax, setFPeopleMax]   = useState('');
+  const [fDesc,     setFDesc]         = useState('');
+
+  const openCreate = () => {
+    setEditing(null);
+    setFName(''); setFType(''); setFPrice(''); setFCost('');
+    setFPeopleMin(''); setFPeopleMax(''); setFDesc('');
+    setModalOpen(true);
+  };
+
+  const openEdit = (p: PackageItem) => {
+    setEditing(p);
+    setFName(p.name);
+    setFType(p.banquet_type ?? '');
+    setFPrice(String(p.suggested_price_yuan));
+    setFCost(p.cost_yuan != null ? String(p.cost_yuan) : '');
+    setFPeopleMin(String(p.target_people_min));
+    setFPeopleMax(String(p.target_people_max));
+    setFDesc(p.description ?? '');
+    setModalOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!fName || !fPrice) return;
+    setSaving(true);
+    const body = {
+      name:                 fName,
+      banquet_type:         fType || null,
+      suggested_price_yuan: parseFloat(fPrice),
+      cost_yuan:            fCost ? parseFloat(fCost) : null,
+      target_people_min:    parseInt(fPeopleMin, 10) || 1,
+      target_people_max:    parseInt(fPeopleMax, 10) || 999,
+      description:          fDesc || null,
+    };
+    try {
+      if (editing) {
+        await apiClient.patch(
+          `/api/v1/banquet-agent/stores/${STORE_ID}/packages/${editing.package_id}`, body,
+        );
+      } else {
+        await apiClient.post(`/api/v1/banquet-agent/stores/${STORE_ID}/packages`, body);
+      }
+      setModalOpen(false);
+      reload();
+    } catch (e) {
+      handleApiError(e, editing ? '更新套餐失败' : '创建套餐失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeactivate = async (p: PackageItem) => {
+    try {
+      await apiClient.delete(`/api/v1/banquet-agent/stores/${STORE_ID}/packages/${p.package_id}`);
+      reload();
+    } catch (e) {
+      handleApiError(e, '下架套餐失败');
+    }
+  };
+
+  return (
+    <>
+      <div className={styles.resHeader}>
+        <div className={styles.resSectionTitle}>套餐管理</div>
+        <ZButton variant="primary" size="sm" onClick={openCreate}>+ 新增套餐</ZButton>
+      </div>
+      {loading ? <ZSkeleton rows={3} /> : packages.length === 0 ? (
+        <ZEmpty title="暂无套餐数据" description="点击「新增套餐」添加" />
+      ) : (
+        <div className={styles.resTable}>
+          {packages.map(p => (
+            <div
+              key={p.package_id}
+              className={`${styles.resRow} ${!p.is_active ? styles.resInactiveRow : ''}`}
+            >
+              <div className={styles.resMain}>
+                <div className={styles.resName}>{p.name}</div>
+                <div className={styles.resMeta}>
+                  {p.banquet_type ? (BANQUET_TYPE_LABELS[p.banquet_type] ?? p.banquet_type) : '通用'}
+                  {' · '}{p.target_people_min}–{p.target_people_max}人
+                  {' · '}¥{p.suggested_price_yuan.toLocaleString()}
+                  {p.gross_margin_pct != null ? ` · 毛利率${p.gross_margin_pct}%` : ''}
+                </div>
+              </div>
+              <ZBadge type={p.is_active ? 'success' : 'default'} text={p.is_active ? '上架' : '已下架'} />
+              <div className={styles.resActions}>
+                <ZButton variant="ghost" size="sm" onClick={() => openEdit(p)}>编辑</ZButton>
+                {p.is_active && (
+                  <ZButton variant="ghost" size="sm" onClick={() => handleDeactivate(p)}>下架</ZButton>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <ZModal
+        open={modalOpen}
+        title={editing ? '编辑套餐' : '新增套餐'}
+        onClose={() => setModalOpen(false)}
+        footer={
+          <div className={styles.resModalFooter}>
+            <ZButton variant="ghost" onClick={() => setModalOpen(false)}>取消</ZButton>
+            <ZButton variant="primary" onClick={handleSave} disabled={saving || !fName || !fPrice}>
+              {saving ? '保存中…' : '保存'}
+            </ZButton>
+          </div>
+        }
+      >
+        <div className={styles.resForm}>
+          <div className={styles.resField}>
+            <label className={styles.resLabel}>套餐名称</label>
+            <ZInput value={fName} onChange={e => setFName(e.target.value)} placeholder="如：经典婚宴套餐" />
+          </div>
+          <div className={styles.resField}>
+            <label className={styles.resLabel}>适用宴会类型（选填）</label>
+            <ZSelect
+              value={fType}
+              options={BANQUET_TYPE_OPTIONS_WITH_EMPTY}
+              onChange={v => setFType(v as string)}
+            />
+          </div>
+          <div className={styles.resFieldRow}>
+            <div className={styles.resField}>
+              <label className={styles.resLabel}>建议售价（元）</label>
+              <ZInput type="number" value={fPrice} onChange={e => setFPrice(e.target.value)} placeholder="如：30000" />
+            </div>
+            <div className={styles.resField}>
+              <label className={styles.resLabel}>估算成本（元，选填）</label>
+              <ZInput type="number" value={fCost} onChange={e => setFCost(e.target.value)} placeholder="如：12000" />
+            </div>
+          </div>
+          <div className={styles.resFieldRow}>
+            <div className={styles.resField}>
+              <label className={styles.resLabel}>最少人数</label>
+              <ZInput type="number" value={fPeopleMin} onChange={e => setFPeopleMin(e.target.value)} placeholder="1" />
+            </div>
+            <div className={styles.resField}>
+              <label className={styles.resLabel}>最多人数</label>
+              <ZInput type="number" value={fPeopleMax} onChange={e => setFPeopleMax(e.target.value)} placeholder="999" />
+            </div>
+          </div>
+          <div className={styles.resField}>
+            <label className={styles.resLabel}>套餐描述（选填）</label>
+            <ZInput value={fDesc} onChange={e => setFDesc(e.target.value)} placeholder="套餐包含内容…" />
+          </div>
+        </div>
+      </ZModal>
+    </>
+  );
+}
+
+function ResourceTab() {
+  const [subTab, setSubTab] = useState<'halls' | 'packages'>('halls');
+
+  return (
+    <div className={styles.tabContent}>
+      <div className={styles.resChipBar}>
+        {(['halls', 'packages'] as const).map(t => (
+          <button
+            key={t}
+            className={`${styles.resChip} ${subTab === t ? styles.resChipActive : ''}`}
+            onClick={() => setSubTab(t)}
+          >
+            {t === 'halls' ? '厅房' : '套餐'}
+          </button>
+        ))}
+      </div>
+      <ZCard>
+        {subTab === 'halls' ? <HallsSection /> : <PackagesSection />}
+      </ZCard>
+    </div>
+  );
+}
+
 /* ─── 主组件 ─── */
 export default function HQBanquet() {
   return (
@@ -838,6 +1283,7 @@ export default function HQBanquet() {
           { key: 'calendar',  label: '销控日历', children: <AvailabilityTab /> },
           { key: 'ai',        label: 'AI 建议',  children: <AITab /> },
           { key: 'profit',    label: '利润复盘', children: <ProfitTab /> },
+          { key: 'resource',  label: '资源配置', children: <ResourceTab /> },
         ]}
       />
     </div>

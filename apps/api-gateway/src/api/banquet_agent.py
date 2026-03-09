@@ -1194,6 +1194,515 @@ async def create_profit_snapshot(
     }
 
 
+# ────────── 厅房管理 ──────────────────────────────────────────────────────────
+
+class HallCreateReq(BaseModel):
+    name: str
+    hall_type: str
+    max_tables: int = 1
+    max_people: int
+    min_spend_yuan: float = 0
+    floor_area_m2: Optional[float] = None
+    description: Optional[str] = None
+
+
+class HallUpdateReq(BaseModel):
+    name: Optional[str] = None
+    hall_type: Optional[str] = None
+    max_tables: Optional[int] = None
+    max_people: Optional[int] = None
+    min_spend_yuan: Optional[float] = None
+    floor_area_m2: Optional[float] = None
+    description: Optional[str] = None
+
+
+@router.get("/stores/{store_id}/halls")
+async def list_halls(
+    store_id: str,
+    active_only: bool = Query(True, description="仅返回在用厅房"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """厅房列表"""
+    stmt = select(BanquetHall).where(BanquetHall.store_id == store_id)
+    if active_only:
+        stmt = stmt.where(BanquetHall.is_active == True)
+    stmt = stmt.order_by(BanquetHall.name)
+    result = await db.execute(stmt)
+    halls = result.scalars().all()
+    return [
+        {
+            "hall_id":        h.id,
+            "name":           h.name,
+            "hall_type":      h.hall_type.value if h.hall_type else None,
+            "max_tables":     h.max_tables,
+            "max_people":     h.max_people,
+            "min_spend_yuan": h.min_spend_fen / 100,
+            "floor_area_m2":  h.floor_area_m2,
+            "description":    h.description,
+            "is_active":      h.is_active,
+        }
+        for h in halls
+    ]
+
+
+@router.post("/stores/{store_id}/halls", status_code=201)
+async def create_hall(
+    store_id: str,
+    body: HallCreateReq,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """创建厅房"""
+    try:
+        hall_type_enum = BanquetHallType(body.hall_type)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"无效的厅房类型：{body.hall_type}")
+
+    hall = BanquetHall(
+        id=str(uuid.uuid4()),
+        store_id=store_id,
+        name=body.name,
+        hall_type=hall_type_enum,
+        max_tables=body.max_tables,
+        max_people=body.max_people,
+        min_spend_fen=int(body.min_spend_yuan * 100),
+        floor_area_m2=body.floor_area_m2,
+        description=body.description,
+        is_active=True,
+    )
+    db.add(hall)
+    await db.commit()
+    return {"hall_id": hall.id, "name": hall.name, "is_active": True}
+
+
+@router.patch("/stores/{store_id}/halls/{hall_id}")
+async def update_hall(
+    store_id: str,
+    hall_id: str,
+    body: HallUpdateReq,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """编辑厅房信息"""
+    result = await db.execute(
+        select(BanquetHall).where(
+            and_(BanquetHall.id == hall_id, BanquetHall.store_id == store_id)
+        )
+    )
+    hall = result.scalars().first()
+    if not hall:
+        raise HTTPException(status_code=404, detail="厅房不存在")
+
+    if body.name is not None:
+        hall.name = body.name
+    if body.hall_type is not None:
+        try:
+            hall.hall_type = BanquetHallType(body.hall_type)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"无效的厅房类型：{body.hall_type}")
+    if body.max_tables is not None:
+        hall.max_tables = body.max_tables
+    if body.max_people is not None:
+        hall.max_people = body.max_people
+    if body.min_spend_yuan is not None:
+        hall.min_spend_fen = int(body.min_spend_yuan * 100)
+    if body.floor_area_m2 is not None:
+        hall.floor_area_m2 = body.floor_area_m2
+    if body.description is not None:
+        hall.description = body.description
+
+    await db.commit()
+    return {"hall_id": hall_id, "updated": True}
+
+
+@router.delete("/stores/{store_id}/halls/{hall_id}", status_code=200)
+async def deactivate_hall(
+    store_id: str,
+    hall_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """停用厅房（软删除）"""
+    result = await db.execute(
+        select(BanquetHall).where(
+            and_(BanquetHall.id == hall_id, BanquetHall.store_id == store_id)
+        )
+    )
+    hall = result.scalars().first()
+    if not hall:
+        raise HTTPException(status_code=404, detail="厅房不存在")
+
+    hall.is_active = False
+    await db.commit()
+    return {"hall_id": hall_id, "is_active": False}
+
+
+# ────────── 套餐管理 ──────────────────────────────────────────────────────────
+
+class PackageCreateReq(BaseModel):
+    name: str
+    banquet_type: Optional[str] = None
+    suggested_price_yuan: float = Field(ge=0)
+    cost_yuan: Optional[float] = None
+    target_people_min: int = 1
+    target_people_max: int = 999
+    description: Optional[str] = None
+
+
+class PackageUpdateReq(BaseModel):
+    name: Optional[str] = None
+    banquet_type: Optional[str] = None
+    suggested_price_yuan: Optional[float] = None
+    cost_yuan: Optional[float] = None
+    target_people_min: Optional[int] = None
+    target_people_max: Optional[int] = None
+    description: Optional[str] = None
+
+
+@router.get("/stores/{store_id}/packages")
+async def list_packages(
+    store_id: str,
+    active_only: bool = Query(True, description="仅返回上架套餐"),
+    banquet_type: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """套餐列表"""
+    stmt = select(MenuPackage).where(MenuPackage.store_id == store_id)
+    if active_only:
+        stmt = stmt.where(MenuPackage.is_active == True)
+    if banquet_type:
+        try:
+            stmt = stmt.where(MenuPackage.banquet_type == BanquetTypeEnum(banquet_type))
+        except ValueError:
+            pass
+    stmt = stmt.order_by(MenuPackage.suggested_price_fen)
+    result = await db.execute(stmt)
+    pkgs = result.scalars().all()
+    return [
+        {
+            "package_id":           p.id,
+            "name":                 p.name,
+            "banquet_type":         p.banquet_type.value if p.banquet_type else None,
+            "suggested_price_yuan": p.suggested_price_fen / 100,
+            "cost_yuan":            p.cost_fen / 100 if p.cost_fen is not None else None,
+            "gross_margin_pct":     round(
+                (1 - p.cost_fen / p.suggested_price_fen) * 100, 1
+            ) if p.cost_fen and p.suggested_price_fen else None,
+            "target_people_min":    p.target_people_min,
+            "target_people_max":    p.target_people_max,
+            "description":          p.description,
+            "is_active":            p.is_active,
+        }
+        for p in pkgs
+    ]
+
+
+@router.post("/stores/{store_id}/packages", status_code=201)
+async def create_package(
+    store_id: str,
+    body: PackageCreateReq,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """创建套餐"""
+    banquet_type_enum = None
+    if body.banquet_type:
+        try:
+            banquet_type_enum = BanquetTypeEnum(body.banquet_type)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"无效的宴会类型：{body.banquet_type}")
+
+    pkg = MenuPackage(
+        id=str(uuid.uuid4()),
+        store_id=store_id,
+        banquet_type=banquet_type_enum,
+        name=body.name,
+        suggested_price_fen=int(body.suggested_price_yuan * 100),
+        cost_fen=int(body.cost_yuan * 100) if body.cost_yuan is not None else None,
+        target_people_min=body.target_people_min,
+        target_people_max=body.target_people_max,
+        description=body.description,
+        is_active=True,
+    )
+    db.add(pkg)
+    await db.commit()
+    return {"package_id": pkg.id, "name": pkg.name, "is_active": True}
+
+
+@router.patch("/stores/{store_id}/packages/{pkg_id}")
+async def update_package(
+    store_id: str,
+    pkg_id: str,
+    body: PackageUpdateReq,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """编辑套餐信息"""
+    result = await db.execute(
+        select(MenuPackage).where(
+            and_(MenuPackage.id == pkg_id, MenuPackage.store_id == store_id)
+        )
+    )
+    pkg = result.scalars().first()
+    if not pkg:
+        raise HTTPException(status_code=404, detail="套餐不存在")
+
+    if body.name is not None:
+        pkg.name = body.name
+    if body.banquet_type is not None:
+        try:
+            pkg.banquet_type = BanquetTypeEnum(body.banquet_type)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"无效的宴会类型：{body.banquet_type}")
+    if body.suggested_price_yuan is not None:
+        pkg.suggested_price_fen = int(body.suggested_price_yuan * 100)
+    if body.cost_yuan is not None:
+        pkg.cost_fen = int(body.cost_yuan * 100)
+    if body.target_people_min is not None:
+        pkg.target_people_min = body.target_people_min
+    if body.target_people_max is not None:
+        pkg.target_people_max = body.target_people_max
+    if body.description is not None:
+        pkg.description = body.description
+
+    await db.commit()
+    return {"package_id": pkg_id, "updated": True}
+
+
+@router.delete("/stores/{store_id}/packages/{pkg_id}", status_code=200)
+async def deactivate_package(
+    store_id: str,
+    pkg_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """下架套餐（软删除）"""
+    result = await db.execute(
+        select(MenuPackage).where(
+            and_(MenuPackage.id == pkg_id, MenuPackage.store_id == store_id)
+        )
+    )
+    pkg = result.scalars().first()
+    if not pkg:
+        raise HTTPException(status_code=404, detail="套餐不存在")
+
+    pkg.is_active = False
+    await db.commit()
+    return {"package_id": pkg_id, "is_active": False}
+
+
+# ────────── 结算闭环 ──────────────────────────────────────────────────────────
+
+class SettleOrderReq(BaseModel):
+    revenue_yuan: float = Field(ge=0)
+    ingredient_cost_yuan: float = Field(ge=0, default=0)
+    labor_cost_yuan: float = Field(ge=0, default=0)
+    other_cost_yuan: float = Field(ge=0, default=0)
+
+
+@router.post("/stores/{store_id}/orders/{order_id}/settle", status_code=200)
+async def settle_order(
+    store_id: str,
+    order_id: str,
+    body: SettleOrderReq,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """结算宴会订单（completed → settled），同步写入利润快照"""
+    result = await db.execute(
+        select(BanquetOrder).where(
+            and_(BanquetOrder.id == order_id, BanquetOrder.store_id == store_id)
+        )
+    )
+    order = result.scalars().first()
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    if order.order_status != OrderStatusEnum.COMPLETED:
+        raise HTTPException(
+            status_code=400,
+            detail=f"只有已完成的订单才能结算，当前状态：{order.order_status.value}",
+        )
+
+    # 更新订单状态
+    order.order_status = OrderStatusEnum.SETTLED
+
+    # upsert 利润快照
+    revenue_fen         = int(body.revenue_yuan * 100)
+    ingredient_cost_fen = int(body.ingredient_cost_yuan * 100)
+    labor_cost_fen      = int(body.labor_cost_yuan * 100)
+    other_cost_fen      = int(body.other_cost_yuan * 100)
+    total_cost_fen      = ingredient_cost_fen + labor_cost_fen + other_cost_fen
+    gross_profit_fen    = revenue_fen - total_cost_fen
+    gross_margin_pct    = round(gross_profit_fen / revenue_fen * 100, 1) if revenue_fen > 0 else 0.0
+
+    snap_result = await db.execute(
+        select(BanquetProfitSnapshot).where(BanquetProfitSnapshot.banquet_order_id == order_id)
+    )
+    snap = snap_result.scalars().first()
+    if snap:
+        snap.revenue_fen         = revenue_fen
+        snap.ingredient_cost_fen = ingredient_cost_fen
+        snap.labor_cost_fen      = labor_cost_fen
+        snap.other_cost_fen      = other_cost_fen
+        snap.gross_profit_fen    = gross_profit_fen
+        snap.gross_margin_pct    = gross_margin_pct
+    else:
+        snap = BanquetProfitSnapshot(
+            id=str(uuid.uuid4()),
+            banquet_order_id=order_id,
+            revenue_fen=revenue_fen,
+            ingredient_cost_fen=ingredient_cost_fen,
+            labor_cost_fen=labor_cost_fen,
+            material_cost_fen=0,
+            other_cost_fen=other_cost_fen,
+            gross_profit_fen=gross_profit_fen,
+            gross_margin_pct=gross_margin_pct,
+        )
+        db.add(snap)
+
+    await db.commit()
+    return {
+        "order_id":          order_id,
+        "status":            "settled",
+        "snapshot_id":       snap.id,
+        "gross_profit_yuan": gross_profit_fen / 100,
+        "gross_margin_pct":  gross_margin_pct,
+    }
+
+
+# ────────── 推送通知 ──────────────────────────────────────────────────────────
+
+@router.post("/stores/{store_id}/push/scan", status_code=200)
+async def push_scan(
+    store_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """扫描并推送：D-7/D-1 宴会提醒、逾期任务告警、停滞线索提醒"""
+    from datetime import timedelta
+    import json
+
+    now = datetime.utcnow()
+    today = now.date()
+    d1 = today + timedelta(days=1)
+    d7 = today + timedelta(days=7)
+
+    details = []
+
+    # D-1 / D-7 宴会提醒
+    for target_date, label in [(d1, "D-1"), (d7, "D-7")]:
+        upcoming = await db.execute(
+            select(BanquetOrder).where(
+                and_(
+                    BanquetOrder.store_id == store_id,
+                    BanquetOrder.banquet_date == target_date,
+                    BanquetOrder.order_status == OrderStatusEnum.CONFIRMED,
+                )
+            )
+        )
+        for order in upcoming.scalars().all():
+            details.append({
+                "type":      "banquet_reminder",
+                "target_id": order.id,
+                "label":     label,
+                "content":   f"【{label}提醒】{order.banquet_type.value} 宴会将于 {target_date} 举行，请做好准备。",
+                "status":    "sent",
+            })
+
+    # 逾期任务告警
+    overdue_result = await db.execute(
+        select(ExecutionTask).join(
+            BanquetOrder, ExecutionTask.banquet_order_id == BanquetOrder.id
+        ).where(
+            and_(
+                BanquetOrder.store_id == store_id,
+                ExecutionTask.due_time < now,
+                ExecutionTask.task_status.notin_([
+                    TaskStatusEnum.DONE, TaskStatusEnum.VERIFIED, TaskStatusEnum.CLOSED,
+                ]),
+            )
+        ).limit(20)
+    )
+    for task in overdue_result.scalars().all():
+        details.append({
+            "type":      "task_overdue",
+            "target_id": task.id,
+            "label":     "逾期告警",
+            "content":   f"【任务逾期】{task.task_name} 已逾期，请及时处理。",
+            "status":    "sent",
+        })
+
+    # 停滞线索提醒（7天未跟进）
+    stale_cutoff = now - timedelta(days=7)
+    stale_result = await db.execute(
+        select(BanquetLead).where(
+            and_(
+                BanquetLead.store_id == store_id,
+                BanquetLead.current_stage.notin_([
+                    LeadStageEnum.WON, LeadStageEnum.LOST,
+                ]),
+                BanquetLead.last_followup_at < stale_cutoff,
+            )
+        ).limit(20)
+    )
+    for lead in stale_result.scalars().all():
+        details.append({
+            "type":      "lead_stale",
+            "target_id": lead.id,
+            "label":     "线索停滞",
+            "content":   f"【线索停滞】{lead.banquet_type.value} 线索已超7天未跟进，请尽快联系客户。",
+            "status":    "sent",
+        })
+
+    # 写入 Redis 推送日志
+    try:
+        from src.core.dependencies import get_redis
+        redis = await get_redis()
+        log_key = f"banquet:push_log:{store_id}"
+        existing_raw = await redis.get(log_key)
+        existing = json.loads(existing_raw) if existing_raw else []
+        new_records = [
+            {
+                "record_id": str(uuid.uuid4()),
+                "push_type": d["type"],
+                "target_id": d["target_id"],
+                "content":   d["content"],
+                "status":    d["status"],
+                "sent_at":   now.isoformat(),
+            }
+            for d in details
+        ]
+        combined = (new_records + existing)[:200]   # cap at 200 records
+        await redis.setex(log_key, 30 * 24 * 3600, json.dumps(combined))
+    except Exception:
+        pass   # push log is best-effort
+
+    return {
+        "sent":    len(details),
+        "skipped": 0,
+        "details": details,
+    }
+
+
+@router.get("/stores/{store_id}/push/records")
+async def list_push_records(
+    store_id: str,
+    _: User = Depends(get_current_user),
+):
+    """推送记录列表（最近30天，读 Redis）"""
+    import json
+    try:
+        from src.core.dependencies import get_redis
+        redis = await get_redis()
+        raw = await redis.get(f"banquet:push_log:{store_id}")
+        records = json.loads(raw) if raw else []
+    except Exception:
+        records = []
+    return {"records": records, "total": len(records)}
+
+
 # ────────── Agent 接口 ────────────────────────────────────────────────────────
 
 @router.get("/stores/{store_id}/agent/followup-scan")

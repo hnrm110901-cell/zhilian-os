@@ -182,6 +182,12 @@ export default function SmBanquet() {
             >
               执行任务
             </ZButton>
+            <ZButton
+              variant="ghost"
+              onClick={() => navigate('/sm/banquet-push')}
+            >
+              推送通知
+            </ZButton>
           </div>
         </ZCard>
       </div>

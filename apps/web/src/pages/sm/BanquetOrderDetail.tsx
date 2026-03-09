@@ -5,12 +5,13 @@
  *      PATCH /api/v1/banquet-agent/stores/{id}/orders/{order_id}/tasks/{task_id}
  *      GET/POST /api/v1/banquet-agent/stores/{id}/orders/{order_id}/contract
  *      PATCH /api/v1/banquet-agent/stores/{id}/orders/{order_id}/contract/sign
+ *      POST /api/v1/banquet-agent/stores/{id}/orders/{order_id}/settle
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
-  ZCard, ZBadge, ZButton, ZSkeleton, ZEmpty,
+  ZCard, ZBadge, ZButton, ZSkeleton, ZEmpty, ZModal, ZInput,
 } from '../../design-system/components';
 import apiClient from '../../services/api';
 import { handleApiError } from '../../utils/message';
@@ -108,6 +109,14 @@ export default function SmBanquetOrderDetail() {
   const [contractLoading, setContractLoading] = useState(false);
   const [contractWorking, setContractWorking] = useState(false);
 
+  // 结算 Modal 状态
+  const [settleOpen,     setSettleOpen]     = useState(false);
+  const [settleRevenue,  setSettleRevenue]  = useState('');
+  const [settleIngred,   setSettleIngred]   = useState('');
+  const [settleLabor,    setSettleLabor]    = useState('');
+  const [settleOther,    setSettleOther]    = useState('');
+  const [settling,       setSettling]       = useState(false);
+
   const loadOrder = useCallback(async () => {
     if (!orderId) return;
     setLoading(true);
@@ -183,6 +192,36 @@ export default function SmBanquetOrderDetail() {
       handleApiError(e, '更新任务失败');
     } finally {
       setCompleting(null);
+    }
+  };
+
+  const openSettleModal = () => {
+    if (!order) return;
+    setSettleRevenue(String(order.total_amount_yuan));
+    setSettleIngred('');
+    setSettleLabor('');
+    setSettleOther('');
+    setSettleOpen(true);
+  };
+
+  const handleSettle = async () => {
+    setSettling(true);
+    try {
+      await apiClient.post(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/orders/${orderId}/settle`,
+        {
+          revenue_yuan:         parseFloat(settleRevenue) || 0,
+          ingredient_cost_yuan: parseFloat(settleIngred)  || 0,
+          labor_cost_yuan:      parseFloat(settleLabor)   || 0,
+          other_cost_yuan:      parseFloat(settleOther)   || 0,
+        },
+      );
+      setSettleOpen(false);
+      await loadOrder();
+    } catch (e) {
+      handleApiError(e, '结算失败');
+    } finally {
+      setSettling(false);
     }
   };
 
@@ -279,6 +318,13 @@ export default function SmBanquetOrderDetail() {
             </div>
           </div>
           {order.remark && <div className={styles.remark}>{order.remark}</div>}
+          {order.status === 'completed' && (
+            <div className={styles.settleRow}>
+              <ZButton variant="primary" size="sm" onClick={openSettleModal}>
+                结算确认
+              </ZButton>
+            </div>
+          )}
         </ZCard>
 
         {/* 执行任务 */}
@@ -398,6 +444,80 @@ export default function SmBanquetOrderDetail() {
           ) : null}
         </ZCard>
       </div>
+
+      {/* 结算 Modal */}
+      {order && (() => {
+        const revenue  = parseFloat(settleRevenue)  || 0;
+        const ingred   = parseFloat(settleIngred)   || 0;
+        const labor    = parseFloat(settleLabor)    || 0;
+        const other    = parseFloat(settleOther)    || 0;
+        const profit   = revenue - ingred - labor - other;
+        const margin   = revenue > 0 ? (profit / revenue * 100).toFixed(1) : '0.0';
+        return (
+          <ZModal
+            open={settleOpen}
+            title="宴会结算 — 录入利润数据"
+            onClose={() => setSettleOpen(false)}
+            footer={
+              <div className={styles.settleFooter}>
+                <ZButton variant="ghost" onClick={() => setSettleOpen(false)}>取消</ZButton>
+                <ZButton
+                  variant="primary"
+                  onClick={handleSettle}
+                  disabled={settling || !settleRevenue}
+                >
+                  {settling ? '结算中…' : '确认结算'}
+                </ZButton>
+              </div>
+            }
+          >
+            <div className={styles.settleForm}>
+              <div className={styles.settleField}>
+                <label className={styles.settleLabel}>实收金额（元）</label>
+                <ZInput
+                  type="number"
+                  value={settleRevenue}
+                  onChange={e => setSettleRevenue(e.target.value)}
+                  placeholder="如：50000"
+                />
+              </div>
+              <div className={styles.settleField}>
+                <label className={styles.settleLabel}>食材成本（元）</label>
+                <ZInput
+                  type="number"
+                  value={settleIngred}
+                  onChange={e => setSettleIngred(e.target.value)}
+                  placeholder="如：15000"
+                />
+              </div>
+              <div className={styles.settleField}>
+                <label className={styles.settleLabel}>人工成本（元）</label>
+                <ZInput
+                  type="number"
+                  value={settleLabor}
+                  onChange={e => setSettleLabor(e.target.value)}
+                  placeholder="如：5000"
+                />
+              </div>
+              <div className={styles.settleField}>
+                <label className={styles.settleLabel}>其他成本（元，选填）</label>
+                <ZInput
+                  type="number"
+                  value={settleOther}
+                  onChange={e => setSettleOther(e.target.value)}
+                  placeholder="如：1000"
+                />
+              </div>
+              <div className={styles.settleSummary}>
+                <span>毛利：<strong className={profit >= 0 ? styles.settlePos : styles.settleNeg}>
+                  ¥{profit.toLocaleString()}
+                </strong></span>
+                <span>毛利率：<strong>{margin}%</strong></span>
+              </div>
+            </div>
+          </ZModal>
+        );
+      })()}
     </div>
   );
 }
