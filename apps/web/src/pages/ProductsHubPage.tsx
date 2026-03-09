@@ -19,7 +19,7 @@ import {
   FileExcelOutlined, BarChartOutlined,
 } from '@ant-design/icons';
 import { apiClient } from '../services/api';
-import { ZCard, ZBadge, ZButton, ZSkeleton, ZSelect } from '../design-system/components';
+import { ZCard, ZBadge, ZButton, ZSkeleton, ZSelect, DetailDrawer } from '../design-system/components';
 import styles from './ProductsHubPage.module.css';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -35,10 +35,12 @@ interface InvStats {
   total_items: number;
   total_value: number;   // 分
   status_distribution: { normal: number; low: number; critical: number; out_of_stock: number };
-  alert_items: Array<{
-    id: string; name: string; status: string;
-    current_quantity: number; min_quantity: number; unit: string;
-  }>;
+  alert_items: InvAlertItem[];
+}
+
+interface InvAlertItem {
+  id: string; name: string; status: string;
+  current_quantity: number; min_quantity: number; unit: string;
 }
 
 interface WasteItem {
@@ -112,6 +114,8 @@ const ProductsHubPage: React.FC = () => {
 
   const [boardLoading, setBoardLoading] = useState(true);
   const [purchaseList, setPurchaseList] = useState<PurchaseItem[]>([]);
+
+  const [selectedAlert, setSelectedAlert] = useState<InvAlertItem | null>(null);
 
   // ── Loaders ──────────────────────────────────────────────────────────────────
 
@@ -351,7 +355,8 @@ const ProductsHubPage: React.FC = () => {
                                   : '#fffbe6';
                       return (
                         <div key={item.id} className={styles.alertRow}
-                          style={{ background: bg, borderLeftColor: color }}>
+                          style={{ background: bg, borderLeftColor: color, cursor: 'pointer' }}
+                          onClick={() => setSelectedAlert(item)}>
                           <span className={styles.alertItemName}>{item.name}</span>
                           <ZBadge
                             type={invStatusBadgeType(item.status)}
@@ -603,6 +608,51 @@ const ProductsHubPage: React.FC = () => {
           </ZCard>
         </>
       )}
+
+      {/* ── 库存预警详情侧边抽屉 ─────────────────────────────────────────────── */}
+      <DetailDrawer
+        open={!!selectedAlert}
+        onClose={() => setSelectedAlert(null)}
+        title={selectedAlert?.name ?? ''}
+        subtitle="库存预警详情"
+        status={selectedAlert ? {
+          label: invStatusLabel(selectedAlert.status),
+          type:  invStatusBadgeType(selectedAlert.status),
+        } : undefined}
+        metrics={selectedAlert ? [
+          { label: '当前库存',   value: `${selectedAlert.current_quantity} ${selectedAlert.unit}`,
+            valueColor: invStatusColor(selectedAlert.status) },
+          { label: '安全库存',   value: `${selectedAlert.min_quantity} ${selectedAlert.unit}` },
+          { label: '缺口',       value: `${Math.max(0, selectedAlert.min_quantity - selectedAlert.current_quantity)} ${selectedAlert.unit}`,
+            valueColor: selectedAlert.current_quantity < selectedAlert.min_quantity ? '#f5222d' : '#52c41a' },
+        ] : []}
+        sections={selectedAlert ? [
+          {
+            title: '建议处置',
+            content: (
+              <p style={{ margin: 0, lineHeight: 1.7 }}>
+                {selectedAlert.status === 'out_of_stock'
+                  ? `【${selectedAlert.name}】已断货，请立即联系供应商紧急补货，避免影响今日营业。`
+                  : selectedAlert.status === 'critical'
+                  ? `【${selectedAlert.name}】库存极低，建议今日下班前完成采购备货。`
+                  : `【${selectedAlert.name}】库存偏低，建议明日采购补充至安全库存水位以上。`}
+              </p>
+            ),
+          },
+        ] : []}
+        actions={selectedAlert ? [
+          {
+            label:   '前往采购',
+            type:    'primary',
+            onClick: () => { navigate('/inventory'); setSelectedAlert(null); },
+          },
+          {
+            label:   '关闭',
+            type:    'default',
+            onClick: () => setSelectedAlert(null),
+          },
+        ] : []}
+      />
     </div>
   );
 };

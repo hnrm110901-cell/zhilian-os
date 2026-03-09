@@ -8,7 +8,7 @@ import {
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../services/api';
-import { ZCard, ZBadge, ZButton, ZSkeleton, ZSelect } from '../design-system/components';
+import { ZCard, ZBadge, ZButton, ZSkeleton, ZSelect, DetailDrawer } from '../design-system/components';
 import css from './CrmHubPage.module.css';
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -161,6 +161,7 @@ export default function CrmHubPage() {
   const [churn,    setChurn]    = useState<ChurnUser[] | null>(null);
   const [loading,  setLoading]  = useState(true);
   const [storeId,  setStoreId]  = useState('S001');
+  const [selectedSignal, setSelectedSignal] = useState<GrowthSignal | null>(null);
 
   const loadStats = useCallback(async () => {
     try {
@@ -322,11 +323,14 @@ export default function CrmHubPage() {
         >
           <div className={css.signalList}>
             {sigs.slice(0, 4).map(sig => (
-              <div key={sig.signal_id} className={css.signalCard}>
+              <div key={sig.signal_id} className={css.signalCard}
+                style={{ cursor: 'pointer' }}
+                onClick={() => setSelectedSignal(sig)}
+              >
                 <div className={css.signalCardTop}>
                   <span className={css.signalTitle}>{sig.title}</span>
                   {sig.recommended_action && (
-                    <span className={css.signalAction} onClick={() => navigate('/private-domain')}>
+                    <span className={css.signalAction} onClick={(e) => { e.stopPropagation(); navigate('/private-domain'); }}>
                       {sig.recommended_action} →
                     </span>
                   )}
@@ -396,6 +400,45 @@ export default function CrmHubPage() {
           ))}
         </div>
       </ZCard>
+
+      {/* ── 增长信号详情抽屉 ──────────────────────────────────────────────────── */}
+      <DetailDrawer
+        open={!!selectedSignal}
+        onClose={() => setSelectedSignal(null)}
+        title={selectedSignal?.title ?? ''}
+        subtitle={selectedSignal ? SIGNAL_TYPE_LABEL[selectedSignal.signal_type] ?? selectedSignal.signal_type : undefined}
+        status={selectedSignal ? {
+          label: selectedSignal.urgency === 'high' ? '紧急' : selectedSignal.urgency === 'medium' ? '建议' : '参考',
+          type:  SIGNAL_URGENCY_TYPE[selectedSignal.urgency] ?? 'default',
+        } : undefined}
+        sections={selectedSignal ? [
+          {
+            title: '信号详情',
+            content: <p style={{ margin: 0, lineHeight: 1.7 }}>{selectedSignal.description}</p>,
+          },
+          ...(selectedSignal.recommended_action ? [{
+            title: '建议行动',
+            content: (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <ZBadge type="info" text={selectedSignal.recommended_action} />
+                <span style={{ fontSize: 12, color: 'var(--t3)' }}>点击前往执行</span>
+              </div>
+            ),
+          }] : []),
+        ] : []}
+        actions={selectedSignal ? [
+          {
+            label:   selectedSignal.recommended_action ?? '立即执行',
+            type:    'primary',
+            onClick: () => { navigate('/private-domain'); setSelectedSignal(null); },
+          },
+          {
+            label:   '关闭',
+            type:    'default',
+            onClick: () => setSelectedSignal(null),
+          },
+        ] : []}
+      />
     </div>
   );
 }

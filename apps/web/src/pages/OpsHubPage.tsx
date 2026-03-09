@@ -19,7 +19,7 @@ import {
   ShoppingCartOutlined, TrophyOutlined, SyncOutlined,
 } from '@ant-design/icons';
 import { apiClient } from '../services/api';
-import { ZCard, ZBadge, ZButton, ZSkeleton, ZSelect } from '../design-system/components';
+import { ZCard, ZBadge, ZButton, ZSkeleton, ZSelect, DetailDrawer } from '../design-system/components';
 import styles from './OpsHubPage.module.css';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -183,6 +183,8 @@ const OpsHubPage: React.FC = () => {
       setBoardLoading(false);
     }
   }, [selectedStore]);
+
+  const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null);
 
   const refresh = useCallback(() => { loadBff(); loadBoard(); }, [loadBff, loadBoard]);
 
@@ -538,7 +540,9 @@ const OpsHubPage: React.FC = () => {
           >
             <div className={styles.taskItems}>
               {tasks.map(task => (
-                <div key={task.id} className={styles.taskRow}>
+                <div key={task.id} className={styles.taskRow} style={{ cursor: 'pointer' }}
+                  onClick={() => setSelectedTask(task)}
+                >
                   <div
                     className={styles.taskPriorityDot}
                     style={{ background: PRIORITY_COLOR[task.priority] }}
@@ -557,9 +561,9 @@ const OpsHubPage: React.FC = () => {
                   <ZButton
                     variant="ghost"
                     size="sm"
-                    onClick={() => navigate(task.route)}
+                    onClick={(e) => { e.stopPropagation(); setSelectedTask(task); }}
                   >
-                    处理
+                    详情
                   </ZButton>
                 </div>
               ))}
@@ -591,6 +595,58 @@ const OpsHubPage: React.FC = () => {
           </ZCard>
         </>
       )}
+
+      {/* ── 任务详情侧边抽屉 ─────────────────────────────────────────────────── */}
+      <DetailDrawer
+        open={!!selectedTask}
+        onClose={() => setSelectedTask(null)}
+        title={selectedTask?.title ?? ''}
+        subtitle={selectedTask ? `类型：${selectedTask.type}` : undefined}
+        status={selectedTask ? {
+          label: PRIORITY_LABEL[selectedTask.priority],
+          type:  PRIORITY_BADGE_TYPE[selectedTask.priority],
+        } : undefined}
+        metrics={selectedTask ? [
+          { label: '截止时间', value: selectedTask.time },
+          { label: '任务类型', value: selectedTask.type },
+          { label: '优先级',   value: PRIORITY_LABEL[selectedTask.priority],
+            valueColor: PRIORITY_COLOR[selectedTask.priority] },
+        ] : []}
+        sections={selectedTask ? [
+          {
+            title: '任务说明',
+            content: (
+              <p style={{ margin: 0, color: 'var(--t1)', lineHeight: 1.7 }}>
+                {selectedTask.title}
+                <br />
+                <span style={{ color: 'var(--t3)', fontSize: 12 }}>
+                  建议在 {selectedTask.time} 前完成处理。
+                </span>
+              </p>
+            ),
+          },
+          {
+            title: '相关操作入口',
+            content: (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <ZBadge type="info" text={selectedTask.route.replace('/', '')} />
+              </div>
+            ),
+          },
+        ] : []}
+        actions={selectedTask ? [
+          {
+            label: '前往处理',
+            type:  'primary',
+            onClick: () => { navigate(selectedTask!.route); setSelectedTask(null); },
+          },
+          {
+            label:   '关闭',
+            type:    'default',
+            onClick: () => setSelectedTask(null),
+          },
+        ] : []}
+      />
     </div>
   );
 };

@@ -7,21 +7,21 @@ import {
   Modal,
   Select,
   Space,
-  Tabs,
   Table,
   Tag,
   Typography,
 } from 'antd';
 import dayjs, { Dayjs } from 'dayjs';
 import ReactECharts from 'echarts-for-react';
-import { CheckCircleOutlined, EditOutlined, ReloadOutlined } from '@ant-design/icons';
+import { CheckCircleOutlined, EditOutlined, ReloadOutlined, TeamOutlined, RiseOutlined, FallOutlined, ThunderboltOutlined } from '@ant-design/icons';
 
 import { apiClient } from '../services/api';
 import { handleApiError, showSuccess } from '../utils/message';
 import { ZButton, ZCard, ZKpi, ZSkeleton } from '../design-system/components';
+import AgentWorkspaceTemplate from '../components/AgentWorkspaceTemplate';
 import styles from './WorkforcePage.module.css';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 type PeriodKey = 'morning' | 'lunch' | 'dinner';
 
@@ -91,7 +91,6 @@ interface EmployeeHealthResp {
 }
 
 const defaultStoreId = localStorage.getItem('store_id') || 'STORE001';
-const MOBILE_BREAKPOINT = 768;
 
 const WorkforcePage: React.FC = () => {
   const [storeId] = useState(defaultStoreId);
@@ -106,11 +105,6 @@ const WorkforcePage: React.FC = () => {
   const [series, setSeries] = useState<SeriesPoint[]>([]);
   const [employeeHealthLoading, setEmployeeHealthLoading] = useState(false);
   const [employeeHealth, setEmployeeHealth] = useState<EmployeeHealthResp | null>(null);
-  const [activeTab, setActiveTab] = useState<'operations' | 'employee'>('operations');
-  const [isMobile, setIsMobile] = useState(
-    typeof window !== 'undefined' ? window.innerWidth <= MOBILE_BREAKPOINT : false
-  );
-
   const [confirmModal, setConfirmModal] = useState(false);
   const [confirmForm] = Form.useForm();
   const [confirmSubmitting, setConfirmSubmitting] = useState(false);
@@ -195,12 +189,6 @@ const WorkforcePage: React.FC = () => {
   useEffect(() => {
     loadEmployeeHealth();
   }, [loadEmployeeHealth]);
-
-  useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth <= MOBILE_BREAKPOINT);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
 
   const activeForecast = useMemo(() => forecast?.periods?.[selectedPeriod], [forecast, selectedPeriod]);
 
@@ -318,193 +306,224 @@ const WorkforcePage: React.FC = () => {
     }
   }, [budgetForm, date, loadCore, storeId]);
 
-  return (
-    <div className={styles.page}>
-      <div className={styles.toolbar}>
-        <Title level={4} className={styles.toolbarTitle}>人力管理工作台</Title>
-        <Space className={styles.toolbarControls}>
-          <Text type="secondary">建议日期</Text>
-          <DatePicker value={date} onChange={d => d && setDate(d)} />
-          <ZButton icon={<ReloadOutlined />} onClick={loadCore}>刷新</ZButton>
-        </Space>
+  const pageKpis = [
+    {
+      label: '今日建议人数',
+      value: forecast?.daily_peak_headcount ?? '—',
+      unit: '人',
+      icon: <TeamOutlined style={{ color: '#1890ff' }} />,
+    },
+    {
+      label: '当前实际出勤',
+      value: cost?.headcount_actual ?? '—',
+      unit: '人',
+      icon: <TeamOutlined style={{ color: '#52c41a' }} />,
+    },
+    {
+      label: '本月人工成本率',
+      value: cost?.actual_labor_cost_rate != null ? cost.actual_labor_cost_rate.toFixed(1) : '—',
+      unit: '%',
+      icon: <RiseOutlined style={{ color: '#fa8c16' }} />,
+      valueColor: cost?.actual_labor_cost_rate != null && budget?.target_labor_cost_rate != null
+        ? cost.actual_labor_cost_rate > budget.target_labor_cost_rate ? '#ff4d4f' : '#52c41a'
+        : undefined,
+    },
+    {
+      label: '本月节省',
+      value: cost?.saving_yuan != null ? `¥${cost.saving_yuan.toFixed(0)}` : '—',
+      icon: <FallOutlined style={{ color: '#52c41a' }} />,
+      valueColor: '#52c41a',
+    },
+  ];
+
+  const operationsTab = loading ? <ZSkeleton rows={8} /> : (
+    <>
+      <div className={styles.kpiGrid}>
+        <ZCard><ZKpi label="今日建议人数" value={forecast?.daily_peak_headcount ?? 0} unit="人" /></ZCard>
+        <ZCard><ZKpi label="当前实际出勤" value={cost?.headcount_actual ?? 0} unit="人" /></ZCard>
+        <ZCard><ZKpi label="本月人工成本率" value={cost?.actual_labor_cost_rate ?? 0} unit="%" /></ZCard>
+        <ZCard><ZKpi label="本月节省" value={cost?.saving_yuan ?? 0} unit="¥" /></ZCard>
       </div>
 
-      <Tabs
-        activeKey={activeTab}
-        onChange={key => setActiveTab(key as 'operations' | 'employee')}
-        items={[
-          { key: 'operations', label: '经营人力' },
-          { key: 'employee', label: '员工健康' },
+      <div className={styles.sectionGrid}>
+        <ZCard title="今日人力建议">
+          <Space style={{ marginBottom: 10 }}>
+            <Text>餐段</Text>
+            <Select<PeriodKey> value={selectedPeriod} onChange={setSelectedPeriod} style={{ width: 130 }}>
+              <Select.Option value="morning">早餐</Select.Option>
+              <Select.Option value="lunch">午餐</Select.Option>
+              <Select.Option value="dinner">晚餐</Select.Option>
+            </Select>
+            <Tag color="blue">置信度 {(Number(activeForecast?.confidence_score || 0) * 100).toFixed(0)}%</Tag>
+          </Space>
+
+          <Alert
+            type="info"
+            showIcon
+            message={`预测客流 ${activeForecast?.predicted_customer_count ?? 0} 人，建议排班 ${activeForecast?.total_headcount_needed ?? 0} 人`}
+            style={{ marginBottom: 12 }}
+          />
+
+          <Table
+            size="small"
+            pagination={false}
+            rowKey="key"
+            dataSource={positionRows}
+            columns={[
+              { title: '岗位', dataIndex: 'position' },
+              { title: '建议人数', dataIndex: 'recommended' },
+              {
+                title: '较当前差值',
+                dataIndex: 'delta',
+                render: (v: number) => (v > 0 ? <Tag color="orange">+{v}</Tag> : v < 0 ? <Tag color="green">{v}</Tag> : <Tag>0</Tag>),
+              },
+            ]}
+            style={{ marginBottom: 12 }}
+          />
+
+          <div style={{ marginBottom: 12 }}>
+            <Text strong>推理链</Text>
+            <ol className={styles.reasonList}>
+              <li>{activeForecast?.reason_1 || '暂无'}</li>
+              <li>{activeForecast?.reason_2 || '暂无'}</li>
+              <li>{activeForecast?.reason_3 || '暂无'}</li>
+            </ol>
+          </div>
+
+          <div className={styles.actions}>
+            <ZButton variant="primary" icon={<CheckCircleOutlined />} onClick={() => {
+              confirmForm.setFieldsValue({ action: 'confirmed' });
+              setConfirmModal(true);
+            }}>
+              确认排班建议
+            </ZButton>
+            <ZButton icon={<EditOutlined />} onClick={() => {
+              confirmForm.setFieldsValue({
+                action: 'modified',
+                modified_headcount: activeForecast?.total_headcount_needed ?? 0,
+              });
+              setConfirmModal(true);
+            }}>
+              修改并确认
+            </ZButton>
+          </div>
+        </ZCard>
+
+        <ZCard title="预算与告警">
+          <Space direction="vertical" style={{ width: '100%' }} size={10}>
+            <Text>预算月份：{budget?.budget_period || date.format('YYYY-MM')}</Text>
+            <Text>目标成本率：<b>{budget?.target_labor_cost_rate ?? 0}%</b></Text>
+            <Text>月度上限：<b>¥{Number(budget?.max_labor_cost_yuan || 0).toLocaleString()}</b></Text>
+            <Text>日预算：<b>¥{Number(budget?.daily_budget_yuan || 0).toLocaleString()}</b></Text>
+            <Text>预警阈值：<b>{budget?.alert_threshold_pct ?? 90}%</b></Text>
+            <ZButton onClick={() => {
+              budgetForm.setFieldsValue({
+                target_labor_cost_rate: budget?.target_labor_cost_rate ?? 28,
+                max_labor_cost_yuan: budget?.max_labor_cost_yuan ?? 0,
+                daily_budget_yuan: budget?.daily_budget_yuan ?? 0,
+                alert_threshold_pct: budget?.alert_threshold_pct ?? 90,
+              });
+              setBudgetModal(true);
+            }}>
+              编辑预算
+            </ZButton>
+          </Space>
+        </ZCard>
+      </div>
+
+      <ZCard title="人工成本趋势（近30天）" extra={seriesLoading ? '加载中...' : undefined}>
+        <div className={styles.chartBox}>
+          <ReactECharts option={costChartOption} style={{ height: 300 }} />
+        </div>
+      </ZCard>
+
+      <ZCard title="本月与建议对比（近30天）">
+        <div className={styles.chartBox}>
+          <ReactECharts option={headcountChartOption} style={{ height: 280 }} />
+        </div>
+      </ZCard>
+    </>
+  );
+
+  const employeeTab = employeeHealthLoading ? <ZSkeleton rows={6} /> : (
+    <>
+      <div className={styles.kpiGrid}>
+        <ZCard><ZKpi label="员工总数" value={employeeHealth?.total ?? 0} unit="人" /></ZCard>
+        <ZCard><ZKpi label="高风险流失" value={employeeHealth?.items.filter(x => x.risk_level === 'high' || x.risk_level === 'critical').length ?? 0} unit="人" /></ZCard>
+        <ZCard><ZKpi label="门店公平性指数" value={employeeHealth?.fairness_index ?? 100} unit="" /></ZCard>
+        <ZCard><ZKpi label="潜在替换成本" value={employeeHealth?.items.reduce((s, x) => s + (x.replacement_cost_yuan || 0), 0) ?? 0} unit="¥" /></ZCard>
+      </div>
+
+      <div className={styles.sectionGrid}>
+        <ZCard title="流失风险排名（Top 20）">
+          <Table
+            size="small"
+            rowKey="employee_id"
+            pagination={false}
+            dataSource={employeeHealth?.items || []}
+            columns={[
+              { title: '员工', dataIndex: 'name' },
+              { title: '岗位', dataIndex: 'position', render: (v?: string) => v || '-' },
+              {
+                title: '风险分(90天)',
+                dataIndex: 'risk_score_90d',
+                render: (v: number) => v.toFixed(2),
+              },
+              {
+                title: '风险等级',
+                dataIndex: 'risk_level',
+                render: (v: 'critical' | 'high' | 'medium' | 'low') =>
+                  v === 'critical' ? <Tag color="magenta">极高</Tag> : v === 'high' ? <Tag color="red">高</Tag> : v === 'medium' ? <Tag color="orange">中</Tag> : <Tag color="green">低</Tag>,
+              },
+              {
+                title: '班次不公平占比',
+                dataIndex: 'unfavorable_ratio',
+                render: (v: number) => `${(v * 100).toFixed(1)}%`,
+              },
+              {
+                title: '替换成本',
+                dataIndex: 'replacement_cost_yuan',
+                render: (v: number) => `¥${Number(v || 0).toLocaleString()}`,
+              },
+            ]}
+          />
+        </ZCard>
+
+        <ZCard title="班次公平性分布">
+          <div className={styles.chartBox}>
+            <ReactECharts option={fairnessPieOption} style={{ height: 340 }} />
+          </div>
+        </ZCard>
+      </div>
+    </>
+  );
+
+  const highRiskCount = employeeHealth?.items.filter(x => x.risk_level === 'high' || x.risk_level === 'critical').length ?? 0;
+
+  return (
+    <>
+      <AgentWorkspaceTemplate
+        agentName="人力管理工作台"
+        agentIcon="👥"
+        agentColor="#1890ff"
+        description="客流预测 · 排班优化 · 人工成本控制 · 员工健康分析"
+        status={loading ? 'idle' : 'running'}
+        kpis={pageKpis}
+        kpiLoading={loading}
+        tabs={[
+          { key: 'operations', label: '经营人力', children: operationsTab },
+          { key: 'employee',   label: '员工健康', count: highRiskCount, children: employeeTab },
         ]}
+        defaultTab="operations"
+        loading={loading}
+        onRefresh={loadCore}
+        headerExtra={
+          <Space size="small">
+            <Text type="secondary" style={{ fontSize: 12 }}>建议日期</Text>
+            <DatePicker value={date} onChange={d => d && setDate(d)} size="small" />
+          </Space>
+        }
       />
-
-      {activeTab === 'operations' && (loading ? (
-        <ZSkeleton rows={8} />
-      ) : (
-        <>
-          <div className={styles.kpiGrid}>
-            <ZCard><ZKpi label="今日建议人数" value={forecast?.daily_peak_headcount ?? 0} unit="人" /></ZCard>
-            <ZCard><ZKpi label="当前实际出勤" value={cost?.headcount_actual ?? 0} unit="人" /></ZCard>
-            <ZCard><ZKpi label="本月人工成本率" value={cost?.actual_labor_cost_rate ?? 0} unit="%" /></ZCard>
-            <ZCard><ZKpi label="本月节省" value={cost?.saving_yuan ?? 0} unit="¥" /></ZCard>
-          </div>
-
-          <div className={styles.sectionGrid}>
-            <ZCard title="今日人力建议">
-              <Space className={styles.periodControls}>
-                <Text>餐段</Text>
-                <Select<PeriodKey> value={selectedPeriod} onChange={setSelectedPeriod} style={{ width: isMobile ? 110 : 130 }}>
-                  <Select.Option value="morning">早餐</Select.Option>
-                  <Select.Option value="lunch">午餐</Select.Option>
-                  <Select.Option value="dinner">晚餐</Select.Option>
-                </Select>
-                <Tag color="blue">置信度 {(Number(activeForecast?.confidence_score || 0) * 100).toFixed(0)}%</Tag>
-              </Space>
-
-              <Alert
-                type="info"
-                showIcon
-                message={`预测客流 ${activeForecast?.predicted_customer_count ?? 0} 人，建议排班 ${activeForecast?.total_headcount_needed ?? 0} 人`}
-                style={{ marginBottom: 12 }}
-              />
-
-              <Table
-                size="small"
-                pagination={false}
-                rowKey="key"
-                scroll={{ x: 'max-content' }}
-                dataSource={positionRows}
-                columns={[
-                  { title: '岗位', dataIndex: 'position' },
-                  { title: '建议人数', dataIndex: 'recommended' },
-                  {
-                    title: '较当前差值',
-                    dataIndex: 'delta',
-                    render: (v: number) => (v > 0 ? <Tag color="orange">+{v}</Tag> : v < 0 ? <Tag color="green">{v}</Tag> : <Tag>0</Tag>),
-                  },
-                ]}
-                style={{ marginBottom: 12 }}
-              />
-
-              <div style={{ marginBottom: 12 }}>
-                <Text strong>推理链</Text>
-                <ol className={styles.reasonList}>
-                  <li>{activeForecast?.reason_1 || '暂无'}</li>
-                  <li>{activeForecast?.reason_2 || '暂无'}</li>
-                  <li>{activeForecast?.reason_3 || '暂无'}</li>
-                </ol>
-              </div>
-
-              <div className={styles.actions}>
-                <ZButton variant="primary" icon={<CheckCircleOutlined />} onClick={() => {
-                  confirmForm.setFieldsValue({ action: 'confirmed' });
-                  setConfirmModal(true);
-                }}>
-                  确认排班建议
-                </ZButton>
-                <ZButton icon={<EditOutlined />} onClick={() => {
-                  confirmForm.setFieldsValue({
-                    action: 'modified',
-                    modified_headcount: activeForecast?.total_headcount_needed ?? 0,
-                  });
-                  setConfirmModal(true);
-                }}>
-                  修改并确认
-                </ZButton>
-              </div>
-            </ZCard>
-
-            <ZCard title="预算与告警">
-              <Space direction="vertical" className={styles.budgetStack} size={10}>
-                <Text>预算月份：{budget?.budget_period || date.format('YYYY-MM')}</Text>
-                <Text>目标成本率：<b>{budget?.target_labor_cost_rate ?? 0}%</b></Text>
-                <Text>月度上限：<b>¥{Number(budget?.max_labor_cost_yuan || 0).toLocaleString()}</b></Text>
-                <Text>日预算：<b>¥{Number(budget?.daily_budget_yuan || 0).toLocaleString()}</b></Text>
-                <Text>预警阈值：<b>{budget?.alert_threshold_pct ?? 90}%</b></Text>
-                <ZButton onClick={() => {
-                  budgetForm.setFieldsValue({
-                    target_labor_cost_rate: budget?.target_labor_cost_rate ?? 28,
-                    max_labor_cost_yuan: budget?.max_labor_cost_yuan ?? 0,
-                    daily_budget_yuan: budget?.daily_budget_yuan ?? 0,
-                    alert_threshold_pct: budget?.alert_threshold_pct ?? 90,
-                  });
-                  setBudgetModal(true);
-                }}>
-                  编辑预算
-                </ZButton>
-              </Space>
-            </ZCard>
-          </div>
-
-          <ZCard title="人工成本趋势（近30天）" extra={seriesLoading ? '加载中...' : undefined}>
-            <div className={styles.chartBox}>
-              <ReactECharts option={costChartOption} style={{ height: 300 }} />
-            </div>
-          </ZCard>
-
-          <ZCard title="本月与建议对比（近30天）">
-            <div className={styles.chartBox}>
-              <ReactECharts option={headcountChartOption} style={{ height: 280 }} />
-            </div>
-          </ZCard>
-        </>
-      ))}
-
-      {activeTab === 'employee' && (employeeHealthLoading ? (
-        <ZSkeleton rows={6} />
-      ) : (
-        <>
-          <div className={styles.kpiGrid}>
-            <ZCard><ZKpi label="员工总数" value={employeeHealth?.total ?? 0} unit="人" /></ZCard>
-            <ZCard><ZKpi label="高风险流失" value={employeeHealth?.items.filter(x => x.risk_level === 'high' || x.risk_level === 'critical').length ?? 0} unit="人" /></ZCard>
-            <ZCard><ZKpi label="门店公平性指数" value={employeeHealth?.fairness_index ?? 100} unit="" /></ZCard>
-            <ZCard><ZKpi label="潜在替换成本" value={employeeHealth?.items.reduce((s, x) => s + (x.replacement_cost_yuan || 0), 0) ?? 0} unit="¥" /></ZCard>
-          </div>
-
-          <div className={styles.sectionGrid}>
-            <ZCard title="流失风险排名（Top 20）">
-              <Table
-                size="small"
-                rowKey="employee_id"
-                pagination={false}
-                scroll={{ x: 'max-content' }}
-                dataSource={employeeHealth?.items || []}
-                columns={[
-                  { title: '员工', dataIndex: 'name' },
-                  { title: '岗位', dataIndex: 'position', render: (v?: string) => v || '-' },
-                  {
-                    title: '风险分(90天)',
-                    dataIndex: 'risk_score_90d',
-                    render: (v: number) => v.toFixed(2),
-                  },
-                  {
-                    title: '风险等级',
-                    dataIndex: 'risk_level',
-                    render: (v: 'critical' | 'high' | 'medium' | 'low') =>
-                      v === 'critical' ? <Tag color="magenta">极高</Tag> : v === 'high' ? <Tag color="red">高</Tag> : v === 'medium' ? <Tag color="orange">中</Tag> : <Tag color="green">低</Tag>,
-                  },
-                  {
-                    title: '班次不公平占比',
-                    dataIndex: 'unfavorable_ratio',
-                    render: (v: number) => `${(v * 100).toFixed(1)}%`,
-                  },
-                  {
-                    title: '替换成本',
-                    dataIndex: 'replacement_cost_yuan',
-                    render: (v: number) => `¥${Number(v || 0).toLocaleString()}`,
-                  },
-                ]}
-              />
-            </ZCard>
-
-            <ZCard title="班次公平性分布">
-              <div className={styles.chartBox}>
-                <ReactECharts option={fairnessPieOption} style={{ height: 340 }} />
-              </div>
-            </ZCard>
-          </div>
-        </>
-      ))}
 
       <Modal
         title="确认排班建议"
@@ -553,7 +572,7 @@ const WorkforcePage: React.FC = () => {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </>
   );
 };
 
