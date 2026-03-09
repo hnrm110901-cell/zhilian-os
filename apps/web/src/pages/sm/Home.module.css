@@ -234,6 +234,30 @@
   gap: 8px;
 }
 
+.adviceSwitchRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.adviceSwitchBtn {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.adviceSwitchBtnActive {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg));
+}
+
 .staffingMetaRow {
   display: flex;
   justify-content: space-between;
@@ -262,4 +286,16 @@
   flex-wrap: wrap;
   gap: 6px;
   padding-top: 4px;
+}
+
+.adviceHint {
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.modalHint {
+  margin-top: -6px;
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
 }

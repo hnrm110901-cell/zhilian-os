@@ -5,6 +5,7 @@ Workforce API — Phase 8 Step 5
 from __future__ import annotations
 
 import calendar
+import os
 from datetime import date, datetime, timedelta
 from typing import Optional
 
@@ -33,6 +34,27 @@ class StaffingAdviceConfirmRequest(BaseModel):
     action: str = Field(..., description="confirmed/rejected/modified")
     modified_headcount: Optional[int] = Field(None, ge=1)
     rejection_reason: Optional[str] = None
+
+
+class StaffingAdviceQueryResponse(BaseModel):
+    exists: bool
+    store_id: str
+    advice_date: str
+    meal_period: str
+    status: Optional[str] = None
+    recommended_headcount: Optional[int] = None
+    current_scheduled_headcount: Optional[int] = None
+    headcount_delta: Optional[int] = None
+    estimated_saving_yuan: Optional[float] = None
+    estimated_overspend_yuan: Optional[float] = None
+    confidence_score: Optional[float] = None
+    position_breakdown: Optional[dict] = None
+    reason_1: Optional[str] = None
+    reason_2: Optional[str] = None
+    reason_3: Optional[str] = None
+    confirmed_action: Optional[str] = None
+    confirmed_at: Optional[str] = None
+    confirmed_by: Optional[str] = None
 
 
 class LaborBudgetUpsertRequest(BaseModel):
@@ -88,6 +110,70 @@ def _parse_yyyymm(month: str) -> tuple[int, int]:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"month 格式错误，需为 YYYY-MM，实际值: {month}",
         )
+
+
+@router.get("/stores/{store_id}/staffing-advice", response_model=StaffingAdviceQueryResponse)
+async def get_staffing_advice(
+    store_id: str,
+    date_str: Optional[str] = Query(None, alias="date", description="建议日期 YYYY-MM-DD，默认明天"),
+    meal_period: str = Query("all_day", description="morning/lunch/dinner/all_day"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    advice_date = _parse_iso_date(date_str, "date") if date_str else (date.today() + timedelta(days=1))
+    meal_period = meal_period.lower()
+    if meal_period not in {"morning", "lunch", "dinner", "all_day"}:
+        raise HTTPException(status_code=400, detail="meal_period 必须是 morning/lunch/dinner/all_day")
+
+    result = await db.execute(
+        text(
+            """
+            SELECT
+                sa.id, sa.store_id, sa.advice_date, sa.meal_period, sa.status,
+                sa.recommended_headcount, sa.current_scheduled_headcount, sa.headcount_delta,
+                sa.estimated_saving_yuan, sa.estimated_overspend_yuan, sa.confidence_score,
+                sa.position_breakdown, sa.reason_1, sa.reason_2, sa.reason_3,
+                sac.action AS confirmed_action, sac.confirmed_at, sac.confirmed_by
+            FROM staffing_advice sa
+            LEFT JOIN staffing_advice_confirmations sac ON sac.advice_id = sa.id
+            WHERE sa.store_id = :sid
+              AND sa.advice_date = :advice_date
+              AND sa.meal_period = :meal_period
+            ORDER BY sa.created_at DESC, sac.confirmed_at DESC NULLS LAST
+            LIMIT 1
+            """
+        ),
+        {"sid": store_id, "advice_date": advice_date, "meal_period": meal_period},
+    )
+    row = result.fetchone()
+    if not row:
+        return StaffingAdviceQueryResponse(
+            exists=False,
+            store_id=store_id,
+            advice_date=advice_date.isoformat(),
+            meal_period=meal_period,
+        )
+
+    return StaffingAdviceQueryResponse(
+        exists=True,
+        store_id=row.store_id,
+        advice_date=row.advice_date.isoformat() if hasattr(row.advice_date, "isoformat") else str(row.advice_date),
+        meal_period=row.meal_period,
+        status=row.status,
+        recommended_headcount=int(row.recommended_headcount) if row.recommended_headcount is not None else None,
+        current_scheduled_headcount=int(row.current_scheduled_headcount) if row.current_scheduled_headcount is not None else None,
+        headcount_delta=int(row.headcount_delta) if row.headcount_delta is not None else None,
+        estimated_saving_yuan=float(row.estimated_saving_yuan) if row.estimated_saving_yuan is not None else None,
+        estimated_overspend_yuan=float(row.estimated_overspend_yuan) if row.estimated_overspend_yuan is not None else None,
+        confidence_score=float(row.confidence_score) if row.confidence_score is not None else None,
+        position_breakdown=row.position_breakdown if isinstance(row.position_breakdown, dict) else None,
+        reason_1=row.reason_1,
+        reason_2=row.reason_2,
+        reason_3=row.reason_3,
+        confirmed_action=row.confirmed_action,
+        confirmed_at=row.confirmed_at.isoformat() if hasattr(row.confirmed_at, "isoformat") and row.confirmed_at else None,
+        confirmed_by=row.confirmed_by,
+    )
 
 
 @router.get("/stores/{store_id}/labor-forecast")
@@ -272,7 +358,10 @@ async def confirm_staffing_advice(
     advice_result = await db.execute(
         text(
             """
-            SELECT id, created_at
+            SELECT
+                id, created_at,
+                recommended_headcount, current_scheduled_headcount,
+                estimated_saving_yuan, estimated_overspend_yuan
             FROM staffing_advice
             WHERE store_id = :sid
               AND advice_date = :advice_date
@@ -291,6 +380,11 @@ async def confirm_staffing_advice(
     created_at = advice_row.created_at if hasattr(advice_row.created_at, "timestamp") else now
     response_seconds = max(int((now - created_at).total_seconds()), 0)
     advice_status = "confirmed" if action in {"confirmed", "modified"} else "rejected"
+    baseline_recommended = int(getattr(advice_row, "recommended_headcount", 0) or 0)
+    baseline_current = int(getattr(advice_row, "current_scheduled_headcount", 0) or 0)
+    avg_wage_per_day = float(os.getenv("L8_AVG_WAGE_PER_DAY", "200"))
+    effective_headcount = int(body.modified_headcount) if action == "modified" and body.modified_headcount is not None else baseline_recommended
+    cost_impact_yuan = float((effective_headcount - baseline_current) * avg_wage_per_day)
 
     await db.execute(
         text(
@@ -328,6 +422,14 @@ async def confirm_staffing_advice(
     )
     await db.commit()
 
+    message = (
+        "排班建议已确认"
+        if action == "confirmed"
+        else "排班建议已修改并确认"
+        if action == "modified"
+        else "排班建议已拒绝"
+    )
+
     return {
         "ok": True,
         "store_id": store_id,
@@ -335,6 +437,8 @@ async def confirm_staffing_advice(
         "meal_period": meal_period,
         "action": action,
         "status": advice_status,
+        "cost_impact_yuan": round(cost_impact_yuan, 2),
+        "message": message,
     }
 
 

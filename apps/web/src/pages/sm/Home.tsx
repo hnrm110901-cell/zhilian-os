@@ -7,7 +7,7 @@ import {
 import { queryHomeSummary } from '../../services/mobile.query.service';
 import type { MobileHomeSummaryResponse } from '../../services/mobile.types';
 import { apiClient } from '../../services/api';
-import { handleApiError, showSuccess } from '../../utils/message';
+import { handleApiError, showInfo, showSuccess } from '../../utils/message';
 import styles from './Home.module.css';
 
 const STORE_ID = localStorage.getItem('store_id') || 'STORE001';
@@ -28,6 +28,32 @@ const HEALTH_LEVEL_MAP: Record<string, { label: string; type: 'success' | 'info'
   critical: { label: '危险', type: 'critical' },
 };
 
+type AdviceStatus = 'pending' | 'confirmed' | 'rejected';
+
+interface StaffingAdvicePayload {
+  exists: boolean;
+  advice_date: string;
+  meal_period: 'morning' | 'lunch' | 'dinner' | 'all_day';
+  status?: AdviceStatus;
+  recommended_headcount?: number;
+  current_scheduled_headcount?: number;
+  estimated_saving_yuan?: number;
+  estimated_overspend_yuan?: number;
+  confidence_score?: number;
+  position_breakdown?: Record<string, any>;
+}
+
+interface AdviceCardData {
+  date: string;
+  meal_period: 'morning' | 'lunch' | 'dinner' | 'all_day';
+  recommended_headcount: number;
+  confidence_score: number;
+  position_requirements: Record<string, number>;
+  estimated_labor_cost_yuan: number;
+  status: AdviceStatus;
+  source: 'advice' | 'forecast';
+}
+
 export default function SmHome() {
   const navigate = useNavigate();
   const [data, setData] = useState<MobileHomeSummaryResponse | null>(null);
@@ -37,40 +63,96 @@ export default function SmHome() {
   const [adviceSubmitting, setAdviceSubmitting] = useState(false);
   const [adviceModal, setAdviceModal] = useState(false);
   const [adviceForm] = Form.useForm();
-  const [advice, setAdvice] = useState<{
-    date: string;
-    meal_period: 'morning' | 'lunch' | 'dinner';
-    recommended_headcount: number;
-    confidence_score?: number;
-    position_requirements?: Record<string, number>;
-    estimated_labor_cost_yuan?: number;
-  } | null>(null);
+  const [adviceMap, setAdviceMap] = useState<Record<'today' | 'tomorrow', AdviceCardData | null>>({
+    today: null,
+    tomorrow: null,
+  });
+  const [adviceKey, setAdviceKey] = useState<'today' | 'tomorrow'>('tomorrow');
+
+  const normalizePositionRequirements = (raw: Record<string, any> | undefined): Record<string, number> => {
+    if (!raw) return {};
+    const keys = ['morning', 'lunch', 'dinner'];
+    if (keys.some((k) => typeof raw[k] === 'object' && raw[k] !== null)) {
+      const merged: Record<string, number> = {};
+      keys.forEach((k) => {
+        const bucket = raw[k] || {};
+        Object.entries(bucket).forEach(([name, count]) => {
+          const n = Number(count || 0);
+          merged[name] = (merged[name] || 0) + n;
+        });
+      });
+      return merged;
+    }
+    return Object.fromEntries(
+      Object.entries(raw).map(([k, v]) => [k, Number(v || 0)])
+    );
+  };
+
+  const queryAdviceByDate = useCallback(async (dateStr: string): Promise<AdviceCardData | null> => {
+    try {
+      const adviceResp = await apiClient.get<StaffingAdvicePayload>(`/api/v1/workforce/stores/${STORE_ID}/staffing-advice`, {
+        params: { date: dateStr, meal_period: 'all_day' },
+      });
+      if (adviceResp.exists) {
+        const savings = Number(adviceResp.estimated_saving_yuan || 0);
+        const overspend = Number(adviceResp.estimated_overspend_yuan || 0);
+        return {
+          date: dateStr,
+          meal_period: adviceResp.meal_period,
+          recommended_headcount: Number(adviceResp.recommended_headcount || 0),
+          confidence_score: Number(adviceResp.confidence_score || 0),
+          position_requirements: normalizePositionRequirements(adviceResp.position_breakdown),
+          estimated_labor_cost_yuan: Math.max(savings, overspend),
+          status: (adviceResp.status as AdviceStatus) || 'pending',
+          source: 'advice',
+        };
+      }
+    } catch {
+      // fallback to forecast
+    }
+
+    try {
+      const forecast = await apiClient.get<any>(`/api/v1/workforce/stores/${STORE_ID}/labor-forecast`, {
+        params: { date: dateStr },
+      });
+      const periods = forecast?.periods || {};
+      const selectedPeriod = periods.lunch ? 'lunch' : periods.dinner ? 'dinner' : 'morning';
+      const period = periods[selectedPeriod] || {};
+      return {
+        date: dateStr,
+        meal_period: selectedPeriod,
+        recommended_headcount: Number(period.recommended_headcount ?? period.total_headcount_needed ?? 0),
+        confidence_score: Number(period.confidence_score ?? forecast?.confidence ?? 0),
+        position_requirements: normalizePositionRequirements(period.position_breakdown ?? period.position_requirements),
+        estimated_labor_cost_yuan: Number(forecast?.estimated_labor_cost_yuan ?? 0),
+        status: 'pending',
+        source: 'forecast',
+      };
+    } catch {
+      return null;
+    }
+  }, []);
 
   const loadStaffingAdvice = useCallback(async () => {
     setAdviceLoading(true);
     try {
-      const targetDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-      const resp = await apiClient.get<any>(`/api/v1/workforce/stores/${STORE_ID}/labor-forecast`, {
-        params: { date: targetDate },
-      });
-      const periods = resp?.periods || {};
-      const selectedPeriod = periods.lunch ? 'lunch' : periods.dinner ? 'dinner' : 'morning';
-      const period = periods[selectedPeriod] || {};
-      const recommended = Number(period.recommended_headcount ?? period.total_headcount_needed ?? 0);
-      setAdvice({
-        date: targetDate,
-        meal_period: selectedPeriod,
-        recommended_headcount: recommended,
-        confidence_score: Number(period.confidence_score ?? resp?.confidence ?? 0),
-        position_requirements: period.position_breakdown ?? period.position_requirements ?? {},
-        estimated_labor_cost_yuan: Number(resp?.estimated_labor_cost_yuan ?? 0),
+      const now = new Date();
+      const today = now.toISOString().slice(0, 10);
+      const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const [todayAdvice, tomorrowAdvice] = await Promise.all([
+        queryAdviceByDate(today),
+        queryAdviceByDate(tomorrow),
+      ]);
+      setAdviceMap({
+        today: todayAdvice,
+        tomorrow: tomorrowAdvice,
       });
     } catch {
-      setAdvice(null);
+      setAdviceMap({ today: null, tomorrow: null });
     } finally {
       setAdviceLoading(false);
     }
-  }, []);
+  }, [queryAdviceByDate]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -89,18 +171,29 @@ export default function SmHome() {
   useEffect(() => { loadStaffingAdvice(); }, [loadStaffingAdvice]);
 
   const submitAdvice = useCallback(async () => {
+    const advice = adviceMap[adviceKey];
     if (!advice) return;
+    if (advice.source !== 'advice') {
+      showInfo('当前仅为预测视图，待 07:00 生成正式建议后可提交确认');
+      return;
+    }
+    if (advice.status !== 'pending') {
+      showInfo('该建议已处理，无需重复提交');
+      return;
+    }
     try {
       const values = await adviceForm.validateFields();
       setAdviceSubmitting(true);
-      await apiClient.post(`/api/v1/workforce/stores/${STORE_ID}/staffing-advice/confirm`, {
+      const resp = await apiClient.post<any>(`/api/v1/workforce/stores/${STORE_ID}/staffing-advice/confirm`, {
         advice_date: advice.date,
         meal_period: advice.meal_period,
         action: values.action,
         modified_headcount: values.action === 'modified' ? values.modified_headcount : undefined,
         rejection_reason: values.action === 'rejected' ? values.rejection_reason : undefined,
       });
-      showSuccess(values.action === 'rejected' ? '已拒绝建议' : '人力建议已确认');
+      const impact = Number(resp?.cost_impact_yuan || 0);
+      const impactLabel = impact === 0 ? '无额外成本影响' : impact > 0 ? `成本 +¥${Math.abs(impact).toFixed(0)}` : `成本 -¥${Math.abs(impact).toFixed(0)}`;
+      showSuccess(`${resp?.message || '提交成功'}（${impactLabel}）`);
       setAdviceModal(false);
       adviceForm.resetFields();
       loadStaffingAdvice();
@@ -109,7 +202,7 @@ export default function SmHome() {
     } finally {
       setAdviceSubmitting(false);
     }
-  }, [advice, adviceForm, loadStaffingAdvice]);
+  }, [adviceForm, adviceKey, adviceMap, loadStaffingAdvice]);
 
   const today = new Date().toLocaleDateString('zh-CN', {
     month: 'long', day: 'numeric', weekday: 'short',
@@ -124,6 +217,20 @@ export default function SmHome() {
     onAction: () => navigate('/sm/tasks'),
   }));
 
+  const selectedAdvice = adviceMap[adviceKey];
+  const selectedAdviceDateLabel = adviceKey === 'today' ? '今日建议' : '明日建议';
+  const statusTextMap: Record<AdviceStatus, string> = {
+    pending: '待处理',
+    confirmed: '已确认',
+    rejected: '已拒绝',
+  };
+  const statusTypeMap: Record<AdviceStatus, 'success' | 'warning' | 'critical'> = {
+    pending: 'warning',
+    confirmed: 'success',
+    rejected: 'critical',
+  };
+  const canSubmitAdvice = !!selectedAdvice && selectedAdvice.source === 'advice' && selectedAdvice.status === 'pending';
+
   return (
     <div className={styles.page}>
       <div className={styles.header}>
@@ -131,7 +238,7 @@ export default function SmHome() {
           <div className={styles.greeting}>{greeting()}，{data?.role_name || '店长'}</div>
           <div className={styles.date}>{today} · {STORE_ID}</div>
         </div>
-        <ZButton variant="ghost" size="sm" onClick={load}>↺ 刷新</ZButton>
+        <ZButton variant="ghost" size="sm" onClick={() => { load(); loadStaffingAdvice(); }}>↺ 刷新</ZButton>
       </div>
 
       {loading && !data ? (
@@ -208,40 +315,62 @@ export default function SmHome() {
             <UrgencyList items={urgencyItems} maxItems={3} />
           </ZCard>
 
-          <ZCard title="明日人力建议" subtitle={advice ? `${advice.meal_period} 时段` : '暂无建议数据'}>
+          <ZCard title="人力建议卡（P1）" subtitle={selectedAdvice ? `${selectedAdvice.meal_period} 时段` : '暂无建议数据'}>
+            <div className={styles.adviceSwitchRow}>
+              <button
+                className={`${styles.adviceSwitchBtn} ${adviceKey === 'today' ? styles.adviceSwitchBtnActive : ''}`}
+                onClick={() => setAdviceKey('today')}
+                type="button"
+              >
+                今日
+              </button>
+              <button
+                className={`${styles.adviceSwitchBtn} ${adviceKey === 'tomorrow' ? styles.adviceSwitchBtnActive : ''}`}
+                onClick={() => setAdviceKey('tomorrow')}
+                type="button"
+              >
+                明日
+              </button>
+              {selectedAdvice && (
+                <ZBadge type={statusTypeMap[selectedAdvice.status]} text={`${selectedAdviceDateLabel} · ${statusTextMap[selectedAdvice.status]}`} />
+              )}
+            </div>
             {adviceLoading ? (
               <ZSkeleton rows={3} />
-            ) : !advice ? (
+            ) : !selectedAdvice ? (
               <ZEmpty title="暂无建议数据" />
             ) : (
               <div className={styles.staffingCard}>
                 <div className={styles.staffingMetaRow}>
                   <span>建议排班人数</span>
-                  <strong>{advice.recommended_headcount} 人</strong>
+                  <strong>{selectedAdvice.recommended_headcount} 人</strong>
                 </div>
                 <div className={styles.staffingMetaRow}>
                   <span>预测置信度</span>
-                  <strong>{Math.round((advice.confidence_score || 0) * 100)}%</strong>
+                  <strong>{Math.round((selectedAdvice.confidence_score || 0) * 100)}%</strong>
                 </div>
                 <div className={styles.staffingMetaRow}>
-                  <span>预估成本</span>
-                  <strong>¥{Math.round(advice.estimated_labor_cost_yuan || 0).toLocaleString()}</strong>
+                  <span>{selectedAdvice.source === 'advice' ? '预估节省/成本影响' : '预估人工成本'}</span>
+                  <strong>¥{Math.round(selectedAdvice.estimated_labor_cost_yuan || 0).toLocaleString()}</strong>
                 </div>
+                {selectedAdvice.source !== 'advice' && (
+                  <div className={styles.adviceHint}>当前为预测视图，尚未生成可确认建议（等待 07:00 推送）</div>
+                )}
                 <div className={styles.positionChips}>
-                  {Object.entries(advice.position_requirements || {}).map(([k, v]) => (
+                  {Object.entries(selectedAdvice.position_requirements || {}).map(([k, v]) => (
                     <span key={k} className={styles.positionChip}>{k} {v}人</span>
                   ))}
                 </div>
                 <div className={styles.staffingActions}>
-                  <ZButton size="sm" variant="primary" onClick={() => {
+                  <ZButton size="sm" variant="primary" disabled={!canSubmitAdvice} onClick={() => {
                     adviceForm.setFieldsValue({ action: 'confirmed' });
                     setAdviceModal(true);
                   }}>✅ 一键确认</ZButton>
-                  <ZButton size="sm" variant="ghost" onClick={() => {
-                    adviceForm.setFieldsValue({ action: 'modified', modified_headcount: advice.recommended_headcount });
+                  <ZButton size="sm" variant="ghost" disabled={!canSubmitAdvice} onClick={() => {
+                    adviceForm.setFieldsValue({ action: 'modified', modified_headcount: selectedAdvice.recommended_headcount });
                     setAdviceModal(true);
                   }}>✏️ 修改人数</ZButton>
-                  <ZButton size="sm" variant="ghost" onClick={() => {
+                  <ZButton size="sm" variant="ghost" disabled={!canSubmitAdvice} onClick={() => {
                     adviceForm.setFieldsValue({ action: 'rejected' });
                     setAdviceModal(true);
                   }}>❌ 拒绝</ZButton>
@@ -294,9 +423,21 @@ export default function SmHome() {
             {({ getFieldValue }) => (
               <>
                 {getFieldValue('action') === 'modified' ? (
-                  <Form.Item label="修改后人数" name="modified_headcount" rules={[{ required: true, message: '请输入人数' }]}>
-                    <InputNumber min={1} style={{ width: '100%' }} />
-                  </Form.Item>
+                  <>
+                    <Form.Item label="修改后人数" name="modified_headcount" rules={[{ required: true, message: '请输入人数' }]}>
+                      <InputNumber min={1} style={{ width: '100%' }} />
+                    </Form.Item>
+                    <div className={styles.modalHint}>
+                      预计成本影响：
+                      {(() => {
+                        const base = selectedAdvice?.recommended_headcount || 0;
+                        const modified = Number(getFieldValue('modified_headcount') || base);
+                        const diff = (modified - base) * 200;
+                        if (diff === 0) return ' 无变化';
+                        return diff > 0 ? ` +¥${Math.abs(diff)}（增配）` : ` -¥${Math.abs(diff)}（降配）`;
+                      })()}
+                    </div>
+                  </>
                 ) : null}
                 {getFieldValue('action') === 'rejected' ? (
                   <Form.Item label="拒绝原因" name="rejection_reason" rules={[{ required: true, message: '请输入拒绝原因' }]}>

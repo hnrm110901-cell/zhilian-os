@@ -36,6 +36,7 @@ from src.api.workforce import (  # noqa: E402
     get_best_staffing_pattern,
     get_employee_health,
     get_labor_budget,
+    get_staffing_advice,
     learn_staffing_patterns,
     upsert_labor_budget,
 )
@@ -226,6 +227,8 @@ class TestWorkforceConfirmLoop:
         advice_row = MagicMock()
         advice_row.id = "advice-001"
         advice_row.created_at = datetime.utcnow() - timedelta(minutes=15)
+        advice_row.recommended_headcount = 10
+        advice_row.current_scheduled_headcount = 8
         db.execute = AsyncMock(
             side_effect=[
                 _result_with_row(advice_row),  # select advice
@@ -247,7 +250,57 @@ class TestWorkforceConfirmLoop:
         )
         assert resp["ok"] is True
         assert resp["status"] == "confirmed"
+        assert resp["message"] == "排班建议已确认"
+        assert "cost_impact_yuan" in resp
         db.commit.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_get_staffing_advice_exists(self):
+        db = AsyncMock()
+        row = MagicMock()
+        row.store_id = "S001"
+        row.advice_date = datetime(2026, 3, 9).date()
+        row.meal_period = "all_day"
+        row.status = "pending"
+        row.recommended_headcount = 12
+        row.current_scheduled_headcount = 10
+        row.headcount_delta = 2
+        row.estimated_saving_yuan = 0
+        row.estimated_overspend_yuan = 400
+        row.confidence_score = 0.83
+        row.position_breakdown = {"lunch": {"waiter": 4}}
+        row.reason_1 = "午市客流上升"
+        row.reason_2 = None
+        row.reason_3 = None
+        row.confirmed_action = None
+        row.confirmed_at = None
+        row.confirmed_by = None
+        db.execute = AsyncMock(return_value=_result_with_row(row))
+
+        resp = await get_staffing_advice(
+            store_id="S001",
+            date_str="2026-03-09",
+            meal_period="all_day",
+            db=db,
+            _=_mock_user(),
+        )
+        assert resp.exists is True
+        assert resp.recommended_headcount == 12
+        assert resp.status == "pending"
+
+    @pytest.mark.asyncio
+    async def test_get_staffing_advice_not_found(self):
+        db = AsyncMock()
+        db.execute = AsyncMock(return_value=_result_with_row(None))
+        resp = await get_staffing_advice(
+            store_id="S001",
+            date_str="2026-03-09",
+            meal_period="all_day",
+            db=db,
+            _=_mock_user(),
+        )
+        assert resp.exists is False
+        assert resp.store_id == "S001"
 
     @pytest.mark.asyncio
     async def test_confirm_staffing_advice_modified_requires_count(self):
