@@ -453,3 +453,44 @@
   color: var(--text-secondary, #aaa);
   margin-top: 3px;
 }
+
+/* ── AI 复盘卡片 ─────────────────────────────── */
+.reviewBody { display: flex; flex-direction: column; gap: 10px; padding-top: 4px; }
+
+.reviewScoreRow { display: flex; align-items: baseline; gap: 4px; }
+.reviewScoreLabel { font-size: 13px; color: var(--text-secondary, #555); margin-right: 6px; }
+.reviewScore { font-size: 28px; font-weight: 700; color: var(--accent, #FF6B2C); }
+.reviewScoreUnit { font-size: 13px; color: var(--text-secondary, #aaa); }
+
+.reviewSummary {
+  font-size: 13px;
+  color: var(--text-primary, #111);
+  line-height: 1.6;
+  background: var(--bg-subtle, #f8f8f8);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.reviewTags { display: flex; flex-wrap: wrap; gap: 6px; }
+.reviewTag {
+  font-size: 12px;
+  color: var(--accent, #FF6B2C);
+  background: rgba(255, 107, 44, 0.08);
+  border-radius: 12px;
+  padding: 2px 10px;
+}
+
+.reviewRatingRow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.reviewRatingLabel { font-size: 13px; color: var(--text-secondary, #555); }
+.starRow { display: flex; align-items: center; gap: 4px; }
+.star {
+  font-size: 22px;
+  color: #ddd;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  transition: color 0.15s;
+}
+.starFilled { color: #FFB800; }

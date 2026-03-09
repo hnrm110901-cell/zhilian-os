@@ -44,6 +44,16 @@ export default function SmBanquet() {
   const [loadingToday,    setLoadingToday]    = useState(true);
   const [loadingLeads,    setLoadingLeads]    = useState(true);
 
+  // 预警订单
+  interface AtRiskOrder {
+    order_id:     string;
+    banquet_date: string;
+    banquet_type: string;
+    risk_score:   number;
+    risk_reasons: string[];
+  }
+  const [atRiskOrders, setAtRiskOrders] = useState<AtRiskOrder[]>([]);
+
   const loadTodayCheck = useCallback(async () => {
     setLoadingToday(true);
     try {
@@ -75,6 +85,10 @@ export default function SmBanquet() {
   useEffect(() => {
     loadTodayCheck();
     loadLeads();
+    // 加载预警订单
+    apiClient.get(`/api/v1/banquet-agent/stores/${STORE_ID}/orders/at-risk`)
+      .then(r => setAtRiskOrders(Array.isArray(r.data) ? r.data : []))
+      .catch(() => {});
   }, [loadTodayCheck, loadLeads]);
 
   const tc = todayCheck;
@@ -92,6 +106,15 @@ export default function SmBanquet() {
       </div>
 
       <div className={styles.body}>
+        {/* 预警横幅 */}
+        {atRiskOrders.length > 0 && (
+          <div className={styles.riskBanner}>
+            <span className={styles.riskIcon}>⚠️</span>
+            <span className={styles.riskText}>
+              {atRiskOrders.length} 个订单存在风险：{atRiskOrders.map(o => o.banquet_date).join('、')}
+            </span>
+          </div>
+        )}
         {/* 今日状态卡 */}
         <ZCard title="今日状态">
           {loadingToday ? (

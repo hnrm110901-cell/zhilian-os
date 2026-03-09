@@ -180,6 +180,19 @@ export default function SmBanquetOrderDetail() {
   const [excSeverity,   setExcSeverity]   = useState('medium');
   const [reporting,     setReporting]     = useState(false);
 
+  // AI 复盘 state
+  interface ReviewData {
+    review_id: string;
+    ai_score: number | null;
+    ai_summary: string | null;
+    improvement_tags: string[];
+    customer_rating: number | null;
+  }
+  const [review,          setReview]          = useState<ReviewData | null>(null);
+  const [reviewLoading,   setReviewLoading]   = useState(false);
+  const [ratingDraft,     setRatingDraft]     = useState<number | null>(null);
+  const [ratingSubmitting, setRatingSubmitting] = useState(false);
+
   const loadOrder = useCallback(async () => {
     if (!orderId) return;
     setLoading(true);
@@ -196,6 +209,60 @@ export default function SmBanquetOrderDetail() {
   }, [orderId]);
 
   useEffect(() => { loadOrder(); }, [loadOrder]);
+
+  // 加载已有复盘（仅已完成/已结算订单）
+  const loadReview = useCallback(async () => {
+    if (!orderId) return;
+    try {
+      const resp = await apiClient.get(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/orders/${orderId}/reviews`,
+      );
+      setReview(resp.data);
+    } catch {
+      setReview(null);
+    }
+  }, [orderId]);
+
+  useEffect(() => {
+    if (order && (order.status === 'completed' || order.status === 'settled')) {
+      loadReview();
+    }
+  }, [order, loadReview]);
+
+  const handleTriggerReview = async () => {
+    if (!orderId) return;
+    setReviewLoading(true);
+    try {
+      const resp = await apiClient.post(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/orders/${orderId}/reviews`,
+      );
+      setReview(resp.data);
+      setRatingDraft(null);
+    } catch (e) {
+      handleApiError(e, '生成复盘失败');
+    } finally {
+      setReviewLoading(false);
+    }
+  };
+
+  const handleRatingStar = (n: number) => { setRatingDraft(n); };
+
+  const handleSubmitRating = async () => {
+    if (!orderId || ratingDraft === null) return;
+    setRatingSubmitting(true);
+    try {
+      await apiClient.patch(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/orders/${orderId}/reviews/rating`,
+        { rating: ratingDraft },
+      );
+      setReview(prev => prev ? { ...prev, customer_rating: ratingDraft } : prev);
+      setRatingDraft(null);
+    } catch (e) {
+      handleApiError(e, '评分提交失败');
+    } finally {
+      setRatingSubmitting(false);
+    }
+  };
 
   const loadTimeline = useCallback(async () => {
     if (!orderId) return;
@@ -740,6 +807,63 @@ export default function SmBanquetOrderDetail() {
             </div>
           )}
         </ZCard>
+
+        {/* AI 复盘卡片（已完成/已结算订单） */}
+        {(order.status === 'completed' || order.status === 'settled') && (
+          <ZCard>
+            <div className={styles.sectionHeader}>
+              <div className={styles.sectionTitle}>AI 复盘</div>
+              <ZButton
+                variant="ghost"
+                size="sm"
+                onClick={handleTriggerReview}
+                disabled={reviewLoading}
+              >
+                {reviewLoading ? '生成中…' : review ? '重新复盘' : '生成复盘'}
+              </ZButton>
+            </div>
+            {reviewLoading ? (
+              <ZSkeleton rows={3} />
+            ) : !review ? (
+              <ZEmpty title="暂无复盘" description="点击「生成复盘」获取 AI 分析" />
+            ) : (
+              <div className={styles.reviewBody}>
+                <div className={styles.reviewScoreRow}>
+                  <span className={styles.reviewScoreLabel}>AI 评分</span>
+                  <span className={styles.reviewScore}>{review.ai_score ?? '—'}</span>
+                  <span className={styles.reviewScoreUnit}>/100</span>
+                </div>
+                {review.ai_summary && (
+                  <div className={styles.reviewSummary}>{review.ai_summary}</div>
+                )}
+                {(review.improvement_tags ?? []).length > 0 && (
+                  <div className={styles.reviewTags}>
+                    {review.improvement_tags.map((tag: string) => (
+                      <span key={tag} className={styles.reviewTag}>{tag}</span>
+                    ))}
+                  </div>
+                )}
+                <div className={styles.reviewRatingRow}>
+                  <span className={styles.reviewRatingLabel}>客户评分</span>
+                  <div className={styles.starRow}>
+                    {[1, 2, 3, 4, 5].map(n => (
+                      <button
+                        key={n}
+                        className={`${styles.star} ${n <= (ratingDraft ?? review.customer_rating ?? 0) ? styles.starFilled : ''}`}
+                        onClick={() => handleRatingStar(n)}
+                      >★</button>
+                    ))}
+                    {ratingDraft !== null && ratingDraft !== review.customer_rating && (
+                      <ZButton variant="primary" size="sm" onClick={handleSubmitRating} disabled={ratingSubmitting}>
+                        {ratingSubmitting ? '…' : '提交'}
+                      </ZButton>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </ZCard>
+        )}
       </div>
 
       {/* 结算 Modal */}

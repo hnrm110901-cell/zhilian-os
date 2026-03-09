@@ -24,6 +24,7 @@ from src.models.banquet import (
     LeadStageEnum, OrderStatusEnum, BanquetTypeEnum,
     BanquetHallType, PaymentTypeEnum, DepositStatusEnum,
     TaskStatusEnum, TaskOwnerRoleEnum, BanquetAgentActionLog, BanquetRevenueTarget,
+    BanquetOrderReview,
 )
 import sys
 from pathlib import Path as _Path
@@ -3277,4 +3278,477 @@ async def banquet_dashboard(
             f"毛利¥{profit_yuan:.0f}，"
             f"转化率{conversion}%，档期利用率{utilization}%。"
         ),
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Phase 12 — 复盘持久化 / 预警 / 跨店 / 跟进调度 / 异常统计
+# ═══════════════════════════════════════════════════════════════════════════
+
+from datetime import timedelta as _timedelta
+
+
+# ── 复盘 Pydantic Schemas ────────────────────────────────────────────────────
+
+class _ReviewRatingBody(BaseModel):
+    rating: int = Field(..., ge=1, le=5)
+
+
+# ── 1. POST /stores/{id}/orders/{order_id}/reviews ─────────────────────────
+
+@router.post("/stores/{store_id}/orders/{order_id}/reviews", status_code=201)
+async def create_or_refresh_review(
+    store_id: str,
+    order_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """触发 ReviewAgent 并持久化复盘结果（已有则覆盖）。"""
+    # 确认订单存在
+    order_res = await db.execute(
+        select(BanquetOrder).where(
+            BanquetOrder.id == order_id,
+            BanquetOrder.store_id == store_id,
+        )
+    )
+    order = order_res.scalars().first()
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    if order.order_status not in (OrderStatusEnum.COMPLETED, OrderStatusEnum.SETTLED):
+        raise HTTPException(status_code=400, detail="只有已完成/已结算订单才能复盘")
+
+    # 调用 ReviewAgent（ephemeral，获取分析数据）
+    review_agent = _ReviewAgent()
+    ai_result = await review_agent.generate_review(order_id=order_id, db=db)
+
+    # 统计逾期任务 & 异常
+    task_res = await db.execute(
+        select(func.count(ExecutionTask.id)).where(
+            ExecutionTask.banquet_order_id == order_id,
+            ExecutionTask.task_status == TaskStatusEnum.PENDING,
+        )
+    )
+    overdue_count = task_res.scalar() or 0
+
+    exc_res = await db.execute(
+        select(func.count(ExecutionException.id)).where(
+            ExecutionException.banquet_order_id == order_id,
+        )
+    )
+    exc_count = exc_res.scalar() or 0
+
+    # 利润快照
+    snap_res = await db.execute(
+        select(BanquetProfitSnapshot).where(
+            BanquetProfitSnapshot.banquet_order_id == order_id
+        )
+    )
+    snap = snap_res.scalars().first()
+    revenue_yuan      = (snap.revenue_fen      / 100) if snap else None
+    gross_profit_yuan = (snap.gross_profit_fen / 100) if snap else None
+    gross_margin_pct  = snap.gross_margin_pct          if snap else None
+
+    # 检查是否已有复盘记录
+    existing_res = await db.execute(
+        select(BanquetOrderReview).where(
+            BanquetOrderReview.banquet_order_id == order_id
+        )
+    )
+    review = existing_res.scalars().first()
+
+    if review is None:
+        review = BanquetOrderReview(
+            id=str(uuid.uuid4()),
+            banquet_order_id=order_id,
+        )
+        db.add(review)
+
+    review.ai_score           = ai_result.get("ai_score")
+    review.ai_summary         = ai_result.get("summary")
+    review.improvement_tags   = ai_result.get("improvement_tags", [])
+    review.revenue_yuan       = revenue_yuan
+    review.gross_profit_yuan  = gross_profit_yuan
+    review.gross_margin_pct   = gross_margin_pct
+    review.overdue_task_count = overdue_count
+    review.exception_count    = exc_count
+
+    await db.commit()
+    await db.refresh(review)
+
+    return {
+        "review_id":          review.id,
+        "banquet_order_id":   review.banquet_order_id,
+        "ai_score":           review.ai_score,
+        "ai_summary":         review.ai_summary,
+        "improvement_tags":   review.improvement_tags or [],
+        "customer_rating":    review.customer_rating,
+        "revenue_yuan":       review.revenue_yuan,
+        "gross_profit_yuan":  review.gross_profit_yuan,
+        "gross_margin_pct":   review.gross_margin_pct,
+        "overdue_task_count": review.overdue_task_count,
+        "exception_count":    review.exception_count,
+        "created_at":         review.created_at.isoformat() if review.created_at else None,
+    }
+
+
+# ── 2. GET /stores/{id}/orders/{order_id}/reviews ──────────────────────────
+
+@router.get("/stores/{store_id}/orders/{order_id}/reviews")
+async def get_review(
+    store_id: str,
+    order_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """读取已持久化的复盘结果。"""
+    res = await db.execute(
+        select(BanquetOrderReview).where(
+            BanquetOrderReview.banquet_order_id == order_id
+        )
+    )
+    review = res.scalars().first()
+    if not review:
+        raise HTTPException(status_code=404, detail="尚无复盘记录，请先触发复盘")
+
+    return {
+        "review_id":          review.id,
+        "banquet_order_id":   review.banquet_order_id,
+        "ai_score":           review.ai_score,
+        "ai_summary":         review.ai_summary,
+        "improvement_tags":   review.improvement_tags or [],
+        "customer_rating":    review.customer_rating,
+        "revenue_yuan":       review.revenue_yuan,
+        "gross_profit_yuan":  review.gross_profit_yuan,
+        "gross_margin_pct":   review.gross_margin_pct,
+        "overdue_task_count": review.overdue_task_count,
+        "exception_count":    review.exception_count,
+        "created_at":         review.created_at.isoformat() if review.created_at else None,
+    }
+
+
+# ── 3. PATCH /stores/{id}/orders/{order_id}/reviews/rating ─────────────────
+
+@router.patch("/stores/{store_id}/orders/{order_id}/reviews/rating")
+async def patch_review_rating(
+    store_id: str,
+    order_id: str,
+    body: _ReviewRatingBody,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """客户提交 1–5 星评分，写入复盘记录。"""
+    res = await db.execute(
+        select(BanquetOrderReview).where(
+            BanquetOrderReview.banquet_order_id == order_id
+        )
+    )
+    review = res.scalars().first()
+    if not review:
+        raise HTTPException(status_code=404, detail="尚无复盘记录")
+
+    review.customer_rating = body.rating
+    await db.commit()
+
+    return {"review_id": review.id, "customer_rating": review.customer_rating}
+
+
+# ── 4. GET /stores/{id}/orders/at-risk ─────────────────────────────────────
+
+@router.get("/stores/{store_id}/orders/at-risk")
+async def list_at_risk_orders(
+    store_id: str,
+    days: int = Query(14, ge=1, le=60),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """返回未来 days 天内存在风险信号的订单列表（逾期任务 / 余款未付 / 未处理异常）。"""
+    from datetime import date as _date_cls
+    today = _date_cls.today()
+    deadline = today + _timedelta(days=days)
+
+    # 未来 days 天内的 confirmed/preparing/in_progress 订单
+    orders_res = await db.execute(
+        select(BanquetOrder).where(
+            BanquetOrder.store_id == store_id,
+            BanquetOrder.order_status.in_([
+                OrderStatusEnum.CONFIRMED,
+                OrderStatusEnum.PREPARING,
+                OrderStatusEnum.IN_PROGRESS,
+            ]),
+            BanquetOrder.banquet_date.isnot(None),
+            BanquetOrder.banquet_date >= today,
+            BanquetOrder.banquet_date <= deadline,
+        )
+    )
+    orders = orders_res.scalars().all()
+
+    result = []
+    for o in orders:
+        risk_score = 0
+        risk_reasons = []
+
+        # 逾期任务
+        task_res = await db.execute(
+            select(func.count(ExecutionTask.id)).where(
+                ExecutionTask.banquet_order_id == o.id,
+                ExecutionTask.task_status == TaskStatusEnum.PENDING,
+            )
+        )
+        overdue = task_res.scalar() or 0
+        if overdue > 0:
+            risk_score += 1
+            risk_reasons.append(f"{overdue}项待执行任务")
+
+        # 余款未付
+        pay_res = await db.execute(
+            select(func.sum(BanquetPaymentRecord.amount_fen)).where(
+                BanquetPaymentRecord.banquet_order_id == o.id,
+            )
+        )
+        paid_fen  = pay_res.scalar() or 0
+        total_fen = o.total_amount_fen or 0
+        if total_fen > 0 and paid_fen < total_fen:
+            risk_score += 1
+            balance_yuan = (total_fen - paid_fen) / 100
+            risk_reasons.append(f"余款¥{balance_yuan:.0f}未付")
+
+        # 未处理异常
+        exc_res = await db.execute(
+            select(func.count(ExecutionException.id)).where(
+                ExecutionException.banquet_order_id == o.id,
+                ExecutionException.status == "open",
+            )
+        )
+        open_exc = exc_res.scalar() or 0
+        if open_exc > 0:
+            risk_score += 1
+            risk_reasons.append(f"{open_exc}个未处理异常")
+
+        if risk_score > 0:
+            result.append({
+                "order_id":     o.id,
+                "banquet_date": str(o.banquet_date),
+                "banquet_type": o.banquet_type.value if hasattr(o.banquet_type, "value") else o.banquet_type,
+                "status":       o.order_status.value if hasattr(o.order_status, "value") else o.order_status,
+                "risk_score":   risk_score,
+                "risk_reasons": risk_reasons,
+            })
+
+    result.sort(key=lambda x: (-x["risk_score"], x["banquet_date"]))
+    return result
+
+
+# ── 5. GET /stores/{id}/analytics/review-summary ───────────────────────────
+
+@router.get("/stores/{store_id}/analytics/review-summary")
+async def get_review_summary(
+    store_id: str,
+    year:  int = Query(None),
+    month: int = Query(None),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """月度复盘汇总统计（平均 AI 分 / 平均客户评分 / 改进标签 TOP3）。"""
+    from datetime import date as _date_cls
+    today = _date_cls.today()
+    y = year  or today.year
+    m = month or today.month
+
+    # 通过订单日期过滤当月
+    reviews_res = await db.execute(
+        select(BanquetOrderReview).join(
+            BanquetOrder,
+            BanquetOrderReview.banquet_order_id == BanquetOrder.id,
+        ).where(
+            BanquetOrder.store_id == store_id,
+            func.extract("year",  BanquetOrder.banquet_date) == y,
+            func.extract("month", BanquetOrder.banquet_date) == m,
+        )
+    )
+    reviews = reviews_res.scalars().all()
+
+    if not reviews:
+        return {"store_id": store_id, "year": y, "month": m, "count": 0,
+                "avg_ai_score": None, "avg_customer_rating": None, "top_improvement_tags": []}
+
+    ai_scores = [r.ai_score for r in reviews if r.ai_score is not None]
+    ratings   = [r.customer_rating for r in reviews if r.customer_rating is not None]
+
+    # 统计 improvement_tags 频次
+    tag_counter: dict[str, int] = {}
+    for r in reviews:
+        for tag in (r.improvement_tags or []):
+            tag_counter[tag] = tag_counter.get(tag, 0) + 1
+    top_tags = sorted(tag_counter.items(), key=lambda x: -x[1])[:3]
+
+    return {
+        "store_id":            store_id,
+        "year":                y,
+        "month":               m,
+        "count":               len(reviews),
+        "avg_ai_score":        round(sum(ai_scores) / len(ai_scores), 1) if ai_scores else None,
+        "avg_customer_rating": round(sum(ratings)   / len(ratings),   1) if ratings   else None,
+        "top_improvement_tags": [{"tag": t, "count": c} for t, c in top_tags],
+    }
+
+
+# ── 6. GET /multi-store/banquet-summary ────────────────────────────────────
+
+@router.get("/multi-store/banquet-summary")
+async def multi_store_banquet_summary(
+    year:  int = Query(None),
+    month: int = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """跨店宴会 KPI 汇总（按 brand_id 过滤）。仅限 HQ 角色。"""
+    from datetime import date as _date_cls
+    today = _date_cls.today()
+    y = year  or today.year
+    m = month or today.month
+
+    # 查出当前品牌的所有 store_id
+    brand_id = getattr(current_user, "brand_id", None)
+    if not brand_id:
+        raise HTTPException(status_code=403, detail="无跨店权限")
+
+    from src.models.store import Store as _Store
+    stores_res = await db.execute(
+        select(_Store.id).where(_Store.brand_id == brand_id)
+    )
+    store_ids = [row[0] for row in stores_res.all()]
+    if not store_ids:
+        return []
+
+    # 聚合 BanquetKpiDaily
+    kpi_res = await db.execute(
+        select(
+            BanquetKpiDaily.store_id,
+            func.sum(BanquetKpiDaily.revenue_fen).label("revenue_fen"),
+            func.sum(BanquetKpiDaily.gross_profit_fen).label("profit_fen"),
+            func.sum(BanquetKpiDaily.order_count).label("order_count"),
+            func.sum(BanquetKpiDaily.lead_count).label("lead_count"),
+            func.avg(BanquetKpiDaily.hall_utilization_pct).label("avg_utilization"),
+        ).where(
+            BanquetKpiDaily.store_id.in_(store_ids),
+            func.extract("year",  BanquetKpiDaily.stat_date) == y,
+            func.extract("month", BanquetKpiDaily.stat_date) == m,
+        ).group_by(BanquetKpiDaily.store_id)
+    )
+    rows = kpi_res.all()
+
+    result = []
+    for row in rows:
+        rev  = (row.revenue_fen or 0) / 100
+        prof = (row.profit_fen  or 0) / 100
+        result.append({
+            "store_id":          row.store_id,
+            "year":              y,
+            "month":             m,
+            "revenue_yuan":      rev,
+            "gross_profit_yuan": prof,
+            "gross_margin_pct":  round(prof / rev * 100, 1) if rev > 0 else 0,
+            "order_count":       row.order_count or 0,
+            "lead_count":        row.lead_count  or 0,
+            "hall_utilization_pct": round(row.avg_utilization or 0, 1),
+        })
+
+    result.sort(key=lambda x: -x["revenue_yuan"])
+    return result
+
+
+# ── 7. POST /stores/{id}/agent/followup-dispatch ───────────────────────────
+
+@router.post("/stores/{store_id}/agent/followup-dispatch", status_code=201)
+async def followup_dispatch(
+    store_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """手动触发跟进扫描，并将建议写入 BanquetAgentActionLog（可审批）。"""
+    agent = _FollowupAgent()
+    suggestions = await agent.scan_stale_leads(store_id=store_id, db=db)
+
+    logs = []
+    for s in suggestions:
+        log = BanquetAgentActionLog(
+            id=str(uuid.uuid4()),
+            agent_type="followup",
+            related_object_type="lead",
+            related_object_id=s.get("lead_id", ""),
+            rule_id=None,
+            action_type="followup_suggestion",
+            action_result=s,
+            suggestion_text=s.get("suggestion", ""),
+            is_human_approved=None,
+        )
+        db.add(log)
+        logs.append({"log_id": log.id, "lead_id": s.get("lead_id"), "suggestion": s.get("suggestion")})
+
+    await db.commit()
+    return {"dispatched": len(logs), "items": logs}
+
+
+# ── 8. GET /stores/{id}/analytics/exception-stats ─────────────────────────
+
+@router.get("/stores/{store_id}/analytics/exception-stats")
+async def get_exception_stats(
+    store_id: str,
+    year:  int = Query(None),
+    month: int = Query(None),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """异常统计：按类型/严重度分组，计算平均解决时长（小时）。"""
+    from datetime import date as _date_cls
+    today = _date_cls.today()
+    y = year  or today.year
+    m = month or today.month
+
+    # 通过 join BanquetOrder 过滤 store & 月份
+    exc_res = await db.execute(
+        select(ExecutionException).join(
+            BanquetOrder,
+            ExecutionException.banquet_order_id == BanquetOrder.id,
+        ).where(
+            BanquetOrder.store_id == store_id,
+            func.extract("year",  ExecutionException.created_at) == y,
+            func.extract("month", ExecutionException.created_at) == m,
+        )
+    )
+    exceptions = exc_res.scalars().all()
+
+    by_type: dict[str, dict] = {}
+    by_severity: dict[str, int] = {}
+    resolution_hours: list[float] = []
+
+    for e in exceptions:
+        # by_type
+        et = e.exception_type
+        if et not in by_type:
+            by_type[et] = {"count": 0, "resolved": 0}
+        by_type[et]["count"] += 1
+        if e.status == "resolved":
+            by_type[et]["resolved"] += 1
+            if e.resolved_at and e.created_at:
+                diff = (e.resolved_at - e.created_at).total_seconds() / 3600
+                resolution_hours.append(diff)
+
+        # by_severity
+        sev = e.severity
+        by_severity[sev] = by_severity.get(sev, 0) + 1
+
+    avg_resolution_hours = (
+        round(sum(resolution_hours) / len(resolution_hours), 1)
+        if resolution_hours else None
+    )
+
+    return {
+        "store_id":              store_id,
+        "year":                  y,
+        "month":                 m,
+        "total":                 len(exceptions),
+        "by_type":               [{"type": k, **v} for k, v in by_type.items()],
+        "by_severity":           [{"severity": k, "count": v} for k, v in by_severity.items()],
+        "avg_resolution_hours":  avg_resolution_hours,
     }

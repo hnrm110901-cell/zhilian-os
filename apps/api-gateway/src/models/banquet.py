@@ -491,3 +491,23 @@ class BanquetRevenueTarget(Base, TimestampMixin):
     __table_args__ = (
         UniqueConstraint("store_id", "year", "month", name="uq_revenue_target_store_ym"),
     )
+
+
+class BanquetOrderReview(Base, TimestampMixin):
+    """宴会订单复盘（AI生成 + 客户评分）"""
+    __tablename__ = "banquet_order_reviews"
+
+    id                 = Column(String(36), primary_key=True)
+    banquet_order_id   = Column(String(36), ForeignKey("banquet_orders.id"),
+                                nullable=False, unique=True, index=True)
+    customer_rating    = Column(Integer, nullable=True)   # 1–5 星
+    ai_score           = Column(Float,   nullable=True)   # 0–100
+    ai_summary         = Column(Text,    nullable=True)
+    improvement_tags   = Column(JSON,    nullable=True)   # ["延误", "菜量不足", ...]
+    revenue_yuan       = Column(Float,   nullable=True)
+    gross_profit_yuan  = Column(Float,   nullable=True)
+    gross_margin_pct   = Column(Float,   nullable=True)
+    overdue_task_count = Column(Integer, nullable=False, default=0)
+    exception_count    = Column(Integer, nullable=False, default=0)
+
+    order = relationship("BanquetOrder", backref="review", uselist=False)

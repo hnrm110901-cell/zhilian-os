@@ -1762,24 +1762,32 @@ function AnalyticsTab() {
   const [lostData,     setLostData]     = useState<LostReason[]>([]);
   const [receivables,  setReceivables]  = useState<ReceivablesData | null>(null);
   const [openExc,      setOpenExc]      = useState<ExceptionSummaryItem[]>([]);
+  const [excStats,     setExcStats]     = useState<{
+    total: number;
+    by_type: { type: string; count: number; resolved: number }[];
+    by_severity: { severity: string; count: number }[];
+    avg_resolution_hours: number | null;
+  } | null>(null);
   const [loading,      setLoading]      = useState(false);
 
   const load = useCallback(async (m: string) => {
     setLoading(true);
     try {
       const STORE = localStorage.getItem('store_id') || 'S001';
-      const [funnelR, forecastR, lostR, arR, excR] = await Promise.allSettled([
+      const [funnelR, forecastR, lostR, arR, excR, excStatsR] = await Promise.allSettled([
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/funnel`, { params: { month: m } }),
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/revenue-forecast`, { params: { months: 3 } }),
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/lost-analysis`, { params: { month: m } }),
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/receivables`),
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/exceptions`, { params: { status: 'open' } }),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/exception-stats`, { params: { month: m } }),
       ]);
-      if (funnelR.status === 'fulfilled')   setFunnel(funnelR.value.data);
-      if (forecastR.status === 'fulfilled') setForecast(forecastR.value.data?.forecast ?? []);
-      if (lostR.status === 'fulfilled')     setLostData(lostR.value.data?.reasons ?? []);
-      if (arR.status === 'fulfilled')       setReceivables(arR.value.data);
-      if (excR.status === 'fulfilled')      setOpenExc(Array.isArray(excR.value.data) ? excR.value.data : []);
+      if (funnelR.status === 'fulfilled')    setFunnel(funnelR.value.data);
+      if (forecastR.status === 'fulfilled')  setForecast(forecastR.value.data?.forecast ?? []);
+      if (lostR.status === 'fulfilled')      setLostData(lostR.value.data?.reasons ?? []);
+      if (arR.status === 'fulfilled')        setReceivables(arR.value.data);
+      if (excR.status === 'fulfilled')       setOpenExc(Array.isArray(excR.value.data) ? excR.value.data : []);
+      if (excStatsR.status === 'fulfilled')  setExcStats(excStatsR.value.data);
     } finally {
       setLoading(false);
     }
@@ -1970,6 +1978,37 @@ function AnalyticsTab() {
                     />
                   </div>
                 ))}
+              </div>
+            )}
+          </ZCard>
+
+          {/* 异常统计分析 */}
+          <ZCard title="异常统计（本月）">
+            {!excStats || excStats.total === 0 ? (
+              <ZEmpty title="暂无异常" description="本月无异常记录" />
+            ) : (
+              <div className={styles.excStatsBody}>
+                <div className={styles.excStatsSummary}>
+                  <div className={styles.excStatItem}>
+                    <span className={styles.excStatValue}>{excStats.total}</span>
+                    <span className={styles.excStatLabel}>总数</span>
+                  </div>
+                  {excStats.avg_resolution_hours != null && (
+                    <div className={styles.excStatItem}>
+                      <span className={styles.excStatValue}>{excStats.avg_resolution_hours}h</span>
+                      <span className={styles.excStatLabel}>平均解决时长</span>
+                    </div>
+                  )}
+                </div>
+                <div className={styles.excStatsByType}>
+                  {excStats.by_type.map(bt => (
+                    <div key={bt.type} className={styles.excStatTypeRow}>
+                      <span className={styles.excStatTypeName}>{bt.type}</span>
+                      <span className={styles.excStatTypeCount}>{bt.count} 次</span>
+                      <span className={styles.excStatTypeResolved}>({bt.resolved} 已解决)</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </ZCard>
@@ -2171,6 +2210,72 @@ function CustomerTab() {
 }
 
 /* ─── 主组件 ─── */
+
+/* ─── 跨店对比 Tab ─── */
+function CrossStoreTab() {
+  const [month,  setMonth]  = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
+  const [rows,    setRows]    = useState<{
+    store_id: string; revenue_yuan: number; gross_profit_yuan: number;
+    gross_margin_pct: number; order_count: number; lead_count: number;
+    hall_utilization_pct: number;
+  }[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async (m: string) => {
+    setLoading(true);
+    const [y, mo] = m.split('-').map(Number);
+    try {
+      const resp = await apiClient.get(
+        '/api/v1/banquet-agent/multi-store/banquet-summary',
+        { params: { year: y, month: mo } },
+      );
+      setRows(Array.isArray(resp.data) ? resp.data : []);
+    } catch {
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(month); }, [load, month]);
+
+  return (
+    <div className={styles.crossStoreTab}>
+      <div className={styles.analyticsPicker}>
+        <ZInput type="month" value={month} onChange={e => setMonth(e.target.value)} />
+      </div>
+      <ZCard title="跨店宴会 KPI 对比">
+        {loading ? (
+          <ZSkeleton rows={4} />
+        ) : rows.length === 0 ? (
+          <ZEmpty title="暂无跨店数据" description="当前品牌下暂无门店记录" />
+        ) : (
+          <div className={styles.crossStoreList}>
+            {rows.map((r, i) => (
+              <div key={r.store_id} className={styles.crossStoreRow}>
+                <div className={styles.crossStoreRank}>{i + 1}</div>
+                <div className={styles.crossStoreInfo}>
+                  <div className={styles.crossStoreId}>{r.store_id}</div>
+                  <div className={styles.crossStoreMeta}>
+                    {r.order_count} 单 · 利用率 {r.hall_utilization_pct}%
+                  </div>
+                </div>
+                <div className={styles.crossStoreRight}>
+                  <div className={styles.crossStoreRevenue}>¥{r.revenue_yuan.toLocaleString()}</div>
+                  <div className={styles.crossStoreMargin}>{r.gross_margin_pct}% 毛利率</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
 export default function HQBanquet() {
   return (
     <div className={styles.page}>
@@ -2187,6 +2292,7 @@ export default function HQBanquet() {
           { key: 'resource',  label: '资源配置', children: <ResourceTab /> },
           { key: 'customers', label: '客户档案', children: <CustomerTab /> },
           { key: 'analytics', label: '转化分析', children: <AnalyticsTab /> },
+          { key: 'crossstore', label: '跨店对比',  children: <CrossStoreTab /> },
         ]}
       />
     </div>

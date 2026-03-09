@@ -121,3 +121,18 @@
 .actionRow > * {
   flex: 1;
 }
+
+/* ── 预警横幅 ─────────────────────────────── */
+.riskBanner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #c2410c;
+}
+.riskIcon { font-size: 16px; flex-shrink: 0; }
+.riskText { flex: 1; line-height: 1.4; }
