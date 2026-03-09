@@ -532,3 +532,56 @@ async def get_dish_health_history(db: AsyncSession, store_id: str,
         'action_priority', 'lifecycle_phase', 'expected_impact_yuan',
     ]
     return [dict(zip(cols, r)) for r in rows]
+
+
+# ── 情感维度注入（第5维） ───────────────────────────────────────────────────────
+
+def enrich_with_sentiment(
+    records: list[dict],
+    dish_sentiment: "dict[str, Any]",
+) -> list[dict]:
+    """
+    将顾客评论情感摘要注入菜品健康评分记录（纯函数，无副作用）。
+
+    在 dish_health_service 原有 4 个评分维度（盈利/成长/对标/预测）基础上，
+    追加来自 CustomerSentimentService 的第 5 个维度：顾客声音。
+
+    Args:
+        records:         build_health_score_record() 返回的 dict 列表
+        dish_sentiment:  Dict[dish_name, DishSentimentSummary]，
+                         由 customer_sentiment_service.aggregate_by_dish() 生成
+
+    Returns:
+        原 records 就地修改并返回，每条新增字段：
+          sentiment_score        float | None  — 0.0-1.0 综合情感分
+          sentiment_score_25     float | None  — 0-25 分制（与其他4维对齐）
+          sentiment_label        str           — "好评为主"/"差评预警"/"口碑中性"/"暂无数据"
+          top_complaints         list[str]     — 高频差评关键词（最多3个）
+          top_praises            list[str]     — 高频好评关键词（最多3个）
+          sentiment_review_count int           — 参与计算的评论条数
+
+    用法示例::
+
+        from .customer_sentiment_service import customer_sentiment_service
+        reviews = [CustomerReview(text="鱼香肉丝偏咸", dish_name="鱼香肉丝"), ...]
+        dish_sentiment = await customer_sentiment_service.analyze_and_aggregate(reviews)
+        records = enrich_with_sentiment(health_records, dish_sentiment)
+    """
+    for rec in records:
+        dish_name = rec.get("dish_name", "")
+        summary = dish_sentiment.get(dish_name)
+        if summary is not None:
+            rec["sentiment_score"]        = summary.sentiment_score
+            rec["sentiment_score_25"]     = summary.sentiment_score_25
+            rec["sentiment_label"]        = summary.sentiment_label
+            rec["top_complaints"]         = summary.top_complaints
+            rec["top_praises"]            = summary.top_praises
+            rec["sentiment_review_count"] = summary.total_reviews
+        else:
+            rec["sentiment_score"]        = None
+            rec["sentiment_score_25"]     = None
+            rec["sentiment_label"]        = "暂无数据"
+            rec["top_complaints"]         = []
+            rec["top_praises"]            = []
+            rec["sentiment_review_count"] = 0
+    return records
