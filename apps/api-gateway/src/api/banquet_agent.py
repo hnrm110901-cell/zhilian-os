@@ -9100,3 +9100,431 @@ async def get_lead_velocity(
         "avg_followup_count": avg_touches,
         "sample_leads":       velocity_list[:10],
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Phase 23 — 员工绩效 · 异常分析 · 满意度 · 定金预测
+# ═══════════════════════════════════════════════════════════════════════════
+
+# ── 1. 员工任务绩效 ─────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/staff/performance")
+async def get_staff_performance(
+    store_id: str,
+    days:     int = 30,
+    db:       AsyncSession = Depends(get_db),
+    _:        User = Depends(get_current_user),
+):
+    """按 owner_user_id 统计任务完成率与平均完成时效"""
+    from datetime import timedelta
+    from src.models.banquet import ExecutionTask, TaskStatusEnum
+
+    cutoff = date_type.today() - timedelta(days=days)
+    res = await db.execute(
+        select(
+            ExecutionTask.owner_user_id,
+            ExecutionTask.owner_role,
+            func.count(ExecutionTask.id).label("total"),
+            func.sum(
+                func.cast(
+                    ExecutionTask.task_status.in_([TaskStatusEnum.DONE, TaskStatusEnum.VERIFIED]),
+                    Integer,
+                )
+            ).label("done_count"),
+        )
+        .where(ExecutionTask.banquet_order_id.in_(
+            select(
+                __import__("sqlalchemy").literal_column("id")
+            ).select_from(
+                __import__("sqlalchemy").text("banquet_orders")
+            ).where(
+                __import__("sqlalchemy").text(f"store_id = :sid")
+            ).params(sid=store_id)
+        ))
+        .where(ExecutionTask.due_time >= cutoff)
+        .group_by(ExecutionTask.owner_user_id, ExecutionTask.owner_role)
+    )
+    rows = res.all()
+
+    staff = []
+    for r in rows:
+        total = r.total or 0
+        done  = int(r.done_count or 0)
+        staff.append({
+            "owner_user_id": r.owner_user_id,
+            "role":          r.owner_role.value if hasattr(r.owner_role, "value") else str(r.owner_role),
+            "total_tasks":   total,
+            "done_tasks":    done,
+            "completion_pct": round(done / total * 100, 1) if total > 0 else 0.0,
+        })
+
+    return {
+        "store_id":   store_id,
+        "days":       days,
+        "total_staff": len(staff),
+        "staff":      sorted(staff, key=lambda x: x["completion_pct"], reverse=True),
+    }
+
+
+# ── 2. 异常事件汇总 ─────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/exception-summary")
+async def get_exception_summary(
+    store_id: str,
+    days:     int = 90,
+    db:       AsyncSession = Depends(get_db),
+    _:        User = Depends(get_current_user),
+):
+    """异常类型分布 · 严重程度分布 · 解决率"""
+    from datetime import timedelta
+    from src.models.banquet import ExecutionException, BanquetOrder, OrderStatusEnum
+
+    cutoff = date_type.today() - timedelta(days=days)
+    res = await db.execute(
+        select(ExecutionException)
+        .join(BanquetOrder, BanquetOrder.id == ExecutionException.banquet_order_id)
+        .where(BanquetOrder.store_id == store_id)
+        .where(ExecutionException.created_at >= cutoff)
+    )
+    exceptions = res.scalars().all()
+
+    if not exceptions:
+        return {"store_id": store_id, "total": 0, "by_type": [], "by_severity": [],
+                "resolution_rate_pct": 0.0}
+
+    total     = len(exceptions)
+    resolved  = sum(1 for e in exceptions if e.status == "resolved")
+    type_cnt: dict = {}
+    sev_cnt:  dict = {}
+    for e in exceptions:
+        type_cnt[e.exception_type] = type_cnt.get(e.exception_type, 0) + 1
+        sev_cnt[e.severity]        = sev_cnt.get(e.severity, 0) + 1
+
+    SEV_ORDER = {"high": 0, "medium": 1, "low": 2}
+    return {
+        "store_id":            store_id,
+        "days":                days,
+        "total":               total,
+        "resolved":            resolved,
+        "resolution_rate_pct": round(resolved / total * 100, 1),
+        "by_type": sorted(
+            [{"type": t, "count": c, "pct": round(c / total * 100, 1)} for t, c in type_cnt.items()],
+            key=lambda x: x["count"], reverse=True
+        ),
+        "by_severity": sorted(
+            [{"severity": s, "count": c, "pct": round(c / total * 100, 1)} for s, c in sev_cnt.items()],
+            key=lambda x: SEV_ORDER.get(x["severity"], 9)
+        ),
+    }
+
+
+# ── 3. 客户满意度趋势 ────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/satisfaction-trend")
+async def get_satisfaction_trend(
+    store_id: str,
+    months:   int = 12,
+    db:       AsyncSession = Depends(get_db),
+    _:        User = Depends(get_current_user),
+):
+    """月度客户评分趋势 + 总体平均分"""
+    from datetime import timedelta
+    from src.models.banquet import BanquetOrderReview, BanquetOrder
+
+    cutoff = date_type.today() - timedelta(days=months * 30)
+    res = await db.execute(
+        select(BanquetOrderReview, BanquetOrder.banquet_date)
+        .join(BanquetOrder, BanquetOrder.id == BanquetOrderReview.banquet_order_id)
+        .where(BanquetOrder.store_id == store_id)
+        .where(BanquetOrder.banquet_date >= cutoff)
+        .where(BanquetOrderReview.customer_rating != None)
+        .order_by(BanquetOrder.banquet_date)
+    )
+    rows = res.all()
+
+    if not rows:
+        return {"store_id": store_id, "avg_rating": None, "total_reviews": 0,
+                "monthly_trend": [], "rating_distribution": {}}
+
+    monthly: dict = {}
+    dist: dict = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+    for review, banquet_date in rows:
+        mon = str(banquet_date)[:7]
+        if mon not in monthly:
+            monthly[mon] = {"sum": 0, "count": 0}
+        monthly[mon]["sum"]   += review.customer_rating
+        monthly[mon]["count"] += 1
+        if review.customer_rating in dist:
+            dist[review.customer_rating] += 1
+
+    all_ratings = [r.customer_rating for r, _ in rows]
+    avg = round(sum(all_ratings) / len(all_ratings), 2)
+
+    trend = [
+        {"month": m, "avg_rating": round(v["sum"] / v["count"], 2), "count": v["count"]}
+        for m, v in sorted(monthly.items())
+    ]
+
+    return {
+        "store_id":             store_id,
+        "total_reviews":        len(rows),
+        "avg_rating":           avg,
+        "monthly_trend":        trend,
+        "rating_distribution":  {str(k): v for k, v in dist.items()},
+    }
+
+
+# ── 4. 定金预期收入预测 ─────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/deposit-forecast")
+async def get_deposit_forecast(
+    store_id: str,
+    months:   int = 3,
+    db:       AsyncSession = Depends(get_db),
+    _:        User = Depends(get_current_user),
+):
+    """未来 N 个月预期收款（已确认订单未付尾款）"""
+    from datetime import timedelta
+    from src.models.banquet import BanquetOrder, OrderStatusEnum
+
+    today = date_type.today()
+    cutoff = today + timedelta(days=months * 30)
+    res = await db.execute(
+        select(BanquetOrder)
+        .where(BanquetOrder.store_id == store_id)
+        .where(BanquetOrder.order_status == OrderStatusEnum.CONFIRMED)
+        .where(BanquetOrder.banquet_date >= today)
+        .where(BanquetOrder.banquet_date < cutoff)
+        .order_by(BanquetOrder.banquet_date)
+    )
+    orders = res.scalars().all()
+
+    monthly: dict = {}
+    for o in orders:
+        mon = str(o.banquet_date)[:7]
+        unpaid = (o.total_amount_fen or 0) - (o.paid_fen or 0)
+        if mon not in monthly:
+            monthly[mon] = {"order_count": 0, "expected_yuan": 0.0, "deposit_yuan": 0.0}
+        monthly[mon]["order_count"]  += 1
+        monthly[mon]["expected_yuan"] += round(unpaid / 100, 2)
+        monthly[mon]["deposit_yuan"]  += round((o.deposit_fen or 0) / 100, 2)
+
+    forecast = [
+        {"month": m, **v}
+        for m, v in sorted(monthly.items())
+    ]
+    total_expected = round(sum(v["expected_yuan"] for v in monthly.values()), 2)
+
+    return {
+        "store_id":        store_id,
+        "months":          months,
+        "total_orders":    len(orders),
+        "total_expected_yuan": total_expected,
+        "monthly_forecast": forecast,
+    }
+
+
+# ── 5. 差评标签词频 ─────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/review-tags")
+async def get_review_tags(
+    store_id: str,
+    db:       AsyncSession = Depends(get_db),
+    _:        User = Depends(get_current_user),
+):
+    """improvement_tags 词频统计（找高频差评原因）"""
+    from src.models.banquet import BanquetOrderReview, BanquetOrder
+
+    res = await db.execute(
+        select(BanquetOrderReview.improvement_tags)
+        .join(BanquetOrder, BanquetOrder.id == BanquetOrderReview.banquet_order_id)
+        .where(BanquetOrder.store_id == store_id)
+        .where(BanquetOrderReview.improvement_tags != None)
+    )
+    rows = res.all()
+
+    tag_freq: dict = {}
+    for (tags,) in rows:
+        if isinstance(tags, list):
+            for t in tags:
+                tag_freq[t] = tag_freq.get(t, 0) + 1
+
+    sorted_tags = sorted(
+        [{"tag": t, "count": c} for t, c in tag_freq.items()],
+        key=lambda x: x["count"], reverse=True
+    )
+    return {
+        "store_id":   store_id,
+        "total_tags": sum(t["count"] for t in sorted_tags),
+        "tags":       sorted_tags[:20],
+    }
+
+
+# ── 6. 付款时间线分布 ────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/payment-timeline")
+async def get_payment_timeline(
+    store_id: str,
+    months:   int = 6,
+    db:       AsyncSession = Depends(get_db),
+    _:        User = Depends(get_current_user),
+):
+    """各月收款额按支付方式分布"""
+    from datetime import timedelta
+    from src.models.banquet import BanquetPaymentRecord, BanquetOrder
+
+    cutoff = date_type.today() - timedelta(days=months * 30)
+    res = await db.execute(
+        select(BanquetPaymentRecord)
+        .join(BanquetOrder, BanquetOrder.id == BanquetPaymentRecord.banquet_order_id)
+        .where(BanquetOrder.store_id == store_id)
+        .where(BanquetPaymentRecord.paid_at >= cutoff)
+        .order_by(BanquetPaymentRecord.paid_at)
+    )
+    payments = res.scalars().all()
+
+    if not payments:
+        return {"store_id": store_id, "months": [], "total_yuan": 0.0}
+
+    monthly: dict = {}
+    for p in payments:
+        mon    = str(p.paid_at)[:7]
+        method = p.payment_method or "other"
+        if mon not in monthly:
+            monthly[mon] = {}
+        monthly[mon][method] = monthly[mon].get(method, 0) + (p.amount_fen or 0)
+
+    result = []
+    all_methods: set = set()
+    for v in monthly.values():
+        all_methods.update(v.keys())
+
+    for mon, v in sorted(monthly.items()):
+        row = {"month": mon, "total_yuan": round(sum(v.values()) / 100, 2)}
+        for m in all_methods:
+            row[m] = round(v.get(m, 0) / 100, 2)
+        result.append(row)
+
+    total = round(sum(p.amount_fen or 0 for p in payments) / 100, 2)
+    return {
+        "store_id":   store_id,
+        "methods":    sorted(all_methods),
+        "months":     result,
+        "total_yuan": total,
+    }
+
+
+# ── 7. 订单规模分布 ─────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/order-size-distribution")
+async def get_order_size_distribution(
+    store_id: str,
+    db:       AsyncSession = Depends(get_db),
+    _:        User = Depends(get_current_user),
+):
+    """订单按桌数分组统计（小/中/大/超大）"""
+    from src.models.banquet import BanquetOrder, OrderStatusEnum
+
+    res = await db.execute(
+        select(BanquetOrder)
+        .where(BanquetOrder.store_id == store_id)
+        .where(BanquetOrder.order_status.in_([OrderStatusEnum.CONFIRMED, OrderStatusEnum.COMPLETED]))
+        .where(BanquetOrder.table_count > 0)
+    )
+    orders = res.scalars().all()
+    if not orders:
+        return {"store_id": store_id, "total": 0, "buckets": []}
+
+    # 分桌档（桌）
+    BUCKETS = [
+        ("小型（≤10桌）",  0,  10),
+        ("中型（11-20桌）", 11, 20),
+        ("大型（21-35桌）", 21, 35),
+        ("超大（36桌以上）", 36, 9999),
+    ]
+    bucket_data: dict = {b[0]: {"count": 0, "revenue_fen": 0} for b in BUCKETS}
+    for o in orders:
+        tc = o.table_count or 0
+        for label, lo, hi in BUCKETS:
+            if lo <= tc <= hi:
+                bucket_data[label]["count"]       += 1
+                bucket_data[label]["revenue_fen"] += o.total_amount_fen or 0
+                break
+
+    total = len(orders)
+    return {
+        "store_id": store_id,
+        "total":    total,
+        "buckets": [
+            {
+                "label":       label,
+                "count":       bucket_data[label]["count"],
+                "pct":         round(bucket_data[label]["count"] / total * 100, 1),
+                "revenue_yuan": round(bucket_data[label]["revenue_fen"] / 100, 2),
+            }
+            for label, _, _ in BUCKETS
+        ],
+    }
+
+
+# ── 8. 厅房收入关联 ─────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/hall-revenue-correlation")
+async def get_hall_revenue_correlation(
+    store_id: str,
+    db:       AsyncSession = Depends(get_db),
+    _:        User = Depends(get_current_user),
+):
+    """各厅房使用次数 + 贡献收入 + 平均桌价"""
+    from src.models.banquet import BanquetHall, BanquetHallBooking, BanquetOrder, OrderStatusEnum
+
+    hall_res = await db.execute(
+        select(BanquetHall)
+        .where(BanquetHall.store_id == store_id)
+        .where(BanquetHall.is_active == True)
+    )
+    halls = hall_res.scalars().all()
+    if not halls:
+        return {"store_id": store_id, "halls": []}
+
+    result = []
+    for hall in halls:
+        bk_res = await db.execute(
+            select(BanquetHallBooking)
+            .where(BanquetHallBooking.hall_id == hall.id)
+        )
+        bookings = bk_res.scalars().all()
+        order_ids = [b.banquet_order_id for b in bookings if b.banquet_order_id]
+
+        revenue_fen  = 0
+        table_totals = 0
+        order_count  = 0
+        if order_ids:
+            ord_res = await db.execute(
+                select(BanquetOrder)
+                .where(BanquetOrder.id.in_(order_ids))
+                .where(BanquetOrder.order_status.in_([OrderStatusEnum.CONFIRMED, OrderStatusEnum.COMPLETED]))
+            )
+            ord_list = ord_res.scalars().all()
+            for o in ord_list:
+                revenue_fen  += o.total_amount_fen or 0
+                table_totals += o.table_count or 0
+                order_count  += 1
+
+        avg_price_per_table = round(revenue_fen / table_totals / 100, 2) if table_totals > 0 else 0.0
+        result.append({
+            "hall_id":              hall.id,
+            "hall_name":            hall.name,
+            "capacity":             hall.max_tables,
+            "booking_count":        len(bookings),
+            "order_count":          order_count,
+            "revenue_yuan":         round(revenue_fen / 100, 2),
+            "avg_price_per_table":  avg_price_per_table,
+        })
+
+    result.sort(key=lambda x: x["revenue_yuan"], reverse=True)
+    return {
+        "store_id": store_id,
+        "total_halls": len(result),
+        "halls": result,
+    }

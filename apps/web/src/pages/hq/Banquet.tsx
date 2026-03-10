@@ -3819,6 +3819,8 @@ export default function HQBanquet() {
           { key: 'funnel',       label: '获客漏斗',  children: <FunnelAnalyticsTab /> },
           { key: 'menuinsight',  label: '套餐洞察',  children: <MenuInsightTab /> },
           { key: 'revforecast',  label: '营收预测',  children: <RevenueForecastTab /> },
+          { key: 'staffexc',     label: '员工绩效',  children: <StaffExceptionTab /> },
+          { key: 'satisfaction', label: '满意度',    children: <SatisfactionTab /> },
         ]}
       />
     </div>
@@ -4336,6 +4338,275 @@ function RevenueForecastTab() {
           </div>
         </ZCard>
       )}
+    </div>
+  );
+}
+
+/* ─── Phase 23: 员工绩效 & 异常分析 Tab ─── */
+function StaffExceptionTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+
+  interface StaffItem {
+    owner_user_id: string | null;
+    role: string;
+    total_tasks: number;
+    done_tasks: number;
+    completion_pct: number;
+  }
+  interface ExcType { type: string; count: number; pct: number; }
+  interface ExcSev  { severity: string; count: number; pct: number; }
+  interface HallItem {
+    hall_id: string;
+    hall_name: string;
+    capacity: number;
+    booking_count: number;
+    order_count: number;
+    revenue_yuan: number;
+    avg_price_per_table: number;
+  }
+
+  const [staff,      setStaff]      = useState<StaffItem[]>([]);
+  const [excTypes,   setExcTypes]   = useState<ExcType[]>([]);
+  const [excSevs,    setExcSevs]    = useState<ExcSev[]>([]);
+  const [excTotal,   setExcTotal]   = useState(0);
+  const [excResRate, setExcResRate] = useState(0);
+  const [halls,      setHalls]      = useState<HallItem[]>([]);
+  const [loading,    setLoading]    = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.allSettled([
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/staff/performance`, { params: { days: 30 } }),
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/exception-summary`, { params: { days: 90 } }),
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/hall-revenue-correlation`),
+    ]).then(([sp, es, hr]) => {
+      if (sp.status === 'fulfilled') setStaff(sp.value.data?.staff ?? []);
+      if (es.status === 'fulfilled') {
+        setExcTypes(es.value.data?.by_type ?? []);
+        setExcSevs(es.value.data?.by_severity ?? []);
+        setExcTotal(es.value.data?.total ?? 0);
+        setExcResRate(es.value.data?.resolution_rate_pct ?? 0);
+      }
+      if (hr.status === 'fulfilled') setHalls(hr.value.data?.halls ?? []);
+    }).finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <ZSkeleton rows={6} />;
+
+  const SEV_BADGE: Record<string, 'warning' | 'default' | 'info'> = {
+    high: 'warning', medium: 'info', low: 'default',
+  };
+
+  return (
+    <div className={styles.staffExceptionTab}>
+      {/* 员工任务完成率 */}
+      <ZCard title="员工任务绩效（近30天）">
+        {staff.length === 0 ? (
+          <ZEmpty title="暂无任务数据" description="任务分配后自动统计" />
+        ) : (
+          <div className={styles.staffList}>
+            {staff.map((s, i) => (
+              <div key={s.owner_user_id ?? s.role + i} className={styles.staffRow}>
+                <div className={styles.staffInfo}>
+                  <div className={styles.staffRole}>{s.role}</div>
+                  <div className={styles.staffMeta}>{s.done_tasks}/{s.total_tasks} 完成</div>
+                </div>
+                <div className={styles.staffBarWrap}>
+                  <div className={styles.staffBar} style={{ width: `${s.completion_pct}%` }} />
+                </div>
+                <div className={styles.staffPct}>{s.completion_pct}%</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+
+      {/* 异常事件分析 */}
+      <ZCard title={`异常事件汇总（近90天）· 共 ${excTotal} 条 · 解决率 ${excResRate}%`}>
+        {excTotal === 0 ? (
+          <ZEmpty title="近90天无异常记录" description="执行过程顺畅" />
+        ) : (
+          <div className={styles.excGrid}>
+            <div>
+              <div className={styles.excSubTitle}>类型分布</div>
+              {excTypes.map(t => (
+                <div key={t.type} className={styles.excRow}>
+                  <span className={styles.excLabel}>{t.type}</span>
+                  <span className={styles.excCount}>{t.count}</span>
+                  <span className={styles.excPct}>{t.pct}%</span>
+                </div>
+              ))}
+            </div>
+            <div>
+              <div className={styles.excSubTitle}>严重程度</div>
+              {excSevs.map(s => (
+                <div key={s.severity} className={styles.excRow}>
+                  <ZBadge type={SEV_BADGE[s.severity] ?? 'default'} text={s.severity} />
+                  <span className={styles.excCount}>{s.count}</span>
+                  <span className={styles.excPct}>{s.pct}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ZCard>
+
+      {/* 厅房收入关联 */}
+      <ZCard title="厅房收入贡献">
+        {halls.length === 0 ? (
+          <ZEmpty title="暂无厅房数据" description="确认厅房信息已录入" />
+        ) : (
+          <div className={styles.hallList}>
+            {halls.map(h => (
+              <div key={h.hall_id} className={styles.hallRow}>
+                <div className={styles.hallInfo}>
+                  <div className={styles.hallName}>{h.hall_name}</div>
+                  <div className={styles.hallMeta}>容纳 {h.capacity} 桌 · {h.order_count} 场宴会</div>
+                </div>
+                <div className={styles.hallRight}>
+                  <div className={styles.hallRevenue}>¥{h.revenue_yuan.toLocaleString()}</div>
+                  <div className={styles.hallPerTable}>均桌价 ¥{h.avg_price_per_table.toLocaleString()}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+/* ─── Phase 23: 满意度 & 定金预测 Tab ─── */
+function SatisfactionTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+
+  interface TrendItem  { month: string; avg_rating: number; count: number; }
+  interface TagItem    { tag: string; count: number; }
+  interface ForecastItem { month: string; order_count: number; expected_yuan: number; deposit_yuan: number; }
+  interface SizeItem   { label: string; count: number; pct: number; revenue_yuan: number; }
+
+  const [trend,    setTrend]    = useState<TrendItem[]>([]);
+  const [avgRating, setAvgRating] = useState<number | null>(null);
+  const [ratingDist, setRatingDist] = useState<Record<string, number>>({});
+  const [tags,     setTags]     = useState<TagItem[]>([]);
+  const [forecast, setForecast] = useState<ForecastItem[]>([]);
+  const [totalExpected, setTotalExpected] = useState(0);
+  const [sizes,    setSizes]    = useState<SizeItem[]>([]);
+  const [loading,  setLoading]  = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.allSettled([
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/satisfaction-trend`),
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/review-tags`),
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/deposit-forecast`, { params: { months: 3 } }),
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/order-size-distribution`),
+    ]).then(([st, rt, df, os]) => {
+      if (st.status === 'fulfilled') {
+        setTrend(st.value.data?.monthly_trend ?? []);
+        setAvgRating(st.value.data?.avg_rating ?? null);
+        setRatingDist(st.value.data?.rating_distribution ?? {});
+      }
+      if (rt.status === 'fulfilled') setTags(rt.value.data?.tags ?? []);
+      if (df.status === 'fulfilled') {
+        setForecast(df.value.data?.monthly_forecast ?? []);
+        setTotalExpected(df.value.data?.total_expected_yuan ?? 0);
+      }
+      if (os.status === 'fulfilled') setSizes(os.value.data?.buckets ?? []);
+    }).finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <ZSkeleton rows={6} />;
+
+  const maxCount = Math.max(...trend.map(t => t.count), 1);
+  const totalReviews = Object.values(ratingDist).reduce((s, c) => s + c, 0);
+
+  return (
+    <div className={styles.satisfactionTab}>
+      {/* 满意度趋势 */}
+      <ZCard title={`满意度趋势${avgRating != null ? ` · 总均分 ${avgRating} ★` : ''}`}>
+        {trend.length === 0 ? (
+          <ZEmpty title="暂无评价数据" description="宴会结束后请引导客户评分" />
+        ) : (
+          <>
+            <div className={styles.ratingTrend}>
+              {trend.map(t => (
+                <div key={t.month} className={styles.trendItem}>
+                  <div className={styles.trendBar} style={{ height: `${Math.round(t.count / maxCount * 50)}px` }} />
+                  <div className={styles.trendScore}>{t.avg_rating}</div>
+                  <div className={styles.trendLabel}>{t.month.slice(5)}</div>
+                </div>
+              ))}
+            </div>
+            {totalReviews > 0 && (
+              <div className={styles.ratingDist}>
+                {['5','4','3','2','1'].map(star => {
+                  const cnt = ratingDist[star] || 0;
+                  return (
+                    <div key={star} className={styles.ratingDistRow}>
+                      <span className={styles.ratingStar}>{star}★</span>
+                      <div className={styles.ratingDistBar}>
+                        <div className={styles.ratingDistFill} style={{ width: `${Math.round(cnt / totalReviews * 100)}%` }} />
+                      </div>
+                      <span className={styles.ratingDistCnt}>{cnt}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+      </ZCard>
+
+      {/* 差评标签 */}
+      <ZCard title="高频差评标签">
+        {tags.length === 0 ? (
+          <ZEmpty title="暂无差评标签" description="顾客满意度良好" />
+        ) : (
+          <div className={styles.tagCloud}>
+            {tags.slice(0, 12).map(t => (
+              <ZBadge key={t.tag} type={t.count >= 3 ? 'warning' : 'default'} text={`${t.tag} ${t.count}`} />
+            ))}
+          </div>
+        )}
+      </ZCard>
+
+      {/* 定金预测 */}
+      <ZCard title={`未来3月预期收款 · 合计 ¥${totalExpected.toLocaleString()}`}>
+        {forecast.length === 0 ? (
+          <ZEmpty title="未来3月无已确认订单" description="确认订单后自动预测收款" />
+        ) : (
+          <div className={styles.forecastList}>
+            {forecast.map(f => (
+              <div key={f.month} className={styles.forecastRow}>
+                <div className={styles.forecastMonth}>{f.month}</div>
+                <div className={styles.forecastMeta}>{f.order_count} 场</div>
+                <div className={styles.forecastAmt}>¥{f.expected_yuan.toLocaleString()}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+
+      {/* 订单规模分布 */}
+      <ZCard title="订单规模分布">
+        {sizes.length === 0 ? (
+          <ZEmpty title="暂无订单数据" />
+        ) : (
+          <div className={styles.sizeList}>
+            {sizes.map(s => (
+              <div key={s.label} className={styles.sizeRow}>
+                <div className={styles.sizeLabel}>{s.label}</div>
+                <div className={styles.sizeBarWrap}>
+                  <div className={styles.sizeBar} style={{ width: `${s.pct}%` }} />
+                </div>
+                <div className={styles.sizePct}>{s.pct}%</div>
+                <div className={styles.sizeAmt}>¥{s.revenue_yuan.toLocaleString()}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
     </div>
   );
 }

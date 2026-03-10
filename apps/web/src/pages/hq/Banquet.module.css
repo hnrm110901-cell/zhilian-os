@@ -1473,3 +1473,67 @@
 .paymentLabel       { font-size: 11px; color: #6b7280; margin-bottom: 4px; }
 .paymentValue       { font-size: 16px; font-weight: 700; color: #111827; }
 .paymentOverdue     { color: #dc2626; }
+
+/* ── Phase 23: 员工绩效 & 满意度 ── */
+.staffExceptionTab  { display: flex; flex-direction: column; gap: 16px; }
+
+/* 员工绩效 */
+.staffList          { display: flex; flex-direction: column; gap: 8px; }
+.staffRow           { display: grid; grid-template-columns: 100px 1fr 48px; align-items: center; gap: 10px; }
+.staffInfo          { min-width: 0; }
+.staffRole          { font-size: 13px; font-weight: 600; color: #111827; }
+.staffMeta          { font-size: 11px; color: #6b7280; margin-top: 1px; }
+.staffBarWrap       { background: #f3f4f6; border-radius: 4px; height: 10px; overflow: hidden; }
+.staffBar           { height: 100%; background: #22c55e; border-radius: 4px; transition: width .3s; }
+.staffPct           { font-size: 12px; font-weight: 600; color: #374151; text-align: right; }
+
+/* 异常事件 */
+.excGrid            { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.excSubTitle        { font-size: 12px; font-weight: 600; color: #374151; margin-bottom: 8px; }
+.excRow             { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid #f9fafb; }
+.excLabel           { font-size: 12px; color: #374151; flex: 1; }
+.excCount           { font-size: 12px; font-weight: 600; color: #111827; width: 28px; text-align: right; }
+.excPct             { font-size: 11px; color: #6b7280; width: 36px; text-align: right; }
+
+/* 厅房收入 */
+.hallList           { display: flex; flex-direction: column; gap: 8px; }
+.hallRow            { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f3f4f6; }
+.hallInfo           { flex: 1; min-width: 0; }
+.hallName           { font-size: 13px; font-weight: 600; color: #111827; }
+.hallMeta           { font-size: 11px; color: #6b7280; margin-top: 2px; }
+.hallRight          { text-align: right; flex-shrink: 0; }
+.hallRevenue        { font-size: 14px; font-weight: 700; color: #16a34a; }
+.hallPerTable       { font-size: 11px; color: #6b7280; margin-top: 2px; }
+
+/* 满意度 Tab */
+.satisfactionTab    { display: flex; flex-direction: column; gap: 16px; }
+.ratingTrend        { display: flex; align-items: flex-end; gap: 6px; height: 80px; margin-bottom: 12px; overflow-x: auto; }
+.trendItem          { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 32px; flex: 1; }
+.trendBar           { width: 100%; background: #f59e0b; border-radius: 2px 2px 0 0; min-height: 2px; transition: height .3s; }
+.trendScore         { font-size: 10px; font-weight: 600; color: #374151; }
+.trendLabel         { font-size: 9px; color: #6b7280; }
+.ratingDist         { display: flex; flex-direction: column; gap: 4px; }
+.ratingDistRow      { display: grid; grid-template-columns: 24px 1fr 24px; align-items: center; gap: 6px; }
+.ratingStar         { font-size: 11px; color: #f59e0b; text-align: right; }
+.ratingDistBar      { background: #f3f4f6; border-radius: 3px; height: 10px; overflow: hidden; }
+.ratingDistFill     { height: 100%; background: #f59e0b; border-radius: 3px; transition: width .3s; }
+.ratingDistCnt      { font-size: 11px; color: #6b7280; }
+
+/* 差评标签云 */
+.tagCloud           { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 0; }
+
+/* 定金预测 */
+.forecastList       { display: flex; flex-direction: column; gap: 6px; }
+.forecastRow        { display: grid; grid-template-columns: 80px 60px 1fr; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f9fafb; }
+.forecastMonth      { font-size: 12px; font-weight: 600; color: #374151; }
+.forecastMeta       { font-size: 11px; color: #6b7280; }
+.forecastAmt        { font-size: 13px; font-weight: 700; color: #16a34a; text-align: right; }
+
+/* 订单规模 */
+.sizeList           { display: flex; flex-direction: column; gap: 6px; }
+.sizeRow            { display: grid; grid-template-columns: 120px 1fr 40px 80px; align-items: center; gap: 8px; }
+.sizeLabel          { font-size: 12px; color: #374151; }
+.sizeBarWrap        { background: #f3f4f6; border-radius: 3px; height: 12px; overflow: hidden; }
+.sizeBar            { height: 100%; background: #3b82f6; border-radius: 3px; transition: width .3s; }
+.sizePct            { font-size: 11px; color: #6b7280; text-align: right; }
+.sizeAmt            { font-size: 12px; color: #374151; text-align: right; }
