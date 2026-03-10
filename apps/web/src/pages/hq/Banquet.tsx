@@ -3821,6 +3821,8 @@ export default function HQBanquet() {
           { key: 'revforecast',  label: '营收预测',  children: <RevenueForecastTab /> },
           { key: 'staffexc',     label: '员工绩效',  children: <StaffExceptionTab /> },
           { key: 'satisfaction', label: '满意度',    children: <SatisfactionTab /> },
+          { key: 'yoy',          label: '年度对比',  children: <YearOverYearTab /> },
+          { key: 'alertcenter',  label: '预警中心',  children: <AlertCenterTab /> },
         ]}
       />
     </div>
@@ -4602,6 +4604,263 @@ function SatisfactionTab() {
                 </div>
                 <div className={styles.sizePct}>{s.pct}%</div>
                 <div className={styles.sizeAmt}>¥{s.revenue_yuan.toLocaleString()}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+/* ─── Phase 24: 年度对比 Tab ─── */
+function YearOverYearTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+
+  interface YoyMetric {
+    metric: string;
+    label: string;
+    unit: string;
+    this_year: number;
+    last_year: number;
+    yoy_pct: number | null;
+  }
+  interface AnnualRow {
+    month: string;
+    revenue_yuan: number;
+    order_count: number;
+    lead_count: number;
+    gross_profit_yuan: number;
+    gross_margin_pct: number;
+  }
+  interface TypeSeries {
+    type: string;
+    total: number;
+    data: Array<{ month: string; count: number }>;
+  }
+
+  const [metrics,   setMetrics]   = useState<YoyMetric[]>([]);
+  const [thisYear,  setThisYear]  = useState(0);
+  const [lastYear,  setLastYear]  = useState(0);
+  const [annualRows, setAnnualRows] = useState<AnnualRow[]>([]);
+  const [typeSeries, setTypeSeries] = useState<TypeSeries[]>([]);
+  const [loading,   setLoading]   = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.allSettled([
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/year-over-year`),
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/annual-summary`),
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/banquet-type-trend`, { params: { months: 12 } }),
+    ]).then(([yoy, ann, tt]) => {
+      if (yoy.status === 'fulfilled') {
+        setMetrics(yoy.value.data?.metrics ?? []);
+        setThisYear(yoy.value.data?.this_year ?? new Date().getFullYear());
+        setLastYear(yoy.value.data?.last_year ?? new Date().getFullYear() - 1);
+      }
+      if (ann.status === 'fulfilled') setAnnualRows(ann.value.data?.monthly_rows ?? []);
+      if (tt.status === 'fulfilled') setTypeSeries(tt.value.data?.series ?? []);
+    }).finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <ZSkeleton rows={6} />;
+
+  return (
+    <div className={styles.yoyTab}>
+      {/* 同比对比卡片 */}
+      <ZCard title={`年度同比：${thisYear} vs ${lastYear}`}>
+        {metrics.length === 0 ? (
+          <ZEmpty title="暂无历史KPI数据" description="KPI日报积累后自动生成同比" />
+        ) : (
+          <div className={styles.yoyGrid}>
+            {metrics.map(m => (
+              <div key={m.metric} className={styles.yoyCard}>
+                <div className={styles.yoyLabel}>{m.label}</div>
+                <div className={styles.yoyThis}>{m.this_year.toLocaleString()} {m.unit}</div>
+                <div className={styles.yoyLast}>去年：{m.last_year.toLocaleString()}</div>
+                {m.yoy_pct != null && (
+                  <div className={`${styles.yoyDelta} ${m.yoy_pct >= 0 ? styles.yoyUp : styles.yoyDown}`}>
+                    {m.yoy_pct >= 0 ? '▲' : '▼'} {Math.abs(m.yoy_pct)}%
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+
+      {/* 月度汇总表 */}
+      <ZCard title={`${thisYear} 年月度汇总`}>
+        {annualRows.length === 0 ? (
+          <ZEmpty title="暂无月度数据" />
+        ) : (
+          <div className={styles.annualTable}>
+            <div className={styles.annualHeader}>
+              <span>月份</span><span>营业额</span><span>场次</span><span>毛利</span><span>毛利率</span>
+            </div>
+            {annualRows.map(r => (
+              <div key={r.month} className={styles.annualRow}>
+                <span>{r.month.slice(5)}</span>
+                <span>¥{r.revenue_yuan.toLocaleString()}</span>
+                <span>{r.order_count} 场</span>
+                <span>¥{r.gross_profit_yuan.toLocaleString()}</span>
+                <span>{r.gross_margin_pct}%</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+
+      {/* 宴会类型趋势 */}
+      <ZCard title="宴会类型构成趋势">
+        {typeSeries.length === 0 ? (
+          <ZEmpty title="暂无类型数据" />
+        ) : (
+          <div className={styles.typeSeriesList}>
+            {typeSeries.map(s => (
+              <div key={s.type} className={styles.typeSeriesRow}>
+                <div className={styles.typeSeriesLabel}>{s.type}</div>
+                <div className={styles.typeSeriesBar}>
+                  <div className={styles.typeSeriesFill} style={{ width: `${Math.min(s.total * 5, 100)}%` }} />
+                </div>
+                <div className={styles.typeSeriesTotal}>{s.total} 场</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+/* ─── Phase 24: 预警中心 Tab ─── */
+function AlertCenterTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+
+  interface AlertItem {
+    alert_id: string;
+    type: string;
+    severity: string;
+    title: string;
+    detail: string;
+    created_at: string;
+  }
+  interface PriceItem { label: string; count: number; pct: number; }
+  interface FreqItem  { label: string; customer_count: number; pct: number; revenue_yuan: number; }
+  interface SourceItem { channel: string; lead_count: number; pct: number; won_count: number; win_rate_pct: number; avg_budget_yuan: number | null; }
+
+  const [alerts,  setAlerts]  = useState<AlertItem[]>([]);
+  const [prices,  setPrices]  = useState<PriceItem[]>([]);
+  const [freqs,   setFreqs]   = useState<FreqItem[]>([]);
+  const [sources, setSources] = useState<SourceItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.allSettled([
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/alerts/active`),
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/pricing-ladder`),
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/customer-frequency`),
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/lead-source-analysis`),
+    ]).then(([al, pl, cf, ls]) => {
+      if (al.status === 'fulfilled') setAlerts(al.value.data?.alerts ?? []);
+      if (pl.status === 'fulfilled') setPrices(pl.value.data?.buckets ?? []);
+      if (cf.status === 'fulfilled') setFreqs(cf.value.data?.buckets ?? []);
+      if (ls.status === 'fulfilled') setSources(ls.value.data?.sources ?? []);
+    }).finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <ZSkeleton rows={6} />;
+
+  const SEV_BADGE: Record<string, 'warning' | 'default' | 'info'> = {
+    high: 'warning', medium: 'info', low: 'default',
+  };
+  const TYPE_LABEL: Record<string, string> = {
+    exception: '异常未处理', overdue_task: '任务逾期', stale_lead: '线索停滞',
+  };
+
+  return (
+    <div className={styles.alertCenterTab}>
+      {/* 活跃预警 */}
+      <ZCard title={`活跃预警${alerts.length > 0 ? ` · ${alerts.length} 条` : ''}`}>
+        {alerts.length === 0 ? (
+          <ZEmpty title="当前无活跃预警" description="运营状态良好" />
+        ) : (
+          <div className={styles.alertList}>
+            {alerts.map(a => (
+              <div key={a.alert_id} className={`${styles.alertRow} ${styles['alertSev_' + a.severity]}`}>
+                <div className={styles.alertLeft}>
+                  <ZBadge type={SEV_BADGE[a.severity] ?? 'default'} text={TYPE_LABEL[a.type] ?? a.type} />
+                  <div className={styles.alertTitle}>{a.title}</div>
+                  <div className={styles.alertDetail}>{a.detail}</div>
+                </div>
+                <div className={styles.alertTime}>{a.created_at}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+
+      {/* 定价阶梯 */}
+      <ZCard title="成交桌单价分布">
+        {prices.length === 0 ? (
+          <ZEmpty title="暂无订单数据" />
+        ) : (
+          <div className={styles.priceList}>
+            {prices.map(p => (
+              <div key={p.label} className={styles.priceRow}>
+                <div className={styles.priceLabel}>{p.label}</div>
+                <div className={styles.priceBarWrap}>
+                  <div className={styles.priceBarFill} style={{ width: `${p.pct}%` }} />
+                </div>
+                <div className={styles.pricePct}>{p.pct}%</div>
+                <div className={styles.priceCnt}>{p.count}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+
+      {/* 消费频次 */}
+      <ZCard title="客户消费频次分布">
+        {freqs.length === 0 ? (
+          <ZEmpty title="暂无客户数据" />
+        ) : (
+          <div className={styles.freqList}>
+            {freqs.map(f => (
+              <div key={f.label} className={styles.freqRow}>
+                <div className={styles.freqLabel}>{f.label}</div>
+                <div className={styles.freqBarWrap}>
+                  <div className={styles.freqBar} style={{ width: `${f.pct}%` }} />
+                </div>
+                <div className={styles.freqPct}>{f.pct}%</div>
+                <div className={styles.freqAmt}>¥{f.revenue_yuan.toLocaleString()}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+
+      {/* 线索来源 */}
+      <ZCard title="线索渠道分析">
+        {sources.length === 0 ? (
+          <ZEmpty title="暂无线索来源数据" />
+        ) : (
+          <div className={styles.sourceList}>
+            <div className={styles.sourceHeader}>
+              <span>渠道</span><span>线索数</span><span>成交率</span><span>均预算</span>
+            </div>
+            {sources.map(s => (
+              <div key={s.channel} className={styles.sourceRow}>
+                <div className={styles.sourceChannel}>{s.channel}</div>
+                <div className={styles.sourceCell}>{s.lead_count} <span className={styles.sourcePct}>({s.pct}%)</span></div>
+                <div className={styles.sourceCell}>
+                  <ZBadge type={s.win_rate_pct >= 30 ? 'success' : s.win_rate_pct >= 15 ? 'info' : 'default'}
+                    text={`${s.win_rate_pct}%`} />
+                </div>
+                <div className={styles.sourceCell}>
+                  {s.avg_budget_yuan != null ? `¥${s.avg_budget_yuan.toLocaleString()}` : '-'}
+                </div>
               </div>
             ))}
           </div>

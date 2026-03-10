@@ -9528,3 +9528,543 @@ async def get_hall_revenue_correlation(
         "total_halls": len(result),
         "halls": result,
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Phase 24 — 年度对比 · 全局预警 · 类型趋势 · 转化分析
+# ═══════════════════════════════════════════════════════════════════════════
+
+# ── 1. 年度同比对比 ─────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/year-over-year")
+async def get_year_over_year(
+    store_id: str,
+    db:       AsyncSession = Depends(get_db),
+    _:        User = Depends(get_current_user),
+):
+    """本年 vs 去年关键指标同比对比"""
+    from datetime import timedelta
+    from src.models.banquet import BanquetKpiDaily
+
+    today = date_type.today()
+    this_year_start = date_type(today.year, 1, 1)
+    last_year_start = date_type(today.year - 1, 1, 1)
+    last_year_end   = date_type(today.year - 1, 12, 31)
+
+    def _agg(kpis):
+        return {
+            "revenue_fen":      sum(k.revenue_fen for k in kpis),
+            "order_count":      sum(k.order_count for k in kpis),
+            "lead_count":       sum(k.lead_count for k in kpis),
+            "gross_profit_fen": sum(k.gross_profit_fen for k in kpis),
+            "avg_conversion":   round(
+                sum(k.conversion_rate_pct for k in kpis) / len(kpis), 1
+            ) if kpis else 0.0,
+            "avg_utilization":  round(
+                sum(k.hall_utilization_pct for k in kpis) / len(kpis), 1
+            ) if kpis else 0.0,
+        }
+
+    res_this = await db.execute(
+        select(BanquetKpiDaily)
+        .where(BanquetKpiDaily.store_id == store_id)
+        .where(BanquetKpiDaily.stat_date >= this_year_start)
+        .where(BanquetKpiDaily.stat_date <= today)
+    )
+    res_last = await db.execute(
+        select(BanquetKpiDaily)
+        .where(BanquetKpiDaily.store_id == store_id)
+        .where(BanquetKpiDaily.stat_date >= last_year_start)
+        .where(BanquetKpiDaily.stat_date <= last_year_end)
+    )
+
+    this_kpis = res_this.scalars().all()
+    last_kpis = res_last.scalars().all()
+    this_agg  = _agg(this_kpis)
+    last_agg  = _agg(last_kpis)
+
+    def _yoy(cur, prev):
+        if prev == 0:
+            return None
+        return round((cur - prev) / prev * 100, 1)
+
+    metrics = []
+    for key, label, unit in [
+        ("revenue_fen",      "营业收入",   "元"),
+        ("order_count",      "宴会场数",   "场"),
+        ("lead_count",       "新增线索",   "条"),
+        ("gross_profit_fen", "毛利润",     "元"),
+    ]:
+        cur  = this_agg[key]
+        prev = last_agg[key]
+        divisor = 100 if "fen" in key else 1
+        metrics.append({
+            "metric":       key,
+            "label":        label,
+            "unit":         unit,
+            "this_year":    round(cur / divisor, 2),
+            "last_year":    round(prev / divisor, 2),
+            "yoy_pct":      _yoy(cur, prev),
+        })
+
+    metrics.append({
+        "metric":    "avg_conversion",
+        "label":     "平均转化率",
+        "unit":      "%",
+        "this_year": this_agg["avg_conversion"],
+        "last_year": last_agg["avg_conversion"],
+        "yoy_pct":   _yoy(this_agg["avg_conversion"], last_agg["avg_conversion"]),
+    })
+    metrics.append({
+        "metric":    "avg_utilization",
+        "label":     "平均厅房利用率",
+        "unit":      "%",
+        "this_year": this_agg["avg_utilization"],
+        "last_year": last_agg["avg_utilization"],
+        "yoy_pct":   _yoy(this_agg["avg_utilization"], last_agg["avg_utilization"]),
+    })
+
+    return {
+        "store_id":   store_id,
+        "this_year":  today.year,
+        "last_year":  today.year - 1,
+        "metrics":    metrics,
+    }
+
+
+# ── 2. 年度综合摘要 ─────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/annual-summary")
+async def get_annual_summary(
+    store_id: str,
+    year:     int = 0,   # 0 = current year
+    db:       AsyncSession = Depends(get_db),
+    _:        User = Depends(get_current_user),
+):
+    """全年 KPI 月度汇总表"""
+    from src.models.banquet import BanquetKpiDaily
+
+    target_year = year if year > 0 else date_type.today().year
+    year_start  = date_type(target_year, 1, 1)
+    year_end    = date_type(target_year, 12, 31)
+
+    res = await db.execute(
+        select(BanquetKpiDaily)
+        .where(BanquetKpiDaily.store_id == store_id)
+        .where(BanquetKpiDaily.stat_date >= year_start)
+        .where(BanquetKpiDaily.stat_date <= year_end)
+        .order_by(BanquetKpiDaily.stat_date)
+    )
+    kpis = res.scalars().all()
+
+    monthly: dict = {}
+    for k in kpis:
+        mon = str(k.stat_date)[:7]
+        if mon not in monthly:
+            monthly[mon] = {"revenue_fen": 0, "order_count": 0, "lead_count": 0,
+                            "gross_profit_fen": 0, "days": 0}
+        monthly[mon]["revenue_fen"]      += k.revenue_fen
+        monthly[mon]["order_count"]      += k.order_count
+        monthly[mon]["lead_count"]       += k.lead_count
+        monthly[mon]["gross_profit_fen"] += k.gross_profit_fen
+        monthly[mon]["days"]             += 1
+
+    rows = []
+    for mon, v in sorted(monthly.items()):
+        rev = v["revenue_fen"]
+        gp  = v["gross_profit_fen"]
+        rows.append({
+            "month":             mon,
+            "revenue_yuan":      round(rev / 100, 2),
+            "order_count":       v["order_count"],
+            "lead_count":        v["lead_count"],
+            "gross_profit_yuan": round(gp / 100, 2),
+            "gross_margin_pct":  round(gp / rev * 100, 1) if rev > 0 else 0.0,
+        })
+
+    annual_rev = sum(v["revenue_fen"] for v in monthly.values())
+    annual_gp  = sum(v["gross_profit_fen"] for v in monthly.values())
+    return {
+        "store_id":              store_id,
+        "year":                  target_year,
+        "total_revenue_yuan":    round(annual_rev / 100, 2),
+        "total_orders":          sum(v["order_count"] for v in monthly.values()),
+        "total_leads":           sum(v["lead_count"] for v in monthly.values()),
+        "total_gross_profit_yuan": round(annual_gp / 100, 2),
+        "annual_gross_margin_pct": round(annual_gp / annual_rev * 100, 1) if annual_rev > 0 else 0.0,
+        "monthly_rows":          rows,
+    }
+
+
+# ── 3. 活跃预警列表 ─────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/alerts/active")
+async def get_active_alerts(
+    store_id: str,
+    db:       AsyncSession = Depends(get_db),
+    _:        User = Depends(get_current_user),
+):
+    """汇总未处理异常、逾期任务、停滞线索作为活跃预警"""
+    from datetime import timedelta
+    from src.models.banquet import (
+        ExecutionException, BanquetOrder,
+        ExecutionTask, TaskStatusEnum,
+        BanquetLead, LeadStageEnum,
+        OrderStatusEnum,
+    )
+
+    today = date_type.today()
+    alerts = []
+
+    # 1. 未处理异常（open）
+    exc_res = await db.execute(
+        select(ExecutionException)
+        .join(BanquetOrder, BanquetOrder.id == ExecutionException.banquet_order_id)
+        .where(BanquetOrder.store_id == store_id)
+        .where(ExecutionException.status == "open")
+        .order_by(ExecutionException.created_at.desc())
+        .limit(10)
+    )
+    for e in exc_res.scalars().all():
+        alerts.append({
+            "alert_id":   e.id,
+            "type":       "exception",
+            "severity":   e.severity,
+            "title":      f"异常未处理：{e.exception_type}",
+            "detail":     e.description[:80],
+            "created_at": str(e.created_at)[:16],
+        })
+
+    # 2. 逾期任务（pending/in_progress 且 due_time 已过）
+    task_res = await db.execute(
+        select(ExecutionTask)
+        .join(BanquetOrder, BanquetOrder.id == ExecutionTask.banquet_order_id)
+        .where(BanquetOrder.store_id == store_id)
+        .where(ExecutionTask.task_status.in_([TaskStatusEnum.PENDING, TaskStatusEnum.IN_PROGRESS]))
+        .where(ExecutionTask.due_time < today)
+        .order_by(ExecutionTask.due_time)
+        .limit(10)
+    )
+    for t in task_res.scalars().all():
+        alerts.append({
+            "alert_id":   t.id,
+            "type":       "overdue_task",
+            "severity":   "high",
+            "title":      f"任务逾期：{t.task_name}",
+            "detail":     f"原截止：{str(t.due_time)[:10]}",
+            "created_at": str(t.due_time)[:16],
+        })
+
+    # 3. 停滞线索（非 won/lost，超过 14 天未更新）
+    stale_cutoff = today - timedelta(days=14)
+    lead_res = await db.execute(
+        select(BanquetLead)
+        .where(BanquetLead.store_id == store_id)
+        .where(BanquetLead.current_stage.notin_([LeadStageEnum.WON, LeadStageEnum.LOST]))
+        .where(BanquetLead.updated_at <= stale_cutoff)
+        .order_by(BanquetLead.updated_at)
+        .limit(10)
+    )
+    for l in lead_res.scalars().all():
+        alerts.append({
+            "alert_id":   l.id,
+            "type":       "stale_lead",
+            "severity":   "medium",
+            "title":      f"线索停滞：{l.banquet_type.value if hasattr(l.banquet_type, 'value') else str(l.banquet_type)}",
+            "detail":     f"已停滞超14天，当前阶段：{l.current_stage.value if hasattr(l.current_stage, 'value') else str(l.current_stage)}",
+            "created_at": str(l.updated_at)[:16],
+        })
+
+    # Sort by severity
+    SEV = {"high": 0, "medium": 1, "low": 2}
+    alerts.sort(key=lambda x: SEV.get(x["severity"], 9))
+
+    return {
+        "store_id":    store_id,
+        "total":       len(alerts),
+        "alerts":      alerts,
+    }
+
+
+# ── 4. 宴会类型年度趋势 ─────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/banquet-type-trend")
+async def get_banquet_type_trend(
+    store_id: str,
+    months:   int = 12,
+    db:       AsyncSession = Depends(get_db),
+    _:        User = Depends(get_current_user),
+):
+    """各宴会类型月度数量趋势（折线图数据）"""
+    from datetime import timedelta
+    from src.models.banquet import BanquetOrder, OrderStatusEnum
+
+    cutoff = date_type.today() - timedelta(days=months * 30)
+    res = await db.execute(
+        select(BanquetOrder)
+        .where(BanquetOrder.store_id == store_id)
+        .where(BanquetOrder.banquet_date >= cutoff)
+        .where(BanquetOrder.order_status.in_([OrderStatusEnum.CONFIRMED, OrderStatusEnum.COMPLETED]))
+    )
+    orders = res.scalars().all()
+
+    # {type: {month: count}}
+    type_monthly: dict = {}
+    all_months: set = set()
+    all_types:  set = set()
+    for o in orders:
+        t   = o.banquet_type.value if hasattr(o.banquet_type, "value") else str(o.banquet_type)
+        mon = str(o.banquet_date)[:7]
+        all_months.add(mon)
+        all_types.add(t)
+        if t not in type_monthly:
+            type_monthly[t] = {}
+        type_monthly[t][mon] = type_monthly[t].get(mon, 0) + 1
+
+    months_list = sorted(all_months)
+    series = [
+        {
+            "type":  t,
+            "data":  [{"month": m, "count": type_monthly[t].get(m, 0)} for m in months_list],
+            "total": sum(type_monthly[t].values()),
+        }
+        for t in sorted(all_types)
+    ]
+    series.sort(key=lambda x: x["total"], reverse=True)
+
+    return {
+        "store_id": store_id,
+        "months":   months_list,
+        "series":   series,
+    }
+
+
+# ── 5. 定价阶梯分析 ─────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/pricing-ladder")
+async def get_pricing_ladder(
+    store_id: str,
+    db:       AsyncSession = Depends(get_db),
+    _:        User = Depends(get_current_user),
+):
+    """实际成交桌单价分布（分桶）"""
+    from src.models.banquet import BanquetOrder, OrderStatusEnum
+
+    res = await db.execute(
+        select(BanquetOrder)
+        .where(BanquetOrder.store_id == store_id)
+        .where(BanquetOrder.order_status.in_([OrderStatusEnum.CONFIRMED, OrderStatusEnum.COMPLETED]))
+        .where(BanquetOrder.table_count > 0)
+        .where(BanquetOrder.total_amount_fen > 0)
+    )
+    orders = res.scalars().all()
+    if not orders:
+        return {"store_id": store_id, "total": 0, "buckets": [], "median_yuan": None}
+
+    per_table = [(o.total_amount_fen // o.table_count) for o in orders]
+    per_table.sort()
+
+    # 分桶（元/桌）
+    BUCKETS = [
+        ("经济型（<1500）",   0,      149999),
+        ("标准型（1500-2999）", 150000, 299999),
+        ("中高端（3000-4999）", 300000, 499999),
+        ("高端（5000-7999）",  500000, 799999),
+        ("顶级（≥8000）",      800000, 9999999),
+    ]
+    bucket_cnt: dict = {b[0]: 0 for b in BUCKETS}
+    for p in per_table:
+        for label, lo, hi in BUCKETS:
+            if lo <= p <= hi:
+                bucket_cnt[label] += 1
+                break
+
+    total = len(per_table)
+    mid   = len(per_table) // 2
+    median_fen = per_table[mid] if len(per_table) % 2 == 1 else (per_table[mid-1] + per_table[mid]) // 2
+
+    return {
+        "store_id":    store_id,
+        "total":       total,
+        "median_yuan": round(median_fen / 100, 2),
+        "avg_yuan":    round(sum(per_table) / total / 100, 2),
+        "buckets": [
+            {"label": label, "count": bucket_cnt[label],
+             "pct": round(bucket_cnt[label] / total * 100, 1)}
+            for label, _, _ in BUCKETS
+        ],
+    }
+
+
+# ── 6. 客户消费频次分布 ─────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/customer-frequency")
+async def get_customer_frequency(
+    store_id: str,
+    db:       AsyncSession = Depends(get_db),
+    _:        User = Depends(get_current_user),
+):
+    """客户按消费场次分布（1次 / 2-3次 / 4-6次 / 7+次）"""
+    from src.models.banquet import BanquetCustomer
+
+    res = await db.execute(
+        select(BanquetCustomer)
+        .where(BanquetCustomer.store_id == store_id)
+    )
+    customers = res.scalars().all()
+    if not customers:
+        return {"store_id": store_id, "total": 0, "buckets": []}
+
+    BUCKETS = [
+        ("仅1次",    1, 1),
+        ("2-3次",    2, 3),
+        ("4-6次",    4, 6),
+        ("7次以上",  7, 9999),
+    ]
+    counts = {b[0]: {"customer_count": 0, "revenue_fen": 0} for b in BUCKETS}
+    for c in customers:
+        n = c.total_banquet_count or 0
+        for label, lo, hi in BUCKETS:
+            if lo <= n <= hi:
+                counts[label]["customer_count"] += 1
+                counts[label]["revenue_fen"]    += c.total_banquet_amount_fen or 0
+                break
+
+    total = len(customers)
+    return {
+        "store_id": store_id,
+        "total":    total,
+        "buckets": [
+            {
+                "label":          label,
+                "customer_count": counts[label]["customer_count"],
+                "pct":            round(counts[label]["customer_count"] / total * 100, 1),
+                "revenue_yuan":   round(counts[label]["revenue_fen"] / 100, 2),
+            }
+            for label, _, _ in BUCKETS
+        ],
+    }
+
+
+# ── 7. 线索来源分析 ─────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/lead-source-analysis")
+async def get_lead_source_analysis(
+    store_id: str,
+    db:       AsyncSession = Depends(get_db),
+    _:        User = Depends(get_current_user),
+):
+    """各渠道线索数量 · 成交率 · 平均预算"""
+    from src.models.banquet import BanquetLead, LeadStageEnum
+
+    res = await db.execute(
+        select(BanquetLead)
+        .where(BanquetLead.store_id == store_id)
+    )
+    leads = res.scalars().all()
+    if not leads:
+        return {"store_id": store_id, "total": 0, "sources": []}
+
+    src_data: dict = {}
+    for l in leads:
+        src = l.source_channel or "未知"
+        if src not in src_data:
+            src_data[src] = {"total": 0, "won": 0, "budget_sum": 0, "budget_cnt": 0}
+        src_data[src]["total"] += 1
+        if l.current_stage == LeadStageEnum.WON:
+            src_data[src]["won"] += 1
+        if l.expected_budget_fen:
+            src_data[src]["budget_sum"] += l.expected_budget_fen
+            src_data[src]["budget_cnt"] += 1
+
+    total = len(leads)
+    sources = []
+    for src, v in src_data.items():
+        win_rate = round(v["won"] / v["total"] * 100, 1) if v["total"] > 0 else 0.0
+        avg_budget = round(v["budget_sum"] / v["budget_cnt"] / 100, 2) if v["budget_cnt"] > 0 else None
+        sources.append({
+            "channel":        src,
+            "lead_count":     v["total"],
+            "pct":            round(v["total"] / total * 100, 1),
+            "won_count":      v["won"],
+            "win_rate_pct":   win_rate,
+            "avg_budget_yuan": avg_budget,
+        })
+
+    sources.sort(key=lambda x: x["lead_count"], reverse=True)
+    return {
+        "store_id": store_id,
+        "total":    total,
+        "sources":  sources,
+    }
+
+
+# ── 8. 线索转化时间线 ────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/conversion-timeline")
+async def get_conversion_timeline(
+    store_id: str,
+    db:       AsyncSession = Depends(get_db),
+    _:        User = Depends(get_current_user),
+):
+    """已成交线索平均停留在各阶段的天数（基于 followup records 推算）"""
+    from src.models.banquet import BanquetLead, LeadFollowupRecord, LeadStageEnum
+
+    res = await db.execute(
+        select(BanquetLead)
+        .where(BanquetLead.store_id == store_id)
+        .where(BanquetLead.current_stage == LeadStageEnum.WON)
+    )
+    won_leads = res.scalars().all()
+    if not won_leads:
+        return {"store_id": store_id, "won_count": 0, "stages": [],
+                "avg_total_days": None}
+
+    # Gather followup records for won leads
+    lead_ids = [l.id for l in won_leads]
+    rec_res  = await db.execute(
+        select(LeadFollowupRecord)
+        .where(LeadFollowupRecord.lead_id.in_(lead_ids))
+        .order_by(LeadFollowupRecord.created_at)
+    )
+    records = rec_res.scalars().all()
+
+    # Group by lead_id
+    by_lead: dict = {}
+    for r in records:
+        by_lead.setdefault(r.lead_id, []).append(r)
+
+    # Stage dwell times
+    stage_days: dict = {}
+    total_days_list = []
+    for lead in won_leads:
+        recs = by_lead.get(lead.id, [])
+        if not recs:
+            continue
+        first = recs[0].created_at
+        last  = recs[-1].created_at
+        total = (last - first).days
+        total_days_list.append(total)
+        # Stage transitions via stage_before/stage_after
+        for r in recs:
+            stage = r.stage_before.value if hasattr(r.stage_before, "value") else str(r.stage_before or "")
+            if stage:
+                stage_days.setdefault(stage, [])
+
+    avg_total = round(sum(total_days_list) / len(total_days_list), 1) if total_days_list else None
+
+    STAGE_LABELS = {
+        "new": "新线索", "contacted": "已联系", "visit_scheduled": "预约看厅",
+        "quoted": "已报价", "waiting_decision": "等待决策", "deposit_pending": "待付定金",
+    }
+    stage_summary = [
+        {"stage": s, "label": STAGE_LABELS.get(s, s), "sample_count": len(v)}
+        for s, v in stage_days.items()
+    ]
+
+    return {
+        "store_id":      store_id,
+        "won_count":     len(won_leads),
+        "avg_total_days": avg_total,
+        "stage_summary": stage_summary,
+    }
