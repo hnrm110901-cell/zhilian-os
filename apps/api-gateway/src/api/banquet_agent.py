@@ -7080,3 +7080,610 @@ async def get_hall_utilization_forecast(
             "underbooked_days":    sum(1 for d in daily if d["status"] == "underbooked"),
         },
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Phase 19 — 宴后闭环 · 成本穿透 · 运营健康
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── 1. 成本穿透分析 ─────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/cost-breakdown")
+async def get_cost_breakdown(
+    store_id: str,
+    year:  int = 0,
+    month: int = 0,
+    db:    AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """按宴会类型拆解成本（原料/人工/其他）vs 毛利"""
+    from datetime import timedelta
+    from src.models.banquet import (
+        BanquetProfitSnapshot, BanquetOrder, BanquetTypeEnum,
+        OrderStatusEnum,
+    )
+
+    q = (
+        select(
+            BanquetOrder.banquet_type,
+            func.sum(BanquetProfitSnapshot.revenue_fen).label("rev"),
+            func.sum(BanquetProfitSnapshot.ingredient_cost_fen).label("ingredient"),
+            func.sum(BanquetProfitSnapshot.labor_cost_fen).label("labor"),
+            func.sum(BanquetProfitSnapshot.material_cost_fen).label("material"),
+            func.sum(BanquetProfitSnapshot.other_cost_fen).label("other"),
+            func.sum(BanquetProfitSnapshot.gross_profit_fen).label("profit"),
+            func.count(BanquetOrder.id).label("cnt"),
+        )
+        .join(BanquetOrder, BanquetProfitSnapshot.banquet_order_id == BanquetOrder.id)
+        .where(BanquetOrder.store_id == store_id)
+        .where(BanquetOrder.order_status == OrderStatusEnum.COMPLETED)
+        .group_by(BanquetOrder.banquet_type)
+    )
+    if year > 0:
+        q = q.where(func.extract("year", BanquetOrder.banquet_date) == year)
+    if month > 0:
+        q = q.where(func.extract("month", BanquetOrder.banquet_date) == month)
+
+    rows = (await db.execute(q)).all()
+
+    result = []
+    for r in rows:
+        rev = r.rev or 0
+        total_cost = (r.ingredient or 0) + (r.labor or 0) + (r.material or 0) + (r.other or 0)
+        result.append({
+            "banquet_type":        r.banquet_type.value if hasattr(r.banquet_type, "value") else str(r.banquet_type),
+            "event_count":         r.cnt or 0,
+            "revenue_yuan":        round((rev) / 100, 2),
+            "ingredient_cost_yuan": round((r.ingredient or 0) / 100, 2),
+            "labor_cost_yuan":     round((r.labor or 0) / 100, 2),
+            "material_cost_yuan":  round((r.material or 0) / 100, 2),
+            "other_cost_yuan":     round((r.other or 0) / 100, 2),
+            "total_cost_yuan":     round(total_cost / 100, 2),
+            "gross_profit_yuan":   round((r.profit or 0) / 100, 2),
+            "gross_margin_pct":    round((r.profit or 0) / rev * 100, 1) if rev > 0 else None,
+        })
+
+    result.sort(key=lambda x: x["revenue_yuan"], reverse=True)
+    return {
+        "store_id":     store_id,
+        "year":         year,
+        "month":        month,
+        "by_type":      result,
+        "total_revenue_yuan":      round(sum(x["revenue_yuan"] for x in result), 2),
+        "total_gross_profit_yuan": round(sum(x["gross_profit_yuan"] for x in result), 2),
+    }
+
+
+# ── 2. 单场宴后复盘 ──────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/orders/{order_id}/post-event-summary")
+async def get_post_event_summary(
+    store_id: str,
+    order_id: str,
+    db:       AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """单场宴会宴后复盘：计划 vs 实际、任务完成率、评价得分"""
+    from src.models.banquet import (
+        BanquetOrder, BanquetProfitSnapshot, BanquetOrderReview,
+        ExecutionTask, TaskStatusEnum, OrderStatusEnum,
+    )
+
+    res = await db.execute(
+        select(BanquetOrder)
+        .where(BanquetOrder.id == order_id)
+        .where(BanquetOrder.store_id == store_id)
+    )
+    order = res.scalars().first()
+    if not order:
+        raise HTTPException(status_code=404, detail="order not found")
+
+    # profit snapshot
+    snap_res = await db.execute(
+        select(BanquetProfitSnapshot)
+        .where(BanquetProfitSnapshot.banquet_order_id == order_id)
+    )
+    snap = snap_res.scalars().first()
+
+    # tasks
+    task_res = await db.execute(
+        select(ExecutionTask).where(ExecutionTask.banquet_order_id == order_id)
+    )
+    tasks = task_res.scalars().all()
+    total_tasks = len(tasks)
+    done_tasks  = sum(1 for t in tasks if t.task_status == TaskStatusEnum.DONE)
+
+    # review
+    rev_res = await db.execute(
+        select(BanquetOrderReview)
+        .where(BanquetOrderReview.banquet_order_id == order_id)
+    )
+    review = rev_res.scalars().first()
+
+    total_fen  = order.total_amount_fen or 0
+    paid_fen   = order.paid_fen or 0
+    unpaid_fen = max(0, total_fen - paid_fen)
+
+    return {
+        "order_id":        order_id,
+        "store_id":        store_id,
+        "banquet_date":    str(order.banquet_date),
+        "banquet_type":    order.banquet_type.value if hasattr(order.banquet_type, "value") else str(order.banquet_type),
+        "order_status":    order.order_status.value if hasattr(order.order_status, "value") else str(order.order_status),
+        "planned_tables":  order.table_count,
+        "planned_people":  order.people_count,
+        "financials": {
+            "total_yuan":          round(total_fen / 100, 2),
+            "paid_yuan":           round(paid_fen / 100, 2),
+            "unpaid_yuan":         round(unpaid_fen / 100, 2),
+            "revenue_yuan":        round((snap.revenue_fen or 0) / 100, 2) if snap else None,
+            "gross_profit_yuan":   round((snap.gross_profit_fen or 0) / 100, 2) if snap else None,
+            "gross_margin_pct":    snap.gross_margin_pct if snap else None,
+            "ingredient_cost_yuan": round((snap.ingredient_cost_fen or 0) / 100, 2) if snap else None,
+            "labor_cost_yuan":     round((snap.labor_cost_fen or 0) / 100, 2) if snap else None,
+        },
+        "tasks": {
+            "total":       total_tasks,
+            "done":        done_tasks,
+            "completion_rate_pct": round(done_tasks / total_tasks * 100, 1) if total_tasks else None,
+        },
+        "review": {
+            "customer_rating": review.customer_rating if review else None,
+            "ai_score":        review.ai_score if review else None,
+            "ai_summary":      review.ai_summary if review else None,
+        } if review else None,
+    }
+
+
+# ── 3. 场次绩效排行 ─────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/event-performance-ranking")
+async def get_event_performance_ranking(
+    store_id:  str,
+    sort_by:   str = "margin",    # margin | rating
+    top_n:     int = 10,
+    btype:     str = "",
+    months:    int = 6,
+    db:        AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """场次绩效排行：按毛利率或评分 Top-N"""
+    from datetime import timedelta
+    from src.models.banquet import (
+        BanquetOrder, BanquetProfitSnapshot, BanquetOrderReview,
+        BanquetTypeEnum, OrderStatusEnum,
+    )
+
+    cutoff = date_type.today() - timedelta(days=months * 30)
+    q = (
+        select(
+            BanquetOrder,
+            BanquetProfitSnapshot.gross_margin_pct,
+            BanquetProfitSnapshot.gross_profit_fen,
+            BanquetOrderReview.customer_rating,
+        )
+        .outerjoin(BanquetProfitSnapshot, BanquetProfitSnapshot.banquet_order_id == BanquetOrder.id)
+        .outerjoin(BanquetOrderReview, BanquetOrderReview.banquet_order_id == BanquetOrder.id)
+        .where(BanquetOrder.store_id == store_id)
+        .where(BanquetOrder.order_status == OrderStatusEnum.COMPLETED)
+        .where(BanquetOrder.banquet_date >= cutoff)
+    )
+    if btype:
+        try:
+            q = q.where(BanquetOrder.banquet_type == BanquetTypeEnum(btype))
+        except ValueError:
+            pass
+
+    rows = (await db.execute(q)).all()
+
+    events = []
+    for order, margin_pct, profit_fen, rating in rows:
+        events.append({
+            "order_id":          order.id,
+            "banquet_date":      str(order.banquet_date),
+            "banquet_type":      order.banquet_type.value if hasattr(order.banquet_type, "value") else str(order.banquet_type),
+            "contact_name":      order.contact_name,
+            "total_yuan":        round((order.total_amount_fen or 0) / 100, 2),
+            "gross_margin_pct":  margin_pct,
+            "gross_profit_yuan": round((profit_fen or 0) / 100, 2),
+            "customer_rating":   rating,
+        })
+
+    if sort_by == "rating":
+        events.sort(key=lambda x: (x["customer_rating"] or 0), reverse=True)
+    else:
+        events.sort(key=lambda x: (x["gross_margin_pct"] or 0), reverse=True)
+
+    return {
+        "store_id": store_id,
+        "sort_by":  sort_by,
+        "months":   months,
+        "total":    len(events),
+        "ranking":  events[:top_n],
+    }
+
+
+# ── 4. 智能催款话术 ─────────────────────────────────────────────────────────
+
+@router.post("/stores/{store_id}/collections/generate-message")
+async def generate_collection_message(
+    store_id:  str,
+    order_id:  str = Body(..., embed=True),
+    db:        AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """针对逾期尾款订单生成催款话术，写入 ActionLog"""
+    from src.models.banquet import BanquetOrder, BanquetAgentActionLog, OrderStatusEnum
+
+    res = await db.execute(
+        select(BanquetOrder)
+        .where(BanquetOrder.id == order_id)
+        .where(BanquetOrder.store_id == store_id)
+    )
+    order = res.scalars().first()
+    if not order:
+        raise HTTPException(status_code=404, detail="order not found")
+
+    unpaid_fen = max(0, (order.total_amount_fen or 0) - (order.paid_fen or 0))
+    unpaid_yuan = round(unpaid_fen / 100, 2)
+    contact = order.contact_name or "尊敬的客户"
+    banquet_date_str = str(order.banquet_date) if order.banquet_date else "贵宴"
+    btype_label = {
+        "wedding": "婚宴", "birthday": "寿宴", "full_moon": "满月宴",
+        "corporate": "商务宴", "other": "宴会",
+    }.get(order.banquet_type.value if hasattr(order.banquet_type, "value") else str(order.banquet_type), "宴会")
+
+    message = (
+        f"您好，{contact}！感谢您选择我们为您的{btype_label}服务（{banquet_date_str}）。"
+        f"根据合同约定，您还有尾款 ¥{unpaid_yuan:,.2f} 待结清。"
+        f"请于近日安排付款，如有疑问请随时联系我们，期待与您保持良好合作！"
+    )
+
+    log = BanquetAgentActionLog(
+        id=str(__import__("uuid").uuid4()),
+        agent_type="collection",
+        related_object_type="banquet_order",
+        related_object_id=order_id,
+        action_type="collection_message",
+        action_result="generated",
+        suggestion_text=message,
+        is_human_approved=False,
+    )
+    db.add(log)
+    await db.commit()
+
+    return {
+        "order_id":    order_id,
+        "contact":     contact,
+        "unpaid_yuan": unpaid_yuan,
+        "message":     message,
+        "log_id":      log.id,
+    }
+
+
+# ── 5. 应收账款账龄分析 ─────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/payment-aging")
+async def get_payment_aging(
+    store_id: str,
+    db:       AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """应收账款账龄分析：0-7 / 8-30 / 31-60 / 60+ 天四段"""
+    from datetime import timedelta
+    from src.models.banquet import BanquetOrder, OrderStatusEnum, DepositStatusEnum
+
+    today = date_type.today()
+    res = await db.execute(
+        select(BanquetOrder)
+        .where(BanquetOrder.store_id == store_id)
+        .where(BanquetOrder.order_status.in_([OrderStatusEnum.CONFIRMED, OrderStatusEnum.COMPLETED]))
+        .where(BanquetOrder.banquet_date < today)  # 已过日期
+    )
+    orders = res.scalars().all()
+
+    buckets = {
+        "0_7":   {"label": "0-7天",  "count": 0, "amount_yuan": 0.0},
+        "8_30":  {"label": "8-30天", "count": 0, "amount_yuan": 0.0},
+        "31_60": {"label": "31-60天","count": 0, "amount_yuan": 0.0},
+        "60p":   {"label": "60天+",  "count": 0, "amount_yuan": 0.0},
+    }
+
+    total_overdue_yuan = 0.0
+    for o in orders:
+        unpaid_fen = max(0, (o.total_amount_fen or 0) - (o.paid_fen or 0))
+        if unpaid_fen <= 0:
+            continue
+        days_past = (today - o.banquet_date).days
+        unpaid_yuan = round(unpaid_fen / 100, 2)
+        total_overdue_yuan += unpaid_yuan
+        if days_past <= 7:
+            b = "0_7"
+        elif days_past <= 30:
+            b = "8_30"
+        elif days_past <= 60:
+            b = "31_60"
+        else:
+            b = "60p"
+        buckets[b]["count"]       += 1
+        buckets[b]["amount_yuan"] += unpaid_yuan
+
+    for bk in buckets.values():
+        bk["amount_yuan"] = round(bk["amount_yuan"], 2)
+
+    return {
+        "store_id":           store_id,
+        "total_overdue_yuan": round(total_overdue_yuan, 2),
+        "buckets":            list(buckets.values()),
+    }
+
+
+# ── 6. 季度经营摘要 ─────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/reports/quarterly-summary")
+async def get_quarterly_summary(
+    store_id: str,
+    year:     int = 0,
+    quarter:  int = 0,  # 1-4
+    db:       AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """季度经营摘要：KPI 一览"""
+    from datetime import timedelta
+    from src.models.banquet import (
+        BanquetOrder, BanquetProfitSnapshot, BanquetOrderReview,
+        BanquetContract, BanquetLead, OrderStatusEnum, LeadStageEnum,
+    )
+
+    today = date_type.today()
+    if year <= 0:
+        year = today.year
+    if quarter <= 0:
+        quarter = (today.month - 1) // 3 + 1
+
+    q_start_month = (quarter - 1) * 3 + 1
+    q_end_month   = q_start_month + 2
+
+    from datetime import date as _date
+    import calendar
+    _, last_day = calendar.monthrange(year, q_end_month)
+    period_start = _date(year, q_start_month, 1)
+    period_end   = _date(year, q_end_month, last_day)
+
+    # orders in quarter
+    res = await db.execute(
+        select(BanquetOrder)
+        .where(BanquetOrder.store_id == store_id)
+        .where(BanquetOrder.banquet_date >= period_start)
+        .where(BanquetOrder.banquet_date <= period_end)
+    )
+    orders = res.scalars().all()
+    order_ids = [o.id for o in orders]
+
+    total_orders    = len(orders)
+    confirmed_count = sum(1 for o in orders if o.order_status.value in ("confirmed", "completed") if hasattr(o.order_status, "value"))
+    total_rev_fen   = sum(o.total_amount_fen or 0 for o in orders)
+    total_paid_fen  = sum(o.paid_fen or 0 for o in orders)
+
+    # snapshots for completed orders
+    avg_margin = None
+    if order_ids:
+        snap_res = await db.execute(
+            select(func.avg(BanquetProfitSnapshot.gross_margin_pct))
+            .join(BanquetOrder, BanquetProfitSnapshot.banquet_order_id == BanquetOrder.id)
+            .where(BanquetOrder.store_id == store_id)
+            .where(BanquetOrder.banquet_date >= period_start)
+            .where(BanquetOrder.banquet_date <= period_end)
+        )
+        avg_margin = snap_res.scalar()
+
+    # reviews
+    avg_rating = None
+    if order_ids:
+        rev_res = await db.execute(
+            select(func.avg(BanquetOrderReview.customer_rating))
+            .where(BanquetOrderReview.banquet_order_id.in_(order_ids))
+        )
+        avg_rating = rev_res.scalar()
+
+    # unsigned contracts
+    unsigned_count = 0
+    if order_ids:
+        ct_res = await db.execute(
+            select(BanquetContract)
+            .where(BanquetContract.banquet_order_id.in_(order_ids))
+            .where(BanquetContract.contract_status != "signed")
+        )
+        unsigned_count = len(ct_res.scalars().all())
+
+    # leads created in quarter (by created_at proxy: banquet_date in range from leads)
+    lead_res = await db.execute(
+        select(func.count(BanquetLead.id))
+        .where(BanquetLead.store_id == store_id)
+        .where(BanquetLead.expected_date >= period_start)
+        .where(BanquetLead.expected_date <= period_end)
+    )
+    lead_count = lead_res.scalar() or 0
+
+    return {
+        "store_id":    store_id,
+        "year":        year,
+        "quarter":     quarter,
+        "period":      {"start": str(period_start), "end": str(period_end)},
+        "total_orders":          total_orders,
+        "confirmed_orders":      confirmed_count,
+        "total_revenue_yuan":    round(total_rev_fen / 100, 2),
+        "total_paid_yuan":       round(total_paid_fen / 100, 2),
+        "avg_gross_margin_pct":  round(avg_margin, 1) if avg_margin is not None else None,
+        "avg_customer_rating":   round(avg_rating, 2) if avg_rating is not None else None,
+        "unsigned_contracts":    unsigned_count,
+        "lead_count":            lead_count,
+    }
+
+
+# ── 7. 运营健康评分 ─────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/operations-health-score")
+async def get_operations_health_score(
+    store_id: str,
+    months:   int = 3,
+    db:       AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """运营健康评分（0-100）= 合同合规 20 + 收款及时 20 + 评价均分 20 + 利用率 20 + 转化率 20"""
+    from datetime import timedelta
+    from src.models.banquet import (
+        BanquetOrder, BanquetContract, BanquetOrderReview,
+        BanquetHallBooking, BanquetHall, BanquetLead,
+        OrderStatusEnum, DepositStatusEnum, LeadStageEnum,
+    )
+
+    cutoff = date_type.today() - timedelta(days=months * 30)
+
+    # ── Dim 1: 合同合规率 (有合同且已签 / 全部订单)
+    ord_res = await db.execute(
+        select(BanquetOrder)
+        .where(BanquetOrder.store_id == store_id)
+        .where(BanquetOrder.banquet_date >= cutoff)
+        .where(BanquetOrder.order_status.in_([OrderStatusEnum.CONFIRMED, OrderStatusEnum.COMPLETED]))
+    )
+    orders = ord_res.scalars().all()
+    total_ord = len(orders)
+    order_ids = [o.id for o in orders]
+
+    signed_ct = 0
+    if order_ids:
+        ct_res = await db.execute(
+            select(func.count(BanquetContract.id))
+            .where(BanquetContract.banquet_order_id.in_(order_ids))
+            .where(BanquetContract.contract_status == "signed")
+        )
+        signed_ct = ct_res.scalar() or 0
+
+    contract_score = round(signed_ct / total_ord * 20, 1) if total_ord > 0 else 0.0
+
+    # ── Dim 2: 收款及时率 (已完成且全额收款 / 已完成)
+    completed = [o for o in orders if o.order_status == OrderStatusEnum.COMPLETED]
+    paid_full  = sum(1 for o in completed if (o.paid_fen or 0) >= (o.total_amount_fen or 1))
+    payment_score = round(paid_full / len(completed) * 20, 1) if completed else 0.0
+
+    # ── Dim 3: 评价均分 (avg_rating / 5 * 20)
+    avg_rating = None
+    if order_ids:
+        rv_res = await db.execute(
+            select(func.avg(BanquetOrderReview.customer_rating))
+            .where(BanquetOrderReview.banquet_order_id.in_(order_ids))
+        )
+        avg_rating = rv_res.scalar()
+    review_score = round((avg_rating or 0) / 5 * 20, 1)
+
+    # ── Dim 4: 厅房利用率 (实际预订 / 理论总容量，上限100%)
+    hall_res = await db.execute(
+        select(BanquetHall).where(BanquetHall.store_id == store_id).where(BanquetHall.is_active == True)
+    )
+    halls = hall_res.scalars().all()
+    hall_count = len(halls)
+    slots_per_day = hall_count * 2  # lunch + dinner
+    total_days = months * 30
+    total_capacity = slots_per_day * total_days
+
+    bk_res = await db.execute(
+        select(func.count(BanquetHallBooking.id))
+        .where(BanquetHallBooking.hall_id.in_([h.id for h in halls]))
+        .where(BanquetHallBooking.slot_date >= cutoff)
+    )
+    booked_slots = bk_res.scalar() or 0
+    util_ratio = min(booked_slots / total_capacity, 1.0) if total_capacity > 0 else 0.0
+    util_score = round(util_ratio * 20, 1)
+
+    # ── Dim 5: 线索转化率 (WON leads / total leads)
+    lead_total_res = await db.execute(
+        select(func.count(BanquetLead.id)).where(BanquetLead.store_id == store_id)
+    )
+    lead_total = lead_total_res.scalar() or 0
+    lead_won_res = await db.execute(
+        select(func.count(BanquetLead.id))
+        .where(BanquetLead.store_id == store_id)
+        .where(BanquetLead.current_stage == LeadStageEnum.WON)
+    )
+    lead_won = lead_won_res.scalar() or 0
+    conv_rate = lead_won / lead_total if lead_total > 0 else 0.0
+    # 目标 30% 转化率为满分
+    conv_score = round(min(conv_rate / 0.30, 1.0) * 20, 1)
+
+    total_score = round(contract_score + payment_score + review_score + util_score + conv_score, 1)
+
+    return {
+        "store_id":    store_id,
+        "months":      months,
+        "total_score": total_score,
+        "grade":       "A" if total_score >= 80 else ("B" if total_score >= 60 else "C"),
+        "dimensions": [
+            {"name": "合同合规率", "score": contract_score, "max": 20,
+             "detail": f"{signed_ct}/{total_ord} 已签"},
+            {"name": "收款及时率", "score": payment_score, "max": 20,
+             "detail": f"{paid_full}/{len(completed)} 已结清"},
+            {"name": "客户评价",   "score": review_score,  "max": 20,
+             "detail": f"均分 {round(avg_rating, 1) if avg_rating else 'N/A'}"},
+            {"name": "厅房利用率", "score": util_score,    "max": 20,
+             "detail": f"{round(util_ratio * 100, 1)}%"},
+            {"name": "线索转化率", "score": conv_score,    "max": 20,
+             "detail": f"{lead_won}/{lead_total}"},
+        ],
+    }
+
+
+# ── 8. 月度基准折线数据 ──────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/monthly-benchmark")
+async def get_monthly_benchmark(
+    store_id: str,
+    months:   int = 12,
+    db:       AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """自身各月份连续数据（收入/毛利/场次），用于趋势折线图"""
+    from datetime import timedelta
+    from src.models.banquet import (
+        BanquetOrder, BanquetProfitSnapshot, OrderStatusEnum,
+    )
+
+    cutoff = date_type.today().replace(day=1)
+    # go back (months-1) full months
+    for _ in range(months - 1):
+        first = cutoff.replace(day=1)
+        cutoff = (first - timedelta(days=1)).replace(day=1)
+
+    q = (
+        select(
+            func.extract("year",  BanquetOrder.banquet_date).label("yr"),
+            func.extract("month", BanquetOrder.banquet_date).label("mo"),
+            func.count(BanquetOrder.id).label("cnt"),
+            func.sum(BanquetOrder.total_amount_fen).label("rev_fen"),
+            func.sum(BanquetProfitSnapshot.gross_profit_fen).label("profit_fen"),
+        )
+        .outerjoin(BanquetProfitSnapshot, BanquetProfitSnapshot.banquet_order_id == BanquetOrder.id)
+        .where(BanquetOrder.store_id == store_id)
+        .where(BanquetOrder.order_status.in_([OrderStatusEnum.CONFIRMED, OrderStatusEnum.COMPLETED]))
+        .where(BanquetOrder.banquet_date >= cutoff)
+        .group_by("yr", "mo")
+        .order_by("yr", "mo")
+    )
+    rows = (await db.execute(q)).all()
+
+    data = []
+    for r in rows:
+        data.append({
+            "year":              int(r.yr),
+            "month":             int(r.mo),
+            "label":             f"{int(r.yr)}-{int(r.mo):02d}",
+            "event_count":       r.cnt or 0,
+            "revenue_yuan":      round((r.rev_fen or 0) / 100, 2),
+            "gross_profit_yuan": round((r.profit_fen or 0) / 100, 2),
+        })
+
+    return {
+        "store_id": store_id,
+        "months":   months,
+        "data":     data,
+    }

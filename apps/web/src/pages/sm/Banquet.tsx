@@ -77,6 +77,13 @@ export default function SmBanquet() {
   const [outreachMsg,       setOutreachMsg]       = useState<string | null>(null);
   const [sendingOutreach,   setSendingOutreach]   = useState<string | null>(null);
 
+  // Phase 19: 催款话术
+  interface OverdueOrder { id: string; banquet_date: string; unpaid_yuan: number; contact_name: string | null; }
+  const [overdueOrders,    setOverdueOrders]    = useState<OverdueOrder[]>([]);
+  const [collectionModal,  setCollectionModal]  = useState(false);
+  const [collectionMsg,    setCollectionMsg]    = useState<string | null>(null);
+  const [sendingCollection, setSendingCollection] = useState<string | null>(null);
+
   const loadTodayCheck = useCallback(async () => {
     setLoadingToday(true);
     try {
@@ -119,6 +126,32 @@ export default function SmBanquet() {
     apiClient.get(`/api/v1/banquet-agent/stores/${STORE_ID}/customers/win-back-candidates`, { params: { months: 12 } })
       .then(r => setWinBackCandidates((r.data?.items ?? []).slice(0, 3)))
       .catch(() => {});
+    // Phase 19: 逾期账款
+    apiClient.get(`/api/v1/banquet-agent/stores/${STORE_ID}/analytics/payment-aging`)
+      .then(r => {
+        const buckets: Array<{ label: string; count: number; amount_yuan: number }> = r.data?.buckets ?? [];
+        const totalOverdue = buckets.reduce((s, b) => s + b.count, 0);
+        if (totalOverdue > 0) {
+          // Load overdue orders for selection
+          apiClient.get(`/api/v1/banquet-agent/stores/${STORE_ID}/orders`, { params: { status: 'confirmed,completed', page_size: 20 } })
+            .then(or => {
+              const orders = (or.data?.items ?? or.data ?? []) as Array<{ id: string; banquet_date: string; total_amount_fen: number; paid_fen: number; contact_name: string | null }>;
+              const overdue = orders
+                .filter(o => {
+                  const unpaid = (o.total_amount_fen || 0) - (o.paid_fen || 0);
+                  return unpaid > 0 && new Date(o.banquet_date) < new Date();
+                })
+                .map(o => ({
+                  id: o.id,
+                  banquet_date: o.banquet_date,
+                  unpaid_yuan: Math.round(((o.total_amount_fen || 0) - (o.paid_fen || 0)) / 100),
+                  contact_name: o.contact_name,
+                }));
+              setOverdueOrders(overdue);
+            }).catch(() => {});
+        }
+      })
+      .catch(() => {});
   }, [loadTodayCheck, loadLeads]);
 
   const tc = todayCheck;
@@ -137,8 +170,7 @@ export default function SmBanquet() {
     }
   };
 
-  const handleWinBack = async (cid: string) => {
-    setSendingOutreach(cid);
+  const handleWinBack = async (cid: string) => {    setSendingOutreach(cid);
     try {
       const r = await apiClient.post(
         `/api/v1/banquet-agent/stores/${STORE_ID}/customers/${cid}/win-back-message`,
@@ -148,6 +180,22 @@ export default function SmBanquet() {
       handleApiError(e, '生成赢回话术失败');
     } finally {
       setSendingOutreach(null);
+    }
+  };
+
+  const handleGenerateCollection = async (orderId: string) => {
+    setSendingCollection(orderId);
+    try {
+      const r = await apiClient.post(
+        `/api/v1/banquet-agent/stores/${STORE_ID}/collections/generate-message`,
+        { order_id: orderId },
+      );
+      setCollectionMsg(r.data?.message ?? '催款话术已生成');
+      setCollectionModal(false);
+    } catch (e) {
+      handleApiError(e, '生成催款话术失败');
+    } finally {
+      setSendingCollection(null);
     }
   };
 
@@ -332,6 +380,14 @@ export default function SmBanquet() {
             >
               推送通知
             </ZButton>
+            {overdueOrders.length > 0 && (
+              <ZButton
+                variant="ghost"
+                onClick={() => setCollectionModal(true)}
+              >
+                催款话术 <ZBadge type="warning" text={String(overdueOrders.length)} />
+              </ZButton>
+            )}
           </div>
         </ZCard>
       </div>
@@ -348,6 +404,53 @@ export default function SmBanquet() {
         }
       >
         <div className={styles.outreachMsgBody}>{outreachMsg}</div>
+      </ZModal>
+
+      {/* Phase 19: 催款话术 Modal */}
+      <ZModal
+        open={collectionModal}
+        title="选择逾期订单生成催款话术"
+        onClose={() => setCollectionModal(false)}
+        footer={
+          <div className={styles.modalFooter}>
+            <ZButton variant="ghost" onClick={() => setCollectionModal(false)}>取消</ZButton>
+          </div>
+        }
+      >
+        <div className={styles.collectionList}>
+          {overdueOrders.map(o => (
+            <div key={o.id} className={styles.collectionRow}>
+              <div className={styles.collectionInfo}>
+                <div className={styles.collectionDate}>{o.banquet_date}</div>
+                <div className={styles.collectionMeta}>
+                  {o.contact_name ?? '客户'} · 欠款 ¥{o.unpaid_yuan.toLocaleString()}
+                </div>
+              </div>
+              <ZButton
+                variant="ghost"
+                size="sm"
+                onClick={() => handleGenerateCollection(o.id)}
+                disabled={sendingCollection === o.id}
+              >
+                {sendingCollection === o.id ? '生成中…' : '生成话术'}
+              </ZButton>
+            </div>
+          ))}
+        </div>
+      </ZModal>
+
+      {/* 催款话术展示 Modal */}
+      <ZModal
+        open={!!collectionMsg}
+        title="催款话术"
+        onClose={() => setCollectionMsg(null)}
+        footer={
+          <div className={styles.modalFooter}>
+            <ZButton variant="primary" onClick={() => setCollectionMsg(null)}>关闭</ZButton>
+          </div>
+        }
+      >
+        <div className={styles.outreachMsgBody}>{collectionMsg}</div>
       </ZModal>
     </div>
   );

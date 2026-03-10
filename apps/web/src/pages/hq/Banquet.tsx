@@ -3378,6 +3378,317 @@ function ReviewsTab() {
   );
 }
 
+/* ─── Phase 19: 宴后复盘 Tab ─── */
+
+interface CostByType {
+  banquet_type: string;
+  event_count: number;
+  revenue_yuan: number;
+  ingredient_cost_yuan: number;
+  labor_cost_yuan: number;
+  material_cost_yuan: number;
+  other_cost_yuan: number;
+  total_cost_yuan: number;
+  gross_profit_yuan: number;
+  gross_margin_pct: number | null;
+}
+
+interface AgingBucket {
+  label: string;
+  count: number;
+  amount_yuan: number;
+}
+
+interface RankingRow {
+  order_id: string;
+  banquet_date: string;
+  banquet_type: string;
+  contact_name: string | null;
+  total_yuan: number;
+  gross_margin_pct: number | null;
+  gross_profit_yuan: number;
+  customer_rating: number | null;
+}
+
+function PostEventTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+  const [costData,  setCostData]  = useState<CostByType[]>([]);
+  const [aging,     setAging]     = useState<AgingBucket[]>([]);
+  const [ranking,   setRanking]   = useState<RankingRow[]>([]);
+  const [loading,   setLoading]   = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.allSettled([
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/cost-breakdown`),
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/payment-aging`),
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/event-performance-ranking`, { params: { sort_by: 'margin', top_n: 5 } }),
+    ]).then(([c, a, r]) => {
+      if (c.status === 'fulfilled') setCostData(c.value.data?.by_type ?? []);
+      if (a.status === 'fulfilled') setAging(a.value.data?.buckets ?? []);
+      if (r.status === 'fulfilled') setRanking(r.value.data?.ranking ?? []);
+    }).finally(() => setLoading(false));
+  }, [STORE]);
+
+  const AGING_COLORS: Record<string, string> = {
+    '0-7天': '#22c55e', '8-30天': '#f59e0b', '31-60天': '#f97316', '60天+': '#ef4444',
+  };
+
+  if (loading) return <ZSkeleton rows={6} />;
+
+  return (
+    <div className={styles.postEventTab}>
+      {/* 场次绩效排行 */}
+      <ZCard title="场次绩效排行（毛利率 Top-5）">
+        {ranking.length === 0 ? (
+          <ZEmpty title="暂无已完成场次数据" />
+        ) : (
+          <div className={styles.rankingList}>
+            {ranking.map((row, idx) => (
+              <div key={row.order_id} className={styles.rankingRow}>
+                <div className={styles.rankingIdx}>{idx + 1}</div>
+                <div className={styles.rankingBody}>
+                  <div className={styles.rankingTitle}>
+                    {row.banquet_type} · {row.banquet_date}
+                    {row.contact_name ? ` · ${row.contact_name}` : ''}
+                  </div>
+                  <div className={styles.rankingMeta}>
+                    总额 ¥{row.total_yuan.toLocaleString()}
+                    {row.customer_rating != null ? ` · ⭐ ${row.customer_rating}` : ''}
+                  </div>
+                </div>
+                <div className={styles.rankingMargin}>
+                  {row.gross_margin_pct != null ? `${row.gross_margin_pct}%` : '-'}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+
+      {/* 成本穿透 */}
+      <ZCard title="成本穿透（按宴会类型）">
+        {costData.length === 0 ? (
+          <ZEmpty title="暂无成本快照数据" />
+        ) : (
+          <div className={styles.costBreakdown}>
+            {costData.map(row => {
+              const maxCost = Math.max(...costData.map(r => r.total_cost_yuan), 1);
+              return (
+                <div key={row.banquet_type} className={styles.costRow}>
+                  <div className={styles.costType}>{row.banquet_type}</div>
+                  <div className={styles.costBars}>
+                    {[
+                      { label: '原料', val: row.ingredient_cost_yuan, color: '#3b82f6' },
+                      { label: '人工', val: row.labor_cost_yuan,      color: '#8b5cf6' },
+                      { label: '物料', val: row.material_cost_yuan,   color: '#06b6d4' },
+                      { label: '其他', val: row.other_cost_yuan,      color: '#94a3b8' },
+                    ].map(seg => (
+                      <div key={seg.label} className={styles.costSeg}>
+                        <div className={styles.costSegLabel}>{seg.label}</div>
+                        <div className={styles.costSegBar}>
+                          <div
+                            className={styles.costSegFill}
+                            style={{ width: `${Math.round(seg.val / maxCost * 100)}%`, background: seg.color }}
+                          />
+                        </div>
+                        <div className={styles.costSegVal}>¥{seg.val.toLocaleString()}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className={styles.costMargin}>
+                    毛利率 {row.gross_margin_pct != null ? `${row.gross_margin_pct}%` : '-'}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </ZCard>
+
+      {/* 账龄分析 */}
+      <ZCard title="应收账款账龄">
+        {aging.length === 0 ? (
+          <ZEmpty title="暂无逾期应收款" />
+        ) : (
+          <div className={styles.agingGrid}>
+            {aging.map(bk => (
+              <div
+                key={bk.label}
+                className={styles.agingBucket}
+                style={{ borderLeft: `4px solid ${AGING_COLORS[bk.label] ?? '#94a3b8'}` }}
+              >
+                <div className={styles.agingLabel} style={{ color: AGING_COLORS[bk.label] }}>{bk.label}</div>
+                <div className={styles.agingAmount}>¥{bk.amount_yuan.toLocaleString()}</div>
+                <div className={styles.agingCount}>{bk.count} 单</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+/* ─── Phase 19: 运营健康 Tab ─── */
+
+interface HealthDimension {
+  name: string;
+  score: number;
+  max: number;
+  detail: string;
+}
+
+interface HealthScore {
+  total_score: number;
+  grade: string;
+  dimensions: HealthDimension[];
+}
+
+interface BenchmarkRow {
+  label: string;
+  year: number;
+  month: number;
+  event_count: number;
+  revenue_yuan: number;
+  gross_profit_yuan: number;
+}
+
+interface QuarterlySummary {
+  year: number;
+  quarter: number;
+  period: { start: string; end: string };
+  total_orders: number;
+  confirmed_orders: number;
+  total_revenue_yuan: number;
+  total_paid_yuan: number;
+  avg_gross_margin_pct: number | null;
+  avg_customer_rating: number | null;
+  unsigned_contracts: number;
+  lead_count: number;
+}
+
+function HealthScoreTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+  const [health,    setHealth]    = useState<HealthScore | null>(null);
+  const [benchmark, setBenchmark] = useState<BenchmarkRow[]>([]);
+  const [quarterly, setQuarterly] = useState<QuarterlySummary | null>(null);
+  const [loading,   setLoading]   = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.allSettled([
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/operations-health-score`),
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/monthly-benchmark`, { params: { months: 12 } }),
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/reports/quarterly-summary`),
+    ]).then(([h, b, q]) => {
+      if (h.status === 'fulfilled') setHealth(h.value.data);
+      if (b.status === 'fulfilled') setBenchmark(b.value.data?.data ?? []);
+      if (q.status === 'fulfilled') setQuarterly(q.value.data);
+    }).finally(() => setLoading(false));
+  }, [STORE]);
+
+  if (loading) return <ZSkeleton rows={6} />;
+
+  const scoreColor = (s: number) => s >= 80 ? '#22c55e' : s >= 60 ? '#f59e0b' : '#ef4444';
+  const maxRevenue = Math.max(...benchmark.map(r => r.revenue_yuan), 1);
+
+  return (
+    <div className={styles.healthTab}>
+      {/* 总分仪表 */}
+      {health && (
+        <ZCard title="运营健康评分">
+          <div className={styles.healthScoreRow}>
+            <div
+              className={styles.healthScoreBig}
+              style={{ color: scoreColor(health.total_score) }}
+            >
+              {health.total_score}
+            </div>
+            <div className={styles.healthGrade} style={{ color: scoreColor(health.total_score) }}>
+              {health.grade} 级
+            </div>
+          </div>
+          <div className={styles.healthDims}>
+            {health.dimensions.map(dim => (
+              <div key={dim.name} className={styles.healthDimRow}>
+                <div className={styles.healthDimName}>{dim.name}</div>
+                <div className={styles.healthDimBar}>
+                  <div
+                    className={styles.healthDimFill}
+                    style={{
+                      width: `${Math.round(dim.score / dim.max * 100)}%`,
+                      background: scoreColor(dim.score / dim.max * 100),
+                    }}
+                  />
+                </div>
+                <div className={styles.healthDimScore}>{dim.score}/{dim.max}</div>
+                <div className={styles.healthDimDetail}>{dim.detail}</div>
+              </div>
+            ))}
+          </div>
+        </ZCard>
+      )}
+
+      {/* 季度摘要 */}
+      {quarterly && (
+        <ZCard title={`Q${quarterly.quarter} ${quarterly.year} 季度摘要`}>
+          <div className={styles.qSummaryGrid}>
+            <div className={styles.qSummaryItem}>
+              <div className={styles.qSummaryVal}>{quarterly.total_orders}</div>
+              <div className={styles.qSummaryLabel}>总场次</div>
+            </div>
+            <div className={styles.qSummaryItem}>
+              <div className={styles.qSummaryVal}>¥{quarterly.total_revenue_yuan.toLocaleString()}</div>
+              <div className={styles.qSummaryLabel}>总收入</div>
+            </div>
+            <div className={styles.qSummaryItem}>
+              <div className={styles.qSummaryVal}>
+                {quarterly.avg_gross_margin_pct != null ? `${quarterly.avg_gross_margin_pct}%` : '-'}
+              </div>
+              <div className={styles.qSummaryLabel}>平均毛利率</div>
+            </div>
+            <div className={styles.qSummaryItem}>
+              <div className={styles.qSummaryVal}>
+                {quarterly.avg_customer_rating != null ? quarterly.avg_customer_rating.toFixed(1) : '-'}
+              </div>
+              <div className={styles.qSummaryLabel}>评价均分</div>
+            </div>
+            <div className={styles.qSummaryItem}>
+              <div className={styles.qSummaryVal}>{quarterly.unsigned_contracts}</div>
+              <div className={styles.qSummaryLabel}>未签合同</div>
+            </div>
+            <div className={styles.qSummaryItem}>
+              <div className={styles.qSummaryVal}>{quarterly.lead_count}</div>
+              <div className={styles.qSummaryLabel}>线索数</div>
+            </div>
+          </div>
+        </ZCard>
+      )}
+
+      {/* 月度基准折线（简易条形替代，避免引入额外 ECharts 实例） */}
+      <ZCard title="12个月收入趋势">
+        {benchmark.length === 0 ? (
+          <ZEmpty title="暂无历史数据" />
+        ) : (
+          <div className={styles.benchmarkChart}>
+            {benchmark.map(row => (
+              <div key={row.label} className={styles.benchmarkItem}>
+                <div
+                  className={styles.benchmarkBar}
+                  style={{ height: `${Math.round(row.revenue_yuan / maxRevenue * 80)}px` }}
+                  title={`¥${row.revenue_yuan.toLocaleString()}`}
+                />
+                <div className={styles.benchmarkLabel}>{`${row.month}月`}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
 /* ─── Phase 17: 运营简报 Tab ─── */
 function DailyBriefTab() {
   const STORE = localStorage.getItem('store_id') || 'S001';
@@ -3502,6 +3813,8 @@ export default function HQBanquet() {
           { key: 'dailybrief',   label: '运营简报',  children: <DailyBriefTab /> },
           { key: 'contract',     label: '合同履约',  children: <ContractTab /> },
           { key: 'reviews',      label: '客户评价',  children: <ReviewsTab /> },
+          { key: 'postevent',    label: '宴后复盘',  children: <PostEventTab /> },
+          { key: 'healthscore',  label: '运营健康',  children: <HealthScoreTab /> },
         ]}
       />
     </div>
