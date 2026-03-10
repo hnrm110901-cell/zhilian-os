@@ -1381,3 +1381,48 @@
 .benchmarkItem      { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 32px; }
 .benchmarkBar       { width: 22px; background: var(--accent, #FF6B2C); border-radius: 3px 3px 0 0; min-height: 2px; }
 .benchmarkLabel     { font-size: 10px; color: #94a3b8; white-space: nowrap; }
+
+/* ── Phase 21: 客户洞察 & 获客漏斗 ── */
+.customerInsightTab { display: flex; flex-direction: column; gap: 16px; }
+.segmentGrid        { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
+.segmentCard        { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; text-align: center; }
+.segmentLabel       { font-size: 12px; font-weight: 600; color: #374151; margin-bottom: 6px; }
+.segmentCount       { font-size: 20px; font-weight: 700; color: #111827; }
+.segmentMeta        { font-size: 11px; color: #6b7280; margin-top: 2px; }
+
+.vipList            { display: flex; flex-direction: column; gap: 8px; }
+.vipRow             { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f3f4f6; }
+.vipRank            { font-size: 12px; font-weight: 700; color: #f59e0b; width: 28px; flex-shrink: 0; }
+.vipInfo            { flex: 1; min-width: 0; }
+.vipName            { font-size: 13px; font-weight: 600; color: #111827; }
+.vipMeta            { font-size: 11px; color: #6b7280; margin-top: 2px; }
+.vipAmt             { font-size: 13px; font-weight: 600; color: #16a34a; flex-shrink: 0; }
+
+.churnList          { display: flex; flex-direction: column; gap: 8px; }
+.churnRow           { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f3f4f6; }
+.churnInfo          { flex: 1; min-width: 0; }
+.churnName          { font-size: 13px; font-weight: 600; color: #111827; }
+.churnMeta          { font-size: 11px; color: #6b7280; margin-top: 2px; }
+.churnRight         { flex-shrink: 0; }
+
+/* 获客漏斗 Tab */
+.funnelAnalyticsTab { display: flex; flex-direction: column; gap: 16px; }
+.funnelStages       { display: flex; flex-direction: column; gap: 6px; }
+.funnelRow          { display: grid; grid-template-columns: 80px 1fr 40px 50px; align-items: center; gap: 8px; }
+.funnelLabel        { font-size: 12px; color: #374151; }
+.funnelBar          { background: #f3f4f6; border-radius: 3px; height: 14px; overflow: hidden; }
+.funnelFill         { height: 100%; background: var(--accent, #FF6B2C); border-radius: 3px; transition: width .3s; }
+.funnelCount        { font-size: 12px; font-weight: 600; color: #111827; text-align: right; }
+.funnelConv         { font-size: 11px; color: #16a34a; text-align: right; }
+
+.gapList            { display: flex; flex-direction: column; gap: 6px; }
+.gapRow             { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid #f9fafb; }
+.gapDate            { font-size: 12px; color: #374151; width: 80px; flex-shrink: 0; }
+.gapUtil            { font-size: 12px; color: #6b7280; flex: 1; }
+
+.upsellList         { display: flex; flex-direction: column; gap: 8px; }
+.upsellRow          { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f3f4f6; }
+.upsellInfo         { flex: 1; min-width: 0; }
+.upsellDate         { font-size: 13px; font-weight: 500; color: #111827; }
+.upsellMeta         { font-size: 11px; color: #6b7280; margin-top: 2px; }
+.upsellAmt          { font-size: 13px; font-weight: 700; color: #16a34a; flex-shrink: 0; padding-left: 8px; }

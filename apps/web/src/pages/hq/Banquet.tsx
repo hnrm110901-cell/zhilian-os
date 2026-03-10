@@ -3815,8 +3815,261 @@ export default function HQBanquet() {
           { key: 'reviews',      label: '客户评价',  children: <ReviewsTab /> },
           { key: 'postevent',    label: '宴后复盘',  children: <PostEventTab /> },
           { key: 'healthscore',  label: '运营健康',  children: <HealthScoreTab /> },
+          { key: 'custinsight',  label: '客户洞察',  children: <CustomerInsightTab /> },
+          { key: 'funnel',       label: '获客漏斗',  children: <FunnelAnalyticsTab /> },
         ]}
       />
+    </div>
+  );
+}
+
+/* ─── Phase 21: 客户洞察 Tab ─── */
+function CustomerInsightTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+
+  interface SegmentItem {
+    segment: string;
+    label: string;
+    color: string;
+    customer_count: number;
+    total_yuan: number;
+    avg_yuan: number;
+  }
+  interface VipItem {
+    rank: number;
+    customer_id: string;
+    name: string;
+    phone: string | null;
+    banquet_count: number;
+    total_yuan: number;
+    last_banquet: string | null;
+    vip_level: number;
+  }
+  interface ChurnItem {
+    customer_id: string;
+    name: string;
+    phone: string | null;
+    banquet_count: number;
+    total_yuan: number;
+    last_banquet: string | null;
+    months_inactive: number | null;
+    risk_level: string;
+  }
+
+  const [segments,  setSegments]  = useState<SegmentItem[]>([]);
+  const [vips,      setVips]      = useState<VipItem[]>([]);
+  const [churns,    setChurns]    = useState<ChurnItem[]>([]);
+  const [loading,   setLoading]   = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.allSettled([
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/customers/segmentation`),
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/customers/vip-ranking`, { params: { top_n: 10 } }),
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/churn-risk`, { params: { months_inactive: 12, min_banquets: 2, top_n: 10 } }),
+    ]).then(([seg, vip, churn]) => {
+      if (seg.status === 'fulfilled') setSegments(seg.value.data?.segments ?? []);
+      if (vip.status === 'fulfilled') setVips(vip.value.data?.ranking ?? []);
+      if (churn.status === 'fulfilled') setChurns(churn.value.data?.items ?? []);
+    }).finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <ZSkeleton rows={6} />;
+
+  return (
+    <div className={styles.customerInsightTab}>
+      {/* 客户分层 */}
+      <ZCard title="客户分层">
+        {segments.length === 0 ? (
+          <ZEmpty title="暂无客户数据" description="确认客户档案已录入" />
+        ) : (
+          <div className={styles.segmentGrid}>
+            {segments.map(s => (
+              <div key={s.segment} className={styles.segmentCard} style={{ borderTop: `3px solid ${s.color}` }}>
+                <div className={styles.segmentLabel}>{s.label}</div>
+                <div className={styles.segmentCount}>{s.customer_count} 人</div>
+                <div className={styles.segmentMeta}>
+                  合计 ¥{s.total_yuan.toLocaleString()}
+                </div>
+                <div className={styles.segmentMeta}>
+                  均消 ¥{s.avg_yuan.toLocaleString()}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+
+      {/* VIP 排行 */}
+      <ZCard title="VIP 客户 Top10">
+        {vips.length === 0 ? (
+          <ZEmpty title="暂无VIP客户" description="累计消费≥5000元后自动进入VIP" />
+        ) : (
+          <div className={styles.vipList}>
+            {vips.map(v => (
+              <div key={v.customer_id} className={styles.vipRow}>
+                <span className={styles.vipRank}>#{v.rank}</span>
+                <div className={styles.vipInfo}>
+                  <div className={styles.vipName}>{v.name}</div>
+                  <div className={styles.vipMeta}>
+                    {v.banquet_count} 场 · 上次：{v.last_banquet ?? '未知'}
+                  </div>
+                </div>
+                <div className={styles.vipAmt}>¥{v.total_yuan.toLocaleString()}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+
+      {/* 流失风险 */}
+      <ZCard title="流失风险客户">
+        {churns.length === 0 ? (
+          <ZEmpty title="暂无流失风险" description="所有高频客户均在活跃期" />
+        ) : (
+          <div className={styles.churnList}>
+            {churns.map(c => (
+              <div key={c.customer_id} className={styles.churnRow}>
+                <div className={styles.churnInfo}>
+                  <div className={styles.churnName}>{c.name}</div>
+                  <div className={styles.churnMeta}>
+                    {c.banquet_count} 场 · 历史 ¥{c.total_yuan.toLocaleString()}
+                  </div>
+                </div>
+                <div className={styles.churnRight}>
+                  <ZBadge
+                    type={c.risk_level === 'high' ? 'warning' : 'default'}
+                    text={`${c.months_inactive ?? '?'} 月未复购`}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+    </div>
+  );
+}
+
+/* ─── Phase 21: 获客漏斗 Tab ─── */
+function FunnelAnalyticsTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+
+  interface FunnelStage {
+    stage: string;
+    label: string;
+    count: number;
+    conversion_rate_pct: number | null;
+  }
+  interface CapGap {
+    date: string;
+    weekday: number;
+    booked_slots: number;
+    capacity: number;
+    utilization_pct: number;
+    suggested_discount_pct: number;
+  }
+  interface UpsellOpp {
+    order_id: string;
+    banquet_date: string;
+    contact_name: string | null;
+    table_count: number;
+    current_yuan: number;
+    price_per_table_yuan: number;
+    median_price_yuan: number;
+    upsell_yuan: number;
+  }
+
+  const [stages,   setStages]   = useState<FunnelStage[]>([]);
+  const [funnel,   setFunnel]   = useState<{ total_leads: number; overall_win_rate: number } | null>(null);
+  const [gaps,     setGaps]     = useState<CapGap[]>([]);
+  const [upsells,  setUpsells]  = useState<UpsellOpp[]>([]);
+  const [loading,  setLoading]  = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.allSettled([
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/acquisition-funnel`),
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/capacity-gaps`, { params: { days: 30, threshold_pct: 30 } }),
+      apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/upsell-opportunities`, { params: { top_n: 10 } }),
+    ]).then(([fn, cg, us]) => {
+      if (fn.status === 'fulfilled') {
+        setStages(fn.value.data?.stages ?? []);
+        setFunnel({ total_leads: fn.value.data?.total_leads ?? 0, overall_win_rate: fn.value.data?.overall_win_rate ?? 0 });
+      }
+      if (cg.status === 'fulfilled') setGaps(cg.value.data?.gaps ?? []);
+      if (us.status === 'fulfilled') setUpsells(us.value.data?.opportunities ?? []);
+    }).finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <ZSkeleton rows={6} />;
+
+  const maxStageCount = Math.max(...stages.map(s => s.count), 1);
+
+  return (
+    <div className={styles.funnelAnalyticsTab}>
+      {/* 获客漏斗 */}
+      <ZCard title={`获客漏斗 · 总线索 ${funnel?.total_leads ?? 0} 条 · 成交率 ${funnel?.overall_win_rate ?? 0}%`}>
+        {stages.length === 0 ? (
+          <ZEmpty title="暂无线索数据" description="录入线索后自动生成漏斗" />
+        ) : (
+          <div className={styles.funnelStages}>
+            {stages.map((s, i) => (
+              <div key={s.stage} className={styles.funnelRow}>
+                <div className={styles.funnelLabel}>{s.label}</div>
+                <div className={styles.funnelBar}>
+                  <div
+                    className={styles.funnelFill}
+                    style={{ width: `${Math.round(s.count / maxStageCount * 100)}%` }}
+                  />
+                </div>
+                <div className={styles.funnelCount}>{s.count}</div>
+                {i > 0 && s.conversion_rate_pct != null && (
+                  <div className={styles.funnelConv}>{s.conversion_rate_pct}%</div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+
+      {/* 档期空缺 */}
+      <ZCard title={`档期空缺（未来30天）· ${gaps.length} 个空缺档期`}>
+        {gaps.length === 0 ? (
+          <ZEmpty title="近30天档期充足" description="利用率均高于30%" />
+        ) : (
+          <div className={styles.gapList}>
+            {gaps.slice(0, 10).map(g => (
+              <div key={g.date} className={styles.gapRow}>
+                <div className={styles.gapDate}>{g.date}</div>
+                <div className={styles.gapUtil}>{g.utilization_pct}% 利用</div>
+                <ZBadge type="info" text={`建议折扣 ${g.suggested_discount_pct}%`} />
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
+
+      {/* 追加销售机会 */}
+      <ZCard title="追加销售机会 Top10">
+        {upsells.length === 0 ? (
+          <ZEmpty title="暂无追加销售机会" description="已确认订单套餐价格均高于中位价" />
+        ) : (
+          <div className={styles.upsellList}>
+            {upsells.map(u => (
+              <div key={u.order_id} className={styles.upsellRow}>
+                <div className={styles.upsellInfo}>
+                  <div className={styles.upsellDate}>{u.banquet_date} · {u.contact_name ?? '客户'}</div>
+                  <div className={styles.upsellMeta}>
+                    {u.table_count} 桌 · 现均 ¥{u.price_per_table_yuan}/桌 → 中位 ¥{u.median_price_yuan}/桌
+                  </div>
+                </div>
+                <div className={styles.upsellAmt}>+¥{u.upsell_yuan.toLocaleString()}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </ZCard>
     </div>
   );
 }

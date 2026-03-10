@@ -8115,3 +8115,501 @@ async def assign_staff_to_order(
         "owner_role":    owner_role,
         "tasks_updated": updated,
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Phase 21 — 客户洞察 · 档期空缺 · 获客漏斗
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── 1. 客户分层 ─────────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/customers/segmentation")
+async def get_customer_segmentation(
+    store_id:    str,
+    db:          AsyncSession = Depends(get_db),
+    _:           User = Depends(get_current_user),
+):
+    """客户分层：按累计消费分 VIP / 高价值 / 普通 / 休眠四层"""
+    from src.models.banquet import BanquetCustomer
+
+    res = await db.execute(
+        select(BanquetCustomer).where(BanquetCustomer.store_id == store_id)
+    )
+    customers = res.scalars().all()
+
+    # 按总消费金额分层阈值（分）
+    VIP_THRESHOLD    = 500_000   # ≥ 5000 元
+    HIGH_THRESHOLD   = 200_000   # ≥ 2000 元
+    NORMAL_THRESHOLD = 1         # > 0
+
+    layers = {
+        "vip":      {"label": "VIP",  "color": "#f59e0b", "customers": []},
+        "high":     {"label": "高价值","color": "#22c55e", "customers": []},
+        "normal":   {"label": "普通",  "color": "#3b82f6", "customers": []},
+        "dormant":  {"label": "休眠",  "color": "#94a3b8", "customers": []},
+    }
+
+    for c in customers:
+        amt = c.total_banquet_amount_fen or 0
+        cnt = c.total_banquet_count or 0
+        row = {
+            "customer_id":  c.id,
+            "name":         c.name,
+            "total_yuan":   round(amt / 100, 2),
+            "banquet_count": cnt,
+        }
+        if amt >= VIP_THRESHOLD:
+            layers["vip"]["customers"].append(row)
+        elif amt >= HIGH_THRESHOLD:
+            layers["high"]["customers"].append(row)
+        elif amt >= NORMAL_THRESHOLD:
+            layers["normal"]["customers"].append(row)
+        else:
+            layers["dormant"]["customers"].append(row)
+
+    result = []
+    for key, layer in layers.items():
+        cust_list = layer["customers"]
+        total_amt = sum(c["total_yuan"] for c in cust_list)
+        result.append({
+            "segment":       key,
+            "label":         layer["label"],
+            "color":         layer["color"],
+            "customer_count": len(cust_list),
+            "total_yuan":    round(total_amt, 2),
+            "avg_yuan":      round(total_amt / len(cust_list), 2) if cust_list else 0.0,
+        })
+
+    total_customers = len(customers)
+    return {
+        "store_id":       store_id,
+        "total_customers": total_customers,
+        "segments":       result,
+    }
+
+
+# ── 2. VIP 客户排行 ─────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/customers/vip-ranking")
+async def get_vip_ranking(
+    store_id:  str,
+    top_n:     int = 20,
+    db:        AsyncSession = Depends(get_db),
+    _:         User = Depends(get_current_user),
+):
+    """VIP 客户排行 Top-N：历史总消费 + 场次 + 最近消费日期"""
+    from src.models.banquet import BanquetCustomer, BanquetOrder, OrderStatusEnum
+
+    q = (
+        select(
+            BanquetCustomer,
+            func.max(BanquetOrder.banquet_date).label("last_date"),
+        )
+        .outerjoin(BanquetOrder, BanquetOrder.customer_id == BanquetCustomer.id)
+        .where(BanquetCustomer.store_id == store_id)
+        .where(BanquetCustomer.total_banquet_amount_fen > 0)
+        .group_by(BanquetCustomer.id)
+        .order_by(BanquetCustomer.total_banquet_amount_fen.desc())
+        .limit(top_n)
+    )
+    rows = (await db.execute(q)).all()
+
+    ranking = []
+    for idx, (customer, last_date) in enumerate(rows, 1):
+        ranking.append({
+            "rank":           idx,
+            "customer_id":    customer.id,
+            "name":           customer.name,
+            "phone":          customer.phone,
+            "banquet_count":  customer.total_banquet_count or 0,
+            "total_yuan":     round((customer.total_banquet_amount_fen or 0) / 100, 2),
+            "last_banquet":   str(last_date) if last_date else None,
+            "vip_level":      customer.vip_level or 0,
+            "tags":           customer.tags or [],
+        })
+
+    return {
+        "store_id": store_id,
+        "total":    len(ranking),
+        "ranking":  ranking,
+    }
+
+
+# ── 3. 档期空缺分析 ─────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/capacity-gaps")
+async def get_capacity_gaps(
+    store_id:         str,
+    days:             int = 30,
+    threshold_pct:    float = 30.0,   # 利用率低于此值认为空缺
+    db:               AsyncSession = Depends(get_db),
+    _:                User = Depends(get_current_user),
+):
+    """未来 N 天档期空缺分析，附建议折扣幅度"""
+    from datetime import timedelta
+    from src.models.banquet import BanquetHall, BanquetHallBooking
+
+    today = date_type.today()
+    hall_res = await db.execute(
+        select(BanquetHall)
+        .where(BanquetHall.store_id == store_id)
+        .where(BanquetHall.is_active == True)
+    )
+    halls = hall_res.scalars().all()
+    hall_count = len(halls)
+    if hall_count == 0:
+        return {"store_id": store_id, "gaps": [], "summary": {"gap_days": 0, "gap_rate_pct": 0.0}}
+
+    hall_ids = [h.id for h in halls]
+    slots_per_day = hall_count * 2   # lunch + dinner
+
+    bk_res = await db.execute(
+        select(BanquetHallBooking.slot_date, func.count(BanquetHallBooking.id).label("cnt"))
+        .where(BanquetHallBooking.hall_id.in_(hall_ids))
+        .where(BanquetHallBooking.slot_date >= today)
+        .where(BanquetHallBooking.slot_date < today + timedelta(days=days))
+        .group_by(BanquetHallBooking.slot_date)
+    )
+    booked_by_date: dict = {str(r.slot_date): r.cnt for r in bk_res.all()}
+
+    gaps = []
+    for i in range(days):
+        d = today + timedelta(days=i)
+        d_str = str(d)
+        booked = booked_by_date.get(d_str, 0)
+        util_pct = round(booked / slots_per_day * 100, 1)
+        if util_pct < threshold_pct:
+            gap_pct = threshold_pct - util_pct
+            # 建议折扣：空缺越大，折扣越高（最高 20%）
+            suggested_discount = min(round(gap_pct / threshold_pct * 20, 0), 20)
+            gaps.append({
+                "date":               d_str,
+                "weekday":            d.weekday(),
+                "booked_slots":       booked,
+                "capacity":           slots_per_day,
+                "utilization_pct":    util_pct,
+                "suggested_discount_pct": int(suggested_discount),
+            })
+
+    return {
+        "store_id":       store_id,
+        "days":           days,
+        "threshold_pct":  threshold_pct,
+        "gaps":           gaps,
+        "summary": {
+            "gap_days":      len(gaps),
+            "gap_rate_pct":  round(len(gaps) / days * 100, 1),
+        },
+    }
+
+
+# ── 4. 节假日规划 ────────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/holiday-planning")
+async def get_holiday_planning(
+    store_id: str,
+    months:   int = 6,
+    db:       AsyncSession = Depends(get_db),
+    _:        User = Depends(get_current_user),
+):
+    """节假日/吉日规划：历史 KPI 峰值日期 + 建议溢价"""
+    from datetime import timedelta
+    from src.models.banquet import BanquetKpiDaily
+
+    cutoff = date_type.today() - timedelta(days=365 * 2)
+    res = await db.execute(
+        select(BanquetKpiDaily)
+        .where(BanquetKpiDaily.store_id == store_id)
+        .where(BanquetKpiDaily.stat_date >= cutoff)
+        .order_by(BanquetKpiDaily.revenue_fen.desc())
+    )
+    kpis = res.scalars().all()
+
+    if not kpis:
+        return {"store_id": store_id, "golden_days": [], "avg_revenue_yuan": 0.0}
+
+    revenues = [k.revenue_fen for k in kpis]
+    avg_rev   = sum(revenues) / len(revenues)
+    p75_rev   = sorted(revenues)[int(len(revenues) * 0.75)]
+
+    golden = []
+    for k in kpis:
+        if k.revenue_fen >= p75_rev and k.order_count > 0:
+            premium_pct = round((k.revenue_fen / avg_rev - 1) * 100, 1) if avg_rev > 0 else 0.0
+            golden.append({
+                "date":             str(k.stat_date),
+                "weekday":          k.stat_date.weekday(),
+                "order_count":      k.order_count,
+                "revenue_yuan":     round(k.revenue_fen / 100, 2),
+                "vs_avg_pct":       premium_pct,
+                "suggested_premium_pct": max(0.0, round(premium_pct * 0.5, 1)),
+            })
+
+    golden.sort(key=lambda x: x["revenue_yuan"], reverse=True)
+    return {
+        "store_id":         store_id,
+        "avg_revenue_yuan": round(avg_rev / 100, 2),
+        "golden_days":      golden[:30],
+    }
+
+
+# ── 5. 获客漏斗 ──────────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/acquisition-funnel")
+async def get_acquisition_funnel(
+    store_id: str,
+    months:   int = 6,
+    db:       AsyncSession = Depends(get_db),
+    _:        User = Depends(get_current_user),
+):
+    """获客漏斗：线索各阶段数量 + 阶段间转化率"""
+    from datetime import timedelta
+    from src.models.banquet import BanquetLead, LeadStageEnum
+
+    cutoff = date_type.today() - timedelta(days=months * 30)
+    res = await db.execute(
+        select(
+            BanquetLead.current_stage,
+            func.count(BanquetLead.id).label("cnt"),
+        )
+        .where(BanquetLead.store_id == store_id)
+        .group_by(BanquetLead.current_stage)
+    )
+    stage_counts: dict = {r.current_stage: r.cnt for r in res.all()}
+
+    FUNNEL_STAGES = [
+        LeadStageEnum.NEW,
+        LeadStageEnum.CONTACTED,
+        LeadStageEnum.VISIT_SCHEDULED,
+        LeadStageEnum.QUOTED,
+        LeadStageEnum.WAITING_DECISION,
+        LeadStageEnum.DEPOSIT_PENDING,
+        LeadStageEnum.WON,
+    ]
+    STAGE_LABELS = {
+        "new":              "新线索",
+        "contacted":        "已联系",
+        "visit_scheduled":  "预约看厅",
+        "quoted":           "已报价",
+        "waiting_decision": "等待决策",
+        "deposit_pending":  "待付定金",
+        "won":              "成交",
+        "lost":             "流失",
+    }
+
+    stages_data = []
+    prev_count = None
+    for stage in FUNNEL_STAGES:
+        cnt = stage_counts.get(stage, 0)
+        conv = None
+        if prev_count is not None and prev_count > 0:
+            conv = round(cnt / prev_count * 100, 1)
+        stages_data.append({
+            "stage":               stage.value if hasattr(stage, "value") else str(stage),
+            "label":               STAGE_LABELS.get(stage.value if hasattr(stage, "value") else str(stage), str(stage)),
+            "count":               cnt,
+            "conversion_rate_pct": conv,
+        })
+        prev_count = cnt
+
+    lost_count = stage_counts.get(LeadStageEnum.LOST, 0)
+    total_leads = sum(stage_counts.values())
+    won_count = stage_counts.get(LeadStageEnum.WON, 0)
+
+    return {
+        "store_id":          store_id,
+        "months":            months,
+        "total_leads":       total_leads,
+        "won_leads":         won_count,
+        "lost_leads":        lost_count,
+        "overall_win_rate":  round(won_count / total_leads * 100, 1) if total_leads > 0 else 0.0,
+        "stages":            stages_data,
+    }
+
+
+# ── 6. 流失风险客户 ─────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/churn-risk")
+async def get_churn_risk(
+    store_id:         str,
+    months_inactive:  int = 12,   # 超过多少个月未消费
+    min_banquets:     int = 2,    # 最少历史场次
+    top_n:            int = 20,
+    db:               AsyncSession = Depends(get_db),
+    _:                User = Depends(get_current_user),
+):
+    """流失风险客户：历史≥N场 且 上次消费超过 M 个月"""
+    from datetime import timedelta
+    from src.models.banquet import BanquetCustomer, BanquetOrder, OrderStatusEnum
+
+    cutoff = date_type.today() - timedelta(days=months_inactive * 30)
+
+    q = (
+        select(
+            BanquetCustomer,
+            func.max(BanquetOrder.banquet_date).label("last_date"),
+            func.count(BanquetOrder.id).label("order_cnt"),
+        )
+        .join(BanquetOrder, BanquetOrder.customer_id == BanquetCustomer.id)
+        .where(BanquetCustomer.store_id == store_id)
+        .where(BanquetOrder.order_status.in_([OrderStatusEnum.COMPLETED, OrderStatusEnum.CONFIRMED]))
+        .group_by(BanquetCustomer.id)
+        .having(func.count(BanquetOrder.id) >= min_banquets)
+        .having(func.max(BanquetOrder.banquet_date) <= cutoff)
+        .order_by(BanquetCustomer.total_banquet_amount_fen.desc())
+        .limit(top_n)
+    )
+    rows = (await db.execute(q)).all()
+
+    items = []
+    today = date_type.today()
+    for customer, last_date, order_cnt in rows:
+        months_since = round((today - last_date).days / 30, 1) if last_date else None
+        items.append({
+            "customer_id":    customer.id,
+            "name":           customer.name,
+            "phone":          customer.phone,
+            "banquet_count":  order_cnt,
+            "total_yuan":     round((customer.total_banquet_amount_fen or 0) / 100, 2),
+            "last_banquet":   str(last_date) if last_date else None,
+            "months_inactive": months_since,
+            "risk_level":     "high" if (months_since or 0) > 18 else "medium",
+        })
+
+    return {
+        "store_id":        store_id,
+        "months_inactive": months_inactive,
+        "min_banquets":    min_banquets,
+        "total":           len(items),
+        "items":           items,
+    }
+
+
+# ── 7. 客户分层批量触达 ─────────────────────────────────────────────────────
+
+@router.post("/stores/{store_id}/customers/segment-message")
+async def send_segment_message(
+    store_id:     str,
+    segment:      str = Body(..., embed=True),        # vip/high/normal/dormant
+    message_type: str = Body("greeting", embed=True), # greeting/promotion/holiday
+    db:           AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """向指定客户分层生成触达话术，写 ActionLog"""
+    from src.models.banquet import BanquetCustomer, BanquetAgentActionLog
+
+    THRESHOLDS = {
+        "vip":     (500_000, None),
+        "high":    (200_000, 500_000),
+        "normal":  (1,       200_000),
+        "dormant": (0,       1),
+    }
+    if segment not in THRESHOLDS:
+        raise HTTPException(status_code=400, detail=f"invalid segment: {segment}")
+
+    low, high = THRESHOLDS[segment]
+    q = select(BanquetCustomer).where(BanquetCustomer.store_id == store_id)
+    q = q.where(BanquetCustomer.total_banquet_amount_fen >= low)
+    if high is not None:
+        q = q.where(BanquetCustomer.total_banquet_amount_fen < high)
+
+    res = await db.execute(q)
+    customers = res.scalars().all()
+
+    SEGMENT_LABELS = {"vip": "VIP", "high": "高价值", "normal": "普通", "dormant": "休眠"}
+    MSG_TEMPLATES = {
+        "greeting":  "感谢您一直以来对我们的支持！期待再次为您服务。",
+        "promotion": "限时优惠：本季宴会套餐8折，名额有限，先到先得！",
+        "holiday":   "佳节将至，我们为您精心准备了节日宴会方案，欢迎垂询！",
+    }
+    message = MSG_TEMPLATES.get(message_type, MSG_TEMPLATES["greeting"])
+
+    queued = 0
+    for c in customers[:100]:
+        log = BanquetAgentActionLog(
+            id=str(__import__("uuid").uuid4()),
+            agent_type="followup",
+            related_object_type="customer",
+            related_object_id=c.id,
+            action_type="segment_message",
+            action_result={"segment": segment, "message_type": message_type},
+            suggestion_text=f"【{SEGMENT_LABELS.get(segment, segment)}】{c.name}：{message}",
+            is_human_approved=False,
+        )
+        db.add(log)
+        queued += 1
+
+    await db.commit()
+    return {
+        "store_id":         store_id,
+        "segment":          segment,
+        "message_type":     message_type,
+        "customer_count":   len(customers),
+        "queued":           queued,
+        "message_preview":  message,
+    }
+
+
+# ── 8. 追加销售机会 ─────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/upsell-opportunities")
+async def get_upsell_opportunities(
+    store_id: str,
+    top_n:    int = 10,
+    db:       AsyncSession = Depends(get_db),
+    _:        User = Depends(get_current_user),
+):
+    """已确认订单中，套餐单价低于门店中位价的，标记为追加销售机会"""
+    from src.models.banquet import BanquetOrder, MenuPackage, OrderStatusEnum
+
+    # 门店套餐中位价（分/桌）
+    pkg_res = await db.execute(
+        select(MenuPackage.suggested_price_fen)
+        .where(MenuPackage.store_id == store_id)
+        .where(MenuPackage.is_active == True)
+    )
+    pkg_prices = [r[0] for r in pkg_res.all() if r[0]]
+    if not pkg_prices:
+        return {"store_id": store_id, "median_price_yuan": None, "opportunities": []}
+
+    sorted_prices = sorted(pkg_prices)
+    mid = len(sorted_prices) // 2
+    median_fen = sorted_prices[mid] if len(sorted_prices) % 2 == 1 else (
+        sorted_prices[mid - 1] + sorted_prices[mid]
+    ) // 2
+
+    # 已确认订单，人均 / 桌单价 < 中位价
+    ord_res = await db.execute(
+        select(BanquetOrder)
+        .where(BanquetOrder.store_id == store_id)
+        .where(BanquetOrder.order_status == OrderStatusEnum.CONFIRMED)
+        .where(BanquetOrder.banquet_date >= date_type.today())
+        .where(BanquetOrder.total_amount_fen > 0)
+        .where(BanquetOrder.table_count > 0)
+    )
+    orders = ord_res.scalars().all()
+
+    opportunities = []
+    for o in orders:
+        price_per_table = (o.total_amount_fen or 0) / (o.table_count or 1)
+        if price_per_table < median_fen:
+            gap_fen = (median_fen - price_per_table) * (o.table_count or 1)
+            opportunities.append({
+                "order_id":           o.id,
+                "banquet_date":       str(o.banquet_date),
+                "banquet_type":       o.banquet_type.value if hasattr(o.banquet_type, "value") else str(o.banquet_type),
+                "contact_name":       o.contact_name,
+                "table_count":        o.table_count,
+                "current_yuan":       round((o.total_amount_fen or 0) / 100, 2),
+                "price_per_table_yuan": round(price_per_table / 100, 2),
+                "median_price_yuan":  round(median_fen / 100, 2),
+                "upsell_yuan":        round(gap_fen / 100, 2),
+            })
+
+    opportunities.sort(key=lambda x: x["upsell_yuan"], reverse=True)
+    return {
+        "store_id":          store_id,
+        "median_price_yuan": round(median_fen / 100, 2),
+        "total":             len(opportunities),
+        "opportunities":     opportunities[:top_n],
+    }
