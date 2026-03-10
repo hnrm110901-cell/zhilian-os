@@ -5948,3 +5948,520 @@ async def get_executive_summary(
         "highlights": highlights[:3],
         "risks":      risks[:3],
     }
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Phase 17 — 套餐毛利分析 · 季节性规律 · 智能运营提醒
+# ════════════════════════════════════════════════════════════════════════════
+
+# ── 1. 套餐毛利排行 ────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/menu-packages/profitability")
+async def get_menu_profitability(
+    store_id: str,
+    year:  int = Query(default=0),
+    month: int = Query(default=0),
+    db:    AsyncSession = Depends(get_db),
+    _:     User         = Depends(get_current_user),
+):
+    """套餐毛利排行：理论毛利率（from MenuPackage）× 实际毛利率（from ProfitSnapshot）"""
+    from datetime import timedelta
+
+    # 查有效套餐
+    pkgs_res = await db.execute(
+        select(MenuPackage).where(
+            MenuPackage.store_id == store_id,
+            MenuPackage.is_active.is_(True),
+        )
+    )
+    pkgs = pkgs_res.scalars().all()
+    if not pkgs:
+        return {"store_id": store_id, "packages": []}
+
+    # 查利润快照（通过 BanquetOrder 关联 store_id + banquet_type）
+    snap_q = (
+        select(BanquetProfitSnapshot, BanquetOrder.banquet_type)
+        .join(BanquetOrder, BanquetProfitSnapshot.banquet_order_id == BanquetOrder.id)
+        .where(BanquetOrder.store_id == store_id)
+    )
+    if year and month:
+        start = date_type(year, month, 1)
+        end_month = month + 1 if month < 12 else 1
+        end_year  = year if month < 12 else year + 1
+        end   = date_type(end_year, end_month, 1)
+        snap_q = snap_q.where(
+            BanquetOrder.banquet_date >= start,
+            BanquetOrder.banquet_date <  end,
+        )
+    snaps_res = await db.execute(snap_q)
+    snap_rows = snaps_res.all()
+
+    # 按 banquet_type 聚合快照
+    snap_by_type: dict = {}
+    for row in snap_rows:
+        s  = row[0]
+        bt = row[1]
+        key = bt.value if hasattr(bt, "value") else str(bt)
+        if key not in snap_by_type:
+            snap_by_type[key] = {"revenue": 0, "cost": 0}
+        rev = getattr(s, "revenue_fen", 0) or 0
+        cost = (
+            (getattr(s, "ingredient_cost_fen", 0) or 0)
+            + (getattr(s, "labor_cost_fen",     0) or 0)
+            + (getattr(s, "material_cost_fen",  0) or 0)
+            + (getattr(s, "other_cost_fen",     0) or 0)
+        )
+        snap_by_type[key]["revenue"] += rev
+        snap_by_type[key]["cost"]    += cost
+
+    # 查订单数量
+    order_q = select(
+        BanquetOrder.banquet_type,
+        func.count(BanquetOrder.id).label("cnt"),
+    ).where(
+        BanquetOrder.store_id == store_id,
+        BanquetOrder.order_status.in_([OrderStatusEnum.CONFIRMED, OrderStatusEnum.COMPLETED]),
+    ).group_by(BanquetOrder.banquet_type)
+    order_res = await db.execute(order_q)
+    order_cnt_by_type = {
+        (r[0].value if hasattr(r[0], "value") else str(r[0])): r[1]
+        for r in order_res.all()
+    }
+
+    rows = []
+    for pkg in pkgs:
+        price_fen = getattr(pkg, "suggested_price_fen", 0) or 0
+        cost_fen  = getattr(pkg, "cost_fen", 0) or 0
+        theo_margin = round((price_fen - cost_fen) / price_fen * 100, 1) if price_fen else None
+
+        bt = getattr(pkg, "banquet_type", None)
+        bt_key = bt.value if hasattr(bt, "value") else str(bt)
+        snap = snap_by_type.get(bt_key)
+        actual_margin: float | None = None
+        if snap and snap["revenue"] > 0:
+            actual_margin = round((snap["revenue"] - snap["cost"]) / snap["revenue"] * 100, 1)
+
+        rows.append({
+            "pkg_id":               str(pkg.id),
+            "name":                 pkg.name,
+            "banquet_type":         bt_key,
+            "suggested_price_yuan": round(price_fen / 100, 2),
+            "cost_yuan":            round(cost_fen  / 100, 2),
+            "theoretical_margin_pct": theo_margin,
+            "actual_margin_pct":    actual_margin,
+            "order_count":          order_cnt_by_type.get(bt_key, 0),
+        })
+
+    rows.sort(key=lambda r: (r["actual_margin_pct"] or r["theoretical_margin_pct"] or 0), reverse=True)
+    return {"store_id": store_id, "packages": rows}
+
+
+# ── 2. 单套餐毛利明细 ──────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/menu-packages/{pkg_id}/margin-detail")
+async def get_menu_package_detail(
+    store_id: str,
+    pkg_id:   str,
+    db:       AsyncSession = Depends(get_db),
+    _:        User         = Depends(get_current_user),
+):
+    """单套餐明细：菜品列表 + 近6月毛利率趋势"""
+    from datetime import timedelta
+    from src.models.banquet import MenuPackageItem
+
+    pkg_res = await db.execute(
+        select(MenuPackage).where(MenuPackage.id == pkg_id, MenuPackage.store_id == store_id)
+    )
+    pkg = pkg_res.scalars().first()
+    if not pkg:
+        raise HTTPException(status_code=404, detail="套餐不存在")
+
+    items_res = await db.execute(
+        select(MenuPackageItem).where(MenuPackageItem.menu_package_id == pkg_id)
+    )
+    items = items_res.scalars().all()
+
+    # 近6个月趋势
+    today = date_type.today()
+    bt = getattr(pkg, "banquet_type", None)
+    bt_key = bt.value if hasattr(bt, "value") else str(bt)
+    trend = []
+    for i in range(5, -1, -1):
+        m = (today.month - i - 1) % 12 + 1
+        y = today.year - ((today.month - i - 1) // 12 + (1 if (today.month - i - 1) < 0 else 0))
+        start = date_type(y, m, 1)
+        end_m = m + 1 if m < 12 else 1
+        end_y = y if m < 12 else y + 1
+        end   = date_type(end_y, end_m, 1)
+        snaps_res = await db.execute(
+            select(BanquetProfitSnapshot)
+            .join(BanquetOrder, BanquetProfitSnapshot.banquet_order_id == BanquetOrder.id)
+            .where(
+                BanquetOrder.store_id    == store_id,
+                BanquetOrder.banquet_date >= start,
+                BanquetOrder.banquet_date <  end,
+            )
+        )
+        snaps = snaps_res.scalars().all()
+        rev  = sum((getattr(s, "revenue_fen", 0) or 0) for s in snaps)
+        cost = sum((
+            (getattr(s, "ingredient_cost_fen", 0) or 0)
+            + (getattr(s, "labor_cost_fen",     0) or 0)
+            + (getattr(s, "material_cost_fen",  0) or 0)
+            + (getattr(s, "other_cost_fen",     0) or 0)
+        ) for s in snaps)
+        margin = round((rev - cost) / rev * 100, 1) if rev > 0 else None
+        trend.append({"month": f"{y:04d}-{m:02d}", "margin_pct": margin})
+
+    return {
+        "pkg": {
+            "id":                   str(pkg.id),
+            "name":                 pkg.name,
+            "banquet_type":         bt_key,
+            "suggested_price_yuan": round((getattr(pkg, "suggested_price_fen", 0) or 0) / 100, 2),
+            "cost_yuan":            round((getattr(pkg, "cost_fen", 0) or 0) / 100, 2),
+        },
+        "items": [
+            {
+                "dish_name":     item.dish_name,
+                "quantity":      item.quantity,
+                "item_type":     item.item_type,
+                "replace_group": item.replace_group,
+            }
+            for item in items
+        ],
+        "margin_trend": trend,
+    }
+
+
+# ── 3. 季节性规律 ──────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/seasonal-patterns")
+async def get_seasonal_patterns(
+    store_id: str,
+    years:    int = Query(default=2),
+    db:       AsyncSession = Depends(get_db),
+    _:        User         = Depends(get_current_user),
+):
+    """月度/周几峰谷规律（过去 N 年历史订单）"""
+    from datetime import timedelta
+
+    cutoff = date_type.today() - timedelta(days=years * 365)
+    orders_res = await db.execute(
+        select(BanquetOrder).where(
+            BanquetOrder.store_id == store_id,
+            BanquetOrder.order_status.in_([OrderStatusEnum.CONFIRMED, OrderStatusEnum.COMPLETED]),
+            BanquetOrder.banquet_date >= cutoff,
+        )
+    )
+    orders = orders_res.scalars().all()
+
+    monthly_orders:  dict[int, int]   = {m: 0 for m in range(1, 13)}
+    monthly_revenue: dict[int, float] = {m: 0.0 for m in range(1, 13)}
+    weekly_orders:   dict[int, int]   = {d: 0 for d in range(7)}
+
+    for o in orders:
+        bd = o.banquet_date
+        monthly_orders[bd.month]  += 1
+        monthly_revenue[bd.month] += (o.total_amount_fen or 0) / 100
+        weekly_orders[bd.weekday()] += 1
+
+    total_months = max(years * 12, 1)
+    avg_monthly  = sum(monthly_orders.values()) / 12
+
+    monthly = []
+    for m in range(1, 13):
+        cnt = monthly_orders[m]
+        rev = monthly_revenue[m]
+        monthly.append({
+            "month":            m,
+            "avg_orders":       round(cnt / years, 1),
+            "avg_revenue_yuan": round(rev / years, 2),
+            "is_peak":          avg_monthly > 0 and cnt > avg_monthly * 1.2,
+            "is_low":           cnt < avg_monthly * 0.8,
+        })
+
+    total_weekly = sum(weekly_orders.values()) or 1
+    weekday_labels = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+    weekly = [
+        {
+            "weekday":      d,
+            "label":        weekday_labels[d],
+            "avg_orders":   round(weekly_orders[d] / years, 1),
+            "relative_pct": round(weekly_orders[d] / total_weekly * 100, 1),
+        }
+        for d in range(7)
+    ]
+
+    return {"store_id": store_id, "monthly": monthly, "weekly": weekly}
+
+
+# ── 4. 宴会类型同期对比 ────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/banquet-type-trends")
+async def get_banquet_type_trends(
+    store_id: str,
+    year:     int = Query(default=0),
+    db:       AsyncSession = Depends(get_db),
+    _:        User         = Depends(get_current_user),
+):
+    """当年 vs 去年同期宴会类型订单量/营收对比"""
+    this_year = year or date_type.today().year
+    last_year = this_year - 1
+
+    async def _fetch_year(y: int):
+        start = date_type(y, 1, 1)
+        end   = date_type(y, 12, 31)
+        res = await db.execute(
+            select(BanquetOrder).where(
+                BanquetOrder.store_id == store_id,
+                BanquetOrder.order_status.in_([OrderStatusEnum.CONFIRMED, OrderStatusEnum.COMPLETED]),
+                BanquetOrder.banquet_date.between(start, end),
+            )
+        )
+        return res.scalars().all()
+
+    this_orders, last_orders = await _fetch_year(this_year), await _fetch_year(last_year)
+
+    def _aggregate(orders):
+        """按 banquet_type × month 聚合"""
+        agg: dict = {}
+        for o in orders:
+            bt = o.banquet_type.value if hasattr(o.banquet_type, "value") else str(o.banquet_type)
+            m  = o.banquet_date.month
+            if bt not in agg:
+                agg[bt] = {mo: {"orders": 0, "revenue_yuan": 0.0} for mo in range(1, 13)}
+            agg[bt][m]["orders"]       += 1
+            agg[bt][m]["revenue_yuan"] += (o.total_amount_fen or 0) / 100
+        return agg
+
+    this_agg = _aggregate(this_orders)
+    last_agg = _aggregate(last_orders)
+
+    all_types = sorted(set(list(this_agg.keys()) + list(last_agg.keys())))
+    bt_labels = {
+        "wedding": "婚宴", "birthday": "寿宴", "business": "商务宴", "full_month": "满月宴",
+        "graduation": "升学宴", "other": "其他",
+    }
+
+    result = []
+    for bt in all_types:
+        this_by_month = [
+            {"month": m, **this_agg.get(bt, {}).get(m, {"orders": 0, "revenue_yuan": 0.0})}
+            for m in range(1, 13)
+        ]
+        last_by_month = [
+            {"month": m, **last_agg.get(bt, {}).get(m, {"orders": 0, "revenue_yuan": 0.0})}
+            for m in range(1, 13)
+        ]
+        this_total = sum(r["orders"] for r in this_by_month)
+        last_total = sum(r["orders"] for r in last_by_month)
+        yoy_growth = round((this_total - last_total) / last_total * 100, 1) if last_total else None
+
+        result.append({
+            "type":           bt,
+            "label":          bt_labels.get(bt, bt),
+            "this_year":      this_by_month,
+            "last_year":      last_by_month,
+            "yoy_growth_pct": yoy_growth,
+        })
+
+    return {"store_id": store_id, "year": this_year, "types": result}
+
+
+# ── 5. 当日运营简报 ────────────────────────────────────────────────────────
+
+async def _build_daily_brief(store_id: str, days: int, db: AsyncSession) -> dict:
+    """共用逻辑：汇总未来 days 天宴会的待办事项"""
+    from datetime import timedelta
+
+    today = date_type.today()
+    end   = today + timedelta(days=days)
+
+    orders_res = await db.execute(
+        select(BanquetOrder).where(
+            BanquetOrder.store_id == store_id,
+            BanquetOrder.order_status.in_([OrderStatusEnum.CONFIRMED, OrderStatusEnum.COMPLETED]),
+            BanquetOrder.banquet_date.between(today, end),
+        )
+    )
+    orders = orders_res.scalars().all()
+
+    alerts = []
+    for o in orders:
+        # 待完成任务
+        tasks_res = await db.execute(
+            select(ExecutionTask).where(
+                ExecutionTask.banquet_order_id == o.id,
+                ExecutionTask.task_status.in_([TaskStatusEnum.PENDING, TaskStatusEnum.IN_PROGRESS]),
+            )
+        )
+        pending_tasks = len(tasks_res.scalars().all())
+
+        # 未收款
+        paid        = getattr(o, "paid_fen", 0) or 0
+        total       = getattr(o, "total_amount_fen", 0) or 0
+        unpaid_yuan = round((total - paid) / 100, 2) if total > paid else 0.0
+
+        # 未处理异常
+        exc_res = await db.execute(
+            select(ExecutionException).where(ExecutionException.banquet_order_id == o.id)
+        )
+        open_exceptions = len(exc_res.scalars().all())
+
+        # 风险级别
+        days_until = (o.banquet_date - today).days
+        risk_level = "ok"
+        if pending_tasks > 3 or (unpaid_yuan > 0 and total > 0 and paid / total < 0.5) \
+                or (days_until <= 3 and paid == 0 and total > 0):
+            risk_level = "high"
+        elif pending_tasks > 0 or unpaid_yuan > 0 or open_exceptions > 0:
+            risk_level = "medium"
+
+        bt = o.banquet_type.value if hasattr(o.banquet_type, "value") else str(o.banquet_type)
+        alerts.append({
+            "order_id":       str(o.id),
+            "banquet_date":   str(o.banquet_date),
+            "banquet_type":   bt,
+            "days_until":     days_until,
+            "risk_level":     risk_level,
+            "pending_tasks":  pending_tasks,
+            "unpaid_yuan":    unpaid_yuan,
+            "open_exceptions": open_exceptions,
+        })
+
+    alerts.sort(key=lambda a: {"high": 0, "medium": 1, "ok": 2}[a["risk_level"]])
+
+    today_count = sum(1 for a in alerts if a["days_until"] == 0)
+    return {
+        "store_id":        store_id,
+        "today_banquets":  today_count,
+        "next_n_banquets": len(alerts),
+        "days":            days,
+        "alerts":          alerts,
+    }
+
+
+@router.get("/stores/{store_id}/operations/daily-brief")
+async def get_daily_brief(
+    store_id: str,
+    days:     int = Query(default=7),
+    db:       AsyncSession = Depends(get_db),
+    _:        User         = Depends(get_current_user),
+):
+    """当日运营简报：未来 N 天宴会的待办/未收/异常汇总"""
+    return await _build_daily_brief(store_id, days, db)
+
+
+# ── 6. 未来风险预警 ────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/operations/upcoming-alerts")
+async def get_upcoming_alerts(
+    store_id: str,
+    days:     int = Query(default=14),
+    db:       AsyncSession = Depends(get_db),
+    _:        User         = Depends(get_current_user),
+):
+    """未来 N 天宴会风险预警（仅返回 high/medium）"""
+    brief = await _build_daily_brief(store_id, days, db)
+    high_medium = [a for a in brief["alerts"] if a["risk_level"] in ("high", "medium")]
+    return {
+        "store_id":     store_id,
+        "days":         days,
+        "total_alerts": len(high_medium),
+        "high":         sum(1 for a in high_medium if a["risk_level"] == "high"),
+        "medium":       sum(1 for a in high_medium if a["risk_level"] == "medium"),
+        "alerts":       high_medium,
+    }
+
+
+# ── 7. 推送当日简报 ────────────────────────────────────────────────────────
+
+@router.post("/stores/{store_id}/operations/daily-brief/push")
+async def push_daily_brief(
+    store_id:     str,
+    db:           AsyncSession = Depends(get_db),
+    current_user: User         = Depends(get_current_user),
+):
+    """将当日简报写入 ActionLog，模拟推送"""
+    brief = await _build_daily_brief(store_id, 7, db)
+
+    log = BanquetAgentActionLog(
+        agent_type          = BanquetAgentTypeEnum.FOLLOWUP,
+        related_object_type = "store",
+        related_object_id   = store_id,
+        action_type         = "daily_brief",
+        action_result       = brief,
+        suggestion_text     = f"今日宴会 {brief['today_banquets']} 场，{brief['days']} 天内预警 {len(brief['alerts'])} 条",
+        is_human_approved   = False,
+    )
+    db.add(log)
+    await db.commit()
+
+    return {
+        "pushed_at":   datetime.utcnow().isoformat(),
+        "alert_count": len(brief["alerts"]),
+        "high_count":  sum(1 for a in brief["alerts"] if a["risk_level"] == "high"),
+    }
+
+
+# ── 8. 营收预测 ────────────────────────────────────────────────────────────
+
+@router.get("/stores/{store_id}/analytics/revenue-forecast")
+async def get_revenue_forecast(
+    store_id:      str,
+    months_ahead:  int = Query(default=1),
+    db:            AsyncSession = Depends(get_db),
+    _:             User         = Depends(get_current_user),
+):
+    """基于历史季节性的未来月营收预测"""
+    from datetime import timedelta
+
+    today      = date_type.today()
+    target_m   = (today.month + months_ahead - 1) % 12 + 1
+    target_y   = today.year + (today.month + months_ahead - 1) // 12
+
+    # 已确认订单（下限）
+    t_start = date_type(target_y, target_m, 1)
+    t_end_m = target_m + 1 if target_m < 12 else 1
+    t_end_y = target_y  if target_m < 12 else target_y + 1
+    t_end   = date_type(t_end_y, t_end_m, 1)
+
+    confirmed_res = await db.execute(
+        select(func.sum(BanquetOrder.total_amount_fen)).where(
+            BanquetOrder.store_id == store_id,
+            BanquetOrder.order_status == OrderStatusEnum.CONFIRMED,
+            BanquetOrder.banquet_date >= t_start,
+            BanquetOrder.banquet_date <  t_end,
+        )
+    )
+    confirmed_fen = confirmed_res.scalar() or 0
+
+    # 历史同月均值（过去2年）
+    hist_totals = []
+    for delta_y in range(1, 3):
+        hy    = target_y - delta_y
+        start = date_type(hy, target_m, 1)
+        hend_m = target_m + 1 if target_m < 12 else 1
+        hend_y = hy if target_m < 12 else hy + 1
+        hend  = date_type(hend_y, hend_m, 1)
+        hist_res = await db.execute(
+            select(func.sum(BanquetOrder.total_amount_fen)).where(
+                BanquetOrder.store_id == store_id,
+                BanquetOrder.order_status.in_([OrderStatusEnum.CONFIRMED, OrderStatusEnum.COMPLETED]),
+                BanquetOrder.banquet_date >= start,
+                BanquetOrder.banquet_date <  hend,
+            )
+        )
+        hist_totals.append(hist_res.scalar() or 0)
+
+    base_fen     = int(sum(hist_totals) / len(hist_totals)) if hist_totals else 0
+    forecast_fen = max(base_fen, confirmed_fen)
+
+    return {
+        "store_id":              store_id,
+        "target_month":          f"{target_y:04d}-{target_m:02d}",
+        "base_revenue_yuan":     round(base_fen     / 100, 2),
+        "confirmed_revenue_yuan": round(confirmed_fen / 100, 2),
+        "forecast_yuan":         round(forecast_fen  / 100, 2),
+    }

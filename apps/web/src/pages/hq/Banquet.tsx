@@ -1829,6 +1829,24 @@ interface CancellationData {
   by_lead_time: { urgent_7d: number; d7_30: number; over_30d: number };
 }
 
+/* Phase 17 */
+interface PkgProfitRow {
+  pkg_id: string; name: string; banquet_type: string;
+  suggested_price_yuan: number; cost_yuan: number;
+  theoretical_margin_pct: number | null; actual_margin_pct: number | null;
+  order_count: number;
+}
+interface SeasonalMonth { month: number; avg_orders: number; avg_revenue_yuan: number; is_peak: boolean; is_low: boolean }
+interface SeasonalWeekday { weekday: number; label: string; avg_orders: number; relative_pct: number }
+interface SeasonalData { monthly: SeasonalMonth[]; weekly: SeasonalWeekday[] }
+interface RevForecast { target_month: string; base_revenue_yuan: number; confirmed_revenue_yuan: number; forecast_yuan: number }
+interface BriefAlert {
+  order_id: string; banquet_date: string; banquet_type: string; days_until: number;
+  risk_level: 'high' | 'medium' | 'ok';
+  pending_tasks: number; unpaid_yuan: number; open_exceptions: number;
+}
+interface DailyBriefData { today_banquets: number; next_n_banquets: number; days: number; alerts: BriefAlert[] }
+
 function AnalyticsTab() {
   const [month,    setMonth]    = useState(() => {
     const d = new Date();
@@ -1853,6 +1871,10 @@ function AnalyticsTab() {
   const [retention,    setRetention]    = useState<RetentionData | null>(null);
   const [cancellation, setCancellation] = useState<CancellationData | null>(null);
   const [execSummary,  setExecSummary]  = useState<ExecSummaryData | null>(null);
+  /* Phase 17 */
+  const [pkgProfit,    setPkgProfit]    = useState<PkgProfitRow[]>([]);
+  const [seasonal,     setSeasonal]     = useState<SeasonalData | null>(null);
+  const [revForecast,  setRevForecast]  = useState<RevForecast | null>(null);
   const [loading,      setLoading]      = useState(false);
 
   const load = useCallback(async (m: string) => {
@@ -1863,6 +1885,7 @@ function AnalyticsTab() {
       const [
         funnelR, forecastR, lostR, arR, excR, excStatsR,
         agingR, quoteStatsR, svcR, ltR, retR, cancelR, execR,
+        pkgProfitR, seasonalR, revForecastR,
       ] = await Promise.allSettled([
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/funnel`, { params: { month: m } }),
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/revenue-forecast`, { params: { months: 3 } }),
@@ -1877,6 +1900,10 @@ function AnalyticsTab() {
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/customer-retention`),
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/cancellation-analysis`),
         apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/executive-summary`, { params: { year: Number(y), month: Number(mo) } }),
+        /* Phase 17 */
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/menu-packages/profitability`, { params: { year: Number(y), month: Number(mo) } }),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/seasonal-patterns`),
+        apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/analytics/revenue-forecast`),
       ]);
       if (funnelR.status === 'fulfilled')     setFunnel(funnelR.value.data);
       if (forecastR.status === 'fulfilled')   setForecast(forecastR.value.data?.forecast ?? []);
@@ -1891,6 +1918,9 @@ function AnalyticsTab() {
       if (retR.status === 'fulfilled')        setRetention(retR.value.data);
       if (cancelR.status === 'fulfilled')     setCancellation(cancelR.value.data);
       if (execR.status === 'fulfilled')       setExecSummary(execR.value.data);
+      if (pkgProfitR.status === 'fulfilled')  setPkgProfit(pkgProfitR.value.data?.packages ?? []);
+      if (seasonalR.status === 'fulfilled')   setSeasonal(seasonalR.value.data);
+      if (revForecastR.status === 'fulfilled') setRevForecast(revForecastR.value.data);
     } finally {
       setLoading(false);
     }
@@ -2380,6 +2410,111 @@ function AnalyticsTab() {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+          </ZCard>
+
+          {/* Phase 17: 套餐毛利排行 */}
+          <ZCard title="套餐毛利排行">
+            {pkgProfit.length === 0 ? (
+              <ZEmpty title="暂无套餐数据" description="请先在资源配置中创建套餐" />
+            ) : (
+              <div className={styles.pkgProfitList}>
+                {pkgProfit.slice(0, 8).map(p => {
+                  const margin = p.actual_margin_pct ?? p.theoretical_margin_pct ?? 0;
+                  return (
+                    <div key={p.pkg_id} className={styles.pkgProfitRow}>
+                      <div className={styles.pkgProfitName}>
+                        <span>{p.name}</span>
+                        <span className={styles.pkgProfitPct} style={{ color: margin >= 50 ? 'var(--green, #22c55e)' : margin >= 30 ? '#f97316' : '#ef4444' }}>
+                          {margin.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className={styles.pkgProfitBars}>
+                        <div className={styles.pkgBar}>
+                          <div className={styles.pkgBarTheo} style={{ width: `${Math.min((p.theoretical_margin_pct ?? 0), 100)}%` }} title={`理论 ${p.theoretical_margin_pct?.toFixed(1)}%`} />
+                        </div>
+                        {p.actual_margin_pct != null && (
+                          <div className={styles.pkgBar}>
+                            <div className={styles.pkgBarActual} style={{ width: `${Math.min(p.actual_margin_pct, 100)}%` }} title={`实际 ${p.actual_margin_pct.toFixed(1)}%`} />
+                          </div>
+                        )}
+                      </div>
+                      <span className={styles.pkgProfitOrderCnt}>{p.order_count} 单</span>
+                    </div>
+                  );
+                })}
+                <div className={styles.pkgProfitLegend}>
+                  <span className={styles.pkgLegendTheo}>■ 理论毛利率</span>
+                  <span className={styles.pkgLegendActual}>■ 实际毛利率</span>
+                </div>
+              </div>
+            )}
+          </ZCard>
+
+          {/* Phase 17: 季节性峰谷 */}
+          <ZCard title="季节性规律">
+            {!seasonal ? (
+              <ZEmpty title="暂无历史数据" description="需要至少1年历史订单" />
+            ) : (
+              <div className={styles.seasonalBody}>
+                <div className={styles.seasonalLabel}>月度热力图（深色 = 高峰）</div>
+                <div className={styles.monthHeatRow}>
+                  {seasonal.monthly.map(m => (
+                    <div
+                      key={m.month}
+                      className={`${styles.monthCell} ${m.is_peak ? styles.monthCellPeak : ''} ${m.is_low ? styles.monthCellLow : ''}`}
+                      title={`${m.month}月 均${m.avg_orders.toFixed(1)}单`}
+                    >
+                      {m.month}月
+                    </div>
+                  ))}
+                </div>
+                <div className={styles.seasonalLabel} style={{ marginTop: 12 }}>周几分布</div>
+                <div className={styles.weekdayBars}>
+                  {seasonal.weekly.map(d => (
+                    <div key={d.weekday} className={styles.weekdayBarItem}>
+                      <div className={styles.weekdayBar} style={{ height: `${Math.max(d.relative_pct * 0.8, 4)}px` }} title={`${d.relative_pct.toFixed(1)}%`} />
+                      <span className={styles.weekdayLabel}>{d.label.replace('周', '')}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </ZCard>
+
+          {/* Phase 17: 营收预测 */}
+          <ZCard title="下月营收预测">
+            {!revForecast ? (
+              <ZEmpty title="暂无预测数据" description="需要历史订单作为基准" />
+            ) : (
+              <div className={styles.forecastBody}>
+                <div className={styles.forecastTarget}>{revForecast.target_month}</div>
+                <div className={styles.forecastKpiRow}>
+                  <div className={styles.forecastKpi}>
+                    <span className={styles.forecastKpiValue}>¥{revForecast.forecast_yuan.toLocaleString()}</span>
+                    <span className={styles.forecastKpiLabel}>预测营收</span>
+                  </div>
+                  <div className={styles.forecastKpi}>
+                    <span className={styles.forecastKpiValue}>¥{revForecast.confirmed_revenue_yuan.toLocaleString()}</span>
+                    <span className={styles.forecastKpiLabel}>已确认</span>
+                  </div>
+                  <div className={styles.forecastKpi}>
+                    <span className={styles.forecastKpiValue}>¥{revForecast.base_revenue_yuan.toLocaleString()}</span>
+                    <span className={styles.forecastKpiLabel}>历史均值</span>
+                  </div>
+                </div>
+                {revForecast.forecast_yuan > 0 && (
+                  <div className={styles.forecastProgress}>
+                    <div
+                      className={styles.forecastProgressBar}
+                      style={{ width: `${Math.min(revForecast.confirmed_revenue_yuan / revForecast.forecast_yuan * 100, 100).toFixed(0)}%` }}
+                    />
+                  </div>
+                )}
+                <div className={styles.forecastProgressLabel}>
+                  已确认 {revForecast.forecast_yuan > 0 ? (revForecast.confirmed_revenue_yuan / revForecast.forecast_yuan * 100).toFixed(0) : 0}%
+                </div>
               </div>
             )}
           </ZCard>
@@ -2951,6 +3086,108 @@ function CrossStoreTab() {
   );
 }
 
+/* ─── Phase 17: 运营简报 Tab ─── */
+function DailyBriefTab() {
+  const STORE = localStorage.getItem('store_id') || 'S001';
+  const [brief,     setBrief]     = useState<DailyBriefData | null>(null);
+  const [loading,   setLoading]   = useState(true);
+  const [pushing,   setPushing]   = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await apiClient.get(`/api/v1/banquet-agent/stores/${STORE}/operations/daily-brief`, { params: { days: 7 } });
+      setBrief(r.data);
+    } catch {
+      setBrief(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [STORE]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handlePush = async () => {
+    setPushing(true);
+    try {
+      await apiClient.post(`/api/v1/banquet-agent/stores/${STORE}/operations/daily-brief/push`);
+      await load();
+    } catch (e) {
+      handleApiError(e, '推送简报失败');
+    } finally {
+      setPushing(false);
+    }
+  };
+
+  const riskColor = (level: string) => level === 'high' ? '#ef4444' : level === 'medium' ? '#f97316' : '#22c55e';
+  const riskLabel = (level: string) => level === 'high' ? '高风险' : level === 'medium' ? '注意' : '正常';
+
+  return (
+    <div className={styles.briefTab}>
+      <div className={styles.briefHeader}>
+        <div className={styles.briefTitle}>运营简报（未来7天）</div>
+        <ZButton variant="primary" size="sm" onClick={handlePush} disabled={pushing}>
+          {pushing ? '推送中…' : '推送简报'}
+        </ZButton>
+      </div>
+      {loading ? (
+        <ZSkeleton rows={4} />
+      ) : !brief ? (
+        <ZEmpty title="暂无数据" description="请稍后重试" />
+      ) : (
+        <>
+          <div className={styles.briefKpiRow}>
+            <div className={styles.briefKpi}>
+              <span className={styles.briefKpiValue}>{brief.today_banquets}</span>
+              <span className={styles.briefKpiLabel}>今日宴会</span>
+            </div>
+            <div className={styles.briefKpi}>
+              <span className={styles.briefKpiValue}>{brief.next_n_banquets}</span>
+              <span className={styles.briefKpiLabel}>7天内宴会</span>
+            </div>
+            <div className={styles.briefKpi}>
+              <span className={styles.briefKpiValue} style={{ color: '#ef4444' }}>
+                {brief.alerts.filter(a => a.risk_level === 'high').length}
+              </span>
+              <span className={styles.briefKpiLabel}>高风险</span>
+            </div>
+            <div className={styles.briefKpi}>
+              <span className={styles.briefKpiValue} style={{ color: '#f97316' }}>
+                {brief.alerts.filter(a => a.risk_level === 'medium').length}
+              </span>
+              <span className={styles.briefKpiLabel}>需关注</span>
+            </div>
+          </div>
+          {brief.alerts.length === 0 ? (
+            <ZEmpty title="近7天无待处理事项" description="所有宴会准备就绪" />
+          ) : (
+            <div className={styles.briefAlertList}>
+              {brief.alerts.map(a => (
+                <div key={a.order_id} className={styles.briefAlertRow} style={{ borderLeftColor: riskColor(a.risk_level) }}>
+                  <div className={styles.briefAlertMeta}>
+                    <span className={styles.briefAlertDate}>{a.banquet_date}</span>
+                    <span className={styles.briefAlertType}>{a.banquet_type}</span>
+                    <ZBadge
+                      type={a.risk_level === 'high' ? 'warning' : a.risk_level === 'medium' ? 'info' : 'success'}
+                      text={riskLabel(a.risk_level)}
+                    />
+                  </div>
+                  <div className={styles.briefAlertIssues}>
+                    {a.pending_tasks > 0 && <span>待完任务 {a.pending_tasks}</span>}
+                    {a.unpaid_yuan > 0 && <span>未收款 ¥{a.unpaid_yuan.toLocaleString()}</span>}
+                    {a.open_exceptions > 0 && <span>异常 {a.open_exceptions}</span>}
+                    {a.pending_tasks === 0 && a.unpaid_yuan === 0 && a.open_exceptions === 0 && <span className={styles.briefAlertOk}>准备就绪</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function HQBanquet() {
   return (
     <div className={styles.page}>
@@ -2959,7 +3196,7 @@ export default function HQBanquet() {
       </div>
       <ZTabs
         items={[
-          { key: 'dashboard', label: '仪表盘',  children: <DashboardTab /> },
+          { key: 'dashboard',  label: '仪表盘',  children: <DashboardTab /> },
           { key: 'pipeline',  label: '销售管道', children: <PipelineTab /> },
           { key: 'calendar',  label: '销控日历', children: <AvailabilityTab /> },
           { key: 'ai',        label: 'AI 建议',  children: <AITab /> },
@@ -2969,7 +3206,8 @@ export default function HQBanquet() {
           { key: 'analytics', label: '转化分析', children: <AnalyticsTab /> },
           { key: 'quotes',    label: '报价管理',  children: <QuoteManagementTab /> },
           { key: 'hallsched', label: '厅房月历',  children: <HallScheduleTab /> },
-          { key: 'crossstore', label: '跨店对比',  children: <CrossStoreTab /> },
+          { key: 'crossstore',   label: '跨店对比',  children: <CrossStoreTab /> },
+          { key: 'dailybrief',   label: '运营简报',  children: <DailyBriefTab /> },
         ]}
       />
     </div>

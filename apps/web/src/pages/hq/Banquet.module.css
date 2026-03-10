@@ -1217,3 +1217,61 @@
                     border-top: 1px solid var(--border, #eee); }
 .execHighlight    { font-size: 13px; color: #15803d; line-height: 1.4; }
 .execRisk         { font-size: 13px; color: #b45309; line-height: 1.4; }
+
+/* ── Phase 17: 套餐毛利 ─────────────────────────────────────── */
+.pkgProfitList    { display: flex; flex-direction: column; gap: 10px; }
+.pkgProfitRow     { display: grid; grid-template-columns: 1fr 120px 48px; align-items: center; gap: 8px; }
+.pkgProfitName    { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+.pkgProfitPct     { font-weight: 700; font-size: 14px; }
+.pkgProfitBars    { display: flex; flex-direction: column; gap: 3px; }
+.pkgBar           { height: 6px; background: #f1f5f9; border-radius: 3px; overflow: hidden; }
+.pkgBarTheo       { height: 100%; background: #93c5fd; border-radius: 3px; }
+.pkgBarActual     { height: 100%; background: var(--accent, #ff6b2c); border-radius: 3px; }
+.pkgProfitOrderCnt{ font-size: 12px; color: var(--text-secondary, #888); text-align: right; }
+.pkgProfitLegend  { display: flex; gap: 12px; font-size: 11px; color: #888; padding-top: 4px; }
+.pkgLegendTheo    { color: #93c5fd; }
+.pkgLegendActual  { color: var(--accent, #ff6b2c); }
+
+/* ── Phase 17: 季节性 ──────────────────────────────────────── */
+.seasonalBody     { display: flex; flex-direction: column; gap: 8px; }
+.seasonalLabel    { font-size: 12px; color: var(--text-secondary, #888); }
+.monthHeatRow     { display: flex; gap: 4px; flex-wrap: wrap; }
+.monthCell        { flex: 1; min-width: 28px; padding: 6px 4px; text-align: center;
+                    font-size: 11px; background: #f8fafc; border-radius: 4px; border: 1px solid #e2e8f0; }
+.monthCellPeak    { background: var(--accent, #ff6b2c); color: #fff; border-color: var(--accent, #ff6b2c); font-weight: 700; }
+.monthCellLow     { background: #f1f5f9; color: #cbd5e1; }
+.weekdayBars      { display: flex; gap: 6px; align-items: flex-end; height: 60px; }
+.weekdayBarItem   { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: 1; justify-content: flex-end; }
+.weekdayBar       { width: 100%; background: var(--accent, #ff6b2c); border-radius: 2px 2px 0 0; min-height: 4px; }
+.weekdayLabel     { font-size: 11px; color: var(--text-secondary, #888); }
+
+/* ── Phase 17: 营收预测 ─────────────────────────────────────── */
+.forecastBody     { display: flex; flex-direction: column; gap: 12px; }
+.forecastTarget   { font-size: 13px; color: var(--text-secondary, #888); font-weight: 600; }
+.forecastKpiRow   { display: flex; gap: 12px; }
+.forecastKpi      { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.forecastKpiValue { font-size: 18px; font-weight: 700; }
+.forecastKpiLabel { font-size: 11px; color: var(--text-secondary, #888); }
+.forecastProgress { height: 8px; background: #f1f5f9; border-radius: 4px; overflow: hidden; }
+.forecastProgressBar { height: 100%; background: var(--accent, #ff6b2c); border-radius: 4px; transition: width .4s; }
+.forecastProgressLabel { font-size: 12px; color: var(--text-secondary, #888); }
+
+/* ── Phase 17: 运营简报 Tab ────────────────────────────────── */
+.briefTab         { padding: 0; }
+.briefHeader      { display: flex; justify-content: space-between; align-items: center;
+                    padding: 0 0 16px; }
+.briefTitle       { font-size: 16px; font-weight: 700; }
+.briefKpiRow      { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+.briefKpi         { background: var(--card-bg, #fff); border: 1px solid var(--border, #eee);
+                    border-radius: 8px; padding: 12px 16px; display: flex; flex-direction: column; gap: 4px; }
+.briefKpiValue    { font-size: 24px; font-weight: 700; }
+.briefKpiLabel    { font-size: 12px; color: var(--text-secondary, #888); }
+.briefAlertList   { display: flex; flex-direction: column; gap: 8px; }
+.briefAlertRow    { background: var(--card-bg, #fff); border: 1px solid var(--border, #eee);
+                    border-left: 4px solid #22c55e; border-radius: 8px;
+                    padding: 12px 16px; display: flex; flex-direction: column; gap: 6px; }
+.briefAlertMeta   { display: flex; align-items: center; gap: 8px; }
+.briefAlertDate   { font-weight: 600; font-size: 14px; }
+.briefAlertType   { font-size: 13px; color: var(--text-secondary, #888); }
+.briefAlertIssues { display: flex; flex-wrap: wrap; gap: 8px; font-size: 13px; color: #64748b; }
+.briefAlertOk     { color: #22c55e; }
