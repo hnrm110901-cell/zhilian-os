@@ -986,7 +986,7 @@ export default function SmBanquetOrderDetail() {
                 <ZInput
                   type="number"
                   value={settleRevenue}
-                  onChange={e => setSettleRevenue(e.target.value)}
+                  onChange={v => setSettleRevenue(v)}
                   placeholder="如：50000"
                 />
               </div>
@@ -995,7 +995,7 @@ export default function SmBanquetOrderDetail() {
                 <ZInput
                   type="number"
                   value={settleIngred}
-                  onChange={e => setSettleIngred(e.target.value)}
+                  onChange={v => setSettleIngred(v)}
                   placeholder="如：15000"
                 />
               </div>
@@ -1004,7 +1004,7 @@ export default function SmBanquetOrderDetail() {
                 <ZInput
                   type="number"
                   value={settleLabor}
-                  onChange={e => setSettleLabor(e.target.value)}
+                  onChange={v => setSettleLabor(v)}
                   placeholder="如：5000"
                 />
               </div>
@@ -1013,7 +1013,7 @@ export default function SmBanquetOrderDetail() {
                 <ZInput
                   type="number"
                   value={settleOther}
-                  onChange={e => setSettleOther(e.target.value)}
+                  onChange={v => setSettleOther(v)}
                   placeholder="如：1000"
                 />
               </div>
@@ -1109,7 +1109,7 @@ export default function SmBanquetOrderDetail() {
             <ZInput
               type="number"
               value={payAmount}
-              onChange={e => setPayAmount(e.target.value)}
+              onChange={v => setPayAmount(v)}
               placeholder="如：10000"
             />
           </div>
@@ -1155,7 +1155,7 @@ export default function SmBanquetOrderDetail() {
             <label className={styles.settleLabel}>任务名称</label>
             <ZInput
               value={newTaskName}
-              onChange={e => setNewTaskName(e.target.value)}
+              onChange={v => setNewTaskName(v)}
               placeholder="如：额外备餐"
             />
           </div>
@@ -1178,7 +1178,7 @@ export default function SmBanquetOrderDetail() {
             <ZInput
               type="datetime-local"
               value={newTaskDueTime}
-              onChange={e => setNewTaskDueTime(e.target.value)}
+              onChange={v => setNewTaskDueTime(v)}
             />
           </div>
         </div>
@@ -1219,7 +1219,7 @@ export default function SmBanquetOrderDetail() {
             <label className={styles.settleLabel}>异常描述</label>
             <ZInput
               value={excDesc}
-              onChange={e => setExcDesc(e.target.value)}
+              onChange={v => setExcDesc(v)}
               placeholder="描述具体情况…"
             />
           </div>

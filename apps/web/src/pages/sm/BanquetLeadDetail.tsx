@@ -462,7 +462,7 @@ export default function SmBanquetLeadDetail() {
               <ZInput
                 type="date"
                 value={cvBanquetDate}
-                onChange={e => setCvBanquetDate(e.target.value)}
+                onChange={v => setCvBanquetDate(v)}
                 placeholder="YYYY-MM-DD"
               />
             </div>
@@ -471,7 +471,7 @@ export default function SmBanquetLeadDetail() {
               <ZInput
                 type="number"
                 value={cvTableCount}
-                onChange={e => setCvTableCount(e.target.value)}
+                onChange={v => setCvTableCount(v)}
                 placeholder="如：20"
               />
             </div>
@@ -482,7 +482,7 @@ export default function SmBanquetLeadDetail() {
               <ZInput
                 type="number"
                 value={cvTotalAmount}
-                onChange={e => setCvTotalAmount(e.target.value)}
+                onChange={v => setCvTotalAmount(v)}
                 placeholder="如：50000"
               />
             </div>
@@ -491,7 +491,7 @@ export default function SmBanquetLeadDetail() {
               <ZInput
                 type="number"
                 value={cvDeposit}
-                onChange={e => setCvDeposit(e.target.value)}
+                onChange={v => setCvDeposit(v)}
                 placeholder="如：10000"
               />
             </div>
@@ -501,7 +501,7 @@ export default function SmBanquetLeadDetail() {
               <label className={styles.label}>联系人</label>
               <ZInput
                 value={cvContactName}
-                onChange={e => setCvContactName(e.target.value)}
+                onChange={v => setCvContactName(v)}
                 placeholder="姓名"
               />
             </div>
@@ -510,7 +510,7 @@ export default function SmBanquetLeadDetail() {
               <ZInput
                 type="tel"
                 value={cvContactPhone}
-                onChange={e => setCvContactPhone(e.target.value)}
+                onChange={v => setCvContactPhone(v)}
                 placeholder="手机号"
               />
             </div>
@@ -519,7 +519,7 @@ export default function SmBanquetLeadDetail() {
             <label className={styles.label}>备注（选填）</label>
             <ZInput
               value={cvRemark}
-              onChange={e => setCvRemark(e.target.value)}
+              onChange={v => setCvRemark(v)}
               placeholder="特殊要求…"
             />
           </div>
@@ -548,7 +548,7 @@ export default function SmBanquetLeadDetail() {
             <label className={styles.label}>流失原因</label>
             <ZInput
               value={lostReason}
-              onChange={e => setLostReason(e.target.value)}
+              onChange={v => setLostReason(v)}
               placeholder="如：价格太高、竞品抢单、日期冲突…"
             />
           </div>
@@ -556,7 +556,7 @@ export default function SmBanquetLeadDetail() {
             <label className={styles.label}>备注（选填）</label>
             <ZInput
               value={lostNote}
-              onChange={e => setLostNote(e.target.value)}
+              onChange={v => setLostNote(v)}
               placeholder="补充说明…"
             />
           </div>
@@ -587,7 +587,7 @@ export default function SmBanquetLeadDetail() {
               <ZInput
                 type="number"
                 value={qPeople}
-                onChange={e => setQPeople(e.target.value)}
+                onChange={v => setQPeople(v)}
                 placeholder="如：200"
               />
             </div>
@@ -596,7 +596,7 @@ export default function SmBanquetLeadDetail() {
               <ZInput
                 type="number"
                 value={qTables}
-                onChange={e => setQTables(e.target.value)}
+                onChange={v => setQTables(v)}
                 placeholder="如：20"
               />
             </div>
@@ -607,7 +607,7 @@ export default function SmBanquetLeadDetail() {
               <ZInput
                 type="number"
                 value={qAmount}
-                onChange={e => setQAmount(e.target.value)}
+                onChange={v => setQAmount(v)}
                 placeholder="如：50000"
               />
             </div>
@@ -616,7 +616,7 @@ export default function SmBanquetLeadDetail() {
               <ZInput
                 type="number"
                 value={qValidDays}
-                onChange={e => setQValidDays(e.target.value)}
+                onChange={v => setQValidDays(v)}
                 placeholder="如：7"
               />
             </div>
@@ -626,7 +626,7 @@ export default function SmBanquetLeadDetail() {
               <label className={styles.label}>套餐（选填）</label>
               <ZSelect
                 value={qPackageId}
-                onChange={e => setQPackageId(e.target.value)}
+                onChange={v => setQPackageId(v)}
                 options={[
                   { value: '', label: '不绑定套餐' },
                   ...packages.map(p => ({ value: p.id, label: p.name })),

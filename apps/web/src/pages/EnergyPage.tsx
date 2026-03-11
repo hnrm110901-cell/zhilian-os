@@ -25,7 +25,7 @@ import {
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
-import apiClient from '../api/apiClient';
+import { apiClient } from '../services/api';
 import FilterToolbar from '../components/FilterToolbar';
 import AgentWorkspaceTemplate from '../components/AgentWorkspaceTemplate';
 

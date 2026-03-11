@@ -34,7 +34,7 @@ export default function SmDecisions() {
     setError(null);
     try {
       const resp = await apiClient.get(`/api/v1/bff/sm/${STORE_ID}/notifications`);
-      setItems(resp.data.items ?? []);
+      setItems(resp.items ?? []);
     } catch (e: any) {
       setError(e?.response?.data?.detail || '数据加载失败');
     } finally {

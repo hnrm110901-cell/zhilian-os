@@ -109,7 +109,7 @@ export default function DishRdPage() {
       const res = await apiClient.get<DashboardData>(
         `/api/v1/dish-rd/brands/${brandId}/dashboard`
       );
-      setDashboard(res.data);
+      setDashboard(res);
     } catch (e) {
       handleApiError(e, '加载驾驶舱失败');
     } finally {
@@ -126,7 +126,7 @@ export default function DishRdPage() {
       const res = await apiClient.get<DishSummary[]>(
         `/api/v1/dish-rd/brands/${brandId}/dishes`, { params }
       );
-      setDishes(res.data);
+      setDishes(res);
     } catch (e) {
       handleApiError(e, '加载菜品列表失败');
     } finally {
@@ -168,7 +168,7 @@ export default function DishRdPage() {
       const res = await apiClient.get<RiskResult>(
         `/api/v1/dish-rd/brands/${brandId}/agent/risk-scan`
       );
-      setRiskResult(res.data);
+      setRiskResult(res);
     } catch (e) {
       handleApiError(e, '风险扫描失败');
       setRiskOpen(false);

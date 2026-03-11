@@ -1,0 +1,62 @@
+/* SupplierAgentPage.module.css */
+
+.page {
+  padding: 20px;
+  min-height: 100%;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--t1);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.titleIcon {
+  color: var(--accent);
+  font-size: 22px;
+}
+
+.tabs {
+  background: transparent;
+}
+
+.code {
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--t3);
+}
+
+.tierDist {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.tierRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tierCount {
+  font-size: 13px;
+  color: var(--t2);
+  white-space: nowrap;
+  width: 40px;
+  text-align: right;
+}
+
+.quickActions {
+  padding: 8px 0;
+}

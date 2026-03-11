@@ -10,6 +10,7 @@ import {
   HealthRing,
 } from '../../design-system/components';
 import apiClient from '../../services/api';
+import RecommendationCard from '../../components/RecommendationCard';
 import styles from './HQHome.module.css';
 
 interface StoreHealth {
@@ -299,6 +300,16 @@ export default function HQHome() {
               </div>
             </ZCard>
           </div>
+
+          {/* AI 经营推荐（取排名最差门店，优先提供帮助） */}
+          {data?.stores_health_ranking?.length ? (
+            <div style={{ marginTop: 12 }}>
+              <RecommendationCard
+                storeId={data.stores_health_ranking[data.stores_health_ranking.length - 1].store_id}
+                maxItems={4}
+              />
+            </div>
+          ) : null}
 
         </div>
       )}

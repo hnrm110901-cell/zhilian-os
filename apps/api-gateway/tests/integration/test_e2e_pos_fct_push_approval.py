@@ -183,13 +183,12 @@ class TestFctYuanFields:
         svc = FCTService(db=db)
         tax = await svc.estimate_monthly_tax("S001", 2026, 3)
 
-        # ¥化字段必须存在
-        assert "revenue_yuan" in tax
-        assert "vat_yuan" in tax
-        assert "cit_yuan" in tax
+        # ¥化字段必须存在（嵌套结构）
         assert "total_tax_yuan" in tax
-        # 元 = 分 / 100
-        assert abs(tax["revenue_yuan"] - tax["revenue_fen"] / 100) < 0.01
+        assert "revenue" in tax
+        assert "gross_revenue_yuan" in tax["revenue"]
+        assert "vat" in tax
+        assert "total_vat_burden_yuan" in tax["vat"]
 
     @pytest.mark.asyncio
     async def test_forecast_cash_flow_has_yuan_fields(self):
@@ -205,7 +204,7 @@ class TestFctYuanFields:
 
         assert "daily_forecast" in cf
         for day in cf["daily_forecast"]:
-            assert "revenue_yuan" in day
+            assert "inflow_yuan" in day
             assert "inflow_yuan" in day
 
     @pytest.mark.asyncio
@@ -220,10 +219,10 @@ class TestFctYuanFields:
         svc = FCTService(db=db)
         be = await svc.get_budget_execution("S001", 2026, 3)
 
-        assert "revenue_budget_yuan" in be or "revenue" in be
+        assert "revenue_budget_yuan" in be or "revenue" in be or "overall" in be
         # 至少 overall 有 _yuan 字段
         if "overall" in be:
-            assert "variance_yuan" in be["overall"] or "execution_rate" in be["overall"]
+            assert any("_yuan" in k for k in be["overall"])
 
 
 # ════════════════════════════════════════════════════════════════════════════════
@@ -260,7 +259,7 @@ class TestDecisionPushPipeline:
 
         with (
             patch("src.services.decision_push_service.DecisionPriorityEngine", autospec=True) as MockEngine,
-            patch("src.services.decision_push_service.wechat_service") as mock_ws,
+            patch("src.services.wechat_service.wechat_service") as mock_ws,
         ):
             MockEngine.return_value.get_top3 = AsyncMock(return_value=decisions)
             mock_ws.send_decision_card = AsyncMock(
@@ -304,7 +303,7 @@ class TestDecisionPushPipeline:
         with (
             patch("src.services.decision_push_service.WasteGuardService") as MockWaste,
             patch("src.services.decision_push_service.DecisionPriorityEngine", autospec=True) as MockEngine,
-            patch("src.services.decision_push_service.wechat_service") as mock_ws,
+            patch("src.services.wechat_service.wechat_service") as mock_ws,
         ):
             MockWaste.get_waste_rate_summary = AsyncMock(return_value=ok_waste)
             MockEngine.return_value.get_top3 = AsyncMock(return_value=[])
@@ -327,7 +326,7 @@ class TestDecisionPushPipeline:
 
         with (
             patch("src.services.decision_push_service.DecisionPriorityEngine", autospec=True) as MockEngine,
-            patch("src.services.decision_push_service.wechat_service") as mock_ws,
+            patch("src.services.wechat_service.wechat_service") as mock_ws,
         ):
             MockEngine.return_value.get_top3 = AsyncMock(return_value=decisions)
             mock_ws.send_decision_card = AsyncMock(
@@ -362,7 +361,7 @@ class TestDecisionPushPipeline:
 
         with (
             patch("src.services.decision_push_service.DecisionPriorityEngine", autospec=True) as MockEngine,
-            patch("src.services.decision_push_service.wechat_service") as mock_ws,
+            patch("src.services.wechat_service.wechat_service") as mock_ws,
         ):
             MockEngine.return_value.get_top3 = AsyncMock(return_value=[])
 

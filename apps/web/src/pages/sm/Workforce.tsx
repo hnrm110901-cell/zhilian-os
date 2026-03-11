@@ -68,7 +68,7 @@ export default function SmWorkforce() {
         `/api/v1/workforce/stores/${STORE_ID}/staffing-advice`,
         { params: { date: TOMORROW, meal_period: 'all_day' } }
       );
-      setAdvice(resp.data);
+      setAdvice(resp);
     } catch (e) {
       handleApiError(e, '人力建议加载失败');
     } finally {

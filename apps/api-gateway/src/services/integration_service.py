@@ -2,10 +2,11 @@
 Integration Service
 外部系统集成服务
 """
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Callable, Tuple
 from datetime import datetime, timedelta
-from sqlalchemy import select, and_, or_, desc
+from sqlalchemy import select, and_, or_, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
+import asyncio
 import os
 import structlog
 import httpx
@@ -649,6 +650,424 @@ class IntegrationService:
 
         result = await session.execute(query)
         return list(result.scalars().all())
+
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # P1 增强功能 #1：自动重试机制
+    # ──────────────────────────────────────────────────────────────────────────
+
+    async def with_retry(
+        self,
+        func: Callable,
+        *args,
+        max_attempts: int = 3,
+        base_delay: float = 1.0,
+        backoff: float = 2.0,
+        retryable_exceptions: Tuple = (httpx.TimeoutException, httpx.ConnectError, ConnectionError),
+        **kwargs,
+    ) -> Any:
+        """
+        通用异步重试包装器（指数退避）
+
+        Args:
+            func: 被重试的异步函数
+            max_attempts: 最大尝试次数（默认3）
+            base_delay: 初始等待秒数（默认1s）
+            backoff: 退避系数（默认2x）
+            retryable_exceptions: 可重试的异常类型元组
+
+        Returns:
+            func 的返回值
+
+        Raises:
+            最后一次尝试的异常
+        """
+        last_exc: Exception = None
+        for attempt in range(1, max_attempts + 1):
+            try:
+                return await func(*args, **kwargs)
+            except retryable_exceptions as e:
+                last_exc = e
+                if attempt == max_attempts:
+                    break
+                delay = base_delay * (backoff ** (attempt - 1))
+                logger.warning(
+                    "integration_retry",
+                    func=getattr(func, "__name__", str(func)),
+                    attempt=attempt,
+                    max_attempts=max_attempts,
+                    delay=delay,
+                    error=str(e),
+                )
+                await asyncio.sleep(delay)
+        raise last_exc
+
+    async def test_connection_with_retry(
+        self, session: AsyncSession, system_id: str, max_attempts: int = 3
+    ) -> Dict[str, Any]:
+        """带自动重试的连接测试"""
+        return await self.with_retry(
+            self.test_connection,
+            session,
+            system_id,
+            max_attempts=max_attempts,
+        )
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # P1 增强功能 #2：数据转换规则配置
+    # ──────────────────────────────────────────────────────────────────────────
+
+    _TRANSFORM_REGISTRY: Dict[str, Dict[str, Callable]] = {}
+
+    def register_transform_rule(
+        self,
+        system_type: str,
+        data_type: str,
+        transform_fn: Callable[[Dict[str, Any]], Dict[str, Any]],
+    ) -> None:
+        """
+        注册数据转换规则
+
+        Args:
+            system_type: 系统类型（如 "meituan_pos", "tianchu"）
+            data_type: 数据类型（如 "order", "inventory"）
+            transform_fn: 接收原始 dict，返回标准化 dict 的纯函数
+        """
+        key = f"{system_type}:{data_type}"
+        self._TRANSFORM_REGISTRY[key] = transform_fn
+        logger.info("transform_rule_registered", key=key)
+
+    def apply_transform(
+        self,
+        system_type: str,
+        data_type: str,
+        raw_data: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """
+        应用数据转换规则
+
+        Returns:
+            转换后的标准字典；若无规则则原样返回
+        """
+        key = f"{system_type}:{data_type}"
+        transform_fn = self._TRANSFORM_REGISTRY.get(key)
+        if transform_fn is None:
+            return raw_data
+        try:
+            return transform_fn(raw_data)
+        except Exception as e:
+            logger.error("transform_failed", key=key, error=str(e))
+            return raw_data
+
+    def get_registered_rules(self) -> List[str]:
+        """返回所有已注册的转换规则 key 列表"""
+        return list(self._TRANSFORM_REGISTRY.keys())
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # P1 增强功能 #3：批量同步优化
+    # ──────────────────────────────────────────────────────────────────────────
+
+    async def batch_sync_members(
+        self,
+        session: AsyncSession,
+        system_id: str,
+        members: List[Dict[str, Any]],
+        chunk_size: int = 50,
+        system_type: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        批量同步会员数据（分块并发处理）
+
+        Args:
+            session: DB session
+            system_id: 外部系统 ID
+            members: 会员数据列表
+            chunk_size: 每批大小（默认50）
+            system_type: 用于查找转换规则的系统类型
+
+        Returns:
+            {"total": int, "success": int, "failed": int, "errors": list}
+        """
+        total = len(members)
+        success = 0
+        failed = 0
+        errors: List[Dict[str, Any]] = []
+
+        for i in range(0, total, chunk_size):
+            chunk = members[i: i + chunk_size]
+            tasks = []
+            for member_data in chunk:
+                if system_type:
+                    member_data = self.apply_transform(system_type, "member", member_data)
+                tasks.append(self._sync_member_safe(session, system_id, member_data, errors))
+
+            results = await asyncio.gather(*tasks)
+            success += sum(1 for r in results if r)
+            failed += sum(1 for r in results if not r)
+
+            logger.info(
+                "batch_sync_progress",
+                system_id=system_id,
+                processed=min(i + chunk_size, total),
+                total=total,
+            )
+
+        return {"total": total, "success": success, "failed": failed, "errors": errors[:10]}
+
+    async def _sync_member_safe(
+        self,
+        session: AsyncSession,
+        system_id: str,
+        member_data: Dict[str, Any],
+        errors: List,
+    ) -> bool:
+        """单条会员同步，异常不中断批处理"""
+        try:
+            await self.sync_member(session, system_id, member_data)
+            return True
+        except Exception as e:
+            errors.append({"member_id": member_data.get("member_id"), "error": str(e)})
+            logger.warning("member_sync_failed", member_id=member_data.get("member_id"), error=str(e))
+            return False
+
+    async def batch_sync_pos_transactions(
+        self,
+        session: AsyncSession,
+        system_id: str,
+        store_id: str,
+        transactions: List[Dict[str, Any]],
+        chunk_size: int = 100,
+        system_type: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """批量同步 POS 交易记录（分块顺序处理，保证幂等）"""
+        total = len(transactions)
+        success = 0
+        failed = 0
+        errors: List[Dict[str, Any]] = []
+
+        for i in range(0, total, chunk_size):
+            chunk = transactions[i: i + chunk_size]
+            for txn in chunk:
+                if system_type:
+                    txn = self.apply_transform(system_type, "order", txn)
+                try:
+                    await self.create_pos_transaction(session, system_id, store_id, txn)
+                    success += 1
+                except Exception as e:
+                    failed += 1
+                    errors.append({"transaction_id": txn.get("transaction_id"), "error": str(e)})
+
+        return {"total": total, "success": success, "failed": failed, "errors": errors[:10]}
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # P1 增强功能 #4：实时同步状态推送
+    # ──────────────────────────────────────────────────────────────────────────
+
+    async def get_realtime_sync_status(
+        self,
+        session: AsyncSession,
+        system_id: str,
+    ) -> Dict[str, Any]:
+        """
+        获取外部系统的实时同步状态快照
+
+        Returns:
+            {
+              "system_id": str,
+              "status": "active|error|idle",
+              "last_sync_at": ISO str | None,
+              "last_sync_type": str | None,
+              "last_24h_success": int,
+              "last_24h_failed": int,
+              "health_score": float,
+            }
+        """
+        system = await self.get_system(session, system_id)
+        if not system:
+            return {"error": "system_not_found"}
+
+        since = datetime.utcnow() - timedelta(hours=24)
+        result = await session.execute(
+            select(SyncLog).where(
+                and_(
+                    SyncLog.system_id == system_id,
+                    SyncLog.created_at >= since,
+                )
+            ).order_by(desc(SyncLog.created_at)).limit(200)
+        )
+        logs = list(result.scalars().all())
+
+        success_count = sum(1 for l in logs if l.status == SyncStatus.SUCCESS)
+        failed_count = sum(1 for l in logs if l.status == SyncStatus.FAILED)
+        last_log = logs[0] if logs else None
+
+        health = self._compute_health_score(success_count, failed_count, system)
+
+        return {
+            "system_id": system_id,
+            "system_name": system.name,
+            "status": system.status.value if system.status else "unknown",
+            "last_sync_at": last_log.created_at.isoformat() if last_log else None,
+            "last_sync_type": last_log.sync_type if last_log else None,
+            "last_24h_success": success_count,
+            "last_24h_failed": failed_count,
+            "health_score": health,
+            "snapshot_at": datetime.utcnow().isoformat(),
+        }
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # P1 增强功能 #5：集成健康度评分
+    # ──────────────────────────────────────────────────────────────────────────
+
+    def _compute_health_score(
+        self,
+        success_count: int,
+        failed_count: int,
+        system: "ExternalSystem",
+    ) -> float:
+        """
+        计算集成健康度评分（0-100）
+
+        维度权重：
+          - 24h 同步成功率（50%）
+          - 系统状态（30%）
+          - 最近是否有错误（20%）
+        """
+        total = success_count + failed_count
+        success_rate = (success_count / total) if total > 0 else 1.0
+
+        from ..models.integration import IntegrationStatus
+        status_score = {
+            IntegrationStatus.ACTIVE: 1.0,
+            IntegrationStatus.INACTIVE: 0.5,
+            IntegrationStatus.ERROR: 0.0,
+        }.get(system.status, 0.5)
+
+        error_penalty = 0.0 if (system.last_error is None) else 0.5
+
+        score = (
+            success_rate * 50
+            + status_score * 30
+            + (1.0 - error_penalty) * 20
+        )
+        return round(min(max(score, 0.0), 100.0), 1)
+
+    async def get_all_systems_health(
+        self,
+        session: AsyncSession,
+        store_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        获取所有外部系统的健康度汇总
+
+        Returns:
+            按 health_score 降序排列的系统状态列表
+        """
+        systems = await self.get_systems(session, store_id=store_id)
+        result = []
+        for sys in systems:
+            status = await self.get_realtime_sync_status(session, str(sys.id))
+            result.append(status)
+        result.sort(key=lambda x: x.get("health_score", 0), reverse=True)
+        return result
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # P1 增强功能 #6：数据冲突解决策略
+    # ──────────────────────────────────────────────────────────────────────────
+
+    def resolve_conflict(
+        self,
+        local: Dict[str, Any],
+        remote: Dict[str, Any],
+        strategy: str = "last_write_wins",
+        timestamp_field: str = "updated_at",
+    ) -> Dict[str, Any]:
+        """
+        数据冲突解决
+
+        Args:
+            local: 本地数据
+            remote: 远端数据
+            strategy: 解决策略
+                "last_write_wins"  — 时间戳较新的一方获胜（默认）
+                "remote_wins"      — 始终用远端数据覆盖
+                "local_wins"       — 始终保留本地数据
+                "merge_remote"     — 以本地为基础，远端字段补充（不覆盖非空本地字段）
+            timestamp_field: 用于比较时间戳的字段名
+
+        Returns:
+            合并后的数据字典
+        """
+        if strategy == "remote_wins":
+            return {**local, **remote}
+
+        if strategy == "local_wins":
+            return local
+
+        if strategy == "merge_remote":
+            merged = {**remote}
+            for k, v in local.items():
+                if v is not None:
+                    merged[k] = v
+            return merged
+
+        # last_write_wins（默认）
+        local_ts = local.get(timestamp_field)
+        remote_ts = remote.get(timestamp_field)
+
+        if local_ts is None and remote_ts is None:
+            return {**local, **remote}
+
+        if local_ts is None:
+            return {**local, **remote}
+
+        if remote_ts is None:
+            return local
+
+        try:
+            if isinstance(local_ts, str):
+                local_ts = datetime.fromisoformat(local_ts)
+            if isinstance(remote_ts, str):
+                remote_ts = datetime.fromisoformat(remote_ts)
+            return {**local, **remote} if remote_ts >= local_ts else local
+        except (ValueError, TypeError):
+            return {**local, **remote}
+
+    async def sync_member_with_conflict_resolution(
+        self,
+        session: AsyncSession,
+        system_id: str,
+        remote_data: Dict[str, Any],
+        strategy: str = "last_write_wins",
+    ) -> "MemberSync":
+        """
+        带冲突解决的会员同步
+
+        在写入前先查出本地记录，应用冲突解决策略后再同步
+        """
+        from sqlalchemy import select as _select
+        from ..models.integration import MemberSync
+
+        result = await session.execute(
+            _select(MemberSync).where(
+                and_(
+                    MemberSync.system_id == system_id,
+                    MemberSync.member_id == remote_data.get("member_id"),
+                )
+            )
+        )
+        existing = result.scalar_one_or_none()
+
+        if existing and existing.raw_data:
+            resolved = self.resolve_conflict(
+                local=existing.raw_data,
+                remote=remote_data,
+                strategy=strategy,
+            )
+        else:
+            resolved = remote_data
+
+        return await self.sync_member(session, system_id, resolved)
 
 
 # 创建全局服务实例

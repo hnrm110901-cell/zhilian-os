@@ -49,7 +49,7 @@ export default function HQStores() {
     setError(null);
     try {
       const resp = await apiClient.get(`/api/v1/bff/hq${refresh ? '?refresh=true' : ''}`);
-      setStores(resp.data.stores_health_ranking ?? []);
+      setStores(resp.stores_health_ranking ?? []);
     } catch (e: any) {
       setError(e?.response?.data?.detail || '数据加载失败');
     } finally {

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Layout, Menu, theme, Dropdown, Avatar, Space, Tag, Breadcrumb, Badge, Tooltip, Button } from 'antd';
 import type { MenuProps } from 'antd';
+import NotificationCenter from '../components/NotificationCenter';
 import {
   DashboardOutlined,
   ScheduleOutlined,
@@ -117,6 +118,10 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/alert-thresholds': 'nav-products',
   '/reconciliation': 'nav-products',
   '/dynamic-pricing': 'nav-products',
+  '/dish-rd': 'nav-products',
+  '/supplier-agent': 'nav-products',
+  '/business-intel': 'nav-agents',
+  '/people-agent': 'nav-agents',
 
   // 04 会员与增长
   '/marketing':       'nav-crm',
@@ -264,6 +269,10 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   '/dish-cost': '菜品成本',
   '/alert-thresholds': '告警阈值',
   '/reconciliation': '对账管理',
+  '/dish-rd': '菜品研发',
+  '/supplier-agent': '供应商管理',
+  '/business-intel': '经营智能体',
+  '/people-agent': '人员智能体',
   '/dynamic-pricing': '动态定价',
   '/members': '会员中心',
   '/crm-hub': '会员与增长中心',
@@ -294,6 +303,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   '/platform-hub': '平台与治理中心',
   '/stores': '门店管理',
   '/multi-store': '多门店管理',
+  '/cross-store-config': '跨店协调',
   '/approval': '审批管理',
   '/approval-list': '审批列表',
   '/action-plans': 'L5 行动计划',
@@ -314,6 +324,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   '/scheduler': '调度管理',
   '/backup': '数据备份',
   '/export-jobs': '导出任务',
+  '/roles': '角色权限',
   '/data-import-export': '数据导入导出',
   '/bulk-import': '数据导入',
   '/open-platform': '开放平台',
@@ -580,6 +591,8 @@ const MainLayout: React.FC = () => {
         { key: '/supply-chain',    icon: <ShoppingOutlined />,  label: '供应链管理' },
         { key: '/reconciliation',  icon: <FileExcelOutlined />, label: '对账管理' },
         { key: '/dynamic-pricing', icon: <DollarOutlined />,    label: '动态定价' },
+        { key: '/dish-rd',         icon: <ExperimentOutlined />, label: '菜品研发' },
+        { key: '/supplier-agent',  icon: <ShoppingOutlined />,  label: '供应商管理' },
       ],
     },
 
@@ -610,6 +623,8 @@ const MainLayout: React.FC = () => {
         { key: '/agent-hub',         icon: <AppstoreOutlined />,    label: 'Agent 总览' },
         // Agent 工作台
         { key: '/decision',          icon: <BarChartOutlined />,    label: '经营决策 Agent' },
+        { key: '/business-intel',    icon: <RobotOutlined />,       label: '经营智能体' },
+        { key: '/people-agent',      icon: <TeamOutlined />,        label: '人员智能体' },
         { key: '/training',          icon: <ReadOutlined />,        label: '培训管理 Agent' },
         // 配置与治理
         { key: '/agent-collaboration',icon: <ApartmentOutlined />,  label: '协作编排' },
@@ -641,6 +656,7 @@ const MainLayout: React.FC = () => {
         { key: '/users',            icon: <TeamOutlined />,       label: '用户管理' },
         { key: '/stores',           icon: <ShopOutlined />,       label: '门店管理' },
         { key: '/multi-store',      icon: <ShopOutlined />,       label: '多门店管理' },
+        { key: '/cross-store-config',icon: <ShopOutlined />,      label: '跨店协调' },
         { key: '/approval',         icon: <CheckCircleOutlined />,label: '审批管理' },
         { key: '/approval-list',    icon: <UnorderedListOutlined />,label: '审批列表' },
         { key: '/audit',            icon: <FileTextOutlined />,   label: '审计日志' },
@@ -665,6 +681,7 @@ const MainLayout: React.FC = () => {
         // 数据与配置
         { key: '/backup',           icon: <DatabaseOutlined />,   label: '数据备份' },
         { key: '/export-jobs',      icon: <ExportOutlined />,     label: '导出任务' },
+        { key: '/roles',            icon: <SafetyOutlined />,     label: '角色权限' },
         { key: '/data-import-export',icon: <FileExcelOutlined />, label: '数据导入导出' },
         { key: '/bulk-import',      icon: <UploadOutlined />,     label: '批量导入' },
         { key: '/report-templates', icon: <FileTextOutlined />,   label: '报表模板' },
@@ -789,15 +806,7 @@ const MainLayout: React.FC = () => {
             </Tooltip>
 
             {/* 通知 */}
-            <Tooltip title="通知中心">
-              <Badge count={5} size="small">
-                <Button
-                  type="text"
-                  icon={<BellOutlined style={{ fontSize: 17 }} />}
-                  onClick={() => navigate('/notifications')}
-                />
-              </Badge>
-            </Tooltip>
+            <NotificationCenter />
 
             {/* 角色视图快速切换 */}
             <Dropdown

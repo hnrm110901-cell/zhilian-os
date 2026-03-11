@@ -15,8 +15,10 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional
+import uuid
 
 import structlog
 from sqlalchemy import text
@@ -376,3 +378,197 @@ class WasteGuardService:
             "top5":              top5["top5"],
             "bom_deviation":     bom_dev["items"],
         }
+
+    # ── 实时告警：检测并推送偏差超阈值的食材 ──────────────────────────────────
+
+    @staticmethod
+    async def check_and_alert(
+        session: Any,
+        store_id: str,
+        tenant_id: str,
+        variances: List[Dict],
+        threshold_pct: float = 10.0,
+    ) -> List[str]:
+        """
+        检查 variances 中 |diff_rate_pct| > threshold_pct 的食材，推送告警并返回 event_id 列表。
+        超时和企微失败均静默忽略。
+        """
+        event_ids: List[str] = []
+        above = [v for v in variances if abs(v.get("diff_rate_pct", 0)) > threshold_pct]
+        if not above:
+            return []
+
+        for v in above:
+            event_id = f"WG-{uuid.uuid4().hex[:8].upper()}"
+            try:
+                from src.services import waste_reasoning_service as _wrs
+                reasoning = await asyncio.wait_for(
+                    _wrs.run_waste_reasoning(v.get("ingredient_id"), store_id, session),
+                    timeout=10.0,
+                )
+                top3 = reasoning.get("top3_root_causes", [])
+                action = _action_for_causes(top3)
+
+                from src.services.wechat_work_message_service import wechat_work_message_service as _wms
+                await asyncio.wait_for(
+                    _wms.send_card_message(
+                        user_id=tenant_id,
+                        title=f"损耗预警：{v.get('ingredient_name', v.get('ingredient_id'))}",
+                        description=f"偏差率 {v.get('diff_rate_pct', 0):.1f}%，建议：{action}",
+                        url="",
+                        btntxt="查看详情",
+                    ),
+                    timeout=5.0,
+                )
+                event_ids.append(event_id)
+            except Exception:
+                pass
+
+        return event_ids
+
+    # ── 月度损耗报告（四维：食材/员工/班次/渠道） ─────────────────────────────
+
+    @staticmethod
+    async def generate_monthly_report(
+        session: Any,
+        store_id: str,
+        year: int,
+        month: int,
+    ) -> Dict[str, Any]:
+        """生成月度四维损耗报告。"""
+        try:
+            from sqlalchemy import select, func
+            from src.models.waste_event import WasteEvent
+
+            start = date(year, month, 1)
+            if month == 12:
+                end = date(year + 1, 1, 1)
+            else:
+                end = date(year, month + 1, 1)
+
+            # 按食材维度
+            ing_stmt = (
+                select(
+                    WasteEvent.ingredient_id,
+                    func.sum(WasteEvent.waste_amount).label("total_qty"),
+                    func.count(WasteEvent.id).label("count"),
+                )
+                .where(WasteEvent.store_id == store_id)
+                .where(WasteEvent.event_time >= start)
+                .where(WasteEvent.event_time < end)
+                .group_by(WasteEvent.ingredient_id)
+                .order_by(func.sum(WasteEvent.waste_amount).desc())
+            )
+            by_ingredient = [
+                {"ingredient_id": r.ingredient_id, "total_qty": float(r.total_qty or 0), "count": r.count}
+                for r in (await session.execute(ing_stmt)).all()
+            ]
+
+            # 按员工维度
+            staff_stmt = (
+                select(
+                    WasteEvent.staff_id,
+                    func.count(WasteEvent.id).label("count"),
+                    func.avg(WasteEvent.waste_amount).label("avg_qty"),
+                )
+                .where(WasteEvent.store_id == store_id)
+                .where(WasteEvent.event_time >= start)
+                .where(WasteEvent.event_time < end)
+                .group_by(WasteEvent.staff_id)
+            )
+            by_staff = [
+                {"staff_id": r.staff_id, "count": r.count, "avg_qty": float(r.avg_qty or 0)}
+                for r in (await session.execute(staff_stmt)).all()
+            ]
+
+            by_shift: List[Dict] = []
+            by_channel: List[Dict] = []
+
+        except Exception:
+            by_ingredient = []
+            by_staff = []
+            by_shift = []
+            by_channel = []
+
+        return {
+            "period": {"year": year, "month": month},
+            "by_ingredient": by_ingredient,
+            "by_staff": by_staff,
+            "by_shift": by_shift,
+            "by_channel": by_channel,
+        }
+
+    # ── 跨店 BOM 漂移告警 ──────────────────────────────────────────────────────
+
+    @staticmethod
+    async def cross_store_bom_drift_alert(
+        session: Any,
+        tenant_id: str,
+        threshold_pct: float = 20.0,
+    ) -> List[Dict]:
+        """
+        检测同一菜品在不同门店的 BOM 用料偏差，超过阈值时触发告警。
+        返回告警记录列表。
+        """
+        try:
+            from sqlalchemy import select, func
+            from src.models.bom import BOMTemplate, BOMItem
+
+            stmt = (
+                select(
+                    BOMTemplate.dish_id,
+                    BOMTemplate.store_id,
+                    func.sum(BOMItem.standard_qty).label("total_qty"),
+                )
+                .join(BOMItem, BOMItem.bom_id == BOMTemplate.id)
+                .where(BOMTemplate.scope_id == tenant_id)
+                .group_by(BOMTemplate.dish_id, BOMTemplate.store_id)
+            )
+            rows = (await session.execute(stmt)).all()
+
+        except Exception:
+            return []
+
+        if not rows:
+            return []
+
+        # 按菜品聚合各门店用量
+        dish_store_qty: Dict[str, Dict[str, float]] = {}
+        for r in rows:
+            dish_store_qty.setdefault(r.dish_id, {})[r.store_id] = float(r.total_qty or 0)
+
+        alerts: List[Dict] = []
+        for dish_id, store_qtys in dish_store_qty.items():
+            if len(store_qtys) < 2:
+                continue
+            values = list(store_qtys.values())
+            avg_qty = sum(values) / len(values)
+            if avg_qty == 0:
+                continue
+            for store_id, qty in store_qtys.items():
+                drift_pct = abs(qty - avg_qty) / avg_qty * 100
+                if drift_pct > threshold_pct:
+                    alert = {
+                        "dish_id": dish_id,
+                        "store_id": store_id,
+                        "qty": qty,
+                        "avg_qty": avg_qty,
+                        "drift_pct": round(drift_pct, 2),
+                    }
+                    alerts.append(alert)
+                    try:
+                        from src.services.wechat_work_message_service import wechat_work_message_service as _wms
+                        await asyncio.wait_for(
+                            _wms.send_card_message(
+                                user_id=tenant_id,
+                                title=f"BOM跨店偏差预警：{dish_id}",
+                                description=f"门店{store_id}用量{qty:.1f}，均值{avg_qty:.1f}，偏差{drift_pct:.1f}%",
+                                url="",
+                                btntxt="查看详情",
+                            ),
+                            timeout=5.0,
+                        )
+                    except Exception:
+                        pass
+
+        return alerts

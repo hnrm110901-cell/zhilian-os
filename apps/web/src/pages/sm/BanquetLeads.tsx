@@ -288,7 +288,7 @@ export default function SmBanquetLeads() {
             <label className={styles.label}>跟进内容（选填）</label>
             <ZInput
               value={followup}
-              onChange={e => setFollowup(e.target.value)}
+              onChange={v => setFollowup(v)}
               placeholder="填写本次跟进情况…"
             />
           </div>
@@ -319,7 +319,7 @@ export default function SmBanquetLeads() {
               <label className={styles.label}>客户姓名</label>
               <ZInput
                 value={nlName}
-                onChange={e => setNlName(e.target.value)}
+                onChange={v => setNlName(v)}
                 placeholder="如：张三"
               />
             </div>
@@ -327,7 +327,7 @@ export default function SmBanquetLeads() {
               <label className={styles.label}>手机号</label>
               <ZInput
                 value={nlPhone}
-                onChange={e => setNlPhone(e.target.value)}
+                onChange={v => setNlPhone(v)}
                 placeholder="13800138000"
                 type="tel"
               />
@@ -346,7 +346,7 @@ export default function SmBanquetLeads() {
             <label className={styles.label}>预期日期（选填）</label>
             <ZInput
               value={nlExpectedDate}
-              onChange={e => setNlExpectedDate(e.target.value)}
+              onChange={v => setNlExpectedDate(v)}
               type="date"
             />
           </div>
@@ -355,7 +355,7 @@ export default function SmBanquetLeads() {
               <label className={styles.label}>预计桌数</label>
               <ZInput
                 value={nlTables}
-                onChange={e => setNlTables(e.target.value)}
+                onChange={v => setNlTables(v)}
                 placeholder="例：20"
                 type="number"
               />
@@ -364,7 +364,7 @@ export default function SmBanquetLeads() {
               <label className={styles.label}>预算（元）</label>
               <ZInput
                 value={nlBudget}
-                onChange={e => setNlBudget(e.target.value)}
+                onChange={v => setNlBudget(v)}
                 placeholder="例：60000"
                 type="number"
               />
@@ -374,7 +374,7 @@ export default function SmBanquetLeads() {
             <label className={styles.label}>备注（选填）</label>
             <ZInput
               value={nlRemark}
-              onChange={e => setNlRemark(e.target.value)}
+              onChange={v => setNlRemark(v)}
               placeholder="如：口碑推荐，有特殊需求"
             />
           </div>

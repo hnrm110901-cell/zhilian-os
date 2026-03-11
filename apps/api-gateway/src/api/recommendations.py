@@ -215,3 +215,57 @@ async def get_recommendation_performance(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== P1-3：门店级经营推荐 ====================
+
+from ..services.recommendation_service import generate_store_recommendations
+from ..core.dependencies import get_current_active_user
+from ..models.user import User
+
+
+@router.get("/{store_id}", summary="获取门店经营推荐（推广/下架/限时折扣）")
+async def get_store_recommendations(
+    store_id: str,
+    _current_user: User = Depends(get_current_active_user),
+):
+    """
+    基于销售历史 + 库存状态，返回门店级推荐列表。
+    每条推荐包含：建议动作、预期¥影响、置信度、优先级。
+    """
+    try:
+        # TODO: 接入真实 sales/inventory DB 查询
+        # 当前使用模拟数据用于演示
+        mock_sales = [
+            {"dish_id": "D001", "dish_name": "招牌红烧肉", "qty_sold_7d": 84, "revenue_7d": 2520.0, "avg_daily_qty": 12.0},
+            {"dish_id": "D002", "dish_name": "夫妻肺片", "qty_sold_7d": 63, "revenue_7d": 1890.0, "avg_daily_qty": 9.0},
+            {"dish_id": "D003", "dish_name": "麻婆豆腐", "qty_sold_7d": 42, "revenue_7d": 840.0, "avg_daily_qty": 6.0},
+            {"dish_id": "D004", "dish_name": "冬瓜汤", "qty_sold_7d": 7, "revenue_7d": 140.0, "avg_daily_qty": 1.0},
+            {"dish_id": "D005", "dish_name": "酸豆角", "qty_sold_7d": 5, "revenue_7d": 75.0, "avg_daily_qty": 0.7},
+        ]
+        mock_inventory = [
+            {"dish_id": "D004", "dish_name": "冬瓜汤", "stock_qty": 30, "days_until_expiry": 3, "cost_per_unit": 4.5},
+            {"dish_id": "D006", "dish_name": "卤猪蹄", "stock_qty": 15, "days_until_expiry": 1, "cost_per_unit": 28.0},
+            {"dish_id": "D005", "dish_name": "酸豆角", "stock_qty": 20, "days_until_expiry": 5, "cost_per_unit": 2.0},
+        ]
+
+        recs = generate_store_recommendations(store_id, mock_sales, mock_inventory)
+        return {
+            "store_id": store_id,
+            "total": len(recs),
+            "recommendations": [
+                {
+                    "dish_id": r.dish_id,
+                    "dish_name": r.dish_name,
+                    "action": r.action.value,
+                    "reason": r.reason,
+                    "expected_revenue_impact": round(r.expected_revenue_impact, 2),
+                    "confidence": round(r.confidence, 2),
+                    "priority": r.priority,
+                    "tags": r.tags,
+                }
+                for r in recs
+            ],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

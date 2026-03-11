@@ -39,6 +39,9 @@ sys.modules.setdefault("src.models", _models_mock)
 _onto_mock = MagicMock()
 sys.modules["src.ontology"] = _onto_mock
 
+# Ensure waste_reasoning_service is imported as the real module, not a mock
+sys.modules.pop("src.services.waste_reasoning_service", None)
+
 import src.services.waste_reasoning_service as _waste_mod  # noqa: E402
 from src.services.waste_reasoning_service import _step2_bom_deviation  # noqa: E402
 

@@ -8,9 +8,10 @@ interface ZInputProps {
   onClear?: () => void;
   icon?: React.ReactNode;
   style?: React.CSSProperties;
+  type?: string;
 }
 
-export default function ZInput({ placeholder, value, onChange, onClear, icon, style }: ZInputProps) {
+export default function ZInput({ placeholder, value, onChange, onClear, icon, style, type }: ZInputProps) {
   return (
     <div className={styles.wrap} style={style}>
       {icon && <span className={styles.iconLeft}>{icon}</span>}
@@ -18,6 +19,7 @@ export default function ZInput({ placeholder, value, onChange, onClear, icon, st
         className={`${styles.input} ${icon ? styles.hasIcon : ''}`}
         placeholder={placeholder}
         value={value}
+        type={type}
         onChange={e => onChange?.(e.target.value)}
       />
       {value && onClear && (

@@ -23,6 +23,7 @@ import time
 from src.core.config import settings
 # 核心模块
 from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation, approval, embedding, raas, model_marketplace, human_in_the_loop, hardware_integration, pos, dishes, benchmark, dish_master, alerts_webhook
+from src.api import roles as roles_api
 from src.api.phase5_apis import platform_router, industry_router, supply_chain_router, i18n_router
 # 逐步启用的模块
 from src.api import dashboard, analytics, audit, multi_store, finance, customer360, wechat_triggers, queue, meituan_queue
@@ -73,6 +74,7 @@ from src.api import pos_webhook
 from src.api import bulk_import
 from src.api import hq_dashboard
 from src.api import dish_rd_agent
+from src.api import supplier_agent
 from src.api import ai_accuracy
 from src.api import dashboard_preferences
 from src.api import governance
@@ -456,6 +458,7 @@ async def prometheus_middleware(request, call_next):
 # 注册路由 - 核心模块
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
+app.include_router(roles_api.router, prefix="/api/v1", tags=["roles"])
 app.include_router(agents.router, prefix="/api/v1/agents", tags=["agents"])
 app.include_router(approval.router, prefix="/api/v1", tags=["approval"])
 app.include_router(notifications.router, prefix="/api/v1", tags=["notifications"])
@@ -582,6 +585,13 @@ app.include_router(pos_webhook.router, tags=["pos_webhook"])
 app.include_router(bulk_import.router, tags=["bulk_import"])
 app.include_router(hq_dashboard.router, prefix="/api/v1", tags=["hq_dashboard"])
 app.include_router(dish_rd_agent.router, tags=["dish-rd"])
+app.include_router(supplier_agent.router, tags=["supplier-agent"])
+# Phase 12 — 经营智能体（营收异常 / KPI健康度 / 订单预测 / Top3决策 / 场景识别）
+from src.api import business_intel
+app.include_router(business_intel.router, tags=["business-intel"])
+# Phase 12B — 人员智能体（排班优化 / 绩效评分 / 人力成本 / 考勤预警 / 人员配置）
+from src.api import people_agent
+app.include_router(people_agent.router, tags=["people-agent"])
 app.include_router(ai_accuracy.router, prefix="/api/v1", tags=["ai_accuracy"])
 app.include_router(governance.router, prefix="/api/v1", tags=["governance"])
 app.include_router(dashboard_preferences.router, prefix="/api/v1", tags=["dashboard_preferences"])

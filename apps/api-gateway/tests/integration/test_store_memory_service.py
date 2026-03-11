@@ -96,75 +96,111 @@ class TestConfidenceLevel:
 
 class TestComputePeakPatterns:
     @pytest.mark.asyncio
-    async def test_no_db_returns_24_mock_patterns(self):
+    async def test_no_db_returns_empty(self):
+        """db=None 时返回空列表（无 mock 回退）"""
         svc = StoreMemoryService(db_session=None, memory_store=_mock_memory_store())
         patterns = await svc.compute_peak_patterns("S1")
-        assert len(patterns) == 24
-        assert all(isinstance(p, PeakHourPattern) for p in patterns)
+        assert patterns == []
 
     @pytest.mark.asyncio
-    async def test_no_db_peak_hours_are_correct(self):
+    async def test_no_db_no_peak_hours(self):
+        """db=None 时无高峰时段数据"""
         svc = StoreMemoryService(db_session=None, memory_store=_mock_memory_store())
         patterns = await svc.compute_peak_patterns("S1")
-        peak_hours = {p.hour for p in patterns if p.is_peak}
-        assert peak_hours == {11, 12, 13, 18, 19, 20}
+        assert len(patterns) == 0
 
     @pytest.mark.asyncio
-    async def test_with_db_queries_each_hour(self):
+    async def test_with_db_single_query_returns_24_patterns(self):
+        """单次 GROUP BY 查询 → 返回 24 个时段模式"""
+        from datetime import date as _date
         mock_db = AsyncMock()
-        mock_db.execute = AsyncMock(return_value=_one_result(order_count=30, revenue=150_000))
+        # 模拟一行数据：hour=12, day=今天, order_count=30, revenue=150_000
+        row = MagicMock()
+        row.hour = 12
+        row.day = _date.today()
+        row.order_count = 30
+        row.revenue = 150_000
+        result = MagicMock()
+        result.all = MagicMock(return_value=[row])
+        mock_db.execute = AsyncMock(return_value=result)
 
         svc = StoreMemoryService(db_session=mock_db, memory_store=_mock_memory_store())
         patterns = await svc.compute_peak_patterns("S1", lookback_days=30)
 
         assert len(patterns) == 24
-        assert mock_db.execute.await_count == 24
+        assert mock_db.execute.await_count == 1  # 单次查询
 
     @pytest.mark.asyncio
     async def test_with_db_avg_orders_calculated(self):
+        from datetime import date as _date
         mock_db = AsyncMock()
-        # 30 orders over 30 days → avg 1.0 per day
-        mock_db.execute = AsyncMock(return_value=_one_result(order_count=30, revenue=0))
-
-        svc = StoreMemoryService(db_session=mock_db, memory_store=_mock_memory_store())
-        patterns = await svc.compute_peak_patterns("S1", lookback_days=30)
-
-        # All hours get same avg_orders = 30/30 = 1.0
-        for p in patterns:
-            assert p.avg_orders == pytest.approx(1.0)
-
-    @pytest.mark.asyncio
-    async def test_with_db_revenue_converted_from_fen(self):
-        mock_db = AsyncMock()
-        # revenue=3000 fen, lookback=1 → avg_revenue = 3000/100/1 = 30 yuan
-        mock_db.execute = AsyncMock(return_value=_one_result(order_count=0, revenue=3000))
+        # 30 orders over 1 day for hour=12 → avg_orders = 30.0 for hour 12
+        row = MagicMock()
+        row.hour = 12
+        row.day = _date.today()
+        row.order_count = 30
+        row.revenue = 0
+        result = MagicMock()
+        result.all = MagicMock(return_value=[row])
+        mock_db.execute = AsyncMock(return_value=result)
 
         svc = StoreMemoryService(db_session=mock_db, memory_store=_mock_memory_store())
         patterns = await svc.compute_peak_patterns("S1", lookback_days=1)
 
-        assert patterns[0].avg_revenue == pytest.approx(30.0)
+        hour12 = next(p for p in patterns if p.hour == 12)
+        assert hour12.avg_orders == pytest.approx(30.0)
 
     @pytest.mark.asyncio
-    async def test_db_exception_returns_mock_fallback(self):
+    async def test_with_db_revenue_converted_from_fen(self):
+        from datetime import date as _date
+        mock_db = AsyncMock()
+        # revenue=3000 fen → avg_revenue = 3000/100 = 30 yuan
+        row = MagicMock()
+        row.hour = 12
+        row.day = _date.today()
+        row.order_count = 0
+        row.revenue = 3000
+        result = MagicMock()
+        result.all = MagicMock(return_value=[row])
+        mock_db.execute = AsyncMock(return_value=result)
+
+        svc = StoreMemoryService(db_session=mock_db, memory_store=_mock_memory_store())
+        patterns = await svc.compute_peak_patterns("S1", lookback_days=1)
+
+        hour12 = next(p for p in patterns if p.hour == 12)
+        assert hour12.avg_revenue == pytest.approx(30.0)
+
+    @pytest.mark.asyncio
+    async def test_db_exception_returns_empty(self):
+        """DB 异常时返回空列表（不再 mock 回退）"""
         mock_db = AsyncMock()
         mock_db.execute = AsyncMock(side_effect=RuntimeError("DB down"))
 
         svc = StoreMemoryService(db_session=mock_db, memory_store=_mock_memory_store())
         patterns = await svc.compute_peak_patterns("S1")
 
-        assert len(patterns) == 24  # mock fallback
+        assert patterns == []
 
     @pytest.mark.asyncio
-    async def test_is_peak_threshold(self):
-        """avg_orders > 1.5 → is_peak"""
+    async def test_is_peak_dynamic_threshold(self):
+        """高峰时段判定：单小时订单远超均值时为 is_peak=True"""
+        from datetime import date as _date
         mock_db = AsyncMock()
-        # 2 orders/day → avg_orders=2.0 > 1.5 → is_peak=True
-        mock_db.execute = AsyncMock(return_value=_one_result(order_count=2, revenue=0))
+        # hour=12 有100单，其余无数据 → 均值=100/24≈4.2，阈值=5.4，12点=100 > 阈值 → is_peak
+        row = MagicMock()
+        row.hour = 12
+        row.day = _date.today()
+        row.order_count = 100
+        row.revenue = 0
+        result = MagicMock()
+        result.all = MagicMock(return_value=[row])
+        mock_db.execute = AsyncMock(return_value=result)
 
         svc = StoreMemoryService(db_session=mock_db, memory_store=_mock_memory_store())
         patterns = await svc.compute_peak_patterns("S1", lookback_days=1)
 
-        assert all(p.is_peak for p in patterns)
+        hour12 = next(p for p in patterns if p.hour == 12)
+        assert hour12.is_peak is True
 
 
 # ===========================================================================
@@ -356,11 +392,12 @@ class TestRefreshStoreMemory:
         assert memory.brand_id == "BRAND-X"
 
     @pytest.mark.asyncio
-    async def test_refresh_includes_24_peak_patterns(self):
+    async def test_refresh_includes_no_peak_patterns_without_db(self):
+        """db=None 时 peak_patterns 为空（无 mock 回退）"""
         mock_store = _mock_memory_store()
         svc = StoreMemoryService(db_session=None, memory_store=mock_store)
         memory = await svc.refresh_store_memory("S1")
-        assert len(memory.peak_patterns) == 24
+        assert len(memory.peak_patterns) == 0
 
 
 # ===========================================================================

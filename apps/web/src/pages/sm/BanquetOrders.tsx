@@ -237,7 +237,7 @@ export default function SmBanquetOrders() {
             <ZInput
               type="number"
               value={payAmount}
-              onChange={e => setPayAmount(e.target.value)}
+              onChange={v => setPayAmount(v)}
               placeholder="请输入金额"
             />
           </div>

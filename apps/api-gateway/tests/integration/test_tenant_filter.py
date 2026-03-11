@@ -139,7 +139,7 @@ class TestEnableTenantFilterRLS:
             await enable_tenant_filter(mock_session, use_rls=True)
 
         # The ORM fallback path should have tried to attach a listener
-        mock_event.listens_for.assert_called_once()
+        mock_event.listen.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_use_rls_false_skips_set_config(self):
@@ -153,7 +153,7 @@ class TestEnableTenantFilterRLS:
         # No execute call for set_config
         mock_session.execute.assert_not_awaited()
         # ORM event listener should be attached
-        mock_event.listens_for.assert_called_once()
+        mock_event.listen.assert_called_once()
 
 
 # ===========================================================================
@@ -205,16 +205,13 @@ class TestReceiveDoOrmExecute:
     """
 
     def _capture_listener(self, mock_event):
-        """Return a fake listens_for that captures the registered function."""
+        """Return a fake listen that captures the registered function."""
         captured = {}
 
-        def fake_listens_for(session, event_name):
-            def decorator(fn):
-                captured["fn"] = fn
-                return fn
-            return decorator
+        def fake_listen(session, event_name, fn):
+            captured["fn"] = fn
 
-        mock_event.listens_for = fake_listens_for
+        mock_event.listen = fake_listen
         return captured
 
     @pytest.mark.asyncio
@@ -227,7 +224,7 @@ class TestReceiveDoOrmExecute:
             captured = self._capture_listener(mock_event)
             await enable_tenant_filter(mock_session, use_rls=False)
 
-        assert "fn" in captured, "listens_for decorator was not called"
+        assert "fn" in captured, "event.listen was not called"
 
         mock_state = MagicMock()
         mock_state.is_select = False

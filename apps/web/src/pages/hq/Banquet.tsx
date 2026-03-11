@@ -120,7 +120,7 @@ function DashboardTab() {
         `/api/v1/banquet-agent/stores/${STORE_ID}/dashboard`,
         { params: { year, month: mon } },
       );
-      setDashboard(resp.data);
+      setDashboard(resp);
     } catch (e) {
       handleApiError(e, '宴会仪表盘加载失败');
       setDashboard(null);
@@ -133,7 +133,7 @@ function DashboardTab() {
     setLoadingFunnel(true);
     try {
       const resp = await apiClient.get(`/api/v1/banquet-lifecycle/${STORE_ID}/funnel`);
-      setFunnel(resp.data);
+      setFunnel(resp);
     } catch {
       setFunnel(null);
     } finally {
@@ -148,7 +148,7 @@ function DashboardTab() {
         `/api/v1/banquet-agent/stores/${STORE_ID}/orders`,
         { params: { status: 'confirmed' } },
       );
-      setOrders(Array.isArray(resp.data) ? resp.data : (resp.data?.items ?? []));
+      setOrders(Array.isArray(resp) ? resp : (resp?.items ?? []));
     } catch {
       setOrders([]);
     } finally {
@@ -430,7 +430,7 @@ function DashboardTab() {
           <ZInput
             type="number"
             value={targetInput}
-            onChange={e => setTargetInput(e.target.value)}
+            onChange={v => setTargetInput(v)}
             placeholder="如：500000"
           />
         </div>
@@ -776,7 +776,7 @@ function AITab() {
               <ZInput
                 type="number"
                 value={recPeople}
-                onChange={e => setRecPeople(e.target.value)}
+                onChange={v => setRecPeople(v)}
                 placeholder="如：200"
               />
             </div>
@@ -785,7 +785,7 @@ function AITab() {
               <ZInput
                 type="number"
                 value={recBudget}
-                onChange={e => setRecBudget(e.target.value)}
+                onChange={v => setRecBudget(v)}
                 placeholder="如：60000"
               />
             </div>
@@ -846,7 +846,7 @@ function AITab() {
               <ZInput
                 type="date"
                 value={hallDate}
-                onChange={e => setHallDate(e.target.value)}
+                onChange={v => setHallDate(v)}
               />
             </div>
             <div className={styles.aiField}>
@@ -864,7 +864,7 @@ function AITab() {
               <ZInput
                 type="number"
                 value={hallPeople}
-                onChange={e => setHallPeople(e.target.value)}
+                onChange={v => setHallPeople(v)}
                 placeholder="如：200"
               />
             </div>
@@ -1249,7 +1249,7 @@ function HallsSection() {
         <div className={styles.resForm}>
           <div className={styles.resField}>
             <label className={styles.resLabel}>厅房名称</label>
-            <ZInput value={fName} onChange={e => setFName(e.target.value)} placeholder="如：一号宴会厅" />
+            <ZInput value={fName} onChange={v => setFName(v)} placeholder="如：一号宴会厅" />
           </div>
           <div className={styles.resField}>
             <label className={styles.resLabel}>厅房类型</label>
@@ -1258,26 +1258,26 @@ function HallsSection() {
           <div className={styles.resFieldRow}>
             <div className={styles.resField}>
               <label className={styles.resLabel}>最多桌数</label>
-              <ZInput type="number" value={fMaxTables} onChange={e => setFMaxTables(e.target.value)} placeholder="如：20" />
+              <ZInput type="number" value={fMaxTables} onChange={v => setFMaxTables(v)} placeholder="如：20" />
             </div>
             <div className={styles.resField}>
               <label className={styles.resLabel}>最多人数</label>
-              <ZInput type="number" value={fMaxPeople} onChange={e => setFMaxPeople(e.target.value)} placeholder="如：200" />
+              <ZInput type="number" value={fMaxPeople} onChange={v => setFMaxPeople(v)} placeholder="如：200" />
             </div>
           </div>
           <div className={styles.resFieldRow}>
             <div className={styles.resField}>
               <label className={styles.resLabel}>最低消费（元）</label>
-              <ZInput type="number" value={fMinSpend} onChange={e => setFMinSpend(e.target.value)} placeholder="如：20000" />
+              <ZInput type="number" value={fMinSpend} onChange={v => setFMinSpend(v)} placeholder="如：20000" />
             </div>
             <div className={styles.resField}>
               <label className={styles.resLabel}>面积（m²，选填）</label>
-              <ZInput type="number" value={fArea} onChange={e => setFArea(e.target.value)} placeholder="如：500" />
+              <ZInput type="number" value={fArea} onChange={v => setFArea(v)} placeholder="如：500" />
             </div>
           </div>
           <div className={styles.resField}>
             <label className={styles.resLabel}>备注（选填）</label>
-            <ZInput value={fDesc} onChange={e => setFDesc(e.target.value)} placeholder="厅房介绍…" />
+            <ZInput value={fDesc} onChange={v => setFDesc(v)} placeholder="厅房介绍…" />
           </div>
         </div>
       </ZModal>
@@ -1443,7 +1443,7 @@ function PackagesSection() {
         <div className={styles.resForm}>
           <div className={styles.resField}>
             <label className={styles.resLabel}>套餐名称</label>
-            <ZInput value={fName} onChange={e => setFName(e.target.value)} placeholder="如：经典婚宴套餐" />
+            <ZInput value={fName} onChange={v => setFName(v)} placeholder="如：经典婚宴套餐" />
           </div>
           <div className={styles.resField}>
             <label className={styles.resLabel}>适用宴会类型（选填）</label>
@@ -1456,26 +1456,26 @@ function PackagesSection() {
           <div className={styles.resFieldRow}>
             <div className={styles.resField}>
               <label className={styles.resLabel}>建议售价（元）</label>
-              <ZInput type="number" value={fPrice} onChange={e => setFPrice(e.target.value)} placeholder="如：30000" />
+              <ZInput type="number" value={fPrice} onChange={v => setFPrice(v)} placeholder="如：30000" />
             </div>
             <div className={styles.resField}>
               <label className={styles.resLabel}>估算成本（元，选填）</label>
-              <ZInput type="number" value={fCost} onChange={e => setFCost(e.target.value)} placeholder="如：12000" />
+              <ZInput type="number" value={fCost} onChange={v => setFCost(v)} placeholder="如：12000" />
             </div>
           </div>
           <div className={styles.resFieldRow}>
             <div className={styles.resField}>
               <label className={styles.resLabel}>最少人数</label>
-              <ZInput type="number" value={fPeopleMin} onChange={e => setFPeopleMin(e.target.value)} placeholder="1" />
+              <ZInput type="number" value={fPeopleMin} onChange={v => setFPeopleMin(v)} placeholder="1" />
             </div>
             <div className={styles.resField}>
               <label className={styles.resLabel}>最多人数</label>
-              <ZInput type="number" value={fPeopleMax} onChange={e => setFPeopleMax(e.target.value)} placeholder="999" />
+              <ZInput type="number" value={fPeopleMax} onChange={v => setFPeopleMax(v)} placeholder="999" />
             </div>
           </div>
           <div className={styles.resField}>
             <label className={styles.resLabel}>套餐描述（选填）</label>
-            <ZInput value={fDesc} onChange={e => setFDesc(e.target.value)} placeholder="套餐包含内容…" />
+            <ZInput value={fDesc} onChange={v => setFDesc(v)} placeholder="套餐包含内容…" />
           </div>
         </div>
       </ZModal>
@@ -1658,7 +1658,7 @@ function TemplatesSection() {
         <div className={styles.resForm}>
           <div className={styles.resField}>
             <label className={styles.resLabel}>模板名称</label>
-            <ZInput value={fName} onChange={e => setFName(e.target.value)} placeholder="如：婚宴标准执行模板" />
+            <ZInput value={fName} onChange={v => setFName(v)} placeholder="如：婚宴标准执行模板" />
           </div>
           <div className={styles.resField}>
             <label className={styles.resLabel}>适用宴会类型</label>
@@ -1680,7 +1680,7 @@ function TemplatesSection() {
                 <div key={i} className={styles.tplTaskRow}>
                   <ZInput
                     value={d.task_name}
-                    onChange={e => updateTaskDef(i, 'task_name', e.target.value)}
+                    onChange={val => updateTaskDef(i, 'task_name', val)}
                     placeholder="任务名称"
                   />
                   <ZSelect
@@ -1697,7 +1697,7 @@ function TemplatesSection() {
                   <ZInput
                     type="number"
                     value={String(d.days_before)}
-                    onChange={e => updateTaskDef(i, 'days_before', parseInt(e.target.value, 10) || 1)}
+                    onChange={val => updateTaskDef(i, 'days_before', parseInt(val, 10) || 1)}
                     placeholder="提前天数"
                   />
                   <button className={styles.tplRemoveBtn} onClick={() => removeTaskDef(i)}>✕</button>
@@ -1996,7 +1996,7 @@ function AnalyticsTab() {
         <ZInput
           type="month"
           value={month}
-          onChange={e => setMonth(e.target.value)}
+          onChange={v => setMonth(v)}
         />
       </div>
 
@@ -2583,7 +2583,7 @@ function AnalyticsTab() {
       )}
     </div>
   );
-} */
+}
 
 interface CustomerItem {
   id:                       string;
@@ -2652,7 +2652,7 @@ function CustomerTab() {
       <div className={styles.customerSearch}>
         <ZInput
           value={q}
-          onChange={e => setQ(e.target.value)}
+          onChange={v => setQ(v)}
           placeholder="搜索客户姓名 / 手机号…"
         />
       </div>
@@ -3080,7 +3080,7 @@ function CrossStoreTab() {
   return (
     <div className={styles.crossStoreTab}>
       <div className={styles.analyticsPicker}>
-        <ZInput type="month" value={month} onChange={e => setMonth(e.target.value)} />
+        <ZInput type="month" value={month} onChange={v => setMonth(v)} />
       </div>
 
       {/* Benchmark 卡 */}

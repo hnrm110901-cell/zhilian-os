@@ -126,6 +126,8 @@ importers:
         specifier: ^2.0.0
         version: 2.1.9(@types/node@24.10.13)(@vitest/ui@2.1.9)(jsdom@25.0.1)
 
+  packages/agents/banquet: {}
+
   packages/agents/decision:
     dependencies:
       '@zhilian-os/agent-inventory':
@@ -151,6 +153,8 @@ importers:
         version: link:../../api-adapters/pinzhi
 
   packages/agents/order: {}
+
+  packages/agents/performance: {}
 
   packages/agents/reservation:
     dependencies:

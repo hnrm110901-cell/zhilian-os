@@ -3,7 +3,7 @@ ARCH-003: 门店记忆服务
 
 计算门店的运营模式记忆：高峰时段、菜品健康度、员工基线。
 """
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 import structlog
 

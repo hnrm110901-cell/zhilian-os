@@ -49,28 +49,28 @@ class TestFederatedLearningService:
 
         service = FederatedLearningService()
         result = await service.create_training_round(
-            model_type=ModelType.DEMAND_FORECAST,
+            model_type=ModelType.DEMAND_PREDICTION,
             config={"min_participants": 2},
         )
 
         assert "round_id" in result
-        assert result["model_type"] == ModelType.DEMAND_FORECAST
+        assert result["model_type"] == ModelType.DEMAND_PREDICTION
         assert result["status"] == "initialized"
 
     @patch("src.services.federated_learning_service.get_db_session")
     @pytest.mark.asyncio
-    async def test_create_training_round_recommendation(self, mock_get_db):
-        """支持 RECOMMENDATION 模型类型。"""
+    async def test_create_training_round_sales_forecast(self, mock_get_db):
+        """支持 SALES_FORECAST 模型类型。"""
         session = make_mock_session()
         mock_get_db.return_value = session
 
         service = FederatedLearningService()
         result = await service.create_training_round(
-            model_type=ModelType.RECOMMENDATION,
+            model_type=ModelType.SALES_FORECAST,
             config={},
         )
 
-        assert result["model_type"] == ModelType.RECOMMENDATION
+        assert result["model_type"] == ModelType.SALES_FORECAST
 
     @patch("src.services.federated_learning_service.get_db_session")
     @pytest.mark.asyncio
@@ -90,8 +90,8 @@ class TestFederatedLearningService:
     def test_model_type_enum_values(self):
         """ModelType 包含所有预期值。"""
         values = [e.value for e in ModelType]
-        assert "demand_forecast" in values
-        assert "recommendation" in values
+        assert "sales_forecast" in values
+        assert "demand_prediction" in values
 
     def test_aggregation_method_enum_values(self):
         """AggregationMethod 包含 fedavg 和 weighted_avg。"""
@@ -164,7 +164,7 @@ class TestFederatedLearningService:
             {"parameters": {"w": np.array([2.0, 0.0])}, "num_samples": 100},
         ]
         result = service._fedavg_aggregation(models)
-        assert pytest.approx(result["w"].tolist()) == [1.0, 1.0]
+        assert pytest.approx(result["parameters"]["w"].tolist()) == [1.0, 1.0]
 
     def test_fedavg_aggregation_same_params(self):
         """FedAvg 聚合两个相同参数应返回原值。"""
@@ -175,7 +175,7 @@ class TestFederatedLearningService:
             {"parameters": {"w": np.array([1.0, 2.0])}, "num_samples": 100},
         ]
         result = service._fedavg_aggregation(models)
-        assert pytest.approx(result["w"].tolist()) == [1.0, 2.0]
+        assert pytest.approx(result["parameters"]["w"].tolist()) == [1.0, 2.0]
 
 
 # ─── FederatedLearningCoordinator ─────────────────────────────────────────────
@@ -195,13 +195,14 @@ class TestFederatedLearningCoordinator:
         mock_get_db.return_value = session
 
         coordinator = FederatedLearningCoordinator()
-        result = await coordinator.start_training_round(
-            model_type=ModelType.DEMAND_FORECAST,
+        round_id = await coordinator.start_training_round(
+            model_type=ModelType.DEMAND_PREDICTION,
+            target_stores=["S001", "S002"],
             config={},
         )
 
-        assert "round_id" in result
-        assert result["round_id"] in coordinator.active_rounds
+        assert isinstance(round_id, str)
+        assert round_id in coordinator.active_rounds
 
     @pytest.mark.asyncio
     async def test_finalize_nonexistent_round_raises(self):

@@ -15,7 +15,7 @@ import {
   DollarOutlined, TeamOutlined, HeartOutlined,
 } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
-import apiClient from '../api/apiClient';
+import { apiClient } from '../services/api';
 import AISuggestionCard from '../design-system/components/AISuggestionCard';
 import { OpsTimeline } from '../design-system/components';
 

@@ -7,6 +7,27 @@
   margin: 0 auto;
 }
 
+/* 桌面宽屏模式：展开布局 */
+@media (min-width: 768px) {
+  .shell {
+    max-width: 640px;
+    box-shadow: 0 0 40px rgba(0,0,0,.3);
+  }
+  .tabBar {
+    padding-bottom: 4px;
+  }
+  .tabItem {
+    padding: 10px 0;
+  }
+  .tabIcon {
+    font-size: 22px;
+  }
+  .tabLabel {
+    font-size: 11px;
+  }
+}
+
+
 .main {
   flex: 1;
   overflow-y: auto;

@@ -613,8 +613,8 @@ class TestWorkforceValidationHelpers:
 
     def test_risk_level(self):
         assert _risk_level(0.2) == "low"
-        assert _risk_level(0.5) == "medium"
-        assert _risk_level(0.8) == "high"
+        assert _risk_level(0.5) == "high"
+        assert _risk_level(0.8) == "critical"
 
 
 class TestEmployeeHealthApi:
@@ -671,7 +671,7 @@ class TestEmployeeHealthApi:
         assert resp["fairness_index"] == 85.5
         assert resp["total"] == 2
         assert resp["items"][0]["employee_id"] == "E1"
-        assert resp["items"][0]["risk_level"] == "high"
+        assert resp["items"][0]["risk_level"] == "critical"
         assert resp["fairness_distribution"]["high_unfairness"] == 1
 
     @pytest.mark.asyncio

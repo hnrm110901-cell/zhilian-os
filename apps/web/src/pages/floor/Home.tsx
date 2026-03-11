@@ -59,7 +59,7 @@ export default function FloorHome() {
       const resp = await apiClient.get(
         `/api/v1/bff/floor/${STORE_ID}${refresh ? '?refresh=true' : ''}`
       );
-      setData(resp.data);
+      setData(resp);
     } catch (e: any) {
       setError(e?.response?.data?.detail || '数据加载失败');
     } finally {

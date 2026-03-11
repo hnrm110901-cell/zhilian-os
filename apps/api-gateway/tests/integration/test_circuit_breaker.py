@@ -233,8 +233,12 @@ class TestCallAsync:
         # Wait — call_async won't trip on sync lambda, test via _on_failure directly
         cb._on_failure()  # force OPEN manually  -- just reset and use known path
         cb.reset()
+
+        async def _fail():
+            raise RuntimeError("fail async")
+
         with pytest.raises(RuntimeError):
-            await cb.call_async(lambda: asyncio.coroutine(lambda: (_ for _ in ()).throw(RuntimeError()))())
+            await cb.call_async(_fail)
 
     @pytest.mark.asyncio
     async def test_call_async_open_circuit_raises(self):

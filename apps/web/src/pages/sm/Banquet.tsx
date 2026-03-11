@@ -88,7 +88,7 @@ export default function SmBanquet() {
     setLoadingToday(true);
     try {
       const resp = await apiClient.get(`/api/v1/banquet/${STORE_ID}/today-check`);
-      setTodayCheck(resp.data);
+      setTodayCheck(resp);
     } catch (e) {
       handleApiError(e, '今日宴会状态加载失败');
       setTodayCheck(null);
@@ -103,8 +103,7 @@ export default function SmBanquet() {
       const resp = await apiClient.get(
         `/api/v1/banquet-agent/stores/${STORE_ID}/agent/followup-scan`,
       );
-      const raw = resp.data;
-      setLeads(Array.isArray(raw) ? raw : (raw?.leads ?? raw?.items ?? []));
+      setLeads(Array.isArray(resp) ? resp : (resp?.leads ?? resp?.items ?? []));
     } catch {
       setLeads([]);
     } finally {

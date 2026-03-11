@@ -271,7 +271,7 @@ export default function SmBanquetFollowups() {
             <label className={styles.label}>跟进内容（选填）</label>
             <ZInput
               value={followupNote}
-              onChange={e => setFollowupNote(e.target.value)}
+              onChange={v => setFollowupNote(v)}
               placeholder="本次跟进情况…"
             />
           </div>
@@ -301,7 +301,7 @@ export default function SmBanquetFollowups() {
             <label className={styles.label}>流失原因</label>
             <ZInput
               value={lostReason}
-              onChange={e => setLostReason(e.target.value)}
+              onChange={v => setLostReason(v)}
               placeholder="如：价格太高、竞品抢单、日期冲突…"
             />
           </div>
@@ -309,7 +309,7 @@ export default function SmBanquetFollowups() {
             <label className={styles.label}>备注（选填）</label>
             <ZInput
               value={lostNote}
-              onChange={e => setLostNote(e.target.value)}
+              onChange={v => setLostNote(v)}
               placeholder="补充说明…"
             />
           </div>
