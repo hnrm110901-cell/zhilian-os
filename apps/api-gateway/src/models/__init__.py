@@ -366,6 +366,13 @@ __all__ = [
     "ScenarioTypeEnum",
     "BizIntelAgentTypeEnum",
     "DecisionStatusEnum",
+    # Phase 12B — PeopleAgent
+    "PeopleShiftRecord",
+    "PeoplePerformanceScore",
+    "PeopleLaborCostRecord",
+    "PeopleAttendanceAlert",
+    "PeopleStaffingDecision",
+    "PeopleAgentLog",
 ]
 
 from .business_intel import (
@@ -373,4 +380,8 @@ from .business_intel import (
     BizDecision, ScenarioRecord, BizIntelLog,
     AnomalyLevelEnum, KpiStatusEnum, DecisionPriorityEnum,
     ScenarioTypeEnum, BizIntelAgentTypeEnum, DecisionStatusEnum,
+)
+from .people_agent import (
+    PeopleShiftRecord, PeoplePerformanceScore, PeopleLaborCostRecord,
+    PeopleAttendanceAlert, PeopleStaffingDecision, PeopleAgentLog,
 )

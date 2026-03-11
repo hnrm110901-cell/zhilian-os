@@ -570,6 +570,9 @@ app.include_router(supplier_agent.router, tags=["supplier-agent"])
 # Phase 12 — 经营智能体（营收异常 / KPI健康度 / 订单预测 / Top3决策 / 场景识别）
 from src.api import business_intel
 app.include_router(business_intel.router, tags=["business-intel"])
+# Phase 12B — 人员智能体（排班优化 / 绩效评分 / 人力成本 / 考勤预警 / 人员配置）
+from src.api import people_agent
+app.include_router(people_agent.router, tags=["people-agent"])
 app.include_router(ai_accuracy.router, prefix="/api/v1", tags=["ai_accuracy"])
 app.include_router(governance.router, prefix="/api/v1", tags=["governance"])
 app.include_router(dashboard_preferences.router, prefix="/api/v1", tags=["dashboard_preferences"])
