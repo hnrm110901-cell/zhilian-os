@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Card, Row, Col, Statistic, Tag, Table, Empty, Spin, Badge, Progress,
+  Card, Row, Col, Statistic, Tag, Table, Empty, Spin, Badge, Progress, Button,
 } from 'antd';
 import {
-  WifiOutlined, DesktopOutlined, BellOutlined, WarningOutlined,
+  WifiOutlined, DesktopOutlined, BellOutlined, WarningOutlined, ReloadOutlined,
 } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import dayjs from 'dayjs';
+import { Link } from 'react-router-dom';
 import { apiClient, handleApiError } from '../services/api';
 import styles from './EdgeHubDashboardPage.module.css';
 
@@ -65,14 +66,18 @@ const LEVEL_COLOR: Record<string, string> = {
 
 // ── 主组件 ────────────────────────────────────────────────────────────────────
 
+const REFRESH_SECONDS = 30;
+
 const EdgeHubDashboardPage: React.FC = () => {
   const [cards, setCards]       = useState<DashboardCards | null>(null);
   const [riskStores, setRisk]   = useState<RiskStore[]>([]);
   const [alerts, setAlerts]     = useState<AlertItem[]>([]);
   const [loading, setLoading]   = useState(false);
   const [refreshedAt, setRefreshedAt] = useState<string>('');
+  const [countdown, setCountdown]     = useState(REFRESH_SECONDS);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fetchAll = async () => {
+  const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
       const [summaryResp, riskResp, alertResp] = await Promise.allSettled([
@@ -96,10 +101,26 @@ const EdgeHubDashboardPage: React.FC = () => {
       handleApiError(err);
     } finally {
       setLoading(false);
+      setCountdown(REFRESH_SECONDS);
     }
-  };
+  }, []);
 
-  useEffect(() => { fetchAll(); }, []);
+  // 首次加载
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  // 30 秒自动刷新
+  useEffect(() => {
+    timerRef.current = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          fetchAll();
+          return REFRESH_SECONDS;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [fetchAll]);
 
   // ── 告警分布饼图 ─────────────────────────────────────────────────────────────
   const p1 = alerts.filter(a => a.level === 'p1').length;
@@ -125,7 +146,9 @@ const EdgeHubDashboardPage: React.FC = () => {
   const riskColumns = [
     {
       title: '门店', dataIndex: 'storeId', width: 120,
-      render: (v: string) => <a href={`#/edge-hub/stores/${v}`}>{v}</a>,
+      render: (v: string) => (
+        <Link to={`/edge-hub/stores/${v}`}>{v}</Link>
+      ),
     },
     {
       title: '状态', dataIndex: 'runtimeStatus', width: 90,
@@ -171,11 +194,21 @@ const EdgeHubDashboardPage: React.FC = () => {
     <div className={styles.page}>
       <div className={styles.header}>
         <h2 className={styles.title}>Edge Hub 总览工作台</h2>
-        {refreshedAt && (
-          <span className={styles.refreshTime}>
-            刷新于 {dayjs(refreshedAt).format('HH:mm:ss')}
-          </span>
-        )}
+        <div className={styles.headerRight}>
+          {refreshedAt && (
+            <span className={styles.refreshTime}>
+              刷新于 {dayjs(refreshedAt).format('HH:mm:ss')}
+            </span>
+          )}
+          <span className={styles.countdown}>{countdown}s</span>
+          <Button
+            size="small" icon={<ReloadOutlined />}
+            loading={loading}
+            onClick={fetchAll}
+          >
+            刷新
+          </Button>
+        </div>
       </div>
 
       <Spin spinning={loading}>
