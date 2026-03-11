@@ -5,6 +5,22 @@
 
 ---
 
+## Phase 11 — 供应商管理 Agent（Supplier Intelligence）
+
+> 北极星：「乐才告诉你买了什么；智链OS告诉你该从谁买、多少钱、有没有风险。」
+
+### 全部完成（2026-03-11）
+
+- [x] 数据模型（L1-L5，11张表）`src/models/supplier_agent.py`
+- [x] Alembic迁移 `z37_supplier_agent_tables.py`
+- [x] 5个 Agent：PriceComparisonAgent/SupplierRatingAgent/AutoSourcingAgent/ContractRiskAgent/SupplyChainRiskAgent
+- [x] API路由 `/api/v1/supplier-agent`（25个端点 + 驾驶舱）
+- [x] 51个单元测试全部通过
+- [x] 前端页面 `SupplierAgentPage.tsx`（驾驶舱/档案/合同/预警/寻源5Tab）
+- [x] pnpm build ✅ 零 TS 错误
+
+---
+
 ## 进行中
 
 ---

@@ -301,10 +301,15 @@ export default function HQHome() {
             </ZCard>
           </div>
 
-          {/* AI 经营推荐（汇总第一家门店作为示例） */}
-          <div style={{ marginTop: 12 }}>
-            <RecommendationCard storeId="STORE001" maxItems={4} />
-          </div>
+          {/* AI 经营推荐（取排名最差门店，优先提供帮助） */}
+          {data?.stores_health_ranking?.length ? (
+            <div style={{ marginTop: 12 }}>
+              <RecommendationCard
+                storeId={data.stores_health_ranking[data.stores_health_ranking.length - 1].store_id}
+                maxItems={4}
+              />
+            </div>
+          ) : null}
 
         </div>
       )}
