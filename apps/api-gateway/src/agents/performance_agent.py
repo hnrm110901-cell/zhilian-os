@@ -720,7 +720,7 @@ class PerformanceAgent(LLMEnhancedAgent):
         }
 
     async def _calculate_performance(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """计算指定岗位、周期、人员绩效得分。DB-first：优先从 employee_metric_records 读取真实指标，无 DB 时降级占位。"""
+        """计算指定岗位、周期、人员绩效得分。DB-first：优先从 employee_metric_records 读取真实指标，无 DB 时返回空指标结构。"""
         store_id = params.get("store_id", "")
         role_id = params.get("role_id", "")
         period = params.get("period", "month")
@@ -923,7 +923,7 @@ class PerformanceAgent(LLMEnhancedAgent):
 
                     data_source = "employee_metric_records + commission_rule_engine"
             except Exception as e:
-                logger.warning("提成 DB 查询失败，降级占位", error=str(e))
+                logger.warning("提成 DB 查询失败，返回空提成数据", error=str(e))
 
         # ── 应用提成规则引擎 ──────────────────────────────────────────────
         details: List[Dict[str, Any]] = []
@@ -1195,7 +1195,7 @@ class PerformanceAgent(LLMEnhancedAgent):
                     "metadata": {"source": "tool_use"},
                 }
             except Exception as e:
-                logger.warning("绩效 nl_query Tool Use 失败，返回占位", error=str(e))
+                logger.warning("绩效 nl_query Tool Use 失败，降级为关键词路由", error=str(e))
 
         # ── 无 LLM / LLM 失败时：keyword dispatch → 真实数据 ────────────────
         detected_role = _detect_nl_role(question)
