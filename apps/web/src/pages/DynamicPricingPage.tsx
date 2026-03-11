@@ -5,7 +5,7 @@
  * 输入会员 ID → 实时查询该会员的个性化定价推荐
  * 结果展示：马斯洛层级、优惠类型、折扣、策略说明、置信度
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Card, Row, Col, Select, Input, Button, Typography, Space,
   Tag, Progress, Alert, Divider, Tooltip, Badge,
@@ -35,7 +35,7 @@ interface PricingOffer {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const STORE_OPTIONS = ['S001', 'S002', 'S003'];
+const DEFAULT_STORE = 'S001';
 
 const MASLOW_COLORS: Record<number, string> = {
   1: '#bfbfbf',
@@ -72,11 +72,21 @@ const OFFER_TYPE_LABELS: Record<string, string> = {
 // ── Main Component ────────────────────────────────────────────────────────────
 
 const DynamicPricingPage: React.FC = () => {
-  const [storeId, setStoreId] = useState('S001');
+  const [storeId, setStoreId] = useState(DEFAULT_STORE);
+  const [storeOptions, setStoreOptions] = useState<string[]>([DEFAULT_STORE]);
   const [customerId, setCustomerId] = useState('');
   const [loading, setLoading] = useState(false);
   const [offer, setOffer] = useState<PricingOffer | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    apiClient.get<{ items: Array<{ id: string }> }>('/api/v1/stores?limit=50')
+      .then(data => {
+        const ids = (data.items ?? []).map((s: { id: string }) => s.id).filter(Boolean);
+        if (ids.length > 0) setStoreOptions(ids);
+      })
+      .catch(() => { /* 保持默认门店列表 */ });
+  }, []);
 
   const handleSearch = async () => {
     if (!customerId.trim()) {
@@ -125,7 +135,7 @@ const DynamicPricingPage: React.FC = () => {
               onChange={setStoreId}
               style={{ width: 110 }}
             >
-              {STORE_OPTIONS.map(s => <Option key={s} value={s}>{s}</Option>)}
+              {storeOptions.map(s => <Option key={s} value={s}>{s}</Option>)}
             </Select>
           </Col>
           <Col flex={1}>
