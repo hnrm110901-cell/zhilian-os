@@ -163,11 +163,53 @@ class AoqiweiService:
         good_name: Optional[str] = None,
         page: int = 1,
         page_size: int = 100,
+        db=None,
     ) -> Dict[str, Any]:
-        """查询货品信息"""
+        """查询货品信息。未配置时降级查询本地 inventory_items 表。"""
         if not self.is_configured():
+            if db is not None:
+                return await self._get_goods_local(good_code=good_code, good_name=good_name, db=db)
             return {"list": [], "total": 0}
         return await self._get_adapter().query_goods(good_code, good_name, page, page_size)
+
+    @staticmethod
+    async def _get_goods_local(
+        good_code: Optional[str],
+        good_name: Optional[str],
+        db,
+    ) -> Dict[str, Any]:
+        """从本地 inventory_items 表读取货品主数据作为降级数据源。"""
+        from sqlalchemy import select
+        from src.models.inventory import InventoryItem
+
+        stmt = select(
+            InventoryItem.id,
+            InventoryItem.name,
+            InventoryItem.category,
+            InventoryItem.unit,
+            InventoryItem.unit_cost,
+            InventoryItem.supplier_name,
+        )
+        if good_code:
+            stmt = stmt.where(InventoryItem.id == good_code)
+        if good_name:
+            stmt = stmt.where(InventoryItem.name.ilike(f"%{good_name}%"))
+
+        rows = (await db.execute(stmt)).all()
+        logger.info("aoqiwei_goods_local_fallback", good_code=good_code, good_name=good_name, count=len(rows))
+        items = [
+            {
+                "good_code":     r.id,
+                "good_name":     r.name,
+                "category":      r.category,
+                "unit":          r.unit,
+                "unit_cost_fen": r.unit_cost,
+                "supplier_name": r.supplier_name,
+                "data_source":   "local_inventory",
+            }
+            for r in rows
+        ]
+        return {"list": items, "total": len(items), "data_source": "local_inventory"}
 
     async def get_suppliers(
         self,
@@ -193,11 +235,68 @@ class AoqiweiService:
         start_date: str,
         end_date: str,
         shop_code: Optional[str] = None,
+        db=None,
     ) -> List[Dict[str, Any]]:
-        """查询配送出库单"""
+        """查询配送出库单。未配置时降级查询本地 inventory_transactions 出库记录。"""
         if not self.is_configured():
+            if db is not None:
+                return await self._get_dispatch_out_local(
+                    start_date=start_date, end_date=end_date, shop_code=shop_code, db=db
+                )
             return []
         return await self._get_adapter().query_delivery_dispatch_out(start_date, end_date, shop_code)
+
+    @staticmethod
+    async def _get_dispatch_out_local(
+        start_date: str,
+        end_date: str,
+        shop_code: Optional[str],
+        db,
+    ) -> List[Dict[str, Any]]:
+        """从本地 inventory_transactions 表读取出库记录作为降级数据源。"""
+        from sqlalchemy import select
+        from src.models.inventory import InventoryItem, InventoryTransaction
+
+        stmt = (
+            select(
+                InventoryTransaction.id,
+                InventoryTransaction.store_id,
+                InventoryTransaction.item_id,
+                InventoryItem.name,
+                InventoryTransaction.quantity,
+                InventoryTransaction.unit_cost,
+                InventoryTransaction.total_cost,
+                InventoryTransaction.transaction_time,
+                InventoryTransaction.reference_id,
+            )
+            .join(InventoryItem, InventoryTransaction.item_id == InventoryItem.id)
+            .where(
+                InventoryTransaction.transaction_type == "out",
+                InventoryTransaction.transaction_time >= start_date,
+                InventoryTransaction.transaction_time <= end_date + " 23:59:59",
+            )
+            .order_by(InventoryTransaction.transaction_time.desc())
+            .limit(200)
+        )
+        if shop_code:
+            stmt = stmt.where(InventoryTransaction.store_id == shop_code)
+
+        rows = (await db.execute(stmt)).all()
+        logger.info("aoqiwei_dispatch_out_local_fallback", shop_code=shop_code, count=len(rows))
+        return [
+            {
+                "order_id":    str(r.id),
+                "shop_code":   r.store_id,
+                "good_code":   r.item_id,
+                "good_name":   r.name,
+                "qty":         abs(r.quantity),
+                "cost_fen":    r.total_cost,
+                "dispatch_time": r.transaction_time.isoformat() if r.transaction_time else None,
+                "reference_id": r.reference_id,
+                "data_source": "local_inventory",
+            }
+            for r in rows
+        ]
 
     async def confirm_delivery_receipt(self, dispatch_in_data: Dict[str, Any]) -> Dict[str, Any]:
         """确认配送收货（生成配送入库单）"""
