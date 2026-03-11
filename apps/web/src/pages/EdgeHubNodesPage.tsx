@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Card, Table, Tag, Badge, Input, Select, Space, Button,
   Tooltip, Empty, Spin, Row, Col, Drawer, Descriptions, List, Progress, message,
@@ -9,7 +9,7 @@ import {
 } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import dayjs from 'dayjs';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiClient, handleApiError } from '../services/api';
 import styles from './EdgeHubNodesPage.module.css';
 
@@ -67,16 +67,19 @@ function resourceBar(pct: number | null) {
 
 const EdgeHubNodesPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [nodes, setNodes]     = useState<NodeItem[]>([]);
   const [meta, setMeta]       = useState<PageMeta>({ page: 1, pageSize: 20, total: 0, hasMore: false });
   const [loading, setLoading] = useState(false);
 
-  // 筛选状态
-  const [keyword, setKeyword]   = useState('');
-  const [status,  setStatus]    = useState<string>('');
-  const [page, setPage]         = useState(1);
+  // 筛选状态 — 从 URL 初始化
+  const [keyword, setKeyword]   = useState(() => searchParams.get('q')      ?? '');
+  const [status,  setStatus]    = useState(() => searchParams.get('status')  ?? '');
+  const [page,    setPage]      = useState(() => Number(searchParams.get('page') ?? '1'));
   const pageSize = 20;
+
+  const isMount = useRef(true);
 
   // 详情抽屉
   const [drawerHubId, setDrawerHubId]   = useState<string | null>(null);
@@ -103,7 +106,25 @@ const EdgeHubNodesPage: React.FC = () => {
     }
   }, [keyword, status]);
 
-  useEffect(() => { fetchNodes(1); }, [keyword, status]);
+  // 首次挂载用 URL 恢复的 page；后续筛选变化重置到第 1 页
+  useEffect(() => {
+    if (isMount.current) {
+      isMount.current = false;
+      fetchNodes(page);
+    } else {
+      fetchNodes(1);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [keyword, status]);
+
+  // URL 同步：筛选/翻页 → query string
+  useEffect(() => {
+    const p: Record<string, string> = {};
+    if (keyword) p.q      = keyword;
+    if (status)  p.status = status;
+    if (page > 1) p.page  = String(page);
+    setSearchParams(p, { replace: true });
+  }, [keyword, status, page, setSearchParams]);
 
   const openNodeDrawer = async (hubId: string) => {
     setDrawerHubId(hubId);

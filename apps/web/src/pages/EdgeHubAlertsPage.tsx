@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Card, Table, Tag, Input, Select, Space, Button,
   Tooltip, Empty, Spin, Popconfirm, message, Row, Col,
@@ -9,6 +9,7 @@ import {
   BellOutlined, RiseOutlined, StopOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import { useSearchParams } from 'react-router-dom';
 import { apiClient, handleApiError } from '../services/api';
 import styles from './EdgeHubAlertsPage.module.css';
 
@@ -49,6 +50,8 @@ const ALERT_TYPES = [
 // ── 主组件 ────────────────────────────────────────────────────────────────────
 
 const EdgeHubAlertsPage: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const [alerts, setAlerts]       = useState<AlertItem[]>([]);
   const [meta, setMeta]           = useState<PageMeta>({ page: 1, pageSize: 20, total: 0, hasMore: false });
   const [loading, setLoading]     = useState(false);
@@ -62,13 +65,15 @@ const EdgeHubAlertsPage: React.FC = () => {
   const [drawerAlert, setDrawerAlert]   = useState<AlertItem | null>(null);
   const [actioning,   setActioning]     = useState<string | null>(null);
 
-  // 筛选状态
-  const [keyword,   setKeyword]   = useState('');
-  const [status,    setStatus]    = useState<string>('');
-  const [level,     setLevel]     = useState<string>('');
-  const [storeId,   setStoreId]   = useState<string>('');
-  const [page, setPage]           = useState(1);
+  // 筛选状态 — 从 URL 初始化
+  const [keyword,   setKeyword]   = useState(() => searchParams.get('q')      ?? '');
+  const [status,    setStatus]    = useState(() => searchParams.get('status')  ?? '');
+  const [level,     setLevel]     = useState(() => searchParams.get('level')   ?? '');
+  const [storeId,   setStoreId]   = useState(() => searchParams.get('store')   ?? '');
+  const [page,      setPage]      = useState(() => Number(searchParams.get('page') ?? '1'));
   const pageSize = 20;
+
+  const isMount = useRef(true);
 
   const fetchAlerts = useCallback(async (pg = 1) => {
     setLoading(true);
@@ -102,7 +107,27 @@ const EdgeHubAlertsPage: React.FC = () => {
     }
   }, [keyword, status, level, storeId]);
 
-  useEffect(() => { fetchAlerts(1); }, [status, level, storeId]);
+  // 首次挂载用 URL 恢复的 page；后续筛选变化重置到第 1 页
+  useEffect(() => {
+    if (isMount.current) {
+      isMount.current = false;
+      fetchAlerts(page);
+    } else {
+      fetchAlerts(1);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, level, storeId]);
+
+  // URL 同步：筛选/翻页 → query string
+  useEffect(() => {
+    const p: Record<string, string> = {};
+    if (keyword) p.q      = keyword;
+    if (status)  p.status = status;
+    if (level)   p.level  = level;
+    if (storeId) p.store  = storeId;
+    if (page > 1) p.page  = String(page);
+    setSearchParams(p, { replace: true });
+  }, [keyword, status, level, storeId, page, setSearchParams]);
 
   const handleBulkAction = async (action: 'resolve' | 'ignore') => {
     if (selectedIds.length === 0) return;
