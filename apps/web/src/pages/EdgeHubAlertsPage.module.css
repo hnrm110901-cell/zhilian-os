@@ -65,3 +65,20 @@
 .resolvedRow td {
   color: #bfbfbf !important;
 }
+
+.bulkBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  background: #e6f4ff;
+  border: 1px solid #91caff;
+  border-radius: 6px;
+}
+
+.bulkCount {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0958d9;
+}

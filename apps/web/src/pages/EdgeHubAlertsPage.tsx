@@ -54,6 +54,10 @@ const EdgeHubAlertsPage: React.FC = () => {
   const [loading, setLoading]     = useState(false);
   const [resolving, setResolving] = useState<string | null>(null);
 
+  // 批量操作
+  const [selectedIds,   setSelectedIds]   = useState<string[]>([]);
+  const [bulkActioning, setBulkActioning] = useState<string | null>(null);
+
   // 详情抽屉
   const [drawerAlert, setDrawerAlert]   = useState<AlertItem | null>(null);
   const [actioning,   setActioning]     = useState<string | null>(null);
@@ -99,6 +103,25 @@ const EdgeHubAlertsPage: React.FC = () => {
   }, [keyword, status, level, storeId]);
 
   useEffect(() => { fetchAlerts(1); }, [status, level, storeId]);
+
+  const handleBulkAction = async (action: 'resolve' | 'ignore') => {
+    if (selectedIds.length === 0) return;
+    setBulkActioning(action);
+    try {
+      const resp = await apiClient.post('/api/v1/edge-hub/alerts/bulk-action', {
+        alert_ids: selectedIds,
+        action,
+      });
+      const affected = (resp as any).data?.affected ?? selectedIds.length;
+      message.success(`已${action === 'resolve' ? '解决' : '忽略'} ${affected} 条告警`);
+      setSelectedIds([]);
+      await fetchAlerts(page);
+    } catch (err) {
+      handleApiError(err);
+    } finally {
+      setBulkActioning(null);
+    }
+  };
 
   const handleResolve = async (alertId: string) => {
     setResolving(alertId);
@@ -281,6 +304,39 @@ const EdgeHubAlertsPage: React.FC = () => {
       {/* 告警表格 */}
       <Spin spinning={loading}>
         <Card size="small" style={{ marginTop: 0 }}>
+          {/* 批量操作栏 */}
+          {selectedIds.length > 0 && (
+            <div className={styles.bulkBar}>
+              <span className={styles.bulkCount}>已选 {selectedIds.length} 条</span>
+              <Space size={8}>
+                <Popconfirm
+                  title={`确认批量解决 ${selectedIds.length} 条告警？`}
+                  onConfirm={() => handleBulkAction('resolve')}
+                  okText="确认" cancelText="取消"
+                >
+                  <Button
+                    size="small" type="primary" icon={<CheckCircleOutlined />}
+                    loading={bulkActioning === 'resolve'}
+                  >
+                    批量解决
+                  </Button>
+                </Popconfirm>
+                <Popconfirm
+                  title={`确认批量忽略 ${selectedIds.length} 条告警？`}
+                  onConfirm={() => handleBulkAction('ignore')}
+                  okText="确认" cancelText="取消"
+                >
+                  <Button
+                    size="small" icon={<StopOutlined />}
+                    loading={bulkActioning === 'ignore'}
+                  >
+                    批量忽略
+                  </Button>
+                </Popconfirm>
+                <Button size="small" onClick={() => setSelectedIds([])}>取消选择</Button>
+              </Space>
+            </div>
+          )}
           {alerts.length === 0 && !loading ? (
             <Empty description="暂无告警数据" />
           ) : (
@@ -290,6 +346,13 @@ const EdgeHubAlertsPage: React.FC = () => {
               rowKey="id"
               size="small"
               scroll={{ x: 1000 }}
+              rowSelection={{
+                selectedRowKeys: selectedIds,
+                onChange: (keys) => setSelectedIds(keys as string[]),
+                getCheckboxProps: (r: AlertItem) => ({
+                  disabled: r.status !== 'open',
+                }),
+              }}
               pagination={{
                 current: page,
                 pageSize,

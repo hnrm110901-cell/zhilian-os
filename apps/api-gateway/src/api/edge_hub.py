@@ -505,6 +505,49 @@ async def list_all_alerts(
     }
 
 
+class BulkAlertAction(BaseModel):
+    alert_ids: List[str]
+    action: str  # "resolve" | "ignore"
+
+
+@router.post("/alerts/bulk-action")
+async def bulk_alert_action(
+    body: BulkAlertAction,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Dict[str, Any]:
+    """批量操作告警（批量解决 / 批量忽略）"""
+    if body.action not in ("resolve", "ignore"):
+        raise HTTPException(status_code=422, detail="action must be 'resolve' or 'ignore'")
+    if not body.alert_ids:
+        return {"code": 0, "message": "no alerts", "data": {"affected": 0}}
+
+    target_status = AlertStatus.RESOLVED if body.action == "resolve" else AlertStatus.IGNORED
+    now       = datetime.utcnow()
+    resolved_by = str(getattr(current_user, "username", current_user.id))
+
+    alerts = (
+        await db.execute(
+            select(EdgeAlert).where(
+                EdgeAlert.id.in_(body.alert_ids),
+                EdgeAlert.status == AlertStatus.OPEN,
+            )
+        )
+    ).scalars().all()
+
+    for alert in alerts:
+        alert.status      = target_status
+        alert.resolved_at = now
+        alert.resolved_by = resolved_by
+
+    await db.commit()
+    return {
+        "code": 0,
+        "message": "ok",
+        "data": {"affected": len(alerts)},
+    }
+
+
 @router.patch("/alerts/{alert_id}/resolve")
 async def resolve_alert(
     alert_id: str,

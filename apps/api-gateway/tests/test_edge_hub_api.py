@@ -699,3 +699,78 @@ class TestDeleteBinding:
         with pytest.raises(HTTPException) as exc_info:
             await delete_binding(binding_id="ghost", db=db, _=_mock_user())
         assert exc_info.value.status_code == 404
+
+
+# ── bulk_alert_action ─────────────────────────────────────────────────────────
+
+class TestBulkAlertAction:
+
+    @pytest.mark.asyncio
+    async def test_bulk_resolve_open_alerts(self):
+        from src.api.edge_hub import bulk_alert_action, BulkAlertAction
+        from src.models.edge_hub import AlertStatus
+
+        a1 = _make_alert(alert_id="a1", status="open")
+        a2 = _make_alert(alert_id="a2", status="open")
+        db = _make_db(_scalars_all([a1, a2]))
+
+        body = BulkAlertAction(alert_ids=["a1", "a2"], action="resolve")
+        result = await bulk_alert_action(body=body, db=db, current_user=_mock_user())
+
+        assert result["code"] == 0
+        assert result["data"]["affected"] == 2
+        assert a1.status == AlertStatus.RESOLVED
+        assert a2.status == AlertStatus.RESOLVED
+        db.commit.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_bulk_ignore_open_alerts(self):
+        from src.api.edge_hub import bulk_alert_action, BulkAlertAction
+        from src.models.edge_hub import AlertStatus
+
+        alert = _make_alert(status="open")
+        db = _make_db(_scalars_all([alert]))
+
+        body = BulkAlertAction(alert_ids=["alert-001"], action="ignore")
+        result = await bulk_alert_action(body=body, db=db, current_user=_mock_user())
+
+        assert result["data"]["affected"] == 1
+        assert alert.status == AlertStatus.IGNORED
+
+    @pytest.mark.asyncio
+    async def test_empty_ids_returns_zero_affected(self):
+        from src.api.edge_hub import bulk_alert_action, BulkAlertAction
+
+        db = _make_db()
+        body = BulkAlertAction(alert_ids=[], action="resolve")
+        result = await bulk_alert_action(body=body, db=db, current_user=_mock_user())
+
+        assert result["data"]["affected"] == 0
+        db.commit.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_invalid_action_raises_422(self):
+        from src.api.edge_hub import bulk_alert_action, BulkAlertAction
+        from fastapi import HTTPException
+
+        db = _make_db()
+        body = BulkAlertAction(alert_ids=["a1"], action="delete")
+        with pytest.raises(HTTPException) as exc_info:
+            await bulk_alert_action(body=body, db=db, current_user=_mock_user())
+        assert exc_info.value.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_only_open_alerts_are_affected(self):
+        """已解决或已忽略的告警不应被批量操作修改（后端 WHERE status=open 过滤）。"""
+        from src.api.edge_hub import bulk_alert_action, BulkAlertAction
+        from src.models.edge_hub import AlertStatus
+
+        # 模拟 DB 只返回 open 的那条（已解决的被 WHERE 过滤掉）
+        open_alert = _make_alert(alert_id="open-1", status="open")
+        db = _make_db(_scalars_all([open_alert]))
+
+        body = BulkAlertAction(alert_ids=["open-1", "resolved-2"], action="resolve")
+        result = await bulk_alert_action(body=body, db=db, current_user=_mock_user())
+
+        assert result["data"]["affected"] == 1
+        assert open_alert.status == AlertStatus.RESOLVED
