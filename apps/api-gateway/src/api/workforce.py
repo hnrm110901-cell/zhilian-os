@@ -168,7 +168,7 @@ def _parse_rejection_reason_payload(raw: Optional[str]) -> tuple[Optional[str], 
             text = str(obj.get("text") or "").strip() or None
             display = text or code
             return code, text, display
-    except Exception:
+    except (json.JSONDecodeError, TypeError, ValueError):
         pass
     return None, raw, raw
 

@@ -485,8 +485,8 @@ async def get_invoice(
     if data.get("line_items") and isinstance(data["line_items"], str):
         try:
             data["line_items"] = json.loads(data["line_items"])
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("billing.invoice_line_items_parse_failed", invoice_id=invoice_id, error=str(exc))
     data["amount_yuan"] = float(data["amount_yuan"])
     return data
 
