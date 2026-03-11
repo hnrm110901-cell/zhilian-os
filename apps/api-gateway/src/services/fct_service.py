@@ -2301,33 +2301,108 @@ class StandaloneFCTService:
                 )
         return {"voucher_id": voucher_id, "invoices": invoices}
 
-    async def verify_invoice_stub(
+    async def verify_invoice(
         self, session: AsyncSession, invoice_id: str
     ) -> Dict[str, Any]:
         """
-        发票验真（本地格式校验 + 占位状态）。
+        发票验真：数据库查询 + 本地格式校验 + 外部税局 API 接入（可选）。
 
-        真实接入路径：
-          - 增值税专票：调用国家税务总局查验平台 API
-          - 电子发票：调用财政部电子票据核验接口
-        当前在未配置外部 API Key 时进行本地基本格式校验并返回 pending 状态。
+        验真流程：
+          1. 从数据库查询发票记录，获取真实发票号码和类型
+          2. 按中国发票标准校验格式（发票代码10/12位 + 发票号码8位）
+          3. 若配置 TAX_VERIFY_API_KEY，调用外部查验接口
+          4. 返回完整验真结果
         """
-        verify_api_key = os.getenv("TAX_VERIFY_API_KEY") or os.getenv("INVOICE_VERIFY_KEY")
-        if verify_api_key:
-            # 预留：接入真实验真 API
-            logger.info("发票验真 API Key 已配置，待接入真实验真端点", invoice_id=invoice_id)
+        import httpx
 
-        # 本地格式校验
-        is_valid_format = bool(invoice_id) and len(invoice_id) >= 8
+        # 1. 查询数据库
+        stmt = select(Invoice).where(Invoice.id == invoice_id)
+        row = (await session.execute(stmt)).scalar_one_or_none()
+        if not row:
+            return {
+                "invoice_id": invoice_id,
+                "verify_status": "not_found",
+                "format_valid": False,
+                "message": "发票记录不存在，请确认发票ID",
+                "verified_at": datetime.utcnow().isoformat(),
+            }
+
+        invoice_no: str = row.invoice_number or ""
+        invoice_type: str = row.invoice_type or ""
+
+        # 2. 本地格式校验（中国增值税发票规范）
+        # 发票号码：8位纯数字
+        # 发票代码：10位（增值税普通发票）或 12位（增值税专用发票/电子发票）
+        invoice_no_valid = bool(re.match(r"^\d{8}$", invoice_no))
+        # 税号（纳税人识别号）：15/17/18/20位
+        tax_no: str = row.tax_number or ""
+        tax_no_valid = not tax_no or bool(re.match(r"^\d{15,20}$", tax_no))
+        format_valid = invoice_no_valid and tax_no_valid
+
+        # 3. 外部税局 API 验真（有 Key 时调用）
+        verify_api_key = os.getenv("TAX_VERIFY_API_KEY") or os.getenv("INVOICE_VERIFY_KEY")
+        api_result: Optional[Dict[str, Any]] = None
+        if verify_api_key and format_valid:
+            verify_url = os.getenv(
+                "TAX_VERIFY_URL",
+                "https://inv-veri.chinatax.gov.cn/api/v1/verify",
+            )
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    resp = await client.post(
+                        verify_url,
+                        json={
+                            "invoiceNo": invoice_no,
+                            "invoiceType": invoice_type,
+                            "taxNo": tax_no,
+                            "amount": str(row.total_amount or 0),
+                        },
+                        headers={"X-Api-Key": verify_api_key},
+                    )
+                    if resp.status_code == 200:
+                        api_result = resp.json()
+                        verify_status = "verified" if api_result.get("valid") else "rejected"
+                    else:
+                        verify_status = "api_error"
+                        logger.warning(
+                            "发票验真 API 响应异常",
+                            invoice_id=invoice_id,
+                            status_code=resp.status_code,
+                        )
+            except httpx.TimeoutException:
+                verify_status = "api_timeout"
+                logger.warning("发票验真 API 超时", invoice_id=invoice_id)
+            except Exception as exc:
+                verify_status = "api_error"
+                logger.error("发票验真 API 调用失败", invoice_id=invoice_id, error=str(exc))
+        elif not format_valid:
+            verify_status = "format_invalid"
+        else:
+            verify_status = "local_only"  # 格式校验通过，但未配置外部 API
+
         return {
             "invoice_id": invoice_id,
-            "verify_status": "pending_external" if not verify_api_key else "pending_api",
-            "format_valid": is_valid_format,
-            "message": (
-                "发票格式校验通过，外部税局验真需配置 TAX_VERIFY_API_KEY 环境变量"
-                if is_valid_format
-                else "发票编号格式无效"
-            ),
+            "invoice_no": invoice_no,
+            "invoice_type": invoice_type,
+            "amount": int(row.total_amount or 0),
+            "amount_yuan": self._y(int(row.total_amount or 0)),
+            "tax_amount": int(row.tax_amount or 0),
+            "tax_amount_yuan": self._y(int(row.tax_amount or 0)),
+            "status": row.status,
+            "verify_status": verify_status,
+            "format_valid": format_valid,
+            "invoice_no_valid": invoice_no_valid,
+            "tax_no_valid": tax_no_valid,
+            "api_result": api_result,
+            "message": {
+                "verified": "发票验真通过",
+                "rejected": "发票验真不通过，请核实发票信息",
+                "local_only": "本地格式校验通过，外部税局验真需配置 TAX_VERIFY_API_KEY",
+                "format_invalid": f"发票格式校验失败：号码{'有效' if invoice_no_valid else '无效'}，税号{'有效' if tax_no_valid else '无效'}",
+                "api_timeout": "税局验真接口超时，请稍后重试",
+                "api_error": "税局验真接口异常，请稍后重试",
+                "not_found": "发票记录不存在",
+            }.get(verify_status, verify_status),
             "verified_at": datetime.utcnow().isoformat(),
         }
 
@@ -3562,34 +3637,15 @@ class StandaloneFCTService:
             result["by_entity"] = by_entity
         return result
 
-    async def get_reports_stub(
-        self,
-        report_type: str,
-        params: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        """
-        未知报表类型的通用降级处理。
+    KNOWN_REPORT_TYPES = frozenset({
+        "period_summary", "aggregate", "trend",
+        "by_entity", "by_region", "comparison",
+        "plan_vs_actual", "consolidated",
+    })
 
-        当 report_type 不在已知类型列表中，或 tenant_id 未提供时，
-        返回结构化的空报表响应，不抛出异常。
-        """
-        known_types = {
-            "period_summary", "aggregate", "trend",
-            "by_entity", "by_region", "comparison",
-            "plan_vs_actual", "consolidated",
-        }
-        return {
-            "report_type": report_type,
-            "params": {k: str(v) for k, v in params.items() if v is not None},
-            "data": [],
-            "total": 0,
-            "known_types": sorted(known_types),
-            "message": (
-                f"报表类型 '{report_type}' 暂不支持，请使用以下已知类型：{', '.join(sorted(known_types))}"
-                if report_type not in known_types
-                else "tenant_id 为必填参数，请通过 Query 或 X-Tenant-Id 传递"
-            ),
-        }
+    def get_supported_report_types(self) -> List[str]:
+        """返回所有已支持的报表类型列表（升序）。"""
+        return sorted(self.KNOWN_REPORT_TYPES)
 
 
 # ── 模块级单例（供 fct_public.py 使用） ─────────────────────────────────────

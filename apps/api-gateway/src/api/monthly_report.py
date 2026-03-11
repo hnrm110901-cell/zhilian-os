@@ -13,7 +13,7 @@ from typing import Optional
 import structlog
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.dependencies import get_current_active_user, get_db
@@ -96,3 +96,41 @@ async def get_monthly_report_html(
     except Exception as exc:
         logger.error("monthly_report_html_failed", store_id=store_id, error=str(exc))
         raise HTTPException(status_code=500, detail=f"HTML 报告生成失败: {exc}")
+
+
+@router.get("/monthly/{store_id}/excel")
+async def get_monthly_report_excel(
+    store_id:     str,
+    year:         Optional[int] = None,
+    month:        Optional[int] = None,
+    current_user: User          = Depends(get_current_active_user),
+    db: AsyncSession            = Depends(get_db),
+):
+    """
+    下载月度经营报告 Excel（.xlsx）。
+
+    包含三个工作表：经营摘要 / 周趋势 / Top3决策明细。
+    """
+    from src.services.monthly_report_service import MonthlyReportService
+
+    today = date.today()
+    if year is None or month is None:
+        from datetime import timedelta
+        prev  = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
+        year  = prev.year
+        month = prev.month
+
+    if not (1 <= month <= 12):
+        raise HTTPException(status_code=400, detail="month 必须在 1–12 之间")
+
+    try:
+        xlsx_bytes = await MonthlyReportService.generate_excel(store_id, year, month, db)
+        filename = f"monthly_report_{store_id}_{year}{month:02d}.xlsx"
+        return Response(
+            content=xlsx_bytes,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except Exception as exc:
+        logger.error("monthly_report_excel_failed", store_id=store_id, error=str(exc))
+        raise HTTPException(status_code=500, detail=f"Excel 报告生成失败: {exc}")

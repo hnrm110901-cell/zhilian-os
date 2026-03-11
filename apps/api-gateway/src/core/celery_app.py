@@ -463,6 +463,16 @@ celery_app.conf.update(
             "args": (),
             "options": {"queue": "default", "priority": 8},
         },
+        # 09:45 成本率趋势预测告警（提前识别恶化趋势，在超标前预警）
+        "check-food-cost-trend-alert": {
+            "task": "src.core.celery_tasks.check_food_cost_trend_alert",
+            "schedule": crontab(
+                hour=int(os.getenv("FOOD_COST_TREND_ALERT_HOUR", "9")),
+                minute=int(os.getenv("FOOD_COST_TREND_ALERT_MINUTE", "45")),
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 8},
+        },
         # 10:30 营销自动触达：批量企微挽回流失风险客户（FrequencyCapEngine 频控保护）
         "marketing-auto-outreach": {
             "task": "src.core.celery_tasks.marketing_auto_outreach",

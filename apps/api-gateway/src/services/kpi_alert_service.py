@@ -33,6 +33,10 @@ _DEFAULT_CRITICAL_PCT = float(os.getenv("FOOD_COST_CRITICAL_THRESHOLD", "35"))
 # 默认回望窗口（天）
 _DEFAULT_LOOKBACK_DAYS = int(os.getenv("FOOD_COST_ALERT_LOOKBACK_DAYS", "7"))
 
+# 趋势告警：回望天数和向前预测天数
+_TREND_LOOKBACK_DAYS  = int(os.getenv("FOOD_COST_TREND_LOOKBACK_DAYS", "14"))
+_TREND_FORECAST_DAYS  = int(os.getenv("FOOD_COST_TREND_FORECAST_DAYS", "7"))
+
 
 # ── 纯函数：告警级别判断 ──────────────────────────────────────────────────────
 
@@ -289,4 +293,209 @@ class KPIAlertService:
             **summary,
             "sent_count":   sent_count,
             "failed_count": failed_count,
+        }
+
+    # ── 趋势预测告警 ──────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _linear_trend(values: List[float]) -> float:
+        """
+        最小二乘线性回归，返回每步斜率（slope）。
+
+        x = [0, 1, ..., n-1]，y = values
+        slope = (n * Σxy - Σx * Σy) / (n * Σx² - (Σx)²)
+        """
+        n = len(values)
+        if n < 2:
+            return 0.0
+        sx  = n * (n - 1) / 2          # Σx
+        sx2 = n * (n - 1) * (2 * n - 1) / 6  # Σx²
+        sy  = sum(values)
+        sxy = sum(i * v for i, v in enumerate(values))
+        denom = n * sx2 - sx * sx
+        if denom == 0:
+            return 0.0
+        return (n * sxy - sx * sy) / denom
+
+    @staticmethod
+    async def check_store_trend(
+        store_id:       str,
+        db:             AsyncSession,
+        thresholds:     Dict[str, float],
+        lookback_days:  int = _TREND_LOOKBACK_DAYS,
+        forecast_days:  int = _TREND_FORECAST_DAYS,
+    ) -> Dict[str, Any]:
+        """
+        趋势预测告警：计算近 lookback_days 天成本率线性趋势，
+        预测 forecast_days 天后是否会突破 warning / critical 阈值。
+
+        Returns:
+            {
+              store_id, current_cost_pct, slope_per_day,
+              forecasted_pct, forecast_days,
+              trend_status: ok | warning_trend | critical_trend,
+              days_to_warning, days_to_critical,
+              needs_trend_alert, history
+            }
+        """
+        end_date   = date.today()
+        history: List[float] = []
+
+        for offset in range(lookback_days - 1, -1, -1):
+            d = end_date - timedelta(days=offset)
+            try:
+                v = await FoodCostService.get_store_food_cost_variance(
+                    store_id=store_id,
+                    start_date=d,
+                    end_date=d,
+                    db=db,
+                )
+                history.append(float(v.get("actual_cost_pct", 0.0)))
+            except Exception:
+                pass  # 某天无数据时跳过，不阻断
+
+        if len(history) < 3:
+            return {
+                "store_id":         store_id,
+                "trend_status":     "insufficient_data",
+                "needs_trend_alert": False,
+                "history":          history,
+                "message":          f"历史数据不足（仅 {len(history)} 天），无法计算趋势",
+            }
+
+        slope   = KPIAlertService._linear_trend(history)
+        current = history[-1]
+        w_thr   = thresholds["warning"]
+        c_thr   = thresholds["critical"]
+
+        # 预测 forecast_days 天后的成本率
+        forecasted = current + slope * forecast_days
+
+        # 计算到达阈值还需多少天（slope > 0 才会超标）
+        def _days_to_threshold(threshold: float) -> Optional[int]:
+            if slope <= 0 or current >= threshold:
+                return None
+            days = (threshold - current) / slope
+            return int(days) if days <= 30 else None  # 超过 30 天不告警
+
+        days_to_warning  = _days_to_threshold(w_thr)
+        days_to_critical = _days_to_threshold(c_thr)
+
+        # 判断趋势告警级别
+        if slope > 0 and forecasted >= c_thr:
+            trend_status = "critical_trend"
+        elif slope > 0 and forecasted >= w_thr:
+            trend_status = "warning_trend"
+        else:
+            trend_status = "ok"
+
+        needs_alert = trend_status != "ok"
+
+        return {
+            "store_id":           store_id,
+            "current_cost_pct":   round(current, 2),
+            "slope_per_day":      round(slope, 4),
+            "forecasted_pct":     round(forecasted, 2),
+            "forecast_days":      forecast_days,
+            "warning_threshold":  w_thr,
+            "critical_threshold": c_thr,
+            "trend_status":       trend_status,
+            "days_to_warning":    days_to_warning,
+            "days_to_critical":   days_to_critical,
+            "needs_trend_alert":  needs_alert,
+            "history":            [round(v, 2) for v in history],
+        }
+
+    @staticmethod
+    def _build_trend_alert_message(result: Dict[str, Any]) -> str:
+        """构建趋势预警消息（Rule 7：动作 + ¥ + 预测窗口）。"""
+        emoji  = "📈" if result["trend_status"] == "warning_trend" else "🚨"
+        level  = "偏高趋势" if result["trend_status"] == "warning_trend" else "超标趋势"
+        d2w    = result.get("days_to_warning")
+        d2c    = result.get("days_to_critical")
+        reach_line = ""
+        if d2c is not None:
+            reach_line = f"\n预计 {d2c} 天后突破超标阈值 {result['critical_threshold']:.0f}%"
+        elif d2w is not None:
+            reach_line = f"\n预计 {d2w} 天后突破警告阈值 {result['warning_threshold']:.0f}%"
+
+        return (
+            f"{emoji} 食材成本率{level}预警\n\n"
+            f"门店：{result['store_id']}\n"
+            f"当前成本率：{result['current_cost_pct']:.1f}%\n"
+            f"日均增速：+{result['slope_per_day']:.3f}%/天\n"
+            f"预测 {result['forecast_days']} 天后：{result['forecasted_pct']:.1f}%"
+            f"{reach_line}\n\n"
+            f"💡 建议：尽早执行 AI 决策推荐中的降本方案，防止成本率持续上升\n"
+            f"---\n智链OS · 成本率趋势监控"
+        )
+
+    @staticmethod
+    async def run_trend_alerts(
+        db:            AsyncSession,
+        lookback_days: int = _TREND_LOOKBACK_DAYS,
+        forecast_days: int = _TREND_FORECAST_DAYS,
+    ) -> Dict[str, Any]:
+        """
+        扫描所有门店的成本率趋势，对趋势恶化的门店发送预警。
+
+        Returns:
+            {total, trend_alert_count, ok_count, sent_count, failed_count, results}
+        """
+        thresholds = await KPIAlertService._get_food_cost_thresholds(db)
+        store_ids  = await KPIAlertService._get_active_store_ids(db)
+
+        results: List[Dict[str, Any]] = []
+        ok_count = 0
+
+        for sid in store_ids:
+            try:
+                r = await KPIAlertService.check_store_trend(
+                    store_id=sid, db=db, thresholds=thresholds,
+                    lookback_days=lookback_days, forecast_days=forecast_days,
+                )
+                results.append(r)
+                if not r["needs_trend_alert"]:
+                    ok_count += 1
+            except Exception as exc:
+                logger.warning("kpi_trend_check_failed", store_id=sid, error=str(exc))
+
+        # 向需要告警的门店发送趋势预警
+        from src.services.wechat_work_message_service import wechat_work_message_service
+
+        sent_count = failed_count = 0
+        for r in results:
+            if not r["needs_trend_alert"]:
+                continue
+            recipient = os.getenv(
+                f"WECHAT_RECIPIENT_{r['store_id'].upper()}",
+                os.getenv("WECHAT_DEFAULT_RECIPIENT", f"store_{r['store_id']}"),
+            )
+            try:
+                msg = KPIAlertService._build_trend_alert_message(r)
+                res = await wechat_work_message_service.send_text_message(
+                    user_id=recipient, content=msg
+                )
+                if res.get("success"):
+                    sent_count += 1
+                    logger.info("kpi_trend_alert_sent", store_id=r["store_id"], status=r["trend_status"])
+                else:
+                    failed_count += 1
+            except Exception as exc:
+                failed_count += 1
+                logger.error("kpi_trend_alert_send_failed", store_id=r["store_id"], error=str(exc))
+
+        alert_results = [r for r in results if r["needs_trend_alert"]]
+        logger.info(
+            "kpi_trend_check_complete",
+            total=len(store_ids), alerts=len(alert_results),
+            ok=ok_count, sent=sent_count,
+        )
+        return {
+            "total":             len(store_ids),
+            "trend_alert_count": len(alert_results),
+            "ok_count":          ok_count,
+            "sent_count":        sent_count,
+            "failed_count":      failed_count,
+            "results":           results,
         }

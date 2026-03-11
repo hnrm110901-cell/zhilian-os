@@ -4,6 +4,7 @@ Celery异步任务
 """
 from typing import Dict, Any
 import asyncio
+import inspect
 import os
 import re
 import structlog
@@ -15,6 +16,12 @@ from celery import Task
 from .celery_app import celery_app
 
 logger = structlog.get_logger()
+
+
+async def _maybe_await(value):
+    if inspect.isawaitable(value):
+        return await value
+    return value
 
 
 class CallbackTask(Task):
@@ -3170,8 +3177,35 @@ def check_food_cost_kpi_alert(self):
         raise self.retry(exc=exc)
 
 
-@celery_app.task(bind=True, max_retries=1, default_retry_delay=300)
-def scan_lifecycle_transitions(self):
+# ============================================================
+# v2.0 食材成本率趋势预测告警（09:45 日检）
+# ============================================================
+
+@celery_app.task(bind=True, max_retries=2, default_retry_delay=300)
+def check_food_cost_trend_alert(self):
+    """
+    每日 09:45 检查所有门店成本率趋势，对趋势恶化（预计 7 天内超标）的门店
+    提前发送企业微信趋势预警，防患于未然。
+    """
+    import asyncio
+
+    async def _run():
+        from src.core.database import get_db_session
+        from src.services.kpi_alert_service import KPIAlertService
+
+        async with get_db_session() as db:
+            result = await KPIAlertService.run_trend_alerts(db=db)
+            logger.info(
+                "food_cost_trend_alert_done",
+                total=result["total"],
+                trend_alerts=result["trend_alert_count"],
+                sent=result["sent_count"],
+                failed=result["failed_count"],
+            )
+    try:
+        asyncio.run(_run())
+    except Exception as exc:
+        raise self.retry(exc=exc)
     """
     每日 06:00 扫描私域会员生命周期变更。
 
@@ -3411,7 +3445,8 @@ def refresh_private_domain_rfm(self):
                 SELECT DISTINCT store_id FROM private_domain_members
             """)
             async with get_db_session() as db2:
-                store_rows = (await db2.execute(stores_sql)).fetchall()
+                store_result = await db2.execute(stores_sql)
+                store_rows = await _maybe_await(store_result.fetchall())
             for (sid,) in store_rows:
                 invalidated += await ctx_store.invalidate_store(sid)
         except Exception as exc:
@@ -3464,7 +3499,8 @@ def trigger_new_member_journeys(self):
         """)
 
         async with get_db_session() as db:
-            rows = (await db.execute(sql)).fetchall()
+            result = await db.execute(sql)
+            rows = await _maybe_await(result.fetchall())
             for row in rows:
                 customer_id, store_id, wechat_openid = row[0], row[1], row[2]
                 stats["scanned"] += 1
@@ -3520,7 +3556,8 @@ def trigger_demand_predictions(self):
         )
 
         async with get_db_session() as db:
-            stores = (await db.execute(store_sql)).fetchall()
+            store_result = await db.execute(store_sql)
+            stores = await _maybe_await(store_result.fetchall())
             stats["stores"] = len(stores)
 
             for (store_id,) in stores:

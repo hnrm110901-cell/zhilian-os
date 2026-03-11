@@ -335,3 +335,150 @@ class MonthlyReportService:
             top3_decisions    = report["top3_decisions"],
             weekly_chart      = report["weekly_trend_chart"],
         )
+
+    @staticmethod
+    async def generate_excel(
+        store_id: str,
+        year:     int,
+        month:    int,
+        db:       AsyncSession,
+    ) -> bytes:
+        """
+        生成月度报告 Excel（.xlsx）字节流，供下载。
+
+        工作表：
+          Sheet1 经营摘要  — KPI 核心指标
+          Sheet2 周趋势    — 成本率 + 营业额折线数据
+          Sheet3 Top3决策  — 本月最高价值决策明细
+        """
+        import io
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from openpyxl.utils import get_column_letter
+
+        report = await MonthlyReportService.generate(store_id, year, month, db)
+
+        wb = openpyxl.Workbook()
+
+        # ── 通用样式 ──────────────────────────────────────────────
+        HDR_FILL  = PatternFill("solid", fgColor="FF6B2C")  # 品牌橙
+        HDR_FONT  = Font(bold=True, color="FFFFFF", size=11)
+        TITLE_FONT = Font(bold=True, size=13)
+        BORDER    = Border(
+            left=Side(style="thin"), right=Side(style="thin"),
+            top=Side(style="thin"),  bottom=Side(style="thin"),
+        )
+        CENTER    = Alignment(horizontal="center", vertical="center")
+        RIGHT     = Alignment(horizontal="right")
+
+        def _set_header(ws, row: int, cols: list[str]) -> None:
+            for c, label in enumerate(cols, start=1):
+                cell = ws.cell(row=row, column=c, value=label)
+                cell.fill   = HDR_FILL
+                cell.font   = HDR_FONT
+                cell.border = BORDER
+                cell.alignment = CENTER
+
+        def _set_cell(ws, row: int, col: int, value, num_fmt: str = None) -> None:
+            cell = ws.cell(row=row, column=col, value=value)
+            cell.border = BORDER
+            if num_fmt:
+                cell.number_format = num_fmt
+            return cell
+
+        # ════════════════════════════════════════════════════════
+        # Sheet1: 经营摘要
+        # ════════════════════════════════════════════════════════
+        ws1 = wb.active
+        ws1.title = "经营摘要"
+        period = report["period_label"]
+
+        # 标题行
+        ws1.merge_cells("A1:C1")
+        title_cell = ws1["A1"]
+        title_cell.value = f"{BRAND_NAME} — {period} 月度经营报告"
+        title_cell.font  = TITLE_FONT
+        title_cell.alignment = CENTER
+
+        es = report["executive_summary"]
+        cm = report["cost_metrics"]
+        dm = report["decision_summary"]
+
+        kpis = [
+            ("指标",          "数值",          "单位"),
+            ("营业额",         es.get("revenue_yuan", "—"),    "元"),
+            ("食材成本率",      f"{cm.get('actual_cost_pct', 0):.2f}%",  "%"),
+            ("成本率状态",      {"ok": "正常", "warning": "偏高", "critical": "超标"}.get(
+                cm.get("cost_rate_status", ""), "—"), ""),
+            ("损耗成本",       es.get("waste_cost_yuan", "—"),  "元"),
+            ("决策采纳率",     f"{dm.get('adoption_rate_pct', 0):.1f}%", "%"),
+            ("累计节省",       dm.get("total_saving_yuan", 0),   "元"),
+            ("发出决策数",     dm.get("total", 0),               "条"),
+            ("已执行决策数",   dm.get("approved", 0),            "条"),
+        ]
+        _set_header(ws1, 2, kpis[0])
+        for r_offset, (label, val, unit) in enumerate(kpis[1:], start=3):
+            _set_cell(ws1, r_offset, 1, label)
+            _set_cell(ws1, r_offset, 2, val)
+            _set_cell(ws1, r_offset, 3, unit)
+
+        for col_idx in range(1, 4):
+            ws1.column_dimensions[get_column_letter(col_idx)].width = 20
+
+        # ════════════════════════════════════════════════════════
+        # Sheet2: 周趋势
+        # ════════════════════════════════════════════════════════
+        ws2 = wb.create_sheet("周趋势")
+        ws2.merge_cells("A1:D1")
+        t2 = ws2["A1"]
+        t2.value = f"{period} 周趋势数据"
+        t2.font  = TITLE_FONT
+        t2.alignment = CENTER
+
+        wc = report.get("weekly_trend_chart", {})
+        weeks   = wc.get("weeks", [])
+        cost_rates = wc.get("cost_rate_pcts", [])
+        revenues   = wc.get("revenues", [])
+
+        _set_header(ws2, 2, ["周次", "成本率(%)", "营业额(元)", "目标成本率(%)"])
+        target_pct = cm.get("target_cost_pct", "—")
+        for i, week in enumerate(weeks):
+            r = i + 3
+            _set_cell(ws2, r, 1, week)
+            _set_cell(ws2, r, 2, cost_rates[i] if i < len(cost_rates) else None, "0.00")
+            _set_cell(ws2, r, 3, revenues[i]   if i < len(revenues)   else None, "#,##0.00")
+            _set_cell(ws2, r, 4, target_pct)
+
+        for col_idx in range(1, 5):
+            ws2.column_dimensions[get_column_letter(col_idx)].width = 18
+
+        # ════════════════════════════════════════════════════════
+        # Sheet3: Top3 决策
+        # ════════════════════════════════════════════════════════
+        ws3 = wb.create_sheet("Top3决策")
+        ws3.merge_cells("A1:E1")
+        t3 = ws3["A1"]
+        t3.value = f"{period} 高价值决策明细"
+        t3.font  = TITLE_FONT
+        t3.alignment = CENTER
+
+        _set_header(ws3, 2, ["排名", "决策标题", "决策叙述", "节省金额(元)", "置信度(%)"])
+        for rank, decision in enumerate(report.get("top3_decisions", []), start=1):
+            r = rank + 2
+            _set_cell(ws3, r, 1, rank)
+            _set_cell(ws3, r, 2, decision.get("title", ""))
+            narr_cell = _set_cell(ws3, r, 3, decision.get("narrative", ""))
+            narr_cell.alignment = Alignment(wrap_text=True)
+            _set_cell(ws3, r, 4, decision.get("saving_yuan", 0), "#,##0.00")
+            _set_cell(ws3, r, 5, decision.get("confidence_pct", 0), "0.0")
+
+        ws3.column_dimensions["A"].width = 6
+        ws3.column_dimensions["B"].width = 28
+        ws3.column_dimensions["C"].width = 50
+        ws3.column_dimensions["D"].width = 16
+        ws3.column_dimensions["E"].width = 12
+
+        buf = io.BytesIO()
+        wb.save(buf)
+        return buf.getvalue()
+

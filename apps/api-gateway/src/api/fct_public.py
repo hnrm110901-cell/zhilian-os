@@ -497,8 +497,7 @@ async def get_reports(
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
     if not tenant_id:
-        params = {"tenant_id": tenant_id, "entity_id": entity_id, "start_date": start_date, "end_date": end_date}
-        return await fct_service.get_reports_stub(report_type, params)
+        raise HTTPException(status_code=400, detail="tenant_id 为必填参数，请通过 Query 或 X-Tenant-Id 传递")
     _start, _end = start_date, end_date
     if period and len(period) == 6:
         try:
@@ -535,8 +534,11 @@ async def get_reports(
         return await fct_service.get_plan_vs_actual(
             session, tenant_id=tenant_id, entity_id=entity_id, start_date=_start, end_date=_end, granularity=granularity or "month"
         )
-    params = {"tenant_id": tenant_id, "entity_id": entity_id, "start_date": start_date, "end_date": end_date}
-    return await fct_service.get_reports_stub(report_type, params)
+    supported = fct_service.get_supported_report_types()
+    raise HTTPException(
+        status_code=400,
+        detail=f"报表类型 '{report_type}' 暂不支持，已支持：{', '.join(supported)}",
+    )
 
 
 @router.put("/plans", summary="年度计划 upsert")
@@ -707,13 +709,13 @@ async def list_invoices_by_voucher(
     return await fct_service.list_invoices_by_voucher(session, voucher_id=voucher_id)
 
 
-@router.post("/invoices/{invoice_id}/verify", summary="发票验真占位")
+@router.post("/invoices/{invoice_id}/verify", summary="发票验真")
 async def verify_invoice(
     invoice_id: str,
     session: AsyncSession = Depends(get_db_fct),
     _: None = Depends(verify_fct_api_key),
 ) -> Dict[str, Any]:
-    return await fct_service.verify_invoice_stub(session, invoice_id=invoice_id)
+    return await fct_service.verify_invoice(session, invoice_id=invoice_id)
 
 
 # ---------- Phase 4：审批流占位 ----------

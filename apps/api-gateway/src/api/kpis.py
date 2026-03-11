@@ -149,3 +149,56 @@ async def create_kpi_record(
         id=str(record.id), kpi_id=record.kpi_id, store_id=record.store_id,
         record_date=record.record_date, value=record.value, notes=None
     )
+
+
+@router.get("/kpis/alerts/trend")
+async def run_trend_alerts(
+    store_id:      Optional[str] = Query(None, description="指定门店，不传则扫描所有门店"),
+    lookback_days: int           = Query(14, ge=3, le=90,  description="趋势回望天数"),
+    forecast_days: int           = Query(7,  ge=1, le=30,  description="向前预测天数"),
+    dry_run:       bool          = Query(False, description="仅计算趋势，不发送企微告警"),
+    session: AsyncSession = Depends(get_db),
+    current_user: User    = Depends(get_current_active_user),
+):
+    """
+    成本率趋势预测告警。
+
+    基于近 lookback_days 天的成本率数据，通过线性回归预测 forecast_days
+    天后是否会突破阈值，提前发出趋势预警。
+
+    - trend_status: ok | warning_trend | critical_trend
+    - slope_per_day: 每天成本率增速（正数表示上涨）
+    - forecasted_pct: 预测期末成本率
+    """
+    from src.services.kpi_alert_service import KPIAlertService
+
+    thresholds = await KPIAlertService._get_food_cost_thresholds(session)
+
+    if store_id:
+        result = await KPIAlertService.check_store_trend(
+            store_id=store_id,
+            db=session,
+            thresholds=thresholds,
+            lookback_days=lookback_days,
+            forecast_days=forecast_days,
+        )
+        return result
+
+    if dry_run:
+        store_ids = await KPIAlertService._get_active_store_ids(session)
+        results = []
+        for sid in store_ids:
+            try:
+                r = await KPIAlertService.check_store_trend(
+                    store_id=sid, db=session, thresholds=thresholds,
+                    lookback_days=lookback_days, forecast_days=forecast_days,
+                )
+                results.append(r)
+            except Exception as exc:
+                logger.warning("trend_alert_dry_run_failed", store_id=sid, error=str(exc))
+        alert_count = sum(1 for r in results if r.get("needs_trend_alert"))
+        return {"dry_run": True, "total": len(results), "alert_count": alert_count, "results": results}
+
+    return await KPIAlertService.run_trend_alerts(
+        db=session, lookback_days=lookback_days, forecast_days=forecast_days
+    )
