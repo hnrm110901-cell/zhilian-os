@@ -13,6 +13,31 @@ import styles from './Home.module.css';
 
 const STORE_ID = localStorage.getItem('store_id') || 'STORE001';
 
+interface DailyDecision {
+  has_decision: boolean;
+  message?: string;
+  decision?: {
+    title: string;
+    action: string;
+    expected_saving_yuan: number;
+    confidence_pct: number;
+    severity: string;
+    detail: string;
+    executor: string;
+    deadline_hours: number;
+    category: string;
+    source: string;
+  };
+  cumulative_saving_yuan?: number;
+}
+
+const SEVERITY_STYLE: Record<string, { bg: string; border: string; accent: string; label: string }> = {
+  critical: { bg: '#fff1f0', border: '#ffa39e', accent: '#cf1322', label: '紧急' },
+  warning: { bg: '#fff7e6', border: '#ffd591', accent: '#ad6800', label: '重要' },
+  watch: { bg: '#e6f7ff', border: '#91d5ff', accent: '#096dd9', label: '关注' },
+  ok: { bg: '#f6ffed', border: '#b7eb8f', accent: '#237804', label: '正常' },
+};
+
 function greeting(): string {
   const h = new Date().getHours();
   if (h < 6) return '凌晨好';
@@ -95,6 +120,8 @@ export default function SmHome() {
   });
   const [adviceHistory, setAdviceHistory] = useState<AdviceHistoryResp | null>(null);
   const [adviceKey, setAdviceKey] = useState<'today' | 'tomorrow'>('tomorrow');
+  const [dailyDecision, setDailyDecision] = useState<DailyDecision | null>(null);
+  const [decisionLoading, setDecisionLoading] = useState(true);
   const normalizePositionRequirements = (raw: Record<string, any> | undefined): Record<string, number> => {
     if (!raw) return {};
     const keys = ['morning', 'lunch', 'dinner'];
@@ -198,8 +225,21 @@ export default function SmHome() {
     }
   }, []);
 
+  const loadDailyDecision = useCallback(async () => {
+    setDecisionLoading(true);
+    try {
+      const resp = await apiClient.get<DailyDecision>(`/api/v1/brain/stores/${STORE_ID}/today`);
+      setDailyDecision(resp);
+    } catch {
+      setDailyDecision(null);
+    } finally {
+      setDecisionLoading(false);
+    }
+  }, []);
+
   useEffect(() => { load(); }, [load]);
   useEffect(() => { loadStaffingAdvice(); }, [loadStaffingAdvice]);
+  useEffect(() => { loadDailyDecision(); }, [loadDailyDecision]);
 
   const submitAdvice = useCallback(async () => {
     const advice = adviceMap[adviceKey];
@@ -295,7 +335,7 @@ export default function SmHome() {
           <div className={styles.greeting}>{greeting()}，{data?.role_name || '店长'}</div>
           <div className={styles.date}>{today} · {STORE_ID}</div>
         </div>
-        <ZButton variant="ghost" size="sm" onClick={() => { load(); loadStaffingAdvice(); }}>↺ 刷新</ZButton>
+        <ZButton variant="ghost" size="sm" onClick={() => { load(); loadStaffingAdvice(); loadDailyDecision(); }}>↺ 刷新</ZButton>
       </div>
 
       {loading && !data ? (
@@ -353,6 +393,43 @@ export default function SmHome() {
               </span>
             </div>
           )}
+
+          {/* P1: 每日1决策 Hero Card */}
+          {decisionLoading ? (
+            <ZSkeleton block rows={3} />
+          ) : dailyDecision?.has_decision && dailyDecision.decision ? (() => {
+            const d = dailyDecision.decision;
+            const sev = SEVERITY_STYLE[d.severity] || SEVERITY_STYLE.watch;
+            return (
+              <div
+                className={styles.decisionHero}
+                style={{ background: sev.bg, borderColor: sev.border }}
+              >
+                <div className={styles.decisionHeader}>
+                  <ZBadge type={d.severity === 'critical' ? 'critical' : d.severity === 'warning' ? 'warning' : 'info'} text={sev.label} />
+                  <span className={styles.decisionDeadline}>{d.deadline_hours}h 内完成</span>
+                </div>
+                <div className={styles.decisionTitle} style={{ color: sev.accent }}>{d.title}</div>
+                <div className={styles.decisionAction}>{d.action}</div>
+                <div className={styles.decisionMeta}>
+                  <span className={styles.decisionSaving}>预计月省 ¥{d.expected_saving_yuan.toLocaleString()}</span>
+                  <span className={styles.decisionConfidence}>置信度 {d.confidence_pct}%</span>
+                  <span className={styles.decisionExecutor}>{d.executor}</span>
+                </div>
+                {d.detail && <div className={styles.decisionDetail}>{d.detail}</div>}
+                {(dailyDecision.cumulative_saving_yuan || 0) > 0 && (
+                  <div className={styles.decisionCumulative}>
+                    本月AI累计帮您省：¥{dailyDecision.cumulative_saving_yuan!.toLocaleString()}
+                  </div>
+                )}
+              </div>
+            );
+          })() : dailyDecision && !dailyDecision.has_decision ? (
+            <div className={styles.decisionOk}>
+              <span className={styles.decisionOkIcon}>&#10004;</span>
+              <span>{dailyDecision.message || '今日经营状况良好'}</span>
+            </div>
+          ) : null}
 
           <div className={styles.kpiGrid}>
             <div className={styles.kpiCell}>

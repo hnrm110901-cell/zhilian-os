@@ -761,6 +761,16 @@ app.include_router(channel_profit.router)
 app.include_router(performance_compute.router)
 app.include_router(onboarding.router)
 
+# P0 — 食材成本真相引擎
+from src.api import cost_truth
+app.include_router(cost_truth.router, tags=["cost_truth"])
+# P1 — Unified Brain 每日1决策
+from src.api import unified_brain
+app.include_router(unified_brain.router, tags=["unified_brain"])
+# P2 — 跨客户食材价格基准网络
+from src.api import price_benchmark
+app.include_router(price_benchmark.router, tags=["price_benchmark"])
+
 # BFF 聚合路由（角色驱动前端，4种角色各一个聚合端点）
 from src.api import bff
 app.include_router(bff.router, tags=["bff"])

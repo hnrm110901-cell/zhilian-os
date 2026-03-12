@@ -431,7 +431,7 @@ const EdgeHubAlertsPage: React.FC = () => {
           )
         }
       >
-        {drawerAlert && (
+        {drawerAlert && (<>
           <Descriptions size="small" column={1} bordered>
             <Descriptions.Item label="级别">
               <Tag color={LEVEL_COLOR[drawerAlert.level] ?? 'default'}>
@@ -498,7 +498,7 @@ const EdgeHubAlertsPage: React.FC = () => {
               }]),
             ]}
           />
-        )}
+        </>)}
       </Drawer>
     </div>
   );

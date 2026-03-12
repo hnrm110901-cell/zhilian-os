@@ -115,6 +115,96 @@
   color: #237804;
 }
 
+/* ── Daily Decision Hero Card ─────────────────────────────────────────────── */
+
+.decisionHero {
+  border: 2px solid;
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.decisionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.decisionDeadline {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+
+.decisionTitle {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.3;
+  font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+}
+
+.decisionAction {
+  font-size: 14px;
+  color: var(--text-primary);
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+.decisionMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding-top: 4px;
+}
+
+.decisionSaving {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.decisionConfidence,
+.decisionExecutor {
+  font-weight: 500;
+}
+
+.decisionDetail {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  line-height: 1.4;
+  padding-top: 2px;
+}
+
+.decisionCumulative {
+  font-size: 12px;
+  color: #237804;
+  font-weight: 600;
+  padding-top: 4px;
+  border-top: 1px dashed #b7eb8f;
+  margin-top: 4px;
+}
+
+.decisionOk {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  background: #f6ffed;
+  border: 1px solid #b7eb8f;
+  border-radius: 12px;
+  font-size: 14px;
+  color: #237804;
+  font-weight: 500;
+}
+
+.decisionOkIcon {
+  font-size: 18px;
+  color: #52c41a;
+}
+
 /* ── KPI grid ─────────────────────────────────────────────────────────────── */
 
 .kpiGrid {
