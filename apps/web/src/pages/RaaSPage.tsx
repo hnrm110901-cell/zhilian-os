@@ -66,7 +66,7 @@ const RaaSPage: React.FC = () => {
           <Row gutter={16}>
             <Col span={6}><Card loading={loading}><Statistic title="基准营收" prefix="¥" value={(baseline?.avg_monthly_revenue || 0).toFixed(0)} /></Card></Col>
             <Col span={6}><Card loading={loading}><Statistic title="当月营收" prefix="¥" value={(effectMetrics?.current_revenue || 0).toFixed(0)} /></Card></Col>
-            <Col span={6}><Card loading={loading}><Statistic title="营收增长" suffix="%" value={((effectMetrics?.revenue_growth || 0) * 100).toFixed(1)} valueStyle={{ color: (effectMetrics?.revenue_growth || 0) >= 0 ? '#52c41a' : '#ff4d4f' }} /></Card></Col>
+            <Col span={6}><Card loading={loading}><Statistic title="营收增长" suffix="%" value={((effectMetrics?.revenue_growth || 0) * 100).toFixed(1)} valueStyle={{ color: (effectMetrics?.revenue_growth || 0) >= 0 ? '#1A7A52' : '#C53030' }} /></Card></Col>
             <Col span={6}><Card loading={loading}><Statistic title="本月账单" prefix="¥" value={(monthlyBill?.total_amount || 0).toFixed(2)} /></Card></Col>
           </Row>
         </div>

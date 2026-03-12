@@ -1,5 +1,5 @@
 """
-智链OS 数据融合引擎（Palantir Fusion Layer）
+屯象OS 数据融合引擎（Palantir Fusion Layer）
 
 职责：将 POS / 企微 / Excel 等多源数据标准化，写入 Neo4j 本体节点。
 

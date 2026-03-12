@@ -10,9 +10,9 @@
   white-space: nowrap;
 }
 
-.critical { background: rgba(255,59,48,0.12); color: var(--red); }
-.warning  { background: rgba(255,159,10,0.12); color: var(--yellow); }
-.success  { background: rgba(52,199,89,0.12);  color: var(--green); }
-.info     { background: rgba(0,122,255,0.12);   color: var(--blue); }
-.default  { background: var(--border);           color: var(--text-secondary); }
-.accent   { background: var(--accent-soft);      color: var(--accent); }
+.critical { background: rgba(197,48,48,0.12);  color: var(--red); }
+.warning  { background: rgba(200,146,58,0.12); color: var(--yellow); }
+.success  { background: rgba(26,122,82,0.12);  color: var(--green); }
+.info     { background: rgba(10,175,154,0.12); color: var(--accent); }
+.default  { background: var(--border);          color: var(--text-secondary); }
+.accent   { background: var(--accent-soft);     color: var(--accent); }

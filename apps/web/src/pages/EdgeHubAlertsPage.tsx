@@ -263,19 +263,19 @@ const EdgeHubAlertsPage: React.FC = () => {
       <Row gutter={[12, 12]} className={styles.statsRow}>
         <Col xs={8}>
           <Card size="small" className={styles.statCard}>
-            <div className={styles.statNum} style={{ color: '#ff4d4f' }}>{p1Count}</div>
+            <div className={styles.statNum} style={{ color: '#C53030' }}>{p1Count}</div>
             <div className={styles.statLabel}>P1 严重（未解决）</div>
           </Card>
         </Col>
         <Col xs={8}>
           <Card size="small" className={styles.statCard}>
-            <div className={styles.statNum} style={{ color: '#fa8c16' }}>{p2Count}</div>
+            <div className={styles.statNum} style={{ color: '#C8923A' }}>{p2Count}</div>
             <div className={styles.statLabel}>P2 重要（未解决）</div>
           </Card>
         </Col>
         <Col xs={8}>
           <Card size="small" className={styles.statCard}>
-            <div className={styles.statNum} style={{ color: openCount > 0 ? '#1677ff' : '#52c41a' }}>{openCount}</div>
+            <div className={styles.statNum} style={{ color: openCount > 0 ? '#0AAF9A' : '#1A7A52' }}>{openCount}</div>
             <div className={styles.statLabel}>未解决总数</div>
           </Card>
         </Col>
@@ -462,7 +462,7 @@ const EdgeHubAlertsPage: React.FC = () => {
           <Timeline
             items={[
               {
-                dot: <BellOutlined style={{ color: LEVEL_COLOR[drawerAlert.level] ?? '#1677ff' }} />,
+                dot: <BellOutlined style={{ color: LEVEL_COLOR[drawerAlert.level] ?? '#0AAF9A' }} />,
                 children: (
                   <span>
                     <Tag color={LEVEL_COLOR[drawerAlert.level]}>{LEVEL_LABEL[drawerAlert.level] ?? drawerAlert.level.toUpperCase()}</Tag>
@@ -474,12 +474,12 @@ const EdgeHubAlertsPage: React.FC = () => {
                 ),
               },
               ...(drawerAlert.level === 'p1' ? [{
-                dot: <RiseOutlined style={{ color: '#ff4d4f' }} />,
+                dot: <RiseOutlined style={{ color: '#C53030' }} />,
                 children: <span><Tag color="red">P1</Tag> 已升级至最高级别</span>,
               }] : []),
               ...(drawerAlert.status !== 'open' ? [{
                 dot: drawerAlert.status === 'resolved'
-                  ? <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                  ? <CheckCircleOutlined style={{ color: '#1A7A52' }} />
                   : <StopOutlined style={{ color: '#8c8c8c' }} />,
                 children: (
                   <span>
@@ -492,9 +492,9 @@ const EdgeHubAlertsPage: React.FC = () => {
                   </span>
                 ),
               }] : [{
-                dot: <BellOutlined style={{ color: '#fa8c16' }} />,
+                dot: <BellOutlined style={{ color: '#C8923A' }} />,
                 color: 'orange',
-                children: <span><Tag color="orange">处理中</Tag> 等待处理…</span>,
+                children: <span><Tag color="mint">处理中</Tag> 等待处理…</span>,
               }]),
             ]}
           />

@@ -11,6 +11,15 @@ export { default as ZTable } from './ZTable';
 export type { ZTableColumn, ZTableProps } from './ZTable';
 export { default as ZModal } from './ZModal';
 export { default as ZSelect } from './ZSelect';
+// New Z components (屯象)
+export { default as ZTag } from './ZTag';
+export { default as ZAlert } from './ZAlert';
+export { default as ZTimeline } from './ZTimeline';
+export type { TimelineItem } from './ZTimeline';
+export { default as ZDrawer } from './ZDrawer';
+export { default as DecisionCard } from './DecisionCard';
+export { default as AIMessageCard } from './AIMessageCard';
+export { default as QuoteBlock } from './QuoteBlock';
 // Business components
 export { default as HealthRing } from './HealthRing';
 export { default as UrgencyList } from './UrgencyList';

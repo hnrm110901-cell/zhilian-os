@@ -322,7 +322,7 @@ class HumanInTheLoopService:
         """
         logger.info("发送审批通知", request_id=request.request_id)
 
-        message = f"""【智链OS - 需要您的审批】
+        message = f"""【屯象OS - 需要您的审批】
 
 操作类型: {request.operation_type}
 风险等级: {request.risk_level}

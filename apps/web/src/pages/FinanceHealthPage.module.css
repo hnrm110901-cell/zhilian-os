@@ -21,7 +21,7 @@
 @media (max-width: 720px)  { .kpiGrid { grid-template-columns: repeat(2, 1fr); } }
 
 .kpiSub     { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
-.kpiSubWarn { font-size: 11px; color: #f5222d; margin-top: 4px; font-weight: 600; }
+.kpiSubWarn { font-size: 11px; color: #C53030; margin-top: 4px; font-weight: 600; }
 
 .noScore {
   grid-column: 1 / -1;
@@ -51,8 +51,8 @@
 }
 .tab:hover { color: var(--text-primary); }
 .tabActive {
-  color: var(--accent, #FF6B2C);
-  border-bottom-color: var(--accent, #FF6B2C);
+  color: var(--accent, #0AAF9A);
+  border-bottom-color: var(--accent, #0AAF9A);
   font-weight: 600;
 }
 
@@ -97,7 +97,7 @@
   background: var(--bg-primary, #fff);
   transition: border-color 0.2s;
 }
-.insightCard:hover { border-color: var(--accent, #FF6B2C); }
+.insightCard:hover { border-color: var(--accent, #0AAF9A); }
 
 .insightHigh   { border-color: #ffccc7; background: #fff8f8; }
 .insightMedium { border-color: #ffe7ba; background: #fffbf0; }

@@ -25,11 +25,11 @@ const PHASE_CONFIG: Record<string, {
   label: string; antColor: string; color: string;
   icon: React.ReactNode; rowClass: string;
 }> = {
-  launch:  { label: '上市', antColor: 'processing', color: '#1677ff', icon: <RocketOutlined />, rowClass: styles.rowLaunch },
-  growth:  { label: '成长', antColor: 'success',    color: '#52c41a', icon: <RiseOutlined />,   rowClass: '' },
+  launch:  { label: '上市', antColor: 'processing', color: '#0AAF9A', icon: <RocketOutlined />, rowClass: styles.rowLaunch },
+  growth:  { label: '成长', antColor: 'success',    color: '#1A7A52', icon: <RiseOutlined />,   rowClass: '' },
   peak:    { label: '成熟', antColor: 'green',       color: '#389e0d', icon: <TrophyOutlined />, rowClass: '' },
-  decline: { label: '衰退', antColor: 'warning',     color: '#fa8c16', icon: <FallOutlined />,   rowClass: styles.rowDecline },
-  exit:    { label: '退出', antColor: 'error',        color: '#ff4d4f', icon: <PoweroffOutlined />, rowClass: styles.rowExit },
+  decline: { label: '衰退', antColor: 'warning',     color: '#C8923A', icon: <FallOutlined />,   rowClass: styles.rowDecline },
+  exit:    { label: '退出', antColor: 'error',        color: '#C53030', icon: <PoweroffOutlined />, rowClass: styles.rowExit },
 };
 
 const PHASE_ORDER = ['launch', 'growth', 'peak', 'decline', 'exit'];
@@ -113,7 +113,7 @@ interface HistoryPoint {
 const fmt    = (n: number) => `¥${Math.abs(n).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
 const fmtPct = (n: number) => `${Number(n).toFixed(1)}%`;
 const fmtTrend = (n: number) => (
-  <Text style={{ color: n >= 0 ? '#52c41a' : '#ff4d4f' }}>
+  <Text style={{ color: n >= 0 ? '#1A7A52' : '#C53030' }}>
     {n >= 0 ? '+' : ''}{Number(n).toFixed(1)}%
   </Text>
 );
@@ -274,7 +274,7 @@ const DishLifecyclePage: React.FC = () => {
           symbol: h.phase_changed ? 'diamond' : 'circle',
           symbolSize: h.phase_changed ? 12 : 6,
         })),
-        lineStyle: { color: '#1677ff', width: 2 },
+        lineStyle: { color: '#0AAF9A', width: 2 },
         areaStyle: { color: 'rgba(22,119,255,0.08)' },
       }],
     };
@@ -334,7 +334,7 @@ const DishLifecyclePage: React.FC = () => {
       sorter: (a: LifecycleRecord, b: LifecycleRecord) =>
         b.expected_impact_yuan - a.expected_impact_yuan,
       defaultSortOrder: 'descend' as const,
-      render: (v: number) => <Text style={{ color: '#52c41a' }}>{fmt(v)}</Text>,
+      render: (v: number) => <Text style={{ color: '#1A7A52' }}>{fmt(v)}</Text>,
     },
     {
       title: '置信度', dataIndex: 'confidence_pct', width: 75,
@@ -402,19 +402,19 @@ const DishLifecyclePage: React.FC = () => {
         <Col xs={12} sm={6}>
           <Card size="small">
             <Statistic title="本期阶段跃迁" value={totalTrans} suffix="次"
-              prefix={<WarningOutlined />} valueStyle={{ color: '#fa8c16' }} />
+              prefix={<WarningOutlined />} valueStyle={{ color: '#C8923A' }} />
           </Card>
         </Col>
         <Col xs={12} sm={6}>
           <Card size="small">
             <Statistic title="退出/衰退菜品" value={exitCount + declineCount} suffix="道"
-              prefix={<FallOutlined />} valueStyle={{ color: '#ff4d4f' }} />
+              prefix={<FallOutlined />} valueStyle={{ color: '#C53030' }} />
           </Card>
         </Col>
         <Col xs={12} sm={6}>
           <Card size="small">
             <Statistic title="行动¥总潜力" value={totalImpact.toFixed(0)}
-              prefix="¥" valueStyle={{ color: '#52c41a' }} />
+              prefix="¥" valueStyle={{ color: '#1A7A52' }} />
           </Card>
         </Col>
       </Row>
@@ -493,7 +493,7 @@ const DishLifecyclePage: React.FC = () => {
                               <Tag color={PHASE_CONFIG[t.phase]?.antColor || 'default'}>
                                 {t.action_label}
                               </Tag>
-                              <Text style={{ color: '#52c41a', fontSize: 12 }}>
+                              <Text style={{ color: '#1A7A52', fontSize: 12 }}>
                                 {fmt(t.expected_impact_yuan)}
                               </Text>
                             </Space>
@@ -546,7 +546,7 @@ const DishLifecyclePage: React.FC = () => {
                           { title: '平均营收趋势', dataIndex: 'avg_rev_trend',
                             render: (v: number) => fmtTrend(v) },
                           { title: '行动¥潜力', dataIndex: 'total_impact',
-                            render: (v: number) => <Text style={{ color: '#52c41a' }}>{fmt(v)}</Text> },
+                            render: (v: number) => <Text style={{ color: '#1A7A52' }}>{fmt(v)}</Text> },
                           { title: '建议动作', dataIndex: 'action_label',
                             render: (l: string, r: PhaseStat) =>
                               <Tag color={PHASE_CONFIG[r.phase]?.antColor || 'default'}>{l}</Tag> },

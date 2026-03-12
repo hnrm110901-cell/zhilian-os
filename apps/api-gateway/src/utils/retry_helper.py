@@ -1,5 +1,5 @@
 """
-重试机制工具模块（移植自 BettaFish，适配智链OS async/structlog/httpx 环境）
+重试机制工具模块（移植自 BettaFish，适配屯象OS async/structlog/httpx 环境）
 
 提供指数退避重试装饰器，增强 LLM API 调用和外部 HTTP 请求的健壮性。
 

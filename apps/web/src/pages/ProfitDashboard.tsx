@@ -79,7 +79,7 @@ interface VarianceDetail {
 // ── 工具函数 ──────────────────────────────────────────────────────────────────
 
 const statusColor = (s: string) =>
-  s === 'critical' ? '#f5222d' : s === 'warning' ? '#faad14' : '#52c41a';
+  s === 'critical' ? '#C53030' : s === 'warning' ? '#faad14' : '#1A7A52';
 
 const statusBadgeType = (s: string): 'success' | 'warning' | 'critical' | 'default' =>
   s === 'critical' ? 'critical' : s === 'warning' ? 'warning' : s === 'ok' ? 'success' : 'default';
@@ -99,7 +99,7 @@ const ingredientColumns: ZTableColumn<any>[] = [
       <span style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         width: 28, height: 28, borderRadius: '50%',
-        background: rank <= 3 ? '#1677ff' : '#d9d9d9',
+        background: rank <= 3 ? '#0AAF9A' : '#d9d9d9',
         color: rank <= 3 ? '#fff' : '#666',
         fontWeight: 700, fontSize: 13,
       }}>
@@ -117,7 +117,7 @@ const ingredientColumns: ZTableColumn<any>[] = [
     title: '用料成本',
     align: 'right',
     render: (yuan: number) => (
-      <strong style={{ color: '#1677ff' }}>
+      <strong style={{ color: '#0AAF9A' }}>
         ¥{yuan?.toLocaleString('zh-CN', { minimumFractionDigits: 0 })}
       </strong>
     ),
@@ -127,7 +127,7 @@ const ingredientColumns: ZTableColumn<any>[] = [
     title: '占实际成本',
     width: 150,
     render: (pct: number) => {
-      const color = pct >= 20 ? '#f5222d' : pct >= 10 ? '#faad14' : '#1677ff';
+      const color = pct >= 20 ? '#C53030' : pct >= 10 ? '#faad14' : '#0AAF9A';
       return (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <div style={{ width: 90, height: 5, background: '#f0f0f0', borderRadius: 3, overflow: 'hidden' }}>
@@ -250,9 +250,9 @@ const ProfitDashboard: React.FC = () => {
         name: '理论成本率',
         type: 'line',
         data: rankingData.stores.map(s => s.theoretical_pct),
-        lineStyle: { color: '#1890ff', type: 'dashed' },
+        lineStyle: { color: '#0AAF9A', type: 'dashed' },
         symbol: 'circle', symbolSize: 6,
-        itemStyle: { color: '#1890ff' },
+        itemStyle: { color: '#0AAF9A' },
       },
     ],
   } : {};
@@ -279,9 +279,9 @@ const ProfitDashboard: React.FC = () => {
         {
           name: '成本率', type: 'line', yAxisIndex: 0,
           data: chart.cost_rate_data.map((v: number, i: number) => ({
-            value: v, itemStyle: { color: chart.point_colors[i] || '#1890ff' },
+            value: v, itemStyle: { color: chart.point_colors[i] || '#0AAF9A' },
           })),
-          lineStyle: { color: '#1890ff', width: 2 },
+          lineStyle: { color: '#0AAF9A', width: 2 },
           areaStyle: { opacity: 0.1 },
           symbol: 'circle', symbolSize: 8,
           markLine: {
@@ -338,7 +338,7 @@ const ProfitDashboard: React.FC = () => {
       title: '差异',
       align: 'right',
       render: (v: number) => {
-        const color = v > 5 ? '#f5222d' : v > 2 ? '#faad14' : '#52c41a';
+        const color = v > 5 ? '#C53030' : v > 2 ? '#faad14' : '#1A7A52';
         const Icon  = v > 0 ? RiseOutlined : FallOutlined;
         return <span style={{ color }}><Icon /> {v?.toFixed(1)}%</span>;
       },
@@ -617,9 +617,9 @@ const ProfitDashboard: React.FC = () => {
                         </div>
                         <div style={{
                           fontSize: 22, fontWeight: 700, lineHeight: 1.2,
-                          color: varianceData.variance_pct > 5 ? '#f5222d'
+                          color: varianceData.variance_pct > 5 ? '#C53030'
                                : varianceData.variance_pct > 2 ? '#faad14'
-                               : '#52c41a',
+                               : '#1A7A52',
                         }}>
                           {varianceData.variance_pct > 0 ? <RiseOutlined /> : <FallOutlined />}
                           {' '}{varianceData.variance_pct?.toFixed(1)}%
@@ -630,7 +630,7 @@ const ProfitDashboard: React.FC = () => {
                     <ZCard
                       title={
                         <span>
-                          <DollarOutlined style={{ color: '#1677ff', marginRight: 6 }} />
+                          <DollarOutlined style={{ color: '#0AAF9A', marginRight: 6 }} />
                           Top 10 食材用料成本（按金额排序）
                         </span>
                       }

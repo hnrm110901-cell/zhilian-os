@@ -90,7 +90,7 @@ const POSPage: React.FC = () => {
       title: '状态', key: 'stock_status',
       render: (_: any, r: any) => {
         if (r.current_stock === 0) return <Tag color="red">缺货</Tag>;
-        if (r.current_stock <= r.min_stock) return <Tag color="orange">库存低</Tag>;
+        if (r.current_stock <= r.min_stock) return <Tag color="mint">库存低</Tag>;
         return <Tag color="green">正常</Tag>;
       },
     },
@@ -162,8 +162,8 @@ const POSPage: React.FC = () => {
           {invSummary && (
             <Row gutter={12} style={{ marginBottom: 12 }}>
               <Col span={8}><Card size="small"><Statistic title="总品类" value={invSummary.total} /></Card></Col>
-              <Col span={8}><Card size="small"><Statistic title="库存低" value={invSummary.low} valueStyle={{ color: '#fa8c16' }} /></Card></Col>
-              <Col span={8}><Card size="small"><Statistic title="缺货" value={invSummary.out} valueStyle={{ color: '#ff4d4f' }} /></Card></Col>
+              <Col span={8}><Card size="small"><Statistic title="库存低" value={invSummary.low} valueStyle={{ color: '#C8923A' }} /></Card></Col>
+              <Col span={8}><Card size="small"><Statistic title="缺货" value={invSummary.out} valueStyle={{ color: '#C53030' }} /></Card></Col>
             </Row>
           )}
           <Table columns={inventoryColumns} dataSource={inventory} rowKey={(r, i) => `${r.item_id || r.name || i}`} loading={loading} size="small" />

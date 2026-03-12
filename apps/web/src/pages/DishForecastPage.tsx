@@ -20,11 +20,11 @@ const { Option } = Select;
 // ── 常量 ──────────────────────────────────────────────────────────────────────
 
 const PHASE_CONFIG: Record<string, { label: string; color: string; antColor: string }> = {
-  launch:  { label: '新品', color: '#52c41a', antColor: 'green' },
-  growth:  { label: '成长', color: '#1677ff', antColor: 'blue' },
+  launch:  { label: '新品', color: '#1A7A52', antColor: 'green' },
+  growth:  { label: '成长', color: '#0AAF9A', antColor: 'blue' },
   peak:    { label: '成熟', color: '#faad14', antColor: 'gold' },
-  decline: { label: '衰退', color: '#fa8c16', antColor: 'orange' },
-  exit:    { label: '退出', color: '#f5222d', antColor: 'red' },
+  decline: { label: '衰退', color: '#C8923A', antColor: 'orange' },
+  exit:    { label: '退出', color: '#C53030', antColor: 'red' },
 };
 
 const DEFAULT_STORE = 'S001';
@@ -167,7 +167,7 @@ const ForecastBoard: React.FC<{ storeId: string }> = ({ storeId }) => {
     { title: '营收趋势', dataIndex: 'trend_revenue_pct', width: 90,
       render: (v: number) => trendTag(v) },
     { title: '阶段调整', dataIndex: 'lifecycle_adj_pct', width: 90, align: 'right' as const,
-      render: (v: number) => v === 0 ? '—' : <span style={{color: v > 0 ? '#52c41a' : '#f5222d'}}>{v > 0 ? '+' : ''}{v.toFixed(1)}%</span> },
+      render: (v: number) => v === 0 ? '—' : <span style={{color: v > 0 ? '#1A7A52' : '#C53030'}}>{v > 0 ? '+' : ''}{v.toFixed(1)}%</span> },
     { title: '预测成本率', dataIndex: 'predicted_fcr', width: 95, align: 'right' as const,
       render: (v: number) => `${v.toFixed(1)}%` },
     { title: '预测毛利率', dataIndex: 'predicted_gpm', width: 95, align: 'right' as const,
@@ -246,10 +246,10 @@ const SummaryAnalysis: React.FC<{ storeId: string }> = ({ storeId }) => {
     ],
     series: [
       { name: '菜品数', type: 'bar', data: summary.by_phase.map(r => r.dish_count),
-        itemStyle: { color: '#1677ff' } },
+        itemStyle: { color: '#0AAF9A' } },
       { name: '预测营收(百元)', type: 'bar', yAxisIndex: 1,
         data: summary.by_phase.map(r => (r.total_revenue / 100).toFixed(0)),
-        itemStyle: { color: '#52c41a' } },
+        itemStyle: { color: '#1A7A52' } },
     ],
   } : {};
 
@@ -274,7 +274,7 @@ const SummaryAnalysis: React.FC<{ storeId: string }> = ({ storeId }) => {
       type: 'bar',
       data: summary.by_phase.map(r => ({
         value: r.avg_trend.toFixed(2),
-        itemStyle: { color: r.avg_trend >= 0 ? '#52c41a' : '#f5222d' },
+        itemStyle: { color: r.avg_trend >= 0 ? '#1A7A52' : '#C53030' },
       })),
     }],
   } : {};
@@ -380,7 +380,7 @@ const AccuracyTracking: React.FC<{ storeId: string }> = ({ storeId }) => {
         itemStyle: {
           color: (p: { data: [number, number, string] }) => {
             const err = Math.abs((p.data[1] - p.data[0]) / (p.data[0] || 1) * 100);
-            return err > 20 ? '#f5222d' : err > 10 ? '#faad14' : '#52c41a';
+            return err > 20 ? '#C53030' : err > 10 ? '#faad14' : '#1A7A52';
           },
         },
       },
@@ -438,9 +438,9 @@ const AccuracyTracking: React.FC<{ storeId: string }> = ({ storeId }) => {
             <Card title="误差概要" size="small" style={{ height: '100%' }}>
               <Row gutter={8}>
                 {[
-                  { label: '误差 <10%', count: data.filter(r => Math.abs(r.revenue_error_pct ?? 999) < 10).length, color: '#52c41a' },
+                  { label: '误差 <10%', count: data.filter(r => Math.abs(r.revenue_error_pct ?? 999) < 10).length, color: '#1A7A52' },
                   { label: '误差 10-20%', count: data.filter(r => { const e = Math.abs(r.revenue_error_pct ?? 999); return e >= 10 && e < 20; }).length, color: '#faad14' },
-                  { label: '误差 >20%', count: data.filter(r => Math.abs(r.revenue_error_pct ?? 999) >= 20).length, color: '#f5222d' },
+                  { label: '误差 >20%', count: data.filter(r => Math.abs(r.revenue_error_pct ?? 999) >= 20).length, color: '#C53030' },
                 ].map(item => (
                   <Col span={8} key={item.label}>
                     <Card size="small" style={{ textAlign: 'center', borderColor: item.color }}>
@@ -517,12 +517,12 @@ const DishForecastDetail: React.FC<{ storeId: string }> = ({ storeId }) => {
       {
         name: '预测营收', type: 'line', symbol: 'circle',
         data: sortedHistory.map(r => r.predicted_revenue_yuan),
-        lineStyle: { color: '#1677ff' }, itemStyle: { color: '#1677ff' },
+        lineStyle: { color: '#0AAF9A' }, itemStyle: { color: '#0AAF9A' },
       },
       {
         name: '实际营收', type: 'line', symbol: 'diamond',
         data: sortedHistory.map(r => r.actual_revenue),
-        lineStyle: { color: '#52c41a', type: 'dashed' }, itemStyle: { color: '#52c41a' },
+        lineStyle: { color: '#1A7A52', type: 'dashed' }, itemStyle: { color: '#1A7A52' },
       },
       {
         name: '置信上限', type: 'line', symbol: 'none',

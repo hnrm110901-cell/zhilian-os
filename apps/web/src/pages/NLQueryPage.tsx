@@ -92,7 +92,7 @@ const NLQueryPage: React.FC = () => {
     <div style={{ maxWidth: 1000, margin: '0 auto', padding: '24px 0' }}>
       <Title level={3}>
         <BulbOutlined style={{ marginRight: 8 }} />
-        智链OS 自然语言图谱查询
+        屯象OS 自然语言图谱查询
       </Title>
       <Paragraph type="secondary">
         用自然语言提问，系统自动翻译为 Cypher 查询本体图谱，返回带溯源的结构化答案。
@@ -176,7 +176,7 @@ const NLQueryPage: React.FC = () => {
               {result.answer && (
                 <div>
                   <Text strong>答案：</Text>
-                  <Paragraph style={{ marginTop: 4, background: '#f6ffed', padding: '12px 16px', borderRadius: 4 }}>
+                  <Paragraph style={{ marginTop: 4, background: 'rgba(26,122,82,0.08)', padding: '12px 16px', borderRadius: 4 }}>
                     {result.answer}
                   </Paragraph>
                 </div>

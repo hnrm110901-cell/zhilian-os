@@ -944,7 +944,7 @@ const LaunchTab: React.FC<{ dishId: string; brandId: string }> = ({ dishId, bran
                   style={{ marginBottom: 12 }}
                 />
               )}
-              <Progress percent={readyPct} strokeColor={readiness.ready_to_launch ? '#52c41a' : '#fa8c16'} />
+              <Progress percent={readyPct} strokeColor={readiness.ready_to_launch ? '#1A7A52' : '#C8923A'} />
             </Col>
           </Row>
 
@@ -956,8 +956,8 @@ const LaunchTab: React.FC<{ dishId: string; brandId: string }> = ({ dishId, bran
                 <List.Item>
                   <Space>
                     {item.passed
-                      ? <CheckCircleOutlined style={{ color: '#52c41a' }} />
-                      : <CloseCircleOutlined style={{ color: '#ff4d4f' }} />}
+                      ? <CheckCircleOutlined style={{ color: '#1A7A52' }} />
+                      : <CloseCircleOutlined style={{ color: '#C53030' }} />}
                     <Text type={item.passed ? undefined : 'danger'}>{item.item}</Text>
                     {item.note && <Text type="secondary">（{item.note}）</Text>}
                   </Space>

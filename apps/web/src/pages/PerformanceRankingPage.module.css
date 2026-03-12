@@ -27,9 +27,9 @@
 
 .computeBtn {
   padding: 4px 16px;
-  border: 1px solid #1677ff;
+  border: 1px solid #0AAF9A;
   border-radius: 6px;
-  background: #1677ff;
+  background: #0AAF9A;
   color: #fff;
   cursor: pointer;
   font-size: 14px;
@@ -95,5 +95,5 @@
 }
 
 .highlightGap {
-  background-color: #fff1f0;
+  background-color: rgba(197,48,48,0.08);
 }

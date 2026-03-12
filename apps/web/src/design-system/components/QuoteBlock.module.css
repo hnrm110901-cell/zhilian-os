@@ -1,0 +1,13 @@
+.quote {
+  border-left: 3px solid #0AAF9A;
+  background: var(--bg-tertiary);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: 12px 16px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+[data-theme='dark'] .quote {
+  background: rgba(10,175,154,0.06);
+}

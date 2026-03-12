@@ -165,7 +165,7 @@ const EdgeHubBindingsPage: React.FC = () => {
       title: '设备状态', dataIndex: 'deviceStatus', width: 90,
       render: (v: string | undefined) => v ? (
         <Badge
-          color={v === 'online' ? '#52c41a' : '#ff4d4f'}
+          color={v === 'online' ? '#1A7A52' : '#C53030'}
           text={v === 'online' ? '在线' : '离线'}
         />
       ) : '—',

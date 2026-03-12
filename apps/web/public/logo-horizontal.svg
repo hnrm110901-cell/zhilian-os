@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  屯象 Logo Horizontal · 芽象 + 文字
+  用于 Topbar / Login / Loading 等场景
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 48" width="200" height="48">
+  <!-- Logo Mark (scaled down) -->
+  <g transform="translate(4,2) scale(0.44)">
+    <circle cx="40" cy="26" r="22" fill="#0AAF9A"/>
+    <rect x="36.5" y="46" width="7" height="28" rx="3.5" fill="#0AAF9A"/>
+    <rect x="10" y="75" width="60" height="8" rx="4" fill="#0AAF9A"/>
+  </g>
+  <!-- 屯象OS Text -->
+  <text x="52" y="32" font-family="'Noto Serif SC', serif" font-weight="700" font-size="20" fill="#0D1E1E" letter-spacing="2">
+    屯象OS
+  </text>
+</svg>

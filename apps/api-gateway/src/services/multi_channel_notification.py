@@ -553,7 +553,7 @@ class WeChatNotificationHandler(NotificationChannelHandler):
                     "data": {
                         "first": {"value": title, "color": "#173177"},
                         "keyword1": {"value": content, "color": "#173177"},
-                        "remark": {"value": "感谢使用智链OS", "color": "#173177"},
+                        "remark": {"value": "感谢使用屯象OS", "color": "#173177"},
                     },
                 }
                 send_resp = await client.post(send_url, json=template_data)

@@ -164,7 +164,7 @@ const GovDashboardPage: React.FC = () => {
       symbol: 'circle',
       symbolSize: 6,
       data: data.weekly_trend.map(w => w.adoption_rate),
-      itemStyle: { color: '#1677ff' },
+      itemStyle: { color: '#0AAF9A' },
       areaStyle: { color: 'rgba(22,119,255,0.08)' },
     }],
     grid: { left: 50, right: 20, top: 20, bottom: 30 },
@@ -181,9 +181,9 @@ const GovDashboardPage: React.FC = () => {
     },
     yAxis: { type: 'value' },
     series: [
-      { name: '已采纳', type: 'bar', stack: 'total', data: data.agent_stats.map(a => a.approved), itemStyle: { color: '#52c41a' } },
-      { name: '已拒绝', type: 'bar', stack: 'total', data: data.agent_stats.map(a => a.rejected), itemStyle: { color: '#ff4d4f' } },
-      { name: '已修改', type: 'bar', stack: 'total', data: data.agent_stats.map(a => a.modified), itemStyle: { color: '#1677ff' } },
+      { name: '已采纳', type: 'bar', stack: 'total', data: data.agent_stats.map(a => a.approved), itemStyle: { color: '#1A7A52' } },
+      { name: '已拒绝', type: 'bar', stack: 'total', data: data.agent_stats.map(a => a.rejected), itemStyle: { color: '#C53030' } },
+      { name: '已修改', type: 'bar', stack: 'total', data: data.agent_stats.map(a => a.modified), itemStyle: { color: '#0AAF9A' } },
       { name: '待决策', type: 'bar', stack: 'total', data: data.agent_stats.map(a => a.pending), itemStyle: { color: '#d9d9d9' } },
     ],
     grid: { left: 40, right: 20, top: 20, bottom: 50 },
@@ -206,7 +206,7 @@ const GovDashboardPage: React.FC = () => {
       title: '¥影响', key: 'impact', width: 100,
       render: (_: unknown, r: DecisionLog) => {
         const net = r.revenue_impact_yuan - r.cost_impact_yuan;
-        return <Text style={{ color: net >= 0 ? '#52c41a' : '#ff4d4f' }}>
+        return <Text style={{ color: net >= 0 ? '#1A7A52' : '#C53030' }}>
           {net >= 0 ? '+' : ''}{net.toFixed(0)}
         </Text>;
       },
@@ -257,7 +257,7 @@ const GovDashboardPage: React.FC = () => {
     <AgentWorkspaceTemplate
       agentName="AI 治理看板"
       agentIcon="🤖"
-      agentColor="#1677ff"
+      agentColor="#0AAF9A"
       description="决策采纳率 · 人工干预率 · Agent 健康度 · 信任分"
       status={(s?.pending_count ?? 0) > 10 ? 'warning' : loading ? 'idle' : 'running'}
       loading={loading}
@@ -289,14 +289,14 @@ const GovDashboardPage: React.FC = () => {
           label: 'AI采纳率',
           value: s != null ? s.adoption_rate.toFixed(1) : '—',
           unit: '%',
-          valueColor: (s?.adoption_rate ?? 0) >= 70 ? '#52c41a' : '#faad14',
+          valueColor: (s?.adoption_rate ?? 0) >= 70 ? '#1A7A52' : '#faad14',
           icon: <CheckCircleOutlined />,
         },
         {
           label: '人工干预率',
           value: s != null ? s.override_rate.toFixed(1) : '—',
           unit: '%',
-          valueColor: (s?.override_rate ?? 0) <= 20 ? '#52c41a' : '#ff4d4f',
+          valueColor: (s?.override_rate ?? 0) <= 20 ? '#1A7A52' : '#C53030',
           icon: <EditOutlined />,
         },
         {

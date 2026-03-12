@@ -88,7 +88,7 @@ const I18nPage: React.FC = () => {
             <Card><Statistic title="支持货币数" value={currencies.length} prefix={<DollarOutlined />} /></Card>
           </Col>
           <Col span={8}>
-            <Card><Statistic title="已启用语言" value={languages.filter(l => l.enabled).length} valueStyle={{ color: '#52c41a' }} /></Card>
+            <Card><Statistic title="已启用语言" value={languages.filter(l => l.enabled).length} valueStyle={{ color: '#1A7A52' }} /></Card>
           </Col>
         </Row>
 
@@ -130,7 +130,7 @@ const I18nPage: React.FC = () => {
                     {convertResult.original_amount} {convertResult.original_currency}
                   </Descriptions.Item>
                   <Descriptions.Item label="换算结果">
-                    <Text strong style={{ color: '#1890ff', fontSize: 18 }}>
+                    <Text strong style={{ color: '#0AAF9A', fontSize: 18 }}>
                       {convertResult.converted_amount?.toFixed(2)} {convertResult.converted_currency}
                     </Text>
                   </Descriptions.Item>

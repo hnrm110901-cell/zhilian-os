@@ -46,8 +46,8 @@ interface StatItem {
 // ── 常量 ──────────────────────────────────────────────────────────────────
 
 const URGENCY_COLOR: Record<string, string> = {
-  high:   '#ff4d4f',
-  medium: '#fa8c16',
+  high:   '#C53030',
+  medium: '#C8923A',
   low:    '#8c8c8c',
 };
 
@@ -165,7 +165,7 @@ const FinancialRecommendationPage: React.FC = () => {
       {
         name: '已采纳', type: 'bar', stack: 'total',
         data: stats.map((s) => s.adopted),
-        itemStyle: { color: '#52c41a' },
+        itemStyle: { color: '#1A7A52' },
       },
       {
         name: '已驳回', type: 'bar', stack: 'total',
@@ -175,7 +175,7 @@ const FinancialRecommendationPage: React.FC = () => {
       {
         name: '待处理', type: 'bar', stack: 'total',
         data: stats.map((s) => s.pending),
-        itemStyle: { color: '#1677ff' },
+        itemStyle: { color: '#0AAF9A' },
       },
     ],
   };
@@ -189,9 +189,9 @@ const FinancialRecommendationPage: React.FC = () => {
       {
         type: 'line', data: stats.map((s) => s.adoption_rate),
         smooth: true, symbol: 'circle', symbolSize: 7,
-        itemStyle: { color: '#52c41a' },
+        itemStyle: { color: '#1A7A52' },
         lineStyle: { width: 2 },
-        areaStyle: { opacity: 0.15, color: '#52c41a' },
+        areaStyle: { opacity: 0.15, color: '#1A7A52' },
       },
     ],
   };
@@ -245,7 +245,7 @@ const FinancialRecommendationPage: React.FC = () => {
           {rec.expected_yuan_impact !== null && (
             <span className={styles.metaItem}>
               <span className={styles.metaLabel}>¥影响</span>
-              <span style={{ color: rec.expected_yuan_impact < 0 ? '#ff4d4f' : '#52c41a', fontWeight: 600 }}>
+              <span style={{ color: rec.expected_yuan_impact < 0 ? '#C53030' : '#1A7A52', fontWeight: 600 }}>
                 {rec.expected_yuan_impact < 0 ? '-' : '+'}
                 ¥{Math.abs(rec.expected_yuan_impact).toLocaleString('zh-CN', { maximumFractionDigits: 0 })}
               </span>
@@ -357,7 +357,7 @@ const FinancialRecommendationPage: React.FC = () => {
             <Statistic
               title="¥提升潜力"
               value={totalYuan > 0 ? `¥${totalYuan.toLocaleString('zh-CN', { maximumFractionDigits: 0 })}` : '—'}
-              valueStyle={{ color: '#1677ff' }}
+              valueStyle={{ color: '#0AAF9A' }}
             />
           </Card>
         </Col>

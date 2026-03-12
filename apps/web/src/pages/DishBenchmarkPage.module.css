@@ -19,15 +19,15 @@
 }
 
 .tierAboveAvg {
-  color: #1677ff;
+  color: #0AAF9A;
 }
 
 .tierBelowAvg {
-  color: #fa8c16;
+  color: #C8923A;
 }
 
 .tierLaggard {
-  color: #ff4d4f;
+  color: #C53030;
   font-weight: 600;
 }
 
@@ -41,13 +41,13 @@
   display: inline-block;
   padding: 2px 8px;
   border-radius: 4px;
-  background: #fff7e6;
-  color: #fa8c16;
+  background: rgba(200,146,58,0.08);
+  color: #C8923A;
   font-size: 13px;
   font-weight: 600;
 }
 
 /* 横向对比表 */
 .bestStore {
-  background: #f6ffed;
+  background: rgba(26,122,82,0.08);
 }

@@ -129,9 +129,9 @@ const TaskManagementPage: React.FC = () => {
   return (
     <div>
       <Row gutter={16} style={{ marginBottom: 16 }}>
-        <Col span={8}><Card><Statistic title="待处理" value={pending} valueStyle={{ color: '#fa8c16' }} /></Card></Col>
-        <Col span={8}><Card><Statistic title="进行中" value={inProgress} valueStyle={{ color: '#1890ff' }} /></Card></Col>
-        <Col span={8}><Card><Statistic title="已完成" value={completed} valueStyle={{ color: '#52c41a' }} /></Card></Col>
+        <Col span={8}><Card><Statistic title="待处理" value={pending} valueStyle={{ color: '#C8923A' }} /></Card></Col>
+        <Col span={8}><Card><Statistic title="进行中" value={inProgress} valueStyle={{ color: '#0AAF9A' }} /></Card></Col>
+        <Col span={8}><Card><Statistic title="已完成" value={completed} valueStyle={{ color: '#1A7A52' }} /></Card></Col>
       </Row>
 
       <Card

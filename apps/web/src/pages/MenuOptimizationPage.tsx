@@ -21,18 +21,18 @@ const { Option } = Select;
 
 // ── 建议类型配置 ──────────────────────────────────────────────────────────────
 const REC_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
-  price_increase: { label: '提价空间', color: '#52c41a',  icon: '📈' },
-  cost_reduction: { label: '降本优化', color: '#1677ff',  icon: '🔧' },
-  promote:        { label: '推广增量', color: '#fa8c16',  icon: '📣' },
-  discontinue:    { label: '建议下架', color: '#ff4d4f',  icon: '🗑️' },
+  price_increase: { label: '提价空间', color: '#1A7A52',  icon: '📈' },
+  cost_reduction: { label: '降本优化', color: '#0AAF9A',  icon: '🔧' },
+  promote:        { label: '推广增量', color: '#C8923A',  icon: '📣' },
+  discontinue:    { label: '建议下架', color: '#C53030',  icon: '🗑️' },
   bundle:         { label: '套餐捆绑', color: '#722ed1',  icon: '🎁' },
 };
 
 const BCG_CONFIG: Record<string, { label: string; color: string }> = {
   star:          { label: '明星菜', color: '#faad14' },
-  cash_cow:      { label: '现金牛', color: '#52c41a' },
-  question_mark: { label: '问题菜', color: '#1677ff' },
-  dog:           { label: '瘦狗菜', color: '#ff4d4f' },
+  cash_cow:      { label: '现金牛', color: '#1A7A52' },
+  question_mark: { label: '问题菜', color: '#0AAF9A' },
+  dog:           { label: '瘦狗菜', color: '#C53030' },
 };
 
 const URGENCY_CONFIG: Record<string, { label: string; color: string }> = {
@@ -138,7 +138,7 @@ const RecCard: React.FC<{
             value={rec.expected_profit_impact_yuan.toFixed(0)}
             prefix="¥"
             valueStyle={{
-              color: rec.expected_profit_impact_yuan >= 0 ? '#52c41a' : '#ff4d4f',
+              color: rec.expected_profit_impact_yuan >= 0 ? '#1A7A52' : '#C53030',
               fontSize: 18,
             }}
           />
@@ -293,7 +293,7 @@ const MenuOptimizationPage: React.FC = () => {
         {
           name: '已采纳数', type: 'line', yAxisIndex: 1,
           data: types.map(t => t.adopted),
-          itemStyle: { color: '#52c41a' },
+          itemStyle: { color: '#1A7A52' },
           symbol: 'circle', symbolSize: 8,
         },
       ],
@@ -312,8 +312,8 @@ const MenuOptimizationPage: React.FC = () => {
       series: [{
         type: 'pie', radius: ['40%', '70%'],
         data: [
-          { name: '紧急', value: counts.high,   itemStyle: { color: '#ff4d4f' } },
-          { name: '一般', value: counts.medium, itemStyle: { color: '#fa8c16' } },
+          { name: '紧急', value: counts.high,   itemStyle: { color: '#C53030' } },
+          { name: '一般', value: counts.medium, itemStyle: { color: '#C8923A' } },
           { name: '低',   value: counts.low,    itemStyle: { color: '#bbb' } },
         ],
         label: { formatter: '{b}\n{c}' },
@@ -334,7 +334,7 @@ const MenuOptimizationPage: React.FC = () => {
   };
 
   const healthScore = computeHealthScore();
-  const healthColor = healthScore >= 70 ? '#52c41a' : healthScore >= 40 ? '#fa8c16' : '#ff4d4f';
+  const healthColor = healthScore >= 70 ? '#1A7A52' : healthScore >= 40 ? '#C8923A' : '#C53030';
 
   const gaugeOption = () => ({
     backgroundColor: 'transparent',
@@ -390,25 +390,25 @@ const MenuOptimizationPage: React.FC = () => {
         <Col xs={12} sm={6}>
           <Card size="small">
             <Statistic title="待处理建议" value={pendingRecs} suffix="条"
-              prefix={<BulbOutlined />} valueStyle={{ color: '#1677ff' }} />
+              prefix={<BulbOutlined />} valueStyle={{ color: '#0AAF9A' }} />
           </Card>
         </Col>
         <Col xs={12} sm={6}>
           <Card size="small">
             <Statistic title="紧急建议" value={highUrgency} suffix="条"
-              prefix={<FireOutlined />} valueStyle={{ color: '#ff4d4f' }} />
+              prefix={<FireOutlined />} valueStyle={{ color: '#C53030' }} />
           </Card>
         </Col>
         <Col xs={12} sm={6}>
           <Card size="small">
             <Statistic title="预期总增利" value={totalImpact.toFixed(0)}
-              prefix="¥" valueStyle={{ color: '#52c41a' }} />
+              prefix="¥" valueStyle={{ color: '#1A7A52' }} />
           </Card>
         </Col>
         <Col xs={12} sm={6}>
           <Card size="small">
             <Statistic title="已采纳建议" value={adoptedRecs} suffix="条"
-              prefix={<CheckCircleOutlined />} valueStyle={{ color: '#52c41a' }} />
+              prefix={<CheckCircleOutlined />} valueStyle={{ color: '#1A7A52' }} />
           </Card>
         </Col>
       </Row>
@@ -484,7 +484,7 @@ const MenuOptimizationPage: React.FC = () => {
                             )},
                           { title: '数量', dataIndex: 'count', width: 60 },
                           { title: '预期增利', dataIndex: 'total_profit_impact_yuan',
-                            render: (v: number) => <Text style={{ color: v >= 0 ? '#52c41a' : '#ff4d4f' }}>{fmt(v)}</Text> },
+                            render: (v: number) => <Text style={{ color: v >= 0 ? '#1A7A52' : '#C53030' }}>{fmt(v)}</Text> },
                           { title: '已采纳', dataIndex: 'adopted', width: 60 },
                         ]}
                       />
@@ -510,7 +510,7 @@ const MenuOptimizationPage: React.FC = () => {
                     <div className={styles.healthBreakdown}>
                       <div className={styles.healthItem}>
                         <Text strong>建议采纳率</Text>
-                        <Text style={{ color: '#52c41a' }}>
+                        <Text style={{ color: '#1A7A52' }}>
                           {summary && (summary.pending_count + summary.adopted_count) > 0
                             ? fmtPct(summary.adopted_count / (summary.pending_count + summary.adopted_count) * 100)
                             : '—'}
@@ -519,14 +519,14 @@ const MenuOptimizationPage: React.FC = () => {
                       </div>
                       <div className={styles.healthItem}>
                         <Text strong>下架建议数</Text>
-                        <Text style={{ color: (summary?.by_type.find(t => t.rec_type === 'discontinue')?.count ?? 0) > 0 ? '#ff4d4f' : '#52c41a' }}>
+                        <Text style={{ color: (summary?.by_type.find(t => t.rec_type === 'discontinue')?.count ?? 0) > 0 ? '#C53030' : '#1A7A52' }}>
                           {summary?.by_type.find(t => t.rec_type === 'discontinue')?.count ?? 0} 条
                         </Text>
                         <Text type="secondary">占总分 30%（越少越好）</Text>
                       </div>
                       <div className={styles.healthItem}>
                         <Text strong>紧急建议数</Text>
-                        <Text style={{ color: highUrgency > 0 ? '#ff4d4f' : '#52c41a' }}>
+                        <Text style={{ color: highUrgency > 0 ? '#C53030' : '#1A7A52' }}>
                           {highUrgency} 条
                         </Text>
                         <Text type="secondary">占总分 30%（越少越好）</Text>

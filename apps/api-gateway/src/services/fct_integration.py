@@ -1,7 +1,7 @@
 """
 业财税资金一体化（FCT）集成
 
-供智链OS 其他模块在业务节点（如对账完成、日结）向 FCT 推送业财事件。
+供屯象OS 其他模块在业务节点（如对账完成、日结）向 FCT 推送业财事件。
 合并部署时直接调用 fct_service，避免 HTTP 自调用。
 """
 from datetime import date, datetime

@@ -279,7 +279,7 @@ const AlertThresholdsPage: React.FC = () => {
 
       {/* 配置说明 */}
       <div className={styles.infoBar}>
-        <WarningOutlined style={{ color: '#1677ff', marginRight: 8, flexShrink: 0 }} />
+        <WarningOutlined style={{ color: '#0AAF9A', marginRight: 8, flexShrink: 0 }} />
         超过「警告阈值」时系统发送橙色告警推送；超过「超标阈值」时发送红色紧急推送并推送至企业微信。阈值调整立即生效。
       </div>
 

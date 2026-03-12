@@ -54,7 +54,7 @@
   gap: 8px;
   width: 100%;
   padding: 11px 14px;
-  background: #fff1f0;
+  background: rgba(197,48,48,0.08);
   border: 1px solid #ffccc7;
   border-radius: 10px;
   cursor: pointer;
@@ -87,8 +87,8 @@
   gap: 8px;
   width: 100%;
   padding: 11px 14px;
-  background: #fff7e6;
-  border: 1px solid #ffd591;
+  background: rgba(200,146,58,0.08);
+  border: 1px solid rgba(200,146,58,0.3);
   border-radius: 10px;
   cursor: pointer;
   font-family: inherit;
@@ -106,8 +106,8 @@
   gap: 8px;
   width: 100%;
   padding: 10px 14px;
-  background: #f6ffed;
-  border: 1px solid #b7eb8f;
+  background: rgba(26,122,82,0.08);
+  border: 1px solid rgba(26,122,82,0.3);
   border-radius: 10px;
 }
 
@@ -183,7 +183,7 @@
   color: #237804;
   font-weight: 600;
   padding-top: 4px;
-  border-top: 1px dashed #b7eb8f;
+  border-top: 1px dashed rgba(26,122,82,0.3);
   margin-top: 4px;
 }
 
@@ -192,8 +192,8 @@
   align-items: center;
   gap: 8px;
   padding: 14px 16px;
-  background: #f6ffed;
-  border: 1px solid #b7eb8f;
+  background: rgba(26,122,82,0.08);
+  border: 1px solid rgba(26,122,82,0.3);
   border-radius: 12px;
   font-size: 14px;
   color: #237804;
@@ -202,7 +202,7 @@
 
 .decisionOkIcon {
   font-size: 18px;
-  color: #52c41a;
+  color: #1A7A52;
 }
 
 /* ── KPI grid ─────────────────────────────────────────────────────────────── */
@@ -221,7 +221,7 @@
 }
 
 .kpiCellAlert {
-  background: #fff7e6;
+  background: rgba(200,146,58,0.08);
   border-color: #ffa940;
 }
 
@@ -477,7 +477,7 @@
 
 .reasonBarFill {
   height: 100%;
-  background: linear-gradient(90deg, #f97316 0%, #ef4444 100%);
+  background: linear-gradient(90deg, #C8923A 0%, #C53030 100%);
   border-radius: 999px;
 }
 

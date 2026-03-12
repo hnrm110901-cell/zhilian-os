@@ -16,8 +16,8 @@ export default function HQLayout() {
     <div className={styles.shell}>
       <aside className={styles.sidebar}>
         <div className={styles.logo}>
-          <span className={styles.logoIcon}>⚡</span>
-          <span className={styles.logoText}>智链OS</span>
+          <img src="/logo-mark-v3.svg" alt="屯象" style={{ width: 24, height: 30 }} />
+          <span className={styles.logoText}>屯象OS</span>
         </div>
         <nav className={styles.nav}>
           {NAV_ITEMS.map(({ to, label, icon }) => (

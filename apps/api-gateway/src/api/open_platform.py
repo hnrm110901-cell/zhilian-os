@@ -30,8 +30,8 @@ router = APIRouter(prefix="/api/v1/open", tags=["open_platform"])
 
 CAPABILITIES: List[Dict[str, Any]] = [
     # Level 1 — 数据同步
-    {"level": 1, "key": "sync_orders", "name": "订单同步", "description": "批量同步 POS/外卖平台订单到智链", "tier_required": "free"},
-    {"level": 1, "key": "sync_dishes", "name": "菜品同步", "description": "同步菜品信息、价格、库存到智链", "tier_required": "free"},
+    {"level": 1, "key": "sync_orders", "name": "订单同步", "description": "批量同步 POS/外卖平台订单到屯象", "tier_required": "free"},
+    {"level": 1, "key": "sync_dishes", "name": "菜品同步", "description": "同步菜品信息、价格、库存到屯象", "tier_required": "free"},
     {"level": 1, "key": "sync_inventory", "name": "库存同步", "description": "实时同步食材库存数据", "tier_required": "free"},
     {"level": 1, "key": "sync_members", "name": "会员同步", "description": "同步会员信息、积分、消费记录", "tier_required": "free"},
     # Level 2 — 智能决策

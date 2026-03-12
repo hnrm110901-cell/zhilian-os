@@ -411,7 +411,7 @@ async def wechat_webhook(
 
                     from agent import PrivateDomainAgent
 
-                    # P1：可选从 User 表解析 store_id（企微 UserId → 智链OS User.store_id）
+                    # P1：可选从 User 表解析 store_id（企微 UserId → 屯象OS User.store_id）
                     store_id = "default"
                     try:
                         from src.core.database import get_db_session

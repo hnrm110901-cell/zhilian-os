@@ -151,7 +151,7 @@ async def get_network_effect(
     """
     获取网络效应指标
 
-    展示智链OS的网络效应和护城河强度
+    展示屯象OS的网络效应和护城河强度
 
     网络效应飞轮:
     更多门店接入 → 更多数据训练 → AI模型更聪明 → 效果更好 → 更多门店愿意接入
@@ -162,7 +162,7 @@ async def get_network_effect(
     return {
         "network_effect": network_effect,
         "vision": {
-            "title": "智链OS = 餐饮行业的\"集体大脑\"",
+            "title": "屯象OS = 餐饮行业的\"集体大脑\"",
             "description": [
                 f"{network_effect['total_stores']:,}家门店的运营经验",
                 f"{network_effect['total_data_points']:,}条交易数据",

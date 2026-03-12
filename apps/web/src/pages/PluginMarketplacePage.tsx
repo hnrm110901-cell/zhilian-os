@@ -344,7 +344,7 @@ const PluginMarketplacePage: React.FC = () => {
       <div className={styles.pageHeader}>
         <div>
           <h1 className={styles.pageTitle}>插件市场</h1>
-          <p className={styles.pageSub}>发现并安装 ISV 提供的集成插件，扩展智链OS的能力边界</p>
+          <p className={styles.pageSub}>发现并安装 ISV 提供的集成插件，扩展屯象OS的能力边界</p>
         </div>
         <div className={styles.headerActions}>
           <ZButton onClick={() => { loadPlugins(); loadStats(); loadPending(); }}>刷新</ZButton>

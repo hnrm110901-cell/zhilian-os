@@ -19,7 +19,7 @@
 @media (max-width: 960px) { .kpiGrid { grid-template-columns: repeat(2, 1fr); } }
 
 .kpiSub     { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
-.kpiSubWarn { font-size: 11px; color: #f5222d; margin-top: 4px; font-weight: 600; }
+.kpiSubWarn { font-size: 11px; color: #C53030; margin-top: 4px; font-weight: 600; }
 
 /* Main layout */
 .mainLayout {
@@ -51,8 +51,8 @@
 }
 .tab:hover { color: var(--text-primary); }
 .tabActive {
-  color: var(--accent, #FF6B2C);
-  border-bottom-color: var(--accent, #FF6B2C);
+  color: var(--accent, #0AAF9A);
+  border-bottom-color: var(--accent, #0AAF9A);
   font-weight: 600;
 }
 
@@ -68,7 +68,7 @@
   cursor: pointer;
   outline: none;
 }
-.filterSelect:focus { border-color: var(--accent, #FF6B2C); }
+.filterSelect:focus { border-color: var(--accent, #0AAF9A); }
 
 /* Money */
 .mono {
@@ -79,7 +79,7 @@
   font-weight: 700;
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
-  color: #f5222d;
+  color: #C53030;
 }
 
 /* Deviation */
@@ -87,12 +87,12 @@
   font-weight: 700;
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
-  color: #fa8c16;
+  color: #C8923A;
 }
 .devOk {
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
-  color: #52c41a;
+  color: #1A7A52;
 }
 
 /* Risk task cards */
@@ -104,7 +104,7 @@
   background: var(--bg-primary, #fff);
   transition: border-color 0.2s;
 }
-.taskCard:hover { border-color: var(--accent, #FF6B2C); }
+.taskCard:hover { border-color: var(--accent, #0AAF9A); }
 .taskDone { opacity: 0.55; }
 
 .taskHeader {

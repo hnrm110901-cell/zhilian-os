@@ -1,5 +1,5 @@
 /**
- * OnboardingPage — 智链OS 企业诊断与数据入库向导
+ * OnboardingPage — 屯象OS 企业诊断与数据入库向导
  * 路由: /onboarding
  * 4步流程: 欢迎 → 系统对接 → 数据导入 → 知识库构建 → 诊断报告
  */
@@ -69,10 +69,10 @@ const BUILD_STAGES = [
 ];
 
 const COLOR_MAP: Record<string, string> = {
-  green:  '#52c41a',
-  blue:   '#1890ff',
+  green:  '#1A7A52',
+  blue:   '#0AAF9A',
   yellow: '#faad14',
-  red:    '#ff4d4f',
+  red:    '#C53030',
   grey:   '#8c8c8c',
 };
 
@@ -86,7 +86,7 @@ export default function OnboardingPage() {
     <div className={styles.page}>
       {/* Header */}
       <div className={styles.header}>
-        <div className={styles.logo}>智链OS</div>
+        <div className={styles.logo}>屯象OS</div>
         <div className={styles.progressBar}>
           {STEPS.map((name, i) => {
             const cls = i < step ? 'done' : i === step ? 'active' : '';
@@ -127,7 +127,7 @@ function WelcomeStep({ onNext }: { onNext: (storeId: string) => void }) {
       </p>
       <h1 className={styles.stepTitle}>让我们先了解您的企业</h1>
       <p className={styles.stepSub}>
-        填写品牌信息并导入历史经营数据，智链OS将在15分钟内完成企业数字体检，
+        填写品牌信息并导入历史经营数据，屯象OS将在15分钟内完成企业数字体检，
         生成专属诊断报告，让所有AI Agent从第一天起就真正「认识」您的店。
       </p>
 
@@ -189,7 +189,7 @@ function ConnectStep({ storeId, onNext, onSkip }: { storeId: string; onNext: () 
     <>
       <h1 className={styles.stepTitle}>连接现有系统</h1>
       <p className={styles.stepSub}>
-        选择您正在使用的POS或SaaS系统，智链OS将自动拉取历史数据用于诊断分析。
+        选择您正在使用的POS或SaaS系统，屯象OS将自动拉取历史数据用于诊断分析。
         如无以上系统，可跳过此步骤，手动导入数据。
       </p>
 
@@ -225,7 +225,7 @@ function ConnectStep({ storeId, onNext, onSkip }: { storeId: string; onNext: () 
               />
             </div>
           ))}
-          {error && <p style={{ color: 'var(--red, #ff4d4f)', fontSize: 12, marginTop: 8 }}>{error}</p>}
+          {error && <p style={{ color: 'var(--red, #C53030)', fontSize: 12, marginTop: 8 }}>{error}</p>}
           <div style={{ marginTop: 16 }}>
             <ZButton variant="primary" onClick={handleConnect} disabled={loading}>
               {loading ? '连接中…' : '测试并连接'}
@@ -392,7 +392,7 @@ function ImportStep({ storeId, onNext }: { storeId: string; onNext: () => void }
             ))}
           </div>
           {preview.missing_required_fields.length > 0 && (
-            <p style={{ color: 'var(--red, #ff4d4f)', fontSize: 12 }}>
+            <p style={{ color: 'var(--red, #C53030)', fontSize: 12 }}>
               缺少必填字段: {preview.missing_required_fields.join(', ')}
             </p>
           )}
@@ -484,7 +484,7 @@ function BuildingStep({ storeId, onNext }: { storeId: string; onNext: () => void
     <>
       <h1 className={styles.stepTitle}>正在构建知识库</h1>
       <p className={styles.stepSub}>
-        智链OS正在分析您的历史数据，构建企业专属知识图谱。全程约5-15分钟，请稍候。
+        屯象OS正在分析您的历史数据，构建企业专属知识图谱。全程约5-15分钟，请稍候。
       </p>
 
       {error ? (
@@ -606,7 +606,7 @@ function ReportStep({ storeId }: { storeId: string }) {
           完成后，各AI Agent将基于您的历史数据开始工作
         </span>
         <ZButton variant="primary" onClick={handleComplete} disabled={completing}>
-          {completing ? '初始化中…' : '开始使用智链OS 🎉'}
+          {completing ? '初始化中…' : '开始使用屯象OS 🎉'}
         </ZButton>
       </div>
     </>

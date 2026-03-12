@@ -223,7 +223,7 @@ const KPIDashboardPage: React.FC = () => {
                   title={<><Tag color={categoryColor[k.category]} style={{ marginRight: 4 }}>{categoryLabel[k.category]}</Tag>{k.name}</>}
                   value={latest?.value ?? '--'}
                   suffix={k.unit || ''}
-                  valueStyle={{ color: rate == null ? undefined : rate >= 1 ? '#52c41a' : rate >= 0.8 ? '#fa8c16' : '#ff4d4f' }}
+                  valueStyle={{ color: rate == null ? undefined : rate >= 1 ? '#1A7A52' : rate >= 0.8 ? '#C8923A' : '#C53030' }}
                 />
                 {k.target_value && <div style={{ fontSize: 11, color: '#999' }}>目标 {k.target_value}{k.unit}</div>}
               </Card>

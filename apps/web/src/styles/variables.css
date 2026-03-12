@@ -1,103 +1,75 @@
-/* 全局CSS变量 - 支持亮色和暗色主题 */
+/* ═══ 屯象OS Design System · CSS Variables ═══ */
+/* 注意: 大部分变量由 injectTokens() 在运行时注入 */
+/* 此文件仅定义 CSS-only 场景的 fallback 和不适合 JS 注入的值 */
 
 :root {
-  /* 主色调 */
-  --primary-color: #667eea;
-  --primary-hover: #5568d3;
-  --primary-active: #4c5fc7;
-  --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  /* ── 品牌色 ── */
+  --primary-color:    #0AAF9A;
+  --primary-hover:    #088F7A;
+  --primary-active:   #066E5D;
+  --primary-gradient: linear-gradient(135deg, #0AAF9A 0%, #066E5D 100%);
 
-  /* 功能色 */
-  --success-color: #52c41a;
-  --warning-color: #faad14;
-  --error-color: #f5222d;
-  --info-color: #1890ff;
+  /* ── 功能色 ── */
+  --success-color: #1A7A52;
+  --warning-color: #C8923A;
+  --error-color:   #C53030;
+  --info-color:    #0AAF9A;
 
-  /* 中性色 - 亮色主题 */
-  --bg-primary: #ffffff;
-  --bg-secondary: #f5f5f5;
-  --bg-tertiary: #fafafa;
-  --bg-elevated: #ffffff;
+  /* ── 浅色模式默认值 (被injectTokens覆盖) ── */
+  --bg-primary:    #FFFFFF;
+  --bg-secondary:  #F7FAFA;
+  --bg-tertiary:   #EEF3F3;
+  --bg-elevated:   #FFFFFF;
 
-  --text-primary: #1D1D1F;
-  --text-secondary: #6E6E73;
-  --text-tertiary: #AEAEB2;
-  --text-disabled: #bfbfbf;
+  --text-primary:   #0D1E1E;
+  --text-secondary: #4A6B6B;
+  --text-tertiary:  #8AABAB;
+  --text-disabled:  #B8CCCC;
 
-  --border-color: #d9d9d9;
-  --border-light: #f0f0f0;
-  --divider-color: #f0f0f0;
+  --border-color: #D8E4E4;
+  --border-light: #EEF3F3;
+  --divider-color: #EEF3F3;
 
-  /* 阴影 */
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.06);
-  --shadow-lg: 0 8px 32px rgba(0,0,0,0.08);
-  --shadow-xl: 0 8px 24px rgba(0, 0, 0, 0.12);
-
-  /* 圆角 */
-  --radius-sm: 10px;
-  --radius-md: 14px;
-  --radius-lg: 20px;
-  --radius-xl: 28px;
-  --radius-full: 9999px;
-
-  /* 间距 */
-  --spacing-xs: 4px;
-  --spacing-sm: 8px;
-  --spacing-md: 16px;
-  --spacing-lg: 24px;
-  --spacing-xl: 32px;
-  --spacing-2xl: 48px;
-
-  /* 动画 */
-  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-base: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-slow: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-
-  /* ── 智链OS Design System Tokens (light) ── */
-  --bg:             #F5F5F7;
+  --bg:             #F7FAFA;
   --surface:        #FFFFFF;
-  --surface-hover:  #FAFAFA;
-  --border:         rgba(0,0,0,0.06);
-  --accent:         #FF6B2C;
-  --accent-soft:    rgba(255,107,44,0.08);
-  --green:          #34C759;
-  --red:            #FF3B30;
-  --yellow:         #FF9F0A;
-  --blue:           #007AFF;
+  --surface-hover:  #EEF3F3;
+  --border:         #D8E4E4;
+  --accent:         #0AAF9A;
+  --accent-soft:    rgba(10,175,154,0.08);
+  --green:          #1A7A52;
+  --red:            #C53030;
+  --yellow:         #C8923A;
+  --blue:           #0A84FF;
 }
 
-/* 暗色主题 */
+/* ── 深色主题 fallback ── */
 [data-theme='dark'] {
-  /* 中性色 - 暗色主题 */
-  --bg-primary: #141414;
-  --bg-secondary: #1f1f1f;
-  --bg-tertiary: #2a2a2a;
-  --bg-elevated: #262626;
+  --bg-primary:    #0B1A20;
+  --bg-secondary:  #0D2029;
+  --bg-tertiary:   #08131A;
+  --bg-elevated:   #0D2029;
 
-  --text-primary: #F5F5F7;
-  --text-secondary: #AEAEB2;
-  --text-tertiary: #636366;
-  --text-disabled: #595959;
+  --text-primary:   rgba(255,255,255,0.92);
+  --text-secondary: rgba(255,255,255,0.50);
+  --text-tertiary:  rgba(255,255,255,0.25);
+  --text-disabled:  rgba(255,255,255,0.08);
 
-  --border-color: #434343;
-  --border-light: #303030;
-  --divider-color: #303030;
+  --border-color: rgba(255,255,255,0.10);
+  --border-light: rgba(255,255,255,0.06);
+  --divider-color: rgba(255,255,255,0.06);
 
-  /* 阴影 - 暗色主题下更明显 */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
-  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.4);
-  --shadow-xl: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --bg:             #0B1A20;
+  --surface:        #0D2029;
+  --surface-hover:  #112830;
+  --border:         rgba(255,255,255,0.06);
+  --accent-soft:    rgba(10,175,154,0.15);
+  --green:          #34D399;
+  --red:            #F87171;
+  --yellow:         #FFC244;
+  --blue:           #60A5FA;
 
-  /* ── 智链OS Design System Tokens (dark) ── */
-  --bg:             #000000;
-  --surface:        #1C1C1E;
-  --surface-hover:  #2C2C2E;
-  --border:         rgba(255,255,255,0.08);
-  --accent-soft:    rgba(255,107,44,0.15);
-  --green:          #30D158;
-  --red:            #FF453A;
-  --yellow:         #FFD60A;
-  --blue:           #0A84FF;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.2);
+  --shadow-md: 0 2px 8px rgba(0,0,0,0.3);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.4);
+  --shadow-xl: 0 8px 24px rgba(0,0,0,0.5);
 }

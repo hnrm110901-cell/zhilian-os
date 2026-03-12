@@ -29,7 +29,7 @@
 /* Narrative */
 .narrativeCard {
   background: var(--bg-secondary, #f6f8fa);
-  border-left: 4px solid var(--accent, #FF6B2C);
+  border-left: 4px solid var(--accent, #0AAF9A);
 }
 .narrativeIcon { font-size: 16px; margin-right: 8px; }
 .narrativeText { font-size: 13px; color: var(--text-primary); line-height: 1.8; }
@@ -51,8 +51,8 @@
 }
 .tab:hover  { color: var(--text-primary); }
 .tabActive  {
-  color: var(--accent, #FF6B2C);
-  border-bottom-color: var(--accent, #FF6B2C);
+  color: var(--accent, #0AAF9A);
+  border-bottom-color: var(--accent, #0AAF9A);
   font-weight: 600;
 }
 
@@ -95,7 +95,7 @@
   transition: border-color 0.2s;
 }
 .alertCritical { border-color: #ffccc7; background: #fff8f8; }
-.alertHigh     { border-color: #ffd591; background: #fffbe6; }
+.alertHigh     { border-color: rgba(200,146,58,0.3); background: #fffbe6; }
 .alertHeader   { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
 .alertStore    { font-size: 12px; font-weight: 600; color: var(--text-primary); }
 .alertMsg      { font-size: 13px; color: var(--text-primary); margin: 0; line-height: 1.6; }

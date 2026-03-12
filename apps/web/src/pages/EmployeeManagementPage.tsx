@@ -77,7 +77,7 @@ const EmployeeManagementPage: React.FC = () => {
       title: '员工', key: 'name',
       render: (_: any, record: any) => (
         <Space>
-          <Avatar icon={<UserOutlined />} style={{ backgroundColor: '#1890ff' }} />
+          <Avatar icon={<UserOutlined />} style={{ backgroundColor: '#0AAF9A' }} />
           <div>
             <div style={{ fontWeight: 500 }}>{record.name}</div>
             <div style={{ fontSize: 12, color: '#999' }}>{record.employee_id || record.id}</div>

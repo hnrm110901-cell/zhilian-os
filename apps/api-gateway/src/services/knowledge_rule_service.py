@@ -278,7 +278,7 @@ def _build_benchmarks() -> List[Dict]:
                 "unit": unit,
                 "direction": direction,
                 "description": desc,
-                "data_source": "2025中国餐饮行业白皮书 + 智链OS平台数据",
+                "data_source": "2025中国餐饮行业白皮书 + 屯象OS平台数据",
                 "sample_size": {"seafood": 280, "hotpot": 1200, "fastfood": 3500}.get(ind, 500),
             })
     return result
@@ -574,7 +574,7 @@ def _build_cross_store_rules() -> List[Dict]:
         ("CROSS-044", "知识规则命中率在同组内排名 Top1 → 门店学习能力领先",
          {"metric": "rule_hit_accuracy_rate", "operator": "==", "value": "rank_1_in_peer"},
          {"root_cause": "knowledge_absorption_leader", "confidence": 0.78,
-          "action": "授予智链OS门店知识贡献认证，开放数据分成权益"}, C, 0.78),
+          "action": "授予屯象OS门店知识贡献认证，开放数据分成权益"}, C, 0.78),
 
         ("CROSS-045", "同组内某改善措施在 3 家门店验证有效 → 可推全组",
          {"metric": "validated_improvement_store_count", "operator": ">=",

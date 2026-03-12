@@ -265,7 +265,7 @@ const FinanceManagement: React.FC = () => {
       render: (variance: number) => {
         const isPositive = variance > 0;
         return (
-          <span style={{ color: isPositive ? '#ff4d4f' : '#52c41a' }}>
+          <span style={{ color: isPositive ? '#C53030' : '#1A7A52' }}>
             {isPositive ? '+' : ''}¥{(variance / 100).toFixed(2)}
           </span>
         );
@@ -328,19 +328,19 @@ const FinanceManagement: React.FC = () => {
         name: '流入',
         type: 'line',
         data: Object.values(cashFlow.cash_flow || {}).map((d: any) => d.inflow / 100),
-        itemStyle: { color: '#52c41a' },
+        itemStyle: { color: '#1A7A52' },
       },
       {
         name: '流出',
         type: 'line',
         data: Object.values(cashFlow.cash_flow || {}).map((d: any) => d.outflow / 100),
-        itemStyle: { color: '#ff4d4f' },
+        itemStyle: { color: '#C53030' },
       },
       {
         name: '净额',
         type: 'line',
         data: Object.values(cashFlow.cash_flow || {}).map((d: any) => d.net / 100),
-        itemStyle: { color: '#1890ff' },
+        itemStyle: { color: '#0AAF9A' },
       },
     ],
   } : null;

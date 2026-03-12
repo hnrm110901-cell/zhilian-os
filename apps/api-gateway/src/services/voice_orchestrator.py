@@ -327,7 +327,7 @@ class VoiceInteractionOrchestrator:
         elif role == "cashier":
             return "您好，我是收银助手。您可以说：查询订单、结账买单、会员查询、优惠查询等。"
         else:
-            return "您好，我是智链OS语音助手。请告诉我您需要什么帮助。"
+            return "您好，我是屯象OS语音助手。请告诉我您需要什么帮助。"
 
 
 # 创建全局实例

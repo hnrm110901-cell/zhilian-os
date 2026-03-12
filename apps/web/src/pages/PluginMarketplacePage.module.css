@@ -79,13 +79,13 @@
 }
 
 .categoryPill:hover {
-  border-color: var(--accent, #FF6B2C);
-  color: var(--accent, #FF6B2C);
+  border-color: var(--accent, #0AAF9A);
+  color: var(--accent, #0AAF9A);
 }
 
 .categoryPillActive {
-  background: var(--accent, #FF6B2C);
-  border-color: var(--accent, #FF6B2C);
+  background: var(--accent, #0AAF9A);
+  border-color: var(--accent, #0AAF9A);
   color: #fff;
 }
 
@@ -220,6 +220,6 @@
   align-items: center;
   gap: 4px;
   font-size: 12px;
-  color: #52c41a;
+  color: #1A7A52;
   font-weight: 500;
 }

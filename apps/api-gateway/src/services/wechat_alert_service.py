@@ -82,7 +82,7 @@ class WeChatAlertService:
 {analysis}
 
 ---
-智链OS实时监控 | 每15分钟自动检测
+屯象OS实时监控 | 每15分钟自动检测
 """
 
             logger.info(
@@ -212,7 +212,7 @@ class WeChatAlertService:
 💡 建议: 请及时补货，确保午高峰供应充足
 
 ---
-智链OS智能预警 | 每天10AM自动检测
+屯象OS智能预警 | 每天10AM自动检测
 """
 
             logger.info(
@@ -336,7 +336,7 @@ class WeChatAlertService:
 💡 建议: 请立即关注并采取改进措施
 
 ---
-智链OS实时监控 | 异常自动检测
+屯象OS实时监控 | 异常自动检测
 """
 
             logger.info(
@@ -436,7 +436,7 @@ class WeChatAlertService:
 级别: {severity.upper()}
 
 ---
-智链OS系统监控
+屯象OS系统监控
 """
 
             logger.info(
@@ -531,10 +531,10 @@ class WeChatAlertService:
 最后心跳: {last_hb_str}
 发现时间: {datetime.now().strftime('%Y-%m-%d %H:%M')}
 
-请尽快登录智链后台或前往现场检查设备连接状态。
+请尽快登录屯象后台或前往现场检查设备连接状态。
 
 ---
-智链OS 系统监控"""
+屯象OS 系统监控"""
 
             logger.info(
                 "Sending hardware alert",

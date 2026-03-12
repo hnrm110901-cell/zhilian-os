@@ -58,11 +58,11 @@
   transition: color 0.15s, border-color 0.15s;
 }
 
-.tab:hover { color: var(--accent, #FF6B2C); }
+.tab:hover { color: var(--accent, #0AAF9A); }
 
 .tabActive {
-  color: var(--accent, #FF6B2C);
-  border-bottom-color: var(--accent, #FF6B2C);
+  color: var(--accent, #0AAF9A);
+  border-bottom-color: var(--accent, #0AAF9A);
 }
 
 .tabContent {
@@ -98,7 +98,7 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: var(--accent, #FF6B2C);
+  background: var(--accent, #0AAF9A);
   color: white;
   font-size: 13px;
   font-weight: 700;
@@ -187,7 +187,7 @@
   align-items: center;
   gap: 10px;
   padding: 0 0 10px 12px;
-  border-left: 3px solid var(--accent, #FF6B2C);
+  border-left: 3px solid var(--accent, #0AAF9A);
   margin-bottom: 12px;
   font-size: 14px;
 }
@@ -308,7 +308,7 @@
 .paramName {
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
-  color: #1677ff;
+  color: #0AAF9A;
   background: #e6f4ff;
   padding: 2px 6px;
   border-radius: 3px;
@@ -341,10 +341,10 @@
   transition: color 0.15s, background 0.15s;
 }
 
-.langTab:hover { color: var(--accent, #FF6B2C); }
+.langTab:hover { color: var(--accent, #0AAF9A); }
 
 .langTabActive {
-  color: var(--accent, #FF6B2C);
+  color: var(--accent, #0AAF9A);
   background: #1e1e2e;
   border-color: #1e1e2e;
 }
@@ -425,8 +425,8 @@
 
 .resultAlert {
   padding: 10px 14px;
-  background: #fff7e6;
-  border: 1px solid #ffd591;
+  background: rgba(200,146,58,0.08);
+  border: 1px solid rgba(200,146,58,0.3);
   border-radius: 6px;
   font-size: 13px;
   color: #873800;

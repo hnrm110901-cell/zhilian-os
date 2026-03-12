@@ -156,7 +156,7 @@ async def process_escalations(session: AsyncSession) -> int:
             title = action.title or action.action_type
             body = (action.body or "")[:200]
             content = (
-                f"【智链OS·升级】{title}\n"
+                f"【屯象OS·升级】{title}\n"
                 f"门店: {action.store_id} | 执行人: {action.assignee_staff_id}\n"
                 f"{body}\n"
                 f"原截止: {action.deadline_at.strftime('%Y-%m-%d %H:%M') if action.deadline_at else '-'} | 升级至: {role}"
@@ -210,14 +210,14 @@ async def push_action_to_wechat(
             ack_url = f"{base_url}/api/v1/enterprise/action-ack?action_id={action.id}&sign={sign}"
             desc = f"{body}\n截止: {deadline_str}\n点击下方按钮确认收到。"
             await wechat_service.send_card_message(
-                title=f"【智链OS】{title}",
+                title=f"【屯象OS】{title}",
                 description=desc,
                 url=ack_url,
                 btntxt="确认回执",
                 touser=touser,
             )
         else:
-            content = f"【智链OS】{title}\n\n{body}\n\n截止: {deadline_str}"
+            content = f"【屯象OS】{title}\n\n{body}\n\n截止: {deadline_str}"
             await wechat_service.send_text_message(content=content, touser=touser)
     except Exception as e:
         logger.warning("action.wechat_notify_failed", error=str(e))

@@ -255,10 +255,10 @@ const ReservationPage: React.FC = () => {
     <div>
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col span={4}><Card size="small"><Statistic title="今日总预约" value={overview?.total ?? '--'} /></Card></Col>
-        <Col span={4}><Card size="small"><Statistic title="待确认" value={overview?.pending_count ?? '--'} valueStyle={{ color: '#fa8c16' }} /></Card></Col>
-        <Col span={4}><Card size="small"><Statistic title="已确认" value={overview?.confirmed_count ?? '--'} valueStyle={{ color: '#52c41a' }} /></Card></Col>
-        <Col span={4}><Card size="small"><Statistic title="已入座" value={overview?.seated_count ?? '--'} valueStyle={{ color: '#1890ff' }} /></Card></Col>
-        <Col span={4}><Card size="small"><Statistic title="未到店" value={overview?.no_show_count ?? '--'} valueStyle={{ color: '#ff4d4f' }} /></Card></Col>
+        <Col span={4}><Card size="small"><Statistic title="待确认" value={overview?.pending_count ?? '--'} valueStyle={{ color: '#C8923A' }} /></Card></Col>
+        <Col span={4}><Card size="small"><Statistic title="已确认" value={overview?.confirmed_count ?? '--'} valueStyle={{ color: '#1A7A52' }} /></Card></Col>
+        <Col span={4}><Card size="small"><Statistic title="已入座" value={overview?.seated_count ?? '--'} valueStyle={{ color: '#0AAF9A' }} /></Card></Col>
+        <Col span={4}><Card size="small"><Statistic title="未到店" value={overview?.no_show_count ?? '--'} valueStyle={{ color: '#C53030' }} /></Card></Col>
         <Col span={4}><Card size="small"><Statistic title="今日总人数" value={overview?.total_guests ?? '--'} suffix="人" /></Card></Col>
       </Row>
       {(overview?.upcoming_soon?.length > 0) && (
@@ -278,9 +278,9 @@ const ReservationPage: React.FC = () => {
       <Col span={6}><Card size="small"><Statistic title="总预约数" value={stats.total} /></Card></Col>
       <Col span={6}><Card size="small"><Statistic title="总接待人数" value={stats.total_guests} suffix="人" /></Card></Col>
       <Col span={6}><Card size="small"><Statistic title="平均桌均人数" value={stats.avg_party_size} /></Card></Col>
-      <Col span={6}><Card size="small"><Statistic title="取消率" value={(stats.cancellation_rate * 100).toFixed(1)} suffix="%" valueStyle={{ color: '#ff4d4f' }} /></Card></Col>
-      <Col span={6} style={{ marginTop: 12 }}><Card size="small"><Statistic title="确认率" value={(stats.confirmed_rate * 100).toFixed(1)} suffix="%" valueStyle={{ color: '#52c41a' }} /></Card></Col>
-      <Col span={6} style={{ marginTop: 12 }}><Card size="small"><Statistic title="未到店率" value={(stats.no_show_rate * 100).toFixed(1)} suffix="%" valueStyle={{ color: '#fa8c16' }} /></Card></Col>
+      <Col span={6}><Card size="small"><Statistic title="取消率" value={(stats.cancellation_rate * 100).toFixed(1)} suffix="%" valueStyle={{ color: '#C53030' }} /></Card></Col>
+      <Col span={6} style={{ marginTop: 12 }}><Card size="small"><Statistic title="确认率" value={(stats.confirmed_rate * 100).toFixed(1)} suffix="%" valueStyle={{ color: '#1A7A52' }} /></Card></Col>
+      <Col span={6} style={{ marginTop: 12 }}><Card size="small"><Statistic title="未到店率" value={(stats.no_show_rate * 100).toFixed(1)} suffix="%" valueStyle={{ color: '#C8923A' }} /></Card></Col>
       <Col span={6} style={{ marginTop: 12 }}><Card size="small"><Statistic title="宴会预约" value={stats.by_type?.banquet ?? 0} /></Card></Col>
       <Col span={6} style={{ marginTop: 12 }}><Card size="small"><Statistic title="包厢预约" value={stats.by_type?.private_room ?? 0} /></Card></Col>
     </Row>

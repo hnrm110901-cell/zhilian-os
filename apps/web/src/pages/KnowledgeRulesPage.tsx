@@ -246,7 +246,7 @@ const KnowledgeRulesPage: React.FC = () => {
         <Progress
           percent={Math.round(v * 100)}
           size="small"
-          strokeColor={v >= 0.7 ? '#52c41a' : v >= 0.5 ? '#faad14' : '#f5222d'}
+          strokeColor={v >= 0.7 ? '#1A7A52' : v >= 0.5 ? '#faad14' : '#C53030'}
         />
       ),
     },
@@ -317,7 +317,7 @@ const KnowledgeRulesPage: React.FC = () => {
         <Progress
           percent={Math.round(v * 100)}
           size="small"
-          strokeColor={v >= 0.7 ? '#52c41a' : '#faad14'}
+          strokeColor={v >= 0.7 ? '#1A7A52' : '#faad14'}
         />
       ),
     },
@@ -380,7 +380,7 @@ const KnowledgeRulesPage: React.FC = () => {
         </Col>
         <Col span={6}>
           <Card size="small">
-            <Statistic title="激活规则" value={activeCount} valueStyle={{ color: '#52c41a' }} />
+            <Statistic title="激活规则" value={activeCount} valueStyle={{ color: '#1A7A52' }} />
           </Card>
         </Col>
         <Col span={6}>

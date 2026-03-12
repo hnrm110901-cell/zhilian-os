@@ -14,29 +14,29 @@
 .point {
   font-variant-numeric: tabular-nums;
   cursor: help;
-  border-bottom: 1px dashed #1677ff;
+  border-bottom: 1px dashed #0AAF9A;
 }
 
 .revenue {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
   cursor: help;
-  border-bottom: 1px dashed #52c41a;
+  border-bottom: 1px dashed #1A7A52;
 }
 
 /* Row highlights */
 .rowLaunch :global(td) {
-  background-color: #f6ffed !important;
+  background-color: rgba(26,122,82,0.08) !important;
 }
 
 .rowDecline :global(td) {
-  background-color: #fff7e6 !important;
+  background-color: rgba(200,146,58,0.08) !important;
 }
 
 .rowExit :global(td) {
-  background-color: #fff1f0 !important;
+  background-color: rgba(197,48,48,0.08) !important;
 }
 
 .rowHighError :global(td) {
-  background-color: #fff1f0 !important;
+  background-color: rgba(197,48,48,0.08) !important;
 }

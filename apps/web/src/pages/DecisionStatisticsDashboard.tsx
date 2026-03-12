@@ -94,7 +94,7 @@ const DecisionStatisticsDashboard: React.FC = () => {
             percent={Math.round((v || 0) * 100)}
             size="small"
             style={{ width: 120 }}
-            strokeColor={v >= 0.7 ? '#52c41a' : v >= 0.4 ? '#fa8c16' : '#ff4d4f'}
+            strokeColor={v >= 0.7 ? '#1A7A52' : v >= 0.4 ? '#C8923A' : '#C53030'}
           />
           <span>{((v || 0) * 100).toFixed(1)}%</span>
         </Space>
@@ -110,7 +110,7 @@ const DecisionStatisticsDashboard: React.FC = () => {
       dataIndex: 'pending',
       key: 'pending',
       width: 80,
-      render: (v: number) => v > 0 ? <Tag color="orange">{v}</Tag> : <span>0</span>,
+      render: (v: number) => v > 0 ? <Tag color="mint">{v}</Tag> : <span>0</span>,
     },
     {
       title: '批准率',
@@ -123,7 +123,7 @@ const DecisionStatisticsDashboard: React.FC = () => {
             percent={Math.round((v || 0) * 100)}
             size="small"
             style={{ width: 100 }}
-            strokeColor={v >= 0.7 ? '#52c41a' : v >= 0.4 ? '#fa8c16' : '#ff4d4f'}
+            strokeColor={v >= 0.7 ? '#1A7A52' : v >= 0.4 ? '#C8923A' : '#C53030'}
           />
           <span>{((v || 0) * 100).toFixed(1)}%</span>
         </Space>
@@ -202,7 +202,7 @@ const DecisionStatisticsDashboard: React.FC = () => {
         </Col>
         <Col span={4}>
           <Card loading={loading} size="small">
-            <Statistic title="待审批" value={stats?.pending || 0} valueStyle={{ color: '#fa8c16' }} />
+            <Statistic title="待审批" value={stats?.pending || 0} valueStyle={{ color: '#C8923A' }} />
           </Card>
         </Col>
         <Col span={4}>
@@ -211,7 +211,7 @@ const DecisionStatisticsDashboard: React.FC = () => {
               title="批准率"
               value={approvalRate.toFixed(1)}
               suffix="%"
-              valueStyle={{ color: '#52c41a' }}
+              valueStyle={{ color: '#1A7A52' }}
               prefix={<ArrowUpOutlined />}
             />
           </Card>
@@ -222,7 +222,7 @@ const DecisionStatisticsDashboard: React.FC = () => {
               title="拒绝率"
               value={rejectionRate.toFixed(1)}
               suffix="%"
-              valueStyle={{ color: '#ff4d4f' }}
+              valueStyle={{ color: '#C53030' }}
               prefix={<ArrowDownOutlined />}
             />
           </Card>
@@ -233,7 +233,7 @@ const DecisionStatisticsDashboard: React.FC = () => {
               title="修改率"
               value={modificationRate.toFixed(1)}
               suffix="%"
-              valueStyle={{ color: '#1677ff' }}
+              valueStyle={{ color: '#0AAF9A' }}
             />
           </Card>
         </Col>
@@ -243,7 +243,7 @@ const DecisionStatisticsDashboard: React.FC = () => {
               title="平均置信度"
               value={avgConfidence.toFixed(1)}
               suffix="%"
-              valueStyle={{ color: avgConfidence >= 70 ? '#52c41a' : '#fa8c16' }}
+              valueStyle={{ color: avgConfidence >= 70 ? '#1A7A52' : '#C8923A' }}
             />
           </Card>
         </Col>
@@ -258,7 +258,7 @@ const DecisionStatisticsDashboard: React.FC = () => {
                 <span style={{ width: 60 }}>已批准</span>
                 <Progress
                   percent={Math.round(approvalRate)}
-                  strokeColor="#52c41a"
+                  strokeColor="#1A7A52"
                   style={{ flex: 1 }}
                 />
                 <span style={{ width: 40, textAlign: 'right' }}>{stats?.approved || 0}</span>
@@ -267,7 +267,7 @@ const DecisionStatisticsDashboard: React.FC = () => {
                 <span style={{ width: 60 }}>已拒绝</span>
                 <Progress
                   percent={Math.round(rejectionRate)}
-                  strokeColor="#ff4d4f"
+                  strokeColor="#C53030"
                   style={{ flex: 1 }}
                 />
                 <span style={{ width: 40, textAlign: 'right' }}>{stats?.rejected || 0}</span>
@@ -276,7 +276,7 @@ const DecisionStatisticsDashboard: React.FC = () => {
                 <span style={{ width: 60 }}>已修改</span>
                 <Progress
                   percent={Math.round(modificationRate)}
-                  strokeColor="#1677ff"
+                  strokeColor="#0AAF9A"
                   style={{ flex: 1 }}
                 />
                 <span style={{ width: 40, textAlign: 'right' }}>{stats?.modified || 0}</span>
@@ -285,7 +285,7 @@ const DecisionStatisticsDashboard: React.FC = () => {
                 <span style={{ width: 60 }}>待审批</span>
                 <Progress
                   percent={stats?.total ? Math.round((stats.pending / stats.total) * 100) : 0}
-                  strokeColor="#fa8c16"
+                  strokeColor="#C8923A"
                   style={{ flex: 1 }}
                 />
                 <span style={{ width: 40, textAlign: 'right' }}>{stats?.pending || 0}</span>

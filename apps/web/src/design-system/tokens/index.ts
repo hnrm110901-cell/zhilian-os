@@ -1,87 +1,150 @@
 /**
- * 智链OS Design Tokens
- * 规范来源：前后端重构_产品研发开发规范_V1.0 第三章
+ * 屯象OS Design Tokens
+ * 品牌: 屯象 TUN XIANG · 餐饮人的好伙伴
  *
- * 使用方式：
- *   import { tokens } from '@/design-system/tokens';
- *   // 或在 CSS Modules 中直接用 var(--accent) 等 CSS 变量
+ * 使用方式:
+ *   import { colors, typography, spacing } from '@/design-system/tokens';
+ *   // CSS中用 var(--tx-mint-500) 等变量
  */
 
-// ── CSS 变量注入（在 main.tsx 中调用 injectTokens()）─────────────────────────
+export { mint, warm, neutral, semantic, dark, colors } from './colors';
+export { fontFamily, fontSize, lineHeight, letterSpacing, typography } from './typography';
+export { spacing, breakpoint, layout } from './spacing';
+export { radius, shadow, zIndex, motion } from './elevation';
+
+import { mint, warm, neutral, semantic, dark } from './colors';
+import { fontFamily, fontSize } from './typography';
+import { spacing } from './spacing';
+import { radius, shadow, zIndex, motion } from './elevation';
+import { lightTheme } from '../themes/light';
+import { darkTheme } from '../themes/dark';
+
+// ── CSS 变量注入（在 main.tsx 中调用 injectTokens()）──
 export function injectTokens() {
   const root = document.documentElement;
+  const isDark = root.getAttribute('data-theme') === 'dark' || root.classList.contains('dark');
 
-  // 判断当前主题
-  const isDark = root.classList.contains('dark');
-
-  const vars: Record<string, string> = isDark ? {
-    '--bg':             '#000000',
-    '--surface':        '#1C1C1E',
-    '--surface-hover':  '#2C2C2E',
-    '--text-primary':   '#F5F5F7',
-    '--text-secondary': '#AEAEB2',
-    '--text-tertiary':  '#636366',
-    '--border':         'rgba(255,255,255,0.08)',
-    '--accent':         '#FF6B2C',
-    '--accent-soft':    'rgba(255,107,44,0.15)',
-    '--green':          '#30D158',
-    '--red':            '#FF453A',
-    '--yellow':         '#FFD60A',
-    '--blue':           '#0A84FF',
+  // ── 语义变量（主题感知）──
+  const themeVars: Record<string, string> = isDark ? {
+    // 背景
+    '--bg':              dark.bg,
+    '--surface':         dark.raised,
+    '--surface-hover':   '#112830',
+    // 文字
+    '--text-primary':    dark.t1,
+    '--text-secondary':  dark.t2,
+    '--text-tertiary':   dark.t3,
+    // 边框
+    '--border':          dark.border,
+    // 语义色
+    '--accent':          mint[500],
+    '--accent-soft':     `rgba(10,175,154,0.15)`,
+    '--green':           '#34D399',
+    '--red':             '#F87171',
+    '--yellow':          warm.sun,
+    '--blue':            '#60A5FA',
+    // Ant Design 兼容
+    '--bg-primary':      dark.bg,
+    '--bg-secondary':    dark.raised,
+    '--bg-tertiary':     dark.sidebar,
+    '--bg-elevated':     dark.raised,
+    '--border-color':    'rgba(255,255,255,0.10)',
+    '--border-light':    dark.border,
+    '--divider-color':   dark.border,
+    '--text-disabled':   dark.t4,
   } : {
-    '--bg':             '#F5F5F7',
-    '--surface':        '#FFFFFF',
-    '--surface-hover':  '#FAFAFA',
-    '--text-primary':   '#1D1D1F',
-    '--text-secondary': '#6E6E73',
-    '--text-tertiary':  '#AEAEB2',
-    '--border':         'rgba(0,0,0,0.06)',
-    '--accent':         '#FF6B2C',
-    '--accent-soft':    'rgba(255,107,44,0.08)',
-    '--green':          '#34C759',
-    '--red':            '#FF3B30',
-    '--yellow':         '#FF9F0A',
-    '--blue':           '#007AFF',
+    // 背景
+    '--bg':              neutral[50],
+    '--surface':         neutral[0],
+    '--surface-hover':   neutral[100],
+    // 文字
+    '--text-primary':    neutral[900],
+    '--text-secondary':  neutral[600],
+    '--text-tertiary':   neutral[400],
+    // 边框
+    '--border':          neutral[200],
+    // 语义色
+    '--accent':          mint[500],
+    '--accent-soft':     `rgba(10,175,154,0.08)`,
+    '--green':           semantic.success,
+    '--red':             semantic.danger,
+    '--yellow':          warm.amber,
+    '--blue':            '#0A84FF',
+    // Ant Design 兼容
+    '--bg-primary':      neutral[0],
+    '--bg-secondary':    neutral[50],
+    '--bg-tertiary':     neutral[100],
+    '--bg-elevated':     neutral[0],
+    '--border-color':    neutral[200],
+    '--border-light':    neutral[100],
+    '--divider-color':   neutral[100],
+    '--text-disabled':   neutral[300],
   };
 
-  // 间距与圆角（与主题无关）
+  // ── 静态变量（不随主题变化）──
   const staticVars: Record<string, string> = {
-    '--radius-sm':   '10px',
-    '--radius-md':   '14px',
-    '--radius-lg':   '20px',
-    '--radius-xl':   '28px',
-    '--radius-full': '9999px',
-    '--shadow-sm':   '0 1px 2px rgba(0,0,0,0.04)',
-    '--shadow-md':   '0 4px 12px rgba(0,0,0,0.06)',
-    '--shadow-lg':   '0 8px 32px rgba(0,0,0,0.08)',
+    // Mint色阶
+    '--tx-mint-50':  mint[50],  '--tx-mint-100': mint[100], '--tx-mint-200': mint[200],
+    '--tx-mint-300': mint[300], '--tx-mint-400': mint[400], '--tx-mint-500': mint[500],
+    '--tx-mint-600': mint[600], '--tx-mint-700': mint[700], '--tx-mint-800': mint[800],
+    '--tx-mint-900': mint[900],
+    // Warm
+    '--tx-warm-sun':   warm.sun,   '--tx-warm-fire': warm.fire,
+    '--tx-warm-blush': warm.blush, '--tx-warm-amber': warm.amber,
+    // Neutral色阶
+    '--tx-n-0':   neutral[0],   '--tx-n-50':  neutral[50],
+    '--tx-n-100': neutral[100], '--tx-n-200': neutral[200], '--tx-n-300': neutral[300],
+    '--tx-n-400': neutral[400], '--tx-n-500': neutral[500], '--tx-n-600': neutral[600],
+    '--tx-n-700': neutral[700], '--tx-n-800': neutral[800], '--tx-n-900': neutral[900],
+    // 语义
+    '--tx-success': semantic.success, '--tx-warning': semantic.warning,
+    '--tx-danger':  semantic.danger,  '--tx-info':    semantic.info,
+    // 圆角
+    '--radius-2xs':  `${radius['2xs']}px`, '--radius-xs':   `${radius.xs}px`,
+    '--radius-sm':   `${radius.sm}px`,     '--radius-md':   `${radius.md}px`,
+    '--radius-lg':   `${radius.lg}px`,     '--radius-xl':   `${radius.xl}px`,
+    '--radius-2xl':  `${radius['2xl']}px`, '--radius-full': `${radius.full}px`,
+    // 阴影
+    '--shadow-0': shadow[0], '--shadow-1': shadow[1], '--shadow-2': shadow[2],
+    '--shadow-3': shadow[3], '--shadow-4': shadow[4],
+    // 旧变量兼容
+    '--shadow-sm': shadow[1], '--shadow-md': shadow[2],
+    '--shadow-lg': shadow[3], '--shadow-xl': shadow[4],
+    // 间距
+    '--sp-1': `${spacing[1]}px`,  '--sp-2': `${spacing[2]}px`,
+    '--sp-3': `${spacing[3]}px`,  '--sp-4': `${spacing[4]}px`,
+    '--sp-5': `${spacing[5]}px`,  '--sp-6': `${spacing[6]}px`,
+    '--sp-7': `${spacing[7]}px`,  '--sp-8': `${spacing[8]}px`,
+    // 旧间距兼容
+    '--spacing-xs':  `${spacing[1]}px`, '--spacing-sm':  `${spacing[2]}px`,
+    '--spacing-md':  `${spacing[4]}px`, '--spacing-lg':  `${spacing[5]}px`,
+    '--spacing-xl':  `${spacing[6]}px`, '--spacing-2xl': `${spacing[8]}px`,
+    // 动效
+    '--motion-fast':   motion.fast,   '--motion-normal': motion.normal,
+    '--motion-slow':   motion.slow,   '--motion-spring': motion.spring,
+    '--transition-fast': `0.15s cubic-bezier(0.4, 0, 0.2, 1)`,
+    '--transition-base': `0.2s cubic-bezier(0.4, 0, 0.2, 1)`,
+    '--transition-slow': `0.3s cubic-bezier(0.4, 0, 0.2, 1)`,
   };
 
-  Object.entries({ ...vars, ...staticVars }).forEach(([k, v]) => {
+  // ── tx-* 主题变量（新规范前缀）──
+  const txThemeVars = isDark ? darkTheme : lightTheme;
+
+  Object.entries({ ...themeVars, ...staticVars, ...txThemeVars }).forEach(([k, v]) => {
     root.style.setProperty(k, v);
   });
+
+  // ── 监听 data-theme 切换，自动重注入 ──
+  if (!(window as any).__txThemeObserver) {
+    const observer = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        if (m.type === 'attributes' && m.attributeName === 'data-theme') {
+          injectTokens();
+          break;
+        }
+      }
+    });
+    observer.observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+    (window as any).__txThemeObserver = observer;
+  }
 }
-
-// ── TypeScript 常量（供 JS 逻辑使用）────────────────────────────────────────
-export const colors = {
-  accent:  '#FF6B2C',
-  green:   '#34C759',
-  red:     '#FF3B30',
-  yellow:  '#FF9F0A',
-  blue:    '#007AFF',
-} as const;
-
-export const typography = {
-  display:  { fontSize: 48, fontWeight: 700, lineHeight: 1.0 },
-  title1:   { fontSize: 28, fontWeight: 700, lineHeight: 1.2 },
-  title2:   { fontSize: 20, fontWeight: 600, lineHeight: 1.3 },
-  body:     { fontSize: 15, fontWeight: 400, lineHeight: 1.5 },
-  caption:  { fontSize: 13, fontWeight: 500, lineHeight: 1.4 },
-  overline: { fontSize: 12, fontWeight: 600, lineHeight: 1.2, letterSpacing: '0.5px', textTransform: 'uppercase' as const },
-  fontStack: "'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif",
-} as const;
-
-export const motion = {
-  cardHover:  'transform 200ms ease-out, box-shadow 200ms ease-out',
-  cardActive: 'transform 100ms ease-in',
-  pageIn:     'opacity 400ms ease, transform 400ms ease',
-} as const;

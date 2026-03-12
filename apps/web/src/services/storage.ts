@@ -4,7 +4,8 @@
  * 未来可以轻松替换为真实API调用
  */
 
-const STORAGE_PREFIX = 'zhilian_os_';
+const STORAGE_PREFIX = 'tunxiang_os_';
+const LEGACY_PREFIX = 'zhilian_os_';
 
 export interface StorageService {
   get<T>(key: string): T | null;
@@ -20,7 +21,8 @@ class LocalStorageService implements StorageService {
 
   get<T>(key: string): T | null {
     try {
-      const item = localStorage.getItem(this.getKey(key));
+      const item = localStorage.getItem(this.getKey(key))
+        ?? localStorage.getItem(`${LEGACY_PREFIX}${key}`);
       if (!item) return null;
       return JSON.parse(item) as T;
     } catch (error) {

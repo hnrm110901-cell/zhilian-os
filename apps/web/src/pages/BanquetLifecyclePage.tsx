@@ -20,9 +20,9 @@ const { Option } = Select;
 // ── Stage definitions ───────────────────────────────────────────────────
 const STAGES = [
   { key: 'lead',        label: '商机',  color: '#8c8c8c', bg: '#f5f5f5' },
-  { key: 'intent',      label: '意向',  color: '#1890ff', bg: '#e6f7ff' },
-  { key: 'room_lock',   label: '锁台',  color: '#fa8c16', bg: '#fff7e6' },
-  { key: 'signed',      label: '签约',  color: '#52c41a', bg: '#f6ffed' },
+  { key: 'intent',      label: '意向',  color: '#0AAF9A', bg: '#e6f7ff' },
+  { key: 'room_lock',   label: '锁台',  color: '#C8923A', bg: 'rgba(200,146,58,0.08)' },
+  { key: 'signed',      label: '签约',  color: '#1A7A52', bg: 'rgba(26,122,82,0.08)' },
   { key: 'preparation', label: '准备',  color: '#722ed1', bg: '#f9f0ff' },
   { key: 'service',     label: '服务中', color: '#eb2f96', bg: '#fff0f6' },
   { key: 'completed',   label: '已完成', color: '#13c2c2', bg: '#e6fffb' },
@@ -63,7 +63,7 @@ interface PipelineStage {
 
 const BudgetDisplay: React.FC<{ cents: number | null }> = ({ cents }) => {
   if (!cents) return <Text type="secondary">未报价</Text>;
-  return <Text style={{ color: '#52c41a' }}>¥{(cents / 100).toLocaleString()}</Text>;
+  return <Text style={{ color: '#1A7A52' }}>¥{(cents / 100).toLocaleString()}</Text>;
 };
 
 const PipelineKanban: React.FC<{
@@ -225,7 +225,7 @@ const FunnelStats: React.FC<{ storeId: string }> = ({ storeId }) => {
                     <Text
                       style={{
                         display: 'block', fontSize: 10,
-                        color: rate >= 50 ? '#52c41a' : rate >= 20 ? '#fa8c16' : '#f5222d',
+                        color: rate >= 50 ? '#1A7A52' : rate >= 20 ? '#C8923A' : '#C53030',
                       }}
                     >
                       {rate.toFixed(0)}%
@@ -246,7 +246,7 @@ const FunnelStats: React.FC<{ storeId: string }> = ({ storeId }) => {
               title="商机总量"
               value={totalLead}
               suffix="个"
-              valueStyle={{ color: '#1890ff' }}
+              valueStyle={{ color: '#0AAF9A' }}
             />
           </Card>
         </Col>
@@ -256,7 +256,7 @@ const FunnelStats: React.FC<{ storeId: string }> = ({ storeId }) => {
               title="平均签约周期"
               value={stats.avg_days_to_signed?.toFixed(1) ?? '-'}
               suffix="天"
-              valueStyle={{ color: '#fa8c16' }}
+              valueStyle={{ color: '#C8923A' }}
             />
           </Card>
         </Col>
@@ -270,7 +270,7 @@ const FunnelStats: React.FC<{ storeId: string }> = ({ storeId }) => {
                   : 0
               }
               suffix="%"
-              valueStyle={{ color: '#52c41a' }}
+              valueStyle={{ color: '#1A7A52' }}
             />
           </Card>
         </Col>
@@ -334,7 +334,7 @@ const AvailabilityCalendar: React.FC<{ storeId: string }> = ({ storeId }) => {
           </Tag>
         )}
         {d.locked_count > 0 && (
-          <Tag color="orange" style={{ fontSize: 9, padding: '0 3px' }}>
+          <Tag color="mint" style={{ fontSize: 9, padding: '0 3px' }}>
             锁{d.locked_count}
           </Tag>
         )}
@@ -382,7 +382,7 @@ const AvailabilityCalendar: React.FC<{ storeId: string }> = ({ storeId }) => {
       {/* Legend */}
       <Space style={{ marginBottom: 12 }} wrap>
         <Tag color="green">签约</Tag>
-        <Tag color="orange">锁台（未签）</Tag>
+        <Tag color="mint">锁台（未签）</Tag>
         <Tag color="red">已满</Tag>
         <Space size={4}><StarFilled style={{ color: '#faad14' }} /><Text style={{ fontSize: 12 }}>吉日</Text></Space>
       </Space>
@@ -503,12 +503,12 @@ const BanquetLifecyclePage: React.FC = () => {
           <Row gutter={16} style={{ marginBottom: 16 }}>
             <Col span={6}>
               <Card size="small">
-                <Statistic title="漏斗总量" value={totalCount} suffix="个" valueStyle={{ color: '#1890ff' }} />
+                <Statistic title="漏斗总量" value={totalCount} suffix="个" valueStyle={{ color: '#0AAF9A' }} />
               </Card>
             </Col>
             <Col span={6}>
               <Card size="small">
-                <Statistic title="已签约" value={signedCount} suffix="个" valueStyle={{ color: '#52c41a' }} />
+                <Statistic title="已签约" value={signedCount} suffix="个" valueStyle={{ color: '#1A7A52' }} />
               </Card>
             </Col>
             <Col span={6}>
@@ -517,7 +517,7 @@ const BanquetLifecyclePage: React.FC = () => {
                   title="锁台待签"
                   value={roomLockCount}
                   suffix="个"
-                  valueStyle={{ color: roomLockCount > 0 ? '#fa8c16' : '#666' }}
+                  valueStyle={{ color: roomLockCount > 0 ? '#C8923A' : '#666' }}
                   prefix={roomLockCount > 3 ? <WarningOutlined /> : undefined}
                 />
               </Card>
@@ -528,7 +528,7 @@ const BanquetLifecyclePage: React.FC = () => {
                   title="签约总额"
                   value={(totalRevenue / 100).toLocaleString()}
                   prefix="¥"
-                  valueStyle={{ color: '#52c41a' }}
+                  valueStyle={{ color: '#1A7A52' }}
                 />
               </Card>
             </Col>

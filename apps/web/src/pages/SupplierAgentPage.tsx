@@ -288,11 +288,11 @@ const SupplierAgentPage: React.FC = () => {
       ),
     },
     { title: '价格', dataIndex: 'price_score', key: 'price_score', width: 80,
-      render: (v: number) => <span style={{ color: v >= 70 ? '#52c41a' : '#fa8c16' }}>{v?.toFixed(0)}</span> },
+      render: (v: number) => <span style={{ color: v >= 70 ? '#1A7A52' : '#C8923A' }}>{v?.toFixed(0)}</span> },
     { title: '质量', dataIndex: 'quality_score', key: 'quality_score', width: 80,
-      render: (v: number) => <span style={{ color: v >= 70 ? '#52c41a' : '#fa8c16' }}>{v?.toFixed(0)}</span> },
+      render: (v: number) => <span style={{ color: v >= 70 ? '#1A7A52' : '#C8923A' }}>{v?.toFixed(0)}</span> },
     { title: '交期', dataIndex: 'delivery_score', key: 'delivery_score', width: 80,
-      render: (v: number) => <span style={{ color: v >= 70 ? '#52c41a' : '#fa8c16' }}>{v?.toFixed(0)}</span> },
+      render: (v: number) => <span style={{ color: v >= 70 ? '#1A7A52' : '#C8923A' }}>{v?.toFixed(0)}</span> },
     { title: '风险标签', dataIndex: 'risk_flags', key: 'risk_flags',
       render: (flags: string[]) => (
         <>
@@ -326,7 +326,7 @@ const SupplierAgentPage: React.FC = () => {
       },
     },
     { title: '自动续签', dataIndex: 'auto_renew', key: 'auto_renew', width: 80,
-      render: (v: boolean) => v ? <CheckCircleOutlined style={{ color: '#52c41a' }} /> : '—' },
+      render: (v: boolean) => v ? <CheckCircleOutlined style={{ color: '#1A7A52' }} /> : '—' },
   ];
 
   const alertColumns = (type: 'contract' | 'supply') => [
@@ -359,7 +359,7 @@ const SupplierAgentPage: React.FC = () => {
       render: (v: number) => `¥${v?.toFixed(2)}` },
     { title: '预计节省', dataIndex: 'estimated_saving_yuan', key: 'estimated_saving_yuan', width: 100,
       render: (v: number) => (
-        <span style={{ color: v > 0 ? '#52c41a' : '#f5222d' }}>
+        <span style={{ color: v > 0 ? '#1A7A52' : '#C53030' }}>
           {v > 0 ? '+' : ''}{`¥${v?.toFixed(2)}`}
         </span>
       ),
@@ -426,7 +426,7 @@ const SupplierAgentPage: React.FC = () => {
                   <ZCard>
                     <Statistic title="本月预计节省¥" value={dashboard.monthly_estimated_saving_yuan}
                                precision={2} prefix={<DollarOutlined />}
-                               valueStyle={{ color: '#52c41a' }} />
+                               valueStyle={{ color: '#1A7A52' }} />
                   </ZCard>
                 </Col>
                 <Col span={6}>
@@ -439,7 +439,7 @@ const SupplierAgentPage: React.FC = () => {
                   <ZCard>
                     <Statistic title="未处理预警" value={dashboard.unresolved_alerts}
                                prefix={<AlertOutlined />}
-                               valueStyle={{ color: dashboard.unresolved_alerts > 0 ? '#f5222d' : '#52c41a' }} />
+                               valueStyle={{ color: dashboard.unresolved_alerts > 0 ? '#C53030' : '#1A7A52' }} />
                   </ZCard>
                 </Col>
                 <Col span={6}>
@@ -456,9 +456,9 @@ const SupplierAgentPage: React.FC = () => {
                     <div className={styles.tierDist}>
                       {[
                         { key: 'strategic', label: '战略级', color: '#722ed1' },
-                        { key: 'preferred', label: '优选级', color: '#1890ff' },
-                        { key: 'approved',  label: '合格级', color: '#52c41a' },
-                        { key: 'probation', label: '试用期', color: '#fa8c16' },
+                        { key: 'preferred', label: '优选级', color: '#0AAF9A' },
+                        { key: 'approved',  label: '合格级', color: '#1A7A52' },
+                        { key: 'probation', label: '试用期', color: '#C8923A' },
                       ].map(({ key, label, color }) => (
                         <div key={key} className={styles.tierRow}>
                           <Tag color={color}>{label}</Tag>

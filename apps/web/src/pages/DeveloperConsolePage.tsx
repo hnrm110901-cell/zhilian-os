@@ -201,7 +201,7 @@ const DeveloperConsolePage: React.FC = () => {
       name: 'API 调用',
       type: 'bar',
       data: trend.map(t => t.calls),
-      itemStyle: { color: 'var(--accent, #FF6B2C)', opacity: 0.8 },
+      itemStyle: { color: 'var(--accent, #0AAF9A)', opacity: 0.8 },
       barMaxWidth: 20,
     }],
   }), [trend]);

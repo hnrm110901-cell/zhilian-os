@@ -53,7 +53,7 @@ const TIER_LABELS: Record<string, string> = {
   free: '免费版', basic: '基础版', pro: '专业版', enterprise: '企业版',
 };
 const TIER_COLORS: Record<string, string> = {
-  free: '#d9d9d9', basic: '#52c41a', pro: '#fa8c16', enterprise: '#f5222d',
+  free: '#d9d9d9', basic: '#1A7A52', pro: '#C8923A', enterprise: '#C53030',
 };
 const CAT_LABELS: Record<string, string> = {
   pos_integration: 'POS', erp_integration: 'ERP',
@@ -155,9 +155,9 @@ const PlatformAnalyticsPage: React.FC = () => {
         type: 'line',
         smooth: true,
         data: trends.map(t => t.gross_yuan.toFixed(2)),
-        areaStyle: { opacity: 0.12, color: '#FF6B2C' },
-        lineStyle: { color: '#FF6B2C', width: 2 },
-        itemStyle: { color: '#FF6B2C' },
+        areaStyle: { opacity: 0.12, color: '#0AAF9A' },
+        lineStyle: { color: '#0AAF9A', width: 2 },
+        itemStyle: { color: '#0AAF9A' },
         symbol: 'circle', symbolSize: 5,
       },
       {
@@ -165,9 +165,9 @@ const PlatformAnalyticsPage: React.FC = () => {
         type: 'line',
         smooth: true,
         data: trends.map(t => t.net_yuan.toFixed(2)),
-        areaStyle: { opacity: 0.1, color: '#52c41a' },
-        lineStyle: { color: '#52c41a', width: 2 },
-        itemStyle: { color: '#52c41a' },
+        areaStyle: { opacity: 0.1, color: '#1A7A52' },
+        lineStyle: { color: '#1A7A52', width: 2 },
+        itemStyle: { color: '#1A7A52' },
         symbol: 'circle', symbolSize: 5,
       },
       {

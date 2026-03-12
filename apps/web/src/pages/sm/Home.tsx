@@ -32,10 +32,10 @@ interface DailyDecision {
 }
 
 const SEVERITY_STYLE: Record<string, { bg: string; border: string; accent: string; label: string }> = {
-  critical: { bg: '#fff1f0', border: '#ffa39e', accent: '#cf1322', label: '紧急' },
-  warning: { bg: '#fff7e6', border: '#ffd591', accent: '#ad6800', label: '重要' },
-  watch: { bg: '#e6f7ff', border: '#91d5ff', accent: '#096dd9', label: '关注' },
-  ok: { bg: '#f6ffed', border: '#b7eb8f', accent: '#237804', label: '正常' },
+  critical: { bg: '#FFF0F0', border: '#FFCDD2', accent: '#C53030', label: '紧急' },
+  warning:  { bg: '#FFF3E0', border: '#FFE0B2', accent: '#8B5E00', label: '重要' },
+  watch:    { bg: '#EDFCF9', border: '#B3EDE4', accent: '#066E5D', label: '关注' },
+  ok:       { bg: '#EDFAF3', border: '#C8E6C9', accent: '#1A7A52', label: '正常' },
 };
 
 function greeting(): string {

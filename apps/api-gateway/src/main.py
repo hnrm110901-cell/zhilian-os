@@ -1,6 +1,6 @@
 """
-智链OS API Gateway
-主应用入口
+屯象OS API Gateway
+主应用入口 — 餐饮人的好伙伴
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -96,13 +96,16 @@ logger = structlog.get_logger()
 
 # API文档描述
 API_DESCRIPTION = """
-## 智链OS (Zhilian Operating System)
+## 屯象OS (TUN XIANG Operating System)
+
+> 餐饮人的好伙伴 — AI驱动的经营决策系统
 
 ### 产品定位: AI数字总经理 (RaaS - Result as a Service)
 
-**不卖软件，卖结果** - 年薪只要几万块的数字总经理
+**不卖软件，卖结果** — 年薪只要几万块的数字总经理
 
-智链OS是一个AI Native的餐饮RaaS系统，定位为"AI数字总经理"，拥有行业Top10%管理经验，24小时不休息，永不离职，持续学习进化。
+屯象OS是一个AI Native的餐饮RaaS系统，定位为"AI数字总经理"，
+拥有行业Top10%管理经验，24小时不休息，永不离职，持续学习进化。
 
 ### 核心价值主张
 
@@ -111,63 +114,21 @@ API_DESCRIPTION = """
 * **一周见效**: 不是三年后的愿景，是一周内看到的效果
 * **按效果付费**: 省下成本的20%，增加营收的15%作为服务费
 
-### 商业模式
+### 屯象智脑 Agent 系统
 
-* **基础版（免费）**: 3个月免费试用，建立信任
-* **效果版**: 按省下的成本分成20%（食材损耗、人工成本、能源成本）
-* **增长版**: 按增加的营收分成15%（客流增加、客单价提升、复购率提升）
-* **模型版**: 购买行业最佳实践模型（¥9,999-29,999/年）
-
-### 核心功能
-
-#### 1. 智能Agent系统
 7个专业Agent实现从排班、订单、库存到决策的全流程智能化管理
 
-* **ScheduleAgent**: 智能排班 - 基于AI的客流预测和自动排班
-* **OrderAgent**: 订单协同 - 预定管理、排队系统、智能点单推荐
-* **InventoryAgent**: 库存预警 - 实时监控、消耗预测、自动补货提醒
-* **ServiceAgent**: 服务质量 - 客户反馈收集、服务质量监控
-* **TrainingAgent**: 培训辅导 - 培训需求评估、计划生成、进度追踪
-* **DecisionAgent**: 决策支持 - KPI分析、业务洞察、改进建议
-* **ReservationAgent**: 预定宴会 - 预定管理、座位分配、宴会管理
-
-#### 2. 前厅破冰：听觉革命（Voice-First）
-"智链耳机" - 解放双手的管理革命
-
-* 外卖爆单催单：语音通知优先处理
-* VIP到店识别：个性化服务推荐
-* 异常实时预警：及时处理客诉
-
-#### 3. 后厨破冰：控损为王（BOM）
-"智链控损" - 每月省下一个员工工资
-
-* 精准预测：AI预测食材需求，减少5%废损
-* 实时监控：库存异常自动预警
-* 智能采购：自动生成采购单，避免过度采购
-
-#### 4. 模型交易市场
-打造产业级突触网络，售卖行业最佳实践
-
-* **Level 1**: 基础服务（免费） - 使用自己门店数据训练的模型
-* **Level 2**: 行业模型（¥9,999/年） - 全国1000家门店联邦训练的通用模型
-* **Level 3**: 定制模型（¥29,999/年） - 针对特定品类的专属模型
-* **Level 4**: 数据贡献分成 - 门店贡献数据获得模型销售收益分成
-
-#### 5. Human-in-the-Loop安全防线
-"机器不可信"安全防线 - 高危操作分级审批
-
-* **Level 1**: 自动执行（低风险）
-* **Level 2**: 自动执行+事后审计（中风险）
-* **Level 3**: 人工审批（高风险）
-* **Level 4**: 禁止AI操作（极高风险）
-
-### 网络效应飞轮
-
-更多门店接入 → 更多数据训练 → AI模型更聪明 → 效果更好 → 更多门店愿意接入
+* **ScheduleAgent**: 智能排班 · 基于AI的客流预测和自动排班
+* **OrderAgent**: 订单协同 · 预定管理、排队系统、智能点单推荐
+* **InventoryAgent**: 库存预警 · 实时监控、消耗预测、自动补货提醒
+* **ServiceAgent**: 服务质量 · 客户反馈收集、服务质量监控
+* **TrainingAgent**: 培训辅导 · 培训需求评估、计划生成、进度追踪
+* **DecisionAgent**: 决策支持 · KPI分析、业务洞察、改进建议
+* **ReservationAgent**: 预定宴会 · 预定管理、座位分配、宴会管理
 
 ### 认证说明
 
-大部分API端点需要认证。使用以下步骤进行认证：
+大部分API端点需要认证：
 
 1. 调用 `/api/v1/auth/login` 获取访问令牌
 2. 在后续请求的 `Authorization` 头中包含令牌: `Bearer <access_token>`
@@ -179,19 +140,18 @@ API_DESCRIPTION = """
 * **数据库**: PostgreSQL with SQLAlchemy ORM
 * **认证**: JWT (JSON Web Tokens)
 * **AI能力**: 联邦学习、神经符号双规、多模态交互
-* **日志**: Structlog
 """
 
 # 创建FastAPI应用
 app = FastAPI(
-    title="智链OS API Gateway",
+    title="屯象OS API Gateway",
     description=API_DESCRIPTION,
-    version="1.0.0",
+    version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
     contact={
-        "name": "智链OS团队",
-        "email": "support@zhilian-os.com",
+        "name": "屯象OS团队",
+        "email": "support@tunxiang-os.com",
     },
     license_info={
         "name": "MIT License",
@@ -800,7 +760,7 @@ if getattr(settings, "FCT_ENABLED", False):
 @app.on_event("startup")
 async def startup_event():
     """应用启动事件"""
-    logger.info("智链OS API Gateway 启动中...")
+    logger.info("屯象OS API Gateway 启动中...")
     logger.info(f"环境: {settings.APP_ENV}")
     logger.info(f"调试模式: {settings.APP_DEBUG}")
 
@@ -873,7 +833,7 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     """应用关闭事件"""
-    logger.info("智链OS API Gateway 关闭中...")
+    logger.info("屯象OS API Gateway 关闭中...")
 
     # Stop scheduler
     try:

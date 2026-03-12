@@ -347,7 +347,7 @@ const PeopleAgentPage: React.FC = () => {
       title: '预计影响',
       dataIndex: 'total_impact_yuan',
       width: 120,
-      render: (v: number) => <span style={{ color: '#52c41a', fontWeight: 600 }}>¥{v.toLocaleString()}</span>,
+      render: (v: number) => <span style={{ color: '#1A7A52', fontWeight: 600 }}>¥{v.toLocaleString()}</span>,
     },
     {
       title: '当前/最优人数',
@@ -415,8 +415,8 @@ const PeopleAgentPage: React.FC = () => {
                 ? Math.round((d.shift_status.coverage_rate) * 100) : '—'}
               suffix={d?.shift_status.coverage_rate != null ? '%' : ''}
               valueStyle={{
-                color: (d?.shift_status.coverage_rate ?? 0) >= 0.9 ? '#52c41a'
-                  : (d?.shift_status.coverage_rate ?? 0) >= 0.75 ? '#faad14' : '#ff4d4f',
+                color: (d?.shift_status.coverage_rate ?? 0) >= 0.9 ? '#1A7A52'
+                  : (d?.shift_status.coverage_rate ?? 0) >= 0.75 ? '#faad14' : '#C53030',
               }}
             />
           </ZCard>
@@ -429,8 +429,8 @@ const PeopleAgentPage: React.FC = () => {
                 ? d.labor_cost.labor_cost_ratio.toFixed(1) : '—'}
               suffix={d?.labor_cost.labor_cost_ratio != null ? '%' : ''}
               valueStyle={{
-                color: (d?.labor_cost.labor_cost_ratio ?? 0) <= 28 ? '#52c41a'
-                  : (d?.labor_cost.labor_cost_ratio ?? 0) <= 32 ? '#faad14' : '#ff4d4f',
+                color: (d?.labor_cost.labor_cost_ratio ?? 0) <= 28 ? '#1A7A52'
+                  : (d?.labor_cost.labor_cost_ratio ?? 0) <= 32 ? '#faad14' : '#C53030',
               }}
             />
           </ZCard>
@@ -446,7 +446,7 @@ const PeopleAgentPage: React.FC = () => {
                   : null
               }
               valueStyle={{
-                color: (d?.attendance_alerts.open_count ?? 0) > 0 ? '#ff4d4f' : '#52c41a',
+                color: (d?.attendance_alerts.open_count ?? 0) > 0 ? '#C53030' : '#1A7A52',
               }}
             />
           </ZCard>
@@ -458,7 +458,7 @@ const PeopleAgentPage: React.FC = () => {
               value={d?.labor_cost.optimization_potential_yuan
                 ? Math.round(d.labor_cost.optimization_potential_yuan) : 0}
               prefix="¥"
-              valueStyle={{ color: '#52c41a' }}
+              valueStyle={{ color: '#1A7A52' }}
             />
           </ZCard>
         </Col>
@@ -635,7 +635,7 @@ const PeopleAgentPage: React.FC = () => {
                 ¥{(perfResult.bonus_commission_yuan as number)?.toFixed(2)}
               </Descriptions.Item>
               <Descriptions.Item label="合计提成" span={2}>
-                <span style={{ color: '#52c41a', fontWeight: 600 }}>
+                <span style={{ color: '#1A7A52', fontWeight: 600 }}>
                   ¥{(perfResult.total_commission_yuan as number)?.toFixed(2)}
                 </span>
               </Descriptions.Item>
@@ -700,7 +700,7 @@ const PeopleAgentPage: React.FC = () => {
               {(laborResult.target_ratio_pct as number)?.toFixed(1)}%
             </Descriptions.Item>
             <Descriptions.Item label="偏差">
-              <span style={{ color: (laborResult.deviation_pct as number) > 0 ? '#ff4d4f' : '#52c41a' }}>
+              <span style={{ color: (laborResult.deviation_pct as number) > 0 ? '#C53030' : '#1A7A52' }}>
                 {(laborResult.deviation_pct as number) > 0 ? '+' : ''}{(laborResult.deviation_pct as number)?.toFixed(1)}pp
               </span>
             </Descriptions.Item>
@@ -709,7 +709,7 @@ const PeopleAgentPage: React.FC = () => {
             </Descriptions.Item>
             {(laborResult.optimization_potential_yuan as number) > 0 && (
               <Descriptions.Item label="优化空间" span={2}>
-                <span style={{ color: '#52c41a', fontWeight: 600 }}>
+                <span style={{ color: '#1A7A52', fontWeight: 600 }}>
                   ¥{(laborResult.optimization_potential_yuan as number)?.toLocaleString()}
                 </span>
               </Descriptions.Item>

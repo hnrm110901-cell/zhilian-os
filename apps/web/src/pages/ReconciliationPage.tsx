@@ -97,7 +97,7 @@ const ReconciliationPage: React.FC = () => {
     <div>
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col span={6}><Card><Statistic title="总对账次数" value={summary?.total_count || 0} /></Card></Col>
-        <Col span={6}><Card><Statistic title="有差异" value={summary?.discrepancy_count || 0} valueStyle={{ color: '#ff4d4f' }} /></Card></Col>
+        <Col span={6}><Card><Statistic title="有差异" value={summary?.discrepancy_count || 0} valueStyle={{ color: '#C53030' }} /></Card></Col>
         <Col span={6}><Card><Statistic title="总差异金额" prefix="¥" value={(summary?.total_difference || 0).toFixed(2)} /></Card></Col>
         <Col span={6}><Card><Statistic title="对账率" suffix="%" value={summary?.reconciliation_rate || 0} /></Card></Col>
       </Row>

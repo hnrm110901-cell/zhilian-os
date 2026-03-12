@@ -1,8 +1,8 @@
 """
-顾客评论情感分析服务（移植自 BettaFish SentimentAnalysisModel，适配智链OS）
+顾客评论情感分析服务（移植自 BettaFish SentimentAnalysisModel，适配屯象OS）
 
 BettaFish原版：WeiboMultilingualSentiment（PyTorch + Transformers 本地模型）
-智链OS改造要点：
+屯象OS改造要点：
   - 用 LLM 替代 PyTorch 模型，零额外依赖
   - 批量处理（8条/次调用），平衡速度与成本
   - 输入：CustomerReview（美团/大众点评/外卖评价/WeCom消息）
@@ -80,7 +80,7 @@ class SentimentResult:
 
 @dataclass
 class DishSentimentSummary:
-    """按菜品聚合的情感摘要（智链OS新增，BettaFish无此概念）"""
+    """按菜品聚合的情感摘要（屯象OS新增，BettaFish无此概念）"""
     dish_name: str
     total_reviews: int
     positive_count: int

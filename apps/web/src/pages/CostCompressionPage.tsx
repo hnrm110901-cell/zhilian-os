@@ -25,9 +25,9 @@ const DEFAULT_STORE  = 'S001';
 const DEFAULT_PERIOD = dayjs().subtract(1, 'month').format('YYYY-MM');
 
 const ACTION_CONFIG: Record<string, { label: string; color: string; rowClass: string; desc: string }> = {
-  renegotiate:    { label: '重新谈判', color: '#ff4d4f', rowClass: styles.rowRenegotiate,   desc: 'FCR超标>5pp且持续恶化' },
-  reformulate:    { label: '调整配方', color: '#fa8c16', rowClass: styles.rowReformulate,   desc: 'FCR超标3-5pp' },
-  adjust_portion: { label: '调整份量', color: '#1677ff', rowClass: styles.rowAdjustPortion, desc: 'FCR超标1-3pp' },
+  renegotiate:    { label: '重新谈判', color: '#C53030', rowClass: styles.rowRenegotiate,   desc: 'FCR超标>5pp且持续恶化' },
+  reformulate:    { label: '调整配方', color: '#C8923A', rowClass: styles.rowReformulate,   desc: 'FCR超标3-5pp' },
+  adjust_portion: { label: '调整份量', color: '#0AAF9A', rowClass: styles.rowAdjustPortion, desc: 'FCR超标1-3pp' },
   monitor:        { label: '持续监控', color: '#8c8c8c', rowClass: styles.rowMonitor,       desc: '已达目标' },
 };
 
@@ -53,7 +53,7 @@ function fmtYuan(v: number | null | undefined) {
 function FcrGapBar({ gap, maxGap = 10 }: { gap: number; maxGap?: number }) {
   if (gap <= 0) return <span className={styles.trendImproving}>已达目标</span>;
   const pct = Math.min(100, (gap / maxGap) * 100);
-  const color = gap > 5 ? '#ff4d4f' : gap > 3 ? '#fa8c16' : '#1677ff';
+  const color = gap > 5 ? '#C53030' : gap > 3 ? '#C8923A' : '#0AAF9A';
   return (
     <Tooltip title={`FCR超标 ${gap}pp`}>
       <Progress percent={pct} size="small" strokeColor={color}
@@ -130,15 +130,15 @@ function CompressionBoard({ storeId, period }: { storeId: string; period: string
       sorter: (a, b) => a.current_fcr - b.current_fcr,
       render: v => `${v}%` },
     { title: '目标FCR', dataIndex: 'target_fcr', width: 80,
-      render: v => <span style={{ color: '#52c41a' }}>{v}%</span> },
+      render: v => <span style={{ color: '#1A7A52' }}>{v}%</span> },
     { title: 'FCR趋势', dataIndex: 'fcr_trend', width: 90,
       render: v => { const c = TREND_CONFIG[v]; return <span className={c?.cls}>{c?.label ?? v}</span>; } },
     { title: '单期压缩机会', dataIndex: 'compression_opportunity_yuan', width: 120,
       sorter: (a, b) => a.compression_opportunity_yuan - b.compression_opportunity_yuan,
-      render: v => <span style={{ color: '#ff4d4f', fontWeight: 600 }}>{fmtYuan(v)}</span> },
+      render: v => <span style={{ color: '#C53030', fontWeight: 600 }}>{fmtYuan(v)}</span> },
     { title: '年化节省预估', dataIndex: 'expected_saving_yuan', width: 120,
       sorter: (a, b) => a.expected_saving_yuan - b.expected_saving_yuan,
-      render: v => <span style={{ color: '#1677ff', fontWeight: 600 }}>{fmtYuan(v)}</span> },
+      render: v => <span style={{ color: '#0AAF9A', fontWeight: 600 }}>{fmtYuan(v)}</span> },
     { title: '当期营收', dataIndex: 'revenue_yuan', width: 95, render: v => fmtYuan(v) },
   ];
 
@@ -177,10 +177,10 @@ function CompressionBoard({ storeId, period }: { storeId: string; period: string
                 <strong>本页合计</strong>
               </Table.Summary.Cell>
               <Table.Summary.Cell index={7}>
-                <strong style={{ color: '#ff4d4f' }}>{fmtYuan(totalOpp)}</strong>
+                <strong style={{ color: '#C53030' }}>{fmtYuan(totalOpp)}</strong>
               </Table.Summary.Cell>
               <Table.Summary.Cell index={8}>
-                <strong style={{ color: '#1677ff' }}>{fmtYuan(totalSaving)}</strong>
+                <strong style={{ color: '#0AAF9A' }}>{fmtYuan(totalSaving)}</strong>
               </Table.Summary.Cell>
               <Table.Summary.Cell index={9} />
             </Table.Summary.Row>
@@ -267,8 +267,8 @@ function SummaryTab({ storeId, period }: { storeId: string; period: string }) {
         name: TREND_CONFIG[d.fcr_trend]?.label ?? d.fcr_trend,
         value: d.dish_count,
         itemStyle: {
-          color: d.fcr_trend === 'improving' ? '#52c41a'
-               : d.fcr_trend === 'worsening' ? '#ff4d4f' : '#8c8c8c',
+          color: d.fcr_trend === 'improving' ? '#1A7A52'
+               : d.fcr_trend === 'worsening' ? '#C53030' : '#8c8c8c',
         },
       })),
     }],
@@ -286,25 +286,25 @@ function SummaryTab({ storeId, period }: { storeId: string; period: string }) {
           <div className={styles.kpiRow}>
             <div className={styles.kpiCard}>
               <div className={styles.kpiLabel}>单期总压缩机会</div>
-              <div className={styles.kpiValue} style={{ color: '#ff4d4f' }}>
+              <div className={styles.kpiValue} style={{ color: '#C53030' }}>
                 {fmtYuan(data.total_opportunity_yuan)}
               </div>
             </div>
             <div className={styles.kpiCard}>
               <div className={styles.kpiLabel}>年化预期节省</div>
-              <div className={styles.kpiValue} style={{ color: '#1677ff' }}>
+              <div className={styles.kpiValue} style={{ color: '#0AAF9A' }}>
                 {fmtYuan(data.total_expected_saving_yuan)}
               </div>
             </div>
             <div className={styles.kpiCard}>
               <div className={styles.kpiLabel}>需紧急处理菜品</div>
-              <div className={styles.kpiValue} style={{ color: '#ff4d4f' }}>
+              <div className={styles.kpiValue} style={{ color: '#C53030' }}>
                 {data.by_action.find(d => d.compression_action === 'renegotiate')?.dish_count ?? 0} 道
               </div>
             </div>
             <div className={styles.kpiCard}>
               <div className={styles.kpiLabel}>FCR恶化菜品</div>
-              <div className={styles.kpiValue} style={{ color: '#fa8c16' }}>
+              <div className={styles.kpiValue} style={{ color: '#C8923A' }}>
                 {data.by_trend.find(d => d.fcr_trend === 'worsening')?.dish_count ?? 0} 道
               </div>
             </div>
@@ -330,9 +330,9 @@ function SummaryTab({ storeId, period }: { storeId: string; period: string }) {
                       render: v => <Tag color={ACTION_CONFIG[v]?.color ?? 'default'}>{ACTION_CONFIG[v]?.label ?? v}</Tag> },
                     { title: '菜品数', dataIndex: 'dish_count', width: 70 },
                     { title: '单期机会', dataIndex: 'total_opportunity',
-                      render: v => <span style={{ color: '#ff4d4f', fontWeight: 600 }}>{fmtYuan(v)}</span> },
+                      render: v => <span style={{ color: '#C53030', fontWeight: 600 }}>{fmtYuan(v)}</span> },
                     { title: '年化节省', dataIndex: 'total_saving',
-                      render: v => <span style={{ color: '#1677ff' }}>{fmtYuan(v)}</span> },
+                      render: v => <span style={{ color: '#0AAF9A' }}>{fmtYuan(v)}</span> },
                     { title: '平均缺口', dataIndex: 'avg_fcr_gap',
                       render: v => `${v}pp` },
                     { title: '高优先级', dataIndex: 'high_priority_dishes',
@@ -350,7 +350,7 @@ function SummaryTab({ storeId, period }: { storeId: string; period: string }) {
                       render: v => { const c = TREND_CONFIG[v]; return <span className={c?.cls}>{c?.label ?? v}</span>; } },
                     { title: '菜品数', dataIndex: 'dish_count', width: 70 },
                     { title: '压缩机会', dataIndex: 'total_opportunity',
-                      render: v => <span style={{ color: '#ff4d4f' }}>{fmtYuan(v)}</span> },
+                      render: v => <span style={{ color: '#C53030' }}>{fmtYuan(v)}</span> },
                     { title: '均FCR', dataIndex: 'avg_current_fcr',
                       render: v => `${v}%` },
                   ]}
@@ -408,7 +408,7 @@ function TopOpportunities({ storeId, period }: { storeId: string; period: string
     series: [
       { name: '单期压缩机会', type: 'bar', stack: 'a',
         data: [...rows].reverse().map(r => r.compression_opportunity_yuan),
-        itemStyle: { color: '#ff4d4f' } },
+        itemStyle: { color: '#C53030' } },
     ],
     grid: { left: 90, right: 20, top: 40, bottom: 30 },
   } : {};
@@ -441,11 +441,11 @@ function TopOpportunities({ storeId, period }: { storeId: string; period: string
                 render: v => <span className={PRIORITY_CONFIG[v]?.cls}>{PRIORITY_CONFIG[v]?.label ?? v}</span> },
               { title: 'FCR缺口', dataIndex: 'fcr_gap', render: v => `+${v}pp` },
               { title: '当前FCR', dataIndex: 'current_fcr', render: v => `${v}%` },
-              { title: '目标FCR', dataIndex: 'target_fcr', render: v => <span style={{ color: '#52c41a' }}>{v}%</span> },
+              { title: '目标FCR', dataIndex: 'target_fcr', render: v => <span style={{ color: '#1A7A52' }}>{v}%</span> },
               { title: '单期机会', dataIndex: 'compression_opportunity_yuan',
-                render: v => <strong style={{ color: '#ff4d4f' }}>{fmtYuan(v)}</strong> },
+                render: v => <strong style={{ color: '#C53030' }}>{fmtYuan(v)}</strong> },
               { title: '年化节省', dataIndex: 'expected_saving_yuan',
-                render: v => <strong style={{ color: '#1677ff' }}>{fmtYuan(v)}</strong> },
+                render: v => <strong style={{ color: '#0AAF9A' }}>{fmtYuan(v)}</strong> },
             ]}
           />
         </>
@@ -501,16 +501,16 @@ function DishFcrHistory({ storeId }: { storeId: string }) {
     series: [
       { name: '当前FCR', type: 'line', smooth: true,
         data: [...rows].reverse().map(r => r.current_fcr),
-        lineStyle: { width: 2, color: '#ff4d4f' }, itemStyle: { color: '#ff4d4f' },
+        lineStyle: { width: 2, color: '#C53030' }, itemStyle: { color: '#C53030' },
         areaStyle: { color: 'rgba(255,77,79,0.08)' } },
       { name: '门店均FCR', type: 'line', smooth: true,
         data: [...rows].reverse().map(r => r.store_avg_fcr),
-        lineStyle: { width: 1.5, color: '#fa8c16', type: 'dashed' },
-        itemStyle: { color: '#fa8c16' } },
+        lineStyle: { width: 1.5, color: '#C8923A', type: 'dashed' },
+        itemStyle: { color: '#C8923A' } },
       { name: '目标FCR', type: 'line', smooth: true,
         data: [...rows].reverse().map(r => r.target_fcr),
-        lineStyle: { width: 1.5, color: '#52c41a', type: 'dashed' },
-        itemStyle: { color: '#52c41a' } },
+        lineStyle: { width: 1.5, color: '#1A7A52', type: 'dashed' },
+        itemStyle: { color: '#1A7A52' } },
     ],
     grid: { top: 50, bottom: 40 },
   } : {};
@@ -538,17 +538,17 @@ function DishFcrHistory({ storeId }: { storeId: string }) {
               { title: '期间', dataIndex: 'period', width: 90 },
               { title: '当前FCR', dataIndex: 'current_fcr', render: v => `${v}%` },
               { title: '上期FCR', dataIndex: 'prev_fcr', render: v => v == null ? '-' : `${v}%` },
-              { title: '目标FCR', dataIndex: 'target_fcr', render: v => <span style={{ color: '#52c41a' }}>{v}%</span> },
+              { title: '目标FCR', dataIndex: 'target_fcr', render: v => <span style={{ color: '#1A7A52' }}>{v}%</span> },
               { title: 'FCR缺口', dataIndex: 'fcr_gap',
-                render: v => <span style={{ color: v > 0 ? '#ff4d4f' : '#52c41a' }}>{v > 0 ? `+${v}pp` : `${v}pp`}</span> },
+                render: v => <span style={{ color: v > 0 ? '#C53030' : '#1A7A52' }}>{v > 0 ? `+${v}pp` : `${v}pp`}</span> },
               { title: 'FCR趋势', dataIndex: 'fcr_trend',
                 render: v => { const c = TREND_CONFIG[v]; return <span className={c?.cls}>{c?.label ?? v}</span>; } },
               { title: '建议行动', dataIndex: 'compression_action',
                 render: v => <Tag color={ACTION_CONFIG[v]?.color ?? 'default'}>{ACTION_CONFIG[v]?.label ?? v}</Tag> },
               { title: '单期机会', dataIndex: 'compression_opportunity_yuan',
-                render: v => <span style={{ color: '#ff4d4f' }}>{fmtYuan(v)}</span> },
+                render: v => <span style={{ color: '#C53030' }}>{fmtYuan(v)}</span> },
               { title: '年化节省', dataIndex: 'expected_saving_yuan',
-                render: v => <span style={{ color: '#1677ff' }}>{fmtYuan(v)}</span> },
+                render: v => <span style={{ color: '#0AAF9A' }}>{fmtYuan(v)}</span> },
             ]}
           />
         </>

@@ -23,15 +23,15 @@ const { Option } = Select;
 
 // ── 配置 ──────────────────────────────────────────────────────────────────────
 const ACTION_CONFIG: Record<string, { label: string; color: string; antColor: string; icon: React.ReactNode }> = {
-  increase: { label: '建议提价', color: '#52c41a', antColor: 'success', icon: <RiseOutlined /> },
-  decrease: { label: '建议降价', color: '#1677ff', antColor: 'processing', icon: <FallOutlined /> },
+  increase: { label: '建议提价', color: '#1A7A52', antColor: 'success', icon: <RiseOutlined /> },
+  decrease: { label: '建议降价', color: '#0AAF9A', antColor: 'processing', icon: <FallOutlined /> },
   maintain: { label: '维持定价', color: '#8c8c8c', antColor: 'default', icon: <DollarOutlined /> },
 };
 
 const ELASTICITY_CONFIG: Record<string, { label: string; color: string }> = {
-  inelastic: { label: '低弹性', color: '#52c41a' },
-  moderate:  { label: '中弹性', color: '#fa8c16' },
-  elastic:   { label: '高弹性', color: '#ff4d4f' },
+  inelastic: { label: '低弹性', color: '#1A7A52' },
+  moderate:  { label: '中弹性', color: '#C8923A' },
+  elastic:   { label: '高弹性', color: '#C53030' },
 };
 
 // ── 类型 ──────────────────────────────────────────────────────────────────────
@@ -201,10 +201,10 @@ const DishPricingPage: React.FC = () => {
       splitLine: { length: 10, lineStyle: { width: 2, color: '#999' } },
       axisLabel: { distance: 20, color: '#999', fontSize: 10 },
       anchor: { show: true, showAbove: true, size: 20, itemStyle: { borderColor: '#999', borderWidth: 2 } },
-      detail: { valueAnimation: true, formatter: '{value}%', color: '#1677ff', fontSize: 22, offsetCenter: [0, '70%'] },
+      detail: { valueAnimation: true, formatter: '{value}%', color: '#0AAF9A', fontSize: 22, offsetCenter: [0, '70%'] },
       title: { offsetCenter: [0, '95%'], fontSize: 12, color: '#8c8c8c' },
       data: [{ value: adoptionRate.toFixed(1), name: '建议采纳率' }],
-      itemStyle: { color: adoptionRate >= 60 ? '#52c41a' : adoptionRate >= 30 ? '#fa8c16' : '#ff4d4f' },
+      itemStyle: { color: adoptionRate >= 60 ? '#1A7A52' : adoptionRate >= 30 ? '#C8923A' : '#C53030' },
     }],
   });
 
@@ -292,7 +292,7 @@ const DishPricingPage: React.FC = () => {
           <Space direction="vertical" size={0}>
             <Tag color={cfg.antColor}>{cfg.icon} {cfg.label}</Tag>
             <Text style={{ fontSize: 12, fontWeight: 600,
-              color: a === 'increase' ? '#52c41a' : a === 'decrease' ? '#1677ff' : '#8c8c8c' }}>
+              color: a === 'increase' ? '#1A7A52' : a === 'decrease' ? '#0AAF9A' : '#8c8c8c' }}>
               → {fmtPrice(r.suggested_price)}
               {r.price_change_pct !== 0 &&
                 <span style={{ fontSize: 11, marginLeft: 4 }}>
@@ -316,7 +316,7 @@ const DishPricingPage: React.FC = () => {
       sorter: (a: PricingRec, b: PricingRec) =>
         b.expected_revenue_delta_yuan - a.expected_revenue_delta_yuan,
       render: (v: number) => (
-        <Text style={{ color: v >= 0 ? '#52c41a' : '#ff4d4f' }}>
+        <Text style={{ color: v >= 0 ? '#1A7A52' : '#C53030' }}>
           {v >= 0 ? '+' : ''}{fmt(v)}
         </Text>
       ),
@@ -327,7 +327,7 @@ const DishPricingPage: React.FC = () => {
         b.expected_profit_delta_yuan - a.expected_profit_delta_yuan,
       defaultSortOrder: 'descend' as const,
       render: (v: number) => (
-        <Text style={{ color: v >= 0 ? '#52c41a' : '#ff4d4f' }}>
+        <Text style={{ color: v >= 0 ? '#1A7A52' : '#C53030' }}>
           {v >= 0 ? '+' : ''}{fmt(v)}
         </Text>
       ),
@@ -402,27 +402,27 @@ const DishPricingPage: React.FC = () => {
         <Col xs={12} sm={6}>
           <Card size="small">
             <Statistic title="建议提价" value={increaseCount} suffix="道"
-              prefix={<RiseOutlined />} valueStyle={{ color: '#52c41a' }} />
+              prefix={<RiseOutlined />} valueStyle={{ color: '#1A7A52' }} />
           </Card>
         </Col>
         <Col xs={12} sm={6}>
           <Card size="small">
             <Statistic title="建议降价" value={decreaseCount} suffix="道"
-              prefix={<FallOutlined />} valueStyle={{ color: '#1677ff' }} />
+              prefix={<FallOutlined />} valueStyle={{ color: '#0AAF9A' }} />
           </Card>
         </Col>
         <Col xs={12} sm={6}>
           <Card size="small">
             <Statistic title="预期¥利润变化" value={totalProfDelta.toFixed(0)}
               prefix={totalProfDelta >= 0 ? '+¥' : '-¥'}
-              valueStyle={{ color: totalProfDelta >= 0 ? '#52c41a' : '#ff4d4f' }} />
+              valueStyle={{ color: totalProfDelta >= 0 ? '#1A7A52' : '#C53030' }} />
           </Card>
         </Col>
         <Col xs={12} sm={6}>
           <Card size="small">
             <Statistic title="建议采纳率" value={adoptionRate.toFixed(1)} suffix="%"
               prefix={<TrophyOutlined />}
-              valueStyle={{ color: adoptionRate >= 60 ? '#52c41a' : '#fa8c16' }} />
+              valueStyle={{ color: adoptionRate >= 60 ? '#1A7A52' : '#C8923A' }} />
           </Card>
         </Col>
       </Row>
@@ -519,13 +519,13 @@ const DishPricingPage: React.FC = () => {
                       { title: '待处理', dataIndex: 'pending', width: 70 },
                       {
                         title: '已采纳', dataIndex: 'adopted', width: 70,
-                        render: (v: number) => <Text style={{ color: '#52c41a' }}>{v}</Text>,
+                        render: (v: number) => <Text style={{ color: '#1A7A52' }}>{v}</Text>,
                       },
                       { title: '已忽略', dataIndex: 'dismissed', width: 70 },
                       {
                         title: '¥营收变化', dataIndex: 'total_rev_delta',
                         render: (v: number) => (
-                          <Text style={{ color: v >= 0 ? '#52c41a' : '#ff4d4f' }}>
+                          <Text style={{ color: v >= 0 ? '#1A7A52' : '#C53030' }}>
                             {v >= 0 ? '+' : ''}{fmt(v)}
                           </Text>
                         ),
@@ -533,7 +533,7 @@ const DishPricingPage: React.FC = () => {
                       {
                         title: '¥利润变化', dataIndex: 'total_profit_delta',
                         render: (v: number) => (
-                          <Text style={{ color: v >= 0 ? '#52c41a' : '#ff4d4f' }}>
+                          <Text style={{ color: v >= 0 ? '#1A7A52' : '#C53030' }}>
                             {v >= 0 ? '+' : ''}{fmt(v)}
                           </Text>
                         ),
@@ -551,16 +551,16 @@ const DishPricingPage: React.FC = () => {
                         </Table.Summary.Cell>
                         <Table.Summary.Cell index={2} />
                         <Table.Summary.Cell index={3}>
-                          <Text strong style={{ color: '#52c41a' }}>{summary.total_adopted}</Text>
+                          <Text strong style={{ color: '#1A7A52' }}>{summary.total_adopted}</Text>
                         </Table.Summary.Cell>
                         <Table.Summary.Cell index={4} />
                         <Table.Summary.Cell index={5}>
-                          <Text strong style={{ color: totalRevDelta >= 0 ? '#52c41a' : '#ff4d4f' }}>
+                          <Text strong style={{ color: totalRevDelta >= 0 ? '#1A7A52' : '#C53030' }}>
                             {totalRevDelta >= 0 ? '+' : ''}{fmt(totalRevDelta)}
                           </Text>
                         </Table.Summary.Cell>
                         <Table.Summary.Cell index={6}>
-                          <Text strong style={{ color: totalProfDelta >= 0 ? '#52c41a' : '#ff4d4f' }}>
+                          <Text strong style={{ color: totalProfDelta >= 0 ? '#1A7A52' : '#C53030' }}>
                             {totalProfDelta >= 0 ? '+' : ''}{fmt(totalProfDelta)}
                           </Text>
                         </Table.Summary.Cell>
@@ -588,7 +588,7 @@ const DishPricingPage: React.FC = () => {
         {adoptModal.rec && (
           <Space direction="vertical" style={{ width: '100%' }}>
             <Text>
-              建议售价：<Text strong style={{ color: '#52c41a' }}>
+              建议售价：<Text strong style={{ color: '#1A7A52' }}>
                 {fmtPrice(adoptModal.rec.suggested_price)}
               </Text>
               <Text type="secondary" style={{ marginLeft: 8 }}>

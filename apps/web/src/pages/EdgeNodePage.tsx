@@ -200,7 +200,7 @@ const EdgeNodePage: React.FC = () => {
               </Form>
 
               {offlineResult && (
-                <ZCard style={{ background: '#f6ffed', borderColor: '#b7eb8f' }} title="执行结果">
+                <ZCard style={{ background: 'rgba(26,122,82,0.08)', borderColor: 'rgba(26,122,82,0.3)' }} title="执行结果">
                   <pre className={styles.resultPre}>{JSON.stringify(offlineResult, null, 2)}</pre>
                 </ZCard>
               )}

@@ -68,16 +68,16 @@ interface PurchaseItem {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function costColor(status: FoodCost['variance_status'] | null): string {
-  if (status === 'critical') return '#f5222d';
-  if (status === 'warning')  return '#fa8c16';
-  return '#52c41a';
+  if (status === 'critical') return '#C53030';
+  if (status === 'warning')  return '#C8923A';
+  return '#1A7A52';
 }
 
 function invStatusColor(status: string): string {
-  if (status === 'out_of_stock') return '#f5222d';
-  if (status === 'critical')     return '#fa8c16';
+  if (status === 'out_of_stock') return '#C53030';
+  if (status === 'critical')     return '#C8923A';
   if (status === 'low')          return '#faad14';
-  return '#52c41a';
+  return '#1A7A52';
 }
 
 function invStatusLabel(status: string): string {
@@ -91,7 +91,7 @@ function invStatusBadgeType(status: string): 'critical' | 'warning' | 'default' 
 }
 
 function wasteRankColor(i: number): string {
-  return ['#f5222d', '#fa8c16', '#faad14', '#1890ff', '#52c41a'][i] ?? '#8c8c8c';
+  return ['#C53030', '#C8923A', '#faad14', '#0AAF9A', '#1A7A52'][i] ?? '#8c8c8c';
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -202,20 +202,20 @@ const ProductsHubPage: React.FC = () => {
     {
       label: '库存品类',
       value: totalItems || '—', unit: '种',
-      iconBg: '#e6f7ff', iconColor: '#1890ff', icon: <InboxOutlined />,
+      iconBg: '#e6f7ff', iconColor: '#0AAF9A', icon: <InboxOutlined />,
     },
     {
       label: '库存预警',
       value: alertCount || 0, unit: '项',
-      iconBg: alertCount > 0 ? '#fff1f0' : '#f6ffed',
-      iconColor: alertCount > 0 ? '#f5222d' : '#52c41a',
+      iconBg: alertCount > 0 ? 'rgba(197,48,48,0.08)' : 'rgba(26,122,82,0.08)',
+      iconColor: alertCount > 0 ? '#C53030' : '#1A7A52',
       icon: <WarningOutlined />,
     },
     {
       label: '食材成本率',
       value: foodCost ? foodCost.actual_cost_pct.toFixed(1) : '—', unit: '%',
-      iconBg: foodCost?.variance_status === 'critical' ? '#fff1f0'
-            : foodCost?.variance_status === 'warning'  ? '#fff7e6' : '#f6ffed',
+      iconBg: foodCost?.variance_status === 'critical' ? 'rgba(197,48,48,0.08)'
+            : foodCost?.variance_status === 'warning'  ? 'rgba(200,146,58,0.08)' : 'rgba(26,122,82,0.08)',
       iconColor: costColor(foodCost?.variance_status ?? null),
       icon: <DollarOutlined />,
     },
@@ -223,13 +223,13 @@ const ProductsHubPage: React.FC = () => {
       label: '本周损耗',
       value: totalWasteYuan > 0 ? `¥${Math.round(totalWasteYuan / 100).toLocaleString()}` : '—',
       unit: '',
-      iconBg: '#fff7e6', iconColor: '#fa8c16', icon: <FireOutlined />,
+      iconBg: 'rgba(200,146,58,0.08)', iconColor: '#C8923A', icon: <FireOutlined />,
     },
     {
       label: '待采购',
       value: purchaseList.length || 0, unit: '项',
-      iconBg: purchaseList.length > 0 ? '#fff7e6' : '#f6ffed',
-      iconColor: purchaseList.length > 0 ? '#fa8c16' : '#52c41a',
+      iconBg: purchaseList.length > 0 ? 'rgba(200,146,58,0.08)' : 'rgba(26,122,82,0.08)',
+      iconColor: purchaseList.length > 0 ? '#C8923A' : '#1A7A52',
       icon: <ShoppingCartOutlined />,
     },
   ];
@@ -306,7 +306,7 @@ const ProductsHubPage: React.FC = () => {
 
             {/* ── 库存状态 ────────────────────────────────────────────────────── */}
             <ZCard
-              title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><InboxOutlined style={{ color: '#1890ff' }} /><span>库存状态</span></div>}
+              title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><InboxOutlined style={{ color: '#0AAF9A' }} /><span>库存状态</span></div>}
               extra={
                 <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                   {totalValueYuan > 0 && (
@@ -323,10 +323,10 @@ const ProductsHubPage: React.FC = () => {
               {/* Status distribution */}
               <div style={{ marginBottom: 10 }}>
                 {[
-                  { key: 'out_of_stock', label: '已断货', count: statusDist.out_of_stock, color: '#f5222d' },
-                  { key: 'critical',     label: '即将断货', count: statusDist.critical,   color: '#fa8c16' },
+                  { key: 'out_of_stock', label: '已断货', count: statusDist.out_of_stock, color: '#C53030' },
+                  { key: 'critical',     label: '即将断货', count: statusDist.critical,   color: '#C8923A' },
                   { key: 'low',          label: '库存偏低', count: statusDist.low,         color: '#faad14' },
-                  { key: 'normal',       label: '正常',    count: statusDist.normal,       color: '#52c41a' },
+                  { key: 'normal',       label: '正常',    count: statusDist.normal,       color: '#1A7A52' },
                 ].map(row => (
                   <div key={row.key} className={styles.statusRow}>
                     <div className={styles.statusDot} style={{ background: row.color }} />
@@ -350,8 +350,8 @@ const ProductsHubPage: React.FC = () => {
                   <div className={styles.alertItems}>
                     {invStats.alert_items.slice(0, 5).map(item => {
                       const color = invStatusColor(item.status);
-                      const bg    = item.status === 'out_of_stock' ? '#fff1f0'
-                                  : item.status === 'critical'     ? '#fff7e6'
+                      const bg    = item.status === 'out_of_stock' ? 'rgba(197,48,48,0.08)'
+                                  : item.status === 'critical'     ? 'rgba(200,146,58,0.08)'
                                   : '#fffbe6';
                       return (
                         <div key={item.id} className={styles.alertRow}
@@ -374,7 +374,7 @@ const ProductsHubPage: React.FC = () => {
 
               {(!invStats || invStats.alert_items?.length === 0) && (
                 <div style={{ textAlign: 'center', padding: '12px 0', color: 'var(--text-secondary)', fontSize: 13 }}>
-                  <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 6 }} />
+                  <CheckCircleOutlined style={{ color: '#1A7A52', marginRight: 6 }} />
                   库存状态正常
                 </div>
               )}
@@ -382,7 +382,7 @@ const ProductsHubPage: React.FC = () => {
 
             {/* ── 损耗 Top5 ───────────────────────────────────────────────────── */}
             <ZCard
-              title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><FireOutlined style={{ color: '#fa8c16' }} /><span>本周损耗 Top5</span></div>}
+              title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><FireOutlined style={{ color: '#C8923A' }} /><span>本周损耗 Top5</span></div>}
               extra={
                 <ZButton variant="ghost" size="sm" onClick={() => navigate('/waste-reasoning')}>
                   损耗分析 <ArrowRightOutlined />
@@ -394,7 +394,7 @@ const ProductsHubPage: React.FC = () => {
                 <>
                   <div className={styles.wasteSummaryRow}>
                     <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>本周总损耗</span>
-                    <strong style={{ fontSize: 15, color: '#fa8c16' }}>
+                    <strong style={{ fontSize: 15, color: '#C8923A' }}>
                       ¥{totalWasteYuan > 0 ? Math.round(totalWasteYuan / 100).toLocaleString() : '—'}
                     </strong>
                   </div>
@@ -402,7 +402,7 @@ const ProductsHubPage: React.FC = () => {
                     <div className={styles.wasteSummaryRow}>
                       <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>损耗率</span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <strong style={{ fontSize: 13, color: (wasteSummary.waste_rate_pct ?? 0) > 5 ? '#f5222d' : '#52c41a' }}>
+                        <strong style={{ fontSize: 13, color: (wasteSummary.waste_rate_pct ?? 0) > 5 ? '#C53030' : '#1A7A52' }}>
                           {wasteSummary.waste_rate_pct.toFixed(1)}%
                         </strong>
                         {wasteSummary.mom_change_pct != null && (
@@ -421,7 +421,7 @@ const ProductsHubPage: React.FC = () => {
               {/* Top 5 waste items */}
               {wasteTop5.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-secondary)', fontSize: 13 }}>
-                  <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 6 }} />
+                  <CheckCircleOutlined style={{ color: '#1A7A52', marginRight: 6 }} />
                   本周暂无损耗记录
                 </div>
               ) : (
@@ -454,7 +454,7 @@ const ProductsHubPage: React.FC = () => {
 
             {/* ── 采购建议 ────────────────────────────────────────────────────── */}
             <ZCard
-              title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><ShoppingCartOutlined style={{ color: '#52c41a' }} /><span>待采购清单</span></div>}
+              title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><ShoppingCartOutlined style={{ color: '#1A7A52' }} /><span>待采购清单</span></div>}
               extra={
                 <ZButton variant="ghost" size="sm" onClick={() => navigate('/inventory')}>
                   采购管理 <ArrowRightOutlined />
@@ -463,7 +463,7 @@ const ProductsHubPage: React.FC = () => {
             >
               {purchaseList.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-secondary)', fontSize: 13 }}>
-                  <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 6 }} />
+                  <CheckCircleOutlined style={{ color: '#1A7A52', marginRight: 6 }} />
                   暂无待采购项目
                 </div>
               ) : (
@@ -530,14 +530,14 @@ const ProductsHubPage: React.FC = () => {
                     <span className={styles.costCellLabel}>实际成本率</span>
                   </div>
                   <div className={styles.costCell}>
-                    <span className={styles.costCellValue} style={{ color: '#1890ff' }}>
+                    <span className={styles.costCellValue} style={{ color: '#0AAF9A' }}>
                       {foodCost.target_pct.toFixed(1)}%
                     </span>
                     <span className={styles.costCellLabel}>目标成本率</span>
                   </div>
                   <div className={styles.costCell}>
                     <span className={styles.costCellValue}
-                      style={{ color: foodCost.variance_pct > 0 ? '#f5222d' : '#52c41a' }}>
+                      style={{ color: foodCost.variance_pct > 0 ? '#C53030' : '#1A7A52' }}>
                       {foodCost.variance_pct > 0 ? '+' : ''}{foodCost.variance_pct.toFixed(1)}%
                     </span>
                     <span className={styles.costCellLabel}>较目标偏差</span>
@@ -569,8 +569,8 @@ const ProductsHubPage: React.FC = () => {
                   <div style={{
                     marginTop: 10,
                     padding: '8px 12px',
-                    background: foodCost.variance_status === 'critical' ? '#fff1f0' : '#fff7e6',
-                    border: `1px solid ${foodCost.variance_status === 'critical' ? '#ffccc7' : '#ffd591'}`,
+                    background: foodCost.variance_status === 'critical' ? 'rgba(197,48,48,0.08)' : 'rgba(200,146,58,0.08)',
+                    border: `1px solid ${foodCost.variance_status === 'critical' ? '#ffccc7' : 'rgba(200,146,58,0.3)'}`,
                     borderRadius: 6,
                     fontSize: 12,
                     color: costColor(foodCost.variance_status),
@@ -624,7 +624,7 @@ const ProductsHubPage: React.FC = () => {
             valueColor: invStatusColor(selectedAlert.status) },
           { label: '安全库存',   value: `${selectedAlert.min_quantity} ${selectedAlert.unit}` },
           { label: '缺口',       value: `${Math.max(0, selectedAlert.min_quantity - selectedAlert.current_quantity)} ${selectedAlert.unit}`,
-            valueColor: selectedAlert.current_quantity < selectedAlert.min_quantity ? '#f5222d' : '#52c41a' },
+            valueColor: selectedAlert.current_quantity < selectedAlert.min_quantity ? '#C53030' : '#1A7A52' },
         ] : []}
         sections={selectedAlert ? [
           {

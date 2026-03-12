@@ -14,12 +14,12 @@
 .impact {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
-  color: #52c41a;
+  color: #1A7A52;
 }
 
 /* Row highlights */
 .rowExcellent :global(td) {
-  background-color: #f6ffed !important;
+  background-color: rgba(26,122,82,0.08) !important;
 }
 
 .rowGood :global(td) {
@@ -31,7 +31,7 @@
 }
 
 .rowPoor :global(td) {
-  background-color: #fff1f0 !important;
+  background-color: rgba(197,48,48,0.08) !important;
 }
 
 /* Action card */

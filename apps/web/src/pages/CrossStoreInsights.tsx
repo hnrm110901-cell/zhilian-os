@@ -55,8 +55,8 @@ const CrossStoreInsights: React.FC = () => {
     xAxis: { type: 'category', data: topStores.map((s: any) => s.store_id) },
     yAxis: { type: 'value' },
     series: [
-      { name: '最佳门店', type: 'bar', data: topStores.map((s: any) => s.value), itemStyle: { color: '#52c41a' } },
-      { name: '最差门店', type: 'bar', data: bottomStores.map((s: any) => s.value), itemStyle: { color: '#f5222d' } },
+      { name: '最佳门店', type: 'bar', data: topStores.map((s: any) => s.value), itemStyle: { color: '#1A7A52' } },
+      { name: '最差门店', type: 'bar', data: bottomStores.map((s: any) => s.value), itemStyle: { color: '#C53030' } },
     ],
   };
 
@@ -69,7 +69,7 @@ const CrossStoreInsights: React.FC = () => {
       type: 'bar',
       data: compStores.map((s: any) => ({
         value: s.growth_rate,
-        itemStyle: { color: s.growth_rate >= 0 ? '#52c41a' : '#f5222d' },
+        itemStyle: { color: s.growth_rate >= 0 ? '#1A7A52' : '#C53030' },
       })),
     }],
   };

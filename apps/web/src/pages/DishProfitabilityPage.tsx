@@ -22,9 +22,9 @@ const { Option } = Select;
 // ── BCG 常量 ─────────────────────────────────────────────────────────────────
 const BCG_CONFIG = {
   star:          { label: '明星菜', color: '#faad14', bg: '#fffbe6', icon: '⭐' },
-  cash_cow:      { label: '现金牛', color: '#52c41a', bg: '#f6ffed', icon: '🐄' },
-  question_mark: { label: '问题菜', color: '#1677ff', bg: '#e6f4ff', icon: '❓' },
-  dog:           { label: '瘦狗菜', color: '#ff4d4f', bg: '#fff2f0', icon: '🐶' },
+  cash_cow:      { label: '现金牛', color: '#1A7A52', bg: 'rgba(26,122,82,0.08)', icon: '🐄' },
+  question_mark: { label: '问题菜', color: '#0AAF9A', bg: '#e6f4ff', icon: '❓' },
+  dog:           { label: '瘦狗菜', color: '#C53030', bg: '#fff2f0', icon: '🐶' },
 } as const;
 
 type BcgKey = keyof typeof BCG_CONFIG;
@@ -168,9 +168,9 @@ const DishProfitabilityPage: React.FC = () => {
   const scatterOption = () => {
     const seriesMap: Record<BcgKey, { name: string; color: string; data: [number, number, string, string][] }> = {
       star:          { name: '⭐明星菜', color: '#faad14', data: [] },
-      cash_cow:      { name: '🐄现金牛', color: '#52c41a', data: [] },
-      question_mark: { name: '❓问题菜', color: '#1677ff', data: [] },
-      dog:           { name: '🐶瘦狗菜', color: '#ff4d4f', data: [] },
+      cash_cow:      { name: '🐄现金牛', color: '#1A7A52', data: [] },
+      question_mark: { name: '❓问题菜', color: '#0AAF9A', data: [] },
+      dog:           { name: '🐶瘦狗菜', color: '#C53030', data: [] },
     };
     dishes.forEach(d => {
       seriesMap[d.bcg_quadrant]?.data.push([
@@ -247,9 +247,9 @@ const DishProfitabilityPage: React.FC = () => {
       { type: 'value', name: '销量', splitLine: { show: false } },
     ],
     series: [
-      { name: '毛利率%',    type: 'line', data: trend.map(t => t.gross_profit_margin.toFixed(1)), smooth: true, itemStyle: { color: '#52c41a' } },
-      { name: '食材成本率%', type: 'line', data: trend.map(t => t.food_cost_rate.toFixed(1)),      smooth: true, itemStyle: { color: '#ff4d4f' } },
-      { name: '销量',       type: 'bar',  data: trend.map(t => t.order_count), yAxisIndex: 1, itemStyle: { color: '#1677ff', opacity: 0.6 } },
+      { name: '毛利率%',    type: 'line', data: trend.map(t => t.gross_profit_margin.toFixed(1)), smooth: true, itemStyle: { color: '#1A7A52' } },
+      { name: '食材成本率%', type: 'line', data: trend.map(t => t.food_cost_rate.toFixed(1)),      smooth: true, itemStyle: { color: '#C53030' } },
+      { name: '销量',       type: 'bar',  data: trend.map(t => t.order_count), yAxisIndex: 1, itemStyle: { color: '#0AAF9A', opacity: 0.6 } },
     ],
   });
 
@@ -367,7 +367,7 @@ const DishProfitabilityPage: React.FC = () => {
               value={dishes.length}
               suffix="道"
               prefix={<BarChartOutlined />}
-              valueStyle={{ color: '#1677ff' }}
+              valueStyle={{ color: '#0AAF9A' }}
             />
           </Card>
         </Col>
@@ -389,7 +389,7 @@ const DishProfitabilityPage: React.FC = () => {
               value={avgFcr.toFixed(1)}
               suffix="%"
               prefix={<FireOutlined />}
-              valueStyle={{ color: avgFcr > 40 ? '#ff4d4f' : '#52c41a' }}
+              valueStyle={{ color: avgFcr > 40 ? '#C53030' : '#1A7A52' }}
             />
           </Card>
         </Col>
@@ -399,7 +399,7 @@ const DishProfitabilityPage: React.FC = () => {
               title="最高毛利菜品"
               value={topByProfit?.dish_name ?? '—'}
               prefix={<DollarOutlined />}
-              valueStyle={{ color: '#52c41a', fontSize: 16 }}
+              valueStyle={{ color: '#1A7A52', fontSize: 16 }}
               suffix={topByProfit ? fmt(topByProfit.gross_profit_yuan) : ''}
             />
           </Card>

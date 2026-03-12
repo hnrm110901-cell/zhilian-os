@@ -1,5 +1,5 @@
 """
-PerformanceAgent - 连锁餐饮绩效与提成智能体 (智链OS 绩效方案)
+PerformanceAgent - 连锁餐饮绩效与提成智能体 (屯象OS 绩效方案)
 
 对应《连锁餐饮绩效 Agent 规划》：
 - 岗位绩效与提成配置
@@ -632,7 +632,7 @@ def _detect_nl_rule(question: str) -> Optional[str]:
 
 class PerformanceAgent(LLMEnhancedAgent):
     """
-    绩效智能体（智链OS 连锁餐饮绩效方案）
+    绩效智能体（屯象OS 连锁餐饮绩效方案）
 
     能力：get_role_config, calculate_performance, calculate_commission,
     get_performance_report, explain_rule, nl_query

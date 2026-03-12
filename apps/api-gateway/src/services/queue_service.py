@@ -485,7 +485,7 @@ class QueueService:
             from ..services.multi_channel_notification import multi_channel_notification
 
             # 构建通知消息
-            message = f"【智链OS】尊敬的{queue.customer_name}，您的排队号{queue.queue_number}已到，"
+            message = f"【屯象OS】尊敬的{queue.customer_name}，您的排队号{queue.queue_number}已到，"
 
             if queue.table_number:
                 message += f"请前往{queue.table_number}号桌就座。"

@@ -455,7 +455,7 @@ const BOMManagementPage: React.FC = () => {
             icon={<DollarOutlined />}
             onClick={() => loadCostReport(rec.id)}
             title="成本分析"
-            style={{ color: '#52c41a', borderColor: '#52c41a' }}
+            style={{ color: '#1A7A52', borderColor: '#1A7A52' }}
           />
           <ZButton size="sm" icon={<HistoryOutlined />} onClick={() => viewHistory(rec.dish_id)} title="版本历史" />
           {!rec.is_active && (
@@ -593,7 +593,7 @@ const BOMManagementPage: React.FC = () => {
         title="配方版本列表"
         extra={
           <span className={styles.hintText}>
-            <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 4 }} />
+            <CheckCircleOutlined style={{ color: '#1A7A52', marginRight: 4 }} />
             绿色徽标 = 当前激活版本
           </span>
         }
@@ -621,9 +621,9 @@ const BOMManagementPage: React.FC = () => {
               BOM 详情
               <span style={{
                 fontSize: 12, padding: '1px 8px', borderRadius: 12,
-                background: selectedBom.is_active ? '#f6ffed' : '#f5f5f5',
-                color: selectedBom.is_active ? '#52c41a' : '#595959',
-                border: `1px solid ${selectedBom.is_active ? '#b7eb8f' : '#d9d9d9'}`,
+                background: selectedBom.is_active ? 'rgba(26,122,82,0.08)' : '#f5f5f5',
+                color: selectedBom.is_active ? '#1A7A52' : '#595959',
+                border: `1px solid ${selectedBom.is_active ? 'rgba(26,122,82,0.3)' : '#d9d9d9'}`,
               }}>
                 {selectedBom.version}
               </span>

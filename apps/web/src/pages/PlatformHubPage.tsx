@@ -135,10 +135,10 @@ const DEMO_APPROVALS: ApprovalItem[] = [
 ];
 
 const DEMO_AUDIT = [
-  { text: '用户 admin 登录系统',               time: '10分钟前', color: '#52c41a' },
-  { text: '更新 LLM 配置（gpt-4o-mini）',     time: '1小时前',  color: '#1890ff' },
-  { text: '导出报表：月度经营报告 S001',        time: '2小时前',  color: '#1890ff' },
-  { text: '备份任务完成（全量）',               time: '6小时前',  color: '#52c41a' },
+  { text: '用户 admin 登录系统',               time: '10分钟前', color: '#1A7A52' },
+  { text: '更新 LLM 配置（gpt-4o-mini）',     time: '1小时前',  color: '#0AAF9A' },
+  { text: '导出报表：月度经营报告 S001',        time: '2小时前',  color: '#0AAF9A' },
+  { text: '备份任务完成（全量）',               time: '6小时前',  color: '#1A7A52' },
   { text: '集成状态更新：天财商龙',             time: '昨天',     color: '#8c8c8c' },
 ];
 
@@ -159,9 +159,9 @@ const DEMO_BACKUP: BackupJob = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function statusColor(s: string): string {
-  if (s === 'healthy' || s === 'ok' || s === 'completed') return '#52c41a';
-  if (s === 'degraded' || s === 'warn' || s === 'pending') return '#fa8c16';
-  return '#f5222d';
+  if (s === 'healthy' || s === 'ok' || s === 'completed') return '#1A7A52';
+  if (s === 'degraded' || s === 'warn' || s === 'pending') return '#C8923A';
+  return '#C53030';
 }
 
 function statusLabel(s: string): string {
@@ -182,9 +182,9 @@ function relativeTime(iso: string): string {
 }
 
 function usageColor(pct: number): string {
-  if (pct >= 85) return '#f5222d';
-  if (pct >= 70) return '#fa8c16';
-  return '#52c41a';
+  if (pct >= 85) return '#C53030';
+  if (pct >= 70) return '#C8923A';
+  return '#1A7A52';
 }
 
 function statusBadgeType(s: string): 'success' | 'warning' | 'critical' {
@@ -268,7 +268,7 @@ export default function PlatformHubPage() {
       subClass: systemStatus === 'ok' ? css.kpiOk : css.kpiErr,
     },
     {
-      icon: '🚨', bg: '#fff7e6',
+      icon: '🚨', bg: 'rgba(200,146,58,0.08)',
       label: '今日错误',
       value: String(e.total_errors),
       unit: '次',
@@ -292,7 +292,7 @@ export default function PlatformHubPage() {
       subClass: ap.length > 0 ? css.kpiWarn : css.kpiOk,
     },
     {
-      icon: '💾', bg: '#f6ffed',
+      icon: '💾', bg: 'rgba(26,122,82,0.08)',
       label: '备份状态',
       value: statusLabel(bk.status),
       sub: bk.status === 'completed' ? relativeTime(bk.created_at) : '检查备份',
@@ -338,7 +338,7 @@ export default function PlatformHubPage() {
       <div className={css.mainGrid}>
         {/* Col 1: 系统状态 */}
         <ZCard
-          title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><BugOutlined style={{ color: '#1890ff' }} /><span>系统状态</span></div>}
+          title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><BugOutlined style={{ color: '#0AAF9A' }} /><span>系统状态</span></div>}
           extra={<a onClick={() => navigate('/monitoring')} style={{ fontSize: 12 }}>监控详情</a>}
         >
           <div className={css.healthList}>
@@ -364,7 +364,7 @@ export default function PlatformHubPage() {
             {[
               { label: 'CPU 使用率',    value: `${p.cpu_usage_pct}%`,    color: usageColor(p.cpu_usage_pct) },
               { label: '内存使用率',    value: `${p.memory_usage_pct}%`, color: usageColor(p.memory_usage_pct) },
-              { label: '平均响应时间',  value: `${p.avg_response_ms}ms`, color: p.avg_response_ms > 500 ? '#fa8c16' : '#52c41a' },
+              { label: '平均响应时间',  value: `${p.avg_response_ms}ms`, color: p.avg_response_ms > 500 ? '#C8923A' : '#1A7A52' },
             ].map(row => (
               <div key={row.label} className={css.perfRow}>
                 <span className={css.perfLabel}>{row.label}</span>
@@ -376,7 +376,7 @@ export default function PlatformHubPage() {
 
         {/* Col 2: 审批与审计 */}
         <ZCard
-          title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><CheckCircleOutlined style={{ color: '#fa8c16' }} /><span>审批与审计</span></div>}
+          title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><CheckCircleOutlined style={{ color: '#C8923A' }} /><span>审批与审计</span></div>}
           extra={<a onClick={() => navigate('/approval-list')} style={{ fontSize: 12 }}>全部审批</a>}
         >
           <div className={css.approvalSummary}>
@@ -428,7 +428,7 @@ export default function PlatformHubPage() {
           <div className={css.integrationList}>
             {DEMO_INTEGRATIONS.map(intg => (
               <div key={intg.name} className={css.integrationRow}>
-                <div className={css.integrationIcon} style={{ background: intg.status === 'ok' ? '#f6ffed' : '#fff7e6' }}>
+                <div className={css.integrationIcon} style={{ background: intg.status === 'ok' ? 'rgba(26,122,82,0.08)' : 'rgba(200,146,58,0.08)' }}>
                   {intg.icon}
                 </div>
                 <span className={css.integrationName}>{intg.name}</span>

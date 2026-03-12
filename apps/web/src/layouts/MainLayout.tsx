@@ -765,7 +765,8 @@ const MainLayout: React.FC = () => {
           whiteSpace: 'nowrap',
           overflow: 'hidden',
         }}>
-          {collapsed ? '屯' : '🍜 屯象OS'}
+          <img src="/logo-mark-v3.svg" alt="屯象" style={{ width: 28, height: 35, flexShrink: 0 }} />
+          {!collapsed && <span style={{ marginLeft: 8 }}>屯象OS</span>}
         </div>
 
         <Menu
@@ -797,8 +798,8 @@ const MainLayout: React.FC = () => {
           height: 56,
         }}>
           {/* 左：系统名 */}
-          <div style={{ fontSize: 15, fontWeight: 600, color: '#1677ff', letterSpacing: 0.3 }}>
-            智链经营助手
+          <div style={{ fontSize: 15, fontWeight: 600, color: '#0AAF9A', letterSpacing: 0.3 }}>
+            屯象OS · 餐饮人的好伙伴
           </div>
 
           {/* 右：工具栏 */}
@@ -839,7 +840,7 @@ const MainLayout: React.FC = () => {
               placement="bottomRight"
             >
               <Space style={{ cursor: 'pointer', padding: '0 4px' }}>
-                <Avatar icon={<UserOutlined />} size={30} style={{ backgroundColor: '#1677ff' }} />
+                <Avatar icon={<UserOutlined />} size={30} style={{ backgroundColor: '#0AAF9A' }} />
                 <span style={{ fontSize: 13, fontWeight: 500 }}>{user?.username}</span>
                 <Tag color={roleMap[user?.role || 'staff']?.color || 'green'} style={{ margin: 0 }}>
                   {roleMap[user?.role || 'staff']?.text || '员工'}
@@ -873,7 +874,7 @@ const MainLayout: React.FC = () => {
         </Content>
 
         <Layout.Footer style={{ textAlign: 'center', color: '#bbb', fontSize: 12, padding: '12px 0' }}>
-          屯象OS ©{new Date().getFullYear()} — 让餐饮管理更智能
+          屯象OS ©{new Date().getFullYear()} — 餐饮人的好伙伴
         </Layout.Footer>
       </Layout>
     </Layout>

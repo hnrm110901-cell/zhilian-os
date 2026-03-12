@@ -163,7 +163,7 @@ const DashboardTab: React.FC<{ storeId: string; brandId: string }> = ({ storeId,
               value={today?.cost_yuan ?? 0}
               prefix="¥"
               precision={2}
-              valueStyle={{ color: '#1890ff' }}
+              valueStyle={{ color: '#0AAF9A' }}
             />
           </Card>
         </Col>
@@ -187,7 +187,7 @@ const DashboardTab: React.FC<{ storeId: string; brandId: string }> = ({ storeId,
               value={data?.avg_30d_kwh ?? 0}
               suffix="度"
               precision={1}
-              valueStyle={{ color: '#52c41a' }}
+              valueStyle={{ color: '#1A7A52' }}
             />
           </Card>
         </Col>
@@ -208,7 +208,7 @@ const DashboardTab: React.FC<{ storeId: string; brandId: string }> = ({ storeId,
                     <Text style={{ fontSize: 12 }}>{val.toFixed(1)} 度 ({pct}%)</Text>
                   </div>
                   <Progress percent={pct} size="small" showInfo={false} strokeColor={
-                    key === 'ac' ? '#1890ff' : key === 'kitchen' ? '#fa8c16' :
+                    key === 'ac' ? '#0AAF9A' : key === 'kitchen' ? '#C8923A' :
                     key === 'cold_chain' ? '#13c2c2' : key === 'lighting' ? '#fadb14' : '#d9d9d9'
                   } />
                 </div>
@@ -898,20 +898,20 @@ const EnergyPage: React.FC = () => {
     {
       label: '今日电费',
       value: today?.cost_yuan != null ? `¥${today.cost_yuan.toFixed(0)}` : '—',
-      icon: <ThunderboltOutlined style={{ color: '#1890ff' }} />,
+      icon: <ThunderboltOutlined style={{ color: '#0AAF9A' }} />,
     },
     {
       label: '非营业耗电',
       value: today?.non_business_kwh?.toFixed(1) ?? '—',
       unit: '度',
-      icon: <WarningOutlined style={{ color: '#fa8c16' }} />,
-      valueColor: (today?.non_business_kwh ?? 0) > 0 ? '#fa8c16' : undefined,
+      icon: <WarningOutlined style={{ color: '#C8923A' }} />,
+      valueColor: (today?.non_business_kwh ?? 0) > 0 ? '#C8923A' : undefined,
     },
     {
       label: '未处理异常',
       value: pageDash?.anomaly_summary?.unresolved_count ?? '—',
-      icon: <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />,
-      valueColor: (pageDash?.anomaly_summary?.unresolved_count ?? 0) > 0 ? '#ff4d4f' : '#52c41a',
+      icon: <ExclamationCircleOutlined style={{ color: '#C53030' }} />,
+      valueColor: (pageDash?.anomaly_summary?.unresolved_count ?? 0) > 0 ? '#C53030' : '#1A7A52',
       sub: (pageDash?.anomaly_summary?.unresolved_count ?? 0) > 0 ? '需处理' : '一切正常',
     },
   ];

@@ -405,7 +405,7 @@ class WeChatService:
         if event == "subscribe":
             return {
                 "type": "text",
-                "content": "欢迎使用智链OS！\n\n我是您的智能助手，可以帮您：\n✅ 智能排班管理\n✅ 订单协同处理\n✅ 库存预警提醒\n✅ 服务质量监控\n✅ 培训辅导支持\n✅ 决策数据分析\n✅ 预定宴会管理\n\n发送关键词即可开始使用！",
+                "content": "欢迎使用屯象OS！\n\n我是您的智能助手，可以帮您：\n✅ 智能排班管理\n✅ 订单协同处理\n✅ 库存预警提醒\n✅ 服务质量监控\n✅ 培训辅导支持\n✅ 决策数据分析\n✅ 预定宴会管理\n\n发送关键词即可开始使用！",
             }
         elif event == "unsubscribe":
             logger.info("用户取消关注", data=data)

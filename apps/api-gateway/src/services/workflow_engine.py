@@ -594,7 +594,7 @@ class WorkflowEngine:
         summary      = json.dumps(content, ensure_ascii=False)[:400]
         deadline_str = expires_at.strftime("%m-%d %H:%M")
         return (
-            f"【智链OS · 工作流审批】\n\n"
+            f"【屯象OS · 工作流审批】\n\n"
             f"阶段: {label}\n"
             f"内容摘要:\n{summary}\n\n"
             f"请在 {deadline_str} 前批准或拒绝。\n"

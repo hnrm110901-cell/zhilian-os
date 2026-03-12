@@ -34,8 +34,8 @@
 /* ── Severity badge ─────────────────────────────────────────────────────────── */
 
 .severityP1 { color: #d9363e; font-weight: 700; }
-.severityP2 { color: #fa8c16; font-weight: 700; }
-.severityP3 { color: #52c41a; font-weight: 600; }
+.severityP2 { color: #C8923A; font-weight: 700; }
+.severityP3 { color: #1A7A52; font-weight: 600; }
 
 /* ── Table ellipsis ─────────────────────────────────────────────────────────── */
 
@@ -134,7 +134,7 @@
   color: var(--text-secondary);
 }
 
-.kpiDeltaImprove { color: #52c41a; font-weight: 600; }
+.kpiDeltaImprove { color: #1A7A52; font-weight: 600; }
 .kpiDeltaWorsen  { color: #d9363e; font-weight: 600; }
 
 @media (max-width: 720px) {

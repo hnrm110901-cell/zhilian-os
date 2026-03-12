@@ -35,7 +35,7 @@ ENDPOINT_CATALOG: List[Dict[str, Any]] = [
         "name": "订单同步",
         "method": "POST",
         "path": "/api/v1/open/data/orders",
-        "description": "批量同步 POS/外卖平台订单到智链，支持创建和更新两种模式（幂等）",
+        "description": "批量同步 POS/外卖平台订单到屯象，支持创建和更新两种模式（幂等）",
         "tier_required": "free",
         "request_params": [
             {"name": "orders", "type": "Array<Order>", "required": True, "description": "订单列表，最多 100 条/批"},
@@ -116,7 +116,7 @@ ENDPOINT_CATALOG: List[Dict[str, Any]] = [
         "name": "会员同步",
         "method": "POST",
         "path": "/api/v1/open/data/members",
-        "description": "同步会员信息、积分、消费记录到智链会员体系",
+        "description": "同步会员信息、积分、消费记录到屯象会员体系",
         "tier_required": "free",
         "request_params": [
             {"name": "members", "type": "Array<Member>", "required": True, "description": "会员列表，最多 200 条/批"},
@@ -318,7 +318,7 @@ ENDPOINT_CATALOG: List[Dict[str, Any]] = [
 
 AUTH_GUIDE = {
     "title": "API 鉴权方式",
-    "summary": "智链开放平台使用 API Key + HMAC-SHA256 请求签名，防止重放攻击和篡改。",
+    "summary": "屯象开放平台使用 API Key + HMAC-SHA256 请求签名，防止重放攻击和篡改。",
     "steps": [
         {
             "step": 1,

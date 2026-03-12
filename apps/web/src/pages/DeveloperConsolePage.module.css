@@ -22,7 +22,7 @@
 @media (max-width: 960px) { .kpiGrid { grid-template-columns: repeat(2, 1fr); } }
 
 .kpiSub { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
-.kpiSubWarn { font-size: 11px; color: #f5222d; margin-top: 4px; font-weight: 600; }
+.kpiSubWarn { font-size: 11px; color: #C53030; margin-top: 4px; font-weight: 600; }
 
 .chart { height: 220px; }
 
@@ -48,8 +48,8 @@
 .tab:hover { color: var(--text-primary); }
 
 .tabActive {
-  color: var(--accent, #FF6B2C);
-  border-bottom-color: var(--accent, #FF6B2C);
+  color: var(--accent, #0AAF9A);
+  border-bottom-color: var(--accent, #0AAF9A);
   font-weight: 600;
 }
 
@@ -68,19 +68,19 @@
   font-weight: 700;
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
-  color: var(--accent, #FF6B2C);
+  color: var(--accent, #0AAF9A);
 }
 
 .amountGreen {
   font-weight: 700;
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
-  color: #52c41a;
+  color: #1A7A52;
 }
 
 /* Leaderboard top ranks */
 .topRank {
   font-weight: 800;
   font-size: 15px;
-  color: #fa8c16;
+  color: #C8923A;
 }

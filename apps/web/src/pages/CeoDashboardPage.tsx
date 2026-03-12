@@ -70,7 +70,7 @@ interface CeoDashboard {
 const today   = new Date().toISOString().slice(0, 10);
 const period  = today.slice(0, 7);
 const SEV_COLORS: Record<string, string> = {
-  critical: '#f5222d', high: '#fa8c16', medium: '#faad14', low: '#52c41a',
+  critical: '#C53030', high: '#C8923A', medium: '#faad14', low: '#1A7A52',
 };
 
 // ── Profit rank columns ───────────────────────────────────────────────────────
@@ -83,7 +83,7 @@ const rankColumns: ZTableColumn<ProfitRank>[] = [
     render: (v) => (
       <span style={{
         fontWeight: 800,
-        color: v <= 3 ? '#fa8c16' : 'var(--text-primary)',
+        color: v <= 3 ? '#C8923A' : 'var(--text-primary)',
         fontSize: v <= 3 ? 16 : 13,
       }}>{v}</span>
     ),
@@ -107,7 +107,7 @@ const rankColumns: ZTableColumn<ProfitRank>[] = [
     align: 'center',
     render: (v) => (
       <span style={{
-        color: Number(v) >= 20 ? '#52c41a' : Number(v) >= 10 ? '#faad14' : '#f5222d',
+        color: Number(v) >= 20 ? '#1A7A52' : Number(v) >= 10 ? '#faad14' : '#C53030',
         fontWeight: 600,
       }}>
         {Number(v).toFixed(1)}%
@@ -156,14 +156,14 @@ const CeoDashboardPage: React.FC = () => {
           name: '净收入',
           type: 'bar',
           data: top.map(r => r.net_revenue_yuan).reverse(),
-          itemStyle: { color: 'rgba(255,107,44,0.25)' },
+          itemStyle: { color: 'rgba(10,175,154,0.25)' },
           barMaxWidth: 16,
         },
         {
           name: '毛利润',
           type: 'bar',
           data: top.map(r => r.gross_profit_yuan).reverse(),
-          itemStyle: { color: '#FF6B2C' },
+          itemStyle: { color: '#0AAF9A' },
           barMaxWidth: 16,
         },
       ],
@@ -188,7 +188,7 @@ const CeoDashboardPage: React.FC = () => {
         itemStyle: {
           color: (p: any) => {
             const v = p.data[0];
-            return v >= 3 ? '#f5222d' : v >= 1 ? '#fa8c16' : '#52c41a';
+            return v >= 3 ? '#C53030' : v >= 1 ? '#C8923A' : '#1A7A52';
           },
           opacity: 0.8,
         },
@@ -296,7 +296,7 @@ const CeoDashboardPage: React.FC = () => {
                         className={styles.heatFill}
                         style={{
                           width: `${Math.min(100, r.high_count * 20)}%`,
-                          background: SEV_COLORS[r.max_severity] || '#52c41a',
+                          background: SEV_COLORS[r.max_severity] || '#1A7A52',
                         }}
                       />
                     </span>

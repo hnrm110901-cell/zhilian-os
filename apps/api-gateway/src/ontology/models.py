@@ -1,5 +1,5 @@
 """
-智链OS 本体数据模型（Python dataclass）
+屯象OS 本体数据模型（Python dataclass）
 
 与 Neo4j 节点对应，用于：
   - 推理引擎类型提示

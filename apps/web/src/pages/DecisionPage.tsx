@@ -277,7 +277,7 @@ const DecisionPage: React.FC = () => {
           <Card><Statistic title="预警指标数" value={warningMetrics} suffix={`/ ${metrics.length}`} valueStyle={{ color: '#cf1322' }} prefix={<WarningOutlined />} /></Card>
         </Col>
         <Col span={6}>
-          <Card><Statistic title="高优先级建议" value={highPriorityRecommendations} suffix="条" valueStyle={{ color: '#1890ff' }} /></Card>
+          <Card><Statistic title="高优先级建议" value={highPriorityRecommendations} suffix="条" valueStyle={{ color: '#0AAF9A' }} /></Card>
         </Col>
         <Col span={6}>
           <Card><Statistic title="平均增长率" value={avgGrowth} suffix="%" valueStyle={{ color: '#3f8600' }} prefix={<ArrowUpOutlined />} /></Card>

@@ -87,7 +87,7 @@ const MonthlyReportPage: React.FC = () => {
         smooth: true,
         data: chart.cost_rate_data,
         yAxisIndex: 0,
-        itemStyle: { color: '#f5222d' },
+        itemStyle: { color: '#C53030' },
         markLine: {
           data: [{ yAxis: 33, lineStyle: { color: '#faad14', type: 'dashed' }, label: { formatter: '警戒线33%' } }],
         },
@@ -97,7 +97,7 @@ const MonthlyReportPage: React.FC = () => {
         type: 'bar',
         data: chart.revenue_data,
         yAxisIndex: 1,
-        itemStyle: { color: '#1890ff', opacity: 0.4 },
+        itemStyle: { color: '#0AAF9A', opacity: 0.4 },
       },
     ],
   } : null;
@@ -228,7 +228,7 @@ const MonthlyReportPage: React.FC = () => {
 
           {/* 经营叙事 */}
           {summary?.narrative && (
-            <ZCard style={{ marginBottom: 14, background: '#f6ffed', borderColor: '#b7eb8f' }}>
+            <ZCard style={{ marginBottom: 14, background: 'rgba(26,122,82,0.08)', borderColor: 'rgba(26,122,82,0.3)' }}>
               <p style={{ fontSize: 13, lineHeight: 1.8, margin: 0, color: '#389e0d' }}>
                 {summary.narrative}
               </p>

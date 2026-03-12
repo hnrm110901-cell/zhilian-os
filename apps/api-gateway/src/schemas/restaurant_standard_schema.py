@@ -3,7 +3,7 @@
 Restaurant Business Standard Schema
 
 覆盖订单、菜品、人员、时间、金额五个核心维度
-智链OS作为餐饮门店的神经系统，统一数据标准
+屯象OS作为餐饮门店的神经系统，统一数据标准
 """
 from pydantic import BaseModel, Field, PlainSerializer
 from typing import Optional, List, Dict, Any, Annotated
@@ -356,7 +356,7 @@ class StaffAction(BaseModel):
 class NeuralEventSchema(BaseModel):
     """神经系统事件标准Schema
 
-    智链OS作为餐饮门店的神经系统，所有业务事件都通过此Schema传递
+    屯象OS作为餐饮门店的神经系统，所有业务事件都通过此Schema传递
     """
     # 事件基础信息
     event_id: str = Field(..., description="事件ID")

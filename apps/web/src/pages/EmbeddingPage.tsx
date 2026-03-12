@@ -138,7 +138,7 @@ const EmbeddingPage: React.FC = () => {
             </Form.Item>
           </Form>
           {similarityResult !== null && (
-            <Statistic title="相似度" value={`${(similarityResult * 100).toFixed(2)}%`} valueStyle={{ color: similarityResult > 0.7 ? '#52c41a' : '#fa8c16' }} />
+            <Statistic title="相似度" value={`${(similarityResult * 100).toFixed(2)}%`} valueStyle={{ color: similarityResult > 0.7 ? '#1A7A52' : '#C8923A' }} />
           )}
         </Card>
       ),

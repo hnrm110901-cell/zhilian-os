@@ -69,7 +69,7 @@ const AIAccuracyPage: React.FC = () => {
       data: weeklyTrend.map((w: any) => w.accuracy),
       markLine: { data: [{ type: 'average', name: '均值' }] },
       areaStyle: { opacity: 0.1 },
-      itemStyle: { color: '#1890ff' },
+      itemStyle: { color: '#0AAF9A' },
     }],
   };
 
@@ -86,7 +86,7 @@ const AIAccuracyPage: React.FC = () => {
         name: '准确率',
         type: 'bar',
         data: confidenceBuckets.map((b: any) => b.accuracy),
-        itemStyle: { color: '#52c41a' },
+        itemStyle: { color: '#1A7A52' },
       },
       {
         name: '决策数',
@@ -163,7 +163,7 @@ const AIAccuracyPage: React.FC = () => {
                 title="整体准确率"
                 value={data?.overall_accuracy || 0}
                 suffix="%"
-                valueStyle={{ color: (data?.overall_accuracy || 0) >= 75 ? '#52c41a' : '#faad14' }}
+                valueStyle={{ color: (data?.overall_accuracy || 0) >= 75 ? '#1A7A52' : '#faad14' }}
               />
             </Card>
           </Col>

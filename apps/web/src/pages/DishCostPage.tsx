@@ -54,7 +54,7 @@ const DishCostPage: React.FC = () => {
       type: 'bar',
       data: items.slice(0, 15).map((d: any) => ({
         value: d.profit_margin,
-        itemStyle: { color: d.profit_margin >= 60 ? '#52c41a' : d.profit_margin >= 40 ? '#1890ff' : '#ff4d4f' },
+        itemStyle: { color: d.profit_margin >= 60 ? '#1A7A52' : d.profit_margin >= 40 ? '#0AAF9A' : '#C53030' },
       })),
     }],
   };
@@ -107,7 +107,7 @@ const DishCostPage: React.FC = () => {
                 title="平均利润率"
                 value={data?.overall_avg_margin || 0}
                 suffix="%"
-                valueStyle={{ color: (data?.overall_avg_margin || 0) >= 50 ? '#52c41a' : '#faad14' }}
+                valueStyle={{ color: (data?.overall_avg_margin || 0) >= 50 ? '#1A7A52' : '#faad14' }}
               />
             </Card>
           </Col>
@@ -117,7 +117,7 @@ const DishCostPage: React.FC = () => {
                 title="最高利润率"
                 value={topProfit[0]?.profit_margin || 0}
                 suffix="%"
-                valueStyle={{ color: '#52c41a' }}
+                valueStyle={{ color: '#1A7A52' }}
               />
               {topProfit[0] && <Text type="secondary" style={{ fontSize: 12 }}>{topProfit[0].name}</Text>}
             </Card>
@@ -128,7 +128,7 @@ const DishCostPage: React.FC = () => {
                 title="最低利润率"
                 value={lowProfit[0]?.profit_margin || 0}
                 suffix="%"
-                valueStyle={{ color: '#ff4d4f' }}
+                valueStyle={{ color: '#C53030' }}
               />
               {lowProfit[0] && <Text type="secondary" style={{ fontSize: 12 }}>{lowProfit[0].name}</Text>}
             </Card>

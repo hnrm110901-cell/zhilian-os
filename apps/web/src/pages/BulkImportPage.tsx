@@ -95,7 +95,7 @@ const BulkImportPage: React.FC = () => {
                     {s.name || s.store_id || s.id}
                   </Option>
                 ))
-              : <Option value="STORE001">智链餐厅-朝阳店</Option>}
+              : <Option value="STORE001">屯象餐厅-朝阳店</Option>}
           </Select>
           <Tabs
             activeKey={entity}

@@ -204,7 +204,7 @@ class CrossStoreInsightsService:
             llm = get_llm_client()
             if llm:
                 prompt = (
-                    f"你是智链OS的数据分析师。根据以下跨店数据，用2-3句话生成简洁的管理洞察，"
+                    f"你是屯象OS的数据分析师。根据以下跨店数据，用2-3句话生成简洁的管理洞察，"
                     f"重点指出需要关注的门店和可借鉴的最佳实践：\n\n{context}"
                 )
                 response = await llm.agenerate([prompt])

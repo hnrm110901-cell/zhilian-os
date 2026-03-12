@@ -10,18 +10,18 @@
 
 /* ── 行动类型配色 ────────────────────────────────────────── */
 .rowRenegotiate   { background: #fff2f0 !important; }
-.rowReformulate   { background: #fff7e6 !important; }
+.rowReformulate   { background: rgba(200,146,58,0.08) !important; }
 .rowAdjustPortion { background: #e6f4ff !important; }
 .rowMonitor       { background: #f9f9f9 !important; }
 
 /* ── 趋势指示 ───────────────────────────────────────────── */
-.trendImproving { color: #52c41a; font-weight: 600; }
-.trendWorsening { color: #ff4d4f; font-weight: 600; }
+.trendImproving { color: #1A7A52; font-weight: 600; }
+.trendWorsening { color: #C53030; font-weight: 600; }
 .trendStable    { color: #8c8c8c; }
 
 /* ── 优先级 ─────────────────────────────────────────────── */
-.prioHigh   { color: #ff4d4f; font-weight: 700; }
-.prioMedium { color: #fa8c16; font-weight: 600; }
+.prioHigh   { color: #C53030; font-weight: 700; }
+.prioMedium { color: #C8923A; font-weight: 600; }
 .prioLow    { color: #8c8c8c; }
 
 /* ── KPI 总览条 ─────────────────────────────────────────── */

@@ -410,7 +410,7 @@ const WasteEventPage: React.FC = () => {
         </Col>
         <Col span={6}>
           <Card size="small">
-            <Statistic title="已推理/验证" value={analyzedCount} valueStyle={{ color: '#1890ff' }} />
+            <Statistic title="已推理/验证" value={analyzedCount} valueStyle={{ color: '#0AAF9A' }} />
           </Card>
         </Col>
         <Col span={6}>
@@ -418,7 +418,7 @@ const WasteEventPage: React.FC = () => {
             <Statistic
               title="高偏差事件（≥20%）"
               value={highVarianceCount}
-              valueStyle={{ color: highVarianceCount > 0 ? '#f5222d' : '#52c41a' }}
+              valueStyle={{ color: highVarianceCount > 0 ? '#C53030' : '#1A7A52' }}
             />
           </Card>
         </Col>
@@ -516,7 +516,7 @@ const WasteEventPage: React.FC = () => {
                             <Progress
                               percent={Math.round(v * 100)}
                               size="small"
-                              strokeColor={v >= 0.7 ? '#52c41a' : v >= 0.5 ? '#faad14' : '#f5222d'}
+                              strokeColor={v >= 0.7 ? '#1A7A52' : v >= 0.5 ? '#faad14' : '#C53030'}
                             />
                           ),
                         },
@@ -663,7 +663,7 @@ const WasteEventPage: React.FC = () => {
                 <Divider orientation="left">推理结论</Divider>
                 <Descriptions bordered size="small" column={2}>
                   <Descriptions.Item label="根因">
-                    <Tag color="orange">
+                    <Tag color="mint">
                       {ROOT_CAUSE_LABELS[selectedEvent.root_cause] || selectedEvent.root_cause}
                     </Tag>
                   </Descriptions.Item>
@@ -674,9 +674,9 @@ const WasteEventPage: React.FC = () => {
                         size="small"
                         style={{ width: 120 }}
                         strokeColor={
-                          selectedEvent.confidence >= 0.7 ? '#52c41a'
+                          selectedEvent.confidence >= 0.7 ? '#1A7A52'
                           : selectedEvent.confidence >= 0.5 ? '#faad14'
-                          : '#f5222d'
+                          : '#C53030'
                         }
                       />
                     ) : '—'}
@@ -695,7 +695,7 @@ const WasteEventPage: React.FC = () => {
                           <Progress
                             percent={Math.round(v * 100)}
                             size="small"
-                            strokeColor="#1890ff"
+                            strokeColor="#0AAF9A"
                           />
                         </Col>
                       ))}

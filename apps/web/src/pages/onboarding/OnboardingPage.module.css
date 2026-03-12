@@ -348,8 +348,8 @@
 }
 
 .mappingPillMissing {
-  background: color-mix(in srgb, var(--red, #ff4d4f) 12%, transparent);
-  color: var(--red, #ff4d4f);
+  background: color-mix(in srgb, var(--red, #C53030) 12%, transparent);
+  color: var(--red, #C53030);
 }
 
 /* ── Actions ── */

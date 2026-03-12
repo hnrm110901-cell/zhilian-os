@@ -90,8 +90,8 @@ const LEVEL_BADGE: Record<string, { type: 'success'|'info'|'warning'|'critical';
 };
 
 const PALETTE = [
-  '#FF6B2C','#3B82F6','#10B981','#F59E0B','#8B5CF6',
-  '#EC4899','#14B8A6','#F97316','#6366F1','#84CC16',
+  '#0AAF9A','#3B82F6','#FFC244','#FF7A3D','#8B5CF6',
+  '#EC4899','#1A7A52','#C8923A','#6366F1','#84CC16',
 ];
 
 export default function HQHome() {

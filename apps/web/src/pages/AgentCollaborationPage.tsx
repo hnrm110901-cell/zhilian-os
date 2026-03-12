@@ -132,10 +132,10 @@ const AgentCollaborationPage: React.FC = () => {
         {status && (
           <Row gutter={16}>
             <Col span={8}><Card><Statistic title="待处理决策" value={status.pending_decisions} prefix={<ApartmentOutlined />} /></Card></Col>
-            <Col span={8}><Card><Statistic title="活跃冲突" value={status.active_conflicts} valueStyle={{ color: status.active_conflicts > 0 ? '#ff4d4f' : '#52c41a' }} prefix={<WarningOutlined />} /></Card></Col>
+            <Col span={8}><Card><Statistic title="活跃冲突" value={status.active_conflicts} valueStyle={{ color: status.active_conflicts > 0 ? '#C53030' : '#1A7A52' }} prefix={<WarningOutlined />} /></Card></Col>
             <Col span={8}>
               <Card>
-                <Statistic title="协作效率" value={+(status.efficiency_score * 100).toFixed(1)} suffix="%" prefix={<BarChartOutlined />} valueStyle={{ color: '#1890ff' }} />
+                <Statistic title="协作效率" value={+(status.efficiency_score * 100).toFixed(1)} suffix="%" prefix={<BarChartOutlined />} valueStyle={{ color: '#0AAF9A' }} />
               </Card>
             </Col>
           </Row>

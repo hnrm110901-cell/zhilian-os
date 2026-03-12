@@ -533,7 +533,7 @@ def _render_pdf(report: Dict) -> bytes:
 
     # Last resort: UTF-8 text
     lines = [
-        f"智链OS 企业诊断报告",
+        f"屯象OS 企业诊断报告",
         f"门店: {report['store_id']}",
         f"综合健康分: {report['total_score']} ({report['total_label']})",
         f"生成时间: {report['generated_at']}",
@@ -566,7 +566,7 @@ def _report_to_html(report: Dict) -> str:
       .score {{ font-size: 48px; font-weight: bold; }}
     </style></head><body>
     <div class="header">
-      <h1>智链OS 企业诊断报告</h1>
+      <h1>屯象OS 企业诊断报告</h1>
       <p>门店: {report['store_id']} | 生成时间: {report['generated_at']}</p>
       <div class="score">{report['total_score']}分</div>
       <p>{report['total_label']}</p>

@@ -109,7 +109,7 @@ const top5Columns: ZTableColumn<WasteItem>[] = [
       <span style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         width: 28, height: 28, borderRadius: '50%',
-        background: rank <= 3 ? '#ff4d4f' : '#d9d9d9',
+        background: rank <= 3 ? '#C53030' : '#d9d9d9',
         color: rank <= 3 ? '#fff' : '#666',
         fontWeight: 'bold', fontSize: 13,
       }}>
@@ -197,7 +197,7 @@ const bomColumns: ZTableColumn<BomDeviationItem>[] = [
       <span style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         width: 28, height: 28, borderRadius: '50%',
-        background: rank <= 3 ? '#fa8c16' : '#d9d9d9',
+        background: rank <= 3 ? '#C8923A' : '#d9d9d9',
         color: rank <= 3 ? '#fff' : '#666',
         fontWeight: 'bold', fontSize: 13,
       }}>
@@ -305,7 +305,7 @@ const WasteReasoningPage: React.FC = () => {
       {/* 页头 */}
       <div className={styles.header}>
         <h4 className={styles.pageTitle}>
-          <FireOutlined style={{ color: '#ff4d4f', marginRight: 8 }} />
+          <FireOutlined style={{ color: '#C53030', marginRight: 8 }} />
           损耗Top5分析
         </h4>
         <div className={styles.headerControls}>
@@ -398,7 +398,7 @@ const WasteReasoningPage: React.FC = () => {
           <ZCard
             title={
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <WarningOutlined style={{ color: '#ff4d4f' }} />
+                <WarningOutlined style={{ color: '#C53030' }} />
                 Top5 损耗食材（按损耗金额排序）
               </div>
             }
@@ -427,7 +427,7 @@ const WasteReasoningPage: React.FC = () => {
             <ZCard
               title={
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <WarningOutlined style={{ color: '#fa8c16' }} />
+                  <WarningOutlined style={{ color: '#C8923A' }} />
                   BOM配方偏差排名（实际用量超出标准）
                 </div>
               }

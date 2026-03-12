@@ -104,12 +104,12 @@ const AIEvolutionPage: React.FC = () => {
       {
         name: '采纳率', type: 'line', smooth: true,
         data: weeklyTrend.map(d => +(d.adoption_rate * 100).toFixed(1)),
-        itemStyle: { color: '#1890ff' },
+        itemStyle: { color: '#0AAF9A' },
       },
       {
         name: '成功率', type: 'line', smooth: true,
         data: weeklyTrend.map(d => +(d.success_rate * 100).toFixed(1)),
-        itemStyle: { color: '#52c41a' },
+        itemStyle: { color: '#1A7A52' },
       },
     ],
   };
@@ -120,9 +120,9 @@ const AIEvolutionPage: React.FC = () => {
     xAxis: { type: 'category', data: hitlEscalations.map(d => d.date) },
     yAxis: { type: 'value' },
     series: [
-      { name: '总计', type: 'bar', data: hitlEscalations.map(d => d.total), itemStyle: { color: '#1890ff' } },
-      { name: '批准', type: 'bar', data: hitlEscalations.map(d => d.approved), itemStyle: { color: '#52c41a' } },
-      { name: '拒绝', type: 'bar', data: hitlEscalations.map(d => d.rejected), itemStyle: { color: '#ff4d4f' } },
+      { name: '总计', type: 'bar', data: hitlEscalations.map(d => d.total), itemStyle: { color: '#0AAF9A' } },
+      { name: '批准', type: 'bar', data: hitlEscalations.map(d => d.approved), itemStyle: { color: '#1A7A52' } },
+      { name: '拒绝', type: 'bar', data: hitlEscalations.map(d => d.rejected), itemStyle: { color: '#C53030' } },
     ],
   };
 
@@ -155,7 +155,7 @@ const AIEvolutionPage: React.FC = () => {
     { title: 'Agent', dataIndex: 'agent_name', key: 'agent_name' },
     {
       title: '采纳率', dataIndex: 'adoption_rate', key: 'adoption_rate',
-      render: (v: number) => <Progress percent={+(v * 100).toFixed(1)} size="small" strokeColor="#1890ff" />,
+      render: (v: number) => <Progress percent={+(v * 100).toFixed(1)} size="small" strokeColor="#0AAF9A" />,
     },
     { title: '决策数', dataIndex: 'decisions_made', key: 'decisions_made' },
     {
@@ -192,7 +192,7 @@ const AIEvolutionPage: React.FC = () => {
                   value={+(summary.avg_adoption_rate * 100).toFixed(1)}
                   suffix="%"
                   prefix={<RiseOutlined />}
-                  valueStyle={{ color: '#1890ff' }}
+                  valueStyle={{ color: '#0AAF9A' }}
                 />
               </Card>
             </Col>
@@ -206,7 +206,7 @@ const AIEvolutionPage: React.FC = () => {
                   value={+(summary.avg_success_rate * 100).toFixed(1)}
                   suffix="%"
                   prefix={<CheckCircleOutlined />}
-                  valueStyle={{ color: '#52c41a' }}
+                  valueStyle={{ color: '#1A7A52' }}
                 />
               </Card>
             </Col>

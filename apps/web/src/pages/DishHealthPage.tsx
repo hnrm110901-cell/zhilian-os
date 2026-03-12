@@ -23,17 +23,17 @@ const { Option } = Select;
 // ── 常量 ──────────────────────────────────────────────────────────────────────
 
 const TIER_CONFIG: Record<string, { label: string; color: string; antColor: string; rowClass: string }> = {
-  excellent: { label: '优秀', color: '#52c41a', antColor: 'green',  rowClass: 'rowExcellent' },
-  good:      { label: '良好', color: '#1677ff', antColor: 'blue',   rowClass: 'rowGood' },
+  excellent: { label: '优秀', color: '#1A7A52', antColor: 'green',  rowClass: 'rowExcellent' },
+  good:      { label: '良好', color: '#0AAF9A', antColor: 'blue',   rowClass: 'rowGood' },
   fair:      { label: '一般', color: '#faad14', antColor: 'gold',   rowClass: 'rowFair' },
-  poor:      { label: '较差', color: '#f5222d', antColor: 'red',    rowClass: 'rowPoor' },
+  poor:      { label: '较差', color: '#C53030', antColor: 'red',    rowClass: 'rowPoor' },
 };
 
 const PRIORITY_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-  immediate: { label: '立即介入', color: '#f5222d', icon: <ExclamationCircleOutlined /> },
+  immediate: { label: '立即介入', color: '#C53030', icon: <ExclamationCircleOutlined /> },
   monitor:   { label: '密切观察', color: '#faad14', icon: <EyeOutlined /> },
-  maintain:  { label: '保持现状', color: '#1677ff', icon: <CheckCircleOutlined /> },
-  promote:   { label: '重点推广', color: '#52c41a', icon: <RocketOutlined /> },
+  maintain:  { label: '保持现状', color: '#0AAF9A', icon: <CheckCircleOutlined /> },
+  promote:   { label: '重点推广', color: '#1A7A52', icon: <RocketOutlined /> },
 };
 
 const COMPONENT_LABELS: Record<string, string> = {
@@ -119,7 +119,7 @@ interface HistoryRec {
 
 function scoreBar(score: number, max = 100) {
   const pct = Math.round((score / max) * 100);
-  const color = pct >= 80 ? '#52c41a' : pct >= 60 ? '#1677ff' : pct >= 40 ? '#faad14' : '#f5222d';
+  const color = pct >= 80 ? '#1A7A52' : pct >= 60 ? '#0AAF9A' : pct >= 40 ? '#faad14' : '#C53030';
   return (
     <div style={{ minWidth: 110 }}>
       <Progress percent={pct} strokeColor={color} size="small" format={() => score.toFixed(1)} />
@@ -485,7 +485,7 @@ const DishHealthHistory: React.FC<{ storeId: string }> = ({ storeId }) => {
     series: [
       { name: '综合评分', type: 'line', symbol: 'circle', lineStyle: { width: 2 },
         data: sortedHistory.map(r => r.total_score),
-        itemStyle: { color: '#1677ff' } },
+        itemStyle: { color: '#0AAF9A' } },
       { name: '盈利能力', type: 'bar', stack: 'score', barMaxWidth: 30,
         data: sortedHistory.map(r => r.profitability_score),
         itemStyle: { color: 'rgba(82,196,26,0.6)' } },

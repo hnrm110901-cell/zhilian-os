@@ -129,14 +129,14 @@ const CompliancePage: React.FC = () => {
         <div>
           <Row gutter={16} style={{ marginBottom: 16 }}>
             <Col span={5}><Card size="small"><Statistic title="总证照数" value={summary?.total ?? licenses.length} /></Card></Col>
-            <Col span={5}><Card size="small"><Statistic title="有效" value={summary?.valid ?? '--'} valueStyle={{ color: '#52c41a' }} /></Card></Col>
-            <Col span={5}><Card size="small"><Statistic title="即将到期" value={summary?.expire_soon ?? expireSoon.length} valueStyle={{ color: '#fa8c16' }} /></Card></Col>
-            <Col span={5}><Card size="small"><Statistic title="已过期" value={summary?.expired ?? expired.length} valueStyle={{ color: '#ff4d4f' }} /></Card></Col>
+            <Col span={5}><Card size="small"><Statistic title="有效" value={summary?.valid ?? '--'} valueStyle={{ color: '#1A7A52' }} /></Card></Col>
+            <Col span={5}><Card size="small"><Statistic title="即将到期" value={summary?.expire_soon ?? expireSoon.length} valueStyle={{ color: '#C8923A' }} /></Card></Col>
+            <Col span={5}><Card size="small"><Statistic title="已过期" value={summary?.expired ?? expired.length} valueStyle={{ color: '#C53030' }} /></Card></Col>
             <Col span={4}><Card size="small"><Statistic title="未知" value={summary?.unknown ?? '--'} /></Card></Col>
           </Row>
           {expireSoon.length > 0 && (
             <Table
-              title={() => <span style={{ color: '#fa8c16' }}><WarningOutlined /> 即将到期证照</span>}
+              title={() => <span style={{ color: '#C8923A' }}><WarningOutlined /> 即将到期证照</span>}
               columns={columns.filter(c => c.key !== 'actions')}
               dataSource={expireSoon}
               rowKey="id"

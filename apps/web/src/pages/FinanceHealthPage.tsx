@@ -68,7 +68,7 @@ const today    = new Date().toISOString().slice(0, 10);
 const period   = today.slice(0, 7);
 
 const GRADE_COLOR: Record<string, string> = {
-  A: '#52c41a', B: '#faad14', C: '#fa8c16', D: '#f5222d',
+  A: '#1A7A52', B: '#faad14', C: '#C8923A', D: '#C53030',
 };
 const PRIORITY_BADGE: Record<string, 'error' | 'warning' | 'neutral'> = {
   high: 'error', medium: 'warning', low: 'neutral',
@@ -131,10 +131,10 @@ const FinanceHealthPage: React.FC = () => {
           lineStyle: {
             width: 18,
             color: [
-              [0.40, '#f5222d'],
-              [0.60, '#fa8c16'],
+              [0.40, '#C53030'],
+              [0.60, '#C8923A'],
               [0.80, '#faad14'],
-              [1.00, '#52c41a'],
+              [1.00, '#1A7A52'],
             ],
           },
         },
@@ -171,8 +171,8 @@ const FinanceHealthPage: React.FC = () => {
         data: vals.map((v, i) => ({
           value: Number(v),
           itemStyle: {
-            color: Number(v) >= maxes[i] * 0.8 ? '#52c41a'
-                 : Number(v) >= maxes[i] * 0.5 ? '#faad14' : '#f5222d',
+            color: Number(v) >= maxes[i] * 0.8 ? '#1A7A52'
+                 : Number(v) >= maxes[i] * 0.5 ? '#faad14' : '#C53030',
           },
         })),
         barMaxWidth: 36,
@@ -197,14 +197,14 @@ const FinanceHealthPage: React.FC = () => {
           name: '总评分',
           type: 'line',
           data: ht.map(r => Number(r.total_score)),
-          lineStyle: { width: 3, color: '#FF6B2C' },
+          lineStyle: { width: 3, color: '#0AAF9A' },
           symbol: 'circle', symbolSize: 6,
-          itemStyle: { color: '#FF6B2C' },
+          itemStyle: { color: '#0AAF9A' },
           markLine: {
             data: [
-              { yAxis: 80, lineStyle: { color: '#52c41a', type: 'dashed' }, label: { formatter: 'A', fontSize: 10 } },
+              { yAxis: 80, lineStyle: { color: '#1A7A52', type: 'dashed' }, label: { formatter: 'A', fontSize: 10 } },
               { yAxis: 60, lineStyle: { color: '#faad14', type: 'dashed' }, label: { formatter: 'B', fontSize: 10 } },
-              { yAxis: 40, lineStyle: { color: '#f5222d', type: 'dashed' }, label: { formatter: 'C', fontSize: 10 } },
+              { yAxis: 40, lineStyle: { color: '#C53030', type: 'dashed' }, label: { formatter: 'C', fontSize: 10 } },
             ],
           },
         },
@@ -238,8 +238,8 @@ const FinanceHealthPage: React.FC = () => {
           type: 'line',
           yAxisIndex: 0,
           data: pt.map(r => Number(r.profit_margin_pct.toFixed(1))),
-          lineStyle: { color: '#52c41a', width: 2 },
-          itemStyle: { color: '#52c41a' },
+          lineStyle: { color: '#1A7A52', width: 2 },
+          itemStyle: { color: '#1A7A52' },
           symbol: 'circle', symbolSize: 5,
         },
         {
@@ -247,7 +247,7 @@ const FinanceHealthPage: React.FC = () => {
           type: 'bar',
           yAxisIndex: 1,
           data: pt.map(r => r.net_revenue_yuan),
-          itemStyle: { color: 'rgba(255,107,44,0.35)' },
+          itemStyle: { color: 'rgba(10,175,154,0.35)' },
           barMaxWidth: 28,
         },
       ],

@@ -1,8 +1,8 @@
 """
-决策推送流程状态（移植自 BettaFish state.py，适配智链OS决策域）
+决策推送流程状态（移植自 BettaFish state.py，适配屯象OS决策域）
 
 BettaFish 原版：Search / Research / State 三层数据类，记录舆情研究全流程
-智链OS改造：DecisionFlowState 记录一次完整决策推送流程的状态快照
+屯象OS改造：DecisionFlowState 记录一次完整决策推送流程的状态快照
 
 核心价值：
   1. 追溯性  — 每次推送生成唯一 flow_id，可查询"今天推了什么、推成功了吗"

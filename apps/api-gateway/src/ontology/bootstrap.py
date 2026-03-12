@@ -1,5 +1,5 @@
 """
-智链OS 本体层 Bootstrap
+屯象OS 本体层 Bootstrap
 对标 Palantir Gotham 五层架构，初始化 Neo4j 11个本体对象、15个关系类型、约束和索引
 
 运行方式：
@@ -105,7 +105,7 @@ def _run_schema(tx, statements: list[str]) -> list[str]:
 
 def bootstrap(uri: str = NEO4J_URI, user: str = NEO4J_USER, password: str = NEO4J_PASSWORD) -> None:
     """
-    初始化智链OS本体 Schema
+    初始化屯象OS本体 Schema
 
     멱等性：多次执行安全（IF NOT EXISTS 保证）
     """
@@ -130,7 +130,7 @@ def bootstrap(uri: str = NEO4J_URI, user: str = NEO4J_USER, password: str = NEO4
             logger.info("本体索引创建完成", count=len(executed), items=executed)
 
         logger.info(
-            "智链OS本体 Schema 初始化完成",
+            "屯象OS本体 Schema 初始化完成",
             objects=11,
             relations=15,
             constraints=len(CONSTRAINTS),

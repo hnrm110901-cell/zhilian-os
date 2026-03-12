@@ -1,5 +1,5 @@
 """
-智链OS 本体推理引擎（Palantir Reasoning Layer）
+屯象OS 本体推理引擎（Palantir Reasoning Layer）
 
 实现损耗五步推理链：
   Step 1：计算理论消耗（BOM × 订单量 × 出成率）

@@ -38,11 +38,11 @@ interface RecommendationResponse {
 }
 
 const SCORE_FACTORS = [
-  { key: 'trend',      label: '趋势',    weight: '30%', color: '#1677ff' },
-  { key: 'margin',     label: '毛利',    weight: '25%', color: '#52c41a' },
+  { key: 'trend',      label: '趋势',    weight: '30%', color: '#0AAF9A' },
+  { key: 'margin',     label: '毛利',    weight: '25%', color: '#1A7A52' },
   { key: 'stock',      label: '库存',    weight: '20%', color: '#faad14' },
   { key: 'time_slot',  label: '时段',    weight: '15%', color: '#722ed1' },
-  { key: 'low_refund', label: '低退单',  weight: '10%', color: '#f5222d' },
+  { key: 'low_refund', label: '低退单',  weight: '10%', color: '#C53030' },
 ];
 
 function ScoreBar({ value, color }: { value: number; color: string }) {
@@ -144,7 +144,7 @@ const MenuRecommendationPage: React.FC = () => {
             type="circle"
             percent={Math.round(scores.total * 100)}
             size={44}
-            strokeColor={scores.total >= 0.7 ? '#52c41a' : scores.total >= 0.5 ? '#faad14' : '#f5222d'}
+            strokeColor={scores.total >= 0.7 ? '#1A7A52' : scores.total >= 0.5 ? '#faad14' : '#C53030'}
           />
         </Space>
       ),
@@ -191,7 +191,7 @@ const MenuRecommendationPage: React.FC = () => {
                       value: s.store_id || s.id,
                       label: s.name || s.store_id || s.id,
                     }))
-                  : [{ value: 'STORE001', label: '智链餐厅-朝阳店' }]}
+                  : [{ value: 'STORE001', label: '屯象餐厅-朝阳店' }]}
                 allowClear
               />
             </Space>

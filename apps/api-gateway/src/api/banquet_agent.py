@@ -4389,7 +4389,7 @@ async def generate_followup_message(
 
     message = template.format(
         name=customer.customer_name if customer else "客户",
-        store="智链酒楼",
+        store="屯象酒楼",
         banquet_type=banquet_type_str,
         date=date_str or "预定日期",
         budget=budget_str or "待定",

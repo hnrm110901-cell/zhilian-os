@@ -21,14 +21,14 @@ const { Option } = Select;
 
 // ── 配置 ──────────────────────────────────────────────────────────────────────
 const SEVERITY_CONFIG: Record<string, { label: string; color: string; antColor: string }> = {
-  critical: { label: '严重', color: '#ff4d4f', antColor: 'red' },
-  warning:  { label: '警告', color: '#fa8c16', antColor: 'orange' },
-  info:     { label: '提示', color: '#1677ff', antColor: 'blue' },
+  critical: { label: '严重', color: '#C53030', antColor: 'red' },
+  warning:  { label: '警告', color: '#C8923A', antColor: 'orange' },
+  info:     { label: '提示', color: '#0AAF9A', antColor: 'blue' },
 };
 
 const ALERT_TYPE_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
-  fcr_spike:     { label: '成本率飙升', color: '#ff4d4f', icon: '📈' },
-  margin_drop:   { label: '毛利率下滑', color: '#fa8c16', icon: '📉' },
+  fcr_spike:     { label: '成本率飙升', color: '#C53030', icon: '📈' },
+  margin_drop:   { label: '毛利率下滑', color: '#C8923A', icon: '📉' },
   bcg_downgrade: { label: 'BCG象限下降', color: '#722ed1', icon: '⬇️' },
 };
 
@@ -171,14 +171,14 @@ const DishCostAlertPage: React.FC = () => {
       {
         name: '平均食材成本率%', type: 'line', smooth: true,
         data: trend.map(t => t.avg_fcr.toFixed(1)),
-        itemStyle: { color: '#ff4d4f' },
+        itemStyle: { color: '#C53030' },
         areaStyle: { color: 'rgba(255,77,79,0.1)' },
         markLine: { data: [{ type: 'average', name: '均值' }] },
       },
       {
         name: '平均毛利率%', type: 'line', smooth: true,
         data: trend.map(t => t.avg_gpm.toFixed(1)),
-        itemStyle: { color: '#52c41a' },
+        itemStyle: { color: '#1A7A52' },
         areaStyle: { color: 'rgba(82,196,26,0.1)' },
       },
     ],
@@ -224,9 +224,9 @@ const DishCostAlertPage: React.FC = () => {
       series: [{
         type: 'pie', radius: ['40%', '70%'],
         data: [
-          { name: '严重', value: summary.by_severity.critical, itemStyle: { color: '#ff4d4f' } },
-          { name: '警告', value: summary.by_severity.warning,  itemStyle: { color: '#fa8c16' } },
-          { name: '提示', value: summary.by_severity.info,     itemStyle: { color: '#1677ff' } },
+          { name: '严重', value: summary.by_severity.critical, itemStyle: { color: '#C53030' } },
+          { name: '警告', value: summary.by_severity.warning,  itemStyle: { color: '#C8923A' } },
+          { name: '提示', value: summary.by_severity.info,     itemStyle: { color: '#0AAF9A' } },
         ].filter(d => d.value > 0),
         label: { formatter: '{b}\n{c}条' },
       }],
@@ -285,7 +285,7 @@ const DishCostAlertPage: React.FC = () => {
     {
       title: '变化', dataIndex: 'change_pp', width: 80,
       render: (v: number, r: DishAlert) => (
-        <Text style={{ color: '#ff4d4f' }}>
+        <Text style={{ color: '#C53030' }}>
           {r.alert_type === 'bcg_downgrade' ? `↓${v.toFixed(0)}级` : fmtPP(v)}
         </Text>
       ),
@@ -293,7 +293,7 @@ const DishCostAlertPage: React.FC = () => {
     {
       title: '¥影响', dataIndex: 'yuan_impact_yuan', width: 90,
       sorter: (a: DishAlert, b: DishAlert) => b.yuan_impact_yuan - a.yuan_impact_yuan,
-      render: (v: number) => <Text style={{ color: '#ff4d4f' }}>{fmt(v)}</Text>,
+      render: (v: number) => <Text style={{ color: '#C53030' }}>{fmt(v)}</Text>,
     },
     {
       title: '说明', dataIndex: 'message', ellipsis: true,
@@ -356,25 +356,25 @@ const DishCostAlertPage: React.FC = () => {
         <Col xs={12} sm={6}>
           <Card size="small">
             <Statistic title="待处理预警" value={openCount} suffix="条"
-              prefix={<WarningOutlined />} valueStyle={{ color: '#fa8c16' }} />
+              prefix={<WarningOutlined />} valueStyle={{ color: '#C8923A' }} />
           </Card>
         </Col>
         <Col xs={12} sm={6}>
           <Card size="small">
             <Statistic title="严重预警" value={critCount} suffix="条"
-              prefix={<FireOutlined />} valueStyle={{ color: '#ff4d4f' }} />
+              prefix={<FireOutlined />} valueStyle={{ color: '#C53030' }} />
           </Card>
         </Col>
         <Col xs={12} sm={6}>
           <Card size="small">
             <Statistic title="¥影响估算" value={totalImpact.toFixed(0)}
-              prefix="¥" valueStyle={{ color: '#ff4d4f' }} />
+              prefix="¥" valueStyle={{ color: '#C53030' }} />
           </Card>
         </Col>
         <Col xs={12} sm={6}>
           <Card size="small">
             <Statistic title="已解决预警" value={resolvedCount} suffix="条"
-              prefix={<CheckCircleOutlined />} valueStyle={{ color: '#52c41a' }} />
+              prefix={<CheckCircleOutlined />} valueStyle={{ color: '#1A7A52' }} />
           </Card>
         </Col>
       </Row>
@@ -447,10 +447,10 @@ const DishCostAlertPage: React.FC = () => {
                               <Text>总销量: {t.total_orders}</Text>
                             </Space>
                             <Space>
-                              <Text style={{ color: '#ff4d4f' }}>
+                              <Text style={{ color: '#C53030' }}>
                                 食材成本率: {fmtPct(t.avg_fcr)}
                               </Text>
-                              <Text style={{ color: '#52c41a' }}>
+                              <Text style={{ color: '#1A7A52' }}>
                                 毛利率: {fmtPct(t.avg_gpm)}
                               </Text>
                             </Space>
@@ -499,7 +499,7 @@ const DishCostAlertPage: React.FC = () => {
                           {
                             title: '¥影响', dataIndex: 'total_impact',
                             render: (v: number) => (
-                              <Text style={{ color: v > 0 ? '#ff4d4f' : '#aaa' }}>
+                              <Text style={{ color: v > 0 ? '#C53030' : '#aaa' }}>
                                 {fmt(v)}
                               </Text>
                             ),

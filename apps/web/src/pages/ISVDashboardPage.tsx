@@ -137,7 +137,7 @@ const settlementColumns: ZTableColumn<Settlement>[] = [
     key: 'net_payout_yuan',
     title: '应得分成',
     align: 'right',
-    render: (v) => <span className={styles.amountCell} style={{ color: '#52c41a' }}>¥{Number(v).toFixed(2)}</span>,
+    render: (v) => <span className={styles.amountCell} style={{ color: '#1A7A52' }}>¥{Number(v).toFixed(2)}</span>,
   },
   {
     key: 'status',

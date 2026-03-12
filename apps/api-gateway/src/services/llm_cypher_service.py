@@ -38,9 +38,9 @@ _FORBIDDEN_PATTERNS = re.compile(
     re.IGNORECASE,
 )
 
-# 智链OS本体 Schema（注入到 LLM 系统提示）
+# 屯象OS本体 Schema（注入到 LLM 系统提示）
 ONTOLOGY_SCHEMA = """
-## 智链OS 本体 Schema（Neo4j）
+## 屯象OS 本体 Schema（Neo4j）
 
 ### 节点类型与核心属性
 - Store: store_id, name, city, store_type, created_at
@@ -74,7 +74,7 @@ ONTOLOGY_SCHEMA = """
 - WasteEvent.root_cause 枚举：staff_error / food_quality / equipment_fault / process_deviation
 """
 
-SYSTEM_PROMPT = f"""你是智链OS餐饮知识图谱的 Cypher 查询专家。
+SYSTEM_PROMPT = f"""你是屯象OS餐饮知识图谱的 Cypher 查询专家。
 
 {ONTOLOGY_SCHEMA}
 

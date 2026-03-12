@@ -69,9 +69,9 @@ interface AccuracyRecord {
 // ── 常量 ──────────────────────────────────────────────────────────────────────
 
 const TYPE_COLORS: Record<string, string> = {
-  revenue:        '#1677ff',
-  food_cost_rate: '#f5222d',
-  profit_margin:  '#52c41a',
+  revenue:        '#0AAF9A',
+  food_cost_rate: '#C53030',
+  profit_margin:  '#1A7A52',
   health_score:   '#722ed1',
 };
 
@@ -96,8 +96,8 @@ const fmt = (v: number | null, unit: string) =>
 
 const trendIcon = (dir: 'up' | 'down' | 'flat', type: string) => {
   const good = LOWER_IS_BETTER.has(type) ? 'down' : 'up';
-  if (dir === 'up') return <RiseOutlined style={{ color: dir === good ? '#52c41a' : '#f5222d' }} />;
-  if (dir === 'down') return <FallOutlined style={{ color: dir === good ? '#52c41a' : '#f5222d' }} />;
+  if (dir === 'up') return <RiseOutlined style={{ color: dir === good ? '#1A7A52' : '#C53030' }} />;
+  if (dir === 'down') return <FallOutlined style={{ color: dir === good ? '#1A7A52' : '#C53030' }} />;
   return <MinusOutlined style={{ color: '#8c8c8c' }} />;
 };
 
@@ -283,7 +283,7 @@ const FinancialForecastPage: React.FC = () => {
       title: '精度',   dataIndex: 'accuracy_pct', key: 'acc',
       render: (v: number | null) => v == null ? '—' : (
         <Progress percent={Math.round(v)} size="small"
-          strokeColor={v >= 90 ? '#52c41a' : v >= 70 ? '#fa8c16' : '#f5222d'}
+          strokeColor={v >= 90 ? '#1A7A52' : v >= 70 ? '#C8923A' : '#C53030'}
           format={p => `${v.toFixed(1)}%`}
         />
       ),
@@ -456,7 +456,7 @@ const FinancialForecastPage: React.FC = () => {
                         type="circle"
                         percent={Math.round(avg)}
                         size={64}
-                        strokeColor={avg >= 90 ? '#52c41a' : avg >= 70 ? '#fa8c16' : '#f5222d'}
+                        strokeColor={avg >= 90 ? '#1A7A52' : avg >= 70 ? '#C8923A' : '#C53030'}
                       />
                       <div className={styles.accSub}>{records.length} 期均值</div>
                     </Card>

@@ -54,7 +54,7 @@ export default function RecommendationCard({ storeId, compact = false, maxItems 
 
   useEffect(() => { fetch(); }, [fetch]);
 
-  const impactColor = (v: number) => v >= 0 ? '#52c41a' : '#f5222d';
+  const impactColor = (v: number) => v >= 0 ? '#1A7A52' : '#C53030';
   const impactLabel = (v: number) => `${v >= 0 ? '+' : ''}¥${Math.abs(v).toFixed(0)}`;
 
   return (

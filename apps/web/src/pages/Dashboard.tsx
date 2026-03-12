@@ -96,9 +96,9 @@ const Dashboard: React.FC = () => {
           itemStyle: {
             color: (params: any) => {
               const v = params.value;
-              if (v >= 95) return '#52c41a';
+              if (v >= 95) return '#1A7A52';
               if (v >= 85) return '#faad14';
-              return '#f5222d';
+              return '#C53030';
             },
           },
         },
@@ -106,7 +106,7 @@ const Dashboard: React.FC = () => {
           name: '目标线',
           data: kpiChartData.categories.map(() => 100),
           type: 'line',
-          itemStyle: { color: '#1890ff' },
+          itemStyle: { color: '#0AAF9A' },
           lineStyle: { type: 'dashed' },
         },
       ],
@@ -125,9 +125,9 @@ const Dashboard: React.FC = () => {
         type: 'pie',
         radius: '50%',
         data: [
-          { value: dist.on_track  || 0, name: '正常', itemStyle: { color: '#52c41a' } },
+          { value: dist.on_track  || 0, name: '正常', itemStyle: { color: '#1A7A52' } },
           { value: dist.at_risk   || 0, name: '风险', itemStyle: { color: '#faad14' } },
-          { value: dist.off_track || 0, name: '异常', itemStyle: { color: '#f5222d' } },
+          { value: dist.off_track || 0, name: '异常', itemStyle: { color: '#C53030' } },
         ],
         emphasis: { itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0,0,0,0.5)' } },
       }],

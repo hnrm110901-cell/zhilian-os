@@ -108,7 +108,7 @@ const ChannelProfitPage: React.FC = () => {
       type: 'bar',
       data: channelAvg.map((v, i) => ({
         value: v,
-        itemStyle: { color: v >= 40 ? '#52c41a' : v >= 20 ? '#faad14' : '#ff4d4f' },
+        itemStyle: { color: v >= 40 ? '#1A7A52' : v >= 20 ? '#faad14' : '#C53030' },
         label: { show: true, position: 'top', formatter: `${v}%` },
       })),
     }],
@@ -122,9 +122,9 @@ const ChannelProfitPage: React.FC = () => {
       type: 'pie',
       radius: ['40%', '70%'],
       data: [
-        { value: profitCount,  name: '赚钱', itemStyle: { color: '#52c41a' } },
+        { value: profitCount,  name: '赚钱', itemStyle: { color: '#1A7A52' } },
         { value: breakEven,    name: '勉强', itemStyle: { color: '#faad14' } },
-        { value: lossCount,    name: '亏钱', itemStyle: { color: '#ff4d4f' } },
+        { value: lossCount,    name: '亏钱', itemStyle: { color: '#C53030' } },
       ],
     }],
   };
@@ -198,7 +198,7 @@ const ChannelProfitPage: React.FC = () => {
                 title="平均毛利率"
                 value={avgMargin}
                 suffix="%"
-                valueStyle={{ color: avgMargin >= 40 ? '#52c41a' : '#faad14' }}
+                valueStyle={{ color: avgMargin >= 40 ? '#1A7A52' : '#faad14' }}
               />
             </Card>
           </Col>
@@ -208,8 +208,8 @@ const ChannelProfitPage: React.FC = () => {
                 title="盈利菜品"
                 value={profitCount}
                 suffix={`/ ${items.length}`}
-                prefix={<RiseOutlined style={{ color: '#52c41a' }} />}
-                valueStyle={{ color: '#52c41a' }}
+                prefix={<RiseOutlined style={{ color: '#1A7A52' }} />}
+                valueStyle={{ color: '#1A7A52' }}
               />
             </Card>
           </Col>
@@ -219,8 +219,8 @@ const ChannelProfitPage: React.FC = () => {
                 title="亏损菜品"
                 value={lossCount}
                 suffix={`/ ${items.length}`}
-                prefix={<FallOutlined style={{ color: '#ff4d4f' }} />}
-                valueStyle={{ color: lossCount > 0 ? '#ff4d4f' : undefined }}
+                prefix={<FallOutlined style={{ color: '#C53030' }} />}
+                valueStyle={{ color: lossCount > 0 ? '#C53030' : undefined }}
               />
             </Card>
           </Col>

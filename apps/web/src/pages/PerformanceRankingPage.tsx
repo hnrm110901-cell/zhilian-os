@@ -68,10 +68,10 @@ interface TrendItem {
 // ── 常量 ──────────────────────────────────────────────────────────────────
 
 const TIER_COLOR: Record<string, string> = {
-  top:       '#52c41a',
-  above_avg: '#1677ff',
-  below_avg: '#fa8c16',
-  laggard:   '#ff4d4f',
+  top:       '#1A7A52',
+  above_avg: '#0AAF9A',
+  below_avg: '#C8923A',
+  laggard:   '#C53030',
 };
 
 const TIER_LABEL: Record<string, string> = {
@@ -82,8 +82,8 @@ const TIER_LABEL: Record<string, string> = {
 };
 
 const CHANGE_ICON: Record<string, React.ReactNode> = {
-  improved: <RiseOutlined style={{ color: '#52c41a' }} />,
-  declined: <FallOutlined  style={{ color: '#ff4d4f' }} />,
+  improved: <RiseOutlined style={{ color: '#1A7A52' }} />,
+  declined: <FallOutlined  style={{ color: '#C53030' }} />,
   stable:   <MinusOutlined style={{ color: '#8c8c8c' }} />,
   new:      <StarOutlined  style={{ color: '#faad14' }} />,
 };
@@ -193,7 +193,7 @@ const PerformanceRankingPage: React.FC = () => {
         smooth: true,
         symbol: 'circle',
         symbolSize: 8,
-        itemStyle: { color: '#1677ff' },
+        itemStyle: { color: '#0AAF9A' },
         lineStyle: { width: 2 },
       },
     ],
@@ -219,7 +219,7 @@ const PerformanceRankingPage: React.FC = () => {
                   const entry = storeRanking?.metrics[m];
                   return entry?.percentile ?? 0;
                 }),
-                itemStyle: { color: '#1677ff' },
+                itemStyle: { color: '#0AAF9A' },
                 areaStyle: { opacity: 0.3 },
               },
             ],
@@ -266,7 +266,7 @@ const PerformanceRankingPage: React.FC = () => {
         if (v === null) return '—';
         const isGood = r.gap_direction === 'above';
         return (
-          <span style={{ color: isGood ? '#52c41a' : '#ff4d4f' }}>
+          <span style={{ color: isGood ? '#1A7A52' : '#C53030' }}>
             {v > 0 ? '+' : ''}{v.toFixed(1)}%
           </span>
         );
@@ -284,7 +284,7 @@ const PerformanceRankingPage: React.FC = () => {
       title: '¥提升潜力', dataIndex: 'yuan_potential', width: 120,
       render: (v: number | null) =>
         v === null ? '—' : (
-          <span style={{ color: '#1677ff', fontWeight: 600 }}>
+          <span style={{ color: '#0AAF9A', fontWeight: 600 }}>
             ¥{Math.abs(v).toLocaleString('zh-CN', { maximumFractionDigits: 0 })}
           </span>
         ),
@@ -297,7 +297,7 @@ const PerformanceRankingPage: React.FC = () => {
     {
       title: '排名', dataIndex: 'rank', width: 60,
       render: (v: number) => (
-        <span style={{ fontWeight: 700, color: v === 1 ? '#faad14' : v <= 3 ? '#1677ff' : undefined }}>
+        <span style={{ fontWeight: 700, color: v === 1 ? '#faad14' : v <= 3 ? '#0AAF9A' : undefined }}>
           {v === 1 ? <TrophyOutlined /> : null} {v}
         </span>
       ),
@@ -325,7 +325,7 @@ const PerformanceRankingPage: React.FC = () => {
         <Progress
           percent={r.percentile ?? 0}
           size="small"
-          strokeColor={TIER_COLOR[r.tier] ?? '#1677ff'}
+          strokeColor={TIER_COLOR[r.tier] ?? '#0AAF9A'}
           showInfo={false}
         />
       ),

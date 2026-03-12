@@ -267,7 +267,7 @@ async def ops_agent(
     current_user: User = Depends(require_permission(Permission.AGENT_OPS_READ)),
 ):
     """
-    运维智能体（智链OS 连锁餐饮AI Agent运维方案）
+    运维智能体（屯象OS 连锁餐饮AI Agent运维方案）
 
     支持操作：health_check, diagnose_fault, runbook_suggestion, predict_maintenance,
     security_advice, link_switch_advice, asset_overview, nl_query
@@ -290,7 +290,7 @@ async def performance_agent(
     current_user: User = Depends(require_permission(Permission.AGENT_PERFORMANCE_READ)),
 ):
     """
-    绩效智能体（智链OS 连锁餐饮绩效方案）
+    绩效智能体（屯象OS 连锁餐饮绩效方案）
 
     支持操作：get_role_config, calculate_performance, calculate_commission,
     get_performance_report, explain_rule, nl_query

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  屯象 Logo Mark v3.0 · 极简芽象
+  ○ 圆 = 太阳 · 希望 · 新的开始
+  | 茎 = 生长 · 向上 · 陪你前行
+  ─ 根 = 大地 · 踏实 · 烟火人间
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 100" width="80" height="100">
+  <circle cx="40" cy="26" r="22" fill="#0AAF9A"/>
+  <rect x="36.5" y="46" width="7" height="28" rx="3.5" fill="#0AAF9A"/>
+  <rect x="10" y="75" width="60" height="8" rx="4" fill="#0AAF9A"/>
+</svg>

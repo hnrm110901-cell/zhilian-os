@@ -3,7 +3,8 @@ import { injectTokens } from '../design-system/tokens/index';
 
 export type Theme = 'light' | 'dark' | 'auto';
 
-const THEME_STORAGE_KEY = 'zhilian-theme';
+const THEME_STORAGE_KEY = 'tunxiang-theme';
+const LEGACY_STORAGE_KEY = 'zhilian-theme';
 
 // 获取系统主题偏好
 const getSystemTheme = (): 'light' | 'dark' => {
@@ -27,13 +28,13 @@ const applyTheme = (theme: 'light' | 'dark') => {
   injectTokens();
   const metaThemeColor = document.querySelector('meta[name="theme-color"]');
   if (metaThemeColor) {
-    metaThemeColor.setAttribute('content', theme === 'dark' ? '#1C1C1E' : '#F5F5F7');
+    metaThemeColor.setAttribute('content', theme === 'dark' ? '#0B1A20' : '#0AAF9A');
   }
 };
 
 export const useTheme = () => {
   const [theme, setThemeState] = useState<Theme>(() => {
-    const saved = localStorage.getItem(THEME_STORAGE_KEY);
+    const saved = localStorage.getItem(THEME_STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
     return (saved as Theme) || 'auto';
   });
 

@@ -17,8 +17,8 @@ const tierColor: Record<string, string> = {
   VIP: 'gold', '高价值': 'blue', '中价值': 'green', '低价值': 'orange', '流失风险': 'red',
 };
 const eventIcon: Record<string, React.ReactNode> = {
-  order: <ShoppingOutlined style={{ color: '#1890ff' }} />,
-  reservation: <CalendarOutlined style={{ color: '#52c41a' }} />,
+  order: <ShoppingOutlined style={{ color: '#0AAF9A' }} />,
+  reservation: <CalendarOutlined style={{ color: '#1A7A52' }} />,
   pos_transaction: <CreditCardOutlined style={{ color: '#722ed1' }} />,
 };
 const eventColor: Record<string, string> = {
@@ -92,7 +92,7 @@ const Customer360Page: React.FC = () => {
           <Col span={8}>
             <Card size="small" title="基础信息">
               <div style={{ textAlign: 'center', marginBottom: 16 }}>
-                <Avatar size={64} icon={<UserOutlined />} style={{ backgroundColor: '#1890ff' }} />
+                <Avatar size={64} icon={<UserOutlined />} style={{ backgroundColor: '#0AAF9A' }} />
                 <div style={{ marginTop: 8, fontWeight: 600, fontSize: 16 }}>
                   {profile.member_info?.name || profile.customer_identifier}
                 </div>
@@ -128,7 +128,7 @@ const Customer360Page: React.FC = () => {
             <Card size="small" title={`RFM评分 ${cv.rfm_score ?? '--'}`}>
               <Progress
                 percent={Math.round(cv.rfm_score || 0)}
-                strokeColor={{ '0%': '#ff4d4f', '50%': '#faad14', '100%': '#52c41a' }}
+                strokeColor={{ '0%': '#C53030', '50%': '#faad14', '100%': '#1A7A52' }}
                 status="active"
               />
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#999', marginTop: 4 }}>
@@ -173,7 +173,7 @@ const Customer360Page: React.FC = () => {
           renderItem={(r: any) => (
             <List.Item>
               <List.Item.Meta
-                avatar={<CalendarOutlined style={{ fontSize: 20, color: '#52c41a' }} />}
+                avatar={<CalendarOutlined style={{ fontSize: 20, color: '#1A7A52' }} />}
                 title={`${r.reservation_date?.slice(0, 10)} — ${r.party_size}人`}
                 description={`状态: ${r.status}${r.special_requests ? ` | 备注: ${r.special_requests}` : ''}`}
               />

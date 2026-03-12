@@ -33,11 +33,11 @@
 }
 
 .rowSevere {
-  background-color: #fff1f0;
+  background-color: rgba(197,48,48,0.08);
 }
 
 .rowModerate {
-  background-color: #fff7e6;
+  background-color: rgba(200,146,58,0.08);
 }
 
 .detectStats {

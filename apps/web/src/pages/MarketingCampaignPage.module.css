@@ -111,6 +111,6 @@
 
 .nativeSelect:focus {
   outline: none;
-  border-color: var(--accent, #1677ff);
-  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.1);
+  border-color: var(--accent, #0AAF9A);
+  box-shadow: 0 0 0 2px rgba(10, 175, 154, 0.1);
 }

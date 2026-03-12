@@ -357,28 +357,28 @@ const WorkforcePage: React.FC = () => {
       label: '今日建议人数',
       value: forecast?.daily_peak_headcount ?? '—',
       unit: '人',
-      icon: <TeamOutlined style={{ color: '#1890ff' }} />,
+      icon: <TeamOutlined style={{ color: '#0AAF9A' }} />,
     },
     {
       label: '当前实际出勤',
       value: cost?.headcount_actual ?? '—',
       unit: '人',
-      icon: <TeamOutlined style={{ color: '#52c41a' }} />,
+      icon: <TeamOutlined style={{ color: '#1A7A52' }} />,
     },
     {
       label: '本月人工成本率',
       value: cost?.actual_labor_cost_rate != null ? cost.actual_labor_cost_rate.toFixed(1) : '—',
       unit: '%',
-      icon: <RiseOutlined style={{ color: '#fa8c16' }} />,
+      icon: <RiseOutlined style={{ color: '#C8923A' }} />,
       valueColor: cost?.actual_labor_cost_rate != null && budget?.target_labor_cost_rate != null
-        ? cost.actual_labor_cost_rate > budget.target_labor_cost_rate ? '#ff4d4f' : '#52c41a'
+        ? cost.actual_labor_cost_rate > budget.target_labor_cost_rate ? '#C53030' : '#1A7A52'
         : undefined,
     },
     {
       label: '本月节省',
       value: cost?.saving_yuan != null ? `¥${cost.saving_yuan.toFixed(0)}` : '—',
-      icon: <FallOutlined style={{ color: '#52c41a' }} />,
-      valueColor: '#52c41a',
+      icon: <FallOutlined style={{ color: '#1A7A52' }} />,
+      valueColor: '#1A7A52',
     },
   ];
 
@@ -421,7 +421,7 @@ const WorkforcePage: React.FC = () => {
               {
                 title: '较当前差值',
                 dataIndex: 'delta',
-                render: (v: number) => (v > 0 ? <Tag color="orange">+{v}</Tag> : v < 0 ? <Tag color="green">{v}</Tag> : <Tag>0</Tag>),
+                render: (v: number) => (v > 0 ? <Tag color="mint">+{v}</Tag> : v < 0 ? <Tag color="green">{v}</Tag> : <Tag>0</Tag>),
               },
             ]}
             style={{ marginBottom: 12 }}
@@ -527,7 +527,7 @@ const WorkforcePage: React.FC = () => {
                     <div>
                       <Text type="secondary">主要风险因子：</Text>
                       <div className={styles.factorList}>
-                        {factors.length > 0 ? factors.map((f, i) => <Tag key={`${record.employee_id}-${i}`} color="orange">{f}</Tag>) : <Tag>暂无</Tag>}
+                        {factors.length > 0 ? factors.map((f, i) => <Tag key={`${record.employee_id}-${i}`} color="mint">{f}</Tag>) : <Tag>暂无</Tag>}
                       </div>
                     </div>
                     <div className={styles.expandFairnessRow}>
@@ -553,7 +553,7 @@ const WorkforcePage: React.FC = () => {
                 title: '风险等级',
                 dataIndex: 'risk_level',
                 render: (v: 'critical' | 'high' | 'medium' | 'low') =>
-                  v === 'critical' ? <Tag color="magenta">极高</Tag> : v === 'high' ? <Tag color="red">高</Tag> : v === 'medium' ? <Tag color="orange">中</Tag> : <Tag color="green">低</Tag>,
+                  v === 'critical' ? <Tag color="magenta">极高</Tag> : v === 'high' ? <Tag color="red">高</Tag> : v === 'medium' ? <Tag color="mint">中</Tag> : <Tag color="green">低</Tag>,
               },
               {
                 title: '班次不公平占比',
@@ -594,7 +594,7 @@ const WorkforcePage: React.FC = () => {
       <AgentWorkspaceTemplate
         agentName="人力管理工作台"
         agentIcon="👥"
-        agentColor="#1890ff"
+        agentColor="#0AAF9A"
         description="客流预测 · 排班优化 · 人工成本控制 · 员工健康分析"
         status={loading ? 'idle' : 'running'}
         kpis={pageKpis}

@@ -21,7 +21,7 @@
   background: none;
   border: none;
   font-size: 14px;
-  color: var(--accent, #ff6b2c);
+  color: var(--accent, #0AAF9A);
   cursor: pointer;
   padding: 4px 0;
 }
@@ -69,11 +69,11 @@
   font-size: 12px;
 }
 
-.chip:hover { border-color: var(--accent, #ff6b2c); color: var(--accent, #ff6b2c); }
+.chip:hover { border-color: var(--accent, #0AAF9A); color: var(--accent, #0AAF9A); }
 
 .chipActive {
-  background: var(--accent, #ff6b2c);
-  border-color: var(--accent, #ff6b2c);
+  background: var(--accent, #0AAF9A);
+  border-color: var(--accent, #0AAF9A);
   color: #fff;
 }
 
@@ -156,7 +156,7 @@
   background: none;
   border: none;
   font-size: 12px;
-  color: var(--accent, #ff6b2c);
+  color: var(--accent, #0AAF9A);
   cursor: pointer;
   padding: 0;
 }

@@ -122,7 +122,7 @@ export default function NotificationCenter() {
               <List.Item.Meta
                 title={
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {!n.is_read && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#1677ff', display: 'inline-block' }} />}
+                    {!n.is_read && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#0AAF9A', display: 'inline-block' }} />}
                     <Tag color={priorityColor[n.priority]} style={{ margin: 0 }}>{typeLabel[n.type] ?? n.type}</Tag>
                     <Text style={{ fontSize: 13 }}>{n.title}</Text>
                   </div>

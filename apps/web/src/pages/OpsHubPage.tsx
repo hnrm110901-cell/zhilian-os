@@ -64,10 +64,10 @@ function deriveServiceData(healthScore: number | null): {
       1: Math.round(Math.max(0, 4 - score * 0.03)),
     },
     issues: [
-      { label: '等待时间过长', count: Math.round(Math.max(0, 8  - score * 0.06)), bg: '#fff1f0', color: '#f5222d' },
-      { label: '菜品出品慢',   count: Math.round(Math.max(0, 5  - score * 0.04)), bg: '#fff7e6', color: '#fa8c16' },
-      { label: '服务态度',     count: Math.round(Math.max(0, 3  - score * 0.02)), bg: '#fff7e6', color: '#fa8c16' },
-      { label: '环境卫生',     count: Math.round(Math.max(0, 2  - score * 0.01)), bg: '#f6ffed', color: '#52c41a' },
+      { label: '等待时间过长', count: Math.round(Math.max(0, 8  - score * 0.06)), bg: 'rgba(197,48,48,0.08)', color: '#C53030' },
+      { label: '菜品出品慢',   count: Math.round(Math.max(0, 5  - score * 0.04)), bg: 'rgba(200,146,58,0.08)', color: '#C8923A' },
+      { label: '服务态度',     count: Math.round(Math.max(0, 3  - score * 0.02)), bg: 'rgba(200,146,58,0.08)', color: '#C8923A' },
+      { label: '环境卫生',     count: Math.round(Math.max(0, 2  - score * 0.01)), bg: 'rgba(26,122,82,0.08)', color: '#1A7A52' },
     ].filter(i => i.count > 0),
   };
 }
@@ -113,9 +113,9 @@ function buildTasks(pending: number): TaskItem[] {
 }
 
 const PRIORITY_COLOR: Record<Priority, string> = {
-  critical: '#f5222d',
-  high:     '#fa8c16',
-  normal:   '#1890ff',
+  critical: '#C53030',
+  high:     '#C8923A',
+  normal:   '#0AAF9A',
 };
 
 const PRIORITY_LABEL: Record<Priority, string> = {
@@ -206,10 +206,10 @@ const OpsHubPage: React.FC = () => {
   }
 
   const shiftDefs = [
-    { key: '早班', label: '早班', time: '07:00–14:00', color: '#fa8c16' },
-    { key: '午班', label: '午班', time: '10:00–17:00', color: '#1890ff' },
+    { key: '早班', label: '早班', time: '07:00–14:00', color: '#C8923A' },
+    { key: '午班', label: '午班', time: '10:00–17:00', color: '#0AAF9A' },
     { key: '晚班', label: '晚班', time: '16:00–22:00', color: '#722ed1' },
-    { key: '全班', label: '全天', time: '09:00–21:00', color: '#52c41a' },
+    { key: '全班', label: '全天', time: '09:00–21:00', color: '#1A7A52' },
   ].filter(def => shiftGroups[def.key]?.length > 0)
    .slice(0, 4);
 
@@ -221,16 +221,16 @@ const OpsHubPage: React.FC = () => {
 
   // Queue status label
   const waitCount = kpi?.waiting_count ?? 0;
-  const queueStatus = waitCount > 10 ? { label: '高峰', color: '#f5222d' }
-                    : waitCount > 5  ? { label: '繁忙', color: '#fa8c16' }
-                    :                  { label: '正常', color: '#52c41a' };
+  const queueStatus = waitCount > 10 ? { label: '高峰', color: '#C53030' }
+                    : waitCount > 5  ? { label: '繁忙', color: '#C8923A' }
+                    :                  { label: '正常', color: '#1A7A52' };
 
   // Health color
-  const healthColor = (kpi?.health_level === 'excellent') ? '#52c41a'
+  const healthColor = (kpi?.health_level === 'excellent') ? '#1A7A52'
                     : (kpi?.health_level === 'good')       ? '#13c2c2'
                     : (kpi?.health_level === 'warning')    ? '#faad14'
-                    : (kpi?.health_level === 'critical')   ? '#f5222d'
-                    : '#1890ff';
+                    : (kpi?.health_level === 'critical')   ? '#C53030'
+                    : '#0AAF9A';
 
   // ── KPI strip ─────────────────────────────────────────────────────────────────
 
@@ -238,24 +238,24 @@ const OpsHubPage: React.FC = () => {
     {
       label: '今日在岗',
       value: totalStaff ?? '—', unit: '人',
-      iconBg: '#fff7e6', iconColor: '#fa8c16', icon: <TeamOutlined />,
+      iconBg: 'rgba(200,146,58,0.08)', iconColor: '#C8923A', icon: <TeamOutlined />,
     },
     {
       label: '当前排队',
       value: kpi?.waiting_count ?? 0, unit: '桌',
-      iconBg: waitCount > 5 ? '#fff1f0' : '#f6ffed',
-      iconColor: waitCount > 5 ? '#f5222d' : '#52c41a',
+      iconBg: waitCount > 5 ? 'rgba(197,48,48,0.08)' : 'rgba(26,122,82,0.08)',
+      iconColor: waitCount > 5 ? '#C53030' : '#1A7A52',
       icon: <ClockCircleOutlined />,
     },
     {
       label: '均等候时',
       value: kpi?.avg_wait_min ?? '—', unit: '分',
-      iconBg: '#e6f7ff', iconColor: '#1890ff', icon: <ClockCircleOutlined />,
+      iconBg: '#e6f7ff', iconColor: '#0AAF9A', icon: <ClockCircleOutlined />,
     },
     {
       label: '今日接待',
       value: kpi?.served_today ?? '—', unit: '桌',
-      iconBg: '#f6ffed', iconColor: '#52c41a', icon: <TeamOutlined />,
+      iconBg: 'rgba(26,122,82,0.08)', iconColor: '#1A7A52', icon: <TeamOutlined />,
     },
     {
       label: '健康指数',
@@ -341,11 +341,11 @@ const OpsHubPage: React.FC = () => {
 
             {/* ── 排班状态 ────────────────────────────────────────────────────── */}
             <ZCard
-              title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><ScheduleOutlined style={{ color: '#fa8c16' }} /><span>今日排班状态</span></div>}
+              title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><ScheduleOutlined style={{ color: '#C8923A' }} /><span>今日排班状态</span></div>}
               extra={
                 <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                   {totalStaff != null && (
-                    <strong style={{ color: '#fa8c16', fontSize: 15 }}>{totalStaff} 人</strong>
+                    <strong style={{ color: '#C8923A', fontSize: 15 }}>{totalStaff} 人</strong>
                   )}
                   <ZButton variant="ghost" size="sm" onClick={() => navigate('/schedule')}>
                     排班管理 <ArrowRightOutlined />
@@ -373,8 +373,8 @@ const OpsHubPage: React.FC = () => {
               ) : (
                 <div className={styles.shiftRows}>
                   {[
-                    { label: '早班', time: '07:00–14:00', color: '#fa8c16', count: Math.round((totalStaff ?? 8) * 0.3) },
-                    { label: '午班', time: '10:00–17:00', color: '#1890ff', count: Math.round((totalStaff ?? 8) * 0.4) },
+                    { label: '早班', time: '07:00–14:00', color: '#C8923A', count: Math.round((totalStaff ?? 8) * 0.3) },
+                    { label: '午班', time: '10:00–17:00', color: '#0AAF9A', count: Math.round((totalStaff ?? 8) * 0.4) },
                     { label: '晚班', time: '16:00–22:00', color: '#722ed1', count: Math.round((totalStaff ?? 8) * 0.3) },
                   ].map(def => (
                     <div key={def.label} className={styles.shiftRow}>
@@ -398,7 +398,7 @@ const OpsHubPage: React.FC = () => {
                   <div className={styles.staffList}>
                     {allShifts.slice(0, 8).map((s: any, i: number) => (
                       <div key={i} className={styles.staffRow}>
-                        <div className={styles.staffDot} style={{ background: '#52c41a' }} />
+                        <div className={styles.staffDot} style={{ background: '#1A7A52' }} />
                         <span className={styles.staffName}>{s.employee_id || `员工${i + 1}`}</span>
                         <span className={styles.staffPosition}>{s.position || s.shift_type}</span>
                       </div>
@@ -410,7 +410,7 @@ const OpsHubPage: React.FC = () => {
 
             {/* ── 排队实况 ────────────────────────────────────────────────────── */}
             <ZCard
-              title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><UnorderedListOutlined style={{ color: '#1890ff' }} /><span>排队实况</span></div>}
+              title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><UnorderedListOutlined style={{ color: '#0AAF9A' }} /><span>排队实况</span></div>}
               extra={
                 <ZButton variant="ghost" size="sm" onClick={() => navigate('/queue')}>
                   排队管理 <ArrowRightOutlined />
@@ -438,13 +438,13 @@ const OpsHubPage: React.FC = () => {
                   <span className={styles.queueStatLabel}>均等候(分)</span>
                 </div>
                 <div className={styles.queueStatItem}>
-                  <span className={styles.queueStatValue} style={{ color: '#52c41a' }}>
+                  <span className={styles.queueStatValue} style={{ color: '#1A7A52' }}>
                     {kpi?.served_today ?? '—'}
                   </span>
                   <span className={styles.queueStatLabel}>今日接待</span>
                 </div>
                 <div className={styles.queueStatItem}>
-                  <span className={styles.queueStatValue} style={{ color: '#1890ff' }} title="翻台率（参考值）">
+                  <span className={styles.queueStatValue} style={{ color: '#0AAF9A' }} title="翻台率（参考值）">
                     {kpi?.served_today
                       ? (Math.min(kpi.served_today / 40, 4.0)).toFixed(1)
                       : '—'}
@@ -466,7 +466,7 @@ const OpsHubPage: React.FC = () => {
               {/* Rating header */}
               <div className={styles.ratingHeader}>
                 <span className={styles.ratingBig} style={{
-                  color: svc.avg >= 4.5 ? '#52c41a' : svc.avg >= 4.0 ? '#faad14' : '#f5222d',
+                  color: svc.avg >= 4.5 ? '#1A7A52' : svc.avg >= 4.0 ? '#faad14' : '#C53030',
                 }}>
                   {svc.avg.toFixed(1)}
                 </span>
@@ -489,7 +489,7 @@ const OpsHubPage: React.FC = () => {
                           className={styles.ratingBarFill}
                           style={{
                             width: `${pct}%`,
-                            background: star >= 4 ? '#52c41a' : star === 3 ? '#faad14' : '#f5222d',
+                            background: star >= 4 ? '#1A7A52' : star === 3 ? '#faad14' : '#C53030',
                           }}
                         />
                       </div>
@@ -524,7 +524,7 @@ const OpsHubPage: React.FC = () => {
           <ZCard
             title={
               <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                <FileTextOutlined style={{ color: '#1890ff' }} />
+                <FileTextOutlined style={{ color: '#0AAF9A' }} />
                 <span>今日任务清单</span>
                 {tasks.filter(t => t.priority === 'critical').length > 0 && (
                   <ZBadge type="critical" text={`${tasks.filter(t => t.priority === 'critical').length} 项紧急`} />
@@ -582,7 +582,7 @@ const OpsHubPage: React.FC = () => {
                   className={styles.quickNavItem}
                   onClick={() => navigate(item.route)}
                 >
-                  <span className={styles.quickNavIcon} style={{ color: '#1890ff' }}>
+                  <span className={styles.quickNavIcon} style={{ color: '#0AAF9A' }}>
                     {item.icon}
                   </span>
                   <span className={styles.quickNavLabel}>{item.label}</span>

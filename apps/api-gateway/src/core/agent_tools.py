@@ -1,7 +1,7 @@
 """
 Claude Tool Use 工具注册表
 
-为智链OS每个Agent定义标准化工具集（Claude Tool Use JSON Schema格式）。
+为屯象OS每个Agent定义标准化工具集（Claude Tool Use JSON Schema格式）。
 工具执行路由器负责将 Claude 的 tool_use 请求分发到对应的业务服务。
 
 使用方式：

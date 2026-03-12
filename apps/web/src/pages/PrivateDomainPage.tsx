@@ -154,7 +154,7 @@ const PrivateDomainPage: React.FC = () => {
       type: 'pie', radius: ['40%', '70%'],
       data: Object.entries(rfmDist).map(([k, v]) => ({
         name: `${k} ${rfmLabel[k] || k}`, value: v,
-        itemStyle: { color: { S1: '#faad14', S2: '#1890ff', S3: '#fa8c16', S4: '#ff4d4f', S5: '#cf1322' }[k as string] || '#999' },
+        itemStyle: { color: { S1: '#faad14', S2: '#0AAF9A', S3: '#C8923A', S4: '#C53030', S5: '#cf1322' }[k as string] || '#999' },
       })),
     }],
   };
@@ -168,8 +168,8 @@ const PrivateDomainPage: React.FC = () => {
       { type: 'value', name: '比率%', min: 0, max: 100 },
     ],
     series: [
-      { name: '新增会员', type: 'bar', data: trendData.map(d => d.new_members), itemStyle: { color: '#1890ff' } },
-      { name: '复购率%', type: 'line', yAxisIndex: 1, data: trendData.map(d => +(d.repurchase_rate * 100).toFixed(1)), smooth: true, itemStyle: { color: '#52c41a' } },
+      { name: '新增会员', type: 'bar', data: trendData.map(d => d.new_members), itemStyle: { color: '#0AAF9A' } },
+      { name: '复购率%', type: 'line', yAxisIndex: 1, data: trendData.map(d => +(d.repurchase_rate * 100).toFixed(1)), smooth: true, itemStyle: { color: '#1A7A52' } },
       { name: '旅程完成率%', type: 'line', yAxisIndex: 1, data: trendData.map(d => +(d.journey_completion * 100).toFixed(1)), smooth: true, itemStyle: { color: '#faad14' } },
     ],
   };
@@ -200,8 +200,8 @@ const PrivateDomainPage: React.FC = () => {
     {
       title: '状态', dataIndex: 'action_taken', key: 'action_taken', width: 80,
       render: (v: string) => v
-        ? <Tooltip title={v}><CheckCircleOutlined style={{ color: '#52c41a' }} /></Tooltip>
-        : <CloseCircleOutlined style={{ color: '#ff4d4f' }} />,
+        ? <Tooltip title={v}><CheckCircleOutlined style={{ color: '#1A7A52' }} /></Tooltip>
+        : <CloseCircleOutlined style={{ color: '#C53030' }} />,
     },
     {
       title: '操作', key: 'op', width: 90,
@@ -255,7 +255,7 @@ const PrivateDomainPage: React.FC = () => {
               </Space>
             </Card>
             <Card title="本月ROI估算" size="small">
-              <Statistic value={dashboard?.roi_estimate ?? '--'} suffix=":1" prefix="≈" valueStyle={{ color: '#52c41a', fontSize: 32 }} />
+              <Statistic value={dashboard?.roi_estimate ?? '--'} suffix=":1" prefix="≈" valueStyle={{ color: '#1A7A52', fontSize: 32 }} />
               <div style={{ color: '#999', fontSize: 12 }}>目标 ≥ 8:1，签约承诺 ≥ 8:1 否则退费</div>
             </Card>
           </Col>
@@ -395,11 +395,11 @@ const PrivateDomainPage: React.FC = () => {
 
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col span={4}><Card size="small"><Statistic title="私域会员" value={dashboard?.total_members ?? '--'} prefix={<UserOutlined />} /></Card></Col>
-        <Col span={4}><Card size="small"><Statistic title="活跃会员" value={dashboard?.active_members ?? '--'} valueStyle={{ color: '#52c41a' }} /></Card></Col>
+        <Col span={4}><Card size="small"><Statistic title="活跃会员" value={dashboard?.active_members ?? '--'} valueStyle={{ color: '#1A7A52' }} /></Card></Col>
         <Col span={4}><Card size="small"><Statistic title="月复购率" value={((dashboard?.monthly_repurchase_rate || 0) * 100).toFixed(1)} suffix="%" /></Card></Col>
-        <Col span={4}><Card size="small"><Statistic title="流失预警" value={dashboard?.churn_risk_count ?? '--'} valueStyle={{ color: '#fa8c16' }} /></Card></Col>
-        <Col span={4}><Card size="small"><Statistic title="待处理信号" value={dashboard?.pending_signals ?? '--'} valueStyle={{ color: '#ff4d4f' }} /></Card></Col>
-        <Col span={4}><Card size="small"><Statistic title="运行中旅程" value={dashboard?.running_journeys ?? '--'} valueStyle={{ color: '#1890ff' }} /></Card></Col>
+        <Col span={4}><Card size="small"><Statistic title="流失预警" value={dashboard?.churn_risk_count ?? '--'} valueStyle={{ color: '#C8923A' }} /></Card></Col>
+        <Col span={4}><Card size="small"><Statistic title="待处理信号" value={dashboard?.pending_signals ?? '--'} valueStyle={{ color: '#C53030' }} /></Card></Col>
+        <Col span={4}><Card size="small"><Statistic title="运行中旅程" value={dashboard?.running_journeys ?? '--'} valueStyle={{ color: '#0AAF9A' }} /></Card></Col>
       </Row>
 
       <Card><Tabs items={tabItems} activeKey={activeTab} onChange={setActiveTab} /></Card>

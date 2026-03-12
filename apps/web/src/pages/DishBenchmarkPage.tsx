@@ -22,9 +22,9 @@ const { Option } = Select;
 // ── 配置 ──────────────────────────────────────────────────────────────────────
 const TIER_CONFIG: Record<string, { label: string; color: string; antColor: string; cls: string }> = {
   top:        { label: '标杆',   color: '#389e0d', antColor: 'success', cls: styles.tierTop },
-  above_avg:  { label: '良好',   color: '#1677ff', antColor: 'processing', cls: styles.tierAboveAvg },
-  below_avg:  { label: '待改进', color: '#fa8c16', antColor: 'warning', cls: styles.tierBelowAvg },
-  laggard:    { label: '落后',   color: '#ff4d4f', antColor: 'error', cls: styles.tierLaggard },
+  above_avg:  { label: '良好',   color: '#0AAF9A', antColor: 'processing', cls: styles.tierAboveAvg },
+  below_avg:  { label: '待改进', color: '#C8923A', antColor: 'warning', cls: styles.tierBelowAvg },
+  laggard:    { label: '落后',   color: '#C53030', antColor: 'error', cls: styles.tierLaggard },
 };
 
 // ── 类型 ──────────────────────────────────────────────────────────────────────
@@ -223,17 +223,17 @@ const DishBenchmarkPage: React.FC = () => {
       {
         name: '落后菜品数', type: 'bar',
         data: trend.map(t => t.laggard_count),
-        itemStyle: { color: '#ff4d4f' },
+        itemStyle: { color: '#C53030' },
       },
       {
         name: '标杆菜品数', type: 'bar',
         data: trend.map(t => t.top_count),
-        itemStyle: { color: '#52c41a' },
+        itemStyle: { color: '#1A7A52' },
       },
       {
         name: '平均FCR差距pp', type: 'line', smooth: true, yAxisIndex: 1,
         data: trend.map(t => t.avg_fcr_gap.toFixed(1)),
-        itemStyle: { color: '#fa8c16' },
+        itemStyle: { color: '#C8923A' },
         lineStyle: { type: 'dashed' },
       },
     ],
@@ -295,14 +295,14 @@ const DishBenchmarkPage: React.FC = () => {
     {
       title: 'FCR差距', dataIndex: 'fcr_gap_pp', width: 85,
       render: (v: number) => v > 0
-        ? <Text style={{ color: '#ff4d4f' }}>+{v.toFixed(1)}pp</Text>
+        ? <Text style={{ color: '#C53030' }}>+{v.toFixed(1)}pp</Text>
         : <Text style={{ color: '#389e0d' }}>-</Text>,
       sorter: (a: BenchRecord, b: BenchRecord) => b.fcr_gap_pp - a.fcr_gap_pp,
     },
     {
       title: 'FCR¥潜力', dataIndex: 'fcr_gap_yuan_impact', width: 95,
       render: (v: number) => v > 0
-        ? <Text style={{ color: '#ff4d4f' }}>{fmt(v)}</Text>
+        ? <Text style={{ color: '#C53030' }}>{fmt(v)}</Text>
         : <Text type="secondary">-</Text>,
       sorter: (a: BenchRecord, b: BenchRecord) =>
         b.fcr_gap_yuan_impact - a.fcr_gap_yuan_impact,
@@ -315,7 +315,7 @@ const DishBenchmarkPage: React.FC = () => {
     {
       title: 'GPM差距', dataIndex: 'gpm_gap_pp', width: 85,
       render: (v: number) => v > 0
-        ? <Text style={{ color: '#fa8c16' }}>-{v.toFixed(1)}pp</Text>
+        ? <Text style={{ color: '#C8923A' }}>-{v.toFixed(1)}pp</Text>
         : <Text style={{ color: '#389e0d' }}>-</Text>,
     },
     {
@@ -346,7 +346,7 @@ const DishBenchmarkPage: React.FC = () => {
     {
       title: 'FCR¥潜力', dataIndex: 'fcr_gap_yuan_impact',
       render: (v: number) => v > 0
-        ? <Text style={{ color: '#ff4d4f' }}>{fmt(v)}</Text>
+        ? <Text style={{ color: '#C53030' }}>{fmt(v)}</Text>
         : <Text type="secondary" style={{ color: '#389e0d' }}>最优</Text>,
     },
     {
@@ -400,19 +400,19 @@ const DishBenchmarkPage: React.FC = () => {
         <Col xs={12} sm={6}>
           <Card size="small">
             <Statistic title="落后档菜品" value={laggardCount} suffix="道"
-              prefix={<WarningOutlined />} valueStyle={{ color: '#ff4d4f' }} />
+              prefix={<WarningOutlined />} valueStyle={{ color: '#C53030' }} />
           </Card>
         </Col>
         <Col xs={12} sm={6}>
           <Card size="small">
             <Statistic title="FCR¥改进潜力" value={fcrPotential.toFixed(0)}
-              prefix="¥" valueStyle={{ color: '#ff4d4f' }} />
+              prefix="¥" valueStyle={{ color: '#C53030' }} />
           </Card>
         </Col>
         <Col xs={12} sm={6}>
           <Card size="small">
             <Statistic title="GPM¥改进潜力" value={gpmPotential.toFixed(0)}
-              prefix="¥" valueStyle={{ color: '#fa8c16' }} />
+              prefix="¥" valueStyle={{ color: '#C8923A' }} />
           </Card>
         </Col>
       </Row>

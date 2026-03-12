@@ -76,7 +76,7 @@ const QualityManagementPage: React.FC = () => {
     {
       title: '评分', dataIndex: 'score', key: 'score',
       render: (v: number) => (
-        <span style={{ color: v >= 80 ? '#52c41a' : v >= 60 ? '#fa8c16' : '#ff4d4f', fontWeight: 600 }}>
+        <span style={{ color: v >= 80 ? '#1A7A52' : v >= 60 ? '#C8923A' : '#C53030', fontWeight: 600 }}>
           {v ?? '--'}
         </span>
       ),
@@ -95,10 +95,10 @@ const QualityManagementPage: React.FC = () => {
       key: 'summary', label: '质检汇总',
       children: (
         <Row gutter={16}>
-          <Col span={6}><Card size="small"><Statistic title="合格率" value={((summary?.pass_rate || 0) * 100).toFixed(1)} suffix="%" valueStyle={{ color: '#52c41a' }} /></Card></Col>
+          <Col span={6}><Card size="small"><Statistic title="合格率" value={((summary?.pass_rate || 0) * 100).toFixed(1)} suffix="%" valueStyle={{ color: '#1A7A52' }} /></Card></Col>
           <Col span={6}><Card size="small"><Statistic title="平均评分" value={summary?.avg_score?.toFixed(1) ?? '--'} /></Card></Col>
           <Col span={6}><Card size="small"><Statistic title="总质检次数" value={summary?.total_inspections ?? inspections.length} /></Card></Col>
-          <Col span={6}><Card size="small"><Statistic title="不合格次数" value={summary?.fail_count ?? '--'} valueStyle={{ color: '#ff4d4f' }} /></Card></Col>
+          <Col span={6}><Card size="small"><Statistic title="不合格次数" value={summary?.fail_count ?? '--'} valueStyle={{ color: '#C53030' }} /></Card></Col>
         </Row>
       ),
     },

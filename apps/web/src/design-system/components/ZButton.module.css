@@ -25,15 +25,15 @@
 .primary {
   background: var(--accent);
   color: #fff;
-  box-shadow: 0 2px 8px rgba(255,107,44,0.3);
+  box-shadow: 0 2px 8px rgba(10,175,154,0.3);
 }
-.primary:not(:disabled):hover { box-shadow: 0 4px 16px rgba(255,107,44,0.4); }
+.primary:not(:disabled):hover { box-shadow: 0 4px 16px rgba(10,175,154,0.4); }
 
 .secondary {
   background: var(--accent-soft);
   color: var(--accent);
 }
-.secondary:not(:disabled):hover { background: rgba(255,107,44,0.14); }
+.secondary:not(:disabled):hover { background: rgba(10,175,154,0.14); }
 
 .ghost {
   background: transparent;
@@ -43,7 +43,7 @@
 .ghost:not(:disabled):hover { background: var(--surface-hover); color: var(--text-primary); }
 
 .danger {
-  background: rgba(255,59,48,0.1);
+  background: rgba(197,48,48,0.1);
   color: var(--red);
 }
-.danger:not(:disabled):hover { background: rgba(255,59,48,0.18); }
+.danger:not(:disabled):hover { background: rgba(197,48,48,0.18); }

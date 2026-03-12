@@ -1,0 +1,61 @@
+.card {
+  background: linear-gradient(135deg, rgba(10,175,154,0.05) 0%, rgba(10,175,154,0.02) 100%);
+  border-left: 3px solid #0AAF9A;
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+[data-theme='dark'] .card {
+  background: linear-gradient(135deg, rgba(10,175,154,0.12) 0%, rgba(10,175,154,0.04) 100%);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(10,175,154,0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.confidenceDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.high   .confidenceDot { background: var(--green); }
+.medium .confidenceDot { background: #C8923A; }
+.low    .confidenceDot { background: var(--text-tertiary); }
+
+.body {
+  font-size: 14px;
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}

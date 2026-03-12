@@ -35,18 +35,18 @@ const QUADRANT_CONFIG: Record<string, {
     action: 'promote', actionLabel: '重点推广', icon: '⭐',
   },
   cash_cow: {
-    label: '现金牛菜', color: '#389e0d', bgColor: '#f6ffed',
-    borderColor: '#52c41a', rowClass: styles.rowCashCow,
+    label: '现金牛菜', color: '#389e0d', bgColor: 'rgba(26,122,82,0.08)',
+    borderColor: '#1A7A52', rowClass: styles.rowCashCow,
     action: 'maintain', actionLabel: '稳定维护', icon: '🐄',
   },
   question_mark: {
     label: '问题菜', color: '#0958d9', bgColor: '#e6f4ff',
-    borderColor: '#1677ff', rowClass: styles.rowQuestionMark,
+    borderColor: '#0AAF9A', rowClass: styles.rowQuestionMark,
     action: 'develop', actionLabel: '挖掘潜力', icon: '❓',
   },
   dog: {
     label: '瘦狗菜', color: '#cf1322', bgColor: '#fff2f0',
-    borderColor: '#ff4d4f', rowClass: styles.rowDog,
+    borderColor: '#C53030', rowClass: styles.rowDog,
     action: 'retire', actionLabel: '考虑退出', icon: '🐕',
   },
 };
@@ -137,8 +137,8 @@ function MatrixScatter({ storeId, period }: { storeId: string; period: string })
     });
 
     const colors: Record<string, string> = {
-      star: '#faad14', cash_cow: '#52c41a',
-      question_mark: '#1677ff', dog: '#ff4d4f',
+      star: '#faad14', cash_cow: '#1A7A52',
+      question_mark: '#0AAF9A', dog: '#C53030',
     };
 
     return {
@@ -186,13 +186,13 @@ function MatrixScatter({ storeId, period }: { storeId: string; period: string })
     { title: '增长百分位', dataIndex: 'growth_percentile', width: 95, sorter: (a, b) => a.growth_percentile - b.growth_percentile,
       render: v => `${v}%` },
     { title: '增长率', dataIndex: 'revenue_delta_pct', width: 80,
-      render: v => v == null ? '-' : <span style={{ color: v >= 0 ? '#52c41a' : '#ff4d4f' }}>{v >= 0 ? '+' : ''}{v}%</span> },
+      render: v => v == null ? '-' : <span style={{ color: v >= 0 ? '#1A7A52' : '#C53030' }}>{v >= 0 ? '+' : ''}{v}%</span> },
     { title: '当期营收', dataIndex: 'revenue_yuan', width: 100, sorter: (a, b) => a.revenue_yuan - b.revenue_yuan,
       render: v => fmtYuan(v) },
     { title: '菜单占比', dataIndex: 'menu_contribution_pct', width: 85,
       render: v => v == null ? '-' : `${v}%` },
     { title: '预期影响', dataIndex: 'expected_impact_yuan', width: 100, sorter: (a, b) => a.expected_impact_yuan - b.expected_impact_yuan,
-      render: v => <span style={{ color: '#1677ff', fontWeight: 600 }}>{fmtYuan(v)}</span> },
+      render: v => <span style={{ color: '#0AAF9A', fontWeight: 600 }}>{fmtYuan(v)}</span> },
   ];
 
   return (
@@ -339,7 +339,7 @@ function SummaryTab({ storeId, period }: { storeId: string; period: string }) {
               <Card size="small">
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ color: '#8c8c8c', fontSize: 13 }}>总营收</div>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: '#52c41a' }}>{fmtYuan(data.total_revenue)}</div>
+                  <div style={{ fontSize: 24, fontWeight: 700, color: '#1A7A52' }}>{fmtYuan(data.total_revenue)}</div>
                 </div>
               </Card>
             </Col>
@@ -347,7 +347,7 @@ function SummaryTab({ storeId, period }: { storeId: string; period: string }) {
               <Card size="small">
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ color: '#8c8c8c', fontSize: 13 }}>优化预期影响</div>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: '#1677ff' }}>{fmtYuan(data.total_expected_impact)}</div>
+                  <div style={{ fontSize: 24, fontWeight: 700, color: '#0AAF9A' }}>{fmtYuan(data.total_expected_impact)}</div>
                 </div>
               </Card>
             </Col>
@@ -380,7 +380,7 @@ function SummaryTab({ storeId, period }: { storeId: string; period: string }) {
                 { title: '营收百分位均值', dataIndex: 'avg_rev_pct', render: v => `${v}%` },
                 { title: '增长百分位均值', dataIndex: 'avg_grow_pct', render: v => `${v}%` },
                 { title: '优化预期影响', dataIndex: 'total_impact',
-                  render: v => <span style={{ color: '#1677ff', fontWeight: 600 }}>{fmtYuan(v)}</span> },
+                  render: v => <span style={{ color: '#0AAF9A', fontWeight: 600 }}>{fmtYuan(v)}</span> },
                 { title: '高优先级菜品', dataIndex: 'high_priority_dishes', width: 110,
                   render: v => <span className={styles.prioHigh}>{v} 道</span> },
               ]}
@@ -440,9 +440,9 @@ function ActionsTab({ storeId, period }: { storeId: string; period: string }) {
       render: v => <span className={PRIORITY_CLASS[v] ?? ''}>{PRIORITY_LABELS[v] ?? v}</span> },
     { title: '营收', dataIndex: 'revenue_yuan', render: v => fmtYuan(v) },
     { title: '增长率', dataIndex: 'revenue_delta_pct',
-      render: v => v == null ? '-' : <span style={{ color: v >= 0 ? '#52c41a' : '#ff4d4f' }}>{v >= 0 ? '+' : ''}{v}%</span> },
+      render: v => v == null ? '-' : <span style={{ color: v >= 0 ? '#1A7A52' : '#C53030' }}>{v >= 0 ? '+' : ''}{v}%</span> },
     { title: '预期影响', dataIndex: 'expected_impact_yuan',
-      render: v => <span style={{ color: '#1677ff', fontWeight: 600 }}>{fmtYuan(v)}</span> },
+      render: v => <span style={{ color: '#0AAF9A', fontWeight: 600 }}>{fmtYuan(v)}</span> },
   ];
 
   const totalImpact = Object.values(actionData).flat()
@@ -453,7 +453,7 @@ function ActionsTab({ storeId, period }: { storeId: string; period: string }) {
       <div className={styles.controlBar}>
         <Button type="primary" icon={<StarOutlined />} onClick={load} loading={loading}>加载行动榜</Button>
         {Object.keys(actionData).length > 0 && (
-          <span style={{ color: '#1677ff', fontWeight: 600 }}>
+          <span style={{ color: '#0AAF9A', fontWeight: 600 }}>
             全部行动预期影响合计：{fmtYuan(totalImpact)}
           </span>
         )}
@@ -553,12 +553,12 @@ function DishHistory({ storeId }: { storeId: string }) {
       type: 'line', smooth: true,
       data: [...rows].reverse().map(r => quadrantOrder[r.matrix_quadrant] ?? 0),
       markPoint: { data: [{ type: 'max', name: '最高' }, { type: 'min', name: '最低' }] },
-      lineStyle: { color: '#1677ff', width: 2 },
+      lineStyle: { color: '#0AAF9A', width: 2 },
       areaStyle: { color: 'rgba(22,119,255,0.08)' },
       symbol: 'circle', symbolSize: 8,
       itemStyle: { color: (p: { dataIndex: number }) => {
         const q = [...rows].reverse()[p.dataIndex]?.matrix_quadrant;
-        return QUADRANT_CONFIG[q]?.borderColor ?? '#1677ff';
+        return QUADRANT_CONFIG[q]?.borderColor ?? '#0AAF9A';
       } },
     }],
     grid: { top: 20, bottom: 40 },
@@ -596,11 +596,11 @@ function DishHistory({ storeId }: { storeId: string }) {
                 render: v => <span className={PRIORITY_CLASS[v] ?? ''}>{PRIORITY_LABELS[v] ?? v}</span> },
               { title: '营收', dataIndex: 'revenue_yuan', render: v => fmtYuan(v) },
               { title: '增长率', dataIndex: 'revenue_delta_pct',
-                render: v => v == null ? '-' : <span style={{ color: v >= 0 ? '#52c41a' : '#ff4d4f' }}>{v >= 0 ? '+' : ''}{v}%</span> },
+                render: v => v == null ? '-' : <span style={{ color: v >= 0 ? '#1A7A52' : '#C53030' }}>{v >= 0 ? '+' : ''}{v}%</span> },
               { title: '营收百分位', dataIndex: 'revenue_percentile', render: v => `${v}%` },
               { title: '增长百分位', dataIndex: 'growth_percentile', render: v => `${v}%` },
               { title: '预期影响', dataIndex: 'expected_impact_yuan',
-                render: v => <span style={{ color: '#1677ff' }}>{fmtYuan(v)}</span> },
+                render: v => <span style={{ color: '#0AAF9A' }}>{fmtYuan(v)}</span> },
             ]}
           />
         </>

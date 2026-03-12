@@ -66,7 +66,7 @@ const OrderAnalyticsPage: React.FC = () => {
         name: '订单数',
         type: 'bar',
         data: trendPoints.map((d: any) => d.orders),
-        itemStyle: { color: '#1890ff' },
+        itemStyle: { color: '#0AAF9A' },
       },
       {
         name: '营收(元)',
@@ -74,7 +74,7 @@ const OrderAnalyticsPage: React.FC = () => {
         yAxisIndex: 1,
         data: trendPoints.map((d: any) => d.revenue.toFixed(0)),
         smooth: true,
-        itemStyle: { color: '#52c41a' },
+        itemStyle: { color: '#1A7A52' },
       },
     ],
   };
@@ -86,7 +86,7 @@ const OrderAnalyticsPage: React.FC = () => {
     series: [{
       type: 'bar',
       data: menuItems.slice(0, 10).map((d: any) => d.quantity).reverse(),
-      itemStyle: { color: '#fa8c16' },
+      itemStyle: { color: '#C8923A' },
       label: { show: true, position: 'right' },
     }],
   };
@@ -144,7 +144,7 @@ const OrderAnalyticsPage: React.FC = () => {
               <Statistic
                 title="高峰时段"
                 value={peakHour || '--'}
-                prefix={<FireOutlined style={{ color: '#ff4d4f' }} />}
+                prefix={<FireOutlined style={{ color: '#C53030' }} />}
               />
             </Card>
           </Col>

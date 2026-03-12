@@ -298,7 +298,7 @@ const DataSecurityPage: React.FC = () => {
             <Statistic
               title="当前激活版本"
               value={activeKey ? `v${activeKey.key_version}` : '未创建'}
-              valueStyle={{ color: activeKey ? '#52c41a' : '#faad14' }}
+              valueStyle={{ color: activeKey ? '#1A7A52' : '#faad14' }}
             />
           </Card>
         </Col>
@@ -313,7 +313,7 @@ const DataSecurityPage: React.FC = () => {
               title="加密覆盖率"
               value={coverage?.coverage_pct ?? 0}
               suffix="%"
-              valueStyle={{ color: (coverage?.coverage_pct ?? 0) >= 100 ? '#52c41a' : '#faad14' }}
+              valueStyle={{ color: (coverage?.coverage_pct ?? 0) >= 100 ? '#1A7A52' : '#faad14' }}
             />
           </Card>
         </Col>
@@ -381,7 +381,7 @@ const DataSecurityPage: React.FC = () => {
           size="small"
           rowClassName={(rec) => rec.is_active ? 'ant-table-row-selected' : ''}
           onRow={(rec) => ({
-            style: rec.is_active ? { background: '#f6ffed' } : {},
+            style: rec.is_active ? { background: 'rgba(26,122,82,0.08)' } : {},
           })}
         />
       </Card>
@@ -403,7 +403,7 @@ const DataSecurityPage: React.FC = () => {
                 <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}>覆盖率</div>
                 <Progress
                   percent={coverage.coverage_pct}
-                  strokeColor={coverage.coverage_pct >= 100 ? '#52c41a' : '#faad14'}
+                  strokeColor={coverage.coverage_pct >= 100 ? '#1A7A52' : '#faad14'}
                   format={(pct) => `${pct}%`}
                 />
               </Col>
@@ -428,8 +428,8 @@ const DataSecurityPage: React.FC = () => {
       <Modal
         title={
           <Space>
-            <WarningOutlined style={{ color: '#f5222d' }} />
-            <span style={{ color: '#f5222d' }}>危险操作：吊销密钥</span>
+            <WarningOutlined style={{ color: '#C53030' }} />
+            <span style={{ color: '#C53030' }}>危险操作：吊销密钥</span>
           </Space>
         }
         open={revokeModalVisible}

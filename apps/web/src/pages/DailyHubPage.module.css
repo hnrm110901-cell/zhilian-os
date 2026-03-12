@@ -81,7 +81,7 @@
   border: none;
   padding: 0;
   font-size: 12px;
-  color: #1890ff;
+  color: #0AAF9A;
   cursor: pointer;
   font-family: inherit;
   height: auto;
@@ -208,26 +208,26 @@
 }
 
 .phaseBtn:hover {
-  border-color: #1890ff;
-  color: #1890ff;
+  border-color: #0AAF9A;
+  color: #0AAF9A;
   background: #e6f7ff;
 }
 
 .phaseBtnCurrent {
-  border-color: #52c41a !important;
-  background: #f6ffed !important;
+  border-color: #1A7A52 !important;
+  background: rgba(26,122,82,0.08) !important;
   color: #389e0d !important;
 }
 
 .phaseBtnSelected {
-  border-color: #1890ff;
-  color: #1890ff;
+  border-color: #0AAF9A;
+  color: #0AAF9A;
   background: #e6f7ff;
 }
 
 .phaseBtnCurrent.phaseBtnSelected {
-  border-color: #52c41a;
-  background: #52c41a;
+  border-color: #1A7A52;
+  background: #1A7A52;
   color: #fff;
 }
 

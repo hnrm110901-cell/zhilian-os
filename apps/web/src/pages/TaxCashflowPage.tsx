@@ -299,20 +299,20 @@ const TaxCashflowPage: React.FC = () => {
           name: '余额',
           type: 'line',
           data: cashflows.map(f => f.balance_yuan),
-          lineStyle: { color: '#FF6B2C', width: 2 },
-          itemStyle: { color: '#FF6B2C' },
+          lineStyle: { color: '#0AAF9A', width: 2 },
+          itemStyle: { color: '#0AAF9A' },
           symbolSize: 0,
           areaStyle: {
             color: {
               type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
               colorStops: [
-                { offset: 0, color: 'rgba(255, 107, 44, 0.15)' },
-                { offset: 1, color: 'rgba(255, 107, 44, 0)' },
+                { offset: 0, color: 'rgba(10, 175, 154, 0.15)' },
+                { offset: 1, color: 'rgba(10, 175, 154, 0)' },
               ],
             },
           },
           markLine: {
-            data: [{ yAxis: 0, lineStyle: { color: '#f5222d', width: 1.5, type: 'dashed' } }],
+            data: [{ yAxis: 0, lineStyle: { color: '#C53030', width: 1.5, type: 'dashed' } }],
             label: { formatter: '零线' },
           },
         },

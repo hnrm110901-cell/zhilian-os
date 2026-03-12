@@ -430,7 +430,7 @@
 
 .quickNavItem:hover {
   background: #f0f7ff;
-  border-color: #1890ff;
+  border-color: #0AAF9A;
   box-shadow: 0 2px 8px rgba(24, 144, 255, 0.1);
 }
 
@@ -448,7 +448,7 @@
 
 .quickNavBadge {
   font-size: 10px;
-  background: #f5222d;
+  background: #C53030;
   color: #fff;
   border-radius: 8px;
   padding: 0 5px;

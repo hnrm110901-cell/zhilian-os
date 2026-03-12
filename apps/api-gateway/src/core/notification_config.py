@@ -12,7 +12,7 @@ class EmailConfig(BaseSettings):
     SMTP_PORT: int = 587
     SMTP_USER: str = "noreply@example.com"
     SMTP_PASSWORD: str = ""
-    SMTP_FROM_NAME: str = "智链OS"
+    SMTP_FROM_NAME: str = "屯象OS"
     SMTP_USE_TLS: bool = True
     SMTP_TIMEOUT: int = 30
 
@@ -24,14 +24,14 @@ class SMSConfig(BaseSettings):
     # 阿里云短信
     ALIYUN_ACCESS_KEY_ID: str = ""
     ALIYUN_ACCESS_KEY_SECRET: str = ""
-    ALIYUN_SMS_SIGN_NAME: str = "智链OS"
+    ALIYUN_SMS_SIGN_NAME: str = "屯象OS"
     ALIYUN_SMS_REGION: str = "cn-hangzhou"
 
     # 腾讯云短信
     TENCENT_SECRET_ID: str = ""
     TENCENT_SECRET_KEY: str = ""
     TENCENT_SMS_APP_ID: str = ""
-    TENCENT_SMS_SIGN: str = "智链OS"
+    TENCENT_SMS_SIGN: str = "屯象OS"
 
     # 使用的SMS提供商: aliyun, tencent
     SMS_PROVIDER: str = "aliyun"

@@ -62,8 +62,8 @@
 }
 
 .alert_ok {
-  background: #f6ffed;
-  border-color: #b7eb8f;
+  background: rgba(26,122,82,0.08);
+  border-color: rgba(26,122,82,0.3);
   color: #389e0d;
 }
 

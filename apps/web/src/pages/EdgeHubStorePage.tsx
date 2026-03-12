@@ -51,11 +51,11 @@ interface AlertItem {
 // ── 常量 ──────────────────────────────────────────────────────────────────────
 
 const STATUS_COLOR: Record<string, string> = {
-  online:   '#52c41a',
-  offline:  '#ff4d4f',
-  degraded: '#fa8c16',
-  upgrading:'#1677ff',
-  error:    '#ff4d4f',
+  online:   '#1A7A52',
+  offline:  '#C53030',
+  degraded: '#C8923A',
+  upgrading:'#0AAF9A',
+  error:    '#C53030',
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -202,13 +202,13 @@ const EdgeHubStorePage: React.FC = () => {
         <Row gutter={[12, 12]} className={styles.summaryRow}>
           <Col xs={8}>
             <Card size="small" className={styles.summaryCard}>
-              <div className={styles.summaryNum} style={{ color: '#52c41a' }}>{onlineDevices}</div>
+              <div className={styles.summaryNum} style={{ color: '#1A7A52' }}>{onlineDevices}</div>
               <div className={styles.summaryLabel}>设备在线</div>
             </Card>
           </Col>
           <Col xs={8}>
             <Card size="small" className={styles.summaryCard}>
-              <div className={styles.summaryNum} style={{ color: offlineDevices > 0 ? '#ff4d4f' : undefined }}>
+              <div className={styles.summaryNum} style={{ color: offlineDevices > 0 ? '#C53030' : undefined }}>
                 {offlineDevices}
               </div>
               <div className={styles.summaryLabel}>设备离线/异常</div>
@@ -216,7 +216,7 @@ const EdgeHubStorePage: React.FC = () => {
           </Col>
           <Col xs={8}>
             <Card size="small" className={styles.summaryCard}>
-              <div className={styles.summaryNum} style={{ color: openAlerts > 0 ? '#fa8c16' : undefined }}>
+              <div className={styles.summaryNum} style={{ color: openAlerts > 0 ? '#C8923A' : undefined }}>
                 {openAlerts}
               </div>
               <div className={styles.summaryLabel}>未解决告警</div>

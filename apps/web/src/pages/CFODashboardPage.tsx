@@ -93,11 +93,11 @@ interface CfoDashboard {
 // ── 常量 ──────────────────────────────────────────────────────────────────────
 
 const GRADE_COLORS: Record<string, string> = {
-  A: '#52c41a', B: '#1677ff', C: '#fa8c16', D: '#f5222d',
+  A: '#1A7A52', B: '#0AAF9A', C: '#C8923A', D: '#C53030',
 };
 
 const SEVERITY_COLORS: Record<string, string> = {
-  critical: '#f5222d', high: '#fa541c', medium: '#fa8c16', low: '#52c41a',
+  critical: '#C53030', high: '#fa541c', medium: '#C8923A', low: '#1A7A52',
 };
 
 const SEVERITY_LABELS: Record<string, string> = {
@@ -178,14 +178,14 @@ const CFODashboardPage: React.FC = () => {
       sub:      ho
         ? `优秀 ${ho.grade_distribution.A} / 良好 ${ho.grade_distribution.B}`
         : '—',
-      color:    '#1677ff',
+      color:    '#0AAF9A',
       icon:     <CheckCircleOutlined />,
     },
     {
       label:    '开放告警',
       value:    as_ != null ? `${as_.open_count}` : '—',
       sub:      as_ ? `严重 ${as_.critical_count} 条` : '—',
-      color:    as_ && as_.critical_count > 0 ? '#f5222d' : '#fa8c16',
+      color:    as_ && as_.critical_count > 0 ? '#C53030' : '#C8923A',
       icon:     <WarningOutlined />,
     },
     {
@@ -193,7 +193,7 @@ const CFODashboardPage: React.FC = () => {
       value:    bs?.avg_achievement_pct != null ? `${fmt(bs.avg_achievement_pct)}%` : '—',
       sub:      bs ? `${bs.store_count_with_budget} 家已设预算` : '—',
       color:    bs?.avg_achievement_pct != null
-        ? (bs.avg_achievement_pct >= 100 ? '#52c41a' : bs.avg_achievement_pct >= 80 ? '#fa8c16' : '#f5222d')
+        ? (bs.avg_achievement_pct >= 100 ? '#1A7A52' : bs.avg_achievement_pct >= 80 ? '#C8923A' : '#C53030')
         : '#8c8c8c',
       icon:     <DollarOutlined />,
     },
@@ -201,7 +201,7 @@ const CFODashboardPage: React.FC = () => {
       label:    '最优门店',
       value:    ho?.best_store?.store_id ?? '—',
       sub:      ho?.best_store ? `${fmt(ho.best_store.total_score)} 分 (${ho.best_store.grade})` : '—',
-      color:    '#52c41a',
+      color:    '#1A7A52',
       icon:     <RiseOutlined />,
     },
     {
@@ -286,15 +286,15 @@ const CFODashboardPage: React.FC = () => {
             name: '品牌均值',
             value: dims.map(d => avg(`${d}_score` as keyof StoreScore)),
             areaStyle: { opacity: 0.2 },
-            lineStyle: { color: '#1677ff' },
-            itemStyle: { color: '#1677ff' },
+            lineStyle: { color: '#0AAF9A' },
+            itemStyle: { color: '#0AAF9A' },
           },
           {
             name: worst.store_id,
             value: dims.map(d => worst[`${d}_score` as keyof StoreScore] as number),
             areaStyle: { opacity: 0.2 },
-            lineStyle: { color: '#f5222d' },
-            itemStyle: { color: '#f5222d' },
+            lineStyle: { color: '#C53030' },
+            itemStyle: { color: '#C53030' },
           },
         ],
       }],

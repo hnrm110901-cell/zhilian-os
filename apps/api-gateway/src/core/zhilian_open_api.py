@@ -1,5 +1,5 @@
 """
-智链OpenAPI规范
+屯象OpenAPI规范
 Zhilian Open API Specification
 
 核心理念：
@@ -109,10 +109,10 @@ class APIResponse(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.now)
 
 
-# ==================== 智链OpenAPI ====================
+# ==================== 屯象OpenAPI ====================
 
 class ZhilianOpenAPI:
-    """智链OpenAPI规范"""
+    """屯象OpenAPI规范"""
 
     def __init__(self, api_key: str, api_secret: str):
         self.api_key = api_key
@@ -763,7 +763,7 @@ class ZhilianOpenAPI:
 # ==================== SDK示例 ====================
 
 class ZhilianSDK:
-    """智链SDK（Python版本）"""
+    """屯象SDK（Python版本）"""
 
     def __init__(self, api_key: str, api_secret: str):
         self.api = ZhilianOpenAPI(api_key, api_secret)

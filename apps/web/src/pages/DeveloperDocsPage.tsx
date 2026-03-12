@@ -56,8 +56,8 @@ const LEVEL_NAMES: Record<number, string> = {
 
 const LEVEL_COLORS: Record<number, string> = {
   1: 'var(--text-secondary)',
-  2: '#1677ff',
-  3: '#fa8c16',
+  2: '#0AAF9A',
+  3: '#C8923A',
   4: '#722ed1',
 };
 
@@ -70,7 +70,7 @@ const TIER_LABELS: Record<string, string> = {
 };
 
 const METHOD_COLORS: Record<string, string> = {
-  GET: '#52c41a', POST: '#1677ff', PUT: '#fa8c16', DELETE: '#f5222d', PATCH: '#722ed1',
+  GET: '#1A7A52', POST: '#0AAF9A', PUT: '#C8923A', DELETE: '#C53030', PATCH: '#722ed1',
 };
 
 const TABS = [
@@ -175,7 +175,7 @@ import requests, hmac, hashlib, time, json
 from typing import Optional
 
 class ZhilianClient:
-    """智链开放平台 Python SDK"""
+    """屯象开放平台 Python SDK"""
 
     def __init__(self, api_key: str, api_secret: str, sandbox: bool = False):
         self.api_key = api_key
@@ -373,7 +373,7 @@ const DeveloperDocsPage: React.FC = () => {
                       <tbody>
                         {step.error_codes.map(e => (
                           <tr key={e.code}>
-                            <td><span style={{ color: '#f5222d', fontWeight: 600 }}>{e.code}</span></td>
+                            <td><span style={{ color: '#C53030', fontWeight: 600 }}>{e.code}</span></td>
                             <td>{e.message}</td>
                             <td style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{e.reason}</td>
                           </tr>

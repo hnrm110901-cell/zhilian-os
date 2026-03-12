@@ -300,7 +300,7 @@ const SchedulePage: React.FC = () => {
                   {day.is_published
                     ? <Tag color="green" style={{ fontSize: 10 }}>已发布</Tag>
                     : day.schedule_id
-                      ? <Tag color="orange" style={{ fontSize: 10 }}>草稿</Tag>
+                      ? <Tag color="mint" style={{ fontSize: 10 }}>草稿</Tag>
                       : <Tag color="default" style={{ fontSize: 10 }}>未排班</Tag>}
                 </th>
               ))}
@@ -313,7 +313,7 @@ const SchedulePage: React.FC = () => {
                   {day.shifts.length === 0
                     ? <div style={{ color: '#ccc', textAlign: 'center', padding: 8 }}>-</div>
                     : day.shifts.map((sh: any) => (
-                      <div key={sh.shift_id} style={{ marginBottom: 4, padding: '4px 6px', background: sh.is_confirmed ? '#f6ffed' : '#fff7e6', borderRadius: 4, border: `1px solid ${sh.is_confirmed ? '#b7eb8f' : '#ffd591'}`, fontSize: 12 }}>
+                      <div key={sh.shift_id} style={{ marginBottom: 4, padding: '4px 6px', background: sh.is_confirmed ? 'rgba(26,122,82,0.08)' : 'rgba(200,146,58,0.08)', borderRadius: 4, border: `1px solid ${sh.is_confirmed ? 'rgba(26,122,82,0.3)' : 'rgba(200,146,58,0.3)'}`, fontSize: 12 }}>
                         <div><Tag color={SHIFT_COLOR[sh.shift_type]} style={{ fontSize: 10, padding: '0 4px' }}>{SHIFT_LABEL[sh.shift_type]}</Tag></div>
                         <div style={{ fontWeight: 500 }}>{sh.employee_name}</div>
                         <div style={{ color: '#666' }}>{sh.start_time}–{sh.end_time}</div>
@@ -324,7 +324,7 @@ const SchedulePage: React.FC = () => {
                             确认
                           </Button>
                         )}
-                        {sh.is_confirmed && <CheckCircleOutlined style={{ color: '#52c41a', fontSize: 11 }} />}
+                        {sh.is_confirmed && <CheckCircleOutlined style={{ color: '#1A7A52', fontSize: 11 }} />}
                       </div>
                     ))
                   }
@@ -404,9 +404,9 @@ const SchedulePage: React.FC = () => {
       </div>
 
       <Row gutter={16} style={{ marginBottom: 24 }}>
-        <Col span={6}><Card size="small"><Statistic title="在职员工" value={activeCount} prefix={<UserOutlined />} valueStyle={{ color: '#1890ff' }} /></Card></Col>
+        <Col span={6}><Card size="small"><Statistic title="在职员工" value={activeCount} prefix={<UserOutlined />} valueStyle={{ color: '#0AAF9A' }} /></Card></Col>
         <Col span={6}><Card size="small"><Statistic title="技能类型" value={skillCount} valueStyle={{ color: '#faad14' }} /></Card></Col>
-        <Col span={6}><Card size="small"><Statistic title="已发布排班" value={publishedCount} prefix={<CalendarOutlined />} valueStyle={{ color: '#52c41a' }} /></Card></Col>
+        <Col span={6}><Card size="small"><Statistic title="已发布排班" value={publishedCount} prefix={<CalendarOutlined />} valueStyle={{ color: '#1A7A52' }} /></Card></Col>
         <Col span={6}><Card size="small"><Statistic title="本周班次" value={weekView?.days?.reduce((acc: number, d: any) => acc + d.shifts.length, 0) ?? '--'} prefix={<ClockCircleOutlined />} valueStyle={{ color: '#722ed1' }} /></Card></Col>
       </Row>
 
@@ -449,7 +449,7 @@ const SchedulePage: React.FC = () => {
                       { title: '开始', dataIndex: 'start_time', key: 'start_time', width: 80 },
                       { title: '结束', dataIndex: 'end_time', key: 'end_time', width: 80 },
                       { title: '职位', dataIndex: 'position', key: 'position', width: 90 },
-                      { title: '已确认', dataIndex: 'is_confirmed', key: 'is_confirmed', width: 80, render: (v: boolean) => v ? <CheckCircleOutlined style={{ color: '#52c41a' }} /> : '-' },
+                      { title: '已确认', dataIndex: 'is_confirmed', key: 'is_confirmed', width: 80, render: (v: boolean) => v ? <CheckCircleOutlined style={{ color: '#1A7A52' }} /> : '-' },
                     ]}
                   />
                 ),

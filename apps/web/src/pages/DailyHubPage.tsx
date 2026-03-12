@@ -26,11 +26,11 @@ const { Text, Title } = Typography;
 
 const OPS_PHASES = [
   { label: '班前准备',   start:  0, end: 10.5, icon: <TeamOutlined />,         color: '#8c8c8c' },
-  { label: '午市中',     start: 10.5, end: 14,  icon: <FireOutlined />,         color: '#fa8c16' },
-  { label: '午市收尾',  start: 14,  end: 16,  icon: <ClockCircleOutlined />,   color: '#1890ff' },
+  { label: '午市中',     start: 10.5, end: 14,  icon: <FireOutlined />,         color: '#C8923A' },
+  { label: '午市收尾',  start: 14,  end: 16,  icon: <ClockCircleOutlined />,   color: '#0AAF9A' },
   { label: '晚市备战',  start: 16,  end: 17.5, icon: <BulbOutlined />,         color: '#722ed1' },
-  { label: '晚市中',     start: 17.5, end: 21,  icon: <FireOutlined />,         color: '#f5222d' },
-  { label: '日结复盘',  start: 21,  end: 24,  icon: <CheckCircleOutlined />,   color: '#52c41a' },
+  { label: '晚市中',     start: 17.5, end: 21,  icon: <FireOutlined />,         color: '#C53030' },
+  { label: '日结复盘',  start: 21,  end: 24,  icon: <CheckCircleOutlined />,   color: '#1A7A52' },
 ];
 
 function currentPhaseIndex(): number {
@@ -113,8 +113,8 @@ const DailyHubPage: React.FC = () => {
   // 健康评分相关
   const healthScore = bff?.health_score?.overall ?? null;
   const healthColor = healthScore == null ? '#d9d9d9'
-    : healthScore >= 80 ? '#52c41a'
-    : healthScore >= 60 ? '#faad14' : '#ff4d4f';
+    : healthScore >= 80 ? '#1A7A52'
+    : healthScore >= 60 ? '#faad14' : '#C53030';
 
   // 能耗数据
   const todayKwh  = energy?.today?.kwh;
@@ -131,7 +131,7 @@ const DailyHubPage: React.FC = () => {
       type: 'bar',
       data: [
         { value: ((banquet?.deterministic_revenue || 0) / 100).toFixed(0), itemStyle: { color: '#f5a623' } },
-        { value: ((forecast?.regular_track?.predicted_revenue || 0) / 100).toFixed(0), itemStyle: { color: '#1890ff' } },
+        { value: ((forecast?.regular_track?.predicted_revenue || 0) / 100).toFixed(0), itemStyle: { color: '#0AAF9A' } },
       ],
     }],
   };
@@ -167,7 +167,7 @@ const DailyHubPage: React.FC = () => {
             {
               title: '今日营收',
               value: review?.total_revenue ? `¥${(review.total_revenue / 100).toFixed(0)}` : '—',
-              icon: <DollarOutlined style={{ color: '#1890ff' }} />,
+              icon: <DollarOutlined style={{ color: '#0AAF9A' }} />,
               sub: review?.order_count ? `${review.order_count} 单` : null,
             },
             {
@@ -186,9 +186,9 @@ const DailyHubPage: React.FC = () => {
             {
               title: '未处理异常',
               value: anomalyCount,
-              icon: <WarningOutlined style={{ color: anomalyCount > 0 ? '#ff4d4f' : '#52c41a' }} />,
+              icon: <WarningOutlined style={{ color: anomalyCount > 0 ? '#C53030' : '#1A7A52' }} />,
               sub: anomalyCount > 0 ? '需处理' : '一切正常',
-              color: anomalyCount > 0 ? '#ff4d4f' : '#52c41a',
+              color: anomalyCount > 0 ? '#C53030' : '#1A7A52',
             },
             {
               title: 'AI 建议数',
@@ -201,7 +201,7 @@ const DailyHubPage: React.FC = () => {
               value: forecast?.total_predicted_revenue
                 ? `¥${(forecast.total_predicted_revenue / 100).toFixed(0)}`
                 : '—',
-              icon: <RiseOutlined style={{ color: '#52c41a' }} />,
+              icon: <RiseOutlined style={{ color: '#1A7A52' }} />,
               sub: banquet?.active ? '宴会熔断' : null,
             },
           ].map((item, i) => (
@@ -238,9 +238,9 @@ const DailyHubPage: React.FC = () => {
             <Card
               title={
                 <Space>
-                  <WarningOutlined style={{ color: '#ff4d4f' }} />
+                  <WarningOutlined style={{ color: '#C53030' }} />
                   <span>异常事件</span>
-                  {anomalyCount > 0 && <Badge count={anomalyCount} style={{ backgroundColor: '#ff4d4f' }} />}
+                  {anomalyCount > 0 && <Badge count={anomalyCount} style={{ backgroundColor: '#C53030' }} />}
                 </Space>
               }
               size="small"
@@ -248,7 +248,7 @@ const DailyHubPage: React.FC = () => {
               extra={<a href="/energy" style={{ fontSize: 12 }}>全部 →</a>}
             >
               {anomalies.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '24px 0', color: '#52c41a' }}>
+                <div style={{ textAlign: 'center', padding: '24px 0', color: '#1A7A52' }}>
                   <CheckCircleOutlined style={{ fontSize: 24 }} />
                   <div style={{ marginTop: 8, fontSize: 13 }}>暂无异常，经营正常</div>
                 </div>
@@ -344,7 +344,7 @@ const DailyHubPage: React.FC = () => {
                 <div key={i} style={{ fontSize: 12, marginTop: 4 }}>✓ {h}</div>
               ))}
               {(review?.alerts || []).map((a: string, i: number) => (
-                <div key={i} style={{ fontSize: 12, color: '#fa8c16', marginTop: 4 }}>⚠ {a}</div>
+                <div key={i} style={{ fontSize: 12, color: '#C8923A', marginTop: 4 }}>⚠ {a}</div>
               ))}
             </Card>
           </Col>

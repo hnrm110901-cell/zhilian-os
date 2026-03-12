@@ -74,7 +74,7 @@ class AgentService:
             logger.error("KPIAgent初始化失败", exc_info=e)
             failed_agents.append(("kpi", str(e)))
 
-        # 初始化运维Agent（智链OS 运维方案）
+        # 初始化运维Agent（屯象OS 运维方案）
         try:
             from ..agents.ops_agent import OpsAgent
             self._agents["ops"] = OpsAgent()
@@ -83,7 +83,7 @@ class AgentService:
             logger.error("OpsAgent初始化失败", exc_info=e)
             failed_agents.append(("ops", str(e)))
 
-        # 初始化绩效Agent（智链OS 绩效方案）
+        # 初始化绩效Agent（屯象OS 绩效方案）
         try:
             from ..agents.performance_agent import PerformanceAgent
             self._agents["performance"] = PerformanceAgent()

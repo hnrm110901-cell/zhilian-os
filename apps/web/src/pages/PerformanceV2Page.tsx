@@ -221,7 +221,7 @@ function DashboardTab({ storeId, brandId, period }: { storeId: string; brandId: 
             label="高危预警"
             value={data.alert_summary.high}
             unit="条"
-            color={data.alert_summary.high > 0 ? '#f5222d' : '#52c41a'}
+            color={data.alert_summary.high > 0 ? '#C53030' : '#1A7A52'}
           />
         </Col>
         <Col span={6}>
@@ -229,7 +229,7 @@ function DashboardTab({ storeId, brandId, period }: { storeId: string; brandId: 
             label="中等预警"
             value={data.alert_summary.medium}
             unit="条"
-            color={data.alert_summary.medium > 0 ? '#fa8c16' : '#52c41a'}
+            color={data.alert_summary.medium > 0 ? '#C8923A' : '#1A7A52'}
           />
         </Col>
         <Col span={6}>
@@ -237,7 +237,7 @@ function DashboardTab({ storeId, brandId, period }: { storeId: string; brandId: 
             label="OKR整体进度"
             value={okr ? Math.round((okr.overall_progress || 0) * 100) : 0}
             unit="%"
-            color="#1890ff"
+            color="#0AAF9A"
           />
         </Col>
       </Row>
@@ -286,7 +286,7 @@ function DashboardTab({ storeId, brandId, period }: { storeId: string; brandId: 
                         backgroundColor:
                           item.rank === 1 ? '#faad14' :
                           item.rank === 2 ? '#bfbfbf' :
-                          item.rank === 3 ? '#d4883a' : '#1890ff',
+                          item.rank === 3 ? '#d4883a' : '#0AAF9A',
                       }}
                     />
                     <Text>{item.employee_id}</Text>
@@ -526,7 +526,7 @@ function GamificationTab({ storeId, period }: { storeId: string; period: string 
             backgroundColor:
               rank === 1 ? '#faad14' :
               rank === 2 ? '#bfbfbf' :
-              rank === 3 ? '#d4883a' : '#1890ff',
+              rank === 3 ? '#d4883a' : '#0AAF9A',
           }}
         />
       ),
@@ -944,7 +944,7 @@ function SkillTreeTab() {
                     <Progress
                       percent={Math.round(s.progress_pct * 100)}
                       size="small"
-                      strokeColor={s.progress_pct >= 1 ? '#52c41a' : '#1890ff'}
+                      strokeColor={s.progress_pct >= 1 ? '#1A7A52' : '#0AAF9A'}
                     />
                     <Row justify="space-between">
                       <Text type="secondary" style={{ fontSize: 11 }}>岗位：{s.role_id}</Text>

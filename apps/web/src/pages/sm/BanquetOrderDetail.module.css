@@ -21,7 +21,7 @@
   background: none;
   border: none;
   font-size: 14px;
-  color: var(--accent, #ff6b2c);
+  color: var(--accent, #0AAF9A);
   cursor: pointer;
   padding: 4px 0;
 }
@@ -83,7 +83,7 @@
 }
 
 .balanceDue {
-  color: var(--accent, #ff6b2c);
+  color: var(--accent, #0AAF9A);
 }
 
 .remark {
@@ -106,7 +106,7 @@
 
 .progressFill {
   height: 100%;
-  background: var(--accent, #ff6b2c);
+  background: var(--accent, #0AAF9A);
   border-radius: 2px;
   transition: width 0.3s ease;
 }
@@ -459,7 +459,7 @@
 
 .reviewScoreRow { display: flex; align-items: baseline; gap: 4px; }
 .reviewScoreLabel { font-size: 13px; color: var(--text-secondary, #555); margin-right: 6px; }
-.reviewScore { font-size: 28px; font-weight: 700; color: var(--accent, #FF6B2C); }
+.reviewScore { font-size: 28px; font-weight: 700; color: var(--accent, #0AAF9A); }
 .reviewScoreUnit { font-size: 13px; color: var(--text-secondary, #aaa); }
 
 .reviewSummary {
@@ -474,8 +474,8 @@
 .reviewTags { display: flex; flex-wrap: wrap; gap: 6px; }
 .reviewTag {
   font-size: 12px;
-  color: var(--accent, #FF6B2C);
-  background: rgba(255, 107, 44, 0.08);
+  color: var(--accent, #0AAF9A);
+  background: rgba(10, 175, 154, 0.08);
   border-radius: 12px;
   padding: 2px 10px;
 }

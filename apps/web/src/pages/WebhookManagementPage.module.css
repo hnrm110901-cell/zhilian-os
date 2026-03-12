@@ -56,9 +56,9 @@
   line-height: 1;
 }
 
-.statGreen  { color: #52c41a; }
-.statOrange { color: #fa8c16; }
-.statRed    { color: #f5222d; }
+.statGreen  { color: #1A7A52; }
+.statOrange { color: #C8923A; }
+.statRed    { color: #C53030; }
 
 .statLabel {
   font-size: 11px;
@@ -91,7 +91,7 @@
 .subUrl {
   font-size: 13px;
   font-family: 'JetBrains Mono', monospace;
-  color: var(--accent, #FF6B2C);
+  color: var(--accent, #0AAF9A);
   word-break: break-all;
 }
 
@@ -135,7 +135,7 @@
 }
 
 .failCount {
-  color: #f5222d;
+  color: #C53030;
   font-weight: 600;
 }
 
@@ -159,7 +159,7 @@
 .eventCode {
   font-size: 11px;
   font-family: 'JetBrains Mono', monospace;
-  color: var(--accent, #FF6B2C);
+  color: var(--accent, #0AAF9A);
   flex-shrink: 0;
 }
 
@@ -183,7 +183,7 @@
 }
 
 .required {
-  color: #f5222d;
+  color: #C53030;
 }
 
 .formInput {
@@ -198,7 +198,7 @@
 }
 
 .formInput:focus {
-  border-color: var(--accent, #FF6B2C);
+  border-color: var(--accent, #0AAF9A);
 }
 
 .formHint {

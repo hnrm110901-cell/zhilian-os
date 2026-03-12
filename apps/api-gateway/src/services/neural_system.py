@@ -2,7 +2,7 @@
 神经系统编排器
 Neural System Orchestrator
 
-智链OS作为餐饮门店的神经系统
+屯象OS作为餐饮门店的神经系统
 统一协调订单、菜品、人员、时间、金额五个核心维度
 """
 import os
@@ -26,7 +26,7 @@ logger = structlog.get_logger()
 class NeuralSystemOrchestrator:
     """神经系统编排器
 
-    智链OS的核心：
+    屯象OS的核心：
     1. 接收所有业务事件
     2. 向量化存储到向量数据库
     3. 触发相应的Agent处理

@@ -27,7 +27,7 @@ from src.services.case_story_generator import CaseStoryGenerator
 logger = structlog.get_logger()
 
 # 报告徽标文字（可通过环境变量覆盖）
-BRAND_NAME = os.getenv("BRAND_NAME", "智链经营助手")
+BRAND_NAME = os.getenv("BRAND_NAME", "屯象经营助手")
 
 
 # ════════════════════════════════════════════════════════════════════════════════

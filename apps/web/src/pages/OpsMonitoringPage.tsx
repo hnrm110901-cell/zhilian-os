@@ -1,5 +1,5 @@
 /**
- * OpsMonitoringPage — 智链OS 运维监控大屏
+ * OpsMonitoringPage — 屯象OS 运维监控大屏
  *
  * 对应方案 第八章：总部一屏掌控所有门店
  * - 门店健康状态卡片（绿/黄/红）
@@ -69,9 +69,9 @@ interface AlertRecord {
 // ── 工具函数 ──────────────────────────────────────────────────────────────────
 
 const statusColor = (s: string) => {
-  if (s === 'healthy') return '#52c41a';
+  if (s === 'healthy') return '#1A7A52';
   if (s === 'warning') return '#faad14';
-  return '#ff4d4f';
+  return '#C53030';
 };
 
 const statusBadge = (s: string): 'success' | 'warning' | 'error' | 'default' => {
@@ -279,7 +279,7 @@ const OpsMonitoringPage: React.FC = () => {
           {/* L1 设备层 */}
           <Col xs={24} sm={6}>
             <Card
-              title={<><DashboardOutlined style={{ color: '#1890ff' }} /> L1 设备层</>}
+              title={<><DashboardOutlined style={{ color: '#0AAF9A' }} /> L1 设备层</>}
               bodyStyle={{ padding: 16 }}
             >
               <Progress
@@ -289,7 +289,7 @@ const OpsMonitoringPage: React.FC = () => {
               />
               <Row style={{ marginTop: 8 }}>
                 <Col span={12}><Statistic title="采集次数" value={l1?.total_readings ?? 0} /></Col>
-                <Col span={12}><Statistic title="告警" value={l1?.alert_count ?? 0} valueStyle={{ color: '#ff4d4f' }} /></Col>
+                <Col span={12}><Statistic title="告警" value={l1?.alert_count ?? 0} valueStyle={{ color: '#C53030' }} /></Col>
               </Row>
             </Card>
           </Col>
@@ -297,7 +297,7 @@ const OpsMonitoringPage: React.FC = () => {
           {/* L2 网络层 */}
           <Col xs={24} sm={6}>
             <Card
-              title={<><WifiOutlined style={{ color: '#52c41a' }} /> L2 网络层</>}
+              title={<><WifiOutlined style={{ color: '#1A7A52' }} /> L2 网络层</>}
               bodyStyle={{ padding: 16 }}
             >
               <Progress
@@ -307,7 +307,7 @@ const OpsMonitoringPage: React.FC = () => {
               />
               <Row style={{ marginTop: 8 }}>
                 <Col span={12}><Statistic title="可用率" value={`${l2?.availability_pct ?? 100}%`} /></Col>
-                <Col span={12}><Statistic title="告警" value={l2?.alert_count ?? 0} valueStyle={{ color: '#ff4d4f' }} /></Col>
+                <Col span={12}><Statistic title="告警" value={l2?.alert_count ?? 0} valueStyle={{ color: '#C53030' }} /></Col>
               </Row>
             </Card>
           </Col>
@@ -325,7 +325,7 @@ const OpsMonitoringPage: React.FC = () => {
               />
               <Row style={{ marginTop: 8 }}>
                 <Col span={12}><Statistic title="正常系统" value={`${(l3?.total_systems ?? 0) - (l3?.down_systems ?? 0)}/${l3?.total_systems ?? 0}`} /></Col>
-                <Col span={12}><Statistic title="P0宕机" value={l3?.p0_down ?? 0} valueStyle={{ color: l3?.p0_down ? '#ff4d4f' : '#52c41a' }} /></Col>
+                <Col span={12}><Statistic title="P0宕机" value={l3?.p0_down ?? 0} valueStyle={{ color: l3?.p0_down ? '#C53030' : '#1A7A52' }} /></Col>
               </Row>
               {(l3?.down_list?.length ?? 0) > 0 && (
                 <div style={{ marginTop: 6 }}>
@@ -341,7 +341,7 @@ const OpsMonitoringPage: React.FC = () => {
           {/* 食安合规 */}
           <Col xs={24} sm={8}>
             <Card
-              title={<><SafetyOutlined style={{ color: '#fa8c16' }} /> 食安合规</>}
+              title={<><SafetyOutlined style={{ color: '#C8923A' }} /> 食安合规</>}
               extra={
                 <Button
                   type="link" size="small"
@@ -356,7 +356,7 @@ const OpsMonitoringPage: React.FC = () => {
                   <Progress
                     type="circle"
                     percent={fs?.compliance_rate_pct ?? 100}
-                    strokeColor={fs?.violations ? '#ff4d4f' : '#52c41a'}
+                    strokeColor={fs?.violations ? '#C53030' : '#1A7A52'}
                     width={80}
                   />
                   <br />
@@ -371,7 +371,7 @@ const OpsMonitoringPage: React.FC = () => {
                   <Statistic
                     title="违规次数"
                     value={fs?.violations ?? 0}
-                    valueStyle={{ color: (fs?.violations ?? 0) > 0 ? '#ff4d4f' : '#52c41a' }}
+                    valueStyle={{ color: (fs?.violations ?? 0) > 0 ? '#C53030' : '#1A7A52' }}
                   />
                 </Col>
               </Row>
@@ -389,7 +389,7 @@ const OpsMonitoringPage: React.FC = () => {
           {/* 活跃告警 */}
           <Col xs={24} sm={16}>
             <Card
-              title={<><WarningOutlined style={{ color: '#ff4d4f' }} /> 活跃告警</>}
+              title={<><WarningOutlined style={{ color: '#C53030' }} /> 活跃告警</>}
               extra={
                 <Button size="small" icon={<ReloadOutlined />} onClick={loadAlerts} loading={alertsLoading}>
                   刷新
@@ -405,7 +405,7 @@ const OpsMonitoringPage: React.FC = () => {
                 pagination={false}
                 scroll={{ y: 200 }}
                 loading={alertsLoading}
-                locale={{ emptyText: <CheckCircleOutlined style={{ color: '#52c41a' }} /> }}
+                locale={{ emptyText: <CheckCircleOutlined style={{ color: '#1A7A52' }} /> }}
               />
             </Card>
           </Col>

@@ -34,7 +34,7 @@ import styles from './DetailDrawer.module.css';
 export interface DrawerMetric {
   label: string;
   value: React.ReactNode;
-  /** 值颜色（可选），如 '#f5222d' */
+  /** 值颜色（可选），如 '#C53030' */
   valueColor?: string;
 }
 

@@ -152,7 +152,7 @@ async def get_value_proposition(
     """
     获取价值主张
 
-    用商业话术展示智链OS的价值，而不是技术话术
+    用商业话术展示屯象OS的价值，而不是技术话术
     """
     service = get_raas_pricing_service(db)
 
@@ -164,7 +164,7 @@ async def get_value_proposition(
 
     # 商业话术
     value_proposition = {
-        "headline": "智链OS = 年薪只要几万块的数字总经理",
+        "headline": "屯象OS = 年薪只要几万块的数字总经理",
         "features": [
             "拥有行业Top10%管理经验",
             "24小时不休息",

@@ -88,9 +88,9 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 const TREND_ICON: Record<string, React.ReactNode> = {
-  up: <RiseOutlined style={{ color: '#52c41a' }} />,
-  down: <FallOutlined style={{ color: '#ff4d4f' }} />,
-  stable: <BarChartOutlined style={{ color: '#1890ff' }} />,
+  up: <RiseOutlined style={{ color: '#1A7A52' }} />,
+  down: <FallOutlined style={{ color: '#C53030' }} />,
+  stable: <BarChartOutlined style={{ color: '#0AAF9A' }} />,
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -236,7 +236,7 @@ const BusinessIntelPage: React.FC = () => {
       dataIndex: 'deviation_pct',
       width: 90,
       render: (v: number) => (
-        <span style={{ color: v < 0 ? '#ff4d4f' : '#52c41a' }}>
+        <span style={{ color: v < 0 ? '#C53030' : '#1A7A52' }}>
           {v > 0 ? '+' : ''}{v.toFixed(1)}%
         </span>
       ),
@@ -275,7 +275,7 @@ const BusinessIntelPage: React.FC = () => {
       title: '预计节省',
       dataIndex: 'total_saving_yuan',
       width: 120,
-      render: (v: number) => <span style={{ color: '#52c41a', fontWeight: 600 }}>¥{v.toLocaleString()}</span>,
+      render: (v: number) => <span style={{ color: '#1A7A52', fontWeight: 600 }}>¥{v.toLocaleString()}</span>,
     },
     {
       title: '状态',
@@ -339,7 +339,7 @@ const BusinessIntelPage: React.FC = () => {
               title="今日预计节省"
               value={d?.today_decision.total_saving_yuan ?? 0}
               prefix="¥"
-              valueStyle={{ color: '#52c41a' }}
+              valueStyle={{ color: '#1A7A52' }}
             />
           </ZCard>
         </Col>
@@ -353,7 +353,7 @@ const BusinessIntelPage: React.FC = () => {
                   ? <Badge count={d?.open_alerts.critical_count} color="red" style={{ marginLeft: 8 }} />
                   : null
               }
-              valueStyle={{ color: (d?.open_alerts.count ?? 0) > 0 ? '#ff4d4f' : '#52c41a' }}
+              valueStyle={{ color: (d?.open_alerts.count ?? 0) > 0 ? '#C53030' : '#1A7A52' }}
             />
           </ZCard>
         </Col>
@@ -364,8 +364,8 @@ const BusinessIntelPage: React.FC = () => {
               value={d?.kpi_health.overall_score ?? '—'}
               suffix={d?.kpi_health.overall_score ? '/100' : ''}
               valueStyle={{
-                color: (d?.kpi_health.overall_score ?? 0) >= 80 ? '#52c41a'
-                  : (d?.kpi_health.overall_score ?? 0) >= 60 ? '#faad14' : '#ff4d4f',
+                color: (d?.kpi_health.overall_score ?? 0) >= 80 ? '#1A7A52'
+                  : (d?.kpi_health.overall_score ?? 0) >= 60 ? '#faad14' : '#C53030',
               }}
             />
           </ZCard>

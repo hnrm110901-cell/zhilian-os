@@ -101,7 +101,7 @@ class InternationalizationService:
     def _initialize_defaults(self):
         """Initialize default translations and configs"""
         # Add common translations
-        self.add_translation("app.name", Language.ZH_CN, "智链OS")
+        self.add_translation("app.name", Language.ZH_CN, "屯象OS")
         self.add_translation("app.name", Language.EN_US, "Zhilian OS")
         self.add_translation("app.name", Language.JA_JP, "智鎖OS")
 

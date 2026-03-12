@@ -66,7 +66,7 @@ const deliveryColumns: ZTableColumn<DeliveryLog>[] = [
     title: 'HTTP',
     align: 'center',
     render: (v) => v ? (
-      <span style={{ fontWeight: 700, color: v < 300 ? '#52c41a' : '#f5222d' }}>{v}</span>
+      <span style={{ fontWeight: 700, color: v < 300 ? '#1A7A52' : '#C53030' }}>{v}</span>
     ) : <span style={{ color: 'var(--text-secondary)' }}>—</span>,
   },
   {

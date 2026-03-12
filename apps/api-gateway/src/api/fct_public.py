@@ -1,7 +1,7 @@
 """
 业财税资金一体化（FCT）公开 API — 独立部署形态
 
-与 fct.py 契约一致，但使用 API Key 认证（X-API-Key），不依赖智链OS 用户与权限。
+与 fct.py 契约一致，但使用 API Key 认证（X-API-Key），不依赖屯象OS 用户与权限。
 用于独立服务部署时对外暴露；租户可通过请求体或 X-Tenant-Id 传递。
 """
 from datetime import date

@@ -304,7 +304,7 @@ class RAGService:
         """
         # 默认系统提示
         if not system_prompt:
-            system_prompt = """你是智链OS的AI助手，专门帮助餐饮门店进行数据分析和决策支持。
+            system_prompt = """你是屯象OS的AI助手，专门帮助餐饮门店进行数据分析和决策支持。
 你的任务是基于历史数据和当前问题，提供准确、可操作的建议。"""
 
         # 构建完整提示

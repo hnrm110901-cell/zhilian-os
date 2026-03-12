@@ -226,7 +226,7 @@ export default function DishRdPage() {
     { label: '活跃试点',   value: dashboard.active_pilots,                             unit: '项' },
     { label: '平均毛利率', value: (dashboard.avg_margin_rate * 100).toFixed(1),        unit: '%'  },
     { label: '高风险预警', value: dashboard.high_risk_count,                           unit: '项',
-      valueColor: dashboard.high_risk_count > 0 ? '#ff4d4f' : undefined },
+      valueColor: dashboard.high_risk_count > 0 ? '#C53030' : undefined },
   ] : [];
 
   const pageContent = (
@@ -385,7 +385,7 @@ export default function DishRdPage() {
     <AgentWorkspaceTemplate
       agentName="菜品研发 Agent"
       agentIcon="🍽️"
-      agentColor="#52c41a"
+      agentColor="#1A7A52"
       description="菜品立项 · 研发跟踪 · 试点管理 · AI 风险扫描"
       status={dashboard?.high_risk_count ? 'warning' : 'running'}
       kpis={templateKpis}

@@ -25,7 +25,7 @@ const BENEFITS = [
   {
     icon: '🤝',
     title: '联合营销支持',
-    desc: '优质 ISV 享受智链官网首页推荐、行业峰会合作展位、联合案例宣传。',
+    desc: '优质 ISV 享受屯象官网首页推荐、行业峰会合作展位、联合案例宣传。',
   },
 ];
 
@@ -77,7 +77,7 @@ const CASE_STUDIES = [
     name: '小象 ERP 连接器',
     company: '北京小象科技',
     category: '系统集成',
-    desc: '将主流 ERP 系统（用友/金蝶/SAP）与智链无缝打通，订单/库存双向同步。',
+    desc: '将主流 ERP 系统（用友/金蝶/SAP）与屯象无缝打通，订单/库存双向同步。',
     installs: 320,
     rating: 4.8,
     tier: 'pro',
@@ -86,7 +86,7 @@ const CASE_STUDIES = [
     name: '餐饮大数据看板',
     company: '上海数聚信息',
     category: '数据分析',
-    desc: '基于智链 Level 2 预测 API 构建多门店横向对比大屏，支持自定义指标。',
+    desc: '基于屯象 Level 2 预测 API 构建多门店横向对比大屏，支持自定义指标。',
     installs: 180,
     rating: 4.6,
     tier: 'basic',
@@ -164,11 +164,11 @@ const ISVEcosystemPage: React.FC = () => {
             <ZBadge type="success" text="现已开放 · 首批 ISV 特权" />
           </div>
           <h1 className={styles.heroTitle}>
-            加入智链 ISV 生态<br />
+            加入屯象 ISV 生态<br />
             <span className={styles.heroAccent}>把 AI 能力卖给 5 万家餐厅</span>
           </h1>
           <p className={styles.heroDesc}>
-            智链开放平台为第三方开发者提供 14 个 AI 能力 API，覆盖数据同步、智能决策、营销自动化、
+            屯象开放平台为第三方开发者提供 14 个 AI 能力 API，覆盖数据同步、智能决策、营销自动化、
             知识库查询四大层级。你只需专注产品，我们负责市场。
           </p>
           <div className={styles.heroActions}>
@@ -196,7 +196,7 @@ const ISVEcosystemPage: React.FC = () => {
       </div>
 
       {/* Benefits */}
-      <ZCard title="为什么选择智链开放平台">
+      <ZCard title="为什么选择屯象开放平台">
         <div className={styles.benefitsGrid}>
           {BENEFITS.map(b => (
             <div key={b.title} className={styles.benefitItem}>

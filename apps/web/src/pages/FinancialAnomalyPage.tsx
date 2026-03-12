@@ -51,10 +51,10 @@ interface DetectResult {
 // ── 常量 ──────────────────────────────────────────────────────────────────
 
 const SEVERITY_COLOR: Record<string, string> = {
-  severe:   '#ff4d4f',
-  moderate: '#fa8c16',
+  severe:   '#C53030',
+  moderate: '#C8923A',
   mild:     '#fadb14',
-  normal:   '#52c41a',
+  normal:   '#1A7A52',
 };
 
 const SEVERITY_LABEL: Record<string, string> = {

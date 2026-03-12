@@ -61,7 +61,7 @@ const storeColumns: ZTableColumn<any>[] = [
     width: 72,
     render: (v: number) => v > 0
       ? <ZBadge type="warning" text={String(v)} />
-      : <CheckCircleOutlined style={{ color: '#52c41a' }} />,
+      : <CheckCircleOutlined style={{ color: '#1A7A52' }} />,
   },
   {
     key: 'has_alert',
@@ -93,10 +93,10 @@ const healthColumns: ZTableColumn<any>[] = [
     width: 140,
     render: (v: number, row: any) => {
       const pct = Math.min(100, Math.round(v || 0));
-      const color = row.level === 'excellent' ? '#52c41a'
-        : row.level === 'good'    ? '#1890ff'
+      const color = row.level === 'excellent' ? '#1A7A52'
+        : row.level === 'good'    ? '#0AAF9A'
         : row.level === 'warning' ? '#faad14'
-        : '#ff4d4f';
+        : '#C53030';
       return (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <div style={{ width: 80, height: 5, background: '#f0f0f0', borderRadius: 3, overflow: 'hidden' }}>
@@ -126,7 +126,7 @@ const healthColumns: ZTableColumn<any>[] = [
     title: '最弱维度',
     render: (v: string | null) => v
       ? <ZBadge type="warning" text={v} />
-      : <CheckCircleOutlined style={{ color: '#52c41a' }} />,
+      : <CheckCircleOutlined style={{ color: '#1A7A52' }} />,
   },
   {
     key: 'revenue_yuan',
@@ -269,7 +269,7 @@ const HQDashboardPage: React.FC = () => {
 
       {/* 门店健康度排名 */}
       <ZCard title={
-        <span><HeartOutlined style={{ color: '#52c41a', marginRight: 6 }} />门店健康度排名</span>
+        <span><HeartOutlined style={{ color: '#1A7A52', marginRight: 6 }} />门店健康度排名</span>
       }>
         <div className={styles.healthSummaryTags} style={{ marginBottom: 12 }}>
           {healthSummary.critical  > 0 && <ZBadge type="critical" text={`危险 ${healthSummary.critical} 家`} />}

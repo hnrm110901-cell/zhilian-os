@@ -238,13 +238,13 @@ function SummaryAnalysis({ storeId, period }: { storeId: string; period: string 
     series: [
       { name: '价格效应', type: 'bar', stack: 'total',
         data: data.by_driver.map(d => d.price_effect),
-        itemStyle: { color: '#fa8c16' } },
+        itemStyle: { color: '#C8923A' } },
       { name: '销量效应', type: 'bar', stack: 'total',
         data: data.by_driver.map(d => d.volume_effect),
-        itemStyle: { color: '#1677ff' } },
+        itemStyle: { color: '#0AAF9A' } },
       { name: '交互效应', type: 'bar', stack: 'total',
         data: data.by_driver.map(d => d.interaction),
-        itemStyle: { color: '#52c41a' } },
+        itemStyle: { color: '#1A7A52' } },
     ],
     legend: { top: 0 },
     grid: { top: 40, bottom: 40 },
@@ -372,9 +372,9 @@ function MoverList({ storeId, period }: { storeId: string; period: string }) {
     yAxis: { type: 'category', data: gainers.map(r => r.dish_name).reverse() },
     xAxis: { type: 'value', name: '营收变化 (¥)' },
     series: [
-      { name: '价格效应', type: 'bar', stack: 'total', data: gainers.map(r => r.price_effect_yuan).reverse(), itemStyle: { color: '#fa8c16' } },
-      { name: '销量效应', type: 'bar', stack: 'total', data: gainers.map(r => r.volume_effect_yuan).reverse(), itemStyle: { color: '#1677ff' } },
-      { name: '交互效应', type: 'bar', stack: 'total', data: gainers.map(r => r.interaction_yuan).reverse(), itemStyle: { color: '#52c41a' } },
+      { name: '价格效应', type: 'bar', stack: 'total', data: gainers.map(r => r.price_effect_yuan).reverse(), itemStyle: { color: '#C8923A' } },
+      { name: '销量效应', type: 'bar', stack: 'total', data: gainers.map(r => r.volume_effect_yuan).reverse(), itemStyle: { color: '#0AAF9A' } },
+      { name: '交互效应', type: 'bar', stack: 'total', data: gainers.map(r => r.interaction_yuan).reverse(), itemStyle: { color: '#1A7A52' } },
     ],
     legend: { top: 0 },
     grid: { left: 80, right: 20, top: 30, bottom: 30 },
@@ -385,9 +385,9 @@ function MoverList({ storeId, period }: { storeId: string; period: string }) {
     yAxis: { type: 'category', data: losers.map(r => r.dish_name) },
     xAxis: { type: 'value', name: '营收变化 (¥)' },
     series: [
-      { name: '价格效应', type: 'bar', stack: 'total', data: losers.map(r => r.price_effect_yuan), itemStyle: { color: '#fa8c16' } },
-      { name: '销量效应', type: 'bar', stack: 'total', data: losers.map(r => r.volume_effect_yuan), itemStyle: { color: '#1677ff' } },
-      { name: '交互效应', type: 'bar', stack: 'total', data: losers.map(r => r.interaction_yuan), itemStyle: { color: '#52c41a' } },
+      { name: '价格效应', type: 'bar', stack: 'total', data: losers.map(r => r.price_effect_yuan), itemStyle: { color: '#C8923A' } },
+      { name: '销量效应', type: 'bar', stack: 'total', data: losers.map(r => r.volume_effect_yuan), itemStyle: { color: '#0AAF9A' } },
+      { name: '交互效应', type: 'bar', stack: 'total', data: losers.map(r => r.interaction_yuan), itemStyle: { color: '#1A7A52' } },
     ],
     legend: { top: 0 },
     grid: { left: 80, right: 20, top: 30, bottom: 30 },
@@ -404,7 +404,7 @@ function MoverList({ storeId, period }: { storeId: string; period: string }) {
         <>
           <div className={styles.moversRow}>
             <Card
-              title={<span style={{ color: '#52c41a' }}><ArrowUpOutlined /> 增幅最大 Top 10</span>}
+              title={<span style={{ color: '#1A7A52' }}><ArrowUpOutlined /> 增幅最大 Top 10</span>}
               size="small"
             >
               {gainers.length > 0 && (
@@ -417,7 +417,7 @@ function MoverList({ storeId, period }: { storeId: string; period: string }) {
               />
             </Card>
             <Card
-              title={<span style={{ color: '#ff4d4f' }}><ArrowDownOutlined /> 降幅最大 Top 10</span>}
+              title={<span style={{ color: '#C53030' }}><ArrowDownOutlined /> 降幅最大 Top 10</span>}
               size="small"
             >
               {losers.length > 0 && (
@@ -481,13 +481,13 @@ function DishHistory({ storeId, period }: { storeId: string; period: string }) {
     series: [
       { name: '价格效应', type: 'bar', stack: 'total',
         data: [...rows].reverse().map(r => r.price_effect_yuan),
-        itemStyle: { color: '#fa8c16' } },
+        itemStyle: { color: '#C8923A' } },
       { name: '销量效应', type: 'bar', stack: 'total',
         data: [...rows].reverse().map(r => r.volume_effect_yuan),
-        itemStyle: { color: '#1677ff' } },
+        itemStyle: { color: '#0AAF9A' } },
       { name: '交互效应', type: 'bar', stack: 'total',
         data: [...rows].reverse().map(r => r.interaction_yuan),
-        itemStyle: { color: '#52c41a' } },
+        itemStyle: { color: '#1A7A52' } },
     ],
     grid: { top: 50, bottom: 30 },
   } : {};

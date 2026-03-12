@@ -418,12 +418,12 @@ const DataImportExportPage: React.FC = () => {
                       message={
                         importResult.success ? (
                           <span>
-                            <CheckCircleOutlined style={{ color: '#52c41a' }} />{' '}
+                            <CheckCircleOutlined style={{ color: '#1A7A52' }} />{' '}
                             导入成功
                           </span>
                         ) : (
                           <span>
-                            <CloseCircleOutlined style={{ color: '#ff4d4f' }} />{' '}
+                            <CloseCircleOutlined style={{ color: '#C53030' }} />{' '}
                             导入失败
                           </span>
                         )
@@ -433,7 +433,7 @@ const DataImportExportPage: React.FC = () => {
                           <p>成功导入: {importResult.imported_count} 条</p>
                           {importResult.errors && importResult.errors.length > 0 && (
                             <div>
-                              <p style={{ color: '#ff4d4f', fontWeight: 'bold' }}>
+                              <p style={{ color: '#C53030', fontWeight: 'bold' }}>
                                 错误信息:
                               </p>
                               <ul style={{ maxHeight: '200px', overflow: 'auto' }}>
@@ -504,12 +504,12 @@ const DataImportExportPage: React.FC = () => {
                       message={
                         importResult.success ? (
                           <span>
-                            <CheckCircleOutlined style={{ color: '#52c41a' }} />{' '}
+                            <CheckCircleOutlined style={{ color: '#1A7A52' }} />{' '}
                             导入成功
                           </span>
                         ) : (
                           <span>
-                            <CloseCircleOutlined style={{ color: '#ff4d4f' }} />{' '}
+                            <CloseCircleOutlined style={{ color: '#C53030' }} />{' '}
                             导入失败
                           </span>
                         )
@@ -519,7 +519,7 @@ const DataImportExportPage: React.FC = () => {
                           <p>成功导入: {importResult.imported_count} 条</p>
                           {importResult.errors && importResult.errors.length > 0 && (
                             <div>
-                              <p style={{ color: '#ff4d4f', fontWeight: 'bold' }}>
+                              <p style={{ color: '#C53030', fontWeight: 'bold' }}>
                                 错误信息:
                               </p>
                               <ul style={{ maxHeight: '200px', overflow: 'auto' }}>

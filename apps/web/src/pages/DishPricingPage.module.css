@@ -24,11 +24,11 @@
 }
 
 .recCardIncrease {
-  border-left: 4px solid #52c41a;
+  border-left: 4px solid #1A7A52;
 }
 
 .recCardDecrease {
-  border-left: 4px solid #1677ff;
+  border-left: 4px solid #0AAF9A;
 }
 
 .recCardMaintain {
@@ -37,7 +37,7 @@
 
 /* 行着色 */
 .rowIncrease {
-  background: #f6ffed !important;
+  background: rgba(26,122,82,0.08) !important;
 }
 
 .rowDecrease {
@@ -46,12 +46,12 @@
 
 /* 价格变化数字 */
 .priceUp {
-  color: #52c41a;
+  color: #1A7A52;
   font-weight: 600;
 }
 
 .priceDown {
-  color: #1677ff;
+  color: #0AAF9A;
   font-weight: 600;
 }
 

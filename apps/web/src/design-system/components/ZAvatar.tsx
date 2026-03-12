@@ -2,7 +2,7 @@ import React from 'react';
 import styles from './ZAvatar.module.css';
 
 type AvatarSize = 'sm' | 'md' | 'lg' | 'xl';
-type AvatarColor = 'orange' | 'blue' | 'green' | 'purple' | 'red';
+type AvatarColor = 'mint' | 'blue' | 'green' | 'purple' | 'red';
 
 interface ZAvatarProps {
   src?: string;
@@ -18,7 +18,7 @@ function initials(name: string): string {
   return name.slice(0, 2);
 }
 
-export default function ZAvatar({ src, name, size = 'md', color = 'orange', style }: ZAvatarProps) {
+export default function ZAvatar({ src, name, size = 'md', color = 'mint', style }: ZAvatarProps) {
   return (
     <div
       className={`${styles.avatar} ${styles[size]} ${src ? '' : styles[color]}`}

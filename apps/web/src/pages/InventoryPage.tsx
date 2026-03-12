@@ -181,9 +181,9 @@ const InventoryPage: React.FC = () => {
     series: [{
       type: 'bar',
       data: [
-        { value: statusDist.normal || 0, itemStyle: { color: '#52c41a' } },
+        { value: statusDist.normal || 0, itemStyle: { color: '#1A7A52' } },
         { value: statusDist.low || 0, itemStyle: { color: '#faad14' } },
-        { value: statusDist.critical || 0, itemStyle: { color: '#ff4d4f' } },
+        { value: statusDist.critical || 0, itemStyle: { color: '#C53030' } },
         { value: statusDist.out_of_stock || 0, itemStyle: { color: '#cf1322' } },
       ],
     }],
@@ -298,7 +298,7 @@ const InventoryPage: React.FC = () => {
 
       <Row gutter={16} style={{ marginBottom: 24 }}>
         <Col span={6}><Card size="small"><Statistic title="总物品数" value={statCounts.total} prefix={<InboxOutlined />} /></Card></Col>
-        <Col span={6}><Card size="small"><Statistic title="库存正常" value={statCounts.normal} valueStyle={{ color: '#52c41a' }} prefix={<CheckCircleOutlined />} /></Card></Col>
+        <Col span={6}><Card size="small"><Statistic title="库存正常" value={statCounts.normal} valueStyle={{ color: '#1A7A52' }} prefix={<CheckCircleOutlined />} /></Card></Col>
         <Col span={6}><Card size="small"><Statistic title="库存偏低" value={statCounts.low} valueStyle={{ color: '#faad14' }} prefix={<WarningOutlined />} /></Card></Col>
         <Col span={6}><Card size="small"><Statistic title="紧急补货" value={statCounts.critical} valueStyle={{ color: '#cf1322' }} prefix={<ExclamationCircleOutlined />} /></Card></Col>
       </Row>
@@ -345,7 +345,7 @@ const InventoryPage: React.FC = () => {
           <Row gutter={16}>
             <Col span={8}>
               <Card size="small" style={{ marginBottom: 16 }}>
-                <Statistic title="库存总价值" value={((stats?.total_value || 0) / 100).toFixed(2)} prefix="¥" valueStyle={{ color: '#1890ff' }} />
+                <Statistic title="库存总价值" value={((stats?.total_value || 0) / 100).toFixed(2)} prefix="¥" valueStyle={{ color: '#0AAF9A' }} />
               </Card>
               <Card size="small" title="库存状态分布">
                 <ReactECharts option={statusBarOption} style={{ height: 200 }} />

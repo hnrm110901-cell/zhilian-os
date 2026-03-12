@@ -49,13 +49,13 @@ interface AlertItem {
 // ── 常量 ──────────────────────────────────────────────────────────────────────
 
 const STATUS_COLOR: Record<string, string> = {
-  online:   '#52c41a',
-  offline:  '#ff4d4f',
-  degraded: '#fa8c16',
-  upgrading:'#1677ff',
-  normal:   '#52c41a',
-  warning:  '#fa8c16',
-  critical: '#ff4d4f',
+  online:   '#1A7A52',
+  offline:  '#C53030',
+  degraded: '#C8923A',
+  upgrading:'#0AAF9A',
+  normal:   '#1A7A52',
+  warning:  '#C8923A',
+  critical: '#C53030',
 };
 
 const LEVEL_COLOR: Record<string, string> = {
@@ -134,9 +134,9 @@ const EdgeHubDashboardPage: React.FC = () => {
       type: 'pie',
       radius: ['45%', '70%'],
       data: [
-        { name: 'P1 严重', value: p1, itemStyle: { color: '#ff4d4f' } },
-        { name: 'P2 重要', value: p2, itemStyle: { color: '#fa8c16' } },
-        { name: 'P3 一般', value: p3, itemStyle: { color: '#1677ff' } },
+        { name: 'P1 严重', value: p1, itemStyle: { color: '#C53030' } },
+        { name: 'P2 重要', value: p2, itemStyle: { color: '#C8923A' } },
+        { name: 'P3 一般', value: p3, itemStyle: { color: '#0AAF9A' } },
       ],
       label: { show: false },
     }],
@@ -158,7 +158,7 @@ const EdgeHubDashboardPage: React.FC = () => {
     },
     {
       title: '告警数', dataIndex: 'alertCount', width: 80,
-      render: (v: number) => <span style={{ color: v > 0 ? '#ff4d4f' : undefined, fontWeight: 600 }}>{v}</span>,
+      render: (v: number) => <span style={{ color: v > 0 ? '#C53030' : undefined, fontWeight: 600 }}>{v}</span>,
     },
     {
       title: '最后心跳', dataIndex: 'lastHeartbeatAt', width: 160,
@@ -261,7 +261,7 @@ const EdgeHubDashboardPage: React.FC = () => {
               <Statistic
                 title={<><BellOutlined /> 今日告警</>}
                 value={cards?.todayAlertCount ?? 0}
-                valueStyle={{ color: (cards?.todayAlertCount ?? 0) > 0 ? '#fa8c16' : undefined }}
+                valueStyle={{ color: (cards?.todayAlertCount ?? 0) > 0 ? '#C8923A' : undefined }}
               />
               <div className={styles.kpiSub}>
                 P1严重: {cards?.todayP1AlertCount ?? 0} 条
@@ -273,7 +273,7 @@ const EdgeHubDashboardPage: React.FC = () => {
               <Statistic
                 title={<><WarningOutlined /> 未解决告警</>}
                 value={cards?.openAlertCount ?? 0}
-                valueStyle={{ color: (cards?.openAlertCount ?? 0) > 0 ? '#ff4d4f' : undefined }}
+                valueStyle={{ color: (cards?.openAlertCount ?? 0) > 0 ? '#C53030' : undefined }}
               />
               <div className={styles.kpiSub}>需要处理</div>
             </Card>

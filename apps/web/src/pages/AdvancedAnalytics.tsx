@@ -140,7 +140,7 @@ const AdvancedAnalytics: React.FC = () => {
         type: 'line',
         yAxisIndex: 0,
         data: salesPrediction.predictions.map((p: any) => p.predicted_revenue / 100),
-        itemStyle: { color: '#1890ff' },
+        itemStyle: { color: '#0AAF9A' },
         areaStyle: { opacity: 0.3 },
       },
       {
@@ -148,7 +148,7 @@ const AdvancedAnalytics: React.FC = () => {
         type: 'line',
         yAxisIndex: 1,
         data: salesPrediction.predictions.map((p: any) => p.predicted_transactions),
-        itemStyle: { color: '#52c41a' },
+        itemStyle: { color: '#1A7A52' },
       },
     ],
   } : null;
@@ -183,7 +183,7 @@ const AdvancedAnalytics: React.FC = () => {
             const hour = timePatterns.hourly_analysis[params.dataIndex].hour;
             if (hour >= 11 && hour < 14) return '#ff7875'; // 午餐
             if (hour >= 17 && hour < 21) return '#ffa940'; // 晚餐
-            return '#1890ff';
+            return '#0AAF9A';
           },
         },
       },
@@ -296,7 +296,7 @@ const AdvancedAnalytics: React.FC = () => {
         >
           {stores.length > 0 ? stores.map((s: any) => (
             <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
-          )) : <Option value="STORE001">智链餐厅-朝阳店</Option>}
+          )) : <Option value="STORE001">屯象餐厅-朝阳店</Option>}
         </Select>
       </Card>
 
@@ -313,7 +313,7 @@ const AdvancedAnalytics: React.FC = () => {
                   <Col span={8}>
                     <Card>
                       <div>平均日营收</div>
-                      <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1890ff' }}>
+                      <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#0AAF9A' }}>
                         ¥{(salesPrediction.average_daily_revenue / 100).toFixed(2)}
                       </div>
                     </Card>
@@ -321,7 +321,7 @@ const AdvancedAnalytics: React.FC = () => {
                   <Col span={8}>
                     <Card>
                       <div>趋势</div>
-                      <div style={{ fontSize: '24px', fontWeight: 'bold', color: salesPrediction.trend >= 0 ? '#52c41a' : '#ff4d4f' }}>
+                      <div style={{ fontSize: '24px', fontWeight: 'bold', color: salesPrediction.trend >= 0 ? '#1A7A52' : '#C53030' }}>
                         {salesPrediction.trend >= 0 ? '+' : ''}{salesPrediction.trend.toFixed(2)}%
                       </div>
                     </Card>
@@ -373,7 +373,7 @@ const AdvancedAnalytics: React.FC = () => {
                     </Col>
                     <Col span={6}>
                       <div>上限阈值</div>
-                      <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#ff4d4f' }}>
+                      <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#C53030' }}>
                         ¥{(anomalies.statistics.threshold_upper / 100).toFixed(2)}
                       </div>
                     </Col>
@@ -444,7 +444,7 @@ const AdvancedAnalytics: React.FC = () => {
                     <Col span={8} key={index}>
                       <Card>
                         <div>高峰时段 #{index + 1}</div>
-                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#1890ff' }}>
+                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#0AAF9A' }}>
                           {peak.hour}:00 ({peak.period})
                         </div>
                         <div style={{ color: '#666' }}>

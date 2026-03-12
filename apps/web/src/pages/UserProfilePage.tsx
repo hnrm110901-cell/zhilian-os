@@ -81,7 +81,7 @@ const UserProfilePage: React.FC = () => {
         {profile && (
           <Card style={{ marginBottom: 16 }}>
             <Space align="start" size={24}>
-              <Avatar size={64} icon={<UserOutlined />} style={{ background: '#1677ff' }} />
+              <Avatar size={64} icon={<UserOutlined />} style={{ background: '#0AAF9A' }} />
               <div>
                 <div style={{ fontSize: 20, fontWeight: 600 }}>{profile.full_name || profile.username}</div>
                 <Space style={{ marginTop: 4 }}>

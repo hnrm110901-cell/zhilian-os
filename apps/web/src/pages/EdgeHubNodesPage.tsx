@@ -43,10 +43,10 @@ interface PageMeta {
 // ── 常量 ──────────────────────────────────────────────────────────────────────
 
 const STATUS_COLOR: Record<string, string> = {
-  online:   '#52c41a',
-  offline:  '#ff4d4f',
-  degraded: '#fa8c16',
-  upgrading:'#1677ff',
+  online:   '#1A7A52',
+  offline:  '#C53030',
+  degraded: '#C8923A',
+  upgrading:'#0AAF9A',
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -57,7 +57,7 @@ const LEVEL_COLOR: Record<string, string> = { p1: 'red', p2: 'orange', p3: 'blue
 
 function resourceBar(pct: number | null) {
   if (pct === null) return '—';
-  const color = pct >= 90 ? '#ff4d4f' : pct >= 70 ? '#fa8c16' : '#52c41a';
+  const color = pct >= 90 ? '#C53030' : pct >= 70 ? '#C8923A' : '#1A7A52';
   return (
     <span style={{ color, fontWeight: 600 }}>{pct.toFixed(1)}%</span>
   );
@@ -268,19 +268,19 @@ const EdgeHubNodesPage: React.FC = () => {
       <Row gutter={[12, 12]} className={styles.statsRow}>
         <Col xs={8}>
           <Card size="small" className={styles.statCard}>
-            <div className={styles.statNum} style={{ color: '#52c41a' }}>{onlineCount}</div>
+            <div className={styles.statNum} style={{ color: '#1A7A52' }}>{onlineCount}</div>
             <div className={styles.statLabel}>在线</div>
           </Card>
         </Col>
         <Col xs={8}>
           <Card size="small" className={styles.statCard}>
-            <div className={styles.statNum} style={{ color: '#ff4d4f' }}>{offlineCount}</div>
+            <div className={styles.statNum} style={{ color: '#C53030' }}>{offlineCount}</div>
             <div className={styles.statLabel}>离线</div>
           </Card>
         </Col>
         <Col xs={8}>
           <Card size="small" className={styles.statCard}>
-            <div className={styles.statNum} style={{ color: '#fa8c16' }}>{degradedCount}</div>
+            <div className={styles.statNum} style={{ color: '#C8923A' }}>{degradedCount}</div>
             <div className={styles.statLabel}>降级</div>
           </Card>
         </Col>
@@ -403,9 +403,9 @@ const EdgeHubNodesPage: React.FC = () => {
                       },
                       yAxis: { type: 'value', min: 0, max: 100, axisLabel: { formatter: '{value}%', fontSize: 10 } },
                       series: [
-                        { name: 'CPU%',  type: 'line', smooth: true, data: metricsPoints.map((p: any) => p.cpuPct),  itemStyle: { color: '#ff4d4f' }, lineStyle: { width: 1.5 }, showSymbol: false },
-                        { name: '内存%', type: 'line', smooth: true, data: metricsPoints.map((p: any) => p.memPct),  itemStyle: { color: '#1677ff' }, lineStyle: { width: 1.5 }, showSymbol: false },
-                        { name: '磁盘%', type: 'line', smooth: true, data: metricsPoints.map((p: any) => p.diskPct), itemStyle: { color: '#52c41a' }, lineStyle: { width: 1.5 }, showSymbol: false },
+                        { name: 'CPU%',  type: 'line', smooth: true, data: metricsPoints.map((p: any) => p.cpuPct),  itemStyle: { color: '#C53030' }, lineStyle: { width: 1.5 }, showSymbol: false },
+                        { name: '内存%', type: 'line', smooth: true, data: metricsPoints.map((p: any) => p.memPct),  itemStyle: { color: '#0AAF9A' }, lineStyle: { width: 1.5 }, showSymbol: false },
+                        { name: '磁盘%', type: 'line', smooth: true, data: metricsPoints.map((p: any) => p.diskPct), itemStyle: { color: '#1A7A52' }, lineStyle: { width: 1.5 }, showSymbol: false },
                       ],
                     }}
                     style={{ height: 180 }}

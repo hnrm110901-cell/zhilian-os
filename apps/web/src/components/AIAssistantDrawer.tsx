@@ -144,9 +144,9 @@ const AIAssistantDrawer: React.FC<Props> = ({ open, onClose, storeId = 'store_00
           <Avatar
             icon={<RobotOutlined />}
             size={28}
-            style={{ backgroundColor: '#1677ff' }}
+            style={{ backgroundColor: '#0AAF9A' }}
           />
-          <span style={{ fontWeight: 600 }}>AI 经营助手</span>
+          <span style={{ fontWeight: 600 }}>屯象智脑</span>
           {scenario && (
             <Tag color="blue" style={{ fontSize: 11 }}>
               <EnvironmentOutlined /> {scenario.scenario_label}
@@ -271,7 +271,7 @@ const AIAssistantDrawer: React.FC<Props> = ({ open, onClose, storeId = 'store_00
                   <Avatar
                     icon={<RobotOutlined />}
                     size={24}
-                    style={{ backgroundColor: '#1677ff', marginRight: 8, flexShrink: 0 }}
+                    style={{ backgroundColor: '#0AAF9A', marginRight: 8, flexShrink: 0 }}
                   />
                 )}
                 <div
@@ -279,7 +279,7 @@ const AIAssistantDrawer: React.FC<Props> = ({ open, onClose, storeId = 'store_00
                     maxWidth: '80%',
                     padding: '8px 12px',
                     borderRadius: m.role === 'user' ? '12px 12px 4px 12px' : '12px 12px 12px 4px',
-                    background: m.role === 'user' ? '#1677ff' : '#f5f5f5',
+                    background: m.role === 'user' ? '#0AAF9A' : '#f5f5f5',
                     color: m.role === 'user' ? 'white' : '#333',
                     fontSize: 13,
                     lineHeight: '1.5',
@@ -295,7 +295,7 @@ const AIAssistantDrawer: React.FC<Props> = ({ open, onClose, storeId = 'store_00
                 <Avatar
                   icon={<RobotOutlined />}
                   size={24}
-                  style={{ backgroundColor: '#1677ff' }}
+                  style={{ backgroundColor: '#0AAF9A' }}
                 />
                 <Spin size="small" />
                 <Text type="secondary" style={{ fontSize: 12 }}>AI 正在思考...</Text>

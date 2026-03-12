@@ -39,8 +39,8 @@ const AGENT_META: Record<string, AgentMeta> = {
     icon:        '🧠',
     description: '综合分析成本、损耗、排班数据，每日生成 Top3 决策建议并跟踪执行效果',
     route:       '/decision',
-    color:       '#fff7e6',
-    accentHex:   '#fa8c16',
+    color:       'rgba(200,146,58,0.08)',
+    accentHex:   '#C8923A',
     capabilities: ['成本分析', '损耗归因', '决策排序'],
   },
   schedule: {
@@ -49,7 +49,7 @@ const AGENT_META: Record<string, AgentMeta> = {
     description: '预测客流趋势，自动推荐最优排班方案，降低人力成本',
     route:       '/schedule',
     color:       '#e6f7ff',
-    accentHex:   '#1890ff',
+    accentHex:   '#0AAF9A',
     capabilities: ['客流预测', '班次推荐', '人力优化'],
   },
   inventory: {
@@ -57,8 +57,8 @@ const AGENT_META: Record<string, AgentMeta> = {
     icon:        '📦',
     description: '实时监控库存水位，预测缺货风险，自动生成采购补单建议',
     route:       '/inventory',
-    color:       '#f6ffed',
-    accentHex:   '#52c41a',
+    color:       'rgba(26,122,82,0.08)',
+    accentHex:   '#1A7A52',
     capabilities: ['库存预警', '备货建议', '采购优化'],
   },
   service: {
@@ -167,23 +167,23 @@ function statusForAgent(stat: AgentStat | undefined): {
     return { label: '待机', color: '#8c8c8c', badgeType: 'default' };
   }
   if (stat.adoption_rate < 30) {
-    return { label: '需关注', color: '#fa8c16', badgeType: 'warning' };
+    return { label: '需关注', color: '#C8923A', badgeType: 'warning' };
   }
-  return { label: '运行中', color: '#52c41a', badgeType: 'success' };
+  return { label: '运行中', color: '#1A7A52', badgeType: 'success' };
 }
 
 function adoptionColor(rate: number): string {
-  if (rate >= 70) return '#52c41a';
+  if (rate >= 70) return '#1A7A52';
   if (rate >= 40) return '#faad14';
-  return '#f5222d';
+  return '#C53030';
 }
 
 function statusColor(status: string | null): string {
   switch (status) {
-    case 'approved':  case 'executed':  return '#52c41a';
-    case 'rejected':                    return '#f5222d';
-    case 'modified':                    return '#fa8c16';
-    case 'pending':                     return '#1890ff';
+    case 'approved':  case 'executed':  return '#1A7A52';
+    case 'rejected':                    return '#C53030';
+    case 'modified':                    return '#C8923A';
+    case 'pending':                     return '#0AAF9A';
     default:                            return '#8c8c8c';
   }
 }
@@ -258,23 +258,23 @@ const AgentHubPage: React.FC = () => {
       value: summary?.total_decisions ?? '—',
       unit: '次',
       iconBg: '#e6f7ff',
-      iconColor: '#1890ff',
+      iconColor: '#0AAF9A',
       icon: <ThunderboltOutlined />,
     },
     {
       label: '决策采纳率',
       value: summary?.adoption_rate != null ? `${summary.adoption_rate.toFixed(1)}` : '—',
       unit: '%',
-      iconBg: '#f6ffed',
-      iconColor: '#52c41a',
+      iconBg: 'rgba(26,122,82,0.08)',
+      iconColor: '#1A7A52',
       icon: <CheckCircleOutlined />,
     },
     {
       label: '人工覆盖率',
       value: summary?.override_rate != null ? `${summary.override_rate.toFixed(1)}` : '—',
       unit: '%',
-      iconBg: '#fff7e6',
-      iconColor: '#fa8c16',
+      iconBg: 'rgba(200,146,58,0.08)',
+      iconColor: '#C8923A',
       icon: <SyncOutlined />,
     },
     {
@@ -289,8 +289,8 @@ const AgentHubPage: React.FC = () => {
       label: '待处理决策',
       value: summary?.pending_count ?? '—',
       unit: '项',
-      iconBg: summary?.pending_count ? '#fff1f0' : '#f6ffed',
-      iconColor: summary?.pending_count ? '#f5222d' : '#52c41a',
+      iconBg: summary?.pending_count ? 'rgba(197,48,48,0.08)' : 'rgba(26,122,82,0.08)',
+      iconColor: summary?.pending_count ? '#C53030' : '#1A7A52',
       icon: <ClockCircleOutlined />,
     },
   ];
@@ -324,8 +324,8 @@ const AgentHubPage: React.FC = () => {
       type: 'line',
       smooth: true,
       data: trend.map(t => t.adoption_rate),
-      lineStyle: { color: '#1890ff', width: 2 },
-      itemStyle: { color: '#1890ff' },
+      lineStyle: { color: '#0AAF9A', width: 2 },
+      itemStyle: { color: '#0AAF9A' },
       areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [
         { offset: 0, color: 'rgba(24,144,255,0.15)' },
         { offset: 1, color: 'rgba(24,144,255,0)' },
@@ -452,7 +452,7 @@ const AgentHubPage: React.FC = () => {
                     <div className={styles.agentMetricItem}>
                       <span
                         className={styles.agentMetricValue}
-                        style={{ color: (stat?.pending ?? 0) > 0 ? '#f5222d' : '#8c8c8c' }}
+                        style={{ color: (stat?.pending ?? 0) > 0 ? '#C53030' : '#8c8c8c' }}
                       >
                         {stat?.pending ?? 0}
                       </span>
@@ -506,7 +506,7 @@ const AgentHubPage: React.FC = () => {
             <ZCard
               title={
                 <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                  <RobotOutlined style={{ color: '#1890ff' }} />
+                  <RobotOutlined style={{ color: '#0AAF9A' }} />
                   <span>最近决策活动</span>
                 </div>
               }
@@ -548,7 +548,7 @@ const AgentHubPage: React.FC = () => {
                       {netImpact !== 0 && (
                         <span
                           className={styles.activityAmount}
-                          style={{ color: netImpact >= 0 ? '#52c41a' : '#f5222d' }}
+                          style={{ color: netImpact >= 0 ? '#1A7A52' : '#C53030' }}
                         >
                           {netImpact >= 0 ? '+' : ''}¥{Math.abs(netImpact).toLocaleString()}
                         </span>
@@ -563,7 +563,7 @@ const AgentHubPage: React.FC = () => {
             <ZCard
               title={
                 <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                  <RiseOutlined style={{ color: '#52c41a' }} />
+                  <RiseOutlined style={{ color: '#1A7A52' }} />
                   <span>采纳率趋势</span>
                 </div>
               }

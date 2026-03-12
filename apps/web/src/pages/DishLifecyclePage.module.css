@@ -13,30 +13,30 @@
 }
 
 /* 阶段标签色 */
-.phaseLaunch  { color: #1677ff; }
-.phaseGrowth  { color: #52c41a; font-weight: 600; }
+.phaseLaunch  { color: #0AAF9A; }
+.phaseGrowth  { color: #1A7A52; font-weight: 600; }
 .phasePeak    { color: #389e0d; font-weight: 600; }
-.phaseDecline { color: #fa8c16; }
-.phaseExit    { color: #ff4d4f; font-weight: 600; }
+.phaseDecline { color: #C8923A; }
+.phaseExit    { color: #C53030; font-weight: 600; }
 
 /* 行着色 */
 .rowExit    { background: #fff2f0 !important; }
-.rowDecline { background: #fff7e6 !important; }
+.rowDecline { background: rgba(200,146,58,0.08) !important; }
 .rowLaunch  { background: #e6f4ff !important; }
 
 /* 跃迁卡片 */
 .transCard {
   border-radius: 8px;
-  border-left: 4px solid #fa8c16;
+  border-left: 4px solid #C8923A;
   margin-bottom: 8px;
 }
 
 .transCardUp {
-  border-left-color: #52c41a;
+  border-left-color: #1A7A52;
 }
 
 .transCardDown {
-  border-left-color: #ff4d4f;
+  border-left-color: #C53030;
 }
 
 /* 生命线节点 */

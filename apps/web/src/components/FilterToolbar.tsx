@@ -15,7 +15,7 @@
  *     { label: '导出',    icon: <ExportOutlined />, onClick: handleExport, type: 'default' },
  *   ]}
  *   summary="共 12 条"
- *   extra={<Tag color="orange">3 条高危</Tag>}
+ *   extra={<Tag color="mint">3 条高危</Tag>}
  * />
  */
 import React, { useState, useCallback } from 'react';

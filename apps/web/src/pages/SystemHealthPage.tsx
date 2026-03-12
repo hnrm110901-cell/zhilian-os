@@ -47,8 +47,8 @@ const statusColor: Record<string, string> = {
 
 const statusIcon = (s: string) => {
   const c = statusColor[s?.toLowerCase()] || 'default';
-  if (c === 'green') return <CheckCircleOutlined style={{ color: '#52c41a' }} />;
-  if (c === 'red') return <CloseCircleOutlined style={{ color: '#ff4d4f' }} />;
+  if (c === 'green') return <CheckCircleOutlined style={{ color: '#1A7A52' }} />;
+  if (c === 'red') return <CloseCircleOutlined style={{ color: '#C53030' }} />;
   return <HeartOutlined style={{ color: '#faad14' }} />;
 };
 
@@ -104,7 +104,7 @@ const SystemHealthPage: React.FC = () => {
     },
     { title: '响应时间', dataIndex: 'response_time_ms', key: 'response_time_ms', render: (v: number) => v != null ? `${v} ms` : '-' },
     { title: '最后检查', dataIndex: 'last_check', key: 'last_check', render: (v: string) => v ? new Date(v).toLocaleString() : '-' },
-    { title: '错误信息', dataIndex: 'error_message', key: 'error_message', render: (v: string) => v ? <span style={{ color: '#ff4d4f' }}>{v}</span> : '-' },
+    { title: '错误信息', dataIndex: 'error_message', key: 'error_message', render: (v: string) => v ? <span style={{ color: '#C53030' }}>{v}</span> : '-' },
   ];
 
   const overallStatus = health?.status?.toLowerCase();
@@ -136,7 +136,7 @@ const SystemHealthPage: React.FC = () => {
           <Col xs={24} sm={12} md={6}>
             <Card>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 32, marginBottom: 8 }}><ApiOutlined style={{ color: readyStatus === 'ok' ? '#52c41a' : '#faad14' }} /></div>
+                <div style={{ fontSize: 32, marginBottom: 8 }}><ApiOutlined style={{ color: readyStatus === 'ok' ? '#1A7A52' : '#faad14' }} /></div>
                 <div style={{ fontWeight: 600, fontSize: 16 }}>就绪探针</div>
                 <Badge status={readyStatus === 'ok' ? 'success' : 'warning'} text={readyStatus || '检查中'} />
               </div>
@@ -145,7 +145,7 @@ const SystemHealthPage: React.FC = () => {
           <Col xs={24} sm={12} md={6}>
             <Card>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 32, marginBottom: 8 }}><HeartOutlined style={{ color: liveStatus === 'ok' ? '#52c41a' : '#faad14' }} /></div>
+                <div style={{ fontSize: 32, marginBottom: 8 }}><HeartOutlined style={{ color: liveStatus === 'ok' ? '#1A7A52' : '#faad14' }} /></div>
                 <div style={{ fontWeight: 600, fontSize: 16 }}>存活探针</div>
                 <Badge status={liveStatus === 'ok' ? 'success' : 'warning'} text={liveStatus || '检查中'} />
               </div>
@@ -154,9 +154,9 @@ const SystemHealthPage: React.FC = () => {
           <Col xs={24} sm={12} md={6}>
             <Card>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 32, marginBottom: 8 }}><RobotOutlined style={{ color: '#1677ff' }} /></div>
+                <div style={{ fontSize: 32, marginBottom: 8 }}><RobotOutlined style={{ color: '#0AAF9A' }} /></div>
                 <div style={{ fontWeight: 600, fontSize: 16 }}>活跃 Agent</div>
-                <div style={{ fontSize: 24, color: '#1677ff' }}>{agents.length}</div>
+                <div style={{ fontSize: 24, color: '#0AAF9A' }}>{agents.length}</div>
               </div>
             </Card>
           </Col>

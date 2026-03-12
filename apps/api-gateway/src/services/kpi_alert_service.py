@@ -91,7 +91,7 @@ def build_alert_message(
         f"本期成本支出：¥{actual_cost_yuan:,.0f}\n\n"
         f"📌 Top3 高消耗食材：\n{top_lines}\n\n"
         f"💡 建议：立即审阅今日 AI 决策推荐，执行压缩成本方案\n"
-        f"---\n智链OS · 食材成本率监控"
+        f"---\n屯象OS · 食材成本率监控"
     )
 
 
@@ -427,7 +427,7 @@ class KPIAlertService:
             f"预测 {result['forecast_days']} 天后：{result['forecasted_pct']:.1f}%"
             f"{reach_line}\n\n"
             f"💡 建议：尽早执行 AI 决策推荐中的降本方案，防止成本率持续上升\n"
-            f"---\n智链OS · 成本率趋势监控"
+            f"---\n屯象OS · 成本率趋势监控"
         )
 
     @staticmethod

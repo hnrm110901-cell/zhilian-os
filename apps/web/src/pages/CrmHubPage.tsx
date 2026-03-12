@@ -49,11 +49,11 @@ interface ChurnUser {
 // ── Segment meta ─────────────────────────────────────────────────────────────
 
 const SEGMENT_META: Record<string, { color: string; label: string; order: number }> = {
-  new:        { color: '#52c41a', label: '新客',     order: 0 },
-  repurchase: { color: '#1890ff', label: '复购客',   order: 1 },
+  new:        { color: '#1A7A52', label: '新客',     order: 0 },
+  repurchase: { color: '#0AAF9A', label: '复购客',   order: 1 },
   high_value: { color: '#722ed1', label: '高价值客', order: 2 },
-  dormant:    { color: '#fa8c16', label: '沉睡客',   order: 3 },
-  churn_risk: { color: '#f5222d', label: '流失预警', order: 4 },
+  dormant:    { color: '#C8923A', label: '沉睡客',   order: 3 },
+  churn_risk: { color: '#C53030', label: '流失预警', order: 4 },
 };
 
 const SIGNAL_TYPE_LABEL: Record<string, string> = {
@@ -244,9 +244,9 @@ export default function CrmHubPage() {
 
   const KPI_ITEMS = [
     { icon: '👥', bg: '#e6f4ff', label: '会员总量',   value: fmtNum(d.total_members),        unit: '人' },
-    { icon: '🆕', bg: '#f6ffed', label: '本月新增',   value: `+${d.new_this_month}`,         unit: '人', sub: '较上月 +8%' },
+    { icon: '🆕', bg: 'rgba(26,122,82,0.08)', label: '本月新增',   value: `+${d.new_this_month}`,         unit: '人', sub: '较上月 +8%' },
     { icon: '🔄', bg: '#fff0f6', label: '复购率',     value: `${d.repurchase_rate.toFixed(1)}`, unit: '%' },
-    { icon: '😴', bg: '#fff7e6', label: '沉睡会员',   value: fmtNum(d.dormant_count),        unit: '人', warn: '需唤醒' },
+    { icon: '😴', bg: 'rgba(200,146,58,0.08)', label: '沉睡会员',   value: fmtNum(d.dormant_count),        unit: '人', warn: '需唤醒' },
     { icon: '💰', bg: '#f9f0ff', label: '储值余额',   value: `¥${fmtMoney(d.stored_value_yuan)}` },
     { icon: '📡', bg: '#e6fffb', label: '私域触达率', value: `${d.reach_rate.toFixed(1)}`,   unit: '%' },
   ];
@@ -298,7 +298,7 @@ export default function CrmHubPage() {
       <div className={css.mainGrid}>
         {/* Col 1: 人群分层 */}
         <ZCard
-          title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><TeamOutlined style={{ color: '#1890ff' }} /><span>人群分层</span></div>}
+          title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><TeamOutlined style={{ color: '#0AAF9A' }} /><span>人群分层</span></div>}
           extra={<a onClick={() => navigate('/members')} style={{ fontSize: 12 }}>会员中心</a>}
         >
           <div className={css.segmentList}>
@@ -326,7 +326,7 @@ export default function CrmHubPage() {
 
         {/* Col 2: 增长信号 */}
         <ZCard
-          title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><RiseOutlined style={{ color: '#52c41a' }} /><span>AI 增长信号</span></div>}
+          title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><RiseOutlined style={{ color: '#1A7A52' }} /><span>AI 增长信号</span></div>}
           extra={<a onClick={() => navigate('/private-domain')} style={{ fontSize: 12 }}>私域运营</a>}
         >
           <div className={css.signalList}>
@@ -360,7 +360,7 @@ export default function CrmHubPage() {
 
         {/* Col 3: 流失预警 */}
         <ZCard
-          title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><WarningOutlined style={{ color: '#f5222d' }} /><span>流失预警</span></div>}
+          title={<div style={{ display:'flex', alignItems:'center', gap:6 }}><WarningOutlined style={{ color: '#C53030' }} /><span>流失预警</span></div>}
           extra={<a onClick={() => navigate('/customer360')} style={{ fontSize: 12 }}>客户360</a>}
         >
           <div className={css.churnSummaryRow}>

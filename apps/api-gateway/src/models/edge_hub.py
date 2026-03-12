@@ -1,6 +1,6 @@
 """
 Edge Hub Models — Phase 9
-智链OS 门店边缘硬件层：边缘主机 / 设备 / 耳机绑定 / 告警
+屯象OS 门店边缘硬件层：边缘主机 / 设备 / 耳机绑定 / 告警
 """
 import enum
 import uuid

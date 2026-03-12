@@ -104,7 +104,7 @@ export default function AgentOKRPage() {
             Agent OKR 达成看板
           </h2>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--text-secondary)' }}>
-            以交付结果为导向 · 每个 Agent 的量化 KPI · 来源于智链OS Agent战略分析
+            以交付结果为导向 · 每个 Agent 的量化 KPI · 来源于屯象OS Agent战略分析
           </p>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>

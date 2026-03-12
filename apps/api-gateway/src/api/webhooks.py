@@ -319,7 +319,7 @@ async def ping_subscription(
         "event": "ping",
         "subscription_id": sub_id,
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "message": "智链OS Webhook 连通性测试",
+        "message": "屯象OS Webhook 连通性测试",
     }
     payload_str = json.dumps(payload, ensure_ascii=False)
 

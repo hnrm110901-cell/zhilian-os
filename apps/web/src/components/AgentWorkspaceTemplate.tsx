@@ -90,7 +90,7 @@ const STATUS_CONFIG: Record<AgentStatus, { label: string; type: 'success' | 'war
 const AgentWorkspaceTemplate: React.FC<AgentWorkspaceTemplateProps> = ({
   agentName,
   agentIcon,
-  agentColor = '#1677ff',
+  agentColor = '#0AAF9A',
   description,
   status = 'idle',
   kpis = [],

@@ -28,7 +28,7 @@ export const DataCard: React.FC<DataCardProps> = ({
   onClick,
   style,
 }) => {
-  const trendColor = trend?.isPositive ? '#52c41a' : '#f5222d';
+  const trendColor = trend?.isPositive ? '#1A7A52' : '#C53030';
   const TrendIcon = trend?.isPositive ? ArrowUpOutlined : ArrowDownOutlined;
 
   return (

@@ -1,4 +1,4 @@
-/* 全局样式 */
+/* ═══ 屯象OS · Global Styles ═══ */
 
 * {
   box-sizing: border-box;
@@ -10,9 +10,8 @@ html,
 body,
 #root {
   height: 100%;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
-    'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
-    'Noto Color Emoji';
+  font-family: 'Noto Sans SC', 'PingFang SC', -apple-system, BlinkMacSystemFont,
+    'SF Pro Display', 'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -23,7 +22,7 @@ body {
   transition: background-color var(--transition-base), color var(--transition-base);
 }
 
-/* 滚动条样式 */
+/* ── Scrollbar ── */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -42,7 +41,6 @@ body {
   background: var(--text-tertiary);
 }
 
-/* 暗色主题下的滚动条 */
 [data-theme='dark'] ::-webkit-scrollbar-thumb {
   background: var(--border-color);
 }
@@ -51,7 +49,7 @@ body {
   background: var(--text-secondary);
 }
 
-/* 通用工具类 */
+/* ── Utilities ── */
 .flex-center {
   display: flex;
   align-items: center;
@@ -77,45 +75,31 @@ body {
   overflow: hidden;
 }
 
-/* 动画 */
+/* ── Animations ── */
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes slideInUp {
-  from {
-    transform: translateY(20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
 
 @keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
-.fade-in {
-  animation: fadeIn var(--transition-base);
+@keyframes txPulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
 }
 
-.slide-in-up {
-  animation: slideInUp var(--transition-slow);
-}
+.fade-in { animation: fadeIn var(--transition-base); }
+.slide-in-up { animation: slideInUp var(--transition-slow); }
 
-/* 响应式断点 */
+/* ── Responsive ── */
 @media (max-width: 576px) {
   :root {
     --spacing-lg: 16px;

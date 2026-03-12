@@ -1,5 +1,5 @@
 """
-智链OS API适配器集成服务
+屯象OS API适配器集成服务
 统一管理所有第三方API适配器，并与神经系统集成
 """
 from typing import Dict, Any, Optional, List
@@ -67,7 +67,7 @@ class AdapterIntegrationService:
         store_id: str,
     ) -> Dict[str, Any]:
         """
-        从天财商龙同步订单到智链OS
+        从天财商龙同步订单到屯象OS
 
         Args:
             order_id: 订单ID
@@ -110,7 +110,7 @@ class AdapterIntegrationService:
         store_id: str,
     ) -> Dict[str, Any]:
         """
-        从美团同步订单到智链OS
+        从美团同步订单到屯象OS
 
         Args:
             order_id: 订单ID
@@ -153,7 +153,7 @@ class AdapterIntegrationService:
         store_id: str,
     ) -> Dict[str, Any]:
         """
-        从品智同步订单到智链OS
+        从品智同步订单到屯象OS
 
         说明：
         - 品智适配器当前提供按日期范围查询列表接口，未提供单号直查接口；
@@ -239,7 +239,7 @@ class AdapterIntegrationService:
         store_id: str,
     ) -> Dict[str, Any]:
         """
-        从天财商龙同步菜品到智链OS
+        从天财商龙同步菜品到屯象OS
 
         Args:
             store_id: 门店ID
@@ -282,7 +282,7 @@ class AdapterIntegrationService:
         store_id: str,
     ) -> Dict[str, Any]:
         """
-        从美团同步菜品到智链OS
+        从美团同步菜品到屯象OS
 
         Args:
             store_id: 门店ID
@@ -324,7 +324,7 @@ class AdapterIntegrationService:
         self,
         store_id: str,
     ) -> Dict[str, Any]:
-        """从品智同步菜品到智链OS。"""
+        """从品智同步菜品到屯象OS。"""
         adapter = self.get_adapter("pinzhi")
         if not adapter:
             raise ValueError("品智适配器未注册")

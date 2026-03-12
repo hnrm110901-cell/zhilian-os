@@ -82,7 +82,7 @@ const OpenPlatformPage: React.FC = () => {
       title: '插件', key: 'name',
       render: (_: unknown, r: Plugin) => (
         <Space>
-          <Avatar icon={<AppstoreOutlined />} style={{ background: '#1890ff' }} size="small" />
+          <Avatar icon={<AppstoreOutlined />} style={{ background: '#0AAF9A' }} size="small" />
           <div>
             <div style={{ fontWeight: 500 }}>{r.name}</div>
             <Text type="secondary" style={{ fontSize: 12 }}>{r.description}</Text>

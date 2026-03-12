@@ -197,8 +197,8 @@ const DecisionValidatorPage: React.FC = () => {
                     <Button type="primary" onClick={handleBatchValidate}>运行示例批量验证</Button>
                     {batchSummary && (
                       <Row gutter={16}>
-                        <Col span={8}><Card><Statistic title="通过" value={batchSummary.approved} valueStyle={{ color: '#52c41a' }} /></Card></Col>
-                        <Col span={8}><Card><Statistic title="拒绝" value={batchSummary.rejected} valueStyle={{ color: '#ff4d4f' }} /></Card></Col>
+                        <Col span={8}><Card><Statistic title="通过" value={batchSummary.approved} valueStyle={{ color: '#1A7A52' }} /></Card></Col>
+                        <Col span={8}><Card><Statistic title="拒绝" value={batchSummary.rejected} valueStyle={{ color: '#C53030' }} /></Card></Col>
                         <Col span={8}><Card><Statistic title="警告" value={batchSummary.warnings} valueStyle={{ color: '#faad14' }} /></Card></Col>
                       </Row>
                     )}

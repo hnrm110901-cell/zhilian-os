@@ -1,5 +1,5 @@
 .card {
-  border-left: 3px solid #1890ff;
+  border-left: 3px solid #0AAF9A;
   border-radius: 8px;
   background: #fff;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
@@ -94,12 +94,12 @@
   white-space: nowrap;
 }
 
-.tagGreen  { background: #f6ffed; color: #52c41a; border: 1px solid #b7eb8f; }
-.tagOrange { background: #fff7e6; color: #fa8c16; border: 1px solid #ffd591; }
+.tagGreen  { background: rgba(26,122,82,0.08); color: #1A7A52; border: 1px solid rgba(26,122,82,0.3); }
+.tagOrange { background: rgba(200,146,58,0.08); color: #C8923A; border: 1px solid rgba(200,146,58,0.3); }
 
-.diffEasy   { background: #f6ffed; color: #52c41a; border: 1px solid #b7eb8f; }
-.diffMedium { background: #fff7e6; color: #fa8c16; border: 1px solid #ffd591; }
-.diffHard   { background: #fff1f0; color: #ff4d4f; border: 1px solid #ffa39e; }
+.diffEasy   { background: rgba(26,122,82,0.08); color: #1A7A52; border: 1px solid rgba(26,122,82,0.3); }
+.diffMedium { background: rgba(200,146,58,0.08); color: #C8923A; border: 1px solid rgba(200,146,58,0.3); }
+.diffHard   { background: rgba(197,48,48,0.08); color: #C53030; border: 1px solid rgba(197,48,48,0.3); }
 
 /* ── Confidence ──────────────────────────────────── */
 
@@ -146,7 +146,7 @@
   padding: 7px 0;
   border: none;
   border-radius: 6px;
-  background: var(--accent, #1677ff);
+  background: var(--accent, #0AAF9A);
   color: #fff;
   font-size: 12px;
   font-weight: 600;
