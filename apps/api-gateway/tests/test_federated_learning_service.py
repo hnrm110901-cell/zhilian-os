@@ -231,3 +231,166 @@ class TestDifferentialPrivacy:
         arr = np.array([0.0, 0.0, 0.0])
         sensitivity = service._calculate_sensitivity(arr)
         assert sensitivity >= 0
+
+
+# ─── 加权聚合 _weighted_aggregation ──────────────────────────────────────────
+
+class TestWeightedAggregation:
+
+    def test_weighted_aggregation_with_equal_weights(self):
+        """等权重时加权聚合结果应等同于简单平均。"""
+        import numpy as np
+        service = FederatedLearningService()
+        models = [
+            {"parameters": {"w": np.array([0.0, 4.0])}, "weight": 1.0},
+            {"parameters": {"w": np.array([4.0, 0.0])}, "weight": 1.0},
+        ]
+        result = service._weighted_aggregation(models)
+        assert pytest.approx(result["parameters"]["w"].tolist()) == [2.0, 2.0]
+        assert result["aggregation_method"] == "weighted_avg"
+
+    def test_weighted_aggregation_with_unequal_weights(self):
+        """不等权重时结果应偏向高权重模型。"""
+        import numpy as np
+        service = FederatedLearningService()
+        models = [
+            {"parameters": {"w": np.array([0.0, 0.0])}, "weight": 1.0},
+            {"parameters": {"w": np.array([10.0, 10.0])}, "weight": 3.0},
+        ]
+        result = service._weighted_aggregation(models)
+        # 期望 = (0*0.25 + 10*0.75) = 7.5
+        assert pytest.approx(result["parameters"]["w"].tolist()) == [7.5, 7.5]
+
+    def test_weighted_aggregation_single_model(self):
+        """单模型加权聚合应返回原值。"""
+        import numpy as np
+        service = FederatedLearningService()
+        models = [
+            {"parameters": {"w": np.array([3.0, 5.0])}, "weight": 42.0},
+        ]
+        result = service._weighted_aggregation(models)
+        assert pytest.approx(result["parameters"]["w"].tolist()) == [3.0, 5.0]
+
+    def test_weighted_aggregation_default_weight(self):
+        """未指定 weight 字段时默认权重为 1.0。"""
+        import numpy as np
+        service = FederatedLearningService()
+        models = [
+            {"parameters": {"w": np.array([2.0])}},
+            {"parameters": {"w": np.array([8.0])}},
+        ]
+        result = service._weighted_aggregation(models)
+        assert pytest.approx(result["parameters"]["w"].tolist()) == [5.0]
+
+    def test_weighted_aggregation_multi_layer(self):
+        """多层参数应各层独立加权聚合。"""
+        import numpy as np
+        service = FederatedLearningService()
+        models = [
+            {"parameters": {"layer1": np.array([1.0]), "layer2": np.array([10.0])}, "weight": 1.0},
+            {"parameters": {"layer1": np.array([3.0]), "layer2": np.array([20.0])}, "weight": 1.0},
+        ]
+        result = service._weighted_aggregation(models)
+        assert pytest.approx(result["parameters"]["layer1"].tolist()) == [2.0]
+        assert pytest.approx(result["parameters"]["layer2"].tolist()) == [15.0]
+
+    def test_weighted_aggregation_returns_normalized_weights(self):
+        """返回值应包含归一化后的 weights 列表。"""
+        import numpy as np
+        service = FederatedLearningService()
+        models = [
+            {"parameters": {"w": np.array([1.0])}, "weight": 2.0},
+            {"parameters": {"w": np.array([1.0])}, "weight": 8.0},
+        ]
+        result = service._weighted_aggregation(models)
+        assert pytest.approx(result["weights"]) == [0.2, 0.8]
+
+    def test_weighted_aggregation_empty_raises(self):
+        """空模型列表应抛出 ValueError。"""
+        service = FederatedLearningService()
+        with pytest.raises(ValueError, match="No models"):
+            service._weighted_aggregation([])
+
+
+# ─── 质量过滤 _validate_model_parameters ─────────────────────────────────────
+
+class TestQualityFiltering:
+
+    def test_reject_nan_parameters(self):
+        """含 NaN 的参数应校验失败。"""
+        import numpy as np
+        service = FederatedLearningService()
+        params = {"layer1": np.array([1.0, float("nan"), 3.0])}
+        assert service._validate_model_parameters(params) is False
+
+    def test_reject_inf_parameters(self):
+        """含 Inf 的参数应校验失败。"""
+        import numpy as np
+        service = FederatedLearningService()
+        params = {"layer1": np.array([1.0, float("inf"), 3.0])}
+        assert service._validate_model_parameters(params) is False
+
+    def test_reject_negative_inf_parameters(self):
+        """含 -Inf 的参数应校验失败。"""
+        import numpy as np
+        service = FederatedLearningService()
+        params = {"layer1": np.array([float("-inf"), 2.0])}
+        assert service._validate_model_parameters(params) is False
+
+    def test_mixed_valid_invalid_layers(self):
+        """多层中任一层含 NaN 应整体校验失败。"""
+        import numpy as np
+        service = FederatedLearningService()
+        params = {
+            "layer1": np.array([1.0, 2.0]),       # valid
+            "layer2": np.array([float("nan")]),     # invalid
+        }
+        assert service._validate_model_parameters(params) is False
+
+    def test_all_valid_layers_pass(self):
+        """所有层均合法时应校验通过。"""
+        import numpy as np
+        service = FederatedLearningService()
+        params = {
+            "layer1": np.array([0.1, 0.2, 0.3]),
+            "layer2": np.array([-1.0, 1.0]),
+            "bias": np.array([0.0]),
+        }
+        assert service._validate_model_parameters(params) is True
+
+    def test_non_array_values_pass(self):
+        """非 numpy array 值（如 str/int）不触发 NaN/Inf 检查。"""
+        import numpy as np
+        service = FederatedLearningService()
+        params = {
+            "layer1": np.array([1.0, 2.0]),
+            "meta": "some_metadata",
+            "version": 3,
+        }
+        assert service._validate_model_parameters(params) is True
+
+
+# ─── DataIsolationManager ────────────────────────────────────────────────────
+
+class TestDataIsolationManager:
+
+    def test_register_and_validate_same_store(self):
+        """同一门店访问自身数据应通过。"""
+        from src.services.federated_learning_service import data_isolation_manager
+        data_isolation_manager.register_store_boundary("S001", {"level": "strict"})
+        assert data_isolation_manager.validate_data_access("S001", "S001", "orders") is True
+
+    def test_cross_store_access_denied(self):
+        """跨店访问应被拒绝。"""
+        from src.services.federated_learning_service import data_isolation_manager
+        assert data_isolation_manager.validate_data_access("S001", "S002", "orders") is False
+
+    def test_anonymize_data_hashes_sensitive_fields(self):
+        """敏感字段应被哈希化，非敏感字段保持原样。"""
+        from src.services.federated_learning_service import data_isolation_manager
+        data = {"customer_id": "C001", "phone": "13800138000", "amount": 99.5}
+        result = data_isolation_manager.anonymize_data(data)
+        assert result["customer_id"] != "C001"
+        assert len(result["customer_id"]) == 16  # SHA256 truncated to 16
+        assert result["phone"] != "13800138000"
+        assert result["amount"] == 99.5  # non-sensitive, untouched

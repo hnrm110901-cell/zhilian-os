@@ -5,6 +5,40 @@
 
 ---
 
+## 规划未完成任务 — 五大类全部完成（2026-03-12）
+
+### 一：Phase 4 测试补全
+- [x] FederatedLearningService：加权聚合 7 测试 + 质量过滤 6 测试 + DataIsolationManager 3 测试（35→passed）
+- [x] RecommendationEngine：评分公式详尽验证 8 测试 + 定价策略 6 测试 + 推荐理由 3 测试（34→passed）
+- [x] Phase 4 集成测试 `test_phase4_integration.py`：FL E2E/推荐E2E/Agent协同E2E/A/B框架（15 passed）
+
+### 二：Codex 前端任务
+- [x] WorkforcePage 员工健康 Tab（已由前期开发完成，含风险排名+公平性图+KPI）
+- [x] SM Home 人力建议卡（已实现 confirm/modify/reject 完整流程）
+- [x] HQ Home 多店人工成本排名（已实现含品牌均值对比）
+
+### 三：Phase 5 生态扩展
+- [x] Open API 平台（service + API + 前端页面已实现）
+- [x] 行业垂直解决方案（service + API + IndustrySolutionsPage 已实现）
+- [x] 供应链集成（service + API 已实现）
+- [x] 国际化（service + API + I18nPage 已实现）
+
+### 四：FCT 长期能力
+- [x] 数据模型 `src/models/fct_advanced.py`：8张表（银企直连3+多实体合并3+税务申报2）
+- [x] Alembic迁移 `z44_fct_advanced_tables.py`（down_revision=z43）
+- [x] 服务 `src/services/fct_advanced_service.py`：银行流水匹配+多实体合并+税务自动提取（全纯函数）
+- [x] 40个单元测试全部通过（`tests/test_fct_advanced_service.py`）
+- [x] API路由 `/api/v1/fct-advanced`（8个端点 + 驾驶舱 BFF）
+- [x] 前端页面 `FctAdvancedPage.tsx`（驾驶舱/银企直连/多实体合并/税务申报 4Tab）
+
+### 五：Tech Debt
+- [x] sys.path 污染：创建 `packages/agents/conftest.py` 共享 conftest（自动注入 agent root + core path）
+- [x] sync Alembic vs async：已由 `alembic/env.py` L41-43 处理（asyncpg→psycopg2 自动转换）
+- [x] Embedding 模型降级监控：`src/services/embedding_monitor_service.py`（相似度/空结果率/延迟P99/健康分/降级检测）
+- [x] 29个单元测试全部通过（`tests/test_embedding_monitor_service.py`）
+
+---
+
 ## AgentCollaborationOptimizer（多Agent协同总线，2026-03-12）
 
 > PPT战略：基础设施层 AgentCollabOptimizer — 冲突检测·优先级仲裁·全局优化

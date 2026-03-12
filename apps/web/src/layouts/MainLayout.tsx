@@ -59,6 +59,7 @@ import {
   HeartOutlined,
   WifiOutlined,
   DesktopOutlined,
+  BankOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -355,6 +356,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   '/financial-anomaly':  '财务异常检测',
   '/performance-ranking':      '财务对标排名',
   '/financial-recommendation': '财务智能建议',
+  '/fct-advanced': 'FCT 高级功能',
   '/dish-profitability': '菜品盈利分析',
   '/menu-optimization': '菜单优化建议',
   '/dish-cost-alert': '菜品成本预警',
@@ -537,6 +539,7 @@ const MainLayout: React.FC = () => {
         { key: '/financial-anomaly',     icon: <WarningOutlined />,    label: '财务异常检测' },
         { key: '/performance-ranking',   icon: <TrophyOutlined />,     label: '财务对标排名' },
         { key: '/financial-recommendation', icon: <BulbOutlined />,    label: '财务智能建议' },
+        { key: '/fct-advanced',            icon: <BankOutlined />,     label: 'FCT 高级功能' },
         { key: '/dish-profitability',      icon: <PieChartOutlined />, label: '菜品盈利分析' },
         { key: '/menu-optimization',       icon: <BulbOutlined />,    label: '菜单优化建议' },
         { key: '/dish-cost-alert',         icon: <WarningOutlined />, label: '菜品成本预警' },

@@ -10,6 +10,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.5.0] — 2026-03-12
+
+### 规划未完成任务 — 五大类全部完成
+
+#### 一：Phase 4 测试补全
+
+- **`tests/test_federated_learning_service.py`**：新增 17 测试（加权聚合7 + 质量过滤6 + DataIsolation3 + 原18 = 35 passed）
+- **`tests/test_recommendation_engine.py`**：新增 17 测试（评分公式8 + 定价策略6 + 推荐理由3 + 原17 = 34 passed）
+- **`tests/test_phase4_integration.py`** [NEW]：15 集成测试（FL E2E + 推荐 E2E + Agent协同 E2E + A/B框架）
+
+#### 四：FCT 长期能力（银企直连 · 多实体合并 · 税务申报自动提取）
+
+- **`src/models/fct_advanced.py`** [NEW]：8张表 + 9 Enum（银企直连3 + 多实体合并3 + 税务申报2）
+- **`alembic/versions/z44_fct_advanced_tables.py`** [NEW]：Alembic migration（down_revision=z43）
+- **`src/services/fct_advanced_service.py`** [NEW]：纯函数服务（银行流水匹配 + 合并抵消 + 税务提取 + VAT/CIT/附加税计算）
+- **`tests/test_fct_advanced_service.py`** [NEW]：40 单元测试全部通过
+- **`src/api/fct_advanced.py`** [NEW]：8个端点 + 驾驶舱 BFF
+- **`src/main.py`**：注册 fct_advanced router
+
+#### 五：Tech Debt
+
+- **`packages/agents/conftest.py`** [NEW]：共享 conftest 消除 sys.path 污染
+- **`src/services/embedding_monitor_service.py`** [NEW]：Embedding 模型降级监控（相似度/空结果率/延迟P99/健康分/降级检测）
+- **`tests/test_embedding_monitor_service.py`** [NEW]：29 单元测试全部通过
+
+#### Frontend (`apps/web`)
+
+- **`src/pages/FctAdvancedPage.tsx`** [NEW]：FCT 高级功能驾驶舱（银企直连/多实体合并/税务申报 4Tab）
+- **`src/App.tsx`**：新增 `/fct-advanced` 路由
+- **`src/layouts/MainLayout.tsx`**：新增「FCT 高级功能」导航（财务分组）
+
+#### 测试汇总：193 passed（新增 118 测试）
+
+---
+
 ## [2.4.0] — 2026-03-12
 
 ### AgentCollaborationOptimizer — 多Agent协同总线（PPT最终模块）

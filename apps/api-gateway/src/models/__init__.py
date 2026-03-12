@@ -391,3 +391,8 @@ from .ops_flow_agent import (
 )
 from .agent_okr import AgentResponseLog, AgentOKRSnapshot
 from .agent_collab import AgentConflict, GlobalOptimizationLog, AgentCollabSnapshot
+from .fct_advanced import (
+    FCTBankAccount, FCTBankTransaction, FCTBankMatchRule,
+    FCTEntity, FCTConsolidationRun, FCTIntercompanyItem,
+    FCTTaxDeclaration, FCTTaxExtractRule,
+)

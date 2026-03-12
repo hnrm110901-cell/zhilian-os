@@ -330,3 +330,228 @@ class TestGenerateMarketingCampaign:
         result = await engine.generate_marketing_campaign("S001", "acquisition", 1000.0)
 
         assert isinstance(result.reason, str) and len(result.reason) > 0
+
+
+# ── 评分公式更详尽验证 ──────────────────────────────────────────────────────
+
+class TestScoringFormulaDetailed:
+
+    @pytest.mark.asyncio
+    async def test_final_score_is_weighted_sum(self):
+        """最终得分应严格等于 0.3*CF + 0.3*CB + 0.2*CTX + 0.2*BIZ。"""
+        engine = make_engine()
+        cf, cb, ctx, biz = 0.8, 0.6, 0.9, 0.4
+        dishes = [make_dish("d1", profit_margin=0.5, tags=["辣"])]
+
+        with (
+            patch.object(engine, "_get_customer_history", new=AsyncMock(return_value=[])),
+            patch.object(engine, "_get_available_dishes", new=AsyncMock(return_value=dishes)),
+            patch.object(engine, "_recently_ordered", new=AsyncMock(return_value=False)),
+            patch.object(engine, "_collaborative_filtering_score", new=AsyncMock(return_value=cf)),
+            patch.object(engine, "_content_based_score", return_value=cb),
+            patch.object(engine, "_context_score", return_value=ctx),
+            patch.object(engine, "_business_score", return_value=biz),
+        ):
+            result = await engine.recommend_dishes("C001", "S001", top_k=1)
+
+        expected = 0.3 * cf + 0.3 * cb + 0.2 * ctx + 0.2 * biz
+        assert len(result) == 1
+        assert abs(result[0].score - expected) < 1e-9
+
+    @pytest.mark.asyncio
+    async def test_score_clipped_at_one(self):
+        """所有子分数最大值时，最终得分不超过 1.0（加权和 ≤ 1.0）。"""
+        engine = make_engine()
+        dishes = [make_dish("d1")]
+
+        with (
+            patch.object(engine, "_get_customer_history", new=AsyncMock(return_value=[])),
+            patch.object(engine, "_get_available_dishes", new=AsyncMock(return_value=dishes)),
+            patch.object(engine, "_recently_ordered", new=AsyncMock(return_value=False)),
+            patch.object(engine, "_collaborative_filtering_score", new=AsyncMock(return_value=1.0)),
+            patch.object(engine, "_content_based_score", return_value=1.0),
+            patch.object(engine, "_context_score", return_value=1.0),
+            patch.object(engine, "_business_score", return_value=1.0),
+        ):
+            result = await engine.recommend_dishes("C001", "S001", top_k=1)
+
+        # 0.3+0.3+0.2+0.2 = 1.0 exactly
+        assert result[0].score <= 1.0
+
+    def test_content_based_score_with_matching_tags(self):
+        """历史订单标签与菜品标签重合时，CB 得分应高于 0.5。"""
+        engine = make_engine()
+        history = [
+            {"dish_id": "d1", "tags": ["辣", "热菜"]},
+            {"dish_id": "d2", "tags": ["辣"]},
+        ]
+        dish = make_dish(tags=["辣", "热菜"])
+        score = engine._content_based_score(history, dish)
+        assert score > 0.5
+
+    def test_content_based_score_no_tag_overlap(self):
+        """历史订单标签与菜品标签完全不重合时，CB 得分仍为 0.4 基线。"""
+        engine = make_engine()
+        history = [{"dish_id": "d1", "tags": ["清淡"]}]
+        dish = make_dish(tags=["辣"])
+        score = engine._content_based_score(history, dish)
+        assert abs(score - 0.4) < 1e-9
+
+    def test_context_score_lunch_boost(self):
+        """午餐时段正餐品类得分应高于基准。"""
+        engine = make_engine()
+        dish = make_dish(category="正餐")
+        base = engine._context_score(dish, {"hour": 16})   # 非午餐
+        boosted = engine._context_score(dish, {"hour": 12})  # 午餐
+        assert boosted > base
+
+    def test_context_score_weather_cold_hot_dish(self):
+        """寒冷天气下热菜得分应提升。"""
+        engine = make_engine()
+        dish = make_dish(tags=["hot"])
+        base = engine._context_score(dish, {"hour": 12, "weather": ""})
+        cold = engine._context_score(dish, {"hour": 12, "weather": "cold"})
+        assert cold > base
+
+    @pytest.mark.asyncio
+    async def test_confidence_is_min_of_cf_cb(self):
+        """推荐结果的 confidence 应等于 min(cf_score, cb_score)。"""
+        engine = make_engine()
+        cf, cb = 0.7, 0.4
+        dishes = [make_dish("d1")]
+
+        with (
+            patch.object(engine, "_get_customer_history", new=AsyncMock(return_value=[])),
+            patch.object(engine, "_get_available_dishes", new=AsyncMock(return_value=dishes)),
+            patch.object(engine, "_recently_ordered", new=AsyncMock(return_value=False)),
+            patch.object(engine, "_collaborative_filtering_score", new=AsyncMock(return_value=cf)),
+            patch.object(engine, "_content_based_score", return_value=cb),
+            patch.object(engine, "_context_score", return_value=0.5),
+            patch.object(engine, "_business_score", return_value=0.5),
+        ):
+            result = await engine.recommend_dishes("C001", "S001", top_k=1)
+
+        assert abs(result[0].confidence - min(cf, cb)) < 1e-9
+
+    @pytest.mark.asyncio
+    async def test_estimated_profit_equals_margin_times_price(self):
+        """estimated_profit 应等于 profit_margin × price。"""
+        engine = make_engine()
+        dishes = [make_dish("d1", price=80.0, profit_margin=0.35)]
+
+        with (
+            patch.object(engine, "_get_customer_history", new=AsyncMock(return_value=[])),
+            patch.object(engine, "_get_available_dishes", new=AsyncMock(return_value=dishes)),
+            patch.object(engine, "_recently_ordered", new=AsyncMock(return_value=False)),
+            patch.object(engine, "_collaborative_filtering_score", new=AsyncMock(return_value=0.5)),
+        ):
+            result = await engine.recommend_dishes("C001", "S001", top_k=1)
+
+        assert abs(result[0].estimated_profit - 80.0 * 0.35) < 1e-9
+
+
+# ── 定价策略详细验证 ──────────────────────────────────────────────────────────
+
+class TestPricingStrategyDetailed:
+
+    @pytest.mark.asyncio
+    async def test_demand_based_pricing_strategy(self):
+        """非高峰非低谷时段且库存正常应触发 DEMAND_BASED 策略。"""
+        engine = make_engine()
+        dish_data = {
+            "dish_id": "d1", "name": "招牌菜", "price": 50.0,
+            "profit_margin": 0.6, "category": "正餐", "tags": [],
+            "inventory": 100, "sales_velocity": 10.0,
+        }
+        with patch.object(engine, "_get_dish_data", new=AsyncMock(return_value=dish_data)):
+            result = await engine.optimize_pricing(
+                "S001", "d1", context={"hour": 15}  # 15:00 非高峰
+            )
+        assert result.strategy == PricingStrategy.DEMAND_BASED
+
+    @pytest.mark.asyncio
+    async def test_demand_based_high_demand_increases_price(self):
+        """高需求 (demand_level=0.9) 下 DEMAND_BASED 定价应涨价。"""
+        engine = make_engine()
+        dish_data = {"dish_id": "d1", "price": 50.0, "profit_margin": 0.6}
+        with patch.object(engine, "_get_dish_data", new=AsyncMock(return_value=dish_data)):
+            result = await engine.optimize_pricing(
+                "S001", "d1", context={"hour": 15, "demand_level": 0.9}
+            )
+        # 0.9 + 0.2*0.9 = 1.08 → 50*1.08 = 54.0
+        assert result.recommended_price > result.current_price
+
+    @pytest.mark.asyncio
+    async def test_inventory_based_pricing_reduces_price(self):
+        """库存过高 (>0.8) 时应降价促销。"""
+        engine = make_engine()
+        dish_data = {"dish_id": "d1", "price": 100.0, "profit_margin": 0.5}
+        with patch.object(engine, "_get_dish_data", new=AsyncMock(return_value=dish_data)):
+            result = await engine.optimize_pricing(
+                "S001", "d1", context={"hour": 14, "inventory_level": 0.95}
+            )
+        assert result.strategy == PricingStrategy.INVENTORY_BASED
+        assert result.recommended_price < result.current_price
+
+    @pytest.mark.asyncio
+    async def test_peak_pricing_ratio_approximately_12_percent(self):
+        """高峰定价默认涨幅约 12%。"""
+        engine = make_engine()
+        dish_data = {"dish_id": "d1", "price": 100.0, "profit_margin": 0.5}
+        with patch.object(engine, "_get_dish_data", new=AsyncMock(return_value=dish_data)):
+            result = await engine.optimize_pricing(
+                "S001", "d1", context={"hour": 12, "is_peak": True}
+            )
+        assert abs(result.recommended_price - 112.0) < 1.0
+
+    @pytest.mark.asyncio
+    async def test_off_peak_pricing_reduces_by_15_percent(self):
+        """低峰定价默认降幅约 15%。"""
+        engine = make_engine()
+        dish_data = {"dish_id": "d1", "price": 100.0, "profit_margin": 0.5}
+        with patch.object(engine, "_get_dish_data", new=AsyncMock(return_value=dish_data)):
+            result = await engine.optimize_pricing(
+                "S001", "d1", context={"hour": 22}
+            )
+        assert abs(result.recommended_price - 85.0) < 1.0
+
+    @pytest.mark.asyncio
+    async def test_price_change_pct_is_correct(self):
+        """price_change_pct 应等于 (推荐价-原价)/原价。"""
+        engine = make_engine()
+        dish_data = {"dish_id": "d1", "price": 50.0, "profit_margin": 0.5}
+        with patch.object(engine, "_get_dish_data", new=AsyncMock(return_value=dish_data)):
+            result = await engine.optimize_pricing("S001", "d1", context={"hour": 12})
+        expected_pct = (result.recommended_price - 50.0) / 50.0
+        assert abs(result.price_change_pct - expected_pct) < 1e-9
+
+
+# ── 推荐理由生成 ──────────────────────────────────────────────────────────────
+
+class TestRecommendationReason:
+
+    def test_high_cf_score_includes_similar_customers(self):
+        """CF 高分时理由应包含'相似顾客'。"""
+        engine = make_engine()
+        reason = engine._generate_recommendation_reason(
+            make_dish(), cf_score=0.9, cb_score=0.1, context_score=0.1, business_score=0.1
+        )
+        assert "相似顾客" in reason
+
+    def test_all_low_scores_returns_default_reason(self):
+        """所有子分数都低时返回默认理由'为您精选'。"""
+        engine = make_engine()
+        reason = engine._generate_recommendation_reason(
+            make_dish(), cf_score=0.3, cb_score=0.3, context_score=0.3, business_score=0.3
+        )
+        assert reason == "为您精选"
+
+    def test_multiple_high_scores_joins_reasons(self):
+        """多个子分数都高时理由应包含多个原因。"""
+        engine = make_engine()
+        reason = engine._generate_recommendation_reason(
+            make_dish(), cf_score=0.9, cb_score=0.9, context_score=0.1, business_score=0.9
+        )
+        assert "、" in reason  # Chinese comma separator
+        assert "相似顾客" in reason
+        assert "口味偏好" in reason
