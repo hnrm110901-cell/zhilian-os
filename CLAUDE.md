@@ -6,6 +6,10 @@
 
 **项目定位：** 智链OS 是面向餐饮连锁的 AI 驱动经营决策系统（对外称"智链经营助手"），核心目标是帮连锁老板每年多赚 30 万+（成本率降低 2 个点）。North Star Metric：**续费率 ≥ 95%**。
 
+**技术栈：** Python/FastAPI + PostgreSQL (Alembic) | React/TypeScript + Vite | LangChain + LangGraph | Claude API (claude-sonnet-4-6 生产 / claude-opus-4-6 架构)
+
+**部署：** 42.194.229.21 / zlsjos.cn (Nginx + Uvicorn) | 企业微信集成 | Docker + K8s
+
 ### 核心宪法（5条不可违反）
 
 1. **正确性 > 简洁 > 性能**：有 bug 的快代码不如正确的慢代码
@@ -57,8 +61,8 @@ Phase 2 [必须] 确认大地图
   → 确认任务涉及哪个模块/子系统
 
 Phase 3 [按需] 加载模块上下文
-  → 读取对应模块的 CONTEXT.md（Level 2）
-  → 路径规则：{module_root}/CONTEXT.md
+  → 读取对应模块的 CLAUDE.md 或 .claude/context/ 文件（Level 2）
+  → 路径规则见下方「关键路径速查」
 
 Phase 4 [精确] 只读必要文件（≤8个）
   → 先用 Grep/Glob 定位，再用 Read 读取
@@ -109,18 +113,72 @@ Phase 5 [执行前] 输出变更蓝图
 ## 🗂 关键路径速查
 
 ```
-ARCHITECTURE.md              ← Level 1 全景图（读这里了解整体）
-apps/api-gateway/CONTEXT.md  ← Level 2 API层上下文
-packages/agents/CONTEXT.md   ← Level 2 Agent层上下文
-tasks/todo.md                ← 当前任务清单
-tasks/lessons.md             ← 经验教训（每次开始先读！）
+# Level 1 — 全景图
+ARCHITECTURE.md                    ← 四层架构 + 模块依赖图
+
+# Level 2 — 渐进式上下文（按需加载）
+.claude/context/architecture.md    ← 四层Ontology架构详解
+.claude/context/db_schema.md       ← 数据库Schema参考
+.claude/context/api_contracts.md   ← API契约速查
+.claude/context/business_rules.md  ← 餐厅业务规则
+
+# Level 2 — 模块专属指令
+apps/api-gateway/CLAUDE.md         ← 后端开发规则（SQL安全/金额处理/测试）
+apps/web/CLAUDE.md                 ← 前端开发规则（设计系统/角色路由/数据获取）
+
+# 自定义斜杠命令
+.claude/commands/sprint.md         ← /project:sprint 开发冲刺
+.claude/commands/review.md         ← /project:review 代码审查
+.claude/commands/ontology.md       ← /project:ontology Ontology检查
+.claude/commands/xuji-pilot.md     ← /project:xuji-pilot 徐记海鲜验证
+
+# 任务管理
+tasks/todo.md                      ← 当前任务清单
+tasks/lessons.md                   ← 经验教训（每次开始先读！）
+tasks/api-contracts.md             ← 前后端接口握手文件
 ```
+
+---
+
+## 🎯 四层 Ontology 架构（速览）
+
+```
+Perception（感知）→ Ontology（本体）→ Reasoning（推理）→ Action（行动）
+  企微/POS/飞书      62个Model       11个Agent        企微推送/一键确认
+```
+
+**11个 Agent 领域：** schedule | order | inventory | service | training | performance | decision | reservation | banquet | private_domain | dish_rd
+
+**详见：** `.claude/context/architecture.md`
+
+---
+
+## ⚡ MAX 配额管理策略
+
+### 模型选择规则
+- **架构决策 / 复杂推理**：Opus（计划阶段）
+- **功能实现 / 迭代修复**：Sonnet（执行阶段）
+- 计划用 Opus 想清楚，执行切 Sonnet 省配额
+
+### 上下文管理
+- 上下文达到 50% 时执行 `/compact`
+- 每完成一个功能模块执行 `/clear` 重置
+- 小任务直接执行，不要过度包装工作流
+
+### 日常节奏
+| 时段 | 工具 | 任务类型 |
+|------|------|---------|
+| 早晨 | Claude.ai (Opus) | 架构决策、PRD、Agent 设计 |
+| 上午 | Claude Code (Opus) | 复杂功能实现，Plan Mode |
+| 下午 | Claude Code (Sonnet) | 迭代修复、测试、文档 |
+| 傍晚 | Claude.ai (Sonnet) | 代码审查、明日任务分解 |
 
 ---
 
 ## 🎨 前端重构规范（v3.0 角色驱动架构）
 
 > 对应规范文档：`智链OS_前后端重构_产品研发开发规范_V1.0`
+> 详细规则见 `apps/web/CLAUDE.md`
 
 ### 角色路由约定
 
@@ -167,4 +225,3 @@ const resp = await apiClient.get('/api/v1/bff/sm/...');
 | BFF 端点角色前缀 | 小写2字母 | `sm`, `chef`, `floor`, `hq` |
 | 页面路径 | 角色前缀/页面 | `pages/sm/Home.tsx` |
 | Layout 文件 | `{Role}Layout.tsx` | `StoreManagerLayout.tsx` |
-
