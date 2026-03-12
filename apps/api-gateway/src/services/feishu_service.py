@@ -4,14 +4,17 @@ Feishu (Lark) Service for message sending and user management
 """
 import json
 import os
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 import httpx
 import structlog
 from datetime import datetime, timedelta
 
 from ..core.config import settings
+from .redis_cache_service import redis_cache
 
 logger = structlog.get_logger()
+
+FEISHU_EVENT_DEDUP_PREFIX = "feishu_event_dedup:"
 
 
 class FeishuService:
@@ -268,6 +271,55 @@ class FeishuService:
             logger.error("获取部门用户列表异常", error=str(e))
             raise
 
+    def _extract_reply_target(self, event: Dict[str, Any]) -> Tuple[Optional[str], Optional[str]]:
+        """从飞书事件中提取回复目标和对应的 receive_id_type。"""
+        sender_id = event.get("sender", {}).get("sender_id", {})
+
+        if sender_id.get("user_id"):
+            return sender_id["user_id"], "user_id"
+        if sender_id.get("open_id"):
+            return sender_id["open_id"], "open_id"
+        if sender_id.get("union_id"):
+            return sender_id["union_id"], "union_id"
+
+        chat_id = event.get("message", {}).get("chat_id")
+        if chat_id:
+            return chat_id, "chat_id"
+
+        return None, None
+
+    def validate_callback_token(self, event_data: Dict[str, Any]) -> bool:
+        """
+        校验飞书回调 token。
+
+        未配置 FEISHU_VERIFICATION_TOKEN 时降级放行，便于开发环境联调。
+        """
+        expected_token = getattr(settings, "FEISHU_VERIFICATION_TOKEN", "")
+        if not expected_token:
+            return True
+
+        actual_token = (
+            event_data.get("token")
+            or event_data.get("header", {}).get("token")
+        )
+        return actual_token == expected_token
+
+    async def is_duplicate_event(self, event_id: Optional[str]) -> bool:
+        """基于 event_id 做 webhook 幂等保护。"""
+        if not event_id:
+            return False
+        return await redis_cache.exists(f"{FEISHU_EVENT_DEDUP_PREFIX}{event_id}")
+
+    async def mark_event_processed(self, event_id: Optional[str], ttl: int = 3600) -> bool:
+        """记录已处理的 webhook 事件。"""
+        if not event_id:
+            return False
+        return await redis_cache.set(
+            f"{FEISHU_EVENT_DEDUP_PREFIX}{event_id}",
+            "1",
+            expire=ttl,
+        )
+
     async def handle_message(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         处理接收到的消息事件
@@ -285,19 +337,40 @@ class FeishuService:
             message = event.get("message", {})
             msg_type = message.get("message_type")
             content = message.get("content", "{}")
-            sender = event.get("sender", {})
 
             if msg_type == "text":
                 # 解析文本内容
-                import json
                 text_content = json.loads(content).get("text", "")
-                response = await self._process_text_message(
-                    sender.get("sender_id", {}).get("user_id", ""),
-                    text_content
-                )
-                return response
+                receive_id, receive_id_type = self._extract_reply_target(event)
+                response = await self._process_text_message(receive_id or "", text_content)
 
-        return {}
+                result: Dict[str, Any] = {
+                    "handled": True,
+                    "event_type": event_type,
+                    "message_type": msg_type,
+                    "response": response,
+                    "reply_sent": False,
+                }
+
+                if response.get("type") == "text" and receive_id:
+                    send_result = await self.send_text_message(
+                        content=response.get("content", ""),
+                        receive_id=receive_id,
+                        receive_id_type=receive_id_type or "user_id",
+                    )
+                    result["reply_sent"] = True
+                    result["send_result"] = send_result
+                    result["reply_target"] = {
+                        "receive_id": receive_id,
+                        "receive_id_type": receive_id_type,
+                    }
+
+                return result
+
+        return {
+            "handled": False,
+            "event_type": event_type,
+        }
 
     async def _process_text_message(self, user_id: str, content: str) -> Dict[str, Any]:
         """处理文本消息，调用Agent"""

@@ -55,6 +55,15 @@ class FeishuMessageRequest(BaseModel):
     receive_id: str = Field(..., description="接收者ID")
     receive_id_type: str = Field("user_id", description="ID类型")
     message_type: str = Field("text", description="消息类型")
+    title: Optional[str] = Field(None, description="富文本标题（post消息使用）")
+    post_content: Optional[list[list[Dict[str, Any]]]] = Field(
+        None,
+        description="飞书 post 消息内容块",
+    )
+    card_content: Optional[Dict[str, Any]] = Field(
+        None,
+        description="飞书 interactive 卡片内容",
+    )
 
 
 # ==================== 企业微信 API ====================
@@ -355,6 +364,29 @@ async def send_feishu_message(
                 receive_id=request.receive_id,
                 receive_id_type=request.receive_id_type,
             )
+        elif request.message_type == "post":
+            if not request.title or not request.post_content:
+                raise HTTPException(
+                    status_code=400,
+                    detail="post消息需要提供title和post_content"
+                )
+            result = await feishu_service.send_post_message(
+                title=request.title,
+                content=request.post_content,
+                receive_id=request.receive_id,
+                receive_id_type=request.receive_id_type,
+            )
+        elif request.message_type == "interactive":
+            if not request.card_content:
+                raise HTTPException(
+                    status_code=400,
+                    detail="interactive消息需要提供card_content"
+                )
+            result = await feishu_service.send_interactive_card(
+                card_content=request.card_content,
+                receive_id=request.receive_id,
+                receive_id_type=request.receive_id_type,
+            )
         else:
             raise HTTPException(
                 status_code=400,
@@ -383,15 +415,29 @@ async def feishu_webhook(request: Request):
         # 获取请求数据
         data = await request.json()
 
+        if not feishu_service.validate_callback_token(data):
+            raise HTTPException(status_code=403, detail="飞书回调token校验失败")
+
         # 处理URL验证
         if data.get("type") == "url_verification":
             return {"challenge": data.get("challenge")}
 
+        event_id = data.get("header", {}).get("event_id")
+        if await feishu_service.is_duplicate_event(event_id):
+            return {
+                "success": True,
+                "duplicate": True,
+                "event_id": event_id,
+            }
+
         # 处理事件
         response = await feishu_service.handle_message(data)
+        await feishu_service.mark_event_processed(event_id)
 
         return {"success": True, "data": response}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("处理飞书回调失败", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))

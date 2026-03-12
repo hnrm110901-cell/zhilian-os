@@ -71,6 +71,7 @@ class Settings(BaseSettings):
     # 飞书配置
     FEISHU_APP_ID: str = ""
     FEISHU_APP_SECRET: str = ""
+    FEISHU_VERIFICATION_TOKEN: str = ""
 
     # 钉钉配置
     DINGTALK_APP_KEY: str = ""
