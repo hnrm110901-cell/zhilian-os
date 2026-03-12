@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, and_, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.db import get_db
+from src.core.database import get_db
 from src.models.people_agent import (
     PeopleShiftRecord,
     PeoplePerformanceScore,

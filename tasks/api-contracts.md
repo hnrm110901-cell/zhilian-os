@@ -9,7 +9,273 @@
 
 | 日期 | 变更 | 影响 |
 |------|------|------|
+| 2026-03-12 | Phase 13 OpsFlowAgent 15个端点 | OpsFlowAgentPage 5个 Tab |
+| 2026-03-12 | Agent OKR 看板 4个端点 | AgentOKRPage |
 | 2026-03-08 | 整理 Phase 8 workforce 全部接口 | 前端 WorkforcePage 相关 |
+
+---
+
+## OpsFlowAgent（运营流程体）接口
+
+**路由前缀**: `/api/v1/ops-flow`
+
+### POST `/api/v1/ops-flow/chain-events`
+创建出品链联动事件，自动触发级联告警
+```typescript
+// Request
+{
+  store_id: string;
+  event_layer: "order" | "inventory" | "quality";
+  event_type: string;   // 事件类型
+  event_data: Record<string, any>;
+  source_agent: string;
+}
+// Response
+{
+  success: boolean;
+  chain_event_id: string;
+  linkages_triggered: number;
+  data: { event: object; linkages: object[] };
+}
+```
+
+### POST `/api/v1/ops-flow/chain-events/{event_id}/resolve`
+```typescript
+// Request: { resolution_note?: string }
+// Response: { success: boolean; data: object }
+```
+
+### GET `/api/v1/ops-flow/chain-events/{event_id}/linkages`
+获取联动事件的所有级联响应
+```typescript
+// Response: { success: boolean; data: object[] }
+```
+
+### POST `/api/v1/ops-flow/order-anomaly/detect`
+检测订单异常并返回建议动作
+```typescript
+// Request
+{
+  store_id: string;
+  order_id: string;
+  expected_amount: number;
+  actual_amount: number;
+  order_time: string; // ISO datetime
+}
+// Response
+{
+  anomaly_detected: boolean;
+  anomaly_type: string | null;
+  deviation_pct: number;
+  revenue_loss_yuan: number;
+  suggested_action: string;
+  data: object;
+}
+```
+
+### GET `/api/v1/ops-flow/order-anomalies`
+```typescript
+// Query: store_id, start_date?, end_date?, anomaly_type?, limit?
+// Response: { success: boolean; data: object[]; count: number }
+```
+
+### POST `/api/v1/ops-flow/inventory/check`
+单次库存智能检查
+```typescript
+// Request
+{
+  store_id: string;
+  sku_id: string;
+  current_stock: number;
+  daily_usage: number;
+  reorder_point?: number;
+  max_capacity?: number;
+}
+// Response
+{
+  risk_level: "safe" | "warning" | "critical";
+  days_remaining: number;
+  suggested_order_quantity: number;
+  inventory_loss_yuan: number;
+  data: object;
+}
+```
+
+### POST `/api/v1/ops-flow/inventory/batch-check`
+```typescript
+// Request: { items: [{ store_id, sku_id, current_stock, daily_usage, reorder_point?, max_capacity? }] }
+// Response: { total: number; critical_count: number; warning_count: number; results: object[] }
+```
+
+### GET `/api/v1/ops-flow/inventory-alerts`
+```typescript
+// Query: store_id, risk_level?, is_resolved?, limit?
+// Response: { success: boolean; data: object[]; count: number }
+```
+
+### POST `/api/v1/ops-flow/inventory-alerts/{alert_id}/resolve`
+```typescript
+// Request: { resolution_note?: string }
+// Response: { success: boolean; data: object }
+```
+
+### POST `/api/v1/ops-flow/quality/inspect`
+创建菜品质检记录
+```typescript
+// Request
+{
+  store_id: string;
+  dish_id: string;
+  dish_name: string;
+  inspector_id: string;
+  appearance_score?: number;   // 0-10
+  taste_score?: number;
+  temperature_score?: number;
+  portion_score?: number;
+  overall_score?: number;
+  notes?: string;
+}
+// Response: { success: boolean; quality_status: string; data: object }
+```
+
+### GET `/api/v1/ops-flow/quality-summary`
+```typescript
+// Query: store_id, start_date?, end_date?
+// Response: { store_id, total_inspections, pass_count, fail_count, warning_count, avg_score, pass_rate_pct }
+```
+
+### GET `/api/v1/ops-flow/quality-records`
+```typescript
+// Query: store_id, status?, dish_id?, limit?
+// Response: { success: boolean; data: object[]; count: number }
+```
+
+### GET `/api/v1/ops-flow/stores/{store_id}/optimize`
+获取门店运营优化建议（OpsOptimizeAgent）
+```typescript
+// Response
+{
+  store_id: string;
+  recommendations: Array<{
+    category: "order" | "inventory" | "quality";
+    priority: "high" | "medium" | "low";
+    title: string;
+    description: string;
+    expected_impact_yuan: number;
+    action_items: string[];
+  }>;
+  total_impact_yuan: number;
+  ai_insight: string;
+}
+```
+
+### POST `/api/v1/ops-flow/decisions/accept`
+接受运营优化决策
+```typescript
+// Request: { store_id, decision_type, decision_data, expected_impact_yuan? }
+// Response: { success: boolean; data: object }
+```
+
+### GET `/api/v1/ops-flow/decisions`
+```typescript
+// Query: store_id, decision_type?, limit?
+// Response: { success: boolean; data: object[]; count: number }
+```
+
+### GET `/api/v1/ops-flow/dashboard`
+驾驶舱 BFF（前端首屏单接口）
+```typescript
+// Query: store_id, days? (default 7)
+// Response
+{
+  store_id: string;
+  period_days: number;
+  chain_events: { total, resolved, unresolved, by_layer: Record<string, number> };
+  order_anomalies: { total, total_revenue_loss_yuan, by_type: Record<string, number> };
+  inventory_alerts: { total, critical, warning, safe };
+  quality: { total_inspections, pass_count, fail_count, avg_score, pass_rate_pct };
+  ai_insight: string;
+}
+```
+
+---
+
+## Agent OKR 看板接口
+
+**路由前缀**: `/api/v1/agent-okr`
+
+### POST `/api/v1/agent-okr/log`
+记录一次 Agent 建议（OKR 追踪起点）
+```typescript
+// Request
+{
+  agent_name: "business_intel" | "ops_flow" | "people" | "marketing" | "banquet" | "dish_rd" | "supplier" | "compliance" | "fct" | "private_domain";
+  store_id: string;
+  recommendation_type: string;
+  recommendation_text: string;
+  expected_impact_yuan?: number;
+  confidence_score?: number;  // 0-1
+}
+// Response: { success: boolean; log_id: string; data: object }
+```
+
+### POST `/api/v1/agent-okr/adopt`
+记录用户采纳/拒绝决策
+```typescript
+// Request
+{
+  log_id: string;
+  status: "adopted" | "rejected" | "auto_executed" | "expired";
+  actual_impact_yuan?: number;
+  response_latency_seconds?: number;
+  notes?: string;
+}
+// Response: { success: boolean; data: object }
+```
+
+### POST `/api/v1/agent-okr/verify`
+记录建议效果验证（48h 后回访）
+```typescript
+// Request
+{
+  log_id: string;
+  actual_impact_yuan: number;
+  outcome_notes?: string;
+}
+// Response: { success: boolean; data: object }
+```
+
+### GET `/api/v1/agent-okr/summary`
+获取所有 Agent OKR 达成汇总（看板首屏）
+```typescript
+// Query: brand_id, days? (default 30)
+// Response
+{
+  overall: {
+    total_recommendations: number;
+    overall_adoption_rate: number | null;
+    overall_adoption_rate_pct: number | null;
+    total_recommendation_yuan: number;
+  };
+  agents: Array<{
+    agent_name: string;
+    total_recommendations: number;
+    adopted_count: number;
+    rejected_count: number;
+    adoption_rate: number | null;
+    adoption_rate_pct: number | null;
+    adoption_target_pct: number;
+    okr_adoption: string;        // "✅ 采纳率达标" / "❌ 采纳率未达标" / "⏳ 数据不足"
+    avg_prediction_error_pct: number | null;
+    accuracy_target_pct: number | null;
+    okr_accuracy: string;
+    avg_response_latency_seconds: number | null;
+    latency_target_seconds: number | null;
+    okr_latency: string;
+    total_recommendation_yuan: number;
+  }>;
+}
+```
 
 ---
 

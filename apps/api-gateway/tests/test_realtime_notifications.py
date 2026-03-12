@@ -40,7 +40,7 @@ def mock_user():
     user.full_name = "Test User"
     user.role = UserRole.STORE_MANAGER
     user.store_id = "store-123"
-    return mock_user
+    return user
 
 
 @pytest.fixture

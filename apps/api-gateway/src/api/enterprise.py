@@ -21,12 +21,20 @@ router = APIRouter()
 
 # 初始化企业微信加解密工具
 wechat_crypto = None
-if settings.WECHAT_TOKEN and settings.WECHAT_ENCODING_AES_KEY and settings.WECHAT_CORP_ID:
-    wechat_crypto = WeChatCrypto(
-        token=settings.WECHAT_TOKEN,
-        encoding_aes_key=settings.WECHAT_ENCODING_AES_KEY,
-        corp_id=settings.WECHAT_CORP_ID
-    )
+try:
+    _token = settings.WECHAT_TOKEN
+    _aes_key = settings.WECHAT_ENCODING_AES_KEY
+    _corp_id = settings.WECHAT_CORP_ID
+    if (isinstance(_token, str) and _token
+            and isinstance(_aes_key, str) and _aes_key
+            and isinstance(_corp_id, str) and _corp_id):
+        wechat_crypto = WeChatCrypto(
+            token=_token,
+            encoding_aes_key=_aes_key,
+            corp_id=_corp_id,
+        )
+except Exception:
+    pass
 
 
 # ==================== Request/Response Models ====================

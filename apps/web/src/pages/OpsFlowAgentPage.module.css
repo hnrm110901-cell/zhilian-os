@@ -1,0 +1,58 @@
+.page { padding: 24px; max-width: 1200px; margin: 0 auto; }
+.header { margin-bottom: 24px; }
+.title { font-size: 20px; font-weight: 600; color: var(--text-primary); margin: 0 0 4px; }
+.subtitle { font-size: 13px; color: var(--text-secondary); margin: 0; }
+
+.kpiRow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+.kpiCard { background: var(--bg-card); border-radius: 12px; padding: 16px 20px; border: 1px solid var(--border); }
+.kpiLabel { font-size: 12px; color: var(--text-tertiary); margin-bottom: 6px; }
+.kpiValue { font-size: 24px; font-weight: 700; color: var(--text-primary); }
+.kpiSub { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+.kpiCritical .kpiValue { color: #f53f3f; }
+.kpiWarn .kpiValue { color: #ff7d00; }
+.kpiOk .kpiValue { color: #00b42a; }
+
+.layerGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+.section { background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; }
+.sectionHeader { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.sectionTitle { font-size: 14px; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
+.sectionCount { font-size: 12px; background: var(--accent-10); color: var(--accent); padding: 2px 8px; border-radius: 10px; }
+.sectionBody { padding: 16px 20px; }
+
+.chainEvents { grid-column: 1 / -1; }
+.eventList { display: flex; flex-direction: column; gap: 10px; }
+.eventItem { display: flex; align-items: flex-start; gap: 12px; padding: 12px; background: var(--bg-raised); border-radius: 8px; }
+.severityDot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+.dotCritical { background: #f53f3f; box-shadow: 0 0 6px rgba(245,63,63,.5); }
+.dotWarning  { background: #ff7d00; }
+.dotInfo     { background: #165dff; }
+.eventTitle { font-size: 13px; font-weight: 500; color: var(--text-primary); margin-bottom: 3px; }
+.eventMeta  { font-size: 12px; color: var(--text-tertiary); }
+.layerBadge { font-size: 11px; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border); color: var(--text-secondary); margin-right: 6px; }
+
+.alertItem { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.alertItem:last-child { border-bottom: none; }
+.alertName { font-size: 13px; color: var(--text-primary); }
+.alertDetail { font-size: 12px; color: var(--text-tertiary); margin-top: 2px; }
+.riskBadge { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 500; }
+.riskCritical { background: rgba(245,63,63,.12); color: #f53f3f; }
+.riskHigh     { background: rgba(255,125,0,.12); color: #ff7d00; }
+.riskMedium   { background: rgba(250,173,20,.12); color: #d48806; }
+.riskLow      { background: rgba(0,180,42,.12); color: #00b42a; }
+
+.decisionCard { background: var(--bg-raised); border-radius: 10px; padding: 16px; border-left: 3px solid var(--accent); }
+.decisionTitle { font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px; }
+.decisionMeta  { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.priorityBadge { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 700; }
+.p0 { background: rgba(245,63,63,.15); color: #f53f3f; }
+.p1 { background: rgba(255,125,0,.15); color: #ff7d00; }
+.p2 { background: rgba(250,173,20,.15); color: #d48806; }
+.layerTag { font-size: 11px; padding: 2px 6px; background: var(--accent-10); color: var(--accent); border-radius: 4px; }
+.recList { display: flex; flex-direction: column; gap: 6px; }
+.recItem { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: var(--text-secondary); }
+.recBullet { color: var(--accent); margin-top: 2px; flex-shrink: 0; }
+.acceptBtn { margin-top: 14px; padding: 8px 20px; background: var(--accent); color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; transition: opacity .15s; }
+.acceptBtn:hover { opacity: .85; }
+
+.emptyState { text-align: center; padding: 32px 0; color: var(--text-tertiary); font-size: 13px; }
+.loading { text-align: center; padding: 32px 0; color: var(--text-tertiary); font-size: 13px; }

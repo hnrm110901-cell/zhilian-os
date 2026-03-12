@@ -10,6 +10,50 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.3.0] — 2026-03-12
+
+### Phase 13 — OpsFlowAgent 三体合并（出品链联动）
+
+#### Backend (`apps/api-gateway`)
+
+- **`src/models/ops_flow_agent.py`**：7张表 + 7 Enum（OpsChainEvent / OpsChainLinkage / OpsOrderAnomaly / OpsInventoryAlert / OpsQualityRecord / OpsFlowDecision / OpsFlowAgentLog）
+- **`alembic/versions/z41_ops_flow_agent_tables.py`**：Alembic migration（down_revision=z40）
+- **`src/api/ops_flow_agent.py`**：15个端点（chain-events / order-anomaly / inventory / quality / decisions / dashboard BFF）
+- **`src/main.py`**：注册 ops_flow_agent + agent_okr 两个新 router
+
+#### Agent Package (`packages/agents/ops_flow`)
+
+- **`src/agent.py`**：5个 Agent 类（ChainAlertAgent / OrderAnomalyAgent / InventoryIntelAgent / QualityInspectionAgent / OpsOptimizeAgent）+ 10个纯函数
+- 核心创新：CHAIN_LINKAGE_RULES 实现「1事件 → 3层级联响应」
+- **`tests/test_agent.py`**：65个单元测试全部通过（sys.modules 注入模式，无真实 DB）
+
+#### Frontend (`apps/web`)
+
+- **`src/pages/OpsFlowAgentPage.tsx`** + `OpsFlowAgentPage.module.css`：驾驶舱/联动事件/库存预警/菜品质检/优化决策 5Tab
+
+### Agent OKR 看板
+
+#### Backend (`apps/api-gateway`)
+
+- **`src/models/agent_okr.py`**：AgentResponseLog + AgentOKRSnapshot，追踪 Per-Agent OKR 指标（采纳率/预测误差/响应时效）
+- **`alembic/versions/z42_agent_okr_tables.py`**：Alembic migration（down_revision=z41）
+- **`src/services/agent_okr_service.py`**：OKR_TARGETS 来自 PPT Slide 8，含纯函数检查体系
+- **`src/api/agent_okr.py`**：log/adopt/verify/summary 4个端点
+- **`tests/test_agent_okr_service.py`**：34个单元测试全部通过
+
+#### Frontend (`apps/web`)
+
+- **`src/pages/AgentOKRPage.tsx`**：OKR达成看板（AdoptionBar进度条+目标线，OKRBadge ✅/❌/⏳，近7/14/30天切换）
+
+### P2 测试基础设施修复
+
+- `src/api/banquet_agent.py`、`supplier_agent.py`、`dish_rd_agent.py`：修复 `get_current_user` 导入路径（`security` → `dependencies`）
+- `src/api/agent_okr.py`、`ops_flow_agent.py`、`people_agent.py`、`business_intel.py`：修复 `from src.db import get_db` → `from src.core.database import get_db`
+- `tests/test_realtime_notifications.py`：修复 `mock_user` fixture 返回 function 对象 bug
+- 测试结果：**88 passed**（修复前 5 个文件收集错误，0 tests run）
+
+---
+
 ## [2.1.0] — 2026-03-09
 
 ### Banquet Agent — Phase 2

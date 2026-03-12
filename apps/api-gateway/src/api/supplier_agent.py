@@ -26,7 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func, desc
 
 from src.core.database import get_db
-from src.core.security import get_current_user
+from src.core.dependencies import get_current_user
 from src.models.user import User
 from src.models.supplier_agent import (
     SupplierProfile, MaterialCatalog,

@@ -385,3 +385,8 @@ from .people_agent import (
     PeopleShiftRecord, PeoplePerformanceScore, PeopleLaborCostRecord,
     PeopleAttendanceAlert, PeopleStaffingDecision, PeopleAgentLog,
 )
+from .ops_flow_agent import (
+    OpsChainEvent, OpsChainLinkage, OpsOrderAnomaly,
+    OpsInventoryAlert, OpsQualityRecord, OpsFlowDecision, OpsFlowAgentLog,
+)
+from .agent_okr import AgentResponseLog, AgentOKRSnapshot

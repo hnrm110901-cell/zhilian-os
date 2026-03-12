@@ -18,7 +18,10 @@ from typing import Optional
 from urllib.parse import urlencode
 
 import structlog
-import websockets
+try:
+    import websockets
+except ImportError:
+    websockets = None  # type: ignore[assignment]
 
 logger = structlog.get_logger()
 

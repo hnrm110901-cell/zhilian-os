@@ -5,6 +5,42 @@
 
 ---
 
+## Phase 13 — OpsFlowAgent 三体合并（2026-03-12）
+
+> PPT战略分析：OrderAgent + InventoryAgent + QualityAgent → OpsFlowAgent（出品链联动）
+> 核心能力：1个事件 → 3层级联响应（ChainAlert + OrderAnomaly + InventoryAlert + QualityRecord）
+
+### 全部完成（2026-03-12）
+
+- [x] 数据模型（7张表 + 7 Enum）`src/models/ops_flow_agent.py`
+- [x] Alembic迁移 `z41_ops_flow_agent_tables.py`（down_revision=z40）
+- [x] 5个 Agent：ChainAlertAgent/OrderAnomalyAgent/InventoryIntelAgent/QualityInspectionAgent/OpsOptimizeAgent
+- [x] 65个单元测试全部通过（`packages/agents/ops_flow/tests/test_agent.py`）
+- [x] API路由 `/api/v1/ops-flow`（15个端点 + 驾驶舱 BFF）`src/api/ops_flow_agent.py`
+- [x] 前端页面 `OpsFlowAgentPage.tsx`（驾驶舱/联动事件/库存预警/菜品质检/优化决策5Tab）
+- [x] `src/main.py` 注册 ops_flow_agent router
+
+### Agent OKR 看板（2026-03-12）
+
+- [x] OKR数据模型 `src/models/agent_okr.py`（AgentResponseLog + AgentOKRSnapshot）
+- [x] Alembic迁移 `z42_agent_okr_tables.py`（down_revision=z41）
+- [x] OKR服务 `src/services/agent_okr_service.py`（PPT Slide 8 OKR目标：采纳率/预测误差/响应时效）
+- [x] 34个单元测试全部通过（`tests/test_agent_okr_service.py`）
+- [x] API路由 `/api/v1/agent-okr`（log/adopt/verify/summary）`src/api/agent_okr.py`
+- [x] 前端页面 `AgentOKRPage.tsx`（OKR达成看板，AdoptionBar + OKRBadge）
+- [x] `src/main.py` 注册 agent_okr router
+
+### P2 测试修复（2026-03-12）
+
+- [x] `src/api/banquet_agent.py`：修复 `get_current_user` 错误导入路径（security → dependencies）
+- [x] `src/api/supplier_agent.py`：同上
+- [x] `src/api/dish_rd_agent.py`：同上
+- [x] `src/api/agent_okr.py`、`ops_flow_agent.py`、`people_agent.py`、`business_intel.py`：修复 `src.db` → `src.core.database` 导入
+- [x] `tests/test_realtime_notifications.py`：修复 `mock_user` fixture 返回 function 而非 user 对象的 bug
+- [x] 整体测试结果：88 passed（vs 修复前 0 tests collected）
+
+---
+
 ## Phase 11 — 供应商管理 Agent（Supplier Intelligence）
 
 > 北极星：「乐才告诉你买了什么；智链OS告诉你该从谁买、多少钱、有没有风险。」

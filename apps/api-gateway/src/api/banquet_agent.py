@@ -14,7 +14,7 @@ from sqlalchemy import select, and_, func
 from sqlalchemy.orm import selectinload
 
 from src.core.database import get_db
-from src.core.security import get_current_user
+from src.core.dependencies import get_current_user
 from src.models.user import User
 from src.models.banquet import (
     BanquetHall, BanquetCustomer, BanquetLead, BanquetOrder,
