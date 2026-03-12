@@ -402,3 +402,13 @@ from .fct_advanced import (
     FCTEntity, FCTConsolidationRun, FCTIntercompanyItem,
     FCTTaxDeclaration, FCTTaxExtractRule,
 )
+# Data Dictionary models — 数据字典补齐
+from .organization import Group, Brand, Region
+from .ingredient_master import IngredientMaster
+from .inventory_ext import InventoryBatch, InventoryCount
+from .purchase_order_item import PurchaseOrderItem
+from .daily_summary import DailyRevenueSummary, DailyWasteSummary, DailyPnlSummary
+from .attendance import AttendanceLog
+from .member_rfm import MemberRfmSnapshot
+from .price_benchmark import PriceBenchmarkPool, PriceBenchmarkReport
+from .decision_lifecycle import DecisionLifecycle
