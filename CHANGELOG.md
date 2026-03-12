@@ -10,6 +10,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.4.0] — 2026-03-12
+
+### AgentCollaborationOptimizer — 多Agent协同总线（PPT最终模块）
+
+#### Backend (`apps/api-gateway`)
+
+- **`src/models/agent_collab.py`**：3张表（AgentConflict / GlobalOptimizationLog / AgentCollabSnapshot）+ 4 Enum
+- **`alembic/versions/z43_agent_collab_tables.py`**：Alembic migration（down_revision=z42）
+- **`src/services/agent_collab_optimizer.py`**：核心协同逻辑（冲突检测+仲裁+去重+抑制+排序），40个纯函数单元测试全部通过
+- **`src/api/agent_collab.py`**：4个端点（/optimize / /conflicts / /conflicts/{id}/escalate / /dashboard BFF）
+
+#### Frontend (`apps/web`)
+
+- **`src/pages/AgentCollabPage.tsx`**：协同总线驾驶舱（冲突统计KPI + 协同原理说明 + 近期冲突列表）
+
+#### 至此PPT 9-Agent生态系统全部完成
+
+```
+增长层: BusinessIntelAgent + MarketingAgent + BanquetAgent
+运营层: OpsFlowAgent + PeopleAgent + DishRdAgent
+底座层: ComplianceAgent + OpsAgent + FctAgent
+基础设施: AgentCollaborationOptimizer (多Agent协同总线)
+量化追踪: Agent OKR 看板
+```
+
+---
+
 ## [2.3.0] — 2026-03-12
 
 ### Phase 13 — OpsFlowAgent 三体合并（出品链联动）
