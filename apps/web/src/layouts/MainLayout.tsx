@@ -124,6 +124,7 @@ const ROUTE_TO_GROUP: Record<string, string> = {
   '/people-agent': 'nav-agents',
   '/ops-flow-agent': 'nav-agents',
   '/agent-okr':      'nav-agents',
+  '/agent-collab':   'nav-agents',
 
   // 04 会员与增长
   '/marketing':       'nav-crm',
@@ -277,6 +278,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   '/people-agent': '人员智能体',
   '/ops-flow-agent': '运营流程体',
   '/agent-okr':      'Agent OKR',
+  '/agent-collab':   'Agent 协同总线',
   '/dynamic-pricing': '动态定价',
   '/members': '会员中心',
   '/crm-hub': '会员与增长中心',
@@ -631,6 +633,7 @@ const MainLayout: React.FC = () => {
         { key: '/people-agent',      icon: <TeamOutlined />,        label: '人员智能体' },
         { key: '/ops-flow-agent',    icon: <ApiOutlined />,         label: '运营流程体' },
         { key: '/agent-okr',         icon: <BarChartOutlined />,    label: 'Agent OKR' },
+        { key: '/agent-collab',      icon: <ApiOutlined />,         label: 'Agent 协同总线' },
         { key: '/training',          icon: <ReadOutlined />,        label: '培训管理 Agent' },
         // 配置与治理
         { key: '/agent-collaboration',icon: <ApartmentOutlined />,  label: '协作编排' },

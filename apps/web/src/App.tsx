@@ -157,6 +157,7 @@ const BusinessIntelPage = lazy(() => import('./pages/BusinessIntelPage'));
 const PeopleAgentPage = lazy(() => import('./pages/PeopleAgentPage'));
 const OpsFlowAgentPage = lazy(() => import('./pages/OpsFlowAgentPage'));
 const AgentOKRPage = lazy(() => import('./pages/AgentOKRPage'));
+const AgentCollabPage = lazy(() => import('./pages/AgentCollabPage'));
 const MarketingCampaignPage = lazy(() => import('./pages/MarketingCampaignPage'));
 const FctPage = lazy(() => import('./pages/FctPage'));
 const ApprovalListPage = lazy(() => import('./pages/ApprovalListPage'));
@@ -692,6 +693,9 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="agent-okr" element={
                     <ProtectedRoute requiredRole="admin"><AgentOKRPage /></ProtectedRoute>
+                  } />
+                  <Route path="agent-collab" element={
+                    <ProtectedRoute requiredRole="admin"><AgentCollabPage /></ProtectedRoute>
                   } />
                 </Route>
                 <Route path="*" element={<NotFoundPage />} />

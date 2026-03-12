@@ -390,3 +390,4 @@ from .ops_flow_agent import (
     OpsInventoryAlert, OpsQualityRecord, OpsFlowDecision, OpsFlowAgentLog,
 )
 from .agent_okr import AgentResponseLog, AgentOKRSnapshot
+from .agent_collab import AgentConflict, GlobalOptimizationLog, AgentCollabSnapshot

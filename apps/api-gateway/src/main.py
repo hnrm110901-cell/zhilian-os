@@ -604,6 +604,9 @@ app.include_router(ops_flow_agent.router, tags=["ops-flow-agent"])
 
 from src.api import agent_okr
 app.include_router(agent_okr.router, tags=["agent-okr"])
+
+from src.api import agent_collab
+app.include_router(agent_collab.router, tags=["agent-collab"])
 app.include_router(ai_accuracy.router, prefix="/api/v1", tags=["ai_accuracy"])
 app.include_router(governance.router, prefix="/api/v1", tags=["governance"])
 app.include_router(dashboard_preferences.router, prefix="/api/v1", tags=["dashboard_preferences"])
