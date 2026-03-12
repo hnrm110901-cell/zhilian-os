@@ -6,6 +6,7 @@ Prefix: /api/v1/dish-pricing
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Optional
 
 from src.core.database import get_db
 from src.services.dish_pricing_service import (
@@ -45,8 +46,8 @@ async def generate(
 async def list_recommendations(
     store_id:   str,
     period:     str          = Query(..., description="YYYY-MM"),
-    rec_action: str | None   = Query(None, description="increase/decrease/maintain"),
-    status:     str | None   = Query(None, description="pending/adopted/dismissed"),
+    rec_action: Optional[str] = Query(None, description="increase/decrease/maintain"),
+    status:     Optional[str] = Query(None, description="pending/adopted/dismissed"),
     limit:      int          = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
 ):
@@ -93,7 +94,7 @@ async def dish_history(
 @router.post("/{rec_id}/adopt")
 async def adopt(
     rec_id:        int,
-    adopted_price: float | None = Query(None, description="实际采纳价格，不传则用建议价"),
+    adopted_price: Optional[float] = Query(None, description="实际采纳价格，不传则用建议价"),
     db: AsyncSession = Depends(get_db),
 ):
     """将定价建议标记为已采纳（可传实际定价）。"""

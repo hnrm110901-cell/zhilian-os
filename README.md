@@ -163,7 +163,7 @@ cp .env.example .env
 - `FEISHU_APP_SECRET`: 飞书应用密钥
 - `DINGTALK_APP_KEY`: 钉钉应用Key
 - `DINGTALK_APP_SECRET`: 钉钉应用密钥
-- `AOQIWEI_API_KEY`: 奥琦韦API密钥
+- `AOQIWEI_APP_KEY`: 奥琦韦应用Key
 - `PINZHI_TOKEN`: 品智Token
 
 ### 启动开发环境
@@ -188,7 +188,21 @@ pnpm --filter api-gateway dev  # 后端
 
 ```bash
 pnpm test
+
+# API Gateway 迁移链和数据库升级验证
+make migrate-verify
 ```
+
+如果本地历史开发库 `zhilian_os` 已经落后当前模型和迁移链，建议直接：
+
+```bash
+make dev-db-backup
+make dev-db-rebuild
+```
+
+相关文档：
+- [API Gateway 迁移验证](./apps/api-gateway/MIGRATION_VALIDATION.md)
+- [开发库恢复指南](./apps/api-gateway/DEV_DB_RECOVERY.md)
 
 ## 开发指南
 

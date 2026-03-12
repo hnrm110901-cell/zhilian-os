@@ -328,3 +328,240 @@ class TestFetchWasteTop5:
             result = await _fetch_waste_top5("S001", db)
 
         assert result == []
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# _fetch_edge_hub_status
+# ════════════════════════════════════════════════════════════════════════════════
+
+def _scalar_one_or_none_bff(value):
+    r = MagicMock()
+    r.scalar_one_or_none.return_value = value
+    return r
+
+
+def _make_seq_db(*side_effects):
+    """Sequential mock: each db.execute() call returns the next side_effect."""
+    db = AsyncMock()
+    results = list(side_effects)
+    idx = [0]
+
+    async def _execute(stmt, *args, **kwargs):
+        r = results[idx[0]] if idx[0] < len(results) else results[-1]
+        idx[0] += 1
+        return r
+
+    db.execute = _execute
+    return db
+
+
+def _alert_level_rows(*pairs):
+    """Build rows like [(level, cnt), ...] as MagicMock with .level/.cnt attrs."""
+    rows = []
+    for level, cnt in pairs:
+        r = MagicMock()
+        r.level = level
+        r.cnt   = cnt
+        rows.append(r)
+
+    result = MagicMock()
+    result.all.return_value = rows
+    return result
+
+
+class TestFetchEdgeHubStatus:
+
+    @pytest.mark.asyncio
+    async def test_hub_online_no_alerts(self):
+        from src.api.bff import _fetch_edge_hub_status
+
+        hub = MagicMock()
+        hub.status = "online"
+        hub.last_heartbeat = datetime(2026, 3, 11, 10, 0, 0)
+
+        db = _make_seq_db(
+            _scalar_one_or_none_bff(hub),
+            _alert_level_rows(),          # no open alerts
+        )
+
+        result = await _fetch_edge_hub_status("S001", db)
+
+        assert result["hub_online"] is True
+        assert result["open_alert_count"] == 0
+        assert result["p1_alert_count"] == 0
+        assert "2026-03-11" in result["last_heartbeat"]
+
+    @pytest.mark.asyncio
+    async def test_hub_offline_with_p1_alerts(self):
+        from src.api.bff import _fetch_edge_hub_status
+
+        hub = MagicMock()
+        hub.status = "offline"
+        hub.last_heartbeat = datetime(2026, 3, 10, 8, 0, 0)
+
+        db = _make_seq_db(
+            _scalar_one_or_none_bff(hub),
+            _alert_level_rows(("p1", 2), ("p2", 1)),
+        )
+
+        result = await _fetch_edge_hub_status("S001", db)
+
+        assert result["hub_online"] is False
+        assert result["open_alert_count"] == 3
+        assert result["p1_alert_count"] == 2
+
+    @pytest.mark.asyncio
+    async def test_no_hub_returns_hub_online_false(self):
+        from src.api.bff import _fetch_edge_hub_status
+
+        db = _make_seq_db(
+            _scalar_one_or_none_bff(None),    # no hub
+            _alert_level_rows(),
+        )
+
+        result = await _fetch_edge_hub_status("S_MISSING", db)
+
+        assert result["hub_online"] is False
+        assert result["last_heartbeat"] is None
+
+    @pytest.mark.asyncio
+    async def test_db_error_returns_none_via_safe(self):
+        """_safe wrapper in sm_home should swallow exceptions → edge_hub_status=None."""
+        from src.api.bff import _safe, _fetch_edge_hub_status
+
+        async def _exploding_db_execute(*a, **kw):
+            raise RuntimeError("db down")
+
+        db = AsyncMock()
+        db.execute = _exploding_db_execute
+
+        result = await _safe(_fetch_edge_hub_status("S001", db), default=None)
+        assert result is None
+
+
+class TestSmHomeEdgeHubStatusIncluded:
+
+    @pytest.mark.asyncio
+    async def test_edge_hub_status_key_present_in_payload(self):
+        """sm_home payload must always include edge_hub_status key."""
+        from src.api.bff import sm_home
+        from unittest.mock import patch, AsyncMock as AM
+
+        hub_status = {"hub_online": True, "open_alert_count": 0, "p1_alert_count": 0, "last_heartbeat": None}
+
+        user = MagicMock()
+        user.store_id = "S001"
+
+        with patch("src.api.bff._cache_get",       new=AM(return_value=None)), \
+             patch("src.api.bff._cache_set",        new=AM(return_value=None)), \
+             patch("src.api.bff._fetch_health_score",       return_value=None), \
+             patch("src.api.bff._fetch_top3_decisions",     return_value=[]), \
+             patch("src.api.bff._fetch_queue_status",       return_value=None), \
+             patch("src.api.bff._fetch_pending_count",      return_value=0), \
+             patch("src.api.bff._fetch_today_revenue",      return_value=None), \
+             patch("src.api.bff._fetch_food_cost_quick",    return_value=None), \
+             patch("src.api.bff._fetch_unread_alerts_count",return_value=0), \
+             patch("src.api.bff._fetch_edge_hub_status",    return_value=hub_status):
+
+            db = AsyncMock()
+            result = await sm_home("S001", db=db, current_user=user)
+
+        assert "edge_hub_status" in result
+        assert result["edge_hub_status"]["hub_online"] is True
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# _fetch_hq_edge_hub_summary
+# ════════════════════════════════════════════════════════════════════════════════
+
+def _hub_status_rows(*pairs):
+    """Build rows with .status/.cnt attrs."""
+    rows = []
+    for status, cnt in pairs:
+        r = MagicMock()
+        r.status = status
+        r.cnt    = cnt
+        rows.append(r)
+    result = MagicMock()
+    result.all.return_value = rows
+    return result
+
+
+class TestFetchHqEdgeHubSummary:
+
+    @pytest.mark.asyncio
+    async def test_mixed_hub_statuses_and_alerts(self):
+        from src.api.bff import _fetch_hq_edge_hub_summary
+
+        db = _make_seq_db(
+            _hub_status_rows(("online", 8), ("offline", 2), ("degraded", 1)),
+            _alert_level_rows(("p1", 3), ("p2", 5), ("p3", 10)),
+        )
+
+        result = await _fetch_hq_edge_hub_summary(db)
+
+        assert result["total_hubs"]       == 11
+        assert result["online_hubs"]      == 8
+        assert result["offline_hubs"]     == 3    # offline + degraded
+        assert result["open_alert_count"] == 18
+        assert result["p1_alert_count"]   == 3
+
+    @pytest.mark.asyncio
+    async def test_all_hubs_online_no_alerts(self):
+        from src.api.bff import _fetch_hq_edge_hub_summary
+
+        db = _make_seq_db(
+            _hub_status_rows(("online", 5)),
+            _alert_level_rows(),
+        )
+
+        result = await _fetch_hq_edge_hub_summary(db)
+
+        assert result["total_hubs"]       == 5
+        assert result["online_hubs"]      == 5
+        assert result["offline_hubs"]     == 0
+        assert result["open_alert_count"] == 0
+        assert result["p1_alert_count"]   == 0
+
+    @pytest.mark.asyncio
+    async def test_empty_fleet(self):
+        from src.api.bff import _fetch_hq_edge_hub_summary
+
+        db = _make_seq_db(
+            _hub_status_rows(),
+            _alert_level_rows(),
+        )
+
+        result = await _fetch_hq_edge_hub_summary(db)
+
+        assert result["total_hubs"]  == 0
+        assert result["online_hubs"] == 0
+
+    @pytest.mark.asyncio
+    async def test_hq_payload_contains_edge_hub_summary(self):
+        """hq_overview payload must include edge_hub_summary key."""
+        from src.api.bff import hq_overview
+        from unittest.mock import patch, AsyncMock as AM
+
+        hub_summary = {
+            "total_hubs": 10, "online_hubs": 9, "offline_hubs": 1,
+            "open_alert_count": 2, "p1_alert_count": 1,
+        }
+
+        user = MagicMock()
+
+        with patch("src.api.bff._cache_get",                  new=AM(return_value=None)), \
+             patch("src.api.bff._cache_set",                  new=AM(return_value=None)), \
+             patch("src.api.bff._fetch_all_stores_health",    return_value=[]), \
+             patch("src.api.bff._fetch_hq_food_cost_ranking", return_value=[]), \
+             patch("src.api.bff._fetch_pending_count",        return_value=0), \
+             patch("src.api.bff._fetch_revenue_trend",        return_value={}), \
+             patch("src.api.bff._fetch_cross_store_decisions",return_value=[]), \
+             patch("src.api.bff._fetch_hq_edge_hub_summary",  return_value=hub_summary):
+
+            db = AsyncMock()
+            result = await hq_overview(db=db, current_user=user)
+
+        assert "edge_hub_summary" in result
+        assert result["edge_hub_summary"]["offline_hubs"] == 1
+        assert result["edge_hub_summary"]["p1_alert_count"] == 1

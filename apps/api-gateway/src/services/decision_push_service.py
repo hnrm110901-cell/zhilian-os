@@ -29,6 +29,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.services.decision_flow_state import DecisionFlowState
 from src.services.decision_priority_engine import DecisionPriorityEngine
 from src.services.waste_guard_service import WasteGuardService
+try:
+    from src.services.wechat_service import wechat_service
+except Exception:
+    wechat_service = None
 
 logger = structlog.get_logger()
 
@@ -39,6 +43,14 @@ _APPROVAL_BASE_URL = os.getenv(
     "WECHAT_APPROVAL_BASE_URL",
     "https://your-domain.com/decisions",
 )
+
+
+def _get_wechat_service():
+    global wechat_service
+    if wechat_service is None:
+        from src.services.wechat_service import wechat_service as _wechat_service
+        wechat_service = _wechat_service
+    return wechat_service
 
 
 # ── 卡片描述格式化 ─────────────────────────────────────────────────────────────
@@ -192,9 +204,8 @@ class DecisionPushService:
         Returns:
             {"sent": bool, "decision_count": int, "message_id": str | None, "flow_id": str}
         """
-        from src.services.wechat_service import wechat_service
-
         state = DecisionFlowState.new(store_id=store_id, push_window="08:00晨推")
+        wechat = _get_wechat_service()
 
         engine = DecisionPriorityEngine(store_id=store_id)
         try:
@@ -216,7 +227,7 @@ class DecisionPushService:
         description = _format_card_description(decisions)
         action_url = f"{_APPROVAL_BASE_URL}?store_id={store_id}&window=morning"
 
-        result = await wechat_service.send_decision_card(
+        result = await wechat.send_decision_card(
             title=title,
             description=description,
             action_url=action_url,
@@ -258,9 +269,8 @@ class DecisionPushService:
 
         仅当存在 warning/critical 异常时推送（纯信息不推）。
         """
-        from src.services.wechat_service import wechat_service
-
         state = DecisionFlowState.new(store_id=store_id, push_window="12:00午推")
+        wechat = _get_wechat_service()
 
         today = date.today()
         start  = today.replace(day=1)   # 本月1日
@@ -300,7 +310,7 @@ class DecisionPushService:
         description = _format_anomaly_description(waste_summary, decisions)
         action_url = f"{_APPROVAL_BASE_URL}?store_id={store_id}&window=noon"
 
-        result = await wechat_service.send_decision_card(
+        result = await wechat.send_decision_card(
             title=title,
             description=description,
             action_url=action_url,
@@ -342,9 +352,8 @@ class DecisionPushService:
 
         仅当存在库存类决策时推送。
         """
-        from src.services.wechat_service import wechat_service
-
         state = DecisionFlowState.new(store_id=store_id, push_window="17:30战前")
+        wechat = _get_wechat_service()
 
         engine = DecisionPriorityEngine(store_id=store_id)
         try:
@@ -369,7 +378,7 @@ class DecisionPushService:
         description = _format_prebattle_description(decisions, store_name or store_id)
         action_url = f"{_APPROVAL_BASE_URL}?store_id={store_id}&window=prebattle"
 
-        result = await wechat_service.send_decision_card(
+        result = await wechat.send_decision_card(
             title=title,
             description=description,
             action_url=action_url,
@@ -414,10 +423,10 @@ class DecisionPushService:
 
         仅在有待批或高优先级决策时推送（纯信息不推）。
         """
-        from src.services.wechat_service import wechat_service
         from src.services.narrative_engine import NarrativeEngine
 
         state = DecisionFlowState.new(store_id=store_id, push_window="20:30晚推")
+        wechat = _get_wechat_service()
 
         # 查询该门店待审批决策数
         pending_count = await _count_pending_approvals(store_id, db)
@@ -458,7 +467,7 @@ class DecisionPushService:
         state.narrative = description
         action_url = f"{_APPROVAL_BASE_URL}?store_id={store_id}&window=evening"
 
-        result = await wechat_service.send_decision_card(
+        result = await wechat.send_decision_card(
             title=title,
             description=description,
             action_url=action_url,

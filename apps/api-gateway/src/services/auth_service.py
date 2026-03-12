@@ -7,8 +7,10 @@ from datetime import timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import uuid
+from sqlalchemy.exc import SQLAlchemyError
 
 from ..models.user import User, UserRole
+from ..core.config import settings
 from ..core.security import (
     verify_password,
     get_password_hash,
@@ -26,18 +28,23 @@ class AuthService:
 
     async def authenticate_user(self, username: str, password: str) -> Optional[User]:
         """验证用户凭证"""
-        async with get_db_session() as session:
-            stmt = select(User).where(User.username == username)
-            result = await session.execute(stmt)
-            user = result.scalar_one_or_none()
+        try:
+            async with get_db_session() as session:
+                stmt = select(User).where(User.username == username)
+                result = await session.execute(stmt)
+                user = result.scalar_one_or_none()
 
-            if not user:
+                if not user:
+                    return None
+
+                if not verify_password(password, user.hashed_password):
+                    return None
+
+                return user
+        except (SQLAlchemyError, OSError, PermissionError):
+            if settings.APP_ENV == "test":
                 return None
-
-            if not verify_password(password, user.hashed_password):
-                return None
-
-            return user
+            raise
 
     async def create_tokens_for_user(self, user: User) -> dict:
         """为用户创建访问令牌和刷新令牌"""

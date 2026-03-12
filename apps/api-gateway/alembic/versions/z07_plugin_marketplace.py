@@ -1,13 +1,13 @@
 """z07 plugin marketplace
 
 Revision ID: z07
-Revises: z06
+Revises: z06_isv_lifecycle
 Create Date: 2026-03-07
 """
 from alembic import op
 
 revision = 'z07'
-down_revision = 'z06'
+down_revision = 'z06_isv_lifecycle'
 branch_labels = None
 depends_on = None
 

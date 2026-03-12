@@ -6,6 +6,7 @@ Prefix: /api/v1/dish-alert
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Optional
 
 from src.core.database import get_db
 from src.services.dish_cost_alert_service import (
@@ -47,8 +48,8 @@ async def detect(
 async def list_alerts(
     store_id: str,
     period:   str          = Query(..., description="YYYY-MM"),
-    severity: str | None   = Query(None, description="critical/warning/info"),
-    status:   str | None   = Query(None, description="open/resolved/suppressed"),
+    severity: Optional[str] = Query(None, description="critical/warning/info"),
+    status:   Optional[str] = Query(None, description="open/resolved/suppressed"),
     limit:    int          = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
 ):

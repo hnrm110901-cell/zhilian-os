@@ -1,6 +1,7 @@
 """
 Unit tests for FeishuService message handling.
 """
+import hashlib
 import sys
 from unittest.mock import AsyncMock, MagicMock
 
@@ -82,6 +83,35 @@ class TestWebhookGuards:
             mp.setattr("src.services.feishu_service.settings.FEISHU_VERIFICATION_TOKEN", "token-123")
             assert svc.validate_callback_token({"header": {"token": "token-123"}}) is True
             assert svc.validate_callback_token({"token": "bad-token"}) is False
+
+    def test_supported_event_type_whitelist(self):
+        svc = FeishuService()
+
+        assert svc.is_supported_event_type({"type": "url_verification"}) is True
+        assert svc.is_supported_event_type(
+            {"header": {"event_type": "im.message.receive_v1"}}
+        ) is True
+        assert svc.is_supported_event_type(
+            {"header": {"event_type": "contact.user.created_v3"}}
+        ) is False
+
+    def test_validate_signature_with_encrypt_key(self):
+        svc = FeishuService()
+        raw_body = b'{"type":"url_verification"}'
+        timestamp = "1700000000"
+        nonce = "nonce-1"
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr("src.services.feishu_service.settings.FEISHU_ENCRYPT_KEY", "encrypt-key")
+            signature = hashlib.sha256(
+                timestamp.encode("utf-8")
+                + nonce.encode("utf-8")
+                + b"encrypt-key"
+                + raw_body
+            ).hexdigest()
+
+            assert svc.validate_signature(raw_body, timestamp, nonce, signature) is True
+            assert svc.validate_signature(raw_body, timestamp, nonce, "bad-signature") is False
 
     @pytest.mark.asyncio
     async def test_mark_and_detect_duplicate_event(self):

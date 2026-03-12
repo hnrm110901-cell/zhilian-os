@@ -46,6 +46,37 @@ cp .env.example .env
 # 编辑.env文件，填入必要的配置
 ```
 
+企业集成最小配置:
+
+```bash
+# 企业微信
+WECHAT_CORP_ID=your_corp_id
+WECHAT_CORP_SECRET=your_corp_secret
+WECHAT_AGENT_ID=1000001
+WECHAT_TOKEN=your_callback_token
+WECHAT_ENCODING_AES_KEY=your_encoding_aes_key
+
+# 飞书
+FEISHU_APP_ID=cli_your_app_id
+FEISHU_APP_SECRET=your_app_secret
+FEISHU_VERIFICATION_TOKEN=your_verification_token
+FEISHU_ENCRYPT_KEY=your_encrypt_key
+```
+
+说明:
+- 企业微信 webhook 依赖 `WECHAT_TOKEN` 和 `WECHAT_ENCODING_AES_KEY`
+- 飞书 webhook 至少应配置 `FEISHU_VERIFICATION_TOKEN`
+- 配置 `FEISHU_ENCRYPT_KEY` 后会启用请求签名校验
+- 可通过 `/api/v1/health/config/validation` 检查 webhook 安全配置是否完整
+- 可通过 `/api/v1/enterprise/support-matrix` 查看真实支持能力
+- 可通过 `/api/v1/enterprise/readiness` 做上线前自检
+
+树莓派 5 边缘节点 bootstrap 最小配置:
+
+```bash
+EDGE_BOOTSTRAP_TOKEN=replace-with-edge-bootstrap-token
+```
+
 ### 3. 启动服务
 
 ```bash
@@ -63,6 +94,7 @@ uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 - ReDoc: http://localhost:8000/redoc
 - 详细API文档: [API_DOCUMENTATION.md](API_DOCUMENTATION.md)
 - Postman集合: [postman_collection.json](postman_collection.json)
+- 企业集成支持矩阵: [../docs/enterprise-integration-support-matrix.md](../docs/enterprise-integration-support-matrix.md)
 
 ## API使用示例
 
@@ -143,6 +175,9 @@ curl -X POST "http://localhost:8000/api/v1/agents/reservation" \\
 # 运行所有测试
 pytest tests/
 
+# 运行迁移验证（head / offline SQL / online upgrade）
+bash scripts/verify_migrations.sh
+
 # 运行特定测试文件
 pytest tests/test_task_service.py
 
@@ -154,6 +189,23 @@ python tests/test_agent_integration.py
 ```
 
 详细测试说明请查看 [tests/README.md](tests/README.md)
+迁移验证与开发库恢复请查看 [MIGRATION_VALIDATION.md](MIGRATION_VALIDATION.md) 和 [DEV_DB_RECOVERY.md](DEV_DB_RECOVERY.md)
+
+树莓派 5 边缘节点第一版安装器与差距清单请查看 [RASPBERRY_PI_EDGE_INSTALLER.md](RASPBERRY_PI_EDGE_INSTALLER.md) 和 [EDGE_NODE_GAP_ANALYSIS.md](EDGE_NODE_GAP_ANALYSIS.md)
+现场远程安装手册请查看 [REMOTE_EDGE_INSTALL_RUNBOOK.md](REMOTE_EDGE_INSTALL_RUNBOOK.md)
+
+常用树莓派 5 命令:
+
+```bash
+# 本地安装
+bash scripts/install_raspberry_pi_edge.sh
+
+# 远程 SSH 安装
+bash scripts/install_raspberry_pi_edge_remote.sh
+
+# 启用开机自动安装 / 自动注册
+bash scripts/enable_raspberry_pi_edge_autoprovision.sh
+```
 
 ## 部署
 

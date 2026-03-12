@@ -52,14 +52,11 @@ docker-compose logs -f
 
 4. **初始化数据库**
 ```bash
-# 进入API容器
-docker-compose exec api-gateway bash
-
-# 运行数据库迁移
-alembic upgrade head
+# 先验证迁移链和数据库可升级
+make migrate-verify
 
 # 创建初始数据
-python scripts/init_data.py
+docker-compose exec api-gateway python scripts/init_data.py
 ```
 
 5. **访问系统**
@@ -85,6 +82,20 @@ createdb zhilian_os
 # 运行迁移
 alembic upgrade head
 ```
+
+如果本地已有历史开发库 `zhilian_os`，优先不要原地修库，建议：
+
+```bash
+# 先备份旧库
+make dev-db-backup
+
+# 再重建到当前 head
+make dev-db-rebuild
+```
+
+迁移链校验、旧开发库恢复和在线验证说明见：
+- `apps/api-gateway/MIGRATION_VALIDATION.md`
+- `apps/api-gateway/DEV_DB_RECOVERY.md`
 
 3. **启动后端服务**
 ```bash

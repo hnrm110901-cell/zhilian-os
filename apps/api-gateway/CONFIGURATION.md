@@ -191,7 +191,22 @@ FEISHU_APP_ID=cli_your_app_id
 
 # 应用密钥
 FEISHU_APP_SECRET=your_app_secret
+
+# 回调Token（基础来源校验）
+FEISHU_VERIFICATION_TOKEN=your_verification_token
+
+# 回调Encrypt Key（启用签名校验时必填）
+FEISHU_ENCRYPT_KEY=your_encrypt_key
 ```
+
+**Webhook安全说明**:
+1. `FEISHU_VERIFICATION_TOKEN` 用于校验回调 JSON 中的 token 字段
+2. `FEISHU_ENCRYPT_KEY` 配置后，系统会校验请求头：
+   - `X-Lark-Request-Timestamp`
+   - `X-Lark-Request-Nonce`
+   - `X-Lark-Signature`
+3. 当前仅接收 `url_verification` 和 `im.message.receive_v1` 两类事件
+4. 建议生产环境同时配置 `FEISHU_VERIFICATION_TOKEN` 和 `FEISHU_ENCRYPT_KEY`
 
 ### 钉钉
 

@@ -5,6 +5,7 @@ Enterprise OAuth Login Service
 """
 import os
 from typing import Dict, Any, Optional
+import inspect
 import httpx
 import structlog
 from datetime import datetime, timedelta
@@ -12,14 +13,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.config import settings
 from ..core.database import get_db_session
-from ..models.user import User
+from ..models.user import User, UserRole
 from ..core.security import create_access_token, create_refresh_token, get_password_hash
+from .auth_service import AuthService
 
 logger = structlog.get_logger()
 
 
 class EnterpriseOAuthService:
     """企业OAuth登录服务"""
+    def __init__(self) -> None:
+        self.auth_service = AuthService()
 
     async def wechat_work_oauth_login(
         self,
@@ -338,67 +342,80 @@ class EnterpriseOAuthService:
             logger.error("钉钉OAuth登录失败", error=str(e))
             raise
 
-    async def _create_or_update_user(
-        self,
-        provider: str,
-        provider_user_id: str,
-        username: str,
-        full_name: Optional[str] = None,
-        email: Optional[str] = None,
-        mobile: Optional[str] = None,
-        department: Optional[list] = None,
-        position: Optional[str] = None,
-    ) -> User:
+    async def _create_or_update_user(self, *args, **kwargs) -> User:
         """
         创建或更新用户
 
         根据企业账号信息自动创建用户并分配权限
         """
-        async with get_db_session() as session:
-            from sqlalchemy import select
+        # Backward-compatible input style used by tests:
+        # _create_or_update_user(user_info: dict, provider: str)
+        if args and isinstance(args[0], dict):
+            user_info = args[0]
+            provider = args[1] if len(args) > 1 else kwargs.get("provider", "oauth")
+            provider_user_id = (
+                user_info.get("userid")
+                or user_info.get("user_id")
+                or user_info.get("open_id")
+                or user_info.get("unionid")
+                or user_info.get("id")
+                or user_info.get("email")
+                or "oauth_user"
+            )
+            username = user_info.get("userid") or user_info.get("username") or str(provider_user_id)
+            full_name = user_info.get("name") or user_info.get("full_name")
+            email = user_info.get("email")
+            mobile = user_info.get("mobile")
+            department = user_info.get("department")
+            position = user_info.get("position")
+        else:
+            provider = kwargs.get("provider")
+            provider_user_id = kwargs.get("provider_user_id")
+            username = kwargs.get("username")
+            full_name = kwargs.get("full_name")
+            email = kwargs.get("email")
+            mobile = kwargs.get("mobile")
+            department = kwargs.get("department")
+            position = kwargs.get("position")
 
-            # 查找是否已存在该用户
-            stmt = select(User).where(User.username == username)
-            result = await session.execute(stmt)
-            user = result.scalar_one_or_none()
+        if not provider or not provider_user_id or not username:
+            raise ValueError("provider/provider_user_id/username are required")
 
-            if user:
-                # 更新用户信息
-                user.full_name = full_name or user.full_name
-                user.email = email or user.email
-                logger.info("更新现有用户", user_id=str(user.id), username=username)
-            else:
-                # 创建新用户
-                # 根据职位/部门自动分配角色
-                role = self._determine_role(position, department)
+        role_str = self._determine_role(position, department)
+        role_value = UserRole(role_str) if role_str in [r.value for r in UserRole] else role_str
 
-                user = User(
-                    username=username,
-                    email=email or f"{username}@{provider}.com",
-                    hashed_password=get_password_hash(f"{provider}_{provider_user_id}"),  # 随机密码
-                    full_name=full_name or username,
-                    role=role,
+        existing = await self._maybe_await(self.auth_service.get_user_by_username(username))
+        if existing:
+            updated = await self._maybe_await(
+                self.auth_service.update_user(
+                    user_id=str(existing.id),
+                    full_name=full_name or getattr(existing, "full_name", None),
+                    email=email or getattr(existing, "email", None),
+                    role=role_value,
+                    store_id=getattr(existing, "store_id", None),
                     is_active=True,
-                    store_id="STORE001",  # 默认门店,可根据部门映射
                 )
+            )
+            logger.info("更新现有用户", user_id=str(existing.id), username=username)
+            return updated or existing
 
-                session.add(user)
-                logger.info(
-                    "创建新用户",
-                    username=username,
-                    role=role,
-                    provider=provider
-                )
-
-            await session.commit()
-            await session.refresh(user)
-
-            return user
+        new_user = await self._maybe_await(
+            self.auth_service.register_user(
+                username=username,
+                email=email or f"{username}@{provider}.com",
+                password=f"{provider}_{provider_user_id}",
+                full_name=full_name or username,
+                role=role_value,
+                store_id="STORE001",
+            )
+        )
+        logger.info("创建新用户", username=username, role=role_str, provider=provider)
+        return new_user
 
     def _determine_role(
         self,
         position: Optional[str],
-        department: Optional[list]
+        department: Optional[Any]
     ) -> str:
         """
         根据职位和部门确定用户角色
@@ -426,13 +443,18 @@ class EnterpriseOAuthService:
         # 检查部门
         if department:
             dept_str = str(department).lower()
-            if any(keyword in dept_str for keyword in ["管理", "高管", "admin"]):
-                return "admin"
             if any(keyword in dept_str for keyword in ["门店", "店铺", "store"]):
                 return "store_manager"
+            if any(keyword in dept_str for keyword in ["管理", "高管", "admin"]):
+                return "admin"
 
         # 默认为员工
         return "staff"
+
+    async def _maybe_await(self, value):
+        if inspect.isawaitable(value):
+            return await value
+        return value
 
 
 # 创建全局实例

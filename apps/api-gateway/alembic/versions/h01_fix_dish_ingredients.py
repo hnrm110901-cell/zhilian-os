@@ -9,7 +9,7 @@ Revision ID: h01_fix_dish_ingredients
 Revises: g01_onboarding_engine
 Create Date: 2026-03-06
 """
-from alembic import op
+from alembic import op, context
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
@@ -21,13 +21,16 @@ depends_on = None
 
 def upgrade() -> None:
     # 仅在表不存在时创建，防止重复执行报错
-    conn = op.get_bind()
-    exists = conn.execute(
-        sa.text(
-            "SELECT EXISTS (SELECT 1 FROM pg_tables "
-            "WHERE schemaname='public' AND tablename='dish_ingredients')"
-        )
-    ).scalar()
+    if context.is_offline_mode():
+        exists = False
+    else:
+        conn = op.get_bind()
+        exists = conn.execute(
+            sa.text(
+                "SELECT EXISTS (SELECT 1 FROM pg_tables "
+                "WHERE schemaname='public' AND tablename='dish_ingredients')"
+            )
+        ).scalar()
 
     if not exists:
         op.create_table(

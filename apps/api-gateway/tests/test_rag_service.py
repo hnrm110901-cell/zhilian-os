@@ -3,7 +3,22 @@ RAG服务测试
 测试向量检索和上下文增强功能
 """
 import pytest
+import socket
 from src.services.rag_service import rag_service
+
+
+def _is_port_open(host: str, port: int, timeout: float = 0.3) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _skip_if_qdrant_unavailable():
+    if not _is_port_open("127.0.0.1", 6333) and not _is_port_open("127.0.0.1", 6334):
+        pytest.skip("Qdrant is not reachable on 127.0.0.1:6333/6334 in this environment")
 
 
 @pytest.mark.asyncio

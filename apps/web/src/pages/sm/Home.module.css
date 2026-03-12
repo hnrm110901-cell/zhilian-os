@@ -262,6 +262,10 @@
   line-height: 1;
 }
 
+.quickBadgeWarn {
+  background: #f97316;
+}
+
 .staffingCard {
   display: flex;
   flex-direction: column;

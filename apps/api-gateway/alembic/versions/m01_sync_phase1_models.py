@@ -8,7 +8,7 @@ Revision ID: m01_sync_phase1_models
 Revises: l15i2kk28m3k
 Create Date: 2026-02-24
 """
-from alembic import op
+from alembic import op, context
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 import uuid
@@ -20,17 +20,32 @@ depends_on = None
 
 
 def upgrade():
+    def table_exists(table_name: str) -> bool:
+        if context.is_offline_mode():
+            return False
+        conn = op.get_bind()
+        return conn.execute(
+            sa.text(
+                "SELECT EXISTS (SELECT 1 FROM pg_tables "
+                "WHERE schemaname='public' AND tablename=:t)"
+            ),
+            {"t": table_name},
+        ).scalar()
+
     # ── 1. 删除旧表（按依赖顺序：子表先删）──────────────────────────────
     op.drop_table('shifts')
     op.drop_table('schedules')
     op.drop_table('inventory_transactions')
     # dish_ingredients 外键依赖 inventory_items，先删
-    conn = op.get_bind()
-    di_exists = conn.execute(
-        sa.text("SELECT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='dish_ingredients')")
-    ).scalar()
-    if di_exists:
-        op.drop_table('dish_ingredients')
+    if context.is_offline_mode():
+        op.execute("DROP TABLE IF EXISTS dish_ingredients")
+    else:
+        conn = op.get_bind()
+        di_exists = conn.execute(
+            sa.text("SELECT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='dish_ingredients')")
+        ).scalar()
+        if di_exists:
+            op.drop_table('dish_ingredients')
     op.drop_table('inventory_items')
     op.drop_table('employees')
     op.drop_table('reservations')
@@ -168,44 +183,46 @@ def upgrade():
     op.create_index('idx_reservations_phone', 'reservations', ['customer_phone'])
 
     # ── 8. 新建 kpis ─────────────────────────────────────────────────────
-    op.create_table(
-        'kpis',
-        sa.Column('id', sa.String(50), primary_key=True),
-        sa.Column('name', sa.String(100), nullable=False),
-        sa.Column('category', sa.String(50), nullable=False),
-        sa.Column('description', sa.String(255)),
-        sa.Column('unit', sa.String(20)),
-        sa.Column('target_value', sa.Float),
-        sa.Column('warning_threshold', sa.Float),
-        sa.Column('critical_threshold', sa.Float),
-        sa.Column('calculation_method', sa.String(50)),
-        sa.Column('is_active', sa.String(10), default='true'),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
-        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
-    )
-    op.create_index('idx_kpis_category', 'kpis', ['category'])
-    op.create_index('idx_kpis_is_active', 'kpis', ['is_active'])
+    if not table_exists('kpis'):
+        op.create_table(
+            'kpis',
+            sa.Column('id', sa.String(50), primary_key=True),
+            sa.Column('name', sa.String(100), nullable=False),
+            sa.Column('category', sa.String(50), nullable=False),
+            sa.Column('description', sa.String(255)),
+            sa.Column('unit', sa.String(20)),
+            sa.Column('target_value', sa.Float),
+            sa.Column('warning_threshold', sa.Float),
+            sa.Column('critical_threshold', sa.Float),
+            sa.Column('calculation_method', sa.String(50)),
+            sa.Column('is_active', sa.String(10), default='true'),
+            sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
+            sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
+        )
+        op.create_index('idx_kpis_category', 'kpis', ['category'])
+        op.create_index('idx_kpis_is_active', 'kpis', ['is_active'])
 
     # ── 9. 新建 kpi_records ──────────────────────────────────────────────
-    op.create_table(
-        'kpi_records',
-        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
-        sa.Column('kpi_id', sa.String(50), sa.ForeignKey('kpis.id'), nullable=False),
-        sa.Column('store_id', sa.String(50), sa.ForeignKey('stores.id'), nullable=False),
-        sa.Column('record_date', sa.Date, nullable=False),
-        sa.Column('value', sa.Float, nullable=False),
-        sa.Column('target_value', sa.Float),
-        sa.Column('achievement_rate', sa.Float),
-        sa.Column('previous_value', sa.Float),
-        sa.Column('change_rate', sa.Float),
-        sa.Column('status', sa.String(20)),
-        sa.Column('trend', sa.String(20)),
-        sa.Column('kpi_metadata', sa.JSON, default=dict),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
-        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
-    )
-    op.create_index('idx_kpi_record_kpi_store_date', 'kpi_records', ['kpi_id', 'store_id', 'record_date'])
-    op.create_index('idx_kpi_record_store_date', 'kpi_records', ['store_id', 'record_date'])
+    if not table_exists('kpi_records'):
+        op.create_table(
+            'kpi_records',
+            sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
+            sa.Column('kpi_id', sa.String(50), sa.ForeignKey('kpis.id'), nullable=False),
+            sa.Column('store_id', sa.String(50), sa.ForeignKey('stores.id'), nullable=False),
+            sa.Column('record_date', sa.Date, nullable=False),
+            sa.Column('value', sa.Float, nullable=False),
+            sa.Column('target_value', sa.Float),
+            sa.Column('achievement_rate', sa.Float),
+            sa.Column('previous_value', sa.Float),
+            sa.Column('change_rate', sa.Float),
+            sa.Column('status', sa.String(20)),
+            sa.Column('trend', sa.String(20)),
+            sa.Column('kpi_metadata', sa.JSON, default=dict),
+            sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
+            sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
+        )
+        op.create_index('idx_kpi_record_kpi_store_date', 'kpi_records', ['kpi_id', 'store_id', 'record_date'])
+        op.create_index('idx_kpi_record_store_date', 'kpi_records', ['store_id', 'record_date'])
 
 
 def downgrade():

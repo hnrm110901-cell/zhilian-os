@@ -21,9 +21,10 @@ Member Lifecycle State Machine
 
 from __future__ import annotations
 
+import inspect
 import os
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 import structlog
 from sqlalchemy import text
@@ -36,6 +37,13 @@ from src.models.member_lifecycle import (
 )
 
 logger = structlog.get_logger()
+
+
+async def _maybe_await(value: Any) -> Any:
+    """Support AsyncMock returning coroutine for sync-style SQLAlchemy methods."""
+    if inspect.isawaitable(value):
+        return await value
+    return value
 
 # ── 阈值（环境变量可覆盖）─────────────────────────────────────────────────────
 _CHURN_WARNING_DAYS = int(os.getenv("LC_CHURN_WARNING_DAYS", "45"))
@@ -175,7 +183,7 @@ class LifecycleStateMachine:
             """),
             {"store_id": store_id, "customer_id": customer_id},
         )
-        member = row.fetchone()
+        member = await _maybe_await(row.fetchone())
 
         if member and member.lifecycle_state:
             try:
@@ -205,7 +213,7 @@ class LifecycleStateMachine:
                 "window": _HIGH_FREQ_WINDOW,
             },
         )
-        stats = stats_row.fetchone()
+        stats = await _maybe_await(stats_row.fetchone())
 
         total_orders  = int(stats.total_orders)  if stats else 0
         recency_days  = int(stats.recency_days)  if stats else 9999
@@ -287,7 +295,7 @@ class LifecycleStateMachine:
             changed_at=datetime.utcnow(),
             reason=reason,
         )
-        db.add(history)
+        await _maybe_await(db.add(history))
         await db.commit()
 
         logger.info(
@@ -324,4 +332,5 @@ class LifecycleStateMachine:
             """),
             {"store_id": store_id, "customer_id": customer_id, "limit": limit},
         )
-        return [dict(r._mapping) for r in rows.fetchall()]
+        records = await _maybe_await(rows.fetchall())
+        return [dict(r._mapping) for r in (records or [])]

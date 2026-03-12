@@ -38,7 +38,7 @@ logger = structlog.get_logger()
 
 # ── 成本率状态阈值 ────────────────────────────────────────────────────────────
 COST_RATE_OK       = float(os.getenv("COST_RATE_OK",       "0.30"))  # ≤30% 正常
-COST_RATE_WARNING  = float(os.getenv("COST_RATE_WARNING",  "0.35"))  # 30–35% 警告
+COST_RATE_WARNING  = float(os.getenv("COST_RATE_WARNING",  "0.32"))  # 32–39.99% 警告
 COST_RATE_CRITICAL = float(os.getenv("COST_RATE_CRITICAL", "0.40"))  # ≥40% 严重
 
 # ── 状态文字映射 ──────────────────────────────────────────────────────────────

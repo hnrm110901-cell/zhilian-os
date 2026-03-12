@@ -20,11 +20,19 @@ depends_on    = None
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 
 def upgrade() -> None:
     # ── Enum 类型 ─────────────────────────────────────────
-    op.execute("CREATE TYPE meal_period_type AS ENUM ('morning','lunch','dinner','all_day')")
+    op.execute("""
+        DO $$
+        BEGIN
+            CREATE TYPE meal_period_type AS ENUM ('morning','lunch','dinner','all_day');
+        EXCEPTION
+            WHEN duplicate_object THEN NULL;
+        END $$;
+    """)
     op.execute("CREATE TYPE staffing_advice_status AS ENUM ('pending','confirmed','rejected','expired')")
     op.execute("CREATE TYPE confirmation_action AS ENUM ('confirmed','rejected','modified')")
     op.execute("CREATE TYPE budget_period_type AS ENUM ('monthly','weekly')")
@@ -33,11 +41,11 @@ def upgrade() -> None:
     # ── 1. labor_demand_forecasts ────────────────────────
     op.create_table(
         'labor_demand_forecasts',
-        sa.Column('id',            sa.dialects.postgresql.UUID(as_uuid=True), primary_key=True),
+        sa.Column('id',            postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column('store_id',      sa.String(50),  sa.ForeignKey('stores.id'), nullable=False),
         sa.Column('forecast_date', sa.Date,        nullable=False),
-        sa.Column('meal_period',   sa.Enum('morning','lunch','dinner','all_day',
-                                           name='meal_period_type', create_type=False),
+        sa.Column('meal_period',   postgresql.ENUM('morning','lunch','dinner','all_day',
+                                                   name='meal_period_type', create_type=False),
                   nullable=False),
 
         sa.Column('predicted_customer_count', sa.Integer,        nullable=False),
@@ -98,15 +106,15 @@ def upgrade() -> None:
     # ── 3. staffing_advice ───────────────────────────────
     op.create_table(
         'staffing_advice',
-        sa.Column('id',          sa.dialects.postgresql.UUID(as_uuid=True), primary_key=True),
+        sa.Column('id',          postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column('store_id',    sa.String(50), sa.ForeignKey('stores.id'), nullable=False),
         sa.Column('advice_date', sa.Date, nullable=False),
-        sa.Column('meal_period', sa.Enum('morning','lunch','dinner','all_day',
-                                         name='meal_period_type', create_type=False),
+        sa.Column('meal_period', postgresql.ENUM('morning','lunch','dinner','all_day',
+                                                 name='meal_period_type', create_type=False),
                   nullable=False),
 
-        sa.Column('status', sa.Enum('pending','confirmed','rejected','expired',
-                                    name='staffing_advice_status', create_type=False),
+        sa.Column('status', postgresql.ENUM('pending','confirmed','rejected','expired',
+                                            name='staffing_advice_status', create_type=False),
                   nullable=False, server_default='pending'),
 
         sa.Column('recommended_headcount',       sa.Integer, nullable=False),
@@ -136,13 +144,13 @@ def upgrade() -> None:
     op.create_table(
         'staffing_advice_confirmations',
         sa.Column('id',        sa.Integer, primary_key=True, autoincrement=True),
-        sa.Column('advice_id', sa.dialects.postgresql.UUID(as_uuid=True),
+        sa.Column('advice_id', postgresql.UUID(as_uuid=True),
                   sa.ForeignKey('staffing_advice.id'), nullable=False),
         sa.Column('store_id',  sa.String(50), nullable=False),
 
         sa.Column('confirmed_by', sa.String(100), nullable=True),
-        sa.Column('action', sa.Enum('confirmed','rejected','modified',
-                                    name='confirmation_action', create_type=False),
+        sa.Column('action', postgresql.ENUM('confirmed','rejected','modified',
+                                            name='confirmation_action', create_type=False),
                   nullable=False),
 
         sa.Column('modified_headcount', sa.Integer,        nullable=True),
@@ -163,8 +171,8 @@ def upgrade() -> None:
         sa.Column('id',            sa.Integer, primary_key=True, autoincrement=True),
         sa.Column('store_id',      sa.String(50), sa.ForeignKey('stores.id'), nullable=False),
         sa.Column('budget_period', sa.String(7),  nullable=False),
-        sa.Column('budget_type',   sa.Enum('monthly','weekly',
-                                           name='budget_period_type', create_type=False),
+        sa.Column('budget_type',   postgresql.ENUM('monthly','weekly',
+                                                   name='budget_period_type', create_type=False),
                   nullable=False, server_default='monthly'),
 
         sa.Column('target_labor_cost_rate', sa.Numeric(6, 2),  nullable=False),
@@ -191,8 +199,8 @@ def upgrade() -> None:
         sa.Column('id',           sa.Integer, primary_key=True, autoincrement=True),
         sa.Column('store_id',     sa.String(50), sa.ForeignKey('stores.id'), nullable=False),
         sa.Column('ranking_date', sa.Date, nullable=False),
-        sa.Column('period_type',  sa.Enum('daily','weekly','monthly',
-                                          name='ranking_period_type', create_type=False),
+        sa.Column('period_type',  postgresql.ENUM('daily','weekly','monthly',
+                                                  name='ranking_period_type', create_type=False),
                   nullable=False),
 
         sa.Column('labor_cost_rate',       sa.Numeric(6, 2), nullable=False),
@@ -246,4 +254,4 @@ def downgrade() -> None:
     op.execute("DROP TYPE IF EXISTS budget_period_type")
     op.execute("DROP TYPE IF EXISTS confirmation_action")
     op.execute("DROP TYPE IF EXISTS staffing_advice_status")
-    op.execute("DROP TYPE IF EXISTS meal_period_type")
+    # meal_period_type is shared by pre-existing meal-period tables/migrations.

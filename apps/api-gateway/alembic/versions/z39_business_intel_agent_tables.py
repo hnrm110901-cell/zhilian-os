@@ -3,16 +3,16 @@
 BusinessIntelAgent — Phase 12 经营智能体
 合并 DecisionAgent + KPIAgent + OrderAgent
 
-Revision ID: z39
-Revises: z38
+Revision ID: z39_business_intel_agent_tables
+Revises: z39_edge_hub_tables
 Create Date: 2026-03-11
 """
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-revision = 'z39'
-down_revision = 'z38'
+revision = 'z39_business_intel_agent_tables'
+down_revision = 'z39_edge_hub_tables'
 branch_labels = None
 depends_on = None
 

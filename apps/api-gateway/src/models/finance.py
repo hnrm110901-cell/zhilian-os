@@ -83,7 +83,7 @@ class Invoice(Base):
 
     # 关系
     store = relationship("Store")
-    supplier = relationship("Supplier")
+    supplier = relationship("src.models.supply_chain.Supplier")
 
 
 class FinancialReport(Base):

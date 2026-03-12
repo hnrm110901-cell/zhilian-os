@@ -51,15 +51,51 @@ CELERY_RESULT_BACKEND=redis://localhost:6379/2
 # 企业微信配置
 WECHAT_CORP_ID=your_corp_id
 WECHAT_AGENT_ID=your_agent_id
-WECHAT_SECRET=your_secret
+WECHAT_CORP_SECRET=your_secret
 WECHAT_TOKEN=your_token
 WECHAT_ENCODING_AES_KEY=your_aes_key
+
+# 飞书配置
+FEISHU_APP_ID=cli_your_app_id
+FEISHU_APP_SECRET=your_app_secret
+FEISHU_VERIFICATION_TOKEN=your_verification_token
+FEISHU_ENCRYPT_KEY=your_encrypt_key
 
 # JWT配置
 SECRET_KEY=your_secret_key_here
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 ```
+
+Webhook接入检查:
+
+```bash
+# 企业微信
+GET  /api/v1/enterprise/wechat/status
+
+# 飞书
+GET  /api/v1/enterprise/feishu/status
+
+# 企业集成支持矩阵
+GET  /api/v1/enterprise/support-matrix
+
+# 企业集成上线自检
+GET  /api/v1/enterprise/readiness
+
+# 综合配置校验
+GET  /api/v1/health/config/validation
+```
+
+其中飞书回调在生产环境建议满足：
+- `configured=true`
+- `webhook_protected=true`
+- `webhook_signed=true`
+
+企业集成上线建议满足：
+- `/api/v1/enterprise/support-matrix` 中 `production_ready.webhook=true`
+- `/api/v1/enterprise/readiness` 中目标平台 `ready=true`
+- `/api/v1/enterprise/readiness` 中 `missing_env=[]`
+- `/api/v1/enterprise/readiness` 中不存在阻断上线的 `risks`
 
 ## 安装依赖
 

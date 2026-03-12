@@ -107,7 +107,7 @@ class WasteEvent(Base, TimestampMixin):
     notes = Column(Text, nullable=True)
 
     # 关联关系
-    dish = relationship("Dish", foreign_keys=[dish_id])
+    dish = relationship("src.models.dish.Dish", foreign_keys=[dish_id])
     ingredient = relationship("InventoryItem", foreign_keys=[ingredient_id])
 
     __table_args__ = (

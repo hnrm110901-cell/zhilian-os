@@ -4,6 +4,7 @@
 支持Human-in-the-loop和联邦学习
 """
 from sqlalchemy import Column, String, Integer, Float, DateTime, Text, JSON, Enum as SQLEnum, ForeignKey, Numeric
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -62,7 +63,7 @@ class DecisionLog(Base):
     ai_alternatives = Column(JSON, comment="AI备选方案")
 
     # 店长决策
-    manager_id = Column(String(36), ForeignKey("users.id"), index=True, comment="店长ID")
+    manager_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), index=True, comment="店长ID")
     manager_decision = Column(JSON, comment="店长实际决策")
     manager_feedback = Column(Text, comment="店长反馈意见")
     decision_status = Column(SQLEnum(DecisionStatus, values_callable=lambda x: [e.value for e in x]), default=DecisionStatus.PENDING, index=True, comment="决策状态")

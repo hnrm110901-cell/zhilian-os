@@ -6,6 +6,7 @@ Prefix: /api/v1/dish-lifecycle
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Optional
 
 from src.core.database import get_db
 from src.services.dish_lifecycle_service import (
@@ -46,7 +47,7 @@ async def compute(
 async def list_records(
     store_id: str,
     period:   str        = Query(..., description="YYYY-MM"),
-    phase:    str | None = Query(None, description="launch/growth/peak/decline/exit"),
+    phase:    Optional[str] = Query(None, description="launch/growth/peak/decline/exit"),
     limit:    int        = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
 ):

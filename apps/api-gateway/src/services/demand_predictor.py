@@ -24,6 +24,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import List
+import inspect
 
 import structlog
 from sqlalchemy import text
@@ -140,10 +141,11 @@ class DemandPredictor:
             查询失败时返回空列表。
         """
         try:
-            rows = (await db.execute(
+            result = await db.execute(
                 _SCAN_SQL,
                 {"store_id": store_id, "horizon_days": horizon_days},
-            )).fetchall()
+            )
+            rows = await _maybe_await(result.fetchall())
 
             predictions = [
                 DemandPrediction(
@@ -172,3 +174,9 @@ class DemandPredictor:
                 error=str(exc),
             )
             return []
+
+
+async def _maybe_await(value):
+    if inspect.isawaitable(value):
+        return await value
+    return value

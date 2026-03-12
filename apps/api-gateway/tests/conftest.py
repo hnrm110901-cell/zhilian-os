@@ -5,6 +5,7 @@ import os
 
 # ── 测试环境变量（必须在所有 src.* 导入前设置）────────────────────────────────
 for _k, _v in {
+    "APP_ENV":               "test",
     "DATABASE_URL":          "postgresql+asyncpg://test:test@localhost/test",
     "REDIS_URL":             "redis://localhost:6379/0",
     "CELERY_BROKER_URL":     "redis://localhost:6379/0",
@@ -33,12 +34,22 @@ TEST_DATABASE_URL = os.getenv(
 USE_SQLITE_FALLBACK = os.getenv("USE_SQLITE_FALLBACK", "true").lower() == "true"
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def event_loop() -> Generator:
     """创建事件循环"""
     loop = asyncio.get_event_loop_policy().new_event_loop()
+    asyncio.set_event_loop(loop)
     yield loop
     loop.close()
+    asyncio.set_event_loop(None)
+
+
+@pytest.fixture
+def benchmark():
+    """轻量 benchmark 兼容夹具（在未安装 pytest-benchmark 时提供）。"""
+    def _run(func, *args, **kwargs):
+        return func(*args, **kwargs)
+    return _run
 
 
 @pytest.fixture(scope="function")

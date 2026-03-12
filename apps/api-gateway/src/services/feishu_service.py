@@ -4,6 +4,7 @@ Feishu (Lark) Service for message sending and user management
 """
 import json
 import os
+import hashlib
 from typing import Dict, Any, List, Optional, Tuple
 import httpx
 import structlog
@@ -15,6 +16,9 @@ from .redis_cache_service import redis_cache
 logger = structlog.get_logger()
 
 FEISHU_EVENT_DEDUP_PREFIX = "feishu_event_dedup:"
+SUPPORTED_FEISHU_EVENT_TYPES = {
+    "im.message.receive_v1",
+}
 
 
 class FeishuService:
@@ -303,6 +307,37 @@ class FeishuService:
             or event_data.get("header", {}).get("token")
         )
         return actual_token == expected_token
+
+    def validate_signature(
+        self,
+        raw_body: bytes,
+        timestamp: Optional[str],
+        nonce: Optional[str],
+        signature: Optional[str],
+    ) -> bool:
+        """
+        校验飞书回调签名。
+
+        配置 FEISHU_ENCRYPT_KEY 后启用签名校验；未配置时返回 True，由 token 校验兜底。
+        """
+        encrypt_key = getattr(settings, "FEISHU_ENCRYPT_KEY", "")
+        if not encrypt_key:
+            return True
+
+        if not timestamp or not nonce or not signature:
+            return False
+
+        payload = timestamp.encode("utf-8") + nonce.encode("utf-8") + encrypt_key.encode("utf-8") + raw_body
+        expected_signature = hashlib.sha256(payload).hexdigest()
+        return signature == expected_signature
+
+    def is_supported_event_type(self, event_data: Dict[str, Any]) -> bool:
+        """校验飞书事件类型是否在白名单中。"""
+        if event_data.get("type") == "url_verification":
+            return True
+
+        event_type = event_data.get("header", {}).get("event_type")
+        return event_type in SUPPORTED_FEISHU_EVENT_TYPES
 
     async def is_duplicate_event(self, event_id: Optional[str]) -> bool:
         """基于 event_id 做 webhook 幂等保护。"""

@@ -6,6 +6,7 @@ Prefix: /api/v1/dish-benchmark
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Optional
 
 from src.core.database import get_db
 from src.services.dish_benchmark_service import (
@@ -45,7 +46,7 @@ async def compute(
 async def store_benchmark(
     store_id: str,
     period:   str          = Query(..., description="YYYY-MM"),
-    fcr_tier: str | None   = Query(None, description="top/above_avg/below_avg/laggard"),
+    fcr_tier: Optional[str] = Query(None, description="top/above_avg/below_avg/laggard"),
     limit:    int          = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
 ):

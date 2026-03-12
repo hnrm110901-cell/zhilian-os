@@ -1,13 +1,13 @@
 """edge_hub tables
 
-Revision ID: z39
+Revision ID: z39_edge_hub_tables
 Revises: z38
 Create Date: 2026-03-11
 """
 from alembic import op
 import sqlalchemy as sa
 
-revision = "z39"
+revision = "z39_edge_hub_tables"
 down_revision = "z38"
 branch_labels = None
 depends_on = None

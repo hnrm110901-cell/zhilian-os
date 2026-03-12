@@ -27,8 +27,8 @@ class DishCategory(Base, TimestampMixin):
     is_active = Column(Boolean, default=True)  # 是否启用
 
     # 关联关系
-    dishes = relationship("Dish", back_populates="category")
-    parent = relationship("DishCategory", remote_side=[id], backref="children")
+    dishes = relationship("src.models.dish.Dish", back_populates="category")
+    parent = relationship("src.models.dish.DishCategory", remote_side=[id], backref="children")
 
     __table_args__ = (
         Index("idx_dish_category_store_id", "store_id"),
@@ -113,7 +113,7 @@ class Dish(Base, TimestampMixin):
     dish_metadata = Column(JSON)  # 扩展字段
 
     # 关联关系
-    category = relationship("DishCategory", back_populates="dishes")
+    category = relationship("src.models.dish.DishCategory", back_populates="dishes")
     ingredients = relationship("DishIngredient", back_populates="dish", cascade="all, delete-orphan")
 
     __table_args__ = (
@@ -162,7 +162,7 @@ class DishIngredient(Base, TimestampMixin):
     notes = Column(Text)
 
     # 关联关系
-    dish = relationship("Dish", back_populates="ingredients")
+    dish = relationship("src.models.dish.Dish", back_populates="ingredients")
     ingredient = relationship("InventoryItem")
 
     __table_args__ = (

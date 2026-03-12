@@ -12,6 +12,9 @@
 # 启动数据库（如果使用Docker）
 docker-compose up -d postgres redis
 
+# 验证 Alembic 迁移链和数据库升级
+make migrate-verify
+
 # 启动后端API服务
 cd apps/api-gateway
 python -m uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
@@ -55,13 +58,14 @@ python seed_database.py
 
 ```bash
 cd apps/api-gateway
-python test_new_features.py
+python3 -m pytest tests/test_api_endpoints.py -q
+python3 -m pytest tests/test_alembic_migrations.py tests/test_database_url_normalization.py -q
 ```
 
 **预期结果：**
-- 所有导入测试通过
-- 所有服务功能测试通过
-- 成功率 100%
+- API 端点测试通过
+- Alembic 单头校验通过
+- `alembic upgrade head --sql` 离线展开通过
 
 **如果测试失败：**
 1. 检查数据库连接
@@ -72,7 +76,7 @@ python test_new_features.py
 
 ```bash
 cd apps/api-gateway
-python test_api_endpoints.py
+python3 -m pytest tests/test_api_endpoints.py -q
 ```
 
 **预期结果：**
@@ -245,11 +249,31 @@ docker ps | grep postgres
 # 如果没有运行，启动PostgreSQL
 docker-compose up -d postgres
 
+# 验证迁移链和数据库可升级
+make migrate-verify
+
 # 检查连接配置
 cat apps/api-gateway/.env
 ```
 
-### 问题3：前端页面空白
+### 问题3：历史开发库迁移混乱
+
+**现象：** 本地 `zhilian_os` 表结构明显落后，`alembic current` 停在早期 revision，或升级过程中出现旧库兼容问题
+
+**解决：**
+```bash
+# 先备份旧库
+make dev-db-backup
+
+# 再重建开发库到当前 head
+make dev-db-rebuild
+```
+
+详细说明见：
+- `apps/api-gateway/MIGRATION_VALIDATION.md`
+- `apps/api-gateway/DEV_DB_RECOVERY.md`
+
+### 问题4：前端页面空白
 
 **原因：** 前端服务器未启动或构建失败
 

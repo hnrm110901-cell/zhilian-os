@@ -39,6 +39,12 @@ CI/CD流水线在以下情况下自动触发：
    - 生成测试覆盖率报告
    - 上传到Codecov
 
+5. **数据库迁移验证 (Alembic)**
+   - 运行 `scripts/verify_migrations.sh`
+   - 验证单头 `head`
+   - 验证 `upgrade head --sql`
+   - 在 CI PostgreSQL 服务上执行真实 `upgrade head`
+
 #### 2. 构建阶段 (Build)
 
 **执行步骤**:
@@ -87,6 +93,9 @@ mypy src/ --ignore-missing-imports
 ```bash
 # 运行所有测试
 pytest tests/
+
+# 运行迁移验证
+bash scripts/verify_migrations.sh
 
 # 运行特定测试文件
 pytest tests/test_task_service.py

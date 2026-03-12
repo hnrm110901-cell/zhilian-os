@@ -14,6 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Dict, List, Optional
+import inspect
 
 import structlog
 from sqlalchemy import select
@@ -153,7 +154,7 @@ class BOMResolverService:
         store_result = await session.execute(
             select(Store).where(Store.id == store_id)
         )
-        store: Optional[Store] = store_result.scalar_one_or_none()
+        store: Optional[Store] = await _maybe_await(store_result.scalar_one_or_none())
         if store is None:
             logger.warning("bom_resolver_store_not_found", store_id=store_id)
             return ResolvedBOM(dish_id=str(dish_id), store_id=store_id, channel=channel)
@@ -167,7 +168,9 @@ class BOMResolverService:
             )
             .options(selectinload(BOMTemplate.items))
         )
-        templates: List[BOMTemplate] = list(templates_result.scalars().all())
+        templates_scalars = templates_result.scalars()
+        templates_all = await _maybe_await(templates_scalars.all())
+        templates: List[BOMTemplate] = list(templates_all)
 
         if not templates:
             logger.debug("bom_resolver_no_templates", dish_id=str(dish_id), store_id=store_id)
@@ -234,3 +237,9 @@ class BOMResolverService:
                 error=str(e),
             )
         return Decimal("0")
+
+
+async def _maybe_await(value):
+    if inspect.isawaitable(value):
+        return await value
+    return value

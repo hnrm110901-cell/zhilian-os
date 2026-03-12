@@ -60,5 +60,5 @@ class PurchaseOrder(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # 关系
-    supplier = relationship("Supplier", back_populates="purchase_orders")
+    supplier = relationship("src.models.supply_chain.Supplier", back_populates="purchase_orders")
     store = relationship("Store")

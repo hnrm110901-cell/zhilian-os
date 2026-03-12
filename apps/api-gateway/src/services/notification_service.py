@@ -3,6 +3,7 @@ Notification Service
 通知服务 - 处理通知的创建、发送、查询等业务逻辑
 """
 import os
+import inspect
 from typing import List, Optional
 from datetime import datetime, timedelta
 from sqlalchemy import select, and_, or_, func
@@ -14,10 +15,13 @@ from ..models.notification import (
     NotificationPreference, NotificationRule,
 )
 from ..core.database import get_db_session
-from ..core.websocket import manager
+from ..core import websocket
 import structlog
 
 logger = structlog.get_logger()
+# 可在测试中 patch：`src.services.notification_service.manager`。
+# 默认走 `src.core.websocket.manager`，兼容另一组测试的 patch 路径。
+manager = None
 
 
 class NotificationService:
@@ -66,7 +70,7 @@ class NotificationService:
                 is_read=False,
             )
 
-            session.add(notification)
+            await self._maybe_await(session.add(notification))
             await session.commit()
             await session.refresh(notification)
 
@@ -88,23 +92,24 @@ class NotificationService:
     async def _send_realtime_notification(self, notification: Notification):
         """实时推送通知"""
         notification_data = notification.to_dict()
+        ws_manager = manager or websocket.manager
 
         try:
             if notification.user_id:
                 # 发送给特定用户
-                await manager.send_personal_message(notification_data, str(notification.user_id))
+                await ws_manager.send_personal_message(notification_data, str(notification.user_id))
             elif notification.role and notification.store_id:
                 # 发送给特定门店的特定角色
-                await manager.send_to_role(notification_data, notification.role, notification.store_id)
+                await ws_manager.send_to_role(notification_data, notification.role, notification.store_id)
             elif notification.role:
                 # 发送给特定角色的所有用户
-                await manager.send_to_role(notification_data, notification.role)
+                await ws_manager.send_to_role(notification_data, notification.role)
             elif notification.store_id:
                 # 发送给特定门店的所有用户
-                await manager.send_to_store(notification_data, notification.store_id)
+                await ws_manager.send_to_store(notification_data, notification.store_id)
             else:
                 # 广播给所有用户
-                await manager.broadcast(notification_data)
+                await ws_manager.broadcast(notification_data)
 
             logger.info("实时通知推送成功", notification_id=str(notification.id))
         except Exception as e:
@@ -186,9 +191,12 @@ class NotificationService:
             stmt = stmt.order_by(Notification.created_at.desc()).limit(limit).offset(offset)
 
             result = await session.execute(stmt)
-            notifications = result.scalars().all()
+            scalars_result = result.scalars()
+            scalars_result = await self._maybe_await(scalars_result)
+            notifications = scalars_result.all()
+            notifications = await self._maybe_await(notifications)
 
-            return notifications
+            return list(notifications)
 
     async def mark_as_read(self, notification_id: str, user_id: str) -> bool:
         """标记通知为已读"""
@@ -196,6 +204,7 @@ class NotificationService:
             stmt = select(Notification).where(Notification.id == notification_id)
             result = await session.execute(stmt)
             notification = result.scalar_one_or_none()
+            notification = await self._maybe_await(notification)
 
             if not notification:
                 return False
@@ -232,6 +241,7 @@ class NotificationService:
             stmt = select(Notification).where(Notification.id == notification_id)
             result = await session.execute(stmt)
             notification = result.scalar_one_or_none()
+            notification = await self._maybe_await(notification)
 
             if not notification:
                 return False
@@ -240,7 +250,7 @@ class NotificationService:
             if notification.user_id and str(notification.user_id) != user_id:
                 return False
 
-            await session.delete(notification)
+            await self._maybe_await(session.delete(notification))
             await session.commit()
 
             logger.info("通知已删除", notification_id=notification_id, user_id=user_id)
@@ -252,6 +262,11 @@ class NotificationService:
             user_id=user_id, role=role, store_id=store_id, is_read=False
         )
         return len(notifications)
+
+    async def _maybe_await(self, value):
+        if inspect.isawaitable(value):
+            return await value
+        return value
 
     # ------------------------------------------------------------------ #
     # 通知偏好设置                                                          #

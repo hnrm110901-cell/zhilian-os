@@ -72,6 +72,7 @@ class Settings(BaseSettings):
     FEISHU_APP_ID: str = ""
     FEISHU_APP_SECRET: str = ""
     FEISHU_VERIFICATION_TOKEN: str = ""
+    FEISHU_ENCRYPT_KEY: str = ""
 
     # 钉钉配置
     DINGTALK_APP_KEY: str = ""
@@ -136,6 +137,10 @@ class Settings(BaseSettings):
     JWT_SECRET: str
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRATION: int = 3600
+    EDGE_BOOTSTRAP_TOKEN: str = ""
+    EDGE_SHOKZ_CALLBACK_URL: str = ""
+    EDGE_SHOKZ_CALLBACK_SECRET: str = ""
+    EDGE_SHOKZ_CALLBACK_TIMEOUT: float = 10.0
 
     # 日志配置
     LOG_LEVEL: str = "INFO"

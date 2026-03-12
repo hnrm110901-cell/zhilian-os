@@ -86,6 +86,20 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-asyncio pytest-cov
 
+      - name: Verify Alembic migrations
+        env:
+          APP_ENV: test
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/zhilian_test
+          REDIS_URL: redis://localhost:6379/0
+          CELERY_BROKER_URL: redis://localhost:6379/0
+          CELERY_RESULT_BACKEND: redis://localhost:6379/0
+          SECRET_KEY: test-secret-key
+          JWT_SECRET: test-jwt-secret
+          SKIP_ONLINE: "0"
+        run: |
+          cd apps/api-gateway
+          bash scripts/verify_migrations.sh
+
       - name: Run tests
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/zhilian_test

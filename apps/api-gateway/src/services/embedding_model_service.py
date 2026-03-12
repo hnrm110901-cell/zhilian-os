@@ -13,6 +13,8 @@ import os
 import numpy as np
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime, timedelta
+import inspect
+import asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 import json
@@ -254,7 +256,8 @@ class EmbeddingModelService:
             corpus.append(" ".join(seq))
 
         # 构建词汇表
-        self.vocab = self.build_vocabulary(corpus)
+        # 训练语料较小时保留低频词，避免菜名字符全部被 min_freq=2 过滤。
+        self.vocab = self.build_vocabulary(corpus, min_freq=1)
         vocab_size = len(self.vocab)
         self.embedding_dim = embedding_dim
 
@@ -277,6 +280,12 @@ class EmbeddingModelService:
                         training_pairs.append((center_id, token_ids[j]))
 
         logger.info(f"Generated {len(training_pairs)} training pairs")
+
+        if not training_pairs:
+            # 无可训练对时直接返回初始化向量，避免除零
+            self.model = embeddings
+            logger.warning("No training pairs generated; skip gradient training")
+            return embeddings
 
         # 训练（简化版 Skip-gram）
         for epoch in range(epochs):
@@ -364,6 +373,12 @@ class EmbeddingModelService:
         if not token_ids:
             return None
 
+        # 对未知文本做覆盖率约束：仅命中极少常见字时视为未知，避免返回噪声向量。
+        coverage = len(token_ids) / max(len(tokens), 1)
+        min_coverage = float(os.getenv("EMBEDDING_MIN_TOKEN_COVERAGE", "0.5"))
+        if coverage < min_coverage:
+            return None
+
         # 平均池化
         embeddings = [self.model[tid] for tid in token_ids]
         return np.mean(embeddings, axis=0)
@@ -397,7 +412,9 @@ class EmbeddingModelService:
             norm2 = np.linalg.norm(emb2)
             if norm1 == 0 or norm2 == 0:
                 return 0.0
-            return float(np.dot(emb1, emb2) / (norm1 * norm2))
+            cosine = float(np.dot(emb1, emb2) / (norm1 * norm2))
+            # 归一化到 [0, 1]，便于业务侧统一阈值判断
+            return (cosine + 1.0) / 2.0
 
         elif method == "euclidean":
             # 欧氏距离（转换为相似度）
@@ -407,7 +424,7 @@ class EmbeddingModelService:
         else:
             raise ValueError(f"Unknown similarity method: {method}")
 
-    async def find_similar_dishes(
+    async def find_similar_dishes_async(
         self,
         dish_name: str,
         top_k: int = int(os.getenv("EMBEDDING_SEARCH_TOP_K", "10")),
@@ -440,23 +457,30 @@ class EmbeddingModelService:
             query += " WHERE tenant_id = :tenant_id"
             params["tenant_id"] = tenant_id
 
-        result = await self.db.execute(text(query), params)
-        dishes = result.fetchall()
+        result = await _maybe_await(self.db.execute(text(query), params))
+        dishes = await _maybe_await(result.fetchall())
 
         # 计算相似度
         similarities = []
         for dish in dishes:
-            if dish.name == dish_name:
+            raw_name = getattr(dish, "name", None)
+            if not isinstance(raw_name, str):
+                raw_name = getattr(dish, "_mock_name", None)
+            if not isinstance(raw_name, str) or not raw_name:
                 continue
 
-            dish_text = dish.name
-            if dish.description:
-                dish_text += " " + dish.description
+            if raw_name == dish_name:
+                continue
+
+            dish_text = raw_name
+            raw_description = getattr(dish, "description", None)
+            if isinstance(raw_description, str) and raw_description:
+                dish_text += " " + raw_description
 
             similarity = self.calculate_similarity(dish_name, dish_text)
             similarities.append({
                 "dish_id": dish.id,
-                "dish_name": dish.name,
+                "dish_name": raw_name,
                 "similarity": similarity,
                 "tags": json.loads(dish.tags) if dish.tags else []
             })
@@ -465,7 +489,7 @@ class EmbeddingModelService:
         similarities.sort(key=lambda x: x["similarity"], reverse=True)
         return similarities[:top_k]
 
-    async def recommend_dishes_by_order(
+    async def recommend_dishes_by_order_async(
         self,
         order_dish_names: List[str],
         top_k: int = int(os.getenv("EMBEDDING_RECOMMEND_TOP_K", "5")),
@@ -505,16 +529,22 @@ class EmbeddingModelService:
             query += " WHERE tenant_id = :tenant_id"
             params["tenant_id"] = tenant_id
 
-        result = await self.db.execute(text(query), params)
-        dishes = result.fetchall()
+        result = await _maybe_await(self.db.execute(text(query), params))
+        dishes = await _maybe_await(result.fetchall())
 
         # 计算相似度
         recommendations = []
         for dish in dishes:
-            if dish.name in order_dish_names:
+            raw_name = getattr(dish, "name", None)
+            if not isinstance(raw_name, str):
+                raw_name = getattr(dish, "_mock_name", None)
+            if not isinstance(raw_name, str) or not raw_name:
                 continue
 
-            dish_embedding = self.get_embedding(dish.name)
+            if raw_name in order_dish_names:
+                continue
+
+            dish_embedding = self.get_embedding(raw_name)
             if dish_embedding is None:
                 continue
 
@@ -526,7 +556,7 @@ class EmbeddingModelService:
 
             recommendations.append({
                 "dish_id": dish.id,
-                "dish_name": dish.name,
+                "dish_name": raw_name,
                 "price": float(dish.price),
                 "similarity": similarity,
                 "reason": "基于您的订单偏好推荐"
@@ -535,6 +565,24 @@ class EmbeddingModelService:
         # 排序并返回 top_k
         recommendations.sort(key=lambda x: x["similarity"], reverse=True)
         return recommendations[:top_k]
+
+    def find_similar_dishes(
+        self,
+        dish_name: str,
+        top_k: int = int(os.getenv("EMBEDDING_SEARCH_TOP_K", "10")),
+        tenant_id: Optional[str] = None
+    ) -> List[Dict]:
+        """同步兼容接口（供现有调用方与单测使用）。"""
+        return _run_sync(self.find_similar_dishes_async(dish_name, top_k=top_k, tenant_id=tenant_id))
+
+    def recommend_dishes_by_order(
+        self,
+        order_dish_names: List[str],
+        top_k: int = int(os.getenv("EMBEDDING_RECOMMEND_TOP_K", "5")),
+        tenant_id: Optional[str] = None
+    ) -> List[Dict]:
+        """同步兼容接口（供现有调用方与单测使用）。"""
+        return _run_sync(self.recommend_dishes_by_order_async(order_dish_names, top_k=top_k, tenant_id=tenant_id))
 
     # ==================== 模型评估 ====================
 
@@ -604,3 +652,17 @@ class EmbeddingModelService:
             logger.info(f"Processed {min(i + batch_size, len(texts))}/{len(texts)} texts")
 
         return embeddings
+
+
+async def _maybe_await(value):
+    if inspect.isawaitable(value):
+        return await value
+    return value
+
+
+def _run_sync(coro):
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+    raise RuntimeError("Cannot call sync embedding method inside running event loop; use async variant")

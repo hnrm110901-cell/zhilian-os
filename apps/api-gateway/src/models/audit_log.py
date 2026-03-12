@@ -140,6 +140,11 @@ class AuditAction:
     REPORT_GENERATE = "report_generate"
     REPORT_EXPORT = "report_export"
 
+    # 边缘节点凭证
+    EDGE_NODE_REGISTER = "edge_node_register"
+    EDGE_NODE_SECRET_ROTATE = "edge_node_secret_rotate"
+    EDGE_NODE_SECRET_REVOKE = "edge_node_secret_revoke"
+
 
 # 资源类型常量
 class ResourceType:
@@ -159,3 +164,4 @@ class ResourceType:
     MEMBER = "member"
     SCHEDULE = "schedule"
     SYSTEM = "system"
+    EDGE_HUB = "edge_hub"

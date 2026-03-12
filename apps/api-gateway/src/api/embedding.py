@@ -226,7 +226,7 @@ async def find_similar_dishes(
         service.load_model(model_path)
 
         # 查找相似菜品
-        similar_dishes = service.find_similar_dishes(
+        similar_dishes = await service.find_similar_dishes_async(
             dish_name=request.dish_name,
             top_k=request.top_k,
             tenant_id=tenant_id
@@ -272,7 +272,7 @@ async def recommend_dishes(
         service.load_model(model_path)
 
         # 推荐菜品
-        recommendations = service.recommend_dishes_by_order(
+        recommendations = await service.recommend_dishes_by_order_async(
             order_dish_names=request.order_dish_names,
             top_k=request.top_k,
             tenant_id=tenant_id

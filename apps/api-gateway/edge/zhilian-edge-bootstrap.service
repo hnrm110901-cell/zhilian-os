@@ -1,0 +1,14 @@
+[Unit]
+Description=Zhilian OS Raspberry Pi Edge Bootstrap
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+EnvironmentFile=/etc/zhilian-edge/edge-bootstrap.env
+ExecStart=/bin/bash /opt/zhilian-edge/bootstrap_edge_firstboot.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

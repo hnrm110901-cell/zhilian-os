@@ -1601,3 +1601,1701 @@
 .sourceChannel      { font-size: 12px; font-weight: 500; color: #111827; }
 .sourceCell         { font-size: 12px; color: #374151; }
 .sourcePct          { color: #9ca3af; font-size: 10px; }
+
+/* ── Phase 25 — 期间对比 / 运营风险 ─────────────────────────────────────── */
+
+.periodCmpTab { display: flex; flex-direction: column; gap: 24px; }
+
+.periodInputRow {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 16px;
+}
+.periodLabel { font-weight: 600; font-size: 13px; color: var(--text-secondary); }
+.dateInput {
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 4px 8px; font-size: 13px; background: var(--surface);
+}
+
+.cmpTable { display: flex; flex-direction: column; }
+.cmpHeader, .cmpRow {
+  display: grid; grid-template-columns: 2fr 1fr 1fr 1fr;
+  padding: 8px 12px; gap: 8px; align-items: center;
+}
+.cmpHeader { font-weight: 600; font-size: 12px; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
+.cmpRow { border-bottom: 1px solid var(--border-light); font-size: 13px; }
+.cmpRow:hover { background: var(--surface-hover); }
+.cmpLabel { font-weight: 500; }
+.cmpVal { color: var(--text-primary); }
+.cmpDelta { font-weight: 600; }
+.cmpUp  { color: var(--green); }
+.cmpDown{ color: var(--red); }
+
+.spenderList { display: flex; flex-direction: column; }
+.spenderHeader, .spenderRow {
+  display: grid; grid-template-columns: 40px 2fr 1fr 1.5fr 1.5fr;
+  padding: 8px 12px; gap: 8px; align-items: center;
+}
+.spenderHeader { font-weight: 600; font-size: 12px; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
+.spenderRow { border-bottom: 1px solid var(--border-light); font-size: 13px; }
+.spenderRow:hover { background: var(--surface-hover); }
+.spenderRank { font-weight: 700; color: var(--accent); }
+.spenderName { font-weight: 500; }
+.spenderCell { color: var(--text-secondary); }
+
+/* operation risk tab */
+.opRiskTab { display: flex; flex-direction: column; gap: 24px; }
+
+.riskList  { display: flex; flex-direction: column; }
+.riskHeader, .riskRow {
+  display: grid;
+  grid-template-columns: 110px 60px 80px 1fr 1fr 80px;
+  padding: 8px 12px; gap: 8px; align-items: center; font-size: 13px;
+}
+.riskHeader { font-weight: 600; font-size: 12px; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
+.riskRow { border-bottom: 1px solid var(--border-light); }
+.riskRow:hover { background: var(--surface-hover); }
+.riskHigh { background: rgba(239,68,68,.06); }
+.riskMed  { background: rgba(251,191,36,.06); }
+.riskRatio { font-weight: 700; color: var(--red); }
+
+.taskTrendList { display: flex; flex-direction: column; }
+.taskTrendHeader, .taskTrendRow {
+  display: grid; grid-template-columns: 120px 80px 80px 1fr;
+  padding: 8px 12px; gap: 8px; align-items: center;
+}
+.taskTrendHeader { font-weight: 600; font-size: 12px; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
+.taskTrendRow { border-bottom: 1px solid var(--border-light); font-size: 13px; }
+.taskWeek { font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+.taskCell { color: var(--text-primary); }
+.taskBarWrap { display: flex; align-items: center; gap: 6px; }
+.taskBar { height: 8px; border-radius: 4px; min-width: 2px; transition: width .3s; }
+.taskBarLabel { font-size: 12px; color: var(--text-secondary); }
+
+/* ── Phase 26 — 取消分析 / 线索健康 ────────────────────────────────────── */
+
+.cancelTab { display: flex; flex-direction: column; gap: 24px; }
+
+.cancelKpiRow { display: flex; gap: 24px; margin-bottom: 16px; }
+.cancelKpi { flex: 1; text-align: center; padding: 12px; background: var(--surface); border-radius: 8px; }
+.cancelKpiVal { font-size: 24px; font-weight: 700; color: var(--text-primary); }
+.cancelKpiLabel { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+.cancelRed { color: var(--red) !important; }
+
+.cancelTypeRow { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.cancelTypeChip {
+  display: flex; align-items: center; gap: 6px; padding: 4px 10px;
+  background: var(--surface); border-radius: 20px; font-size: 13px;
+  border: 1px solid var(--border);
+}
+.cancelTypePct { color: var(--text-secondary); font-size: 11px; }
+
+.cancelMonthList { display: flex; flex-direction: column; gap: 4px; }
+.cancelMonthRow { display: flex; align-items: center; gap: 12px; padding: 6px 0; font-size: 13px; border-bottom: 1px solid var(--border-light); }
+.cancelMonth { width: 70px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.cancelLost { color: var(--red); margin-left: auto; }
+
+/* Revenue per table */
+.rptTypeList { margin-bottom: 16px; }
+.rptTypeHeader, .rptTypeRow {
+  display: grid; grid-template-columns: 2fr 1fr 1fr;
+  padding: 7px 12px; gap: 8px; align-items: center;
+}
+.rptTypeHeader { font-weight: 600; font-size: 12px; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
+.rptTypeRow { border-bottom: 1px solid var(--border-light); font-size: 13px; }
+.rptAvg { font-weight: 600; color: var(--accent); }
+
+.rptMonthBars { display: flex; flex-direction: column; gap: 6px; }
+.rptMonthBar { display: grid; grid-template-columns: 40px 1fr 70px; align-items: center; gap: 8px; }
+.rptMonthLabel { font-size: 12px; color: var(--text-secondary); text-align: right; }
+.rptBarTrack { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+.rptBarFill { height: 100%; background: var(--accent); border-radius: 4px; transition: width .3s; }
+.rptMonthVal { font-size: 12px; color: var(--text-secondary); }
+
+/* lead pipeline health */
+.leadHealthTab { display: flex; flex-direction: column; gap: 24px; }
+
+.agingBuckets { display: flex; flex-direction: column; gap: 8px; }
+.agingBucket { display: grid; grid-template-columns: 80px 1fr 50px 40px; align-items: center; gap: 8px; }
+.agingLabel { font-size: 13px; color: var(--text-secondary); }
+.agingBarTrack { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+.agingBarFill { height: 100%; border-radius: 4px; transition: width .3s; }
+.agingCount { font-size: 13px; font-weight: 600; text-align: right; }
+.agingPct { font-size: 12px; color: var(--text-secondary); }
+
+.staleList { display: flex; flex-direction: column; }
+.staleHeader, .staleRow {
+  display: grid; grid-template-columns: 2fr 2fr 80px;
+  padding: 8px 12px; gap: 8px; align-items: center;
+}
+.staleHeader { font-weight: 600; font-size: 12px; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
+.staleRow { border-bottom: 1px solid var(--border-light); font-size: 13px; }
+.staleDays { font-weight: 700; }
+.staleDanger { color: var(--red); }
+.staleWarn { color: var(--yellow-dark, #b45309); }
+
+.waitlistGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.waitlistKpi { text-align: center; padding: 12px; background: var(--surface); border-radius: 8px; }
+.waitlistVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.waitlistLabel { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+.waitlistAccent { color: var(--accent) !important; }
+
+/* ── Phase 27 — 退款风险 / 目标达成 ────────────────────────────────────── */
+
+.refundTab { display: flex; flex-direction: column; gap: 24px; }
+
+.refundKpiRow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px; }
+.refundKpi { text-align: center; padding: 12px; background: var(--surface); border-radius: 8px; }
+.refundKpiVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.refundKpiLabel { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+.refundRed { color: var(--red) !important; }
+
+.refundTypeRow { display: flex; flex-wrap: wrap; gap: 8px; }
+.refundTypeChip {
+  display: flex; align-items: center; gap: 6px; padding: 4px 10px;
+  background: var(--surface); border-radius: 20px; font-size: 13px;
+  border: 1px solid var(--border);
+}
+.refundTypePct { color: var(--text-secondary); font-size: 11px; }
+
+.bundleList  { display: flex; flex-direction: column; }
+.bundleHeader, .bundleRow {
+  display: grid; grid-template-columns: 3fr 60px 1fr 1fr 80px;
+  padding: 8px 12px; gap: 8px; align-items: center;
+}
+.bundleHeader { font-weight: 600; font-size: 12px; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
+.bundleRow { border-bottom: 1px solid var(--border-light); font-size: 13px; }
+.bundleRow:hover { background: var(--surface-hover); }
+.bundleName { font-weight: 500; }
+
+/* monthly target gap */
+.targetGapTab { display: flex; flex-direction: column; gap: 24px; }
+
+.targetTable { display: flex; flex-direction: column; }
+.targetHeader, .targetRow {
+  display: grid; grid-template-columns: 50px 1fr 1fr 1fr 80px;
+  padding: 7px 12px; gap: 8px; align-items: center;
+}
+.targetHeader { font-weight: 600; font-size: 12px; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
+.targetRow { border-bottom: 1px solid var(--border-light); font-size: 13px; }
+.targetRow:hover { background: var(--surface-hover); }
+.targetMonth { font-weight: 600; }
+.targetGoal  { color: var(--text-secondary); }
+.targetGap   { font-weight: 600; }
+.gapPos { color: var(--green); }
+.gapNeg { color: var(--red); }
+
+/* sentiment */
+.sentGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; }
+.sentKpi  { text-align: center; padding: 12px; border-radius: 8px; }
+.sentVal  { font-size: 24px; font-weight: 700; }
+.sentLabel{ font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+.sentPos  { background: rgba(34,197,94,.1); }
+.sentPos .sentVal { color: var(--green); }
+.sentNeu  { background: rgba(234,179,8,.1); }
+.sentNeu .sentVal { color: var(--yellow-dark, #b45309); }
+.sentNeg  { background: rgba(239,68,68,.1); }
+.sentNeg .sentVal { color: var(--red); }
+
+.sentTrendList { display: flex; flex-direction: column; gap: 6px; }
+.sentTrendRow  { display: grid; grid-template-columns: 70px 1fr 60px; align-items: center; gap: 8px; }
+.sentMonth { font-size: 12px; color: var(--text-secondary); }
+.sentBar   { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: var(--border); }
+.sentAi    { font-size: 12px; color: var(--text-secondary); text-align: right; }
+
+/* ─── Phase 28: 季节规律 Tab ─── */
+.seasonalTab { display: flex; flex-direction: column; gap: 16px; }
+.seasonalBars { display: flex; align-items: flex-end; gap: 4px; height: 120px; padding: 0 4px; }
+.seasonBar { display: flex; flex-direction: column; align-items: center; flex: 1; cursor: default; }
+.seasonBar.seasonPeak .seasonBarFill { background: var(--accent); }
+.seasonBar.seasonTrough .seasonBarFill { background: var(--text-tertiary); }
+.seasonBarInner { width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; flex: 1; }
+.seasonBarFill { width: 80%; border-radius: 3px 3px 0 0; background: var(--text-secondary); transition: height 0.3s; }
+.seasonMonthLabel { font-size: 11px; color: var(--text-tertiary); margin-top: 4px; }
+.seasonRevLabel { font-size: 10px; color: var(--text-secondary); margin-top: 2px; }
+.sizeCorrelList { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.sizeCorrelHeader { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 8px; padding: 8px 12px; background: var(--bg-secondary); font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.sizeCorrelRow { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); font-size: 13px; }
+.sizeCorrelRow.sizeOptimal { background: rgba(var(--accent-rgb), 0.06); }
+.sizeLabel { color: var(--text-primary); font-weight: 500; }
+.sizeAvg { color: var(--accent); font-weight: 600; }
+
+/* ─── Phase 28: 客户LTV Tab ─── */
+.ltvTab { display: flex; flex-direction: column; gap: 16px; }
+.ltvBuckets { display: flex; flex-direction: column; gap: 8px; }
+.ltvBucket { display: flex; align-items: center; gap: 8px; }
+.ltvBucketLabel { font-size: 12px; color: var(--text-secondary); width: 72px; flex-shrink: 0; }
+.ltvBucketBarTrack { flex: 1; height: 12px; background: var(--bg-tertiary); border-radius: 6px; overflow: hidden; }
+.ltvBucketBarFill { height: 100%; background: var(--accent); border-radius: 6px; transition: width 0.3s; }
+.ltvBucketStats { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.ltvBucketPct { color: var(--text-secondary); width: 36px; text-align: right; }
+.ltvTopList { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.ltvTopRow { display: grid; grid-template-columns: 28px 1fr 1fr 80px; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); font-size: 13px; align-items: center; }
+.ltvTopRow:first-child { border-top: none; background: var(--bg-secondary); font-weight: 600; color: var(--text-secondary); font-size: 12px; }
+.ltvTopRank { color: var(--text-secondary); font-weight: 700; text-align: center; }
+.ltvTopId { color: var(--text-secondary); font-size: 12px; }
+.ltvTopAmt { color: var(--accent); font-weight: 600; text-align: right; }
+.fuList { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.fuHeader { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; padding: 8px 12px; background: var(--bg-secondary); font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.fuRow { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); font-size: 13px; }
+.fuRow.fuOptimal { background: rgba(var(--accent-rgb), 0.06); }
+.fuBucket { font-weight: 500; color: var(--text-primary); }
+
+/* ─── Phase 29: 回头客 Tab ─── */
+.repeatTab { display: flex; flex-direction: column; gap: 16px; }
+.repeatKpiRow { display: flex; flex-wrap: wrap; gap: 12px; }
+.repeatKpi { display: flex; flex-direction: column; align-items: center; min-width: 100px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.repeatKpi.repeatAccent .repeatKpiVal { color: var(--accent); }
+.repeatKpiVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.repeatKpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.srcRoiList { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.srcRoiHeader { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 8px; padding: 8px 12px; background: var(--bg-secondary); font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.srcRoiRow { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); font-size: 13px; }
+.srcRoiRow.srcBest { background: rgba(var(--accent-rgb), 0.06); }
+.srcName { font-weight: 500; color: var(--text-primary); }
+.srcRate { color: var(--accent); font-weight: 600; }
+
+/* ─── Phase 29: 提前天数 Tab ─── */
+.leadTimeTab { display: flex; flex-direction: column; gap: 16px; }
+.leadTimeKpiRow { display: flex; gap: 16px; margin-bottom: 12px; }
+.leadTimeKpi { display: flex; flex-direction: column; align-items: center; min-width: 80px; }
+.leadTimeVal { font-size: 20px; font-weight: 700; color: var(--text-primary); }
+.leadTimeLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.leadTimeBuckets { display: flex; flex-direction: column; gap: 8px; }
+.leadTimeBucket { display: flex; align-items: center; gap: 8px; }
+.leadTimeBucketLabel { font-size: 12px; color: var(--text-secondary); width: 72px; flex-shrink: 0; }
+.leadTimeBucketTrack { flex: 1; height: 12px; background: var(--bg-tertiary); border-radius: 6px; overflow: hidden; }
+.leadTimeBucketFill { height: 100%; background: var(--accent); border-radius: 6px; transition: width 0.3s; }
+.leadTimeBucketCount { font-size: 12px; color: var(--text-secondary); width: 80px; text-align: right; }
+.collKpiRow { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+.collKpi { display: flex; flex-direction: column; align-items: center; min-width: 100px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.collKpi.collRed .collKpiVal { color: #ef4444; }
+.collKpiVal { font-size: 20px; font-weight: 700; color: var(--text-primary); }
+.collKpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.overdueList { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.overdueHeader { display: grid; grid-template-columns: 1fr 2fr 1fr 1fr 1fr; gap: 8px; padding: 8px 12px; background: var(--bg-secondary); font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.overdueRow { display: grid; grid-template-columns: 1fr 2fr 1fr 1fr 1fr; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); font-size: 13px; }
+.overdueId { color: var(--text-secondary); font-size: 12px; }
+.overdueAmt { color: #ef4444; font-weight: 600; }
+
+/* ─── Phase 30: 桌位利用率 Tab ─── */
+.tableUtilTab { display: flex; flex-direction: column; gap: 16px; }
+.tableUtilKpi { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; margin-bottom: 8px; font-size: 14px; color: var(--text-secondary); }
+.tableUtilPct { font-size: 18px; font-weight: 700; color: var(--accent); }
+.tableUtilList { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.tableUtilHeader { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 8px; padding: 8px 12px; background: var(--bg-secondary); font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.tableUtilRow { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); font-size: 13px; }
+.peakBadge { display: inline-block; padding: 4px 12px; border-radius: 12px; background: var(--accent); color: #fff; font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+.peakBars { display: flex; align-items: flex-end; gap: 6px; height: 120px; padding: 0 4px; }
+.peakBar { display: flex; flex-direction: column; align-items: center; flex: 1; }
+.peakBarTop .peakBarFill { background: var(--accent); }
+.peakBarInner { width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 80px; }
+.peakBarFill { width: 80%; border-radius: 3px 3px 0 0; background: var(--text-tertiary); transition: height 0.3s; }
+.peakBarLabel { font-size: 11px; color: var(--text-tertiary); margin-top: 4px; }
+.peakBarVal { font-size: 10px; color: var(--text-secondary); }
+
+/* ─── Phase 30: 满意度&转介绍 Tab ─── */
+.satRefTab { display: flex; flex-direction: column; gap: 16px; }
+.satKpiRow { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+.satKpi { display: flex; flex-direction: column; align-items: center; min-width: 80px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.satKpiVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.satKpiVal.satGreen { color: #22c55e; }
+.satKpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.satMonthList { display: flex; flex-direction: column; gap: 4px; }
+.satMonthRow { display: grid; grid-template-columns: 80px 1fr 1fr 1fr; gap: 8px; padding: 6px 0; font-size: 13px; border-top: 1px solid var(--border); }
+.satMonth { color: var(--text-secondary); font-weight: 500; }
+.refKpiRow { display: flex; flex-wrap: wrap; gap: 12px; }
+.refKpi { display: flex; flex-direction: column; align-items: center; min-width: 80px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.refKpi.refAccent .refKpiVal { color: var(--accent); }
+.refKpiVal { font-size: 20px; font-weight: 700; color: var(--text-primary); }
+.refKpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+
+/* ─── Phase 31: 报价周转 Tab ─── */
+.qtTab { display: flex; flex-direction: column; gap: 16px; }
+.qtKpiRow { display: flex; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
+.qtKpi { display: flex; flex-direction: column; align-items: center; min-width: 100px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.qtKpiVal { font-size: 18px; font-weight: 700; color: var(--text-primary); }
+.qtKpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.qtBuckets { display: flex; flex-direction: column; gap: 8px; }
+.qtBucket { display: flex; align-items: center; gap: 8px; }
+.qtBucketLabel { font-size: 12px; color: var(--text-secondary); width: 72px; flex-shrink: 0; }
+.qtBucketTrack { flex: 1; height: 10px; background: var(--bg-tertiary); border-radius: 5px; overflow: hidden; }
+.qtBucketFill { height: 100%; background: var(--accent); border-radius: 5px; transition: width 0.3s; }
+.qtBucketCount { font-size: 12px; color: var(--text-secondary); width: 80px; text-align: right; }
+.contractKpiRow { display: flex; gap: 16px; flex-wrap: wrap; }
+.contractKpi { display: flex; flex-direction: column; align-items: center; min-width: 90px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.contractKpi.contractAccent .contractKpiVal { color: var(--accent); }
+.contractKpiVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.contractKpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+
+/* ─── Phase 31: 新客对比 Tab ─── */
+.newRepeatTab { display: flex; flex-direction: column; gap: 16px; }
+.nrTable { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.nrHeader { display: grid; grid-template-columns: 80px 1fr 1fr 1fr 1fr; gap: 8px; padding: 8px 12px; background: var(--bg-secondary); font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.nrRow { display: grid; grid-template-columns: 80px 1fr 1fr 1fr 1fr; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); font-size: 13px; }
+.nrMonth { color: var(--text-secondary); font-weight: 500; }
+.nrRepeat { color: var(--accent); font-weight: 600; }
+.overdueKpiRow { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+.overdueKpi { display: flex; flex-direction: column; align-items: center; min-width: 80px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.overdueKpiVal { font-size: 20px; font-weight: 700; color: var(--text-primary); }
+.overdueKpiVal.overdueRed { color: #ef4444; }
+.overdueKpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.overdueStaffList { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.overdueStaffHeader { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 8px; padding: 8px 12px; background: var(--bg-secondary); font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.overdueStaffRow { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); font-size: 13px; }
+.overdueStaffRow.overdueHighRow { background: rgba(239,68,68,0.05); }
+.overdueStaffId { color: var(--text-secondary); font-size: 12px; }
+.overdueRed { color: #ef4444; font-weight: 600; }
+
+/* ─── Phase 32: 订单修改&套餐附加 Tab ─── */
+.amendTab { display: flex; flex-direction: column; gap: 16px; }
+.amendKpiRow { display: flex; gap: 16px; flex-wrap: wrap; }
+.amendKpi { display: flex; flex-direction: column; align-items: center; min-width: 90px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.amendKpi.amendAccent .amendKpiVal { color: var(--accent); }
+.amendKpiVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.amendKpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.attachKpiRow { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+.attachKpi { display: flex; flex-direction: column; align-items: center; min-width: 90px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.attachKpi.attachAccent .attachKpiVal { color: var(--accent); }
+.attachKpiVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.attachKpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.topPkgList { display: flex; flex-direction: column; gap: 4px; }
+.topPkgRow { display: grid; grid-template-columns: 28px 1fr 60px; gap: 8px; padding: 6px 0; font-size: 13px; border-top: 1px solid var(--border); }
+.topPkgRank { color: var(--text-secondary); font-weight: 700; }
+.topPkgId { color: var(--text-secondary); font-size: 12px; }
+
+/* ─── Phase 32: 盈利能力&执行评分 Tab ─── */
+.profTab { display: flex; flex-direction: column; gap: 16px; }
+.profList { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.profHeader { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 8px; padding: 8px 12px; background: var(--bg-secondary); font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.profRow { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); font-size: 13px; }
+.profRow.profTop { background: rgba(var(--accent-rgb), 0.06); }
+.profType { font-weight: 500; color: var(--text-primary); }
+.profMargin { color: var(--accent); font-weight: 600; }
+.execKpiRow { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+.execKpi { display: flex; flex-direction: column; align-items: center; min-width: 100px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.execKpi.execAccent .execKpiVal { color: var(--accent); }
+.execKpiVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.execKpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.execList { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.execHeader { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 8px; padding: 8px 12px; background: var(--bg-secondary); font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.execRow { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); font-size: 13px; }
+.execGood { color: #22c55e; font-weight: 600; }
+.execWarn { color: #f59e0b; font-weight: 600; }
+
+/* ─── Phase 33: 交叉销售 Tab ─── */
+.crossTab { display: flex; flex-direction: column; gap: 16px; }
+.crossKpiRow { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 4px; }
+.crossKpi { display: flex; flex-direction: column; align-items: center; min-width: 90px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.crossKpi.crossAccent .crossKpiVal { color: var(--accent); }
+.crossKpiVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.crossKpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.sizeOverallKpi { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-secondary); margin-bottom: 12px; }
+.sizeOverallVal { font-size: 24px; font-weight: 700; color: var(--text-primary); }
+.sizeTrendList { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.sizeTrendRow { display: grid; grid-template-columns: 80px 1fr 80px; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--border); font-size: 13px; align-items: center; }
+.sizeTrendMonth { color: var(--text-secondary); font-weight: 500; }
+.sizeTrendAvg { font-weight: 600; color: var(--text-primary); text-align: right; }
+
+/* ─── Phase 33: VIP消费&账龄 Tab ─── */
+.vipSpendTab { display: flex; flex-direction: column; gap: 16px; }
+.vipSpendKpi { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-secondary); margin-bottom: 12px; }
+.vipSpendVal { font-size: 24px; font-weight: 700; color: var(--text-primary); }
+.vipLevelList { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.vipLevelHeader { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; padding: 8px 12px; background: var(--bg-secondary); font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.vipLevelRow { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); font-size: 13px; }
+.vipLevelBadge { display: inline-block; padding: 2px 8px; background: var(--accent); color: #fff; border-radius: 12px; font-size: 12px; font-weight: 600; }
+.vipAvgOrder { color: var(--accent); font-weight: 600; }
+.agingAllPaid { color: #22c55e; font-weight: 600; font-size: 15px; padding: 12px 0; text-align: center; }
+.agingKpiRow { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+.agingKpi { display: flex; flex-direction: column; align-items: center; min-width: 100px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.agingKpi.agingRed .agingKpiVal { color: #ef4444; }
+.agingKpiVal { font-size: 20px; font-weight: 700; color: var(--text-primary); }
+.agingKpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.agingBucketList { display: flex; flex-direction: column; gap: 8px; }
+.agingBucketRow { display: grid; grid-template-columns: 80px 1fr 140px; gap: 8px; align-items: center; }
+.agingBucketLabel { font-size: 13px; color: var(--text-secondary); font-weight: 500; }
+.agingBucketTrack { height: 8px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden; }
+.agingBucketFill { height: 100%; background: #ef4444; border-radius: 4px; }
+.agingBucketStat { font-size: 12px; color: var(--text-tertiary); text-align: right; }
+
+/* ─── Phase 34: 积分兑换&菜单升级 Tab ─── */
+.loyaltyTab { display: flex; flex-direction: column; gap: 16px; }
+.loyaltyKpiRow { display: flex; gap: 16px; flex-wrap: wrap; }
+.loyaltyKpi { display: flex; flex-direction: column; align-items: center; min-width: 90px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.loyaltyKpi.loyaltyAccent .loyaltyKpiVal { color: var(--accent); }
+.loyaltyKpiVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.loyaltyKpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.upgradeKpiRow { display: flex; gap: 16px; flex-wrap: wrap; }
+.upgradeKpi { display: flex; flex-direction: column; align-items: center; min-width: 90px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.upgradeKpi.upgradeAccent .upgradeKpiVal { color: var(--accent); }
+.upgradeKpiVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.upgradeKpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.channelBest { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-secondary); margin-bottom: 12px; }
+.channelList { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.channelHeader { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 8px; padding: 8px 12px; background: var(--bg-secondary); font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.channelRow { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); font-size: 13px; }
+.channelRate { color: var(--accent); font-weight: 600; }
+
+/* ─── Phase 34: 预测准确率&热力图 Tab ─── */
+.forecastTab { display: flex; flex-direction: column; gap: 16px; }
+.forecastKpiRow { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+.forecastKpi { display: flex; flex-direction: column; align-items: center; min-width: 90px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.forecastKpi.forecastAccent .forecastKpiVal { color: var(--accent); }
+.forecastKpiVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.forecastKpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.forecastList { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.forecastHeader { display: grid; grid-template-columns: 80px 1fr 1fr 80px; gap: 8px; padding: 8px 12px; background: var(--bg-secondary); font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.forecastRow { display: grid; grid-template-columns: 80px 1fr 1fr 80px; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); font-size: 13px; }
+.forecastRow.forecastGood { background: rgba(34, 197, 94, 0.05); }
+.forecastAcc { font-weight: 600; color: var(--text-primary); }
+.heatmapList { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.heatmapHeader { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; padding: 8px 12px; background: var(--bg-secondary); font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.heatmapRow { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); font-size: 13px; }
+.heatmapId { color: var(--text-secondary); font-size: 12px; }
+.heatmapPeak { color: var(--accent); font-weight: 600; }
+.ltKpiRow { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+.ltKpi { display: flex; flex-direction: column; align-items: center; min-width: 80px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.ltKpiVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.ltKpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.ltDistList { display: flex; flex-direction: column; gap: 8px; }
+.ltDistRow { display: grid; grid-template-columns: 60px 1fr 120px; gap: 8px; align-items: center; }
+.ltDistLabel { font-size: 13px; color: var(--text-secondary); font-weight: 500; }
+.ltDistTrack { height: 8px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden; }
+.ltDistFill { height: 100%; background: var(--accent); border-radius: 4px; }
+.ltDistStat { font-size: 12px; color: var(--text-tertiary); text-align: right; }
+
+/* ─── Phase 35: 定金退款&赢单比 Tab ─── */
+.depositTab { display: flex; flex-direction: column; gap: 16px; }
+.depositKpiRow { display: flex; gap: 16px; flex-wrap: wrap; }
+.depositKpi { display: flex; flex-direction: column; align-items: center; min-width: 90px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.depositKpi.depositRed .depositKpiVal { color: #ef4444; }
+.depositKpiVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.depositKpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.winlossKpiRow { display: flex; gap: 12px; flex-wrap: wrap; }
+.winlossKpi { display: flex; flex-direction: column; align-items: center; min-width: 80px; padding: 12px 14px; background: var(--bg-secondary); border-radius: 8px; }
+.winlossKpi.winGreen .winlossKpiVal { color: #22c55e; }
+.winlossKpi.winRed .winlossKpiVal { color: #ef4444; }
+.winlossKpi.winAccent .winlossKpiVal { color: var(--accent); }
+.winlossKpiVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.winlossKpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.retKpiRow { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+.retKpi { display: flex; flex-direction: column; align-items: center; min-width: 90px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.retKpi.retAccent .retKpiVal { color: var(--accent); }
+.retKpiVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.retKpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.retLevelList { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.retLevelHeader { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; padding: 8px 12px; background: var(--bg-secondary); font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.retLevelRow { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); font-size: 13px; }
+.retLevelBadge { display: inline-block; padding: 2px 8px; background: var(--accent); color: #fff; border-radius: 12px; font-size: 12px; font-weight: 600; }
+.retRate { color: var(--accent); font-weight: 600; }
+
+/* ─── Phase 35: 季节指数&复购间隔 Tab ─── */
+.seasonalRevTab { display: flex; flex-direction: column; gap: 16px; }
+.seasonRevKpi { font-size: 14px; color: var(--text-secondary); margin-bottom: 12px; }
+.seasonRevBars { display: flex; gap: 6px; align-items: flex-end; height: 100px; overflow-x: auto; padding-bottom: 4px; }
+.seasonRevBar { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 36px; }
+.seasonRevBar.seasonRevPeak .seasonRevBarFill { background: var(--accent); }
+.seasonRevBarTrack { width: 28px; height: 70px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden; display: flex; align-items: flex-end; }
+.seasonRevBarFill { width: 100%; background: var(--text-secondary); border-radius: 4px; transition: height 0.3s; }
+.seasonRevBarLabel { font-size: 10px; color: var(--text-tertiary); }
+.seasonRevBarIdx { font-size: 11px; font-weight: 600; color: var(--text-secondary); }
+.intervalKpiRow { display: flex; gap: 16px; flex-wrap: wrap; }
+.intervalKpi { display: flex; flex-direction: column; align-items: center; min-width: 90px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.intervalKpi.intervalAccent .intervalKpiVal { color: var(--accent); }
+.intervalKpiVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.intervalKpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.downtimeKpiRow { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+.downtimeKpi { display: flex; flex-direction: column; align-items: center; min-width: 90px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.downtimeKpi.downtimeRed .downtimeKpiVal { color: #ef4444; }
+.downtimeKpiVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.downtimeKpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.downtimeHallList { display: flex; flex-direction: column; gap: 6px; }
+.downtimeHallRow { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-radius: 6px; background: var(--bg-secondary); font-size: 13px; }
+.downtimeHallRow.downtimeInactive { background: rgba(239,68,68,0.05); }
+
+/* ─── Phase 36: 取消分析 Tab ─── */
+.cancelTab { display: flex; flex-direction: column; gap: 16px; }
+.cancelKpiRow { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+.cancelKpi { display: flex; flex-direction: column; align-items: center; min-width: 100px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.cancelKpi.cancelRed .cancelKpiVal { color: #ef4444; }
+.cancelKpiVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.cancelKpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.cancelTypeList { display: flex; flex-direction: column; gap: 8px; }
+.cancelTypeRow { display: grid; grid-template-columns: 80px 1fr 120px; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 6px; }
+.cancelTypeRow.cancelTopRow { background: rgba(239,68,68,0.06); }
+.cancelTypeName { font-size: 13px; color: var(--text-secondary); font-weight: 500; }
+.cancelTypeTrack { height: 8px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden; }
+.cancelTypeFill { height: 100%; background: #ef4444; border-radius: 4px; }
+.cancelTypeStat { font-size: 12px; color: var(--text-tertiary); text-align: right; }
+.acceptKpiRow { display: flex; gap: 16px; flex-wrap: wrap; }
+.acceptKpi { display: flex; flex-direction: column; align-items: center; min-width: 90px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.acceptKpi.acceptAccent .acceptKpiVal { color: var(--accent); }
+.acceptKpiVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.acceptKpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.churnKpiRow { display: flex; gap: 16px; flex-wrap: wrap; }
+.churnKpi { display: flex; flex-direction: column; align-items: center; min-width: 90px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.churnKpi.churnRed .churnKpiVal { color: #ef4444; }
+.churnKpiVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.churnKpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+
+/* ─── Phase 36: 星期分布 Tab ─── */
+.weekdayTab { display: flex; flex-direction: column; gap: 16px; }
+.wdPeak { font-size: 14px; color: var(--text-secondary); margin-bottom: 12px; }
+.wdBars { display: flex; gap: 8px; align-items: flex-end; height: 100px; }
+.wdBar { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: 1; }
+.wdBar.wdPeakBar .wdBarFill { background: var(--accent); }
+.wdBarTrack { width: 100%; height: 70px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden; display: flex; align-items: flex-end; }
+.wdBarFill { width: 100%; background: var(--text-secondary); border-radius: 4px; transition: height 0.3s; }
+.wdBarLabel { font-size: 11px; color: var(--text-tertiary); }
+.wdBarCount { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.pkgContribRow { display: flex; gap: 16px; flex-wrap: wrap; }
+.pkgContribKpi { display: flex; flex-direction: column; align-items: center; min-width: 90px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.pkgContribKpi.pkgContribAccent .pkgContribVal { color: var(--accent); }
+.pkgContribVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.pkgContribLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.otKpiRow { display: flex; gap: 16px; flex-wrap: wrap; }
+.otKpi { display: flex; flex-direction: column; align-items: center; min-width: 90px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.otKpi.otRed .otKpiVal { color: #ef4444; }
+.otKpiVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.otKpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+
+/* ─── Phase 37: 桌均收入 Tab ─── */
+.rptTab { display: flex; flex-direction: column; gap: 16px; }
+.rptOverall { display: flex; flex-direction: column; align-items: center; padding: 16px; background: var(--bg-secondary); border-radius: 8px; }
+.rptOverallVal { font-size: 28px; font-weight: 700; color: var(--accent); }
+.rptList { display: flex; flex-direction: column; gap: 0; }
+.rptHeader { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-tertiary); font-weight: 600; }
+.rptRow { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-primary); }
+.rptVal { font-weight: 600; color: var(--accent); }
+.srcVolKpi { display: flex; flex-direction: column; gap: 8px; }
+.srcVolVal { font-size: 20px; font-weight: 700; color: var(--text-primary); }
+.srcVolList { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.srcVolRow { display: flex; align-items: center; gap: 8px; }
+.srcVolCh { font-size: 13px; color: var(--text-primary); min-width: 60px; }
+.srcVolTrack { flex: 1; height: 8px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden; }
+.srcVolFill { height: 100%; background: var(--accent); border-radius: 4px; }
+.srcVolStat { font-size: 12px; color: var(--text-tertiary); min-width: 50px; text-align: right; }
+.spendKpiRow { display: flex; gap: 16px; flex-wrap: wrap; }
+.spendKpi { display: flex; flex-direction: column; align-items: center; min-width: 90px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.spendKpi.spendAccent .spendKpiVal { color: var(--accent); }
+.spendKpiVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.spendKpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+
+/* ─── Phase 37: 评价情感 Tab ─── */
+.sentimentTab { display: flex; flex-direction: column; gap: 16px; }
+.sentKpiRow { display: flex; gap: 16px; flex-wrap: wrap; }
+.sentKpi { display: flex; flex-direction: column; align-items: center; min-width: 90px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.sentKpi.sentGreen .sentKpiVal { color: #22c55e; }
+.sentKpi.sentRed .sentKpiVal { color: #ef4444; }
+.sentKpiVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.sentKpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.sentTagList { display: flex; flex-direction: column; gap: 6px; }
+.sentTagTitle { font-size: 12px; color: var(--text-tertiary); font-weight: 600; margin-bottom: 4px; }
+.sentTag { display: inline-block; padding: 2px 8px; background: #fef2f2; color: #ef4444; border-radius: 12px; font-size: 12px; margin: 2px; }
+.speedKpiRow { display: flex; gap: 16px; flex-wrap: wrap; }
+.speedKpi { display: flex; flex-direction: column; align-items: center; min-width: 90px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.speedKpi.speedAccent .speedKpiVal { color: var(--accent); }
+.speedKpiVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.speedKpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.growthAvg { display: flex; flex-direction: column; align-items: center; padding: 12px; background: var(--bg-secondary); border-radius: 8px; margin-bottom: 4px; }
+.growthAvgVal { font-size: 22px; font-weight: 700; color: var(--accent); }
+.growthList { display: flex; flex-direction: column; gap: 0; }
+.growthHeader { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-tertiary); font-weight: 600; }
+.growthRow { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-primary); }
+.growthPos { color: #22c55e; font-weight: 600; }
+.growthNeg { color: #ef4444; font-weight: 600; }
+
+/* ─── Phase 38: 加购分析 Tab ─── */
+.upsell38Tab { display: flex; flex-direction: column; gap: 16px; }
+.upsell38KpiRow { display: flex; gap: 16px; flex-wrap: wrap; }
+.upsell38Kpi { display: flex; flex-direction: column; align-items: center; min-width: 90px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.upsell38Kpi.upsell38Accent .upsell38KpiVal { color: var(--accent); }
+.upsell38KpiVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.upsell38KpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.cap38Tab { display: flex; flex-direction: column; gap: 8px; }
+.cap38Overall { display: flex; flex-direction: column; align-items: center; padding: 12px; background: var(--bg-secondary); border-radius: 8px; margin-bottom: 4px; }
+.cap38OverallVal { font-size: 28px; font-weight: 700; color: var(--accent); }
+.cap38List { display: flex; flex-direction: column; gap: 0; }
+.cap38Header { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-tertiary); font-weight: 600; }
+.cap38Row { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-primary); }
+.ref38KpiRow { display: flex; gap: 16px; flex-wrap: wrap; }
+.ref38Kpi { display: flex; flex-direction: column; align-items: center; min-width: 90px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.ref38Kpi.ref38Accent .ref38KpiVal { color: var(--accent); }
+.ref38KpiVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.ref38KpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.sign38KpiRow { display: flex; gap: 16px; flex-wrap: wrap; }
+.sign38Kpi { display: flex; flex-direction: column; align-items: center; min-width: 90px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.sign38Kpi.sign38Accent .sign38KpiVal { color: var(--accent); }
+.sign38KpiVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.sign38KpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+
+/* ─── Phase 38: 收入趋势 Tab ─── */
+.revTrend38Tab { display: flex; flex-direction: column; gap: 16px; }
+.revTrend38KpiRow { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
+.revTrend38Kpi { display: flex; flex-direction: column; align-items: center; min-width: 90px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.revTrend38Kpi.revTrend38Accent .revTrend38KpiVal { color: var(--accent); }
+.revTrend38KpiVal { font-size: 20px; font-weight: 700; color: var(--text-primary); }
+.revTrend38KpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.revTrend38List { display: flex; flex-direction: column; gap: 0; }
+.revTrend38Header { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-tertiary); font-weight: 600; }
+.revTrend38Row { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-primary); }
+.revTrend38Pos { color: #22c55e; font-weight: 600; }
+.revTrend38Neg { color: #ef4444; font-weight: 600; }
+.revRate38KpiRow { display: flex; gap: 16px; flex-wrap: wrap; }
+.revRate38Kpi { display: flex; flex-direction: column; align-items: center; min-width: 90px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.revRate38Kpi.revRate38Accent .revRate38KpiVal { color: var(--accent); }
+.revRate38KpiVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.revRate38KpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.coord38Tab { display: flex; flex-direction: column; gap: 6px; }
+.coord38Top { font-size: 13px; color: var(--accent); font-weight: 600; padding: 6px 0; }
+.coord38List { display: flex; flex-direction: column; gap: 0; }
+.coord38Header { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-tertiary); font-weight: 600; }
+.coord38Row { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-primary); }
+.leadTime38Tab { display: flex; flex-direction: column; gap: 8px; }
+.leadTime38Overall { display: flex; flex-direction: column; align-items: center; padding: 12px; background: var(--bg-secondary); border-radius: 8px; margin-bottom: 4px; }
+.leadTime38OverallVal { font-size: 28px; font-weight: 700; color: var(--accent); }
+.leadTime38DistList { display: flex; flex-direction: column; gap: 6px; }
+.leadTime38DistRow { display: flex; align-items: center; gap: 8px; }
+.leadTime38DistLabel { font-size: 13px; color: var(--text-primary); min-width: 70px; }
+.leadTime38DistTrack { flex: 1; height: 8px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden; }
+.leadTime38DistFill { height: 100%; background: var(--accent); border-radius: 4px; }
+.leadTime38DistStat { font-size: 12px; color: var(--text-tertiary); min-width: 80px; text-align: right; }
+
+/* ─── Phase 39: 利润率 Tab ─── */
+.profitMarginTab { display: flex; flex-direction: column; gap: 16px; }
+.pmKpiRow { display: flex; gap: 16px; flex-wrap: wrap; }
+.pmKpi { display: flex; flex-direction: column; align-items: center; min-width: 90px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.pmKpi.pmAccent .pmKpiVal { color: var(--accent); }
+.pmKpiVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.pmKpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.turnTab { display: flex; flex-direction: column; gap: 8px; }
+.turnOverall { font-size: 13px; color: var(--text-secondary); padding: 8px; background: var(--bg-secondary); border-radius: 8px; }
+.turnList { display: flex; flex-direction: column; gap: 0; }
+.turnHeader { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-tertiary); font-weight: 600; }
+.turnRow { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-primary); }
+.payMethodTab { display: flex; flex-direction: column; gap: 8px; }
+.payMethodTop { font-size: 13px; color: var(--accent); font-weight: 600; padding: 4px 0; }
+.payMethodList { display: flex; flex-direction: column; gap: 6px; }
+.payMethodRow { display: flex; align-items: center; gap: 8px; }
+.payMethodName { font-size: 13px; color: var(--text-primary); min-width: 48px; }
+.payMethodTrack { flex: 1; height: 8px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden; }
+.payMethodFill { height: 100%; background: var(--accent); border-radius: 4px; }
+.payMethodStat { font-size: 12px; color: var(--text-tertiary); min-width: 80px; text-align: right; }
+.sizeDistTab { display: flex; flex-direction: column; gap: 8px; }
+.sizeDistAvg { font-size: 13px; color: var(--text-secondary); padding: 6px 0; }
+.sizeDistList { display: flex; flex-direction: column; gap: 6px; }
+.sizeDistRow { display: flex; align-items: center; gap: 8px; }
+.sizeDistLabel { font-size: 13px; color: var(--text-primary); min-width: 60px; }
+.sizeDistTrack { flex: 1; height: 8px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden; }
+.sizeDistFill { height: 100%; background: var(--accent); border-radius: 4px; }
+.sizeDistStat { font-size: 12px; color: var(--text-tertiary); min-width: 40px; text-align: right; }
+
+/* ─── Phase 39: 类型趋势 Tab ─── */
+.typeTrend39Tab { display: flex; flex-direction: column; gap: 16px; }
+.tt39List { display: flex; flex-direction: column; gap: 8px; }
+.tt39Top { font-size: 13px; color: var(--accent); font-weight: 600; padding: 4px 0; }
+.tt39TypeList { display: flex; flex-direction: column; gap: 0; }
+.tt39Header { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-tertiary); font-weight: 600; }
+.tt39Row { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-primary); }
+.resp39KpiRow { display: flex; gap: 16px; flex-wrap: wrap; }
+.resp39Kpi { display: flex; flex-direction: column; align-items: center; min-width: 90px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.resp39Kpi.resp39Accent .resp39KpiVal { color: var(--accent); }
+.resp39KpiVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.resp39KpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.sat39Tab { display: flex; flex-direction: column; gap: 8px; }
+.sat39Overall { display: flex; flex-direction: column; align-items: center; padding: 12px; background: var(--bg-secondary); border-radius: 8px; margin-bottom: 4px; }
+.sat39OverallVal { font-size: 32px; font-weight: 700; color: var(--accent); }
+.sat39List { display: flex; flex-direction: column; gap: 0; }
+.sat39Header { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-tertiary); font-weight: 600; }
+.sat39Row { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-primary); }
+.staff39Tab { display: flex; flex-direction: column; gap: 6px; }
+.staff39Top { font-size: 13px; color: var(--accent); font-weight: 600; padding: 4px 0; }
+.staff39List { display: flex; flex-direction: column; gap: 0; }
+.staff39Header { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-tertiary); font-weight: 600; }
+.staff39Row { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-primary); }
+
+/* ─── Phase 40: 复购分析 Tab ─── */
+.reorder40Tab { display: flex; flex-direction: column; gap: 16px; }
+.conv40KpiRow { display: flex; gap: 16px; flex-wrap: wrap; }
+.conv40Kpi { display: flex; flex-direction: column; align-items: center; min-width: 90px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.conv40Kpi.conv40Accent .conv40KpiVal { color: var(--accent); }
+.conv40KpiVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.conv40KpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.age40Tab { display: flex; flex-direction: column; gap: 8px; }
+.age40Avg { font-size: 13px; color: var(--text-secondary); padding: 6px 0; }
+.age40DistList { display: flex; flex-direction: column; gap: 6px; }
+.age40DistRow { display: flex; align-items: center; gap: 8px; }
+.age40DistLabel { font-size: 13px; color: var(--text-primary); min-width: 60px; }
+.age40DistTrack { flex: 1; height: 8px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden; }
+.age40DistFill { height: 100%; background: var(--accent); border-radius: 4px; }
+.age40DistStat { font-size: 12px; color: var(--text-tertiary); min-width: 80px; text-align: right; }
+.cancelLt40Tab { display: flex; flex-direction: column; gap: 8px; }
+.cancelLt40Avg { font-size: 13px; color: var(--text-secondary); padding: 6px 0; }
+.cancelLt40DistList { display: flex; flex-direction: column; gap: 6px; }
+.cancelLt40DistRow { display: flex; align-items: center; gap: 8px; }
+.cancelLt40DistLabel { font-size: 13px; color: var(--text-primary); min-width: 60px; }
+.cancelLt40DistTrack { flex: 1; height: 8px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden; }
+.cancelLt40DistFill { height: 100%; background: #ef4444; border-radius: 4px; }
+.cancelLt40DistStat { font-size: 12px; color: var(--text-tertiary); min-width: 80px; text-align: right; }
+
+/* ─── Phase 40: 定金分析 Tab ─── */
+.deposit40Tab { display: flex; flex-direction: column; gap: 16px; }
+.dep40Tab { display: flex; flex-direction: column; gap: 8px; }
+.dep40Avg { font-size: 13px; color: var(--text-secondary); padding: 6px 0; }
+.dep40DistList { display: flex; flex-direction: column; gap: 6px; }
+.dep40DistRow { display: flex; align-items: center; gap: 8px; }
+.dep40DistLabel { font-size: 13px; color: var(--text-primary); min-width: 60px; }
+.dep40DistTrack { flex: 1; height: 8px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden; }
+.dep40DistFill { height: 100%; background: var(--accent); border-radius: 4px; }
+.dep40DistStat { font-size: 12px; color: var(--text-tertiary); min-width: 80px; text-align: right; }
+.perf40Tab { display: flex; flex-direction: column; gap: 6px; }
+.perf40Top { font-size: 13px; color: var(--accent); font-weight: 600; padding: 4px 0; }
+.perf40List { display: flex; flex-direction: column; gap: 0; }
+.perf40Header { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-tertiary); font-weight: 600; }
+.perf40Row { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-primary); }
+.season40Tab { display: flex; flex-direction: column; gap: 8px; }
+.season40KpiRow { display: flex; gap: 24px; font-size: 13px; color: var(--text-secondary); padding: 6px 0; }
+.season40Bars { display: flex; gap: 4px; align-items: flex-end; height: 90px; }
+.season40Bar { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: 1; }
+.season40Bar.season40PeakBar .season40BarFill { background: var(--accent); }
+.season40BarTrack { width: 100%; height: 60px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden; display: flex; align-items: flex-end; }
+.season40BarFill { width: 100%; background: var(--text-secondary); border-radius: 4px; transition: height 0.3s; }
+.season40BarLabel { font-size: 10px; color: var(--text-tertiary); }
+.season40BarIdx { font-size: 10px; color: var(--text-secondary); font-weight: 600; }
+
+/* ─── Phase 41: 爽约分析 Tab ─── */
+.noShow41Tab { display: flex; flex-direction: column; gap: 16px; }
+.ns41KpiRow { display: flex; gap: 16px; flex-wrap: wrap; }
+.ns41Kpi { display: flex; flex-direction: column; align-items: center; min-width: 90px; padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; }
+.ns41Kpi.ns41Red .ns41KpiVal { color: #ef4444; }
+.ns41Kpi.ns41Accent .ns41KpiVal { color: var(--accent); }
+.ns41KpiVal { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.ns41KpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.slot41Tab { display: flex; flex-direction: column; gap: 8px; }
+.slot41Peak { font-size: 13px; color: var(--accent); font-weight: 600; padding: 4px 0; }
+.slot41List { display: flex; flex-direction: column; gap: 6px; }
+.slot41Row { display: flex; align-items: center; gap: 8px; }
+.slot41Name { font-size: 13px; color: var(--text-primary); min-width: 60px; }
+.slot41Track { flex: 1; height: 8px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden; }
+.slot41Fill { height: 100%; background: var(--accent); border-radius: 4px; }
+.slot41Stat { font-size: 12px; color: var(--text-tertiary); min-width: 70px; text-align: right; }
+
+/* ─── Phase 41: 套餐热度 Tab ─── */
+.pkgPop41Tab { display: flex; flex-direction: column; gap: 16px; }
+.pkgPop41List { display: flex; flex-direction: column; gap: 6px; }
+.pkgPop41Top { font-size: 13px; color: var(--accent); font-weight: 600; padding: 4px 0; }
+.pkgPop41Rows { display: flex; flex-direction: column; gap: 0; }
+.pkgPop41Header { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-tertiary); font-weight: 600; }
+.pkgPop41Row { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-primary); }
+.acq41Tab { display: flex; flex-direction: column; gap: 8px; }
+.acq41Avg { font-size: 13px; color: var(--text-secondary); padding: 6px 0; }
+.acq41List { display: flex; flex-direction: column; gap: 6px; }
+.acq41Row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.acq41Ch { color: var(--text-primary); font-weight: 500; }
+.acq41Budget { color: var(--accent); font-weight: 600; }
+.spec41Tab { display: flex; flex-direction: column; gap: 6px; }
+.spec41Top { font-size: 13px; color: var(--accent); font-weight: 600; padding: 4px 0; }
+.spec41List { display: flex; flex-direction: column; gap: 0; }
+.spec41Header { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-tertiary); font-weight: 600; }
+.spec41Row { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-primary); }
+
+/* ─── Phase 42: 人均消费 Tab ─── */
+.guestRev42Tab { display: flex; flex-direction: column; gap: 12px; }
+.gr42KpiRow { display: flex; gap: 12px; flex-wrap: wrap; }
+.gr42Kpi { flex: 1; min-width: 90px; display: flex; flex-direction: column; align-items: center; padding: 12px 8px; background: var(--bg-secondary); border-radius: 8px; }
+.gr42Accent { background: rgba(255,107,44,0.08); }
+.gr42Accent .gr42KpiVal { color: var(--accent); }
+.gr42KpiVal { font-size: 20px; font-weight: 700; color: var(--text-primary); }
+.gr42KpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.gr42TypeList { display: flex; flex-direction: column; gap: 0; }
+.gr42TypeHeader { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-tertiary); font-weight: 600; }
+.gr42TypeRow { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-primary); }
+.density42Tab { display: flex; flex-direction: column; gap: 8px; }
+.dens42Overall { font-size: 13px; color: var(--text-secondary); padding: 4px 0; }
+.dens42List { display: flex; flex-direction: column; gap: 0; }
+.dens42Header { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-tertiary); font-weight: 600; }
+.dens42Row { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-primary); }
+.fbResp42KpiRow { display: flex; gap: 12px; flex-wrap: wrap; }
+.fbResp42Kpi { flex: 1; min-width: 90px; display: flex; flex-direction: column; align-items: center; padding: 12px 8px; background: var(--bg-secondary); border-radius: 8px; }
+.overdueTab42 { display: flex; flex-direction: column; gap: 8px; }
+
+/* ─── Phase 42: VIP分析 Tab ─── */
+.vipAnal42Tab { display: flex; flex-direction: column; gap: 12px; }
+.vip42KpiRow { display: flex; gap: 12px; flex-wrap: wrap; }
+.vip42Kpi { flex: 1; min-width: 90px; display: flex; flex-direction: column; align-items: center; padding: 12px 8px; background: var(--bg-secondary); border-radius: 8px; }
+.vip42Accent { background: rgba(255,107,44,0.08); }
+.vip42Accent .vip42KpiVal { color: var(--accent); }
+.vip42KpiVal { font-size: 20px; font-weight: 700; color: var(--text-primary); }
+.vip42KpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.vip42LevelList { display: flex; flex-direction: column; gap: 0; }
+.budgetAcc42 { display: flex; flex-direction: column; gap: 8px; }
+.addon42KpiRow { display: flex; gap: 12px; flex-wrap: wrap; }
+.payGap42KpiRow { display: flex; gap: 12px; flex-wrap: wrap; }
+
+/* ─── Phase 43: 每桌收入 Tab ─── */
+.perTable43Tab { display: flex; flex-direction: column; gap: 12px; }
+.pt43KpiRow { display: flex; gap: 12px; flex-wrap: wrap; }
+.pt43Kpi { flex: 1; min-width: 90px; display: flex; flex-direction: column; align-items: center; padding: 12px 8px; background: var(--bg-secondary); border-radius: 8px; }
+.pt43Accent { background: rgba(255,107,44,0.08); }
+.pt43Accent .pt43KpiVal { color: var(--accent); }
+.pt43KpiVal { font-size: 20px; font-weight: 700; color: var(--text-primary); }
+.pt43KpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.pt43TypeList { display: flex; flex-direction: column; gap: 0; }
+.pt43TypeHeader { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-tertiary); font-weight: 600; }
+.pt43TypeRow { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-primary); }
+.roi43Tab { display: flex; flex-direction: column; gap: 8px; }
+.roi43Best { font-size: 13px; color: var(--text-secondary); padding: 4px 0; }
+.roi43List { display: flex; flex-direction: column; gap: 0; }
+.roi43Header { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-tertiary); font-weight: 600; }
+.roi43Row { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-primary); }
+.pay43KpiRow { display: flex; gap: 12px; flex-wrap: wrap; }
+.risk43Tab { display: flex; flex-direction: column; gap: 8px; }
+
+/* ─── Phase 43: 客户价值 Tab ─── */
+.ltv43Tab { display: flex; flex-direction: column; gap: 12px; }
+.ltv43KpiRow { display: flex; gap: 12px; flex-wrap: wrap; }
+.ltv43Kpi { flex: 1; min-width: 90px; display: flex; flex-direction: column; align-items: center; padding: 12px 8px; background: var(--bg-secondary); border-radius: 8px; }
+.ltv43Accent { background: rgba(255,107,44,0.08); }
+.ltv43Accent .ltv43KpiVal { color: var(--accent); }
+.ltv43KpiVal { font-size: 20px; font-weight: 700; color: var(--text-primary); }
+.ltv43KpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.ltv43TopList { display: flex; flex-direction: column; gap: 0; }
+.ltv43TopHeader { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-tertiary); font-weight: 600; }
+.ltv43TopRow { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-primary); }
+.season43Tab { display: flex; flex-direction: column; gap: 8px; }
+.season43Peak { font-size: 13px; color: var(--text-secondary); padding: 4px 0; }
+.season43List { display: flex; flex-direction: column; gap: 0; }
+.season43Row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.season43Q { font-weight: 700; min-width: 28px; color: var(--text-primary); }
+.season43Cnt { min-width: 50px; color: var(--text-tertiary); font-size: 12px; }
+.season43Idx { min-width: 42px; text-align: right; font-size: 12px; color: var(--text-tertiary); }
+.load43Tab { display: flex; flex-direction: column; gap: 6px; }
+.load43Top { font-size: 13px; color: var(--accent); font-weight: 600; padding: 4px 0; }
+.load43List { display: flex; flex-direction: column; gap: 0; }
+.load43Header { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-tertiary); font-weight: 600; }
+.load43Row { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-primary); }
+.venue43Tab { display: flex; flex-direction: column; gap: 8px; }
+
+/* ─── Phase 44: 转化漏斗 Tab ─── */
+.funnel44Tab { display: flex; flex-direction: column; gap: 12px; }
+.funnel44KpiRow { display: flex; gap: 12px; flex-wrap: wrap; }
+.funnel44Kpi { flex: 1; min-width: 90px; display: flex; flex-direction: column; align-items: center; padding: 12px 8px; background: var(--bg-secondary); border-radius: 8px; }
+.funnel44Accent { background: rgba(255,107,44,0.08); }
+.funnel44Accent .funnel44KpiVal { color: var(--accent); }
+.funnel44KpiVal { font-size: 20px; font-weight: 700; color: var(--text-primary); }
+.funnel44KpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.funnel44Stages { display: flex; flex-direction: column; gap: 6px; }
+.funnel44Stage { display: flex; align-items: center; gap: 8px; }
+.funnel44StageName { min-width: 100px; font-size: 12px; color: var(--text-secondary); }
+.funnel44Bar { flex: 1; height: 8px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden; }
+.funnel44Fill { height: 100%; background: var(--accent); border-radius: 4px; }
+.funnel44Stat { font-size: 12px; color: var(--text-tertiary); min-width: 80px; text-align: right; }
+.winLoss44Tab { display: flex; flex-direction: column; gap: 8px; }
+.conc44Tab { display: flex; flex-direction: column; gap: 8px; }
+
+/* ─── Phase 44: 退款分析 Tab ─── */
+.refund44Tab { display: flex; flex-direction: column; gap: 8px; }
+.ref44KpiRow { display: flex; gap: 12px; flex-wrap: wrap; }
+.ref44Kpi { flex: 1; min-width: 90px; display: flex; flex-direction: column; align-items: center; padding: 12px 8px; background: var(--bg-secondary); border-radius: 8px; }
+.ref44Accent { background: rgba(255,107,44,0.08); }
+.ref44Accent .ref44KpiVal { color: var(--accent); }
+.ref44KpiVal { font-size: 20px; font-weight: 700; color: var(--text-primary); }
+.ref44KpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.avail44Tab { display: flex; flex-direction: column; gap: 8px; }
+.avail44Overall { font-size: 13px; color: var(--text-secondary); padding: 4px 0; }
+.avail44List { display: flex; flex-direction: column; gap: 6px; }
+.avail44Row { display: flex; align-items: center; gap: 8px; }
+.avail44Name { font-size: 13px; color: var(--text-primary); min-width: 60px; }
+.avail44Track { flex: 1; height: 8px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden; }
+.avail44Fill { height: 100%; background: var(--accent); border-radius: 4px; }
+.avail44Stat { font-size: 12px; color: var(--text-tertiary); min-width: 50px; text-align: right; }
+
+/* ─── Phase 45: 高峰日 Tab ─── */
+.peak45Tab { display: flex; flex-direction: column; gap: 10px; }
+.peak45Top { font-size: 13px; color: var(--accent); font-weight: 600; padding: 4px 0; }
+.peak45List { display: flex; flex-direction: column; gap: 6px; }
+.peak45Row { display: flex; align-items: center; gap: 8px; }
+.peak45Name { min-width: 36px; font-size: 13px; color: var(--text-primary); }
+.peak45Bar { flex: 1; height: 8px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden; }
+.peak45Fill { height: 100%; background: var(--accent); border-radius: 4px; }
+.peak45Stat { font-size: 12px; color: var(--text-tertiary); min-width: 28px; text-align: right; }
+.sqm45Tab { display: flex; flex-direction: column; gap: 8px; }
+.sqm45Overall { font-size: 13px; color: var(--text-secondary); padding: 4px 0; }
+.sqm45List { display: flex; flex-direction: column; gap: 0; }
+.sqm45Header { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-tertiary); font-weight: 600; }
+.sqm45Row { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-primary); }
+.nur45KpiRow { display: flex; gap: 12px; flex-wrap: wrap; }
+.nur45Kpi { flex: 1; min-width: 90px; display: flex; flex-direction: column; align-items: center; padding: 12px 8px; background: var(--bg-secondary); border-radius: 8px; }
+.nur45Accent { background: rgba(255,107,44,0.08); }
+.nur45Accent .nur45KpiVal { color: var(--accent); }
+.nur45KpiVal { font-size: 20px; font-weight: 700; color: var(--text-primary); }
+.nur45KpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.table45Tab { display: flex; flex-direction: column; gap: 8px; }
+.table45List { display: flex; flex-direction: column; gap: 0; margin-top: 8px; }
+.table45Row { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-primary); }
+
+/* ─── Phase 45: 风险预警 Tab ─── */
+.warn45Tab { display: flex; flex-direction: column; gap: 10px; }
+.warn45KpiRow { display: flex; gap: 12px; flex-wrap: wrap; }
+.warn45Kpi { flex: 1; min-width: 90px; display: flex; flex-direction: column; align-items: center; padding: 12px 8px; background: var(--bg-secondary); border-radius: 8px; }
+.warn45Danger { background: rgba(229,62,62,0.08); }
+.warn45Danger .warn45KpiVal { color: #e53e3e; }
+.warn45KpiVal { font-size: 20px; font-weight: 700; color: var(--text-primary); }
+.warn45KpiLabel { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.warn45List { display: flex; flex-direction: column; gap: 0; }
+.warn45Header { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-tertiary); font-weight: 600; }
+.warn45Row { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-primary); }
+.staff45Tab { display: flex; flex-direction: column; gap: 6px; }
+.staff45Top { font-size: 13px; color: var(--accent); font-weight: 600; padding: 4px 0; }
+.staff45List { display: flex; flex-direction: column; gap: 0; }
+.staff45Header { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-tertiary); font-weight: 600; }
+.staff45Row { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-primary); }
+.payChan45Tab { display: flex; flex-direction: column; gap: 8px; }
+.payChan45Top { font-size: 13px; color: var(--text-secondary); padding: 4px 0; }
+.payChan45Row { display: flex; align-items: center; gap: 8px; }
+.payChan45Name { min-width: 60px; font-size: 13px; color: var(--text-primary); }
+.payChan45Track { flex: 1; height: 8px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden; }
+.payChan45Fill { height: 100%; background: var(--accent); border-radius: 4px; }
+.payChan45Stat { font-size: 12px; color: var(--text-tertiary); min-width: 48px; text-align: right; }
+
+/* ── Phase 46 ─────────────────────────────────────────────────────────────── */
+
+.p46Wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.p46KpiRow {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 16px;
+}
+
+.p46Kpi {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.p46KpiVal {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.p46KpiLabel {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.p46BucketList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.p46BucketRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.p46BucketLabel {
+  width: 80px;
+  font-size: 13px;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.p46BucketTrack {
+  flex: 1;
+  height: 8px;
+  background: var(--surface-alt);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.p46BucketFill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+  min-width: 2px;
+}
+
+.p46BucketStat {
+  width: 44px;
+  text-align: right;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.p46OverallRow {
+  font-size: 14px;
+  color: var(--text-primary);
+  margin-bottom: 14px;
+}
+
+.p46TypeList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.p46TypeRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.p46TypeName {
+  width: 72px;
+  font-size: 13px;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.p46TypeTrack {
+  flex: 1;
+  height: 8px;
+  background: var(--surface-alt);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.p46TypeFill {
+  height: 100%;
+  background: #ef4444;
+  border-radius: 4px;
+  min-width: 2px;
+}
+
+.p46TypeStat {
+  width: 44px;
+  text-align: right;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.p46TypeCount {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ── Phase 47 ─────────────────────────────────────────────────────────────── */
+
+.p47Wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.p47KpiRow {
+  display: flex;
+  gap: 32px;
+  margin-bottom: 20px;
+}
+
+.p47Kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.p47KpiVal {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.p47KpiLabel {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.p47BarChart {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 120px;
+}
+
+.p47BarCol {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+}
+
+.p47BarTrack {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  background: var(--surface-alt);
+  border-radius: 3px 3px 0 0;
+}
+
+.p47BarFill {
+  width: 100%;
+  background: var(--accent);
+  border-radius: 3px 3px 0 0;
+  min-height: 2px;
+}
+
+.p47BarLabel {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.p47PremiumGrid {
+  display: flex;
+  gap: 16px;
+}
+
+.p47PremiumCard {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 8px;
+  background: var(--surface-alt);
+  border-radius: 8px;
+}
+
+.p47PremiumHighlight {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.p47PremiumVal {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.p47PremiumHighlight .p47PremiumVal {
+  color: var(--accent);
+}
+
+.p47PremiumLabel {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* ── Phase 48 ─────────────────────────────────────────────────────────────── */
+
+.p48Wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.p48ThresholdGrid {
+  display: flex;
+  gap: 16px;
+}
+
+.p48ThreshCard {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 8px;
+  background: var(--surface-alt);
+  border-radius: 8px;
+}
+
+.p48ThreshHighlight {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.p48ThreshVal {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.p48ThreshHighlight .p48ThreshVal {
+  color: var(--accent);
+}
+
+.p48ThreshLabel {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.p48RefKpiRow {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.p48RefKpi {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 8px;
+  background: var(--surface-alt);
+  border-radius: 8px;
+}
+
+.p48RefHighlight {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.p48RefKpiVal {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.p48RefHighlight .p48RefKpiVal {
+  color: var(--accent);
+}
+
+.p48RefKpiLabel {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.p48RefTotal {
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* ── Phase 49 ─────────────────────────────────────────────────────────────── */
+
+.p49Wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.p49KpiRow {
+  display: flex;
+  gap: 32px;
+  margin-bottom: 16px;
+}
+
+.p49Kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.p49KpiVal {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.p49KpiLabel {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.p49MonthList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.p49MonthRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.p49MonthLabel {
+  width: 36px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.p49MonthTrack {
+  flex: 1;
+  height: 8px;
+  background: var(--surface-alt);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.p49MonthFill {
+  height: 100%;
+  background: #f59e0b;
+  border-radius: 4px;
+  min-width: 2px;
+}
+
+.p49MonthStat {
+  width: 48px;
+  text-align: right;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.p49MonthCount {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.p49ScoreHeader {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.p49ScoreAvg {
+  font-size: 40px;
+  font-weight: 700;
+  color: #f59e0b;
+}
+
+.p49ScoreStars {
+  font-size: 16px;
+  color: var(--text-secondary);
+}
+
+.p49ScoreList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.p49ScoreRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.p49ScoreLabel {
+  width: 60px;
+  font-size: 12px;
+  color: #f59e0b;
+  flex-shrink: 0;
+}
+
+.p49ScoreTrack {
+  flex: 1;
+  height: 8px;
+  background: var(--surface-alt);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.p49ScoreFill {
+  height: 100%;
+  background: #f59e0b;
+  border-radius: 4px;
+  min-width: 2px;
+}
+
+.p49ScoreStat {
+  width: 36px;
+  text-align: right;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.p49ScorePct {
+  width: 36px;
+  text-align: right;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ── Phase 50 ─────────────────────────────────────────────────────────────── */
+
+.p50Wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.p50RatioBar {
+  height: 12px;
+  background: var(--surface-alt);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.p50RatioWeekend {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 6px 0 0 6px;
+  min-width: 2px;
+}
+
+.p50RatioLabels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+}
+
+.p50CompareGrid {
+  display: flex;
+  gap: 16px;
+}
+
+.p50CompareCard {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 8px;
+  background: var(--surface-alt);
+  border-radius: 8px;
+}
+
+.p50CompareTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.p50CompareVal {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.p50CompareSub {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.p50BestQ {
+  font-size: 14px;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+}
+
+.p50QBarChart {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  height: 130px;
+}
+
+.p50QBarCol {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+}
+
+.p50QBarTrack {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  background: var(--surface-alt);
+  border-radius: 4px 4px 0 0;
+}
+
+.p50QBarFill {
+  width: 100%;
+  background: color-mix(in srgb, var(--accent) 60%, transparent);
+  border-radius: 4px 4px 0 0;
+  min-height: 4px;
+}
+
+.p50QBarBest {
+  background: var(--accent);
+}
+
+.p50QBarLabel {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.p50QBarRev {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ── Phase 51 ──────────────────────────────────────────────────────────────── */
+.p51Wrap { display:flex; flex-direction:column; gap:16px; }
+.p51TotalRow { display:flex; gap:16px; flex-wrap:wrap; }
+.p51TopBadge { background:var(--accent); color:#fff; border-radius:4px; padding:2px 8px; font-size:12px; }
+.p51TypeList { display:flex; flex-direction:column; gap:8px; }
+.p51TypeRow { display:flex; align-items:center; gap:8px; }
+.p51TypeName { width:80px; font-size:13px; color:var(--text-secondary); }
+.p51TypeTrack { flex:1; height:10px; background:var(--bg-subtle); border-radius:5px; overflow:hidden; }
+.p51TypeFill { height:100%; background:var(--accent); border-radius:5px; transition:width .3s; }
+.p51TypePct { width:44px; text-align:right; font-size:12px; color:var(--text-secondary); }
+.p51TypeRev { width:72px; text-align:right; font-size:12px; font-weight:600; }
+.p51ConvKpiRow { display:flex; gap:16px; flex-wrap:wrap; }
+.p51ConvKpi { background:var(--bg-subtle); border-radius:8px; padding:12px 16px; flex:1; min-width:120px; }
+.p51ConvKpiVal { font-size:22px; font-weight:700; color:var(--accent); }
+.p51ConvKpiLabel { font-size:12px; color:var(--text-secondary); margin-top:2px; }
+.p51ConvMonthList { display:flex; flex-direction:column; gap:8px; }
+.p51ConvMonthRow { display:flex; align-items:center; gap:8px; }
+.p51ConvMonthLabel { width:64px; font-size:12px; color:var(--text-secondary); }
+.p51ConvTrack { flex:1; height:10px; background:var(--bg-subtle); border-radius:5px; overflow:hidden; }
+.p51ConvFill { height:100%; background:var(--accent); border-radius:5px; }
+.p51ConvStat { width:44px; text-align:right; font-size:12px; color:var(--text-secondary); }
+.p51ConvCount { width:52px; text-align:right; font-size:11px; color:var(--text-tertiary); }
+
+/* ── Phase 52 ──────────────────────────────────────────────────────────────── */
+.p52Wrap { display:flex; flex-direction:column; gap:16px; }
+.p52KpiRow { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:12px; }
+.p52Kpi { background:var(--bg-subtle); border-radius:8px; padding:12px 16px; flex:1; min-width:120px; }
+.p52KpiVal { display:block; font-size:22px; font-weight:700; color:var(--accent); }
+.p52KpiLabel { display:block; font-size:12px; color:var(--text-secondary); margin-top:2px; }
+.p52TypeList { display:flex; flex-direction:column; gap:8px; }
+.p52TypeRow { display:flex; align-items:center; gap:8px; }
+.p52TypeName { width:80px; font-size:13px; color:var(--text-secondary); }
+.p52Track { flex:1; height:10px; background:var(--bg-subtle); border-radius:5px; overflow:hidden; }
+.p52Fill { height:100%; background:var(--red,#ef4444); border-radius:5px; transition:width .3s; }
+.p52Pct { width:44px; text-align:right; font-size:12px; color:var(--text-secondary); }
+.p52Count { width:60px; text-align:right; font-size:11px; color:var(--text-tertiary); }
+.p52HourChart { display:flex; align-items:flex-end; gap:4px; height:120px; margin-top:12px; }
+.p52HourCol { display:flex; flex-direction:column; align-items:center; flex:1; gap:4px; }
+.p52HourBar { flex:1; width:100%; display:flex; align-items:flex-end; }
+.p52HourFill { width:100%; border-radius:2px 2px 0 0; transition:height .3s; min-height:2px; }
+.p52HourLabel { font-size:10px; color:var(--text-tertiary); }
+
+/* ── Phase 53 ──────────────────────────────────────────────────────────────── */
+.p53Wrap { display:flex; flex-direction:column; gap:16px; }
+.p53KpiRow { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:12px; }
+.p53Kpi { background:var(--bg-subtle); border-radius:8px; padding:12px 16px; flex:1; min-width:120px; }
+.p53KpiVal { display:block; font-size:22px; font-weight:700; color:var(--accent); }
+.p53KpiLabel { display:block; font-size:12px; color:var(--text-secondary); margin-top:2px; }
+.p53TopRow { display:flex; align-items:center; gap:8px; padding-top:8px; border-top:1px solid var(--border); }
+.p53TopLabel { font-size:13px; color:var(--text-secondary); }
+.p53MonthList { display:flex; flex-direction:column; gap:8px; }
+.p53MonthRow { display:flex; align-items:center; gap:8px; }
+.p53MonthLabel { width:64px; font-size:12px; color:var(--text-secondary); }
+.p53Track { flex:1; height:10px; background:var(--bg-subtle); border-radius:5px; overflow:hidden; }
+.p53Fill { height:100%; border-radius:5px; transition:width .3s; }
+.p53Count { width:32px; text-align:right; font-size:12px; color:var(--text-secondary); }
+
+/* ── Phase 54 ──────────────────────────────────────────────────────────────── */
+.p54Wrap { display:flex; flex-direction:column; gap:16px; }
+.p54KpiRow { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:12px; }
+.p54Kpi { background:var(--bg-subtle); border-radius:8px; padding:12px 16px; flex:1; min-width:120px; }
+.p54KpiVal { display:block; font-size:22px; font-weight:700; color:var(--accent); }
+.p54KpiLabel { display:block; font-size:12px; color:var(--text-secondary); margin-top:2px; }
+.p54MethodList { display:flex; flex-direction:column; gap:8px; }
+.p54MethodRow { display:flex; align-items:center; gap:8px; }
+.p54MethodName { width:56px; font-size:13px; color:var(--text-secondary); }
+.p54Track { flex:1; height:10px; background:var(--bg-subtle); border-radius:5px; overflow:hidden; }
+.p54Fill { height:100%; background:var(--accent); border-radius:5px; transition:width .3s; }
+.p54Pct { width:44px; text-align:right; font-size:12px; color:var(--text-secondary); }
+.p54Count { width:48px; text-align:right; font-size:11px; color:var(--text-tertiary); }
+.p54SeasonList { display:flex; flex-direction:column; gap:8px; }
+.p54SeasonRow { display:flex; align-items:center; gap:8px; }
+.p54SeasonName { width:40px; font-size:13px; color:var(--text-secondary); }
+.p54Rev { width:72px; text-align:right; font-size:11px; color:var(--text-tertiary); }
+
+/* ── Phase 55 ──────────────────────────────────────────────────────────────── */
+.p55Wrap { display:flex; flex-direction:column; gap:16px; }
+.p55KpiRow { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+.p55Kpi { background:var(--bg-subtle); border-radius:8px; padding:12px 16px; flex:1; min-width:100px; }
+.p55KpiVal { display:block; font-size:22px; font-weight:700; color:var(--accent); }
+.p55KpiLabel { display:block; font-size:12px; color:var(--text-secondary); margin-top:2px; }
+.p55RatioBar { display:flex; height:14px; border-radius:7px; overflow:hidden; margin:12px 0 4px; background:var(--bg-subtle); }
+.p55WinFill { height:100%; background:var(--green,#22c55e); transition:width .3s; }
+.p55LossFill { height:100%; background:var(--red,#ef4444); transition:width .3s; }
+.p55RatioLegend { display:flex; gap:16px; font-size:12px; }
+.p55LegendWin { color:var(--green,#22c55e); }
+.p55LegendLoss { color:var(--red,#ef4444); }
+.p55MonthList { display:flex; flex-direction:column; gap:8px; }
+.p55MonthRow { display:flex; align-items:center; gap:8px; }
+.p55MonthLabel { width:64px; font-size:12px; color:var(--text-secondary); }
+.p55Track { flex:1; height:10px; background:var(--bg-subtle); border-radius:5px; overflow:hidden; }
+.p55Fill { height:100%; border-radius:5px; transition:width .3s; }
+.p55Count { width:32px; text-align:right; font-size:12px; color:var(--text-secondary); }
+
+/* ── Phase 56 ──────────────────────────────────────────────────────────────── */
+.p56Wrap { display:flex; flex-direction:column; gap:16px; }
+.p56KpiRow { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:12px; }
+.p56Kpi { background:var(--bg-subtle); border-radius:8px; padding:12px 16px; flex:1; min-width:120px; }
+.p56KpiVal { display:block; font-size:22px; font-weight:700; color:var(--accent); }
+.p56KpiLabel { display:block; font-size:12px; color:var(--text-secondary); margin-top:2px; }
+.p56FunnelList { display:flex; flex-direction:column; gap:8px; }
+.p56FunnelRow { display:flex; align-items:center; gap:8px; }
+.p56StageName { width:72px; font-size:12px; color:var(--text-secondary); }
+.p56Track { flex:1; height:10px; background:var(--bg-subtle); border-radius:5px; overflow:hidden; }
+.p56Fill { height:100%; border-radius:5px; transition:width .3s; background:var(--accent-muted); }
+.p56Count { width:32px; text-align:right; font-size:12px; color:var(--text-secondary); }
+.p56Pct { width:40px; text-align:right; font-size:11px; color:var(--text-tertiary); }
+.p56MonthList { display:flex; flex-direction:column; gap:8px; }
+.p56MonthRow { display:flex; align-items:center; gap:8px; }
+.p56MonthLabel { width:64px; font-size:12px; color:var(--text-secondary); }
+.p56Rev { width:72px; text-align:right; font-size:12px; font-weight:600; }
+.p56SmCount { width:36px; text-align:right; font-size:11px; color:var(--text-tertiary); }
+
+/* ── Phase 57 ── */
+.p57Wrap { display:flex; flex-direction:column; gap:16px; }
+.p57KpiRow { display:flex; gap:16px; margin-bottom:16px; }
+.p57Kpi { flex:1; display:flex; flex-direction:column; align-items:center; padding:12px; background:var(--surface-2); border-radius:8px; }
+.p57KpiVal { font-size:20px; font-weight:700; color:var(--accent); }
+.p57KpiLabel { font-size:12px; color:var(--text-secondary); margin-top:4px; }
+.p57ChannelList { display:flex; flex-direction:column; gap:8px; }
+.p57ChannelRow { display:flex; align-items:center; gap:8px; }
+.p57ChannelName { width:56px; font-size:13px; color:var(--text-primary); }
+.p57Track { flex:1; height:8px; background:var(--surface-3); border-radius:4px; overflow:hidden; }
+.p57Fill { height:100%; background:var(--accent); border-radius:4px; }
+.p57Rev { width:72px; text-align:right; font-size:12px; font-weight:600; }
+.p57SmCount { width:36px; text-align:right; font-size:11px; color:var(--text-tertiary); }
+.p57BucketList { display:flex; flex-direction:column; gap:8px; }
+.p57BucketRow { display:flex; align-items:center; gap:8px; }
+.p57BucketName { width:80px; font-size:13px; color:var(--text-primary); }
+.p57CancelFill { height:100%; background:#ef4444; border-radius:4px; }
+.p57BucketCount { width:40px; text-align:right; font-size:12px; font-weight:600; }
+.p57BucketPct { width:40px; text-align:right; font-size:11px; color:var(--text-tertiary); }
+
+/* ── Phase 58 ── */
+.p58Wrap { display:flex; flex-direction:column; gap:16px; }
+.p58KpiRow { display:flex; gap:16px; margin-bottom:16px; }
+.p58Kpi { flex:1; display:flex; flex-direction:column; align-items:center; padding:12px; background:var(--surface-2); border-radius:8px; }
+.p58KpiVal { font-size:20px; font-weight:700; color:var(--accent); }
+.p58KpiLabel { font-size:12px; color:var(--text-secondary); margin-top:4px; }
+.p58BarWrap { display:flex; flex-direction:column; gap:6px; }
+.p58BarLabel { display:flex; justify-content:space-between; font-size:12px; color:var(--text-secondary); }
+.p58Track { display:flex; height:16px; border-radius:8px; overflow:hidden; background:var(--surface-3); }
+.p58CompletedFill { height:100%; background:#22c55e; transition:width 0.4s; }
+.p58InProgressFill { height:100%; background:#f59e0b; transition:width 0.4s; }
+.p58TypeList { display:flex; flex-direction:column; gap:8px; }
+.p58TypeRow { display:flex; align-items:center; gap:8px; }
+.p58TypeName { width:72px; font-size:13px; color:var(--text-primary); }
+.p58ExcFill { height:100%; background:#ef4444; border-radius:4px; }
+.p58TypeCount { width:44px; text-align:right; font-size:12px; font-weight:600; }
+.p58TypePct { width:40px; text-align:right; font-size:11px; color:var(--text-tertiary); }
+
+/* ── Phase 59 ── */
+.p59Wrap { display:flex; flex-direction:column; gap:16px; }
+.p59KpiRow { display:flex; gap:16px; margin-bottom:16px; }
+.p59Kpi { flex:1; display:flex; flex-direction:column; align-items:center; padding:12px; background:var(--surface-2); border-radius:8px; }
+.p59KpiVal { font-size:20px; font-weight:700; color:var(--accent); }
+.p59KpiLabel { font-size:12px; color:var(--text-secondary); margin-top:4px; }
+.p59DayList { display:flex; flex-direction:column; gap:8px; }
+.p59DayRow { display:flex; align-items:center; gap:8px; }
+.p59DayName { width:36px; font-size:13px; color:var(--text-primary); text-align:center; }
+.p59Track { flex:1; height:10px; background:var(--surface-3); border-radius:5px; overflow:hidden; }
+.p59DayFill { height:100%; background:var(--accent); border-radius:5px; opacity:0.6; transition:width 0.4s; }
+.p59Peak { opacity:1; }
+.p59DayCount { width:32px; text-align:right; font-size:12px; font-weight:600; }
+.p59DayPct { width:40px; text-align:right; font-size:11px; color:var(--text-tertiary); }
+.p59BarWrap { display:flex; flex-direction:column; gap:6px; }
+.p59BarLabel { display:flex; justify-content:space-between; font-size:12px; color:var(--text-secondary); }
+.p59BarTrack { display:flex; height:16px; border-radius:8px; overflow:hidden; background:var(--surface-3); }
+.p59ClearedFill { height:100%; background:#22c55e; transition:width 0.4s; }
+.p59PartialFill { height:100%; background:#f59e0b; transition:width 0.4s; }

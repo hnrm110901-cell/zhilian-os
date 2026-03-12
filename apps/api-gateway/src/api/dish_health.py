@@ -6,6 +6,7 @@ Prefix: /api/v1/dish-health
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Optional
 
 from src.core.database import get_db
 from src.services.dish_health_service import (
@@ -93,7 +94,7 @@ async def dish_health_history(
 async def list_scores(
     store_id:    str,
     period:      str          = Query(..., description="数据期 YYYY-MM"),
-    health_tier: str | None   = Query(None),
+    health_tier: Optional[str] = Query(None),
     limit:       int          = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
 ):

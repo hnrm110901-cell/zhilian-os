@@ -22,6 +22,8 @@ from pydantic import BaseModel
 import structlog
 import asyncio
 import os
+import secrets
+import hashlib
 
 logger = structlog.get_logger()
 
@@ -56,6 +58,8 @@ class EdgeNodeInfo(BaseModel):
     disk_usage: float  # 磁盘使用率（%）
     temperature: float  # CPU温度（℃）
     uptime_seconds: int  # 运行时长（秒）
+    pending_status_queue: int = 0
+    last_queue_error: Optional[str] = None
     last_sync_time: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
@@ -117,6 +121,135 @@ class RaspberryPiEdgeService:
     def __init__(self):
         self.edge_nodes: Dict[str, EdgeNodeInfo] = {}
         self.local_models: Dict[str, LocalAIModel] = {}
+        self.device_secrets: Dict[str, str] = {}
+
+    @staticmethod
+    def _hash_device_secret(device_secret: str) -> str:
+        return hashlib.sha256(device_secret.encode("utf-8")).hexdigest()
+
+    async def _persist_edge_hub(self, node: EdgeNodeInfo, device_secret_hash: Optional[str] = None) -> None:
+        """Persist edge hub state when DB is available; fall back silently in test/dev without DB."""
+        try:
+            from sqlalchemy import select
+            from src.core.database import get_db_session
+            from src.models.edge_hub import EdgeHub
+
+            async with get_db_session(enable_tenant_isolation=False) as session:
+                existing = await session.execute(select(EdgeHub).where(EdgeHub.id == node.node_id))
+                hub = existing.scalar_one_or_none()
+                if hub is None:
+                    hub = EdgeHub(
+                        id=node.node_id,
+                        store_id=node.store_id,
+                        hub_code=node.node_id,
+                    )
+                    session.add(hub)
+
+                hub.name = node.device_name
+                hub.status = node.status.value if isinstance(node.status, EdgeNodeStatus) else str(node.status)
+                hub.runtime_version = "edge-agent-v1"
+                hub.ip_address = node.ip_address
+                hub.mac_address = node.mac_address
+                hub.network_mode = node.network_mode.value if isinstance(node.network_mode, NetworkMode) else str(node.network_mode)
+                hub.last_heartbeat = node.updated_at
+                hub.cpu_pct = node.cpu_usage
+                hub.mem_pct = node.memory_usage
+                hub.disk_pct = node.disk_usage
+                hub.temperature_c = node.temperature
+                hub.uptime_seconds = node.uptime_seconds
+                hub.pending_status_queue = node.pending_status_queue
+                hub.last_queue_error = node.last_queue_error
+                hub.provisioned_at = hub.provisioned_at or node.created_at
+                hub.is_active = True
+                if device_secret_hash:
+                    hub.device_secret_hash = device_secret_hash
+        except Exception as exc:
+            logger.warning("持久化边缘节点失败，回退到内存态", error=str(exc), node_id=node.node_id)
+
+    async def _load_edge_hub(self, node_id: str) -> Optional[EdgeNodeInfo]:
+        try:
+            from sqlalchemy import select
+            from src.core.database import get_db_session
+            from src.models.edge_hub import EdgeHub
+
+            async with get_db_session(enable_tenant_isolation=False) as session:
+                result = await session.execute(select(EdgeHub).where(EdgeHub.id == node_id))
+                hub = result.scalar_one_or_none()
+                if hub is None:
+                    return None
+
+                node = EdgeNodeInfo(
+                    node_id=hub.id,
+                    store_id=hub.store_id,
+                    device_name=hub.name or hub.hub_code,
+                    hardware_model=self.HARDWARE_SPECS["model"],
+                    ip_address=hub.ip_address or "",
+                    mac_address=hub.mac_address or "",
+                    status=EdgeNodeStatus(hub.status or EdgeNodeStatus.OFFLINE.value),
+                    network_mode=NetworkMode(hub.network_mode or NetworkMode.CLOUD.value),
+                    cpu_usage=hub.cpu_pct or 0.0,
+                    memory_usage=hub.mem_pct or 0.0,
+                    disk_usage=hub.disk_pct or 0.0,
+                    temperature=hub.temperature_c or 0.0,
+                    uptime_seconds=hub.uptime_seconds or 0,
+                    pending_status_queue=hub.pending_status_queue or 0,
+                    last_queue_error=hub.last_queue_error,
+                    last_sync_time=None,
+                    created_at=hub.created_at,
+                    updated_at=hub.updated_at,
+                )
+                self.edge_nodes[node_id] = node
+                return node
+        except Exception as exc:
+            logger.warning("读取边缘节点持久化状态失败", error=str(exc), node_id=node_id)
+            return None
+
+    async def _list_store_hubs(self, store_id: str) -> List[EdgeNodeInfo]:
+        try:
+            from sqlalchemy import select
+            from src.core.database import get_db_session
+            from src.models.edge_hub import EdgeHub
+
+            async with get_db_session(enable_tenant_isolation=False) as session:
+                result = await session.execute(select(EdgeHub).where(EdgeHub.store_id == store_id))
+                hubs = result.scalars().all()
+                nodes: List[EdgeNodeInfo] = []
+                for hub in hubs:
+                    node = EdgeNodeInfo(
+                        node_id=hub.id,
+                        store_id=hub.store_id,
+                        device_name=hub.name or hub.hub_code,
+                        hardware_model=self.HARDWARE_SPECS["model"],
+                        ip_address=hub.ip_address or "",
+                        mac_address=hub.mac_address or "",
+                        status=EdgeNodeStatus(hub.status or EdgeNodeStatus.OFFLINE.value),
+                        network_mode=NetworkMode(hub.network_mode or NetworkMode.CLOUD.value),
+                        cpu_usage=hub.cpu_pct or 0.0,
+                        memory_usage=hub.mem_pct or 0.0,
+                        disk_usage=hub.disk_pct or 0.0,
+                        temperature=hub.temperature_c or 0.0,
+                        uptime_seconds=hub.uptime_seconds or 0,
+                        pending_status_queue=hub.pending_status_queue or 0,
+                        last_queue_error=hub.last_queue_error,
+                        last_sync_time=None,
+                        created_at=hub.created_at,
+                        updated_at=hub.updated_at,
+                    )
+                    self.edge_nodes[node.node_id] = node
+                    nodes.append(node)
+                return nodes
+        except Exception as exc:
+            logger.warning("列出边缘节点持久化状态失败", error=str(exc), store_id=store_id)
+            return []
+
+    async def _ensure_node_loaded(self, node_id: str) -> EdgeNodeInfo:
+        if node_id not in self.edge_nodes:
+            loaded = await self._load_edge_hub(node_id)
+            if loaded is None:
+                raise ValueError(f"边缘节点不存在: {node_id}")
+            self.edge_nodes[node_id] = loaded
+            return loaded
+        return self.edge_nodes[node_id]
 
     async def register_edge_node(
         self,
@@ -153,14 +286,90 @@ class RaspberryPiEdgeService:
             disk_usage=0.0,
             temperature=0.0,
             uptime_seconds=0,
+            pending_status_queue=0,
+            last_queue_error=None,
             created_at=datetime.now(),
             updated_at=datetime.now()
         )
 
         self.edge_nodes[node_id] = node
+        await self._persist_edge_hub(node)
 
         logger.info("边缘节点注册成功", node_id=node_id)
         return node
+
+    def get_or_create_device_secret(self, node_id: str) -> str:
+        """为边缘节点签发设备密钥，用于后续设备侧免人工 JWT 调用。"""
+        if node_id not in self.edge_nodes:
+            raise ValueError(f"边缘节点不存在: {node_id}")
+        secret = self.device_secrets.get(node_id)
+        if secret:
+            return secret
+        secret = secrets.token_urlsafe(32)
+        self.device_secrets[node_id] = secret
+        node = self.edge_nodes.get(node_id)
+        if node is not None:
+            asyncio.create_task(self._persist_edge_hub(node, device_secret_hash=self._hash_device_secret(secret)))
+        return secret
+
+    async def rotate_device_secret(self, node_id: str) -> str:
+        """轮换边缘节点设备密钥，旧密钥立即失效。"""
+        if node_id not in self.edge_nodes:
+            loaded = await self._load_edge_hub(node_id)
+            if loaded is None:
+                raise ValueError(f"边缘节点不存在: {node_id}")
+        secret = secrets.token_urlsafe(32)
+        self.device_secrets[node_id] = secret
+        node = self.edge_nodes[node_id]
+        await self._persist_edge_hub(node, device_secret_hash=self._hash_device_secret(secret))
+        return secret
+
+    async def revoke_device_secret(self, node_id: str) -> None:
+        """吊销边缘节点设备密钥。"""
+        if node_id not in self.edge_nodes:
+            loaded = await self._load_edge_hub(node_id)
+            if loaded is None:
+                raise ValueError(f"边缘节点不存在: {node_id}")
+
+        self.device_secrets.pop(node_id, None)
+        node = self.edge_nodes[node_id]
+
+        try:
+            from sqlalchemy import select
+            from src.core.database import get_db_session
+            from src.models.edge_hub import EdgeHub
+
+            async with get_db_session(enable_tenant_isolation=False) as session:
+                result = await session.execute(select(EdgeHub).where(EdgeHub.id == node_id))
+                hub = result.scalar_one_or_none()
+                if hub is not None:
+                    hub.device_secret_hash = None
+        except Exception as exc:
+            logger.warning("吊销设备密钥持久化失败", error=str(exc), node_id=node_id)
+
+        await self._persist_edge_hub(node)
+
+    async def verify_device_secret(self, node_id: str, device_secret: str) -> bool:
+        """校验边缘节点设备密钥。"""
+        if not device_secret:
+            return False
+        expected = self.device_secrets.get(node_id)
+        if not expected:
+            try:
+                from sqlalchemy import select
+                from src.core.database import get_db_session
+                from src.models.edge_hub import EdgeHub
+
+                expected_hash = self._hash_device_secret(device_secret)
+                async with get_db_session(enable_tenant_isolation=False) as session:
+                    result = await session.execute(select(EdgeHub).where(EdgeHub.id == node_id))
+                    hub = result.scalar_one_or_none()
+                    if hub is None or not hub.device_secret_hash:
+                        return False
+                    return secrets.compare_digest(hub.device_secret_hash, expected_hash)
+            except Exception:
+                return False
+        return secrets.compare_digest(expected, device_secret)
 
     async def update_node_status(
         self,
@@ -169,22 +378,23 @@ class RaspberryPiEdgeService:
         memory_usage: float,
         disk_usage: float,
         temperature: float,
-        uptime_seconds: int
+        uptime_seconds: int,
+        pending_status_queue: int = 0,
+        last_queue_error: Optional[str] = None,
     ) -> EdgeNodeInfo:
         """
         更新节点状态
 
         树莓派5每30秒上报一次状态
         """
-        if node_id not in self.edge_nodes:
-            raise ValueError(f"边缘节点不存在: {node_id}")
-
-        node = self.edge_nodes[node_id]
+        node = await self._ensure_node_loaded(node_id)
         node.cpu_usage = cpu_usage
         node.memory_usage = memory_usage
         node.disk_usage = disk_usage
         node.temperature = temperature
         node.uptime_seconds = uptime_seconds
+        node.pending_status_queue = pending_status_queue
+        node.last_queue_error = last_queue_error
         node.updated_at = datetime.now()
 
         # 健康检查
@@ -195,6 +405,7 @@ class RaspberryPiEdgeService:
         if cpu_usage > float(os.getenv("EDGE_CPU_ALERT_THRESHOLD", "90")) or memory_usage > float(os.getenv("EDGE_MEMORY_ALERT_THRESHOLD", "90")):
             logger.warning("边缘节点资源紧张", node_id=node_id, cpu=cpu_usage, memory=memory_usage)
 
+        await self._persist_edge_hub(node)
         return node
 
     async def switch_network_mode(
@@ -209,10 +420,7 @@ class RaspberryPiEdgeService:
         - EDGE: 边缘模式（离线工作，本地AI推理）
         - HYBRID: 混合模式（云边协同，智能路由）
         """
-        if node_id not in self.edge_nodes:
-            raise ValueError(f"边缘节点不存在: {node_id}")
-
-        node = self.edge_nodes[node_id]
+        node = await self._ensure_node_loaded(node_id)
         old_mode = node.network_mode
         node.network_mode = mode
         node.updated_at = datetime.now()
@@ -224,6 +432,7 @@ class RaspberryPiEdgeService:
             new_mode=mode
         )
 
+        await self._persist_edge_hub(node)
         return node
 
     async def load_local_model(
@@ -236,8 +445,7 @@ class RaspberryPiEdgeService:
 
         树莓派5启动时，预加载常用模型
         """
-        if node_id not in self.edge_nodes:
-            raise ValueError(f"边缘节点不存在: {node_id}")
+        await self._ensure_node_loaded(node_id)
 
         if model_type not in self.LOCAL_AI_MODELS:
             raise ValueError(f"不支持的模型类型: {model_type}")
@@ -276,8 +484,7 @@ class RaspberryPiEdgeService:
 
         在树莓派5上运行AI模型，无需联网
         """
-        if node_id not in self.edge_nodes:
-            raise ValueError(f"边缘节点不存在: {node_id}")
+        await self._ensure_node_loaded(node_id)
 
         model_id = f"{node_id}_{model_type}"
         if model_id not in self.local_models:
@@ -355,10 +562,7 @@ class RaspberryPiEdgeService:
         - 下载模型更新
         - 同步配置
         """
-        if node_id not in self.edge_nodes:
-            raise ValueError(f"边缘节点不存在: {node_id}")
-
-        node = self.edge_nodes[node_id]
+        node = await self._ensure_node_loaded(node_id)
         node.status = EdgeNodeStatus.SYNCING
         node.updated_at = datetime.now()
 
@@ -408,6 +612,7 @@ class RaspberryPiEdgeService:
 
         node.status = EdgeNodeStatus.ONLINE
         node.last_sync_time = datetime.now()
+        await self._persist_edge_hub(node)
 
         logger.info("云边同步完成", node_id=node_id, result=sync_result)
 
@@ -418,25 +623,52 @@ class RaspberryPiEdgeService:
         node_id: str
     ) -> EdgeNodeInfo:
         """获取边缘节点信息"""
-        if node_id not in self.edge_nodes:
-            raise ValueError(f"边缘节点不存在: {node_id}")
-
-        return self.edge_nodes[node_id]
+        return await self._ensure_node_loaded(node_id)
 
     async def list_store_nodes(
         self,
         store_id: str
     ) -> List[EdgeNodeInfo]:
         """列出门店的所有边缘节点"""
-        nodes = [
-            node for node in self.edge_nodes.values()
-            if node.store_id == store_id
-        ]
+        nodes = [node for node in self.edge_nodes.values() if node.store_id == store_id]
+        if not nodes:
+            nodes = await self._list_store_hubs(store_id)
         return nodes
 
     async def get_hardware_specs(self) -> Dict:
         """获取硬件规格"""
         return self.HARDWARE_SPECS
+
+    async def get_credential_status(self, node_id: str) -> Dict:
+        """获取边缘节点凭证状态。"""
+        node = await self.get_node_info(node_id)
+        secret_in_memory = bool(self.device_secrets.get(node_id))
+        secret_persisted = False
+        try:
+            from sqlalchemy import select
+            from src.core.database import get_db_session
+            from src.models.edge_hub import EdgeHub
+
+            async with get_db_session(enable_tenant_isolation=False) as session:
+                result = await session.execute(select(EdgeHub).where(EdgeHub.id == node_id))
+                hub = result.scalar_one_or_none()
+                secret_persisted = bool(hub and hub.device_secret_hash)
+                provisioned_at = hub.provisioned_at if hub else None
+        except Exception:
+            provisioned_at = node.created_at
+
+        return {
+            "node_id": node_id,
+            "store_id": node.store_id,
+            "network_mode": node.network_mode.value if isinstance(node.network_mode, NetworkMode) else str(node.network_mode),
+            "device_secret_active": bool(secret_in_memory or secret_persisted),
+            "device_secret_in_memory": secret_in_memory,
+            "device_secret_persisted": secret_persisted,
+            "last_heartbeat": node.updated_at.isoformat() if node.updated_at else None,
+            "provisioned_at": provisioned_at.isoformat() if provisioned_at else None,
+            "pending_status_queue": node.pending_status_queue,
+            "last_queue_error": node.last_queue_error,
+        }
 
     async def get_deployment_cost(self) -> Dict:
         """

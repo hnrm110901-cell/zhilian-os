@@ -385,6 +385,7 @@ async def config_validation(
         "FEISHU_APP_ID": bool(settings.FEISHU_APP_ID),
         "FEISHU_APP_SECRET": bool(settings.FEISHU_APP_SECRET),
         "FEISHU_VERIFICATION_TOKEN": bool(settings.FEISHU_VERIFICATION_TOKEN),
+        "FEISHU_ENCRYPT_KEY": bool(settings.FEISHU_ENCRYPT_KEY),
     }
 
     # 可选配置 - 奥琦韦

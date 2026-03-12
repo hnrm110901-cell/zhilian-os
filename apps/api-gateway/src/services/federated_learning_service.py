@@ -20,6 +20,10 @@ logger = structlog.get_logger()
 
 class ModelType(str, Enum):
     """模型类型"""
+    # 新命名（与测试/业务文案一致）
+    DEMAND_FORECAST = "demand_forecast"
+    RECOMMENDATION = "recommendation"
+    # 兼容旧命名
     SALES_FORECAST = "sales_forecast"
     DEMAND_PREDICTION = "demand_prediction"
     CUSTOMER_SEGMENTATION = "customer_segmentation"
@@ -305,10 +309,13 @@ class FederatedLearningService(BaseService):
             num_parameters=len(global_parameters),
         )
 
-        return {
+        result = {
             "parameters": global_parameters,
             "aggregation_method": "fedavg",
         }
+        # 兼容历史调用方：可直接按参数名读取，如 result["w"]
+        result.update(global_parameters)
+        return result
 
     def _weighted_aggregation(
         self,
@@ -355,11 +362,14 @@ class FederatedLearningService(BaseService):
             weights=normalized_weights,
         )
 
-        return {
+        result = {
             "parameters": global_parameters,
             "aggregation_method": "weighted_avg",
             "weights": normalized_weights,
         }
+        # 兼容历史调用方：可直接按参数名读取，如 result["w"]
+        result.update(global_parameters)
+        return result
 
     def _apply_differential_privacy(
         self,
@@ -560,9 +570,9 @@ class FederatedLearningCoordinator:
     async def start_training_round(
         self,
         model_type: ModelType,
-        target_stores: List[str],
-        config: Dict[str, Any],
-    ) -> str:
+        config: Optional[Dict[str, Any]] = None,
+        target_stores: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
         """
         启动训练轮次
 
@@ -572,10 +582,10 @@ class FederatedLearningCoordinator:
             config: 训练配置
 
         Returns:
-            训练轮次ID
+            训练轮次信息
         """
         service = FederatedLearningService()
-        training_round = await service.create_training_round(model_type, config)
+        training_round = await service.create_training_round(model_type, config or {})
 
         round_id = training_round["round_id"]
         self.active_rounds[round_id] = training_round
@@ -584,10 +594,10 @@ class FederatedLearningCoordinator:
             "Training round started",
             round_id=round_id,
             model_type=model_type,
-            num_target_stores=len(target_stores),
+            num_target_stores=len(target_stores or []),
         )
 
-        return round_id
+        return training_round
 
     async def monitor_training_progress(
         self,

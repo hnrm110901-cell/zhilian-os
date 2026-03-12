@@ -16,8 +16,8 @@ Supplier Intelligence System：
 from alembic import op
 import sqlalchemy as sa
 
-revision      = 'z37'
-down_revision = 'z36'
+revision      = 'z37_supplier_agent_tables'
+down_revision = 'z37_banquet_revenue_target'
 branch_labels = None
 depends_on    = None
 

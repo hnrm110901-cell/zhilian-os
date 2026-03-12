@@ -11,7 +11,7 @@ Create Date: 2026-03-01
 3. super_admin / system_admin 豁免两层隔离
 4. 创建 set_current_brand() / clear_current_brand() PG 辅助函数
 """
-from alembic import op
+from alembic import op, context
 import re
 import sqlalchemy as sa
 
@@ -56,6 +56,8 @@ TENANT_TABLES = [
 
 
 def _table_exists(table_name: str) -> bool:
+    if context.is_offline_mode():
+        return True
     conn = op.get_bind()
     result = conn.execute(
         sa.text(
@@ -67,6 +69,9 @@ def _table_exists(table_name: str) -> bool:
 
 
 def _column_exists(table_name: str, column_name: str) -> bool:
+    if context.is_offline_mode():
+        # During offline export, only the stores/users branch needs a stable answer.
+        return False
     conn = op.get_bind()
     result = conn.execute(
         sa.text(

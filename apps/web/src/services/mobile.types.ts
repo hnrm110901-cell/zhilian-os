@@ -46,6 +46,13 @@ export interface TaskSummaryResponse {
   tasks: MobileTask[];
 }
 
+export interface MobileEdgeHubStatus {
+  hub_online: boolean;
+  open_alert_count: number;
+  p1_alert_count: number;
+  last_heartbeat: string | null;
+}
+
 export interface MobileHomeSummaryResponse {
   store_id: string;
   as_of: string;
@@ -60,6 +67,7 @@ export interface MobileHomeSummaryResponse {
   weakest_dimension?: string;
   today_shift: MobileShift | null;
   top_tasks: MobileTask[];
+  edge_hub_status?: MobileEdgeHubStatus | null;
 }
 
 export interface MobileActionResult {

@@ -17,10 +17,11 @@ Shokz设备集成服务 (Shokz Device Integration Service)
 5. 多设备管理（店长、副店长、厨师长）
 """
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from enum import Enum
 from pydantic import BaseModel
 import os
+import httpx
 import structlog
 
 logger = structlog.get_logger()
@@ -152,6 +153,58 @@ class ShokzDeviceService:
         self.devices: Dict[str, ShokzDeviceInfo] = {}
         self.interactions: List[VoiceInteraction] = []
 
+    def _get_edge_callback_config(self) -> Dict[str, Any]:
+        return {
+            "url": os.getenv("EDGE_SHOKZ_CALLBACK_URL", "").strip(),
+            "secret": os.getenv("EDGE_SHOKZ_CALLBACK_SECRET", "").strip(),
+            "timeout": float(os.getenv("EDGE_SHOKZ_CALLBACK_TIMEOUT", "10.0")),
+        }
+
+    async def _notify_edge_callback(
+        self,
+        action: str,
+        device: ShokzDeviceInfo,
+        payload: Optional[Dict[str, Any]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        callback = self._get_edge_callback_config()
+        if not callback["url"]:
+            return None
+
+        headers = {"Content-Type": "application/json"}
+        if callback["secret"]:
+            headers["X-Edge-Callback-Secret"] = callback["secret"]
+
+        request_body = {
+            "action": action,
+            "device_id": device.device_id,
+            "store_id": device.store_id,
+            "edge_node_id": device.edge_node_id,
+            "device_name": device.device_name,
+            "mac_address": device.mac_address,
+            "user_id": device.user_id,
+            "user_role": device.user_role,
+            "payload": payload or {},
+            "requested_at": datetime.now().isoformat(),
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=callback["timeout"]) as client:
+                response = await client.post(callback["url"], json=request_body, headers=headers)
+                response.raise_for_status()
+                data = response.json()
+                if not data.get("success", False):
+                    raise RuntimeError(f"edge callback rejected action={action}: {data}")
+                return data
+        except Exception as exc:
+            logger.error(
+                "Shokz edge callback failed",
+                action=action,
+                device_id=device.device_id,
+                edge_node_id=device.edge_node_id,
+                error=str(exc),
+            )
+            raise RuntimeError(f"edge callback failed for {action}: {exc}") from exc
+
     async def register_device(
         self,
         device_name: str,
@@ -210,6 +263,7 @@ class ShokzDeviceService:
             raise ValueError(f"设备不存在: {device_id}")
 
         device = self.devices[device_id]
+        callback_result = await self._notify_edge_callback("connect_device", device)
         device.status = DeviceStatus.CONNECTED
         device.connected_at = datetime.now()
         device.updated_at = datetime.now()
@@ -217,7 +271,8 @@ class ShokzDeviceService:
         logger.info(
             "Shokz设备已连接",
             device_id=device_id,
-            device_name=device.device_name
+            device_name=device.device_name,
+            edge_callback=bool(callback_result)
         )
 
         return device
@@ -231,10 +286,11 @@ class ShokzDeviceService:
             raise ValueError(f"设备不存在: {device_id}")
 
         device = self.devices[device_id]
+        callback_result = await self._notify_edge_callback("disconnect_device", device)
         device.status = DeviceStatus.DISCONNECTED
         device.updated_at = datetime.now()
 
-        logger.info("Shokz设备已断开", device_id=device_id)
+        logger.info("Shokz设备已断开", device_id=device_id, edge_callback=bool(callback_result))
         return device
 
     async def update_battery_level(
@@ -385,14 +441,24 @@ class ShokzDeviceService:
             logger.error("TTS合成失败", error=str(e))
             audio_data = ""
 
-        # 通过蓝牙发送到Shokz耳机
+        callback_result = await self._notify_edge_callback(
+            "voice_output",
+            device,
+            {
+                "text": text,
+                "priority": priority,
+                "audio_data": audio_data,
+            },
+        )
+
         result = {
             "device_id": device_id,
             "text": text,
             "audio_data": audio_data,
             "priority": priority,
             "sent_at": datetime.now(),
-            "success": True
+            "success": True,
+            "edge_callback": callback_result or {"success": False, "message": "not_configured"},
         }
 
         return result

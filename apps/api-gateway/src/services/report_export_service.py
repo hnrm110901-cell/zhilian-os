@@ -70,6 +70,36 @@ class ReportExportService:
         self, data: Dict[str, Any], start_date: datetime, end_date: datetime
     ) -> bytes:
         """生成损益表CSV"""
+        def _num(*keys: str, default: float = 0.0) -> float:
+            for key in keys:
+                value = data.get(key)
+                if value is not None:
+                    return float(value)
+            return float(default)
+
+        total_revenue = _num("total_revenue", default=_num("revenue") + _num("other_income"))
+        cogs = _num("cost_of_goods_sold", "cost_of_goods")
+        gross_profit = _num("gross_profit", default=total_revenue - cogs)
+        total_expenses = _num(
+            "total_expenses",
+            "operating_expenses",
+            default=_num("labor_cost") + _num("rent") + _num("utilities") + _num("marketing") + _num("other_expenses"),
+        )
+        operating_profit = _num("operating_profit", default=gross_profit - total_expenses)
+        net_profit = _num("net_profit", default=operating_profit)
+        gross_profit_margin = _num(
+            "gross_profit_margin",
+            default=(gross_profit / total_revenue * 100) if total_revenue else 0.0,
+        )
+        operating_profit_margin = _num(
+            "operating_profit_margin",
+            default=(operating_profit / total_revenue * 100) if total_revenue else 0.0,
+        )
+        net_profit_margin = _num(
+            "net_profit_margin",
+            default=(net_profit / total_revenue * 100) if total_revenue else 0.0,
+        )
+
         output = io.StringIO()
         writer = csv.writer(output)
 
@@ -80,34 +110,34 @@ class ReportExportService:
 
         # 写入收入部分
         writer.writerow(["收入"])
-        writer.writerow(["营业收入", f"¥{data['revenue']:,.2f}"])
-        writer.writerow(["其他收入", f"¥{data.get('other_income', 0):,.2f}"])
-        writer.writerow(["总收入", f"¥{data['total_revenue']:,.2f}"])
+        writer.writerow(["营业收入", f"¥{_num('revenue'):,.2f}"])
+        writer.writerow(["其他收入", f"¥{_num('other_income'):,.2f}"])
+        writer.writerow(["总收入", f"¥{total_revenue:,.2f}"])
         writer.writerow([])
 
         # 写入成本部分
         writer.writerow(["成本"])
-        writer.writerow(["营业成本", f"¥{data['cost_of_goods_sold']:,.2f}"])
-        writer.writerow(["毛利润", f"¥{data['gross_profit']:,.2f}"])
-        writer.writerow(["毛利率", f"{data['gross_profit_margin']:.2f}%"])
+        writer.writerow(["营业成本", f"¥{cogs:,.2f}"])
+        writer.writerow(["毛利润", f"¥{gross_profit:,.2f}"])
+        writer.writerow(["毛利率", f"{gross_profit_margin:.2f}%"])
         writer.writerow([])
 
         # 写入费用部分
         writer.writerow(["费用"])
-        writer.writerow(["人工成本", f"¥{data['labor_cost']:,.2f}"])
-        writer.writerow(["租金", f"¥{data['rent']:,.2f}"])
-        writer.writerow(["水电费", f"¥{data['utilities']:,.2f}"])
-        writer.writerow(["营销费用", f"¥{data['marketing']:,.2f}"])
-        writer.writerow(["其他费用", f"¥{data['other_expenses']:,.2f}"])
-        writer.writerow(["总费用", f"¥{data['total_expenses']:,.2f}"])
+        writer.writerow(["人工成本", f"¥{_num('labor_cost'):,.2f}"])
+        writer.writerow(["租金", f"¥{_num('rent'):,.2f}"])
+        writer.writerow(["水电费", f"¥{_num('utilities'):,.2f}"])
+        writer.writerow(["营销费用", f"¥{_num('marketing'):,.2f}"])
+        writer.writerow(["其他费用", f"¥{_num('other_expenses'):,.2f}"])
+        writer.writerow(["总费用", f"¥{total_expenses:,.2f}"])
         writer.writerow([])
 
         # 写入利润部分
         writer.writerow(["利润"])
-        writer.writerow(["营业利润", f"¥{data['operating_profit']:,.2f}"])
-        writer.writerow(["营业利润率", f"{data['operating_profit_margin']:.2f}%"])
-        writer.writerow(["净利润", f"¥{data['net_profit']:,.2f}"])
-        writer.writerow(["净利润率", f"{data['net_profit_margin']:.2f}%"])
+        writer.writerow(["营业利润", f"¥{operating_profit:,.2f}"])
+        writer.writerow(["营业利润率", f"{operating_profit_margin:.2f}%"])
+        writer.writerow(["净利润", f"¥{net_profit:,.2f}"])
+        writer.writerow(["净利润率", f"{net_profit_margin:.2f}%"])
 
         return output.getvalue().encode('utf-8-sig')
 
@@ -115,6 +145,13 @@ class ReportExportService:
         self, data: Dict[str, Any], start_date: datetime, end_date: datetime
     ) -> bytes:
         """生成现金流量表CSV"""
+        def _num(*keys: str, default: float = 0.0) -> float:
+            for key in keys:
+                value = data.get(key)
+                if value is not None:
+                    return float(value)
+            return float(default)
+
         output = io.StringIO()
         writer = csv.writer(output)
 
@@ -125,29 +162,29 @@ class ReportExportService:
 
         # 经营活动现金流
         writer.writerow(["经营活动现金流"])
-        writer.writerow(["销售收入", f"¥{data['cash_from_sales']:,.2f}"])
-        writer.writerow(["采购支出", f"¥{data['cash_for_purchases']:,.2f}"])
-        writer.writerow(["工资支出", f"¥{data['cash_for_salaries']:,.2f}"])
-        writer.writerow(["其他经营支出", f"¥{data['cash_for_operations']:,.2f}"])
-        writer.writerow(["经营活动净现金流", f"¥{data['operating_cash_flow']:,.2f}"])
+        writer.writerow(["销售收入", f"¥{_num('cash_from_sales'):,.2f}"])
+        writer.writerow(["采购支出", f"¥{_num('cash_for_purchases'):,.2f}"])
+        writer.writerow(["工资支出", f"¥{_num('cash_for_salaries'):,.2f}"])
+        writer.writerow(["其他经营支出", f"¥{_num('cash_for_operations'):,.2f}"])
+        writer.writerow(["经营活动净现金流", f"¥{_num('operating_cash_flow'):,.2f}"])
         writer.writerow([])
 
         # 投资活动现金流
         writer.writerow(["投资活动现金流"])
-        writer.writerow(["设备采购", f"¥{data['cash_for_investments']:,.2f}"])
-        writer.writerow(["投资活动净现金流", f"¥{data['investing_cash_flow']:,.2f}"])
+        writer.writerow(["设备采购", f"¥{_num('cash_for_investments'):,.2f}"])
+        writer.writerow(["投资活动净现金流", f"¥{_num('investing_cash_flow'):,.2f}"])
         writer.writerow([])
 
         # 筹资活动现金流
         writer.writerow(["筹资活动现金流"])
-        writer.writerow(["融资收入", f"¥{data['cash_from_financing']:,.2f}"])
-        writer.writerow(["筹资活动净现金流", f"¥{data['financing_cash_flow']:,.2f}"])
+        writer.writerow(["融资收入", f"¥{_num('cash_from_financing'):,.2f}"])
+        writer.writerow(["筹资活动净现金流", f"¥{_num('financing_cash_flow'):,.2f}"])
         writer.writerow([])
 
         # 现金净变动
-        writer.writerow(["现金净变动", f"¥{data['net_cash_flow']:,.2f}"])
-        writer.writerow(["期初现金", f"¥{data['beginning_cash']:,.2f}"])
-        writer.writerow(["期末现金", f"¥{data['ending_cash']:,.2f}"])
+        writer.writerow(["现金净变动", f"¥{_num('net_cash_flow'):,.2f}"])
+        writer.writerow(["期初现金", f"¥{_num('beginning_cash'):,.2f}"])
+        writer.writerow(["期末现金", f"¥{_num('ending_cash'):,.2f}"])
 
         return output.getvalue().encode('utf-8-sig')
 
@@ -156,6 +193,8 @@ class ReportExportService:
         output = io.StringIO()
         writer = csv.writer(output)
 
+        writer.writerow(["交易记录"])
+        writer.writerow([])
         # 写入表头
         writer.writerow([
             "日期", "类型", "分类", "金额", "描述", "门店ID", "参考编号"
@@ -163,11 +202,12 @@ class ReportExportService:
 
         # 写入数据
         for trans in transactions:
+            trans_date = trans.get('transaction_date') or trans.get('date') or datetime.utcnow()
             writer.writerow([
-                trans['transaction_date'].strftime('%Y-%m-%d %H:%M:%S'),
-                trans['transaction_type'],
-                trans['category'],
-                f"¥{trans['amount']:,.2f}",
+                trans_date.strftime('%Y-%m-%d %H:%M:%S') if hasattr(trans_date, "strftime") else str(trans_date),
+                trans.get('transaction_type', trans.get('type', '')),
+                trans.get('category', ''),
+                f"¥{float(trans.get('amount', 0)):,.2f}",
                 trans.get('description', ''),
                 trans.get('store_id', ''),
                 trans.get('reference_number', '')

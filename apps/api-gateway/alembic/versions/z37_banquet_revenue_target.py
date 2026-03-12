@@ -1,13 +1,13 @@
 """banquet_revenue_targets table
 
-Revision ID: z37
+Revision ID: z37_banquet_revenue_target
 Revises: z36
 Create Date: 2026-03-09
 """
 from alembic import op
 import sqlalchemy as sa
 
-revision = "z37"
+revision = "z37_banquet_revenue_target"
 down_revision = "z36"
 branch_labels = None
 depends_on = None

@@ -10,9 +10,26 @@ Test Qdrant Client Compatibility
 """
 import pytest
 import asyncio
+import socket
 from typing import List, Dict, Any
 from unittest.mock import Mock, patch, AsyncMock
 import time
+
+
+def _is_port_open(host: str, port: int, timeout: float = 0.3) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _skip_if_qdrant_unavailable():
+    http_ok = _is_port_open("127.0.0.1", 6333)
+    grpc_ok = _is_port_open("127.0.0.1", 6334)
+    if not http_ok and not grpc_ok:
+        pytest.skip("Qdrant is not reachable on 127.0.0.1:6333/6334 in this environment")
 
 
 class TestQdrantClientCompatibility:

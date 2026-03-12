@@ -27,7 +27,7 @@ Covers all ORM models that had no migration, in dependency order:
   20. report_templates      (report_template.py) — FK: users
   21. scheduled_reports     (report_template.py) — FK: report_templates, users
 """
-from alembic import op
+from alembic import op, context
 import sqlalchemy as sa
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.dialects import postgresql
@@ -39,8 +39,11 @@ depends_on = None
 
 
 def upgrade() -> None:
-    bind = op.get_bind()
-    existing_tables = set(sa_inspect(bind).get_table_names())
+    if context.is_offline_mode():
+        existing_tables = set()
+    else:
+        bind = op.get_bind()
+        existing_tables = set(sa_inspect(bind).get_table_names())
 
     # ── 1. audit_logs ─────────────────────────────────────────────────────────
     op.create_table(
@@ -225,7 +228,7 @@ def upgrade() -> None:
             sa.Column('ai_confidence',    sa.Float()),
             sa.Column('ai_reasoning',     sa.Text()),
             sa.Column('ai_alternatives',  sa.JSON()),
-            sa.Column('manager_id',       sa.String(36),   sa.ForeignKey('users.id')),
+            sa.Column('manager_id',       postgresql.UUID(as_uuid=True), sa.ForeignKey('users.id')),
             sa.Column('manager_decision', sa.JSON()),
             sa.Column('manager_feedback', sa.Text()),
             sa.Column('decision_status',  sa.String(20),   server_default='pending'),

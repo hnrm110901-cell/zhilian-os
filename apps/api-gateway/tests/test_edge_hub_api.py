@@ -774,3 +774,124 @@ class TestBulkAlertAction:
 
         assert result["data"]["affected"] == 1
         assert open_alert.status == AlertStatus.RESOLVED
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# POST /api/v1/edge-hub/nodes/{hub_id}/heartbeat
+# ════════════════════════════════════════════════════════════════════════════════
+
+class TestReceiveHeartbeat:
+
+    @pytest.mark.asyncio
+    async def test_happy_path_updates_hub_fields(self):
+        """Heartbeat updates last_heartbeat, status, cpu/mem/disk and commits."""
+        from src.api.edge_hub import receive_heartbeat, HeartbeatPayload
+
+        hub = _make_hub(status="offline")
+        db  = _make_db(
+            _scalar_one_or_none(hub),   # hub lookup
+        )
+        db.commit = AsyncMock()
+
+        payload = HeartbeatPayload(
+            status="online",
+            runtime_version="1.5.0",
+            ip_address="10.0.0.1",
+            cpu_pct=55.5,
+            mem_pct=70.0,
+            disk_pct=40.0,
+        )
+
+        result = await receive_heartbeat(
+            hub_id="hub-001", body=payload, db=db, x_hub_secret=None,
+        )
+
+        assert hub.status          == "online"
+        assert hub.runtime_version == "1.5.0"
+        assert hub.ip_address      == "10.0.0.1"
+        assert hub.cpu_pct         == 55.5
+        assert hub.mem_pct         == 70.0
+        assert hub.disk_pct        == 40.0
+        assert hub.last_heartbeat  is not None
+        assert result["code"] == 0
+        db.commit.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_no_status_in_body_implicitly_sets_online(self):
+        """If body.status is None, hub gets status=online (it's sending a heartbeat)."""
+        from src.api.edge_hub import receive_heartbeat, HeartbeatPayload
+        from src.models.edge_hub import HubStatus
+
+        hub = _make_hub(status="offline")
+        db  = _make_db(_scalar_one_or_none(hub))
+        db.commit = AsyncMock()
+
+        await receive_heartbeat(
+            hub_id="hub-001", body=HeartbeatPayload(), db=db, x_hub_secret=None,
+        )
+
+        assert hub.status == HubStatus.ONLINE
+
+    @pytest.mark.asyncio
+    async def test_hub_not_found_raises_404(self):
+        """Unknown hub_id returns 404."""
+        from src.api.edge_hub import receive_heartbeat, HeartbeatPayload
+        from fastapi import HTTPException
+
+        db = _make_db(_scalar_one_or_none(None))
+        db.commit = AsyncMock()
+
+        with pytest.raises(HTTPException) as exc_info:
+            await receive_heartbeat(
+                hub_id="missing", body=HeartbeatPayload(), db=db, x_hub_secret=None,
+            )
+        assert exc_info.value.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_wrong_secret_raises_401(self):
+        """Mismatched X-Hub-Secret header rejects request with 401."""
+        import os as _os
+        from src.api.edge_hub import receive_heartbeat, HeartbeatPayload
+        from fastapi import HTTPException
+        import src.api.edge_hub as eh_module
+
+        original_secret = eh_module._HUB_SECRET
+        eh_module._HUB_SECRET = "correct-secret"
+        try:
+            db = _make_db()
+            db.commit = AsyncMock()
+            with pytest.raises(HTTPException) as exc_info:
+                await receive_heartbeat(
+                    hub_id="hub-001", body=HeartbeatPayload(),
+                    db=db, x_hub_secret="wrong-secret",
+                )
+            assert exc_info.value.status_code == 401
+        finally:
+            eh_module._HUB_SECRET = original_secret
+
+    @pytest.mark.asyncio
+    async def test_device_status_updated_when_provided(self):
+        """Heartbeat with devices[] updates matching EdgeDevice records."""
+        from src.api.edge_hub import receive_heartbeat, HeartbeatPayload
+
+        hub    = _make_hub()
+        device = _make_device(device_code="DEV-001", status="offline")
+
+        db = _make_db(
+            _scalar_one_or_none(hub),     # hub lookup
+            _scalar_one_or_none(device),  # device lookup
+        )
+        db.commit = AsyncMock()
+
+        payload = HeartbeatPayload(
+            devices=[{"device_code": "DEV-001", "status": "online", "firmware_ver": "3.0"}],
+        )
+
+        result = await receive_heartbeat(
+            hub_id="hub-001", body=payload, db=db, x_hub_secret=None,
+        )
+
+        assert device.status      == "online"
+        assert device.firmware_ver == "3.0"
+        assert device.last_seen   is not None
+        assert result["data"]["devicesUpdated"] == 1

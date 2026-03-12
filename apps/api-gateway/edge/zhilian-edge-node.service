@@ -1,0 +1,20 @@
+[Unit]
+Description=Zhilian OS Raspberry Pi Edge Node Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=zhilian-edge
+Group=zhilian-edge
+EnvironmentFile=/etc/zhilian-edge/edge-node.env
+WorkingDirectory=/opt/zhilian-edge
+ExecStart=/usr/bin/python3 /opt/zhilian-edge/edge_node_agent.py
+Restart=always
+RestartSec=5
+StateDirectory=zhilian-edge
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

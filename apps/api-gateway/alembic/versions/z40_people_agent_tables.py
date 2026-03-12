@@ -4,7 +4,7 @@ PeopleAgent — Phase 12B 人员智能体
 排班优化 / 绩效评分 / 人力成本 / 考勤预警 / 人员配置
 
 Revision ID: z40
-Revises: z39
+Revises: z39_business_intel_agent_tables
 Create Date: 2026-03-11
 """
 from alembic import op
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 revision = 'z40'
-down_revision = 'z39'
+down_revision = 'z39_business_intel_agent_tables'
 branch_labels = None
 depends_on = None
 

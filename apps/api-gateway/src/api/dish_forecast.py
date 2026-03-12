@@ -6,6 +6,7 @@ Prefix: /api/v1/dish-forecast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Optional
 
 from src.core.database import get_db
 from src.services.dish_forecast_service import (
@@ -31,7 +32,7 @@ _VALID_PHASES = list(LIFECYCLE_ADJUSTMENT.keys())
 async def generate(
     store_id:        str,
     base_period:     str          = Query(..., description="最近完整期 YYYY-MM"),
-    forecast_period: str | None   = Query(None, description="目标预测期，默认为 base_period+1"),
+    forecast_period: Optional[str] = Query(None, description="目标预测期，默认为 base_period+1"),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -50,7 +51,7 @@ async def generate(
 async def list_forecasts(
     store_id:        str,
     forecast_period: str          = Query(..., description="预测目标期 YYYY-MM"),
-    lifecycle_phase: str | None   = Query(None),
+    lifecycle_phase: Optional[str] = Query(None),
     limit:           int          = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
 ):

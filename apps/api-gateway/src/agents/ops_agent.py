@@ -10,6 +10,7 @@ OpsAgent - 连锁餐饮IT运维智能体 (智链OS 运维方案)
 """
 import time
 from typing import Dict, Any, Optional, List
+from types import SimpleNamespace
 import structlog
 
 from .llm_agent import LLMEnhancedAgent
@@ -107,6 +108,41 @@ class OpsAgent(LLMEnhancedAgent):
                 execution_time=time.time() - start,
             )
 
+    async def _with_rag(self, query: str, store_id: Optional[str], top_k: int = 5) -> Dict[str, Any]:
+        """RAG 查询包装：无 RAG 时返回空上下文，供单测与降级路径复用。"""
+        if not getattr(self, "_rag", None):
+            return {"response": "", "metadata": {"context_count": 0, "timestamp": ""}}
+        try:
+            return await self._rag.analyze_with_rag(
+                query=query,
+                store_id=store_id or "",
+                collection="events",
+                top_k=top_k,
+            )
+        except Exception as exc:
+            logger.warning("ops_rag_failed", error=str(exc))
+            return {"response": "", "metadata": {"context_count": 0, "timestamp": "", "error": str(exc)}}
+
+    async def _safe_execute_with_tools(
+        self,
+        user_message: str,
+        store_id: str,
+        context: Dict[str, Any],
+    ):
+        """LLM 可用时走工具执行；不可用时走本地降级，保持接口稳定。"""
+        if getattr(self, "llm_enabled", False):
+            return await self.execute_with_tools(user_message=user_message, store_id=store_id, context=context)
+
+        rag_result = await self._with_rag(user_message, store_id)
+        fallback_text = rag_result.get("response") or f"已生成运维建议（降级模式）：{user_message}"
+        return SimpleNamespace(
+            success=True,
+            data=fallback_text,
+            message=None,
+            tool_calls=[],
+            iterations=0,
+        )
+
     async def _health_check(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """健康检查：结合方案中的软件/硬件/网络域，给出检查项与结论建议。"""
         store_id = params.get("store_id")
@@ -116,7 +152,7 @@ class OpsAgent(LLMEnhancedAgent):
             f"请检查软件域(POS/ERP/会员)、硬件域(POS/打印机/KDS/门禁/监控)、"
             f"网络域(带宽/链路/VPN)，列出各域检查项状态与结论建议。"
         )
-        result = await self.execute_with_tools(
+        result = await self._safe_execute_with_tools(
             user_message=user_message,
             store_id=store_id or "",
             context={"scope": scope}
@@ -137,7 +173,7 @@ class OpsAgent(LLMEnhancedAgent):
             f"门店 {store_id} 故障根因分析：症状「{symptom}」。"
             f"请做根因分析（网络/数据库/应用），给出可能原因（按概率排序）与排查顺序。"
         )
-        result = await self.execute_with_tools(
+        result = await self._safe_execute_with_tools(
             user_message=user_message,
             store_id=store_id or "",
             context={"symptom": symptom}
@@ -158,7 +194,7 @@ class OpsAgent(LLMEnhancedAgent):
             f"故障类型「{fault_type}」的标准修复步骤（Runbook）："
             f"请给出分步操作指南、注意事项与回滚建议。"
         )
-        result = await self.execute_with_tools(
+        result = await self._safe_execute_with_tools(
             user_message=user_message,
             store_id=store_id or "",
             context={"fault_type": fault_type}
@@ -179,7 +215,7 @@ class OpsAgent(LLMEnhancedAgent):
             f"门店 {store_id} 设备类型「{device_type}」预测性维护："
             f"请根据使用频率与历史故障数据，给出维护时间窗口、备件建议和巡检计划。"
         )
-        result = await self.execute_with_tools(
+        result = await self._safe_execute_with_tools(
             user_message=user_message,
             store_id=store_id or "",
             context={"device_type": device_type}
@@ -200,7 +236,7 @@ class OpsAgent(LLMEnhancedAgent):
             f"门店 {store_id} 网络安全加固建议（focus={focus or '全面'}）："
             f"请分析弱密码风险、非授权设备、固件漏洞、VPN 隧道健康，给出优先级排序的加固措施。"
         )
-        result = await self.execute_with_tools(
+        result = await self._safe_execute_with_tools(
             user_message=user_message,
             store_id=store_id or "",
             context={"focus": focus}
@@ -221,7 +257,7 @@ class OpsAgent(LLMEnhancedAgent):
             f"门店 {store_id} 主备链路切换决策：当前主链路质量分 {quality_score}。"
             f"请判断是否建议切换、切换时机、回切条件与注意事项。"
         )
-        result = await self.execute_with_tools(
+        result = await self._safe_execute_with_tools(
             user_message=user_message,
             store_id=store_id or "",
             context={"quality_score": quality_score}
@@ -243,7 +279,7 @@ class OpsAgent(LLMEnhancedAgent):
             f"硬件域(POS/打印机/显示屏/KDS/门禁/监控/服务器)、"
             f"网络域(局域网/广域网/WiFi/4G5G/VPN)的建议采集项与分类。"
         )
-        result = await self.execute_with_tools(
+        result = await self._safe_execute_with_tools(
             user_message=user_message,
             store_id=store_id or "",
             context={}
@@ -264,7 +300,7 @@ class OpsAgent(LLMEnhancedAgent):
             f"运维问答 门店 {store_id or '不限'}：{question}。"
             f"请结合运维知识给出人类可读的分析与操作建议。"
         )
-        result = await self.execute_with_tools(
+        result = await self._safe_execute_with_tools(
             user_message=user_message,
             store_id=store_id or "",
             context={"question": question}
@@ -308,7 +344,7 @@ class OpsAgent(LLMEnhancedAgent):
                f"活跃告警: {dashboard_data.get('active_alerts', 'N/A')} 条"
                if dashboard_data else "暂无实时数据，请基于运维知识给出巡检建议")
         )
-        result = await self.execute_with_tools(
+        result = await self._safe_execute_with_tools(
             user_message=summary_text + "。请给出摘要解读和优先处置建议。",
             store_id=store_id,
             context={"dashboard": dashboard_data},
@@ -352,7 +388,7 @@ class OpsAgent(LLMEnhancedAgent):
             f"告警分布：{convergence_data.get('alert_counts', {})}。\n"
             f"请验证根因判断，补充可能遗漏的原因，并给出优先级排序的处置步骤。"
         )
-        result = await self.execute_with_tools(
+        result = await self._safe_execute_with_tools(
             user_message=user_message,
             store_id=store_id,
             context={"convergence": convergence_data},
@@ -391,7 +427,7 @@ class OpsAgent(LLMEnhancedAgent):
             f"未解决问题: {fs_data.get('open_issues', [])}。\n"
             f"请给出食安风险等级评估和整改建议，并关注2026年6月食安新规合规要求。"
         )
-        result = await self.execute_with_tools(
+        result = await self._safe_execute_with_tools(
             user_message=user_message,
             store_id=store_id,
             context={"food_safety": fs_data},

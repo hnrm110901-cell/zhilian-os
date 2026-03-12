@@ -1,7 +1,7 @@
 # Makefile for Zhilian OS
 # 智链OS开发辅助命令
 
-.PHONY: help install dev test lint format clean run docker staging-up staging-down staging-logs staging-migrate staging-health prod-env-check prod-deploy prod-health prod-scheduler-patrol prod-monitor-up prod-monitor-down prod-monitor-status prod-monitor-lint prod-alert-test prod-alert-webhook-smoke prod-alert-e2e prod-ops-report prod-install-ops-timer
+.PHONY: help install dev test lint format clean run docker staging-up staging-down staging-logs staging-migrate staging-health prod-env-check prod-deploy prod-health prod-scheduler-patrol prod-monitor-up prod-monitor-down prod-monitor-status prod-monitor-lint prod-alert-test prod-alert-webhook-smoke prod-alert-e2e prod-ops-report prod-install-ops-timer edge-install edge-install-remote edge-autoprovision
 
 # 默认目标
 help:
@@ -43,6 +43,11 @@ help:
 	@echo "  make prod-alert-e2e          - 端到端告警链路检查"
 	@echo "  make prod-ops-report         - 生成每日巡检报告（logs/ops）"
 	@echo "  make prod-install-ops-timer  - 安装 systemd 定时巡检（需 root）"
+	@echo ""
+	@echo "树莓派 5 边缘节点:"
+	@echo "  make edge-install            - 在树莓派本机执行安装"
+	@echo "  make edge-install-remote     - 通过 SSH 远程下发安装"
+	@echo "  make edge-autoprovision      - 启用开机自动安装 / 自动注册"
 
 # 安装生产依赖
 install:
@@ -177,6 +182,28 @@ migrate-history:
 # 生成 SQL 脚本（不执行，仅预览）
 migrate-sql:
 	$(ALEMBIC) upgrade head --sql
+
+# 迁移完整校验（head / offline SQL / online current+upgrade）
+migrate-verify:
+	cd apps/api-gateway && bash scripts/verify_migrations.sh
+
+# 备份本地开发库 zhilian_os
+dev-db-backup:
+	cd apps/api-gateway && bash scripts/backup_dev_database.sh
+
+# 重建本地开发库 zhilian_os（危险操作）
+dev-db-rebuild:
+	cd apps/api-gateway && CONFIRM_REBUILD=1 bash scripts/rebuild_dev_database.sh
+
+# 树莓派 5 边缘节点安装
+edge-install:
+	cd apps/api-gateway && bash scripts/install_raspberry_pi_edge.sh
+
+edge-install-remote:
+	cd apps/api-gateway && bash scripts/install_raspberry_pi_edge_remote.sh
+
+edge-autoprovision:
+	cd apps/api-gateway && bash scripts/enable_raspberry_pi_edge_autoprovision.sh
 
 # ============================================================
 # Staging 环境

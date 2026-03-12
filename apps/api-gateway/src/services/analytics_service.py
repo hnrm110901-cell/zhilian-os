@@ -256,7 +256,14 @@ class AnalyticsService:
             if not order.items:
                 continue
 
-            items = [item.item_name for item in order.items if item.item_name]
+            items = []
+            for item in order.items:
+                if isinstance(item, dict):
+                    name = item.get("item_name") or item.get("name")
+                else:
+                    name = getattr(item, "item_name", None) or getattr(item, "name", None)
+                if name:
+                    items.append(name)
 
             # 统计单个商品出现次数
             for item in items:

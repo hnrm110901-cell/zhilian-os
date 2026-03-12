@@ -18,26 +18,41 @@ logger = structlog.get_logger()
 # Import Base for models
 from src.models.base import Base
 
+
+def _get_async_database_url(raw_url: str) -> str:
+    """Normalize DATABASE_URL to an async SQLAlchemy URL."""
+    if raw_url.startswith("postgresql+asyncpg://"):
+        return raw_url
+    if raw_url.startswith("postgresql+psycopg2://"):
+        return raw_url.replace("postgresql+psycopg2://", "postgresql+asyncpg://", 1)
+    if raw_url.startswith("postgresql://"):
+        return raw_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    return raw_url
+
+
+ASYNC_DATABASE_URL = _get_async_database_url(settings.DATABASE_URL)
+IS_POSTGRES = ASYNC_DATABASE_URL.startswith("postgresql")
+
 # Create async engine with environment-specific configuration
 # Architecture Review Fix: Clear separation of test vs production pool config
 if settings.APP_ENV == "test":
     # Test environment: Use NullPool to avoid connection issues
     # NullPool creates a new connection for each request and closes it immediately
     engine = create_async_engine(
-        settings.DATABASE_URL,
+        ASYNC_DATABASE_URL,
         echo=settings.APP_DEBUG,
         poolclass=NullPool,
         # Connection arguments for better reliability
         connect_args={
             "server_settings": {"application_name": "zhilian_os_api_test"},
             "timeout": 10,
-        } if "postgresql" in settings.DATABASE_URL else {},
+        } if IS_POSTGRES else {},
     )
 else:
     # Production/Development: Use QueuePool with optimized settings
     # QueuePool maintains a pool of connections for reuse
     engine = create_async_engine(
-        settings.DATABASE_URL,
+        ASYNC_DATABASE_URL,
         echo=settings.APP_DEBUG,
         # Connection pool settings for production load（支持环境变量覆盖）
         pool_size=int(os.getenv("DB_POOL_SIZE", "20")),
@@ -49,7 +64,7 @@ else:
             "server_settings": {"application_name": "zhilian_os_api"},
             "timeout": int(os.getenv("DB_CONNECT_TIMEOUT", "10")),
             "command_timeout": int(os.getenv("DB_COMMAND_TIMEOUT", "60")),
-        } if "postgresql" in settings.DATABASE_URL else {},
+        } if IS_POSTGRES else {},
     )
 
 # Create session factory
@@ -210,4 +225,3 @@ async def health_check():
             "database": "disconnected",
             "error": str(e),
         }
-

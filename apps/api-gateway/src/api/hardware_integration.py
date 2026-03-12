@@ -2,11 +2,15 @@
 硬件集成API - 树莓派5 + Shokz设备
 边缘计算与语音交互接口
 """
-from fastapi import APIRouter, Depends, HTTPException
+from types import SimpleNamespace
+import secrets
+from fastapi import APIRouter, Depends, HTTPException, Header, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, List
 from pydantic import BaseModel
 
+from src.core.config import settings
 from src.core.dependencies import get_db, get_current_user
 from src.services.raspberry_pi_edge_service import (
     get_raspberry_pi_edge_service,
@@ -21,8 +25,117 @@ from src.services.shokz_device_service import (
     VoiceCommand
 )
 from src.models.user import User
+from src.models.audit_log import AuditAction, ResourceType
+from src.services.audit_log_service import audit_log_service
 
 router = APIRouter(prefix="/api/v1/hardware")
+edge_security = HTTPBearer(auto_error=False)
+
+
+async def _safe_audit_log(
+    *,
+    action: str,
+    resource_id: str,
+    description: str,
+    current_user,
+    store_id: Optional[str] = None,
+    changes: Optional[dict] = None,
+    old_value: Optional[dict] = None,
+    new_value: Optional[dict] = None,
+) -> None:
+    try:
+        await audit_log_service.log_action(
+            action=action,
+            resource_type=ResourceType.EDGE_HUB,
+            user_id=str(getattr(current_user, "id", "system")),
+            username=getattr(current_user, "username", None),
+            user_role=str(getattr(current_user, "role", "")) if getattr(current_user, "role", None) else None,
+            resource_id=resource_id,
+            description=description,
+            changes=changes,
+            old_value=old_value,
+            new_value=new_value,
+            store_id=store_id,
+        )
+    except Exception:
+        # 审计失败不能阻断硬件接入主链路
+        return
+
+
+async def _get_edge_node_audit_summary(node_id: str) -> dict:
+    try:
+        logs, total = await audit_log_service.get_logs(
+            resource_type=ResourceType.EDGE_HUB,
+            resource_id=node_id,
+            skip=0,
+            limit=1,
+        )
+    except Exception:
+        return {
+            "available": False,
+            "total": 0,
+            "latest_action": None,
+            "latest_description": None,
+            "latest_at": None,
+        }
+
+    latest = logs[0].to_dict() if logs else None
+    return {
+        "available": True,
+        "total": total,
+        "latest_action": latest["action"] if latest else None,
+        "latest_description": latest.get("description") if latest else None,
+        "latest_at": latest.get("created_at") if latest else None,
+    }
+
+
+async def get_edge_bootstrap_or_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(edge_security),
+    session: AsyncSession = Depends(get_db),
+):
+    if credentials and settings.EDGE_BOOTSTRAP_TOKEN:
+        token = credentials.credentials
+        if secrets.compare_digest(token, settings.EDGE_BOOTSTRAP_TOKEN):
+            return SimpleNamespace(
+                id="edge-bootstrap",
+                username="edge-bootstrap",
+                role="system",
+                is_active=True,
+                auth_type="edge_bootstrap",
+            )
+
+    if credentials:
+        return await get_current_user(credentials, session)
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="缺少认证信息",
+    )
+
+
+async def get_edge_node_or_user(
+    node_id: str,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(edge_security),
+    session: AsyncSession = Depends(get_db),
+    x_edge_node_secret: Optional[str] = Header(default=None, alias="X-Edge-Node-Secret"),
+):
+    service = get_raspberry_pi_edge_service()
+    if x_edge_node_secret and await service.verify_device_secret(node_id, x_edge_node_secret):
+        return SimpleNamespace(
+            id=node_id,
+            username=node_id,
+            role="edge-node",
+            is_active=True,
+            auth_type="edge_device",
+        )
+
+    if credentials:
+        return await get_current_user(credentials, session)
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="缺少认证信息",
+    )
 
 
 # ==================== 树莓派5边缘节点 ====================
@@ -33,7 +146,7 @@ async def register_edge_node(
     device_name: str,
     ip_address: str,
     mac_address: str,
-    current_user: User = Depends(get_current_user)
+    current_user=Depends(get_edge_bootstrap_or_user)
 ):
     """
     注册边缘节点
@@ -47,10 +160,25 @@ async def register_edge_node(
         ip_address=ip_address,
         mac_address=mac_address
     )
+    device_secret = service.get_or_create_device_secret(node.node_id)
+    await _safe_audit_log(
+        action=AuditAction.EDGE_NODE_REGISTER,
+        resource_id=node.node_id,
+        description=f"注册边缘节点 {node.device_name}",
+        current_user=current_user,
+        store_id=node.store_id,
+        new_value={
+            "node_id": node.node_id,
+            "device_name": node.device_name,
+            "ip_address": node.ip_address,
+            "mac_address": node.mac_address,
+        },
+    )
 
     return {
         "success": True,
         "node": node.model_dump(),
+        "device_secret": device_secret,
         "message": "边缘节点注册成功"
     }
 
@@ -63,7 +191,9 @@ async def update_node_status(
     disk_usage: float,
     temperature: float,
     uptime_seconds: int,
-    current_user: User = Depends(get_current_user)
+    pending_status_queue: int = 0,
+    last_queue_error: Optional[str] = None,
+    current_user=Depends(get_edge_node_or_user)
 ):
     """
     更新节点状态
@@ -77,7 +207,9 @@ async def update_node_status(
         memory_usage=memory_usage,
         disk_usage=disk_usage,
         temperature=temperature,
-        uptime_seconds=uptime_seconds
+        uptime_seconds=uptime_seconds,
+        pending_status_queue=pending_status_queue,
+        last_queue_error=last_queue_error,
     )
 
     return {
@@ -90,7 +222,7 @@ async def update_node_status(
 async def switch_network_mode(
     node_id: str,
     mode: NetworkMode,
-    current_user: User = Depends(get_current_user)
+    current_user=Depends(get_edge_node_or_user)
 ):
     """
     切换网络模式
@@ -143,7 +275,7 @@ async def local_inference(
 @router.post("/edge-node/{node_id}/sync")
 async def sync_with_cloud(
     node_id: str,
-    current_user: User = Depends(get_current_user)
+    current_user=Depends(get_edge_node_or_user)
 ):
     """
     与云端同步
@@ -161,6 +293,148 @@ async def sync_with_cloud(
     }
 
 
+@router.post("/edge-node/{node_id}/rotate-secret")
+async def rotate_edge_node_secret(
+    node_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """轮换边缘节点 device_secret。"""
+    service = get_raspberry_pi_edge_service()
+    status_before = await service.get_credential_status(node_id)
+    new_secret = await service.rotate_device_secret(node_id=node_id)
+    status_after = await service.get_credential_status(node_id)
+    await _safe_audit_log(
+        action=AuditAction.EDGE_NODE_SECRET_ROTATE,
+        resource_id=node_id,
+        description=f"轮换边缘节点 device_secret: {node_id}",
+        current_user=current_user,
+        store_id=status_after.get("store_id"),
+        old_value=status_before,
+        new_value={**status_after, "device_secret_rotated": True},
+    )
+    return {
+        "success": True,
+        "node_id": node_id,
+        "device_secret": new_secret,
+        "message": "device_secret 已轮换"
+    }
+
+
+@router.post("/edge-node/{node_id}/revoke-secret")
+async def revoke_edge_node_secret(
+    node_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """吊销边缘节点 device_secret。"""
+    service = get_raspberry_pi_edge_service()
+    status_before = await service.get_credential_status(node_id)
+    await service.revoke_device_secret(node_id=node_id)
+    status_after = await service.get_credential_status(node_id)
+    await _safe_audit_log(
+        action=AuditAction.EDGE_NODE_SECRET_REVOKE,
+        resource_id=node_id,
+        description=f"吊销边缘节点 device_secret: {node_id}",
+        current_user=current_user,
+        store_id=status_after.get("store_id"),
+        old_value=status_before,
+        new_value=status_after,
+    )
+    return {
+        "success": True,
+        "node_id": node_id,
+        "message": "device_secret 已吊销"
+    }
+
+
+@router.get("/edge-node/{node_id}/credential-status")
+async def get_edge_node_credential_status(
+    node_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """获取边缘节点凭证状态，用于运维排查。"""
+    service = get_raspberry_pi_edge_service()
+    status_payload = await service.get_credential_status(node_id=node_id)
+    return {
+        "success": True,
+        "credential_status": status_payload,
+        "bootstrap_token_configured": bool(settings.EDGE_BOOTSTRAP_TOKEN),
+    }
+
+
+@router.get("/edge-node/{node_id}/recovery-guide")
+async def get_edge_node_recovery_guide(
+    node_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """获取边缘节点重注册/恢复指引。"""
+    service = get_raspberry_pi_edge_service()
+    node = await service.get_node_info(node_id=node_id)
+    credential_status = await service.get_credential_status(node_id=node_id)
+    requires_rebootstrap = not credential_status.get("device_secret_active", False)
+    bootstrap_configured = bool(settings.EDGE_BOOTSTRAP_TOKEN)
+    installer_command = (
+        "sudo EDGE_API_BASE_URL=http://your-api-host:8000 \\\n"
+        "     EDGE_API_TOKEN=replace-with-bootstrap-token \\\n"
+        f"     EDGE_STORE_ID={node.store_id} \\\n"
+        f"     EDGE_DEVICE_NAME={node.device_name} \\\n"
+        "     bash scripts/install_raspberry_pi_edge.sh"
+    )
+    steps = [
+        "确认 API Gateway 已配置 EDGE_BOOTSTRAP_TOKEN，且边缘节点能访问服务端。",
+        "在树莓派上检查 /etc/zhilian-edge/edge-node.env，确认 EDGE_API_BASE_URL 和 EDGE_STORE_ID 正确。",
+        "如果当前凭证已失效或被吊销，重新写入 bootstrap token 后重启服务，触发自动注册。",
+        "执行 systemctl restart zhilian-edge-node.service，并通过 journalctl -u zhilian-edge-node.service -f 观察日志。",
+        "回到硬件管理页刷新状态，确认节点重新拿到 device_secret 并恢复心跳。",
+    ]
+    if not requires_rebootstrap:
+        steps[2] = "当前 device_secret 仍有效，优先检查网络、时间同步和本地配置，再决定是否重新注册。"
+
+    return {
+        "success": True,
+        "node_id": node_id,
+        "store_id": node.store_id,
+        "device_name": node.device_name,
+        "requires_rebootstrap": requires_rebootstrap,
+        "bootstrap_token_configured": bootstrap_configured,
+        "required_env": [
+            "EDGE_API_BASE_URL",
+            "EDGE_API_TOKEN",
+            "EDGE_STORE_ID",
+            "EDGE_DEVICE_NAME",
+        ],
+        "service_name": "zhilian-edge-node.service",
+        "config_file": "/etc/zhilian-edge/edge-node.env",
+        "state_file": "/var/lib/zhilian-edge/node_state.json",
+        "installer_command_template": installer_command,
+        "steps": steps,
+        "credential_status": credential_status,
+    }
+
+
+@router.get("/edge-node/{node_id}/audit-logs")
+async def get_edge_node_audit_logs(
+    node_id: str,
+    skip: int = 0,
+    limit: int = 20,
+    current_user: User = Depends(get_current_user),
+):
+    """获取边缘节点审计记录，用于凭证运维排查。"""
+    logs, total = await audit_log_service.get_logs(
+        resource_type=ResourceType.EDGE_HUB,
+        resource_id=node_id,
+        skip=skip,
+        limit=limit,
+    )
+    return {
+        "success": True,
+        "node_id": node_id,
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+        "logs": [log.to_dict() for log in logs],
+    }
+
+
 @router.get("/edge-node/{node_id}")
 async def get_edge_node_info(
     node_id: str,
@@ -169,9 +443,11 @@ async def get_edge_node_info(
     """获取边缘节点信息"""
     service = get_raspberry_pi_edge_service()
     node = await service.get_node_info(node_id=node_id)
+    audit_summary = await _get_edge_node_audit_summary(node_id)
 
     return {
-        "node": node.model_dump()
+        "node": node.model_dump(),
+        "audit_summary": audit_summary,
     }
 
 
@@ -183,11 +459,21 @@ async def list_store_edge_nodes(
     """列出门店的所有边缘节点"""
     service = get_raspberry_pi_edge_service()
     nodes = await service.list_store_nodes(store_id=store_id)
+    enriched_nodes = []
+    for node in nodes:
+        credential_status = await service.get_credential_status(node.node_id)
+        audit_summary = await _get_edge_node_audit_summary(node.node_id)
+        payload = node.model_dump()
+        payload["credential_status"] = credential_status
+        payload["credential_ok"] = credential_status["device_secret_active"]
+        payload["credential_persisted"] = credential_status["device_secret_persisted"]
+        payload["audit_summary"] = audit_summary
+        enriched_nodes.append(payload)
 
     return {
         "store_id": store_id,
-        "total": len(nodes),
-        "nodes": [node.model_dump() for node in nodes]
+        "total": len(enriched_nodes),
+        "nodes": enriched_nodes
     }
 
 

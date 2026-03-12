@@ -16,6 +16,7 @@ Private Domain Growth Metrics Service
 from __future__ import annotations
 
 import datetime
+import inspect
 from typing import Any, Dict
 
 import structlog
@@ -27,10 +28,17 @@ logger = structlog.get_logger()
 
 # ── 内部 helpers ──────────────────────────────────────────────────────────────
 
+async def _maybe_await(value):
+    if inspect.isawaitable(value):
+        return await value
+    return value
+
+
 async def _scalar(db: AsyncSession, sql: str, params: dict, default=0):
     """执行 SQL 并返回第一行第一列，失败则返回 default。"""
     try:
-        row = (await db.execute(text(sql), params)).fetchone()
+        result = await db.execute(text(sql), params)
+        row = await _maybe_await(result.fetchone())
         return row[0] if row and row[0] is not None else default
     except Exception as exc:
         logger.warning("private_domain_metrics.query_failed", sql=sql[:60], error=str(exc))
@@ -40,7 +48,9 @@ async def _scalar(db: AsyncSession, sql: str, params: dict, default=0):
 async def _rows(db: AsyncSession, sql: str, params: dict) -> list:
     """执行 SQL 并返回所有行，失败则返回空列表。"""
     try:
-        return list((await db.execute(text(sql), params)).fetchall())
+        result = await db.execute(text(sql), params)
+        rows = await _maybe_await(result.fetchall())
+        return list(rows or [])
     except Exception as exc:
         logger.warning("private_domain_metrics.query_failed", sql=sql[:60], error=str(exc))
         return []

@@ -1,14 +1,14 @@
 """banquet_order_reviews table
 
 Revision ID: z38
-Revises: z37
+Revises: z37_supplier_agent_tables
 Create Date: 2026-03-09
 """
 from alembic import op
 import sqlalchemy as sa
 
 revision = "z38"
-down_revision = "z37"
+down_revision = "z37_supplier_agent_tables"
 branch_labels = None
 depends_on = None
 

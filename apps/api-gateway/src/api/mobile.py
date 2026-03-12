@@ -17,6 +17,7 @@ from ..models.user import User
 from ..models.task import Task, TaskStatus, TaskPriority
 from ..models.schedule import Schedule, Shift
 from ..models.order import Order
+from ..models.edge_hub import EdgeHub, EdgeAlert, AlertStatus, AlertLevel, HubStatus
 from ..core.dependencies import get_current_active_user
 from ..core.database import get_db
 from ..services.notification_service import notification_service
@@ -89,6 +90,13 @@ class MobileTaskItem(BaseModel):
     evidence_count: int = 0
 
 
+class MobileEdgeHubStatus(BaseModel):
+    hub_online: bool
+    open_alert_count: int
+    p1_alert_count: int
+    last_heartbeat: Optional[str] = None
+
+
 class MobileHomeSummary(BaseModel):
     store_id: str
     as_of: str
@@ -103,6 +111,7 @@ class MobileHomeSummary(BaseModel):
     weakest_dimension: Optional[str] = None
     today_shift: Optional[MobileShiftItem] = None
     top_tasks: List[MobileTaskItem]
+    edge_hub_status: Optional[MobileEdgeHubStatus] = None
 
 
 class MobileShiftSummary(BaseModel):
@@ -788,6 +797,35 @@ def _task_to_mobile(task: Task, assignee_name: str = "待分配") -> MobileTaskI
     )
 
 
+async def _fetch_edge_hub_status(store_id: str, db: AsyncSession) -> Optional[MobileEdgeHubStatus]:
+    """Query the store's edge hub and open alerts, returning a compact status object."""
+    try:
+        hub = (await db.execute(
+            select(EdgeHub).where(EdgeHub.store_id == store_id).limit(1)
+        )).scalar_one_or_none()
+
+        alert_counts = (await db.execute(
+            select(EdgeAlert.level, func.count(EdgeAlert.id).label("cnt"))
+            .where(and_(
+                EdgeAlert.store_id == store_id,
+                EdgeAlert.status == AlertStatus.OPEN,
+            ))
+            .group_by(EdgeAlert.level)
+        )).all()
+
+        total_open = sum(r.cnt for r in alert_counts)
+        p1_open = sum(r.cnt for r in alert_counts if r.level == AlertLevel.P1)
+
+        return MobileEdgeHubStatus(
+            hub_online=hub is not None and hub.status == HubStatus.ONLINE,
+            open_alert_count=total_open,
+            p1_alert_count=p1_open,
+            last_heartbeat=hub.last_heartbeat.isoformat() if hub and hub.last_heartbeat else None,
+        )
+    except Exception:
+        return None
+
+
 @router.get("/mobile/home/summary", response_model=MobileHomeSummary)
 async def get_mobile_home_summary(
     current_user: User = Depends(get_current_active_user),
@@ -819,6 +857,7 @@ async def get_mobile_home_summary(
 
     unread_alerts_count = len([t for t in top_tasks if t.task_status == "expired"])
     pending_approvals = len([t for t in top_tasks if t.need_review and t.task_status in {"pending", "in_progress"}])
+    edge_hub_status = await _fetch_edge_hub_status(store_id, db)
 
     return MobileHomeSummary(
         store_id=store_id,
@@ -834,6 +873,7 @@ async def get_mobile_home_summary(
         weakest_dimension="成本率",
         today_shift=shifts[0] if shifts else None,
         top_tasks=top_tasks,
+        edge_hub_status=edge_hub_status,
     )
 
 

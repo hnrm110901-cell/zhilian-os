@@ -4,6 +4,7 @@ Real-time Notification System Tests
 """
 import os
 for _k, _v in {
+    "APP_ENV":               "test",
     "DATABASE_URL":          "postgresql+asyncpg://test:test@localhost/test",
     "REDIS_URL":             "redis://localhost:6379/0",
     "CELERY_BROKER_URL":     "redis://localhost:6379/0",

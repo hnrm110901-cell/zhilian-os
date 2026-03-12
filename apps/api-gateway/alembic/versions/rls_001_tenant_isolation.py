@@ -6,7 +6,7 @@ Revises:
 Create Date: 2026-02-22
 
 """
-from alembic import op
+from alembic import op, context
 import re
 import sqlalchemy as sa
 
@@ -51,12 +51,30 @@ TENANT_TABLES = [
 
 
 def _table_exists(table_name: str) -> bool:
+    if context.is_offline_mode():
+        # Offline SQL export validates migration ordering, not live catalog state.
+        return True
     conn = op.get_bind()
     result = conn.execute(
         sa.text(
             "SELECT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename=:t)"
         ),
         {"t": table_name},
+    )
+    return result.scalar()
+
+
+def _column_exists(table_name: str, column_name: str) -> bool:
+    if context.is_offline_mode():
+        return True
+    conn = op.get_bind()
+    result = conn.execute(
+        sa.text(
+            "SELECT EXISTS ("
+            "SELECT 1 FROM information_schema.columns "
+            "WHERE table_schema='public' AND table_name=:t AND column_name=:c)"
+        ),
+        {"t": table_name, "c": column_name},
     )
     return result.scalar()
 
@@ -68,7 +86,7 @@ def upgrade() -> None:
     # 为每个租户表启用RLS（跳过尚未创建的表）
     for table_name in TENANT_TABLES:
         _assert_safe_ident(table_name)   # DDL 不支持 bind 参数，白名单前置校验
-        if not _table_exists(table_name):
+        if not _table_exists(table_name) or not _column_exists(table_name, "store_id"):
             continue
         # 启用RLS
         op.execute(f'ALTER TABLE {table_name} ENABLE ROW LEVEL SECURITY;')
@@ -153,7 +171,7 @@ def downgrade() -> None:
     # 为每个租户表移除RLS
     for table_name in TENANT_TABLES:
         _assert_safe_ident(table_name)   # DDL 不支持 bind 参数，白名单前置校验
-        if not _table_exists(table_name):
+        if not _table_exists(table_name) or not _column_exists(table_name, "store_id"):
             continue
         policy_name = f'{table_name}_tenant_isolation_policy'
 

@@ -93,15 +93,16 @@ async def sm_home(
             return {**cached, "_from_cache": True}
 
     # 并行拉取所有子数据
-    health_task   = _fetch_health_score(store_id, db)
-    top3_task     = _fetch_top3_decisions(store_id, monthly_revenue_yuan, db)
-    queue_task    = _fetch_queue_status(store_id, db)
-    pending_task  = _fetch_pending_count(store_id, db)
-    revenue_task  = _fetch_today_revenue(store_id, db)
-    fc_task       = _fetch_food_cost_quick(store_id, db)
-    alerts_task   = _fetch_unread_alerts_count(store_id, db)
+    health_task    = _fetch_health_score(store_id, db)
+    top3_task      = _fetch_top3_decisions(store_id, monthly_revenue_yuan, db)
+    queue_task     = _fetch_queue_status(store_id, db)
+    pending_task   = _fetch_pending_count(store_id, db)
+    revenue_task   = _fetch_today_revenue(store_id, db)
+    fc_task        = _fetch_food_cost_quick(store_id, db)
+    alerts_task    = _fetch_unread_alerts_count(store_id, db)
+    hub_task       = _fetch_edge_hub_status(store_id, db)
 
-    health, top3, queue, pending, revenue, fc, alerts_count = await asyncio.gather(
+    health, top3, queue, pending, revenue, fc, alerts_count, hub_status = await asyncio.gather(
         _safe(health_task,  default=None),
         _safe(top3_task,    default=[]),
         _safe(queue_task,   default=None),
@@ -109,6 +110,7 @@ async def sm_home(
         _safe(revenue_task, default=None),
         _safe(fc_task,      default=None),
         _safe(alerts_task,  default=0),
+        _safe(hub_task,     default=None),
     )
 
     payload = {
@@ -121,6 +123,7 @@ async def sm_home(
         "today_revenue_yuan":      revenue,
         "food_cost_summary":       fc,
         "unread_alerts_count":     alerts_count,
+        "edge_hub_status":         hub_status,
     }
 
     await _cache_set(cache_key, payload)
@@ -240,13 +243,15 @@ async def hq_overview(
     pending_task      = _fetch_pending_count(store_id=None, db=db)
     trend_task        = _fetch_revenue_trend(db)
     decisions_task    = _fetch_cross_store_decisions(db)
+    hub_summary_task  = _fetch_hq_edge_hub_summary(db)
 
-    health_ranking, fc_ranking, pending, revenue_trend, cross_decisions = await asyncio.gather(
+    health_ranking, fc_ranking, pending, revenue_trend, cross_decisions, hub_summary = await asyncio.gather(
         _safe(health_task,       default=[]),
         _safe(fc_rank_task,      default=[]),
         _safe(pending_task,      default=0),
         _safe(trend_task,        default={}),
         _safe(decisions_task,    default=[]),
+        _safe(hub_summary_task,  default=None),
     )
 
     # 计算汇总指标
@@ -272,6 +277,7 @@ async def hq_overview(
             "critical_store_count": critical_count,
             "warning_store_count":  warning_count,
         },
+        "edge_hub_summary": hub_summary,
     }
 
     await _cache_set(cache_key, payload)
@@ -706,6 +712,67 @@ async def _fetch_food_cost_quick(store_id: str, db: AsyncSession) -> Optional[Di
         "target_pct":      round(float(result.get("theoretical_pct") or 33.0), 1),
         "variance_pct":    round(float(result.get("variance_pct") or 0), 1),
         "variance_status": result.get("variance_status", "ok"),
+    }
+
+
+async def _fetch_hq_edge_hub_summary(db: AsyncSession) -> Dict:
+    """全平台边缘硬件汇总：离线主机数 + 未解决告警数。"""
+    from ..models.edge_hub import EdgeHub, EdgeAlert, AlertStatus, AlertLevel, HubStatus
+    from sqlalchemy import select, and_, func as sqlfunc
+
+    hub_rows = (await db.execute(
+        select(EdgeHub.status, sqlfunc.count(EdgeHub.id).label("cnt"))
+        .group_by(EdgeHub.status)
+    )).all()
+
+    total_hubs   = sum(r.cnt for r in hub_rows)
+    online_hubs  = sum(r.cnt for r in hub_rows if r.status == HubStatus.ONLINE)
+    offline_hubs = total_hubs - online_hubs
+
+    alert_rows = (await db.execute(
+        select(EdgeAlert.level, sqlfunc.count(EdgeAlert.id).label("cnt"))
+        .where(EdgeAlert.status == AlertStatus.OPEN)
+        .group_by(EdgeAlert.level)
+    )).all()
+
+    total_open_alerts = sum(r.cnt for r in alert_rows)
+    p1_open_alerts    = sum(r.cnt for r in alert_rows if r.level == AlertLevel.P1)
+
+    return {
+        "total_hubs":         total_hubs,
+        "online_hubs":        online_hubs,
+        "offline_hubs":       offline_hubs,
+        "open_alert_count":   total_open_alerts,
+        "p1_alert_count":     p1_open_alerts,
+    }
+
+
+async def _fetch_edge_hub_status(store_id: str, db: AsyncSession) -> Optional[Dict]:
+    """返回门店边缘主机在线状态与未解决告警数量。"""
+    from ..models.edge_hub import EdgeHub, EdgeAlert, AlertStatus, AlertLevel, HubStatus
+    from sqlalchemy import select, and_, func as sqlfunc
+
+    hub = (await db.execute(
+        select(EdgeHub).where(EdgeHub.store_id == store_id).limit(1)
+    )).scalar_one_or_none()
+
+    rows = (await db.execute(
+        select(EdgeAlert.level, sqlfunc.count(EdgeAlert.id).label("cnt"))
+        .where(and_(
+            EdgeAlert.store_id == store_id,
+            EdgeAlert.status == AlertStatus.OPEN,
+        ))
+        .group_by(EdgeAlert.level)
+    )).all()
+
+    total_open = sum(r.cnt for r in rows)
+    p1_open    = sum(r.cnt for r in rows if r.level == AlertLevel.P1)
+
+    return {
+        "hub_online":       hub is not None and hub.status == HubStatus.ONLINE,
+        "open_alert_count": total_open,
+        "p1_alert_count":   p1_open,
+        "last_heartbeat":   hub.last_heartbeat.isoformat() if hub and hub.last_heartbeat else None,
     }
 
 

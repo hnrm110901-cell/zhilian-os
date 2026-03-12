@@ -19,6 +19,7 @@ from __future__ import annotations
 from dataclasses import dataclass, asdict
 from datetime import datetime
 from typing import Optional, Dict, Any
+import inspect
 
 import structlog
 from sqlalchemy import text
@@ -172,9 +173,8 @@ class DynamicPricingService:
             LIMIT 1
         """)
         try:
-            row = (
-                await db.execute(sql, {"customer_id": customer_id, "store_id": store_id})
-            ).fetchone()
+            result = await db.execute(sql, {"customer_id": customer_id, "store_id": store_id})
+            row = await _maybe_await(result.fetchone())
             if row is None:
                 return MemberProfile()
             return MemberProfile(
@@ -191,3 +191,9 @@ class DynamicPricingService:
                 error=str(exc),
             )
             return MemberProfile()
+
+
+async def _maybe_await(value):
+    if inspect.isawaitable(value):
+        return await value
+    return value

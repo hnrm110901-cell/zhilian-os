@@ -36,6 +36,7 @@ from .neural_event_log import NeuralEventLog, EventProcessingStatus
 from .dish import DishCategory, Dish, DishIngredient
 from .bom import BOMTemplate, BOMItem
 from .dish_master import DishMaster, BrandMenu, StoreMenu
+from .edge_hub import EdgeHub, EdgeDevice, EdgeAlert, HeadsetBinding
 from .channel_config import SalesChannelConfig
 from .dish_channel import DishChannelConfig
 from .ai_model import AIModel, ModelPurchaseRecord, DataContributionRecord, ModelType, ModelLevel, ModelStatus, PurchaseStatus
@@ -216,6 +217,10 @@ __all__ = [
     "DishMaster",
     "BrandMenu",
     "StoreMenu",
+    "EdgeHub",
+    "EdgeDevice",
+    "EdgeAlert",
+    "HeadsetBinding",
     "SalesChannelConfig",
     "DishChannelConfig",
     "AIModel",

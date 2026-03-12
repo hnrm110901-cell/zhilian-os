@@ -458,3 +458,109 @@ class TestMobilePerformance:
         # Mobile API should respond quickly (< 1 second for mocked services)
         assert (end_time - start_time) < 1.0
 
+
+# ════════════════════════════════════════════════════════════════════════════════
+# _fetch_edge_hub_status  (mobile.py helper)
+# ════════════════════════════════════════════════════════════════════════════════
+
+def _make_seq_db_mobile(*side_effects):
+    db = AsyncMock()
+    results = list(side_effects)
+    idx = [0]
+
+    async def _execute(stmt, *args, **kwargs):
+        r = results[idx[0]] if idx[0] < len(results) else results[-1]
+        idx[0] += 1
+        return r
+
+    db.execute = _execute
+    return db
+
+
+def _scalar_one_or_none_mob(value):
+    r = MagicMock()
+    r.scalar_one_or_none.return_value = value
+    return r
+
+
+def _level_rows_mob(*pairs):
+    rows = []
+    for level, cnt in pairs:
+        row = MagicMock()
+        row.level = level
+        row.cnt   = cnt
+        rows.append(row)
+    res = MagicMock()
+    res.all.return_value = rows
+    return res
+
+
+class TestMobileFetchEdgeHubStatus:
+
+    @pytest.mark.asyncio
+    async def test_online_hub_returns_hub_online_true(self):
+        from src.api.mobile import _fetch_edge_hub_status
+
+        hub = MagicMock()
+        hub.status = "online"
+        hub.last_heartbeat = datetime(2026, 3, 11, 12, 0, 0)
+
+        db = _make_seq_db_mobile(
+            _scalar_one_or_none_mob(hub),
+            _level_rows_mob(),
+        )
+
+        result = await _fetch_edge_hub_status("S001", db)
+
+        assert result is not None
+        assert result.hub_online is True
+        assert result.open_alert_count == 0
+        assert result.p1_alert_count   == 0
+        assert "2026-03-11" in result.last_heartbeat
+
+    @pytest.mark.asyncio
+    async def test_offline_hub_with_mixed_alerts(self):
+        from src.api.mobile import _fetch_edge_hub_status
+
+        hub = MagicMock()
+        hub.status = "offline"
+        hub.last_heartbeat = datetime(2026, 3, 10, 6, 0, 0)
+
+        db = _make_seq_db_mobile(
+            _scalar_one_or_none_mob(hub),
+            _level_rows_mob(("p1", 1), ("p3", 4)),
+        )
+
+        result = await _fetch_edge_hub_status("S001", db)
+
+        assert result.hub_online is False
+        assert result.open_alert_count == 5
+        assert result.p1_alert_count   == 1
+
+    @pytest.mark.asyncio
+    async def test_no_hub_returns_hub_online_false(self):
+        from src.api.mobile import _fetch_edge_hub_status
+
+        db = _make_seq_db_mobile(
+            _scalar_one_or_none_mob(None),
+            _level_rows_mob(),
+        )
+
+        result = await _fetch_edge_hub_status("S_NONE", db)
+
+        assert result is not None
+        assert result.hub_online is False
+        assert result.last_heartbeat is None
+
+    @pytest.mark.asyncio
+    async def test_db_exception_returns_none(self):
+        """Any DB error must be caught; home screen must not crash."""
+        from src.api.mobile import _fetch_edge_hub_status
+
+        db = AsyncMock()
+        db.execute = AsyncMock(side_effect=RuntimeError("connection lost"))
+
+        result = await _fetch_edge_hub_status("S001", db)
+
+        assert result is None
+

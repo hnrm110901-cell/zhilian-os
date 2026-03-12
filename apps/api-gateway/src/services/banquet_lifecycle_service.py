@@ -39,6 +39,7 @@ from src.models.banquet_lifecycle import (
     INITIAL_STAGE,
     ROOM_LOCK_TIMEOUT_DAYS,
 )
+from src.services.auspicious_date_service import AuspiciousDateService
 
 logger = structlog.get_logger()
 
@@ -323,8 +324,6 @@ class BanquetLifecycleService:
         - demand_factor:    吉日需求倍增因子（来自 AuspiciousDateService）
         - is_auspicious:    是否为好日子
         """
-        from src.services.auspicious_date_service import AuspiciousDateService
-
         auspicious_svc = AuspiciousDateService()
         days_in_month  = monthrange(year, month)[1]
         month_start    = date(year, month, 1)

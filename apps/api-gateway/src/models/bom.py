@@ -79,7 +79,7 @@ class BOMTemplate(Base, TimestampMixin):
         back_populates="bom_template",
         cascade="all, delete-orphan",
     )
-    dish = relationship("Dish", foreign_keys=[dish_id])
+    dish = relationship("src.models.dish.Dish", foreign_keys=[dish_id])
 
     __table_args__ = (
         UniqueConstraint("dish_id", "version", name="uq_bom_dish_version"),

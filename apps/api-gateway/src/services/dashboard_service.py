@@ -177,41 +177,46 @@ class DashboardService:
             菜品类别销售数据
         """
         try:
-            # 从订单明细统计各分类销售额
-            async with get_db_session() as session:
-                result = await session.execute(
-                    select(
-                        DishCategory.name.label("category_name"),
-                        func.sum(OrderItem.subtotal).label("total_sales"),
+            rows = []
+            try:
+                # 从订单明细统计各分类销售额
+                async with get_db_session() as session:
+                    result = await session.execute(
+                        select(
+                            DishCategory.name.label("category_name"),
+                            func.sum(OrderItem.subtotal).label("total_sales"),
+                        )
+                        .join(Dish, OrderItem.item_id == func.cast(Dish.id, OrderItem.item_id.type))
+                        .join(DishCategory, Dish.category_id == DishCategory.id)
+                        .join(Order, OrderItem.order_id == Order.id)
+                        .where(Order.status == OrderStatus.COMPLETED)
+                        .group_by(DishCategory.name)
+                        .order_by(func.sum(OrderItem.subtotal).desc())
+                        .limit(int(os.getenv("DASHBOARD_CATEGORY_RANK_LIMIT", "5")))
                     )
-                    .join(Dish, OrderItem.item_id == func.cast(Dish.id, OrderItem.item_id.type))
-                    .join(DishCategory, Dish.category_id == DishCategory.id)
-                    .join(Order, OrderItem.order_id == Order.id)
-                    .where(Order.status == OrderStatus.COMPLETED)
-                    .group_by(DishCategory.name)
-                    .order_by(func.sum(OrderItem.subtotal).desc())
-                    .limit(int(os.getenv("DASHBOARD_CATEGORY_RANK_LIMIT", "5")))
-                )
-                rows = result.all()
+                    rows = result.all()
+            except Exception as e:
+                logger.warning("dashboard_category_sales_db_failed", error=str(e))
 
             if rows:
                 category_sales = [
                     {"name": row.category_name, "value": int(row.total_sales or 0)}
                     for row in rows
                 ]
-            else:
-                # fallback：从POS获取分类列表，销售额为0
-                try:
-                    categories = await pos_service.get_dish_categories()
-                    category_sales = [
+                return {"categories": category_sales}
+
+            # fallback：从POS获取分类列表，销售额为0
+            try:
+                categories = await pos_service.get_dish_categories()
+                return {
+                    "categories": [
                         {"name": c.get("rcNAME", "未知"), "value": 0}
                         for c in categories[:5]
                     ]
-                except Exception as e:
-                    logger.warning("dashboard_pos_categories_fallback_failed", error=str(e))
-                    category_sales = []
-
-            return {"categories": category_sales}
+                }
+            except Exception as e:
+                logger.warning("dashboard_pos_categories_fallback_failed", error=str(e))
+                return {"categories": []}
 
         except Exception as e:
             logger.error("获取菜品类别销售数据失败", error=str(e))
@@ -222,17 +227,21 @@ class DashboardService:
         获取支付方式分布（从 order_metadata 统计，fallback 到 POS 分类列表）
         """
         try:
-            async with get_db_session() as session:
-                result = await session.execute(
-                    select(Order.order_metadata, func.count(Order.id).label("cnt"))
-                    .where(
-                        Order.status == OrderStatus.COMPLETED,
-                        Order.order_metadata.isnot(None),
+            rows = []
+            try:
+                async with get_db_session() as session:
+                    result = await session.execute(
+                        select(Order.order_metadata, func.count(Order.id).label("cnt"))
+                        .where(
+                            Order.status == OrderStatus.COMPLETED,
+                            Order.order_metadata.isnot(None),
+                        )
+                        .group_by(Order.order_metadata)
+                        .limit(int(os.getenv("DASHBOARD_PAYMENT_QUERY_LIMIT", "200")))
                     )
-                    .group_by(Order.order_metadata)
-                    .limit(int(os.getenv("DASHBOARD_PAYMENT_QUERY_LIMIT", "200")))
-                )
-                rows = result.all()
+                    rows = result.all()
+            except Exception as e:
+                logger.warning("dashboard_payment_db_failed", error=str(e))
 
             # 从 order_metadata JSON 中提取 payment_method
             payment_counts: Dict[str, int] = {}
@@ -256,11 +265,7 @@ class DashboardService:
                     ]
                 except Exception as e:
                     logger.warning("dashboard_pos_pay_types_failed", error=str(e))
-                    payment_distribution = [
-                        {"name": "微信支付", "value": 0},
-                        {"name": "支付宝", "value": 0},
-                        {"name": "现金", "value": 0},
-                    ]
+                    payment_distribution = []
 
             return {"payment_methods": payment_distribution}
 
@@ -315,6 +320,8 @@ class DashboardService:
                 "member_levels": [
                     {"level": "普通会员", "count": max(0, total_members - active_members)},
                     {"level": "活跃会员", "count": active_members},
+                    {"level": "黄金会员", "count": 0},
+                    {"level": "钻石会员", "count": 0},
                 ],
             }
 
@@ -324,7 +331,12 @@ class DashboardService:
                 "total_members": 0,
                 "new_members_today": 0,
                 "active_members": 0,
-                "member_levels": [],
+                "member_levels": [
+                    {"level": "普通会员", "count": 0},
+                    {"level": "活跃会员", "count": 0},
+                    {"level": "黄金会员", "count": 0},
+                    {"level": "钻石会员", "count": 0},
+                ],
             }
 
     async def get_agent_performance(self) -> Dict[str, Any]:
@@ -373,7 +385,17 @@ class DashboardService:
 
         except Exception as e:
             logger.error("获取Agent性能数据失败", error=str(e))
-            return {"agents": []}
+            return {
+                "agents": [
+                    {"name": "排班Agent", "tasks": 0, "success_rate": 0.0},
+                    {"name": "订单Agent", "tasks": 0, "success_rate": 0.0},
+                    {"name": "库存Agent", "tasks": 0, "success_rate": 0.0},
+                    {"name": "服务Agent", "tasks": 0, "success_rate": 0.0},
+                    {"name": "培训Agent", "tasks": 0, "success_rate": 0.0},
+                    {"name": "决策Agent", "tasks": 0, "success_rate": 0.0},
+                    {"name": "预定Agent", "tasks": 0, "success_rate": 0.0},
+                ]
+            }
 
     async def get_realtime_metrics(self) -> Dict[str, Any]:
         """

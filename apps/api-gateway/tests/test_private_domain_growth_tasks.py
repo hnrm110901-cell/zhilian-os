@@ -31,8 +31,10 @@ def _make_mock_db_session(fetchall_rows=None, rowcount=0):
     构造可用于 async with get_db_session() as db: 的异步上下文管理器 mock。
     """
     db = AsyncMock()
-    db.execute.return_value.fetchall.return_value = fetchall_rows or []
-    db.execute.return_value.rowcount = rowcount
+    execute_result = MagicMock()
+    execute_result.fetchall = MagicMock(return_value=fetchall_rows or [])
+    execute_result.rowcount = rowcount
+    db.execute = AsyncMock(return_value=execute_result)
     db.commit = AsyncMock()
 
     @asynccontextmanager

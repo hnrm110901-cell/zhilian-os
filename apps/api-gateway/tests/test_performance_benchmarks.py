@@ -7,7 +7,18 @@ Performance Benchmark Tests
 import pytest
 import asyncio
 import time
+import socket
 from typing import List, Dict, Any
+
+
+@pytest.fixture(scope="module", autouse=True)
+def require_qdrant():
+    """性能基准依赖本地 Qdrant；不可达时跳过该模块。"""
+    try:
+        with socket.create_connection(("127.0.0.1", 6334), timeout=0.5):
+            return
+    except OSError:
+        pytest.skip("Qdrant is not reachable at 127.0.0.1:6334; skipping performance benchmarks")
 
 
 class TestPerformanceBenchmarks:

@@ -1,9 +1,9 @@
 # 智链OS硬件集成技术框架
 # Hardware Integration Framework - Raspberry Pi 5 + Shokz Devices
 
-**文档版本**: v1.0
-**最后更新**: 2026-02-22
-**状态**: ✅ 技术方案完成，待实施验证
+**文档版本**: v1.1
+**最后更新**: 2026-03-12
+**状态**: ⚠️ 第一版安装器、设备凭证、Shokz 本地回调守护进程已补齐，仍待真实门店实施验证
 
 ---
 
@@ -159,7 +159,7 @@ class RaspberryPiEdgeService:
 ### 2.2 Shokz设备集成服务
 
 **文件**: `src/services/shokz_device_service.py`
-**代码行数**: 420行
+**边缘守护进程**: `edge/shokz_callback_daemon.py`
 
 **核心类**:
 ```python
@@ -173,6 +173,24 @@ class ShokzDeviceService:
     async def voice_output()  # 语音输出
     async def send_alert()  # 发送异常驱动通知
 ```
+
+**当前实际执行链路**:
+```text
+API Gateway -> EDGE_SHOKZ_CALLBACK_URL -> 树莓派 shokz_callback_daemon.py
+```
+
+当前第一版已实现：
+
+- 云端 `connect_device` / `disconnect_device` / `voice_output` 回推到树莓派
+- 树莓派本地校验 `X-Edge-Callback-Secret`
+- 本地持久化 `shokz_state.json`
+- systemd 服务 `zhilian-edge-shokz.service`
+
+当前仍未实现：
+
+- 真实蓝牙命令执行
+- 本地麦克风采集 / 扬声播放
+- 多耳机并发抢占控制
 
 **推荐配置**:
 | 角色 | 设备型号 | 数量 | 优先级 | 通知类型 |
@@ -322,7 +340,7 @@ LTV/CAC = ¥300,000 / ¥9,300 = 32.3
 3. 网络配置（WiFi/以太网）
 
 **Phase 2: 远程部署（2小时）**
-1. 树莓派5首次启动，自动注册到云端
+1. 树莓派5通过第一版安装器完成配置并注册到云端
 2. 下载本地AI模型（395MB，约5分钟）
 3. 配置门店信息（store_id、设备名称）
 4. 健康检查（CPU、内存、温度）
@@ -339,6 +357,10 @@ LTV/CAC = ¥300,000 / ¥9,300 = 32.3
 3. 验收测试（10分钟）
 
 **总时长**: 4.5小时（可并行操作，实际3.5小时）
+
+补充：
+- 第一版安装器文档：`RASPBERRY_PI_EDGE_INSTALLER.md`
+- 差距清单：`EDGE_NODE_GAP_ANALYSIS.md`
 
 ---
 

@@ -7,7 +7,7 @@ Revision ID: h03_orders_missing_columns
 Revises: h02_stores_missing_columns
 Create Date: 2026-03-06
 """
-from alembic import op
+from alembic import op, context
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
@@ -18,6 +18,8 @@ depends_on = None
 
 
 def _col_exists(conn, table, col):
+    if conn is None:
+        return False
     r = conn.execute(sa.text(
         "SELECT EXISTS (SELECT 1 FROM information_schema.columns "
         "WHERE table_name=:t AND column_name=:c)"
@@ -31,7 +33,7 @@ def _add_col(conn, table, col, col_type):
 
 
 def upgrade() -> None:
-    conn = op.get_bind()
+    conn = None if context.is_offline_mode() else op.get_bind()
 
     # ── orders ──────────────────────────────────────────────────────────────
     _add_col(conn, "orders", "discount_amount",  "INTEGER DEFAULT 0")
@@ -56,7 +58,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    conn = op.get_bind()
     for col in ["discount_amount", "final_amount", "confirmed_at",
                 "completed_at", "order_metadata"]:
         op.execute(sa.text(f"ALTER TABLE orders DROP COLUMN IF EXISTS {col}"))

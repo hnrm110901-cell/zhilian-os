@@ -16,6 +16,7 @@ TTL：25 小时（稍大于 24h RFM 刷新周期，防止 stale data）
 from __future__ import annotations
 
 import json
+import inspect
 import os
 from typing import Any, Dict, Optional
 
@@ -24,6 +25,12 @@ import structlog
 logger = structlog.get_logger()
 
 _CTX_TTL = int(os.getenv("MEMBER_CTX_TTL", str(25 * 3600)))  # 25h
+
+
+async def _maybe_await(value):
+    if inspect.isawaitable(value):
+        return await value
+    return value
 
 # ── Redis key 构造（纯函数）────────────────────────────────────────────────────
 
@@ -104,7 +111,7 @@ class MemberContextStore:
         if not self._redis:
             return None
         try:
-            raw = await self._redis.get(make_context_key(store_id, customer_id))
+            raw = await _maybe_await(self._redis.get(make_context_key(store_id, customer_id)))
             if raw is None:
                 return None
             return json.loads(raw)
@@ -134,11 +141,11 @@ class MemberContextStore:
         if not self._redis:
             return
         try:
-            await self._redis.setex(
+            await _maybe_await(self._redis.setex(
                 make_context_key(store_id, customer_id),
                 ttl,
                 json.dumps(data, ensure_ascii=False, default=str),
-            )
+            ))
         except Exception as exc:
             logger.debug(
                 "member_context_store.set_failed",
@@ -156,7 +163,7 @@ class MemberContextStore:
         if not self._redis:
             return
         try:
-            await self._redis.delete(make_context_key(store_id, customer_id))
+            await _maybe_await(self._redis.delete(make_context_key(store_id, customer_id)))
             logger.debug(
                 "member_context_store.invalidated",
                 store_id=store_id,
@@ -184,9 +191,15 @@ class MemberContextStore:
         try:
             pattern = f"member_ctx:{store_id}:*"
             deleted = 0
-            async for key in self._redis.scan_iter(match=pattern, count=200):
-                await self._redis.delete(key)
-                deleted += 1
+            keys_iter = await _maybe_await(self._redis.scan_iter(match=pattern, count=200))
+            if hasattr(keys_iter, "__aiter__"):
+                async for key in keys_iter:
+                    await _maybe_await(self._redis.delete(key))
+                    deleted += 1
+            else:
+                for key in (keys_iter or []):
+                    await _maybe_await(self._redis.delete(key))
+                    deleted += 1
             logger.info(
                 "member_context_store.store_invalidated",
                 store_id=store_id,

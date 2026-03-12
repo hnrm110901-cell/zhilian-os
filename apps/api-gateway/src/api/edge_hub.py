@@ -25,12 +25,13 @@ Edge Hub API
 
 from __future__ import annotations
 
+import os
 import uuid
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -53,6 +54,16 @@ class BindingCreate(BaseModel):
     position:    str
     employee_id: Optional[str] = None
     channel:     Optional[int] = None
+
+
+class HeartbeatPayload(BaseModel):
+    status:          Optional[str]   = None   # "online" | "degraded" | "upgrading"
+    runtime_version: Optional[str]   = None
+    ip_address:      Optional[str]   = None
+    cpu_pct:         Optional[float] = None
+    mem_pct:         Optional[float] = None
+    disk_pct:        Optional[float] = None
+    devices: Optional[List[Dict[str, Any]]] = None   # [{device_code, status, firmware_ver}]
 
 
 class BindingUpdate(BaseModel):
@@ -631,6 +642,89 @@ async def inspect_node(
             "hubId": hub.id,
             "inspectedAt": hub.last_heartbeat.isoformat() + "Z",
             "status": hub.status,
+        },
+    }
+
+
+_HUB_SECRET = os.getenv("EDGE_HUB_SECRET", "")
+
+
+@router.post("/nodes/{hub_id}/heartbeat")
+async def receive_heartbeat(
+    hub_id:  str,
+    body:    HeartbeatPayload,
+    db:      AsyncSession = Depends(get_db),
+    x_hub_secret: Optional[str] = Header(None, alias="X-Hub-Secret"),
+) -> Dict[str, Any]:
+    """
+    边缘主机心跳上报（硬件专用，不要求 JWT）。
+
+    认证：请求头 X-Hub-Secret 必须匹配环境变量 EDGE_HUB_SECRET（非空时启用）。
+
+    接受字段：status / runtime_version / ip_address / cpu_pct / mem_pct / disk_pct /
+              devices[{device_code, status, firmware_ver}]
+    """
+    if _HUB_SECRET and x_hub_secret != _HUB_SECRET:
+        raise HTTPException(status_code=401, detail="invalid hub secret")
+
+    hub = (await db.execute(select(EdgeHub).where(EdgeHub.id == hub_id))).scalar_one_or_none()
+    if not hub:
+        raise HTTPException(status_code=404, detail="hub not found")
+
+    now = datetime.utcnow()
+    hub.last_heartbeat = now
+
+    if body.status is not None:
+        hub.status = body.status
+    elif hub.status != HubStatus.ONLINE:
+        hub.status = HubStatus.ONLINE   # implicitly online if sending heartbeat
+
+    if body.runtime_version is not None:
+        hub.runtime_version = body.runtime_version
+    if body.ip_address is not None:
+        hub.ip_address = body.ip_address
+    if body.cpu_pct is not None:
+        hub.cpu_pct = body.cpu_pct
+    if body.mem_pct is not None:
+        hub.mem_pct = body.mem_pct
+    if body.disk_pct is not None:
+        hub.disk_pct = body.disk_pct
+
+    # Update per-device status if provided
+    device_results: List[Dict[str, Any]] = []
+    if body.devices:
+        for d in body.devices:
+            code   = d.get("device_code")
+            status = d.get("status")
+            fw_ver = d.get("firmware_ver")
+            if not code:
+                continue
+            device = (await db.execute(
+                select(EdgeDevice).where(EdgeDevice.hub_id == hub.id, EdgeDevice.device_code == code)
+            )).scalar_one_or_none()
+            if device:
+                if status:
+                    device.status = status
+                if fw_ver:
+                    device.firmware_ver = fw_ver
+                device.last_seen = now
+                device_results.append({"device_code": code, "updated": True})
+
+    await db.commit()
+
+    logger.debug(
+        "edge_hub.heartbeat_received",
+        hub_id=hub_id, hub_code=hub.hub_code, status=hub.status,
+    )
+
+    return {
+        "code":    0,
+        "message": "ok",
+        "data": {
+            "hubId":        hub.id,
+            "receivedAt":   now.isoformat() + "Z",
+            "status":       hub.status,
+            "devicesUpdated": len(device_results),
         },
     }
 

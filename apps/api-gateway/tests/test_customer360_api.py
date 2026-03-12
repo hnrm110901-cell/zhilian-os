@@ -93,13 +93,15 @@ def _mock_pricing(maslow_level=2):
     """返回一个假的 PricingOffer dataclass-like 对象（能被 asdict 处理）。"""
     from dataclasses import dataclass
 
+    _level = maslow_level
+
     @dataclass
     class FakeOffer:
         offer_type: str = "discount_coupon"
         title: str = "回头客专属优惠"
         description: str = "享 88折"
         discount_pct: float = 8.8
-        maslow_level: int = maslow_level
+        maslow_level: int = _level
         strategy_note: str = "test"
         is_peak_hour: bool = False
         confidence: float = 0.86

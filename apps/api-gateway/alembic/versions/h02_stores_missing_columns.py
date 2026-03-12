@@ -8,7 +8,7 @@ Revision ID: h02_stores_missing_columns
 Revises: h01_fix_dish_ingredients
 Create Date: 2026-03-06
 """
-from alembic import op
+from alembic import op, context
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
@@ -19,9 +19,11 @@ depends_on = None
 
 
 def upgrade() -> None:
-    conn = op.get_bind()
+    conn = None if context.is_offline_mode() else op.get_bind()
 
     def col_exists(table, col):
+        if conn is None:
+            return False
         r = conn.execute(sa.text(
             "SELECT EXISTS (SELECT 1 FROM information_schema.columns "
             "WHERE table_name=:t AND column_name=:c)"
