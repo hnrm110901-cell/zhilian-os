@@ -103,21 +103,21 @@ const LoginPage: React.FC = () => {
         <div className={styles.header}>
           <div className={styles.emoji}>🍜</div>
           <h1 className={styles.brand}>屯象OS</h1>
-          <p className={styles.subtitle}><RocketOutlined /> 餐饮行业智能管理系统</p>
+          <p className={styles.subtitle}><RocketOutlined /> 餐饮人的好伙伴</p>
         </div>
 
         {/* 登录表单 */}
         <Form name="login" onFinish={onFinish} autoComplete="off" size="large">
           <Form.Item name="username" rules={[{ required: true, message: '请输入用户名' }]}>
             <Input
-              prefix={<UserOutlined style={{ color: '#667eea' }} />}
+              prefix={<UserOutlined style={{ color: '#0AAF9A' }} />}
               placeholder="用户名"
               style={{ borderRadius: 8 }}
             />
           </Form.Item>
           <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }]}>
             <Input.Password
-              prefix={<LockOutlined style={{ color: '#667eea' }} />}
+              prefix={<LockOutlined style={{ color: '#0AAF9A' }} />}
               placeholder="密码"
               style={{ borderRadius: 8 }}
             />

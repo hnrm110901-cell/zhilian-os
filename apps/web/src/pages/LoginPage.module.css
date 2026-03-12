@@ -5,7 +5,7 @@
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #0AAF9A 0%, #066E5D 100%);
   position: relative;
   overflow: hidden;
 }
@@ -68,7 +68,7 @@
 .brand {
   font-size: 28px;
   font-weight: 700;
-  color: #667eea;
+  color: #0AAF9A;
   margin: 0 0 6px;
 }
 
@@ -85,7 +85,7 @@
   height: 48px;
   border: none;
   border-radius: 8px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #0AAF9A 0%, #066E5D 100%);
   color: #fff;
   font-size: 16px;
   font-weight: 500;
