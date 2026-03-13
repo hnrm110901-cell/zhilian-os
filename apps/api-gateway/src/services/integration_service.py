@@ -211,32 +211,35 @@ class IntegrationService:
             return {"success": False, "error": str(e)}
 
     async def _test_pinzhi_connection(self, system: ExternalSystem) -> Dict[str, Any]:
-        """测试品智POS连接（Token鉴权）"""
+        """测试品智POS连接（MD5签名鉴权）"""
+        import hashlib
         cfg = system.config or {}
         token = cfg.get("token") or system.api_key
         if not token:
             return {"success": False, "error": "未配置品智Token"}
         try:
-            import hashlib, time
-            timestamp = str(int(time.time()))
-            sign_str = f"token={token}&timestamp={timestamp}"
-            sign = hashlib.md5(sign_str.encode()).hexdigest().upper()
-            params = {"token": token, "timestamp": timestamp, "sign": sign, "pageIndex": 1, "pageSize": 1}
+            # 品智签名算法：空参数时 sign = md5("token=<token>")
+            sign = hashlib.md5(f"token={token}".encode("utf-8")).hexdigest()
+            params = {"sign": sign}
             async with httpx.AsyncClient(timeout=10.0) as client:
-                for path in ["/category/query.do", "/bill/query.do"]:
-                    try:
-                        resp = await client.get(f"{system.api_endpoint}{path}", params=params)
-                        body = resp.json()
-                        # 品智返回 code 0 或 1 均代表接口可达
-                        if resp.status_code < 500:
-                            code = body.get("code", body.get("returnCode", -1))
-                            if code in (0, 1, "0", "1", 200, "200"):
-                                return {"success": True, "message": f"品智POS连接成功（{path}）"}
-                            else:
-                                return {"success": True, "message": f"品智接口可达，认证码={code}"}
-                    except Exception:
-                        continue
-            return {"success": False, "error": "品智API端点无法访问"}
+                # storeInfo.do 是最轻量的基础接口，无需额外参数
+                resp = await client.get(
+                    f"{system.api_endpoint}/pinzhi/storeInfo.do",
+                    params=params,
+                )
+                body = resp.json()
+                # 品智 success=0 表示成功
+                if body.get("success") == 0:
+                    stores = body.get("res", [])
+                    return {"success": True, "message": f"品智POS连接成功，共{len(stores)}家门店"}
+                else:
+                    # 接口可达但认证/参数问题
+                    msg = body.get("msg", body.get("errmsg", str(body)))
+                    return {"success": True, "message": f"品智接口可达（{msg}）"}
+        except httpx.ConnectError:
+            return {"success": False, "error": "无法连接到品智服务器，请检查网络"}
+        except httpx.TimeoutException:
+            return {"success": False, "error": "品智API连接超时"}
         except Exception as e:
             return {"success": False, "error": str(e)}
 
