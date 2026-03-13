@@ -232,15 +232,18 @@ class IntegrationService:
                 try:
                     body = resp.json()
                 except Exception:
-                    # 非 JSON 响应（HTML 错误页等），只要 HTTP 状态正常说明可连通
-                    return {"success": True, "message": f"品智接口可达（HTTP {resp.status_code}，响应非JSON）"}
+                    # 非 JSON（HTML错误页等），HTTP<400 才算连通
+                    if resp.status_code < 400:
+                        return {"success": True, "message": f"品智服务器可达（HTTP {resp.status_code}）"}
+                    else:
+                        return {"success": False, "error": f"品智接口返回 HTTP {resp.status_code}，请确认域名和路径"}
                 # 品智 success=0 表示成功
                 if body.get("success") == 0:
                     stores = body.get("res", [])
                     return {"success": True, "message": f"品智POS连接成功，共{len(stores)}家门店"}
                 else:
                     msg = body.get("msg", body.get("errmsg", ""))
-                    return {"success": True, "message": f"品智接口可达（{msg or resp.status_code}）"}
+                    return {"success": True, "message": f"品智接口可达（{msg or 'Token需确认'}）"}
         except httpx.ConnectError:
             return {"success": False, "error": "无法连接到品智服务器，请检查网络"}
         except httpx.TimeoutException:
