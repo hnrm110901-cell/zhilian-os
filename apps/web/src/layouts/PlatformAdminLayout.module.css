@@ -1,0 +1,320 @@
+/* ── Shell ───────────────────────────────────────────────────────────────────*/
+
+.shell {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  background: #F5F5F7;
+  font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────────────────────*/
+
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: #1A1A2E;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.2s ease;
+  overflow: hidden;
+  z-index: 100;
+}
+
+.sidebarCollapsed {
+  width: 56px;
+}
+
+/* ── Logo ────────────────────────────────────────────────────────────────────*/
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.logoIcon {
+  font-size: 28px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.logoText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.logoName {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.logoSub {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+  white-space: nowrap;
+}
+
+/* ── Nav ─────────────────────────────────────────────────────────────────────*/
+
+.nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 0;
+  scrollbar-width: none;
+}
+
+.nav::-webkit-scrollbar {
+  display: none;
+}
+
+.navGroup {
+  margin-bottom: 4px;
+}
+
+.groupTitle {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 8px 16px 4px;
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px;
+  color: rgba(255, 255, 255, 0.6);
+  text-decoration: none;
+  font-size: 13.5px;
+  border-radius: 0;
+  transition: all 0.15s;
+  position: relative;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.navItem:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.navItemActive {
+  color: #0AAF9A !important;
+  background: rgba(10, 175, 154, 0.12) !important;
+}
+
+.navItemActive::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 60%;
+  background: #0AAF9A;
+  border-radius: 0 3px 3px 0;
+}
+
+.navIcon {
+  font-size: 16px;
+  flex-shrink: 0;
+  width: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.navLabel {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Badge ───────────────────────────────────────────────────────────────────*/
+
+.badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 20px;
+  flex-shrink: 0;
+}
+
+.badge_new {
+  background: rgba(10, 175, 154, 0.2);
+  color: #0AAF9A;
+}
+
+.badge_beta {
+  background: rgba(250, 173, 20, 0.2);
+  color: #faad14;
+}
+
+/* ── User Area ───────────────────────────────────────────────────────────────*/
+
+.userArea {
+  padding: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.userInfo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  min-width: 0;
+}
+
+.userAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0AAF9A, #066E5D);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.userMeta {
+  min-width: 0;
+}
+
+.userName {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.userRole {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.logoutBtn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.logoutBtn:hover {
+  background: rgba(255, 80, 80, 0.15);
+  color: #ff6b6b;
+}
+
+/* ── Main ────────────────────────────────────────────────────────────────────*/
+
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* ── Topbar ──────────────────────────────────────────────────────────────────*/
+
+.topbar {
+  height: 52px;
+  background: #fff;
+  border-bottom: 1px solid #E8E8E8;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 20px;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.collapseBtn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: #6E6E73;
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.collapseBtn:hover {
+  background: #F5F5F7;
+  color: #1D1D1F;
+}
+
+.breadcrumb {
+  flex: 1;
+  min-width: 0;
+}
+
+.breadcrumbText {
+  font-size: 14px;
+  color: #6E6E73;
+}
+
+.breadcrumbSep {
+  margin: 0 6px;
+  color: #AEAEB2;
+}
+
+.topbarRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.envBadge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(10, 175, 154, 0.12);
+  color: #0AAF9A;
+  letter-spacing: 0.05em;
+}
+
+.version {
+  font-size: 12px;
+  color: #AEAEB2;
+}
+
+/* ── Content ─────────────────────────────────────────────────────────────────*/
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}

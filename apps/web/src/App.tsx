@@ -1,5 +1,5 @@
-import React, { Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import React, { Suspense, lazy, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { ConfigProvider, Spin } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { AuthProvider } from './contexts/AuthContext';
@@ -184,6 +184,10 @@ const SmAlerts    = lazy(() => import('./pages/sm/Alerts'));
 const SmWorkforce = lazy(() => import('./pages/sm/Workforce'));
 const SmPrepSuggestion = lazy(() => import('./pages/sm/PrepSuggestion'));
 
+// Platform Admin layout + pages (admin.zlsjos.cn / www.admin.zlsjos.cn)
+const PlatformAdminLayout = lazy(() => import('./layouts/PlatformAdminLayout'));
+const PlatformAdminHome   = lazy(() => import('./pages/platform/PlatformAdminHome'));
+
 // Role-based views (Phase 2 — Chef /chef, Floor /floor, HQ /hq)
 const ChefLayout      = lazy(() => import('./layouts/ChefLayout'));
 const ChefHome        = lazy(() => import('./pages/chef/Home'));
@@ -224,6 +228,28 @@ const PageLoader = (
   </div>
 );
 
+// ── hostname 自动识别 ──────────────────────────────────────────
+// 访问 admin.zlsjos.cn / www.admin.zlsjos.cn 时，自动跳转到 /platform
+const ADMIN_HOSTNAMES = ['admin.zlsjos.cn', 'www.admin.zlsjos.cn'];
+
+const HostnameRedirect: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const host = window.location.hostname;
+    const isAdminHost = ADMIN_HOSTNAMES.includes(host);
+    const isAlreadyOnPlatform = location.pathname.startsWith('/platform');
+    const isLoginPage = location.pathname === '/login';
+
+    if (isAdminHost && !isAlreadyOnPlatform && !isLoginPage) {
+      navigate('/platform', { replace: true });
+    }
+  }, [navigate, location.pathname]);
+
+  return null;
+};
+
 const AppContent: React.FC = () => {
   const { isDark } = useTheme();
 
@@ -231,6 +257,7 @@ const AppContent: React.FC = () => {
     <ConfigProvider locale={zhCN} theme={isDark ? darkTheme : lightTheme}>
       <AuthProvider>
         <BrowserRouter>
+          <HostnameRedirect />
           <ErrorBoundary>
             <Suspense fallback={PageLoader}>
               <Routes>
@@ -709,6 +736,40 @@ const AppContent: React.FC = () => {
                   } />
                 </Route>
                 <Route path="*" element={<NotFoundPage />} />
+
+                {/* ── 企业管理后台 /platform (admin.zlsjos.cn) ── */}
+                <Route path="/platform" element={
+                  <ProtectedRoute requiredRole="admin">
+                    <PlatformAdminLayout />
+                  </ProtectedRoute>
+                }>
+                  {/* 控制台首页 */}
+                  <Route index element={<PlatformAdminHome />} />
+                  {/* 平台分析 → 复用现有页面 */}
+                  <Route path="analytics" element={<PlatformAnalyticsPage />} />
+                  {/* 商户管理 → 复用现有页面 */}
+                  <Route path="merchants" element={<MerchantManagementPage />} />
+                  {/* API 集成配置 → 复用现有页面 */}
+                  <Route path="integrations" element={<EnterpriseIntegrationPage />} />
+                  {/* 开放平台 → 复用现有页面 */}
+                  <Route path="open-platform" element={<OpenPlatformPage />} />
+                  {/* 系统监控 → 复用现有页面 */}
+                  <Route path="monitoring" element={<MonitoringPage />} />
+                  {/* 灰度 & 特性开关（新页面，暂用 PlatformHubPage 占位） */}
+                  <Route path="feature-flags" element={<PlatformHubPage />} />
+                  {/* 审计日志 → 复用现有页面 */}
+                  <Route path="audit-log" element={<AuditLogPage />} />
+                  {/* 备份管理 → 复用现有页面 */}
+                  <Route path="backup" element={<BackupManagement />} />
+                  {/* Agent 配置 → 复用 HQ 决策页面占位 */}
+                  <Route path="agents" element={<HQDashboardPage />} />
+                  {/* 本体图管理 → 复用现有页面 */}
+                  <Route path="ontology" element={<OntologyAdminPage />} />
+                  {/* 数据主权 → 复用现有页面 */}
+                  <Route path="data-sovereignty" element={<DataSovereigntyPage />} />
+                  {/* 系统设置 → 复用用户管理页面 */}
+                  <Route path="settings" element={<UserManagementPage />} />
+                </Route>
 
                 {/* Role-based views — Store Manager (手机) */}
                 <Route path="/sm" element={
