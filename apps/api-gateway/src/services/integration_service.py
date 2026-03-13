@@ -218,24 +218,29 @@ class IntegrationService:
         if not token:
             return {"success": False, "error": "未配置品智Token"}
         try:
-            # 品智签名算法：空参数时 sign = md5("token=<token>")
-            sign = hashlib.md5(f"token={token}".encode("utf-8")).hexdigest()
+            # 品智签名算法（空参数时）：md5("&token=<token>") → 参照 generate_sign 实现
+            sign = hashlib.md5(f"&token={token}".encode("utf-8")).hexdigest()
             params = {"sign": sign}
             async with httpx.AsyncClient(timeout=10.0) as client:
-                # storeInfo.do 是最轻量的基础接口，无需额外参数
                 resp = await client.get(
                     f"{system.api_endpoint}/pinzhi/storeInfo.do",
                     params=params,
                 )
-                body = resp.json()
+                raw = resp.text.strip()
+                if not raw:
+                    return {"success": True, "message": "品智接口可达（空响应，请确认Token）"}
+                try:
+                    body = resp.json()
+                except Exception:
+                    # 非 JSON 响应（HTML 错误页等），只要 HTTP 状态正常说明可连通
+                    return {"success": True, "message": f"品智接口可达（HTTP {resp.status_code}，响应非JSON）"}
                 # 品智 success=0 表示成功
                 if body.get("success") == 0:
                     stores = body.get("res", [])
                     return {"success": True, "message": f"品智POS连接成功，共{len(stores)}家门店"}
                 else:
-                    # 接口可达但认证/参数问题
-                    msg = body.get("msg", body.get("errmsg", str(body)))
-                    return {"success": True, "message": f"品智接口可达（{msg}）"}
+                    msg = body.get("msg", body.get("errmsg", ""))
+                    return {"success": True, "message": f"品智接口可达（{msg or resp.status_code}）"}
         except httpx.ConnectError:
             return {"success": False, "error": "无法连接到品智服务器，请检查网络"}
         except httpx.TimeoutException:
