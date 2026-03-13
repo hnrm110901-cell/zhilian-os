@@ -139,6 +139,16 @@ jobs:
               sleep 3
             done
 
+            echo "=== [4.5/5] Run DB migrations ==="
+            CONTAINER=$(docker ps --filter "name=api-gateway" --format "{{.Names}}" | head -1)
+            if [ -n "$CONTAINER" ]; then
+              docker exec "$CONTAINER" sh -c "cd /app && alembic upgrade head"
+              echo "✓ DB migrations done"
+            else
+              echo "⚠ Container not found, trying direct alembic run"
+              cd /opt/zhilian-os/apps/api-gateway && alembic upgrade head || echo "⚠ Migration skipped"
+            fi
+
             echo "=== [5/5] Check final status ==="
             docker ps --filter "name=zhilian" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
             curl -sf http://127.0.0.1:8000/api/v1/health && echo "" || echo "⚠ Health check failed"
