@@ -118,6 +118,14 @@ class IntegrationService:
             if hasattr(system, key) and value is not None:
                 setattr(system, key, value)
 
+        # 若更新了 config，同步从 config 中提取独立字段
+        new_config = kwargs.get("config")
+        if new_config:
+            for col in ("api_endpoint", "api_key", "api_secret", "webhook_url"):
+                val = new_config.get(col)
+                if val is not None:
+                    setattr(system, col, val)
+
         system.updated_at = datetime.utcnow()
         await session.commit()
         await session.refresh(system)

@@ -38,6 +38,10 @@ class UpdateSystemRequest(BaseModel):
     name: Optional[str] = None
     status: Optional[IntegrationStatus] = None
     config: Optional[Dict[str, Any]] = None
+    api_endpoint: Optional[str] = None
+    api_key: Optional[str] = None
+    api_secret: Optional[str] = None
+    webhook_url: Optional[str] = None
     sync_enabled: Optional[bool] = None
     sync_interval: Optional[int] = None
 
