@@ -31,7 +31,10 @@ from pathlib import Path as _Path
 
 def _load_banquet_agents():
     """懒加载 Banquet Agent（与 workforce_auto_schedule_service 同一模式）"""
-    repo_root = _Path(__file__).resolve().parents[4]
+    repo_root = next(
+        (p for p in _Path(__file__).resolve().parents if (p / "packages").is_dir()),
+        _Path(__file__).resolve().parents[2],
+    )
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
     from packages.agents.banquet.src.agent import (

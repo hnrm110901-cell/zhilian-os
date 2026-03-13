@@ -275,7 +275,10 @@ class WorkforceAutoScheduleService:
 
     @staticmethod
     def _load_schedule_agent_cls():
-        repo_root = Path(__file__).resolve().parents[4]
+        repo_root = next(
+            (p for p in Path(__file__).resolve().parents if (p / "packages").is_dir()),
+            Path(__file__).resolve().parents[2],
+        )
         core_dir = Path(__file__).resolve().parents[1] / "core"
         if str(core_dir) not in sys.path:
             sys.path.insert(0, str(core_dir))

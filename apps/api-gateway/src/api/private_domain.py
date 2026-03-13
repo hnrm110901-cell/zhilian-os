@@ -20,8 +20,12 @@ from ..models.user import User
 
 import sys
 from pathlib import Path
-# packages/ 目录位于仓库根（相对于此文件向上 5 级）
-_repo_root = Path(__file__).resolve().parents[4]
+# 向上查找包含 packages/ 的目录作为 repo_root
+# Docker: /app/packages/  本地: <repo>/packages/
+_repo_root = next(
+    (p for p in Path(__file__).resolve().parents if (p / "packages").is_dir()),
+    Path(__file__).resolve().parents[2],
+)
 agent_path = _repo_root / "packages" / "agents" / "private_domain" / "src"
 _core_path = Path(__file__).resolve().parents[1] / "core"  # src/core（base_agent 所在目录）
 for _p in (agent_path, _core_path):
