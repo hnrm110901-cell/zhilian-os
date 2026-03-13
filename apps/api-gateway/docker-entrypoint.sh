@@ -15,5 +15,5 @@ async def run():
 asyncio.run(run())
 " && echo "[1/2] ✓ 数据库初始化完成" || echo "[1/2] ⚠ 数据库初始化失败（继续启动，将在 startup_event 重试）"
 
-echo "[2/2] 启动 uvicorn..."
-exec uvicorn src.main:app --host 0.0.0.0 --port 8000
+echo "[2/2] 启动服务..."
+exec "$@"
