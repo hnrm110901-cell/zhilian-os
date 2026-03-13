@@ -609,6 +609,9 @@ const MainLayout: React.FC = () => {
     return false;
   };
 
+  // ── Current sidebar groups ──
+  const sidebarGroups = DOMAIN_SIDEBAR[activeDomain] || [];
+
   // 侧边栏搜索过滤后的菜单项
   const filteredSidebarGroups = useMemo(() => {
     if (!sidebarFilter.trim()) return sidebarGroups;
@@ -623,9 +626,6 @@ const MainLayout: React.FC = () => {
       }))
       .filter(group => group.items.length > 0);
   }, [sidebarGroups, sidebarFilter]);
-
-  // ── Current sidebar groups ──
-  const sidebarGroups = DOMAIN_SIDEBAR[activeDomain] || [];
 
   // ── Breadcrumb ──
   const domainLabel = DOMAIN_TABS.find(t => t.key === activeDomain)?.label || '';
