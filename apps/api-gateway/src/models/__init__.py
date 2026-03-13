@@ -418,3 +418,12 @@ from .customer_ownership import (
     CustomerOwnership, TransferReason,
     CustomerRiskAlert, RiskLevel, RiskType,
 )
+# Phase P2 — 宴会销控
+from .banquet_sales import (
+    BanquetDateConfig, AuspiciousLevel, DateBookingStatus,
+    SalesFunnelRecord, FunnelStage,
+    BanquetCompetitor,
+)
+# Phase P3 — EO执行引擎
+from .event_staff import EventStaff, StaffRole, StaffConfirmStatus
+from .hall_showcase import HallShowcase

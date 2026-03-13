@@ -28,7 +28,7 @@ import {
   ChartTrend,
 } from '../../design-system/components';
 import type { ZTableColumn } from '../../design-system/components';
-import apiClient from '../../services/apiClient';
+import apiClient from '../../services/api';
 import styles from './PlatformAdminHome.module.css';
 
 // ── 类型定义 ────────────────────────────────────────────────────────────────

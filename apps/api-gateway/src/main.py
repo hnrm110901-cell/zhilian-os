@@ -88,6 +88,12 @@ from src.api import channel_profit
 from src.api import performance_compute
 # Phase P1 — 预订Agent: 渠道中台 + 客户风控
 from src.api import channel_analytics, customer_risk
+# Phase P2 — 预订Agent: 宴会销控引擎
+from src.api import banquet_sales_api
+# Phase P3 — 预订Agent: EO执行引擎（宴小猪能力）
+from src.api import event_orders
+# Phase P4 — 预订Agent: AI智能整合（屯象独有）
+from src.api import reservation_ai
 # Onboarding Engine — 企业诊断与数据入库
 from src.api import onboarding
 from src.middleware.monitoring import MonitoringMiddleware
@@ -735,6 +741,12 @@ app.include_router(onboarding.router)
 # Phase P1 — 预订Agent: 渠道中台 + 客户风控
 app.include_router(channel_analytics.router, prefix="/api/v1", tags=["channel-analytics"])
 app.include_router(customer_risk.router, prefix="/api/v1", tags=["customer-risk"])
+# Phase P2 — 宴会销控引擎
+app.include_router(banquet_sales_api.router, prefix="/api/v1", tags=["banquet-sales"])
+# Phase P3 — EO执行引擎
+app.include_router(event_orders.router, prefix="/api/v1", tags=["event-orders"])
+# Phase P4 — 预订AI助手
+app.include_router(reservation_ai.router, prefix="/api/v1", tags=["reservation-ai"])
 
 # P0 — 食材成本真相引擎
 from src.api import cost_truth
