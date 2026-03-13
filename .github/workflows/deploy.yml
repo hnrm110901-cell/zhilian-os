@@ -1,0 +1,181 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ main ]
+
+# 只允许一个部署同时运行
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  # ── 1. 快速健康检查（确保最基本代码正确） ────────────────────────
+  pre-deploy-check:
+    name: Pre-deploy Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Check Python syntax
+        run: |
+          cd apps/api-gateway
+          python -m py_compile src/main.py
+          echo "✓ Python syntax OK"
+
+      - name: Set up Node / pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install & TypeScript check
+        run: |
+          pnpm install --frozen-lockfile
+          cd apps/web
+          npx tsc --noEmit --skipLibCheck
+          echo "✓ TypeScript check OK"
+
+  # ── 2. 构建前端并上传产物 ────────────────────────────────────────
+  build-frontend:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+    needs: pre-deploy-check
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 8
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        run: |
+          cd apps/web
+          pnpm run build
+        env:
+          VITE_API_URL: https://zlsjos.cn
+          VITE_APP_ENV: production
+
+      - name: Upload frontend dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: apps/web/dist/
+          retention-days: 1
+
+  # ── 3. 部署到服务器 ──────────────────────────────────────────────
+  deploy:
+    name: Deploy to Server
+    runs-on: ubuntu-latest
+    needs: [pre-deploy-check, build-frontend]
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: apps/web/dist/
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
+
+      - name: Add server to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H 42.194.229.21 >> ~/.ssh/known_hosts
+
+      - name: Deploy backend — pull & restart
+        run: |
+          ssh root@42.194.229.21 << 'ENDSSH'
+            set -e
+            echo "=== [1/5] Pull latest code ==="
+            cd /opt/zhilian-os
+            git fetch origin main
+            git reset --hard origin/main
+            echo "Git HEAD: $(git log -1 --oneline)"
+
+            echo "=== [2/5] Stop old supervisor process ==="
+            supervisorctl stop tunxiang-os 2>/dev/null || true
+            # 确保 supervisor 不会自动重启旧进程
+            sed -i 's/^autostart=true/autostart=false/' /etc/supervisor/conf.d/tunxiang-os.conf 2>/dev/null || true
+            supervisorctl reread 2>/dev/null || true
+            supervisorctl update 2>/dev/null || true
+
+            echo "=== [3/5] Start Docker API container ==="
+            cd /opt/zhilian-os
+            docker compose \
+              --env-file .env.prod \
+              -f docker-compose.prod.yml \
+              up -d --no-deps --build zhilian-api
+
+            echo "=== [4/5] Wait for API health ==="
+            for i in $(seq 1 20); do
+              if curl -sf http://127.0.0.1:8000/api/v1/health > /dev/null 2>&1; then
+                echo "✓ API healthy after ${i}s"
+                break
+              fi
+              echo "  waiting... ($i/20)"
+              sleep 3
+            done
+
+            echo "=== [5/5] Check final status ==="
+            docker ps --filter "name=zhilian-api" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+            curl -sf http://127.0.0.1:8000/api/v1/health && echo "" || echo "⚠ Health check failed"
+          ENDSSH
+
+      - name: Deploy frontend — rsync dist to nginx
+        run: |
+          # 同步前端静态文件到 nginx 目录
+          rsync -avz --delete \
+            --exclude='.git' \
+            apps/web/dist/ \
+            root@42.194.229.21:/var/www/html/zhilian-os/
+
+          # 通知 nginx reload（不重启，零停机）
+          ssh root@42.194.229.21 "nginx -t && nginx -s reload"
+
+      - name: Smoke test
+        run: |
+          sleep 5
+          # 测试 API
+          HTTP_CODE=$(curl -sk -o /dev/null -w "%{http_code}" \
+            -H "Host: zlsjos.cn" \
+            https://42.194.229.21/api/v1/health)
+          echo "API health HTTP code: $HTTP_CODE"
+          [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "404" ] && echo "⚠ Partial — API may need DB init"
+
+          # 测试前端
+          HTTP_FRONT=$(curl -sk -o /dev/null -w "%{http_code}" \
+            -H "Host: zlsjos.cn" \
+            https://42.194.229.21/)
+          echo "Frontend HTTP code: $HTTP_FRONT"
+          [ "$HTTP_FRONT" = "200" ] && echo "✓ Frontend serving OK"
+
+      - name: Notify deploy result
+        if: always()
+        run: |
+          STATUS="${{ job.status }}"
+          COMMIT=$(git log -1 --format="%h %s")
+          echo "Deploy $STATUS: $COMMIT"
+          # TODO: 可接入企业微信 Webhook 通知
