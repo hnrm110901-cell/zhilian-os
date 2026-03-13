@@ -211,39 +211,33 @@ class IntegrationService:
             return {"success": False, "error": str(e)}
 
     async def _test_pinzhi_connection(self, system: ExternalSystem) -> Dict[str, Any]:
-        """测试品智POS连接（MD5签名鉴权）"""
-        import hashlib
+        """测试品智POS连接（Bearer Token鉴权，REST API /api/v1）"""
         cfg = system.config or {}
         token = cfg.get("token") or system.api_key
         if not token:
             return {"success": False, "error": "未配置品智Token"}
         try:
-            # 品智签名算法（空参数时）：md5("&token=<token>") → 参照 generate_sign 实现
-            sign = hashlib.md5(f"&token={token}".encode("utf-8")).hexdigest()
-            params = {"sign": sign}
+            headers = {"Authorization": f"Bearer {token}"}
             async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.get(
-                    f"{system.api_endpoint}/pinzhi/storeInfo.do",
-                    params=params,
+                    f"{system.api_endpoint}/stores",
+                    headers=headers,
                 )
-                raw = resp.text.strip()
-                if not raw:
-                    return {"success": True, "message": "品智接口可达（空响应，请确认Token）"}
                 try:
                     body = resp.json()
                 except Exception:
-                    # 非 JSON（HTML错误页等），HTTP<400 才算连通
                     if resp.status_code < 400:
                         return {"success": True, "message": f"品智服务器可达（HTTP {resp.status_code}）"}
-                    else:
-                        return {"success": False, "error": f"品智接口返回 HTTP {resp.status_code}，请确认域名和路径"}
-                # 品智 success=0 表示成功
-                if body.get("success") == 0:
-                    stores = body.get("res", [])
-                    return {"success": True, "message": f"品智POS连接成功，共{len(stores)}家门店"}
+                    return {"success": False, "error": f"品智接口返回 HTTP {resp.status_code}"}
+                # 品智 REST API: code=200 表示成功
+                code = body.get("code", body.get("success", -1))
+                if code in (200, 0, "200", "0"):
+                    data = body.get("data", {})
+                    total = data.get("total", "?") if isinstance(data, dict) else len(data)
+                    return {"success": True, "message": f"品智POS连接成功，共{total}家门店"}
                 else:
-                    msg = body.get("msg", body.get("errmsg", ""))
-                    return {"success": True, "message": f"品智接口可达（{msg or 'Token需确认'}）"}
+                    msg = body.get("message", body.get("msg", ""))
+                    return {"success": True, "message": f"品智接口可达（{msg or code}）"}
         except httpx.ConnectError:
             return {"success": False, "error": "无法连接到品智服务器，请检查网络"}
         except httpx.TimeoutException:
