@@ -1,0 +1,254 @@
+/* PlatformDataSovereigntyPage.module.css */
+
+/* ── 页面容器 ─────────────────────────────────────────────────────────────── */
+.page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 28px;
+}
+
+/* ── 页头 ──────────────────────────────────────────────────────────────────── */
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 16px;
+}
+
+.pageTitle {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin: 0 0 4px;
+  letter-spacing: -0.3px;
+}
+
+.pageSubtitle {
+  font-size: 13px;
+  color: var(--text-tertiary, #9ca3af);
+  margin: 0;
+}
+
+/* ── 提示 ─────────────────────────────────────────────────────────────────── */
+.alertRow {
+  margin-bottom: 16px;
+}
+
+/* ── 配置卡 ─────────────────────────────────────────────────────────────────── */
+.configCard {
+  padding: 20px 24px !important;
+  margin-bottom: 24px;
+}
+
+.configCardTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin-bottom: 16px;
+}
+
+.configRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-subtle, #f0f0f0);
+}
+
+.configRow:last-of-type {
+  border-bottom: none;
+}
+
+.configLabel {
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+  min-width: 120px;
+  flex-shrink: 0;
+}
+
+.configVal {
+  font-size: 13px;
+  color: var(--text-primary, #111827);
+}
+
+.actionRow {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border, #e5e7eb);
+}
+
+/* ── 日志区域 ─────────────────────────────────────────────────────────────── */
+.logSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.logHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.logTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin: 0 0 2px;
+}
+
+.logSubtitle {
+  font-size: 13px;
+  color: var(--text-tertiary, #9ca3af);
+  margin: 0;
+}
+
+.logSubtitle strong {
+  color: var(--text-primary, #111827);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pageInfo {
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+  white-space: nowrap;
+}
+
+.tableCard {
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+/* ── 单元格 ─────────────────────────────────────────────────────────────────── */
+.timeCell {
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+  font-family: 'SF Mono', 'Fira Mono', monospace;
+  white-space: nowrap;
+}
+
+.userCell {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary, #111827);
+}
+
+.descCell {
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── Modal 内部 ────────────────────────────────────────────────────────────── */
+.modalBody {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.modalTip {
+  margin-bottom: 16px;
+}
+
+.modalErr {
+  margin-bottom: 12px;
+}
+
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* ── 表单字段 ─────────────────────────────────────────────────────────────── */
+.fieldRow {
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.fieldLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+}
+
+.req {
+  color: var(--danger, #ef4444);
+  margin-left: 2px;
+}
+
+.fieldInput {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text-primary, #111827);
+  background: var(--surface, #fff);
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  box-sizing: border-box;
+}
+
+.fieldInput:focus {
+  border-color: var(--accent, #FF6B2C);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #FF6B2C) 12%, transparent);
+}
+
+.fieldHint {
+  font-size: 11px;
+  color: var(--text-tertiary, #9ca3af);
+  line-height: 1.4;
+}
+
+.checkRow {
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
+
+.checkLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-primary, #111827);
+  cursor: pointer;
+}
+
+.checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent, #FF6B2C);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* ── 响应式 ──────────────────────────────────────────────────────────────── */
+@media (max-width: 700px) {
+  .page {
+    padding: 16px;
+  }
+  .configCard {
+    padding: 16px !important;
+  }
+  .actionRow {
+    flex-direction: column;
+  }
+}

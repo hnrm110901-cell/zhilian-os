@@ -213,6 +213,7 @@ const PlatformAgentsPage         = lazy(() => import('./pages/platform/PlatformA
 const PlatformFeatureFlagsPage   = lazy(() => import('./pages/platform/PlatformFeatureFlagsPage'));
 const PlatformOntologyPage       = lazy(() => import('./pages/platform/PlatformOntologyPage'));
 const PlatformAuditLogPage       = lazy(() => import('./pages/platform/PlatformAuditLogPage'));
+const PlatformDataSovereigntyPage = lazy(() => import('./pages/platform/PlatformDataSovereigntyPage'));
 
 // Role-based views (Phase 2 — Chef /chef, Floor /floor, HQ /hq)
 const ChefLayout      = lazy(() => import('./layouts/ChefLayout'));
@@ -824,8 +825,8 @@ const AppContent: React.FC = () => {
                   <Route path="agents" element={<PlatformAgentsPage />} />
                   {/* 本体图管理 → 专用本体知识图谱管理页 */}
                   <Route path="ontology" element={<PlatformOntologyPage />} />
-                  {/* 数据主权 → 复用现有页面 */}
-                  <Route path="data-sovereignty" element={<DataSovereigntyPage />} />
+                  {/* 数据主权 → 专用数据主权管理页 */}
+                  <Route path="data-sovereignty" element={<PlatformDataSovereigntyPage />} />
                   {/* 系统设置 → 复用用户管理页面 */}
                   <Route path="settings" element={<UserManagementPage />} />
                 </Route>
