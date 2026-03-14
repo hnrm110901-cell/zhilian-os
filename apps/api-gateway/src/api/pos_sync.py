@@ -604,13 +604,27 @@ async def get_sync_status(
             "configured": bool(os.getenv("PINZHI_BASE_URL") and os.getenv("PINZHI_TOKEN")),
             "base_url": os.getenv("PINZHI_BASE_URL", ""),
             "missing_vars": [v for v in ["PINZHI_BASE_URL", "PINZHI_TOKEN"] if not os.getenv(v)],
-            "scheduled_time": "每日 01:30",
+            "scheduled_time": "每日 01:30（订单 + 营业汇总）",
+            "merchant": "尝在一起",
+            "data_type": "POS 订单 + 营业汇总",
+        },
+        "aoqiwei_crm": {
+            "configured": bool(os.getenv("AOQIWEI_CRM_APPID") and os.getenv("AOQIWEI_CRM_APPKEY")),
+            "base_url": os.getenv("AOQIWEI_CRM_BASE_URL", "https://welcrm.com"),
+            "missing_vars": [v for v in ["AOQIWEI_CRM_APPID", "AOQIWEI_CRM_APPKEY"] if not os.getenv(v)],
+            "scheduled_time": "每日 02:25（基于近30天订单手机号增强会员积分/余额/等级）",
+            "merchant": "徐记海鲜",
+            "data_type": "会员积分 / 储值余额 / 等级（单条查询，无批量导出 API）",
+            "note": "奥琦玮 CRM 无批量会员列表 API，仅支持按手机号/卡号逐条查询。"
+                    "自动任务从 orders.customer_phone 提取近30天有消费记录的手机号逐一查询。",
         },
         "tiancai": {
             "configured": bool(os.getenv("TIANCAI_APPID") and os.getenv("TIANCAI_ACCESSID")),
             "base_url": os.getenv("TIANCAI_BASE_URL", "https://cysms.wuuxiang.com"),
             "missing_vars": [v for v in ["TIANCAI_APPID", "TIANCAI_ACCESSID"] if not os.getenv(v)],
-            "scheduled_time": "每日 02:00",
+            "scheduled_time": "每日 02:00（订单）",
+            "merchant": "最黔线 / 尚宫厨（待确认）",
+            "data_type": "POS 订单",
         },
         "aoqiwei_supply": {
             "configured": bool(os.getenv("AOQIWEI_APP_KEY") and os.getenv("AOQIWEI_APP_SECRET")),
@@ -643,6 +657,25 @@ async def get_sync_status(
                     adapters_status[key]["last_sync_date"] = str(row[1]) if row[1] else None
                     adapters_status[key]["recent_7d_orders"] = int(row[2] or 0)
                     adapters_status[key]["recent_7d_revenue_yuan"] = round(float(row[3] or 0) / 100, 2)
+
+            # 奥琦玮 CRM 会员同步统计（member_syncs 表）
+            crm_row = await session.execute(
+                text("""
+                    SELECT COUNT(*) AS total_members,
+                           MAX(synced_at) AS last_sync_at,
+                           COUNT(*) FILTER (WHERE sync_status = 'success') AS success_count
+                    FROM member_syncs ms
+                    JOIN external_systems es ON ms.system_id = es.id
+                    WHERE es.provider = 'aoqiwei_crm'
+                      AND ms.synced_at >= NOW() - INTERVAL '7 days'
+                """)
+            )
+            crm_data = crm_row.fetchone()
+            if crm_data and crm_data[0]:
+                adapters_status["aoqiwei_crm"]["recent_7d_members_enriched"] = int(crm_data[0])
+                adapters_status["aoqiwei_crm"]["last_member_sync_at"] = (
+                    str(crm_data[1]) if crm_data[1] else None
+                )
     except Exception as exc:
         logger.warning("pos_sync.status_query_failed", error=str(exc))
 

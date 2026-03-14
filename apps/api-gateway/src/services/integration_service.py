@@ -328,6 +328,10 @@ class IntegrationService:
         if not system.api_endpoint:
             return {"success": False, "error": "未配置API端点"}
 
+        # 奥琦玮微生活会员：使用 CRM 适配器真实 API 测试
+        if system.provider in ("aoqiwei_crm",):
+            return await self._test_aoqiwei_crm_connection(system)
+
         try:
             headers = {}
             if system.api_key:
@@ -347,6 +351,54 @@ class IntegrationService:
             return {"success": False, "error": "无法连接到会员系统"}
         except Exception as e:
             return {"success": False, "error": str(e)}
+
+    async def _test_aoqiwei_crm_connection(self, system: ExternalSystem) -> Dict[str, Any]:
+        """
+        测试奥琦玮微生活会员 CRM 连接。
+        通过调用 /member/info（传入不存在的测试号码）来验证签名算法和网络连通性。
+        若业务错误码为 "会员不存在" 类，则视为连接成功（签名正确、服务可达）。
+        """
+        appid = system.api_key or ""
+        appkey = system.api_secret or ""
+
+        if not appid or not appkey:
+            missing = []
+            if not appid:
+                missing.append("AppID（api_key）")
+            if not appkey:
+                missing.append("AppKey（api_secret）")
+            return {
+                "success": False,
+                "error": f"奥琦玮CRM缺少凭证：{', '.join(missing)}",
+            }
+
+        from packages.api_adapters.aoqiwei.src.crm_adapter import AoqiweiCrmAdapter
+
+        adapter = AoqiweiCrmAdapter({
+            "base_url": system.api_endpoint or "https://welcrm.com",
+            "appid": appid,
+            "appkey": appkey,
+            "timeout": 10,
+            "retry_times": 1,
+        })
+        try:
+            # 用测试号码触发一次 API 调用，验证签名算法和网络连通性
+            # "会员不存在" 类业务错误说明服务可达且签名正确
+            await adapter.get_member_info(mobile="13800000000")
+            await adapter.aclose()
+            return {"success": True, "message": "奥琦玮CRM连接成功（API可达，签名验证通过）"}
+        except Exception as e:
+            err = str(e)
+            try:
+                await adapter.aclose()
+            except Exception:
+                pass
+            # 业务错误（签名正确但号码不存在）→ 连接成功
+            not_found_keywords = ["会员不存在", "用户不存在", "member not found",
+                                   "status=0", "status=2", "无效用户"]
+            if any(kw.lower() in err.lower() for kw in not_found_keywords):
+                return {"success": True, "message": "奥琦玮CRM连接成功（服务正常，测试号码不存在属正常）"}
+            return {"success": False, "error": f"奥琦玮CRM连接失败: {err}"}
 
     # POS Transaction Methods
     async def create_pos_transaction(

@@ -5523,3 +5523,205 @@ def pull_aoqiwei_daily_supply(self) -> Dict[str, Any]:
     except Exception as exc:
         logger.error("pull_aoqiwei_daily_supply.failed", error=str(exc))
         raise self.retry(exc=exc)
+
+
+# ── 奥琦玮微生活会员：基于 POS 订单手机号增强会员数据 ──────────────────────────
+
+@celery_app.task(
+    bind=True,
+    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
+    default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY_LONG", "300")),
+)
+def enrich_members_from_aoqiwei_crm(self) -> Dict[str, Any]:
+    """
+    从奥琦玮微生活 CRM 拉取会员积分/余额/等级，写入 MemberSync 表。
+
+    执行流程：
+      1. 从 ExternalSystem 表查找 provider='aoqiwei_crm' 的已启用配置
+      2. 从 orders.customer_phone 提取近 30 天有消费记录的会员手机号
+      3. 逐个调用 CRM /member/info 补全会员数据
+      4. 写入 member_syncs 表（支持 upsert）
+
+    注意：奥琦玮 CRM 无批量导出 API，仅支持按手机号/卡号逐条查询。
+    MemberSync 表记录单次同步结果，重复手机号只更新最新数据。
+
+    环境变量（优先于 ExternalSystem 表配置）：
+      AOQIWEI_CRM_APPID    — CRM AppID
+      AOQIWEI_CRM_APPKEY   — CRM AppKey（签名密钥）
+      AOQIWEI_CRM_BASE_URL — 默认 https://welcrm.com
+    """
+    async def _run():
+        import json as _json
+        from datetime import date, timedelta
+        from sqlalchemy import select, text as _text
+        from ..core.database import get_db_session
+        from ..models.integration import ExternalSystem, IntegrationStatus
+
+        appid = os.getenv("AOQIWEI_CRM_APPID", "")
+        appkey = os.getenv("AOQIWEI_CRM_APPKEY", "")
+        base_url = os.getenv("AOQIWEI_CRM_BASE_URL", "https://welcrm.com")
+
+        members_enriched = 0
+        members_not_found = 0
+        errors: list = []
+
+        async with get_db_session() as session:
+            # 优先用 DB 中配置的凭证（如有），fallback 到环境变量
+            sys_result = await session.execute(
+                _text("""
+                    SELECT api_key, api_secret, api_endpoint
+                    FROM external_systems
+                    WHERE provider = 'aoqiwei_crm'
+                      AND status != 'inactive'
+                    ORDER BY created_at ASC
+                    LIMIT 1
+                """)
+            )
+            sys_row = sys_result.fetchone()
+            if sys_row:
+                appid = sys_row[0] or appid
+                appkey = sys_row[1] or appkey
+                base_url = sys_row[2] or base_url
+
+            if not appid or not appkey:
+                logger.warning(
+                    "aoqiwei_crm_enrich.skipped",
+                    reason="AOQIWEI_CRM_APPID 或 AOQIWEI_CRM_APPKEY 未配置（环境变量或DB均未找到）",
+                )
+                return {
+                    "success": True,
+                    "skipped": True,
+                    "members_enriched": 0,
+                    "members_not_found": 0,
+                    "errors": [],
+                }
+
+            # 取近 30 天有手机号的会员（去重）
+            thirty_days_ago = (date.today() - timedelta(days=30)).strftime("%Y-%m-%d")
+            phones_result = await session.execute(
+                _text("""
+                    SELECT DISTINCT customer_phone
+                    FROM orders
+                    WHERE customer_phone IS NOT NULL
+                      AND customer_phone <> ''
+                      AND order_time >= :since
+                    LIMIT 2000
+                """),
+                {"since": thirty_days_ago},
+            )
+            phones = [row[0] for row in phones_result.fetchall() if row[0]]
+
+            if not phones:
+                logger.info("aoqiwei_crm_enrich.no_phones",
+                            reason="近30天无含手机号的订单，跳过本次同步")
+                return {
+                    "success": True,
+                    "skipped": True,
+                    "members_enriched": 0,
+                    "members_not_found": 0,
+                    "errors": [],
+                }
+
+            logger.info("aoqiwei_crm_enrich.start", total_phones=len(phones))
+
+            from packages.api_adapters.aoqiwei.src.crm_adapter import AoqiweiCrmAdapter
+
+            adapter = AoqiweiCrmAdapter({
+                "base_url": base_url,
+                "appid": appid,
+                "appkey": appkey,
+                "timeout": int(os.getenv("AOQIWEI_CRM_TIMEOUT", "15")),
+                "retry_times": 2,
+            })
+
+            for phone in phones:
+                try:
+                    info = await adapter.get_member_info(mobile=phone)
+                    if not info:
+                        members_not_found += 1
+                        continue
+
+                    # 提取字段（适配奥琦玮 CRM 实际返回格式）
+                    cno = info.get("cno") or info.get("card_no") or ""
+                    name = info.get("name") or info.get("real_name") or ""
+                    level = info.get("level_name") or info.get("level") or ""
+                    points = int(info.get("credits") or info.get("points") or 0)
+                    balance_fen = int(info.get("balance") or 0)
+                    balance_yuan = round(balance_fen / 100, 2)
+                    raw_json = _json.dumps(info, ensure_ascii=False)
+
+                    await session.execute(
+                        _text("""
+                            INSERT INTO member_syncs
+                                (id, system_id, member_id, external_member_id,
+                                 phone, name, level, points, balance,
+                                 sync_status, synced_at, raw_data,
+                                 created_at, updated_at)
+                            VALUES
+                                (gen_random_uuid(),
+                                 (SELECT id FROM external_systems
+                                  WHERE provider='aoqiwei_crm' LIMIT 1),
+                                 :phone, :cno,
+                                 :phone, :name, :level, :points, :balance,
+                                 'success', NOW(), :raw_data::jsonb,
+                                 NOW(), NOW())
+                            ON CONFLICT (phone, system_id) DO UPDATE SET
+                                external_member_id = EXCLUDED.external_member_id,
+                                name               = EXCLUDED.name,
+                                level              = EXCLUDED.level,
+                                points             = EXCLUDED.points,
+                                balance            = EXCLUDED.balance,
+                                sync_status        = 'success',
+                                synced_at          = NOW(),
+                                raw_data           = EXCLUDED.raw_data,
+                                updated_at         = NOW()
+                        """),
+                        {
+                            "phone": phone,
+                            "cno": cno,
+                            "name": name,
+                            "level": level,
+                            "points": points,
+                            "balance": balance_yuan,
+                            "raw_data": raw_json,
+                        },
+                    )
+                    members_enriched += 1
+
+                    # 限速：每 10 条请求休眠 200ms，避免触发 CRM 限流
+                    if members_enriched % 10 == 0:
+                        await asyncio.sleep(0.2)
+
+                except Exception as phone_exc:
+                    err_str = str(phone_exc)
+                    # "会员不存在" 不算错误
+                    not_found_keywords = ["会员不存在", "用户不存在", "member not found",
+                                          "status=0", "status=2", "无效用户"]
+                    if any(kw.lower() in err_str.lower() for kw in not_found_keywords):
+                        members_not_found += 1
+                    else:
+                        errors.append(f"{phone}: {err_str}")
+                        logger.warning("aoqiwei_crm_enrich.phone_error",
+                                       phone=phone, error=err_str)
+
+            await adapter.aclose()
+            await session.commit()
+
+        logger.info(
+            "aoqiwei_crm_enrich.done",
+            members_enriched=members_enriched,
+            members_not_found=members_not_found,
+            errors=len(errors),
+        )
+        return {
+            "success": len(errors) == 0,
+            "members_enriched": members_enriched,
+            "members_not_found": members_not_found,
+            "errors": errors[:20],  # 最多返回20条错误
+        }
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        logger.error("enrich_members_from_aoqiwei_crm.failed", error=str(exc))
+        raise self.retry(exc=exc)
