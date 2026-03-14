@@ -1,0 +1,429 @@
+/* PlatformOntologyPage.module.css */
+
+.page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 28px;
+}
+
+/* ── 页头 ─────────────────────────────────────────────────────── */
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.pageTitle {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin: 0 0 4px;
+  letter-spacing: -0.3px;
+}
+
+.pageSubtitle {
+  font-size: 13px;
+  color: var(--text-tertiary, #9ca3af);
+  margin: 0;
+}
+
+/* ── Tab ──────────────────────────────────────────────────────── */
+.tabBar {
+  display: flex;
+  gap: 0;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+}
+
+.tab {
+  padding: 8px 18px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-secondary, #6b7280);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.tab:hover { color: var(--accent, #FF6B2C); }
+
+.tabActive {
+  color: var(--accent, #FF6B2C);
+  border-bottom-color: var(--accent, #FF6B2C);
+  font-weight: 600;
+}
+
+/* ── 品牌选择栏 ───────────────────────────────────────────────── */
+.brandBar, .storeBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.brandBarLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary, #6b7280);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.brandTabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.brandTab {
+  padding: 5px 14px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 20px;
+  background: transparent;
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+
+.brandTab:hover {
+  border-color: var(--accent, #FF6B2C);
+  color: var(--accent, #FF6B2C);
+}
+
+.brandTabActive {
+  background: var(--accent, #FF6B2C);
+  border-color: var(--accent, #FF6B2C);
+  color: #fff;
+  font-weight: 600;
+}
+
+.noData {
+  font-size: 13px;
+  color: var(--text-tertiary, #9ca3af);
+}
+
+/* ── 全量总览网格 ─────────────────────────────────────────────── */
+.overviewSection { }
+
+.skeletonGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.onboardingGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.onboardCard {
+  padding: 14px !important;
+}
+
+.onboardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.onboardStoreId {
+  font-size: 12px;
+  font-family: 'SF Mono', 'Fira Mono', monospace;
+  color: var(--text-tertiary, #9ca3af);
+}
+
+.onboardProgress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.onboardPct {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-primary, #111827);
+  min-width: 44px;
+}
+
+.onboardCounts {
+  display: flex;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-tertiary, #9ca3af);
+  flex-wrap: wrap;
+}
+
+.onboardEst {
+  font-size: 11px;
+  color: var(--text-tertiary, #9ca3af);
+  margin-top: 6px;
+}
+
+/* ── 详情网格 ─────────────────────────────────────────────────── */
+.detailGrid {
+  display: grid;
+  grid-template-columns: 260px 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.healthCard, .coverageCard, .issuesCard {
+  padding: 18px !important;
+}
+
+.cardTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin: 0 0 14px;
+}
+
+/* ── 健康评分卡 ───────────────────────────────────────────────── */
+.healthHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.scoreRing {
+  position: relative;
+  width: 120px;
+  margin: 0 auto 16px;
+}
+
+.ringsvg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.scoreText {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.scoreNum {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text-primary, #111827);
+  line-height: 1;
+}
+
+.scoreUnit {
+  font-size: 12px;
+  color: var(--text-tertiary, #9ca3af);
+}
+
+.entityGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.entityItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px;
+  background: var(--surface-elevated, #f9fafb);
+  border-radius: 8px;
+}
+
+.entityCount {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+}
+
+.entityLabel {
+  font-size: 11px;
+  color: var(--text-tertiary, #9ca3af);
+  margin-top: 2px;
+}
+
+.densityRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle, #f0f0f0);
+}
+
+.densityLabel { color: var(--text-tertiary, #9ca3af); }
+.densityValue { font-weight: 700; color: var(--text-primary, #111827); }
+
+/* ── 覆盖率卡 ─────────────────────────────────────────────────── */
+.coverageItem {
+  margin-bottom: 14px;
+}
+
+.coverageHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 5px;
+}
+
+.coverageLabel {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+}
+
+.coverageValue {
+  font-size: 12px;
+  color: var(--text-tertiary, #9ca3af);
+}
+
+.coveragePct {
+  font-size: 13px;
+  font-weight: 700;
+  min-width: 38px;
+  text-align: right;
+}
+
+.progressTrack {
+  height: 6px;
+  background: var(--surface-elevated, #f3f4f6);
+  border-radius: 3px;
+  overflow: hidden;
+  flex: 1;
+}
+
+.progressBar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.subTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-tertiary, #9ca3af);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 14px 0 8px;
+}
+
+.categoryCloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.categoryChip {
+  font-size: 11px;
+  background: var(--surface-elevated, #f3f4f6);
+  border-radius: 4px;
+  padding: 2px 8px;
+  color: var(--text-secondary, #6b7280);
+}
+
+.categoryChip strong { color: var(--text-primary, #111827); }
+
+.orphanWarning {
+  font-size: 12px;
+  color: #d97706;
+  background: rgba(245, 158, 11, 0.08);
+  padding: 6px 10px;
+  border-radius: 6px;
+  margin-top: 6px;
+}
+
+/* ── 质量问题卡 ───────────────────────────────────────────────── */
+.issuesHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.issueList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.issueItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--surface-elevated, #f9fafb);
+  border-radius: 8px;
+}
+
+.issueLeft { flex-shrink: 0; }
+
+.issueBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.issueName {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary, #111827);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.issueDesc {
+  font-size: 11px;
+  color: var(--text-tertiary, #9ca3af);
+  margin-top: 1px;
+}
+
+.issueType {
+  font-size: 11px;
+  color: var(--text-tertiary, #9ca3af);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.issueFooter {
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle, #f0f0f0);
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ── 响应式 ───────────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .detailGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .healthCard {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 700px) {
+  .detailGrid {
+    grid-template-columns: 1fr;
+  }
+}
