@@ -1,9 +1,9 @@
 /**
  * 个人中心 — 店长移动端
- * 个人信息、设置、退出登录
+ * 个人信息、菜单导航、退出登录
  */
 import React from 'react';
-import { Card, Button, List } from 'antd';
+import { ZCard, ZBadge } from '../../design-system/components';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import styles from './Profile.module.css';
@@ -13,7 +13,7 @@ const MENU_ITEMS = [
   { label: '通知设置',    icon: '🔔', action: 'notification-settings' },
   { label: '操作日志',    icon: '📝', action: 'activity-log' },
   { label: '帮助与反馈',  icon: '💬', action: 'help' },
-  { label: '关于屯象OS', icon: 'ℹ️', action: 'about' },
+  { label: '关于屯象OS', icon: 'ℹ️',  action: 'about' },
 ];
 
 export default function Profile() {
@@ -25,41 +25,41 @@ export default function Profile() {
     navigate('/login');
   };
 
+  const displayName = user?.full_name || user?.username || '店长';
+  const initials = displayName[0]?.toUpperCase() ?? 'U';
+
   return (
     <div className={styles.container}>
-      <Card className={styles.userCard} size="small">
+      {/* 用户信息卡 */}
+      <ZCard className={styles.userCard}>
         <div className={styles.userRow}>
-          <div className={styles.avatar}>
-            {user?.full_name?.[0] || user?.username?.[0] || 'U'}
-          </div>
+          <div className={styles.avatar}>{initials}</div>
           <div className={styles.userInfo}>
-            <div className={styles.userName}>{user?.full_name || user?.username || '店长'}</div>
+            <div className={styles.userName}>{displayName}</div>
             <div className={styles.userRole}>门店管理员</div>
           </div>
+          <ZBadge type="success" text="在线" />
         </div>
-      </Card>
+      </ZCard>
 
-      <Card className={styles.menuCard} size="small">
-        <List
-          dataSource={MENU_ITEMS}
-          split
-          renderItem={(item) => (
-            <List.Item className={styles.menuItem}>
-              <span>{item.icon} {item.label}</span>
-              <span className={styles.arrow}>›</span>
-            </List.Item>
-          )}
-        />
-      </Card>
+      {/* 菜单列表 */}
+      <ZCard className={styles.menuCard}>
+        {MENU_ITEMS.map((item, idx) => (
+          <div
+            key={item.action}
+            className={`${styles.menuItem} ${idx < MENU_ITEMS.length - 1 ? styles.menuItemBorder : ''}`}
+          >
+            <span className={styles.menuIcon}>{item.icon}</span>
+            <span className={styles.menuLabel}>{item.label}</span>
+            <span className={styles.menuArrow}>›</span>
+          </div>
+        ))}
+      </ZCard>
 
-      <Button
-        block
-        danger
-        className={styles.logoutBtn}
-        onClick={handleLogout}
-      >
+      {/* 退出登录 */}
+      <button className={styles.logoutBtn} onClick={handleLogout}>
         退出登录
-      </Button>
+      </button>
     </div>
   );
 }

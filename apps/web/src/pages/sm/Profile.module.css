@@ -1,16 +1,117 @@
-.container { padding: 16px; }
-.userCard { margin-bottom: 12px; border-radius: 12px; }
-.userRow { display: flex; align-items: center; gap: 12px; }
-.avatar {
-  width: 48px; height: 48px; border-radius: 50%;
-  background: linear-gradient(135deg, #26C9B4, #0AAF9A);
-  display: flex; align-items: center; justify-content: center;
-  color: #fff; font-size: 18px; font-weight: 700; flex-shrink: 0;
+/* Profile.module.css — 个人中心（店长移动端） */
+
+.container {
+  padding: 16px;
+  max-width: 480px;
+  margin: 0 auto;
 }
-.userInfo { display: flex; flex-direction: column; gap: 2px; }
-.userName { font-size: 16px; font-weight: 600; color: var(--text-primary); }
-.userRole { font-size: 12px; color: var(--text-secondary); }
-.menuCard { border-radius: 12px; margin-bottom: 16px; }
-.menuItem { display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-size: 14px; }
-.arrow { color: var(--text-tertiary); font-size: 18px; }
-.logoutBtn { border-radius: 10px; height: 44px; font-size: 15px; }
+
+/* ── 用户卡 ───────────────────────────────────────────────────────────────── */
+.userCard {
+  padding: 16px !important;
+  margin-bottom: 14px;
+}
+
+.userRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #FF8E53, #FF6B35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.userInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.userName {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+}
+
+.userRole {
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+}
+
+/* ── 菜单卡 ───────────────────────────────────────────────────────────────── */
+.menuCard {
+  padding: 0 !important;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.menuItem:hover {
+  background: var(--surface-elevated, #f9fafb);
+}
+
+.menuItemBorder {
+  border-bottom: 1px solid var(--border-subtle, #f0f0f0);
+}
+
+.menuIcon {
+  font-size: 18px;
+  width: 24px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.menuLabel {
+  flex: 1;
+  font-size: 14px;
+  color: var(--text-primary, #111827);
+}
+
+.menuArrow {
+  font-size: 18px;
+  color: var(--text-tertiary, #9ca3af);
+  line-height: 1;
+}
+
+/* ── 退出按钮 ─────────────────────────────────────────────────────────────── */
+.logoutBtn {
+  width: 100%;
+  height: 44px;
+  border: 1.5px solid #ef4444;
+  border-radius: 10px;
+  background: transparent;
+  color: #ef4444;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  font-family: inherit;
+}
+
+.logoutBtn:hover {
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.logoutBtn:active {
+  background: rgba(239, 68, 68, 0.15);
+}

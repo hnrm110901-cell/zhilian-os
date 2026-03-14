@@ -1,11 +1,167 @@
-.container { padding: 16px; }
-.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.title { font-size: 18px; font-weight: 600; color: var(--text-primary); margin: 0; }
-.scoreCard { margin-bottom: 12px; border-radius: 12px; }
-.scoreRow { display: flex; align-items: center; gap: 16px; }
-.scoreMeta { display: flex; flex-direction: column; gap: 4px; }
-.scoreLabel { font-size: 14px; font-weight: 600; color: var(--text-primary); }
-.scoreDetail { font-size: 12px; color: var(--text-secondary); }
-.itemCard { margin-bottom: 8px; border-radius: 10px; }
-.itemRow { display: flex; justify-content: space-between; align-items: center; }
-.itemTitle { font-size: 13px; color: var(--text-primary); }
+/* Patrol.module.css — 巡店检查（店长移动端） */
+
+.container {
+  padding: 16px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+/* ── 页头 ─────────────────────────────────────────────────────────────────── */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin: 0;
+}
+
+/* ── 得分卡 ───────────────────────────────────────────────────────────────── */
+.scoreCard {
+  padding: 14px 16px !important;
+  margin-bottom: 14px;
+}
+
+.scoreRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.scoreMeta {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.scoreLabel {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+}
+
+.scoreDetail {
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+}
+
+.failHint {
+  font-size: 12px;
+  color: #ef4444;
+  font-weight: 500;
+}
+
+.scoreStats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
+}
+
+.statPill {
+  font-size: 12px;
+  color: #22c55e;
+  font-weight: 600;
+  padding: 2px 8px;
+  background: rgba(34, 197, 94, 0.1);
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.statFail {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* ── Tab 过滤 ─────────────────────────────────────────────────────────────── */
+.tabBar {
+  display: flex;
+  gap: 0;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+  overflow-x: auto;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.tabBar::-webkit-scrollbar { display: none; }
+
+.tab {
+  padding: 7px 12px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.tab:hover {
+  color: var(--accent, #FF6B2C);
+}
+
+.tabActive {
+  color: var(--accent, #FF6B2C);
+  border-bottom-color: var(--accent, #FF6B2C);
+  font-weight: 600;
+}
+
+/* ── 列表 ─────────────────────────────────────────────────────────────────── */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.itemCard {
+  padding: 12px 14px !important;
+}
+
+.itemRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.itemLeft {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.itemIcon {
+  font-size: 18px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.itemCategory {
+  font-size: 11px;
+  color: var(--text-tertiary, #9ca3af);
+  margin-bottom: 2px;
+}
+
+.itemTitle {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #111827);
+}
+
+.itemMeta {
+  font-size: 11px;
+  color: var(--text-tertiary, #9ca3af);
+  margin-top: 3px;
+}
