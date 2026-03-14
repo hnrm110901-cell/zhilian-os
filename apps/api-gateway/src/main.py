@@ -23,6 +23,7 @@ import time
 from src.core.config import settings
 # 核心模块
 from src.api import health, agents, auth, notifications, stores, mobile, integrations, monitoring, llm, enterprise, voice, neural, adapters, tasks, reconciliation, approval, embedding, raas, model_marketplace, human_in_the_loop, hardware_integration, pos, dishes, benchmark, dish_master, alerts_webhook
+from src.api import pos_sync
 from src.api import roles as roles_api
 from src.api import merchants
 from src.api import prep_suggestion, soldout, agent_configs
@@ -454,6 +455,7 @@ app.include_router(enterprise.router, prefix="/api/v1/enterprise", tags=["enterp
 app.include_router(voice.router, prefix="/api/v1/voice", tags=["voice"])
 app.include_router(neural.router, prefix="/api/v1/neural", tags=["neural"])
 app.include_router(adapters.router, tags=["adapters"])
+app.include_router(pos_sync.router, tags=["pos-sync"])
 app.include_router(tasks.router, prefix="/api/v1", tags=["tasks"])
 app.include_router(reconciliation.router, prefix="/api/v1", tags=["reconciliation"])
 app.include_router(dishes.router, prefix="/api/v1", tags=["dishes"])

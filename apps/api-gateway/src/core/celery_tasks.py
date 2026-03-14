@@ -3687,12 +3687,13 @@ def pull_tiancai_daily_orders(self) -> Dict[str, Any]:
     在 03:00 POS 对账任务之前完成数据入库）。
 
     环境变量：
-      TIANCAI_BASE_URL            — API 基础地址（必填；缺失则整体跳过）
-      TIANCAI_BRAND_ID            — 品牌 ID（用于 to_order 映射）
-      TIANCAI_APP_ID              — 全局默认 app_id
-      TIANCAI_APP_SECRET          — 全局默认 app_secret
-      TIANCAI_APP_ID_{store_id}   — 门店级 app_id（优先于全局）
-      TIANCAI_APP_SECRET_{store_id} — 门店级 app_secret（优先于全局）
+      TIANCAI_BASE_URL    — API 基础地址（必填；缺失则整体跳过）
+      TIANCAI_BRAND_ID    — 品牌 ID（用于 to_order 映射）
+      TIANCAI_APPID       — Terminal ID（鉴权用，全局共享）
+      TIANCAI_ACCESSID    — Terminal authorization ID（鉴权用，全局共享）
+      TIANCAI_CENTER_ID   — 集团 centerId（全局或门店级）
+      TIANCAI_SHOP_ID     — 默认门店 shopId
+      TIANCAI_SHOP_ID_{store_id} — 门店级 shopId（优先于全局）
 
     Returns:
         {success, date, stores_processed, orders_upserted, errors}
@@ -3727,30 +3728,41 @@ def pull_tiancai_daily_orders(self) -> Dict[str, Any]:
             result = await session.execute(select(Store).where(Store.is_active == True))
             stores = result.scalars().all()
 
+            # 天财商龙鉴权凭据：全局共享（appid/accessid 是 Terminal 级别，非门店级别）
+            appid = os.getenv("TIANCAI_APPID", "")
+            accessid = os.getenv("TIANCAI_ACCESSID", "")
+            center_id = os.getenv("TIANCAI_CENTER_ID", "")
+
+            if not appid or not accessid:
+                logger.warning(
+                    "tiancai_pull.skipped",
+                    reason="TIANCAI_APPID or TIANCAI_ACCESSID not configured",
+                )
+                return {
+                    "success": True,
+                    "skipped": True,
+                    "stores_processed": 0,
+                    "orders_upserted": 0,
+                    "errors": [{"reason": "TIANCAI_APPID/ACCESSID 未配置"}],
+                }
+
             for store in stores:
                 sid = str(store.id)
-                app_id = (
-                    os.getenv(f"TIANCAI_APP_ID_{sid}")
-                    or os.getenv("TIANCAI_APP_ID", "")
+                # 门店 shopId：优先读门店级 env，回退全局，最终用 store.code 或 UUID
+                shop_id = (
+                    os.getenv(f"TIANCAI_SHOP_ID_{sid}")
+                    or os.getenv("TIANCAI_SHOP_ID", "")
+                    or getattr(store, "code", None)
+                    or sid
                 )
-                app_secret = (
-                    os.getenv(f"TIANCAI_APP_SECRET_{sid}")
-                    or os.getenv("TIANCAI_APP_SECRET", "")
-                )
-
-                if not app_id or not app_secret:
-                    logger.debug(
-                        "tiancai_pull.store_skipped",
-                        store_id=sid, reason="credentials not configured",
-                    )
-                    continue
 
                 try:
                     adapter = TiancaiShanglongAdapter({
                         "base_url": base_url,
-                        "app_id": app_id,
-                        "app_secret": app_secret,
-                        "store_id": sid,
+                        "appid": appid,
+                        "accessid": accessid,
+                        "center_id": center_id,
+                        "shop_id": shop_id,
                         "timeout": 30,
                         "retry_times": 2,
                     })
@@ -5311,4 +5323,203 @@ def evaluate_decision_effects(self) -> Dict[str, Any]:
         return asyncio.run(_run())
     except Exception as exc:
         logger.error("evaluate_decision_effects.failed", error=str(exc))
+        raise self.retry(exc=exc)
+
+
+# ── 奥琦玮供应链：每日库存 + 采购单拉取 ──────────────────────────────────────
+
+@celery_app.task(
+    bind=True,
+    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
+    default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY_LONG", "300")),
+)
+def pull_aoqiwei_daily_supply(self) -> Dict[str, Any]:
+    """
+    拉取奥琦玮供应链昨日采购入库单 + 当前库存快照，写入 DB。
+
+    注意：奥琦玮 POS 订单为 push 模型（POS 向我方推送），无 pull API；
+    此任务仅处理供应链（inventory/purchase）数据。
+
+    环境变量：
+      AOQIWEI_BASE_URL    — API 基础地址（默认 https://openapi.acescm.cn）
+      AOQIWEI_APP_KEY     — AppKey（必填；缺失则跳过）
+      AOQIWEI_APP_SECRET  — AppSecret（必填；缺失则跳过）
+      AOQIWEI_SHOP_CODE   — 默认门店 shopCode
+      AOQIWEI_SHOP_CODE_{store_id} — 门店级 shopCode（优先）
+
+    Returns:
+        {success, date, stores_processed, purchase_orders_saved, stock_snapshots, errors}
+    """
+    async def _run():
+        from datetime import date, timedelta
+        from sqlalchemy import select
+        from ..core.database import get_db_session
+        from ..models.store import Store
+
+        app_key = os.getenv("AOQIWEI_APP_KEY", "")
+        app_secret = os.getenv("AOQIWEI_APP_SECRET", "")
+
+        if not app_key or not app_secret:
+            logger.warning("aoqiwei_supply_pull.skipped",
+                           reason="AOQIWEI_APP_KEY or AOQIWEI_APP_SECRET not configured")
+            return {
+                "success": True,
+                "skipped": True,
+                "stores_processed": 0,
+                "purchase_orders_saved": 0,
+                "stock_snapshots": 0,
+                "errors": [],
+            }
+
+        yesterday = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
+        base_url = os.getenv("AOQIWEI_BASE_URL", "https://openapi.acescm.cn")
+
+        from packages.api_adapters.aoqiwei.src.adapter import AoqiweiAdapter
+
+        adapter = AoqiweiAdapter({
+            "base_url": base_url,
+            "app_key": app_key,
+            "app_secret": app_secret,
+            "timeout": int(os.getenv("AOQIWEI_TIMEOUT", "30")),
+            "retry_times": int(os.getenv("AOQIWEI_RETRY_TIMES", "3")),
+        })
+
+        stores_processed = 0
+        purchase_orders_saved = 0
+        stock_snapshots = 0
+        errors = []
+
+        try:
+            async with get_db_session() as session:
+                result = await session.execute(
+                    select(Store).where(Store.is_active.is_(True))
+                )
+                stores = result.scalars().all()
+
+                for store in stores:
+                    sid = str(store.id)
+                    shop_code = (
+                        os.getenv(f"AOQIWEI_SHOP_CODE_{sid}")
+                        or os.getenv("AOQIWEI_SHOP_CODE", "")
+                        or getattr(store, "code", None)
+                        or sid
+                    )
+
+                    try:
+                        # 1) 拉取昨日采购入库单
+                        page = 1
+                        store_po_count = 0
+                        while True:
+                            po_resp = await adapter.query_purchase_orders(
+                                start_date=yesterday,
+                                end_date=yesterday,
+                                page=page,
+                                page_size=100,
+                            )
+                            po_list = po_resp.get("list", []) if isinstance(po_resp, dict) else []
+                            if not po_list:
+                                break
+
+                            for po in po_list:
+                                order_no = po.get("purchaseOrderNo") or po.get("orderNo") or ""
+                                depot_code = po.get("depotCode", "")
+                                total_amount = float(po.get("totalAmount") or po.get("amount") or 0)
+                                order_date = po.get("orderDate") or yesterday
+                                raw_json = __import__("json").dumps(po, ensure_ascii=False)
+                                # 写入 inventory_transactions 或专用采购表（降级：只记录摘要到 daily_summaries source='aoqiwei_supply'）
+                                from sqlalchemy import text as _text
+                                await session.execute(
+                                    _text("""
+                                        INSERT INTO daily_summaries
+                                            (store_id, business_date, revenue_cents,
+                                             order_count, source, raw_data, created_at)
+                                        VALUES
+                                            (:store_id, :business_date, :revenue_cents,
+                                             :order_count, 'aoqiwei_supply', :raw_data, NOW())
+                                        ON CONFLICT (store_id, business_date, source) DO UPDATE SET
+                                            revenue_cents = EXCLUDED.revenue_cents + daily_summaries.revenue_cents,
+                                            order_count   = EXCLUDED.order_count   + daily_summaries.order_count,
+                                            raw_data      = EXCLUDED.raw_data,
+                                            created_at    = NOW()
+                                    """),
+                                    {
+                                        "store_id": sid,
+                                        "business_date": order_date,
+                                        "revenue_cents": int(total_amount * 100),
+                                        "order_count": 1,
+                                        "raw_data": raw_json,
+                                    },
+                                )
+                                store_po_count += 1
+
+                            total_count = po_resp.get("total", 0) if isinstance(po_resp, dict) else 0
+                            if page * 100 >= total_count or len(po_list) < 100:
+                                break
+                            page += 1
+
+                        purchase_orders_saved += store_po_count
+
+                        # 2) 库存快照（当前库存，不依赖日期）
+                        stock_list = await adapter.query_stock(shop_code=shop_code)
+                        if stock_list:
+                            stock_snapshots += len(stock_list)
+                            # 库存数据写入 inventory_items（仅记录有 good_code 的行）
+                            from sqlalchemy import text as _text2
+                            for item in stock_list:
+                                good_code = item.get("goodCode") or item.get("good_code") or ""
+                                good_name = item.get("goodName") or item.get("good_name") or ""
+                                qty = float(item.get("qty") or item.get("remainQty") or 0)
+                                unit = item.get("unit") or ""
+                                if not good_code:
+                                    continue
+                                await session.execute(
+                                    _text2("""
+                                        INSERT INTO inventory_items
+                                            (store_id, sku_code, name, unit, quantity,
+                                             category, low_stock_threshold, created_at, updated_at)
+                                        VALUES
+                                            (:store_id, :sku_code, :name, :unit, :qty,
+                                             'aoqiwei', 0, NOW(), NOW())
+                                        ON CONFLICT (store_id, sku_code) DO UPDATE SET
+                                            quantity   = EXCLUDED.quantity,
+                                            updated_at = NOW()
+                                    """),
+                                    {
+                                        "store_id": sid,
+                                        "sku_code": good_code,
+                                        "name": good_name,
+                                        "unit": unit,
+                                        "qty": qty,
+                                    },
+                                )
+
+                        stores_processed += 1
+                        logger.info("aoqiwei_supply_pull.store_done",
+                                    store_id=sid, purchase_orders=store_po_count,
+                                    stock_items=len(stock_list) if stock_list else 0)
+
+                    except Exception as store_exc:
+                        err_msg = f"store {sid}: {store_exc}"
+                        errors.append(err_msg)
+                        logger.error("aoqiwei_supply_pull.store_error", store_id=sid, error=str(store_exc))
+
+                await session.commit()
+
+        except Exception as exc:
+            logger.error("aoqiwei_supply_pull.fatal", error=str(exc))
+            errors.append(str(exc))
+
+        return {
+            "success": len(errors) == 0,
+            "date": yesterday,
+            "stores_processed": stores_processed,
+            "purchase_orders_saved": purchase_orders_saved,
+            "stock_snapshots": stock_snapshots,
+            "errors": errors,
+        }
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        logger.error("pull_aoqiwei_daily_supply.failed", error=str(exc))
         raise self.retry(exc=exc)

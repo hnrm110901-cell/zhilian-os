@@ -565,6 +565,16 @@ celery_app.conf.update(
             "args": (),
             "options": {"queue": "default", "priority": 7},
         },
+        # 每日凌晨 02:15 拉取奥琦玮供应链数据（采购入库单 + 库存快照）
+        "pull-aoqiwei-daily-supply": {
+            "task": "src.core.celery_tasks.pull_aoqiwei_daily_supply",
+            "schedule": crontab(
+                hour=int(os.getenv("AOQIWEI_PULL_HOUR", "2")),
+                minute=int(os.getenv("AOQIWEI_PULL_MINUTE", "15")),
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 7},
+        },
         # Sprint 1 CDP: POS拉取后回填 consumer_id（02:30 紧跟 POS 拉取）
         "cdp-sync-consumer-ids": {
             "task": "src.core.celery_tasks.cdp_sync_consumer_ids",
