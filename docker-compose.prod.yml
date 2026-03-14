@@ -216,6 +216,8 @@ services:
       - |
         cat > /tmp/sentinel.conf <<CONF
         port 26379
+        sentinel resolve-hostnames yes
+        sentinel announce-hostnames yes
         sentinel monitor mymaster redis 6379 2
         sentinel auth-pass mymaster ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
         sentinel down-after-milliseconds mymaster 5000
@@ -240,6 +242,8 @@ services:
       - |
         cat > /tmp/sentinel.conf <<CONF
         port 26379
+        sentinel resolve-hostnames yes
+        sentinel announce-hostnames yes
         sentinel monitor mymaster redis 6379 2
         sentinel auth-pass mymaster ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
         sentinel down-after-milliseconds mymaster 5000
@@ -264,6 +268,8 @@ services:
       - |
         cat > /tmp/sentinel.conf <<CONF
         port 26379
+        sentinel resolve-hostnames yes
+        sentinel announce-hostnames yes
         sentinel monitor mymaster redis 6379 2
         sentinel auth-pass mymaster ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
         sentinel down-after-milliseconds mymaster 5000
