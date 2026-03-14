@@ -23,27 +23,27 @@ from .base import Base
 PeopleAgentTypeEnum = ENUM(
     "shift_optimizer", "performance_score", "labor_cost",
     "attendance_warn", "staffing_plan",
-    name="people_agent_type_enum", create_type=False,
+    name="people_agent_type_enum", create_type=True,
 )
 
 ShiftStatusEnum = ENUM(
     "draft", "published", "active", "completed", "cancelled",
-    name="people_shift_status_enum", create_type=False,
+    name="people_shift_status_enum", create_type=True,
 )
 
 PerformanceRatingEnum = ENUM(
     "outstanding", "exceeds", "meets", "below", "unsatisfactory",
-    name="people_performance_rating_enum", create_type=False,
+    name="people_performance_rating_enum", create_type=True,
 )
 
 AttendanceAlertTypeEnum = ENUM(
     "late", "absent", "early_leave", "overtime", "understaffed",
-    name="people_attendance_alert_type_enum", create_type=False,
+    name="people_attendance_alert_type_enum", create_type=True,
 )
 
 StaffingDecisionStatusEnum = ENUM(
     "pending", "accepted", "rejected",
-    name="people_staffing_decision_status_enum", create_type=False,
+    name="people_staffing_decision_status_enum", create_type=True,
 )
 
 

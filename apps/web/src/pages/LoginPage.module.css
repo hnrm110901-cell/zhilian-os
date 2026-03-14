@@ -394,6 +394,139 @@
 
 .oauthBtn:hover { opacity: 0.88; }
 
+/* ── WeChat Work Panel ───────────────────────────────────────────────────────*/
+
+.weworkPanel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0 4px;
+  gap: 12px;
+  text-align: center;
+}
+
+.weworkIcon {
+  font-size: 56px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.weworkDesc {
+  font-size: 15px;
+  color: #3D3D3D;
+  line-height: 1.6;
+}
+
+.weworkHint {
+  display: inline-block;
+  font-size: 12px;
+  color: #6E6E73;
+  background: #F5F5F7;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-top: 4px;
+}
+
+.weworkBtn {
+  width: 100%;
+  height: 52px;
+  border: none;
+  border-radius: 10px;
+  background: #07C160;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+.weworkBtn:hover {
+  opacity: 0.92;
+}
+
+.weworkBtn:active {
+  transform: scale(0.98);
+}
+
+.weworkWarning {
+  width: 100%;
+  background: #FFF8E6;
+  border: 1px solid #FFD666;
+  border-radius: 8px;
+  padding: 12px 14px;
+  text-align: left;
+  font-size: 13px;
+  color: #7D4E00;
+}
+
+.weworkWarning strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #5C3800;
+}
+
+.weworkConfigList {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.weworkConfigList li {
+  line-height: 1.6;
+}
+
+.weworkConfigList a {
+  color: #0AAF9A;
+  text-decoration: underline;
+}
+
+.weworkSteps {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 4px 0;
+}
+
+.weworkStep {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #6E6E73;
+  text-align: center;
+  max-width: 72px;
+}
+
+.stepNum {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #0AAF9A;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.stepArrow {
+  font-size: 14px;
+  color: #AEAEB2;
+  margin-top: -12px;
+}
+
 /* ── Animations ──────────────────────────────────────────────────────────────*/
 
 @keyframes fadeInUp {

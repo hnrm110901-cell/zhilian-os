@@ -1,4 +1,18 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+/**
+ * LoginPage — 屯象OS 企业管理后台登录页
+ *
+ * 登录方式优先级：
+ *   1. 企业微信扫码登录（主要，仅限屯象科技内部员工）
+ *   2. 账号密码登录（备用）
+ *   3. 手机验证码登录（备用）
+ *
+ * 修复记录（v2.0）：
+ *   - 修复企业微信OAuth URL：personal WeChat → 企业微信网页扫码 (open.work.weixin.qq.com)
+ *   - 修复OAuth回调路径：/api/auth/ → /api/v1/auth/
+ *   - 新增 VITE_WECHAT_WORK_AGENT_ID 环境变量读取（企业微信必填）
+ *   - OAuth/密码登录后跳转到 /platform
+ */
+import React, { useState, useEffect, useRef } from 'react';
 import { Form, Input, message } from 'antd';
 import {
   UserOutlined,
@@ -8,8 +22,8 @@ import {
   WechatOutlined,
   MobileOutlined,
   SafetyOutlined,
-  QrcodeOutlined,
   ReloadOutlined,
+  KeyOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -17,32 +31,32 @@ import axios from 'axios';
 import styles from './LoginPage.module.css';
 
 // ── 登录方式 Tab ──────────────────────────────────────────
-type LoginTab = 'password' | 'phone' | 'qrcode';
+type LoginTab = 'wework' | 'password' | 'phone';
 
 const LOGIN_TABS: { key: LoginTab; label: string; icon: React.ReactNode }[] = [
-  { key: 'password', label: '密码登录', icon: <LockOutlined /> },
-  { key: 'phone', label: '手机登录', icon: <MobileOutlined /> },
-  { key: 'qrcode', label: '扫码登录', icon: <QrcodeOutlined /> },
+  { key: 'wework',   label: '企业微信',   icon: <WechatOutlined /> },
+  { key: 'password', label: '密码登录',   icon: <KeyOutlined /> },
+  { key: 'phone',    label: '手机验证码', icon: <MobileOutlined /> },
 ];
 
 const LoginPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<LoginTab>('password');
+  const [activeTab, setActiveTab] = useState<LoginTab>('wework');
   const [loading, setLoading] = useState(false);
   const { login, setToken } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // ── OAuth 回调处理 ────────────────────────────────────
+  // ── OAuth 回调处理（企业微信授权后携带 code 返回） ────────────────
   useEffect(() => {
-    const code = searchParams.get('code');
+    const code     = searchParams.get('code');
     const authCode = searchParams.get('auth_code');
-    const state = searchParams.get('state');
+    const state    = searchParams.get('state');
     const provider = searchParams.get('provider');
 
     if ((code || authCode) && provider) {
       handleOAuthCallback(provider, code, authCode, state);
     }
-  }, [searchParams]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleOAuthCallback = async (
     provider: string,
@@ -52,7 +66,8 @@ const LoginPage: React.FC = () => {
   ) => {
     setLoading(true);
     try {
-      const endpoint = `/api/auth/oauth/${provider}/callback`;
+      // ✅ 修复：使用正确的 /api/v1/ 路径（原来缺少 /v1/）
+      const endpoint = `/api/v1/auth/oauth/${provider}/callback`;
       const payload =
         provider === 'dingtalk'
           ? { auth_code: authCode, state }
@@ -61,35 +76,45 @@ const LoginPage: React.FC = () => {
       const response = await axios.post(endpoint, payload);
 
       if (response.data.access_token) {
-        setToken(response.data.access_token, response.data.refresh_token);
+        await setToken(response.data.access_token, response.data.refresh_token);
         message.success('登录成功！');
-        setTimeout(() => navigate(state || '/'), 500);
+        // ✅ 修复：登录后跳转到管理后台，而非根路由 /
+        const redirect = state && state.startsWith('/') ? state : '/platform';
+        setTimeout(() => navigate(redirect, { replace: true }), 400);
       }
-    } catch {
-      message.error('OAuth登录失败，请重试');
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail || 'OAuth 登录失败，请重试';
+      message.error(detail);
       navigate('/login', { replace: true });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleOAuthLogin = (provider: string) => {
-    const state = searchParams.get('redirect') || '/';
-    const redirectUri = `${window.location.origin}/login?provider=${provider}`;
-    let authUrl = '';
+  // ── 企业微信网页扫码登录 ──────────────────────────────
+  const handleWechatWorkLogin = () => {
+    const corpId  = import.meta.env.VITE_WECHAT_WORK_CORP_ID  || '';
+    const agentId = import.meta.env.VITE_WECHAT_WORK_AGENT_ID || '';
 
-    if (provider === 'wechat-work') {
-      const appId = import.meta.env.VITE_WECHAT_WORK_CORP_ID || 'YOUR_CORP_ID';
-      authUrl = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=snsapi_base&state=${state}#wechat_redirect`;
-    } else if (provider === 'feishu') {
-      const appId = import.meta.env.VITE_FEISHU_APP_ID || 'YOUR_APP_ID';
-      authUrl = `https://open.feishu.cn/open-apis/authen/v1/index?app_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
-    } else if (provider === 'dingtalk') {
-      const appId = import.meta.env.VITE_DINGTALK_APP_KEY || 'YOUR_APP_KEY';
-      authUrl = `https://oapi.dingtalk.com/connect/oauth2/sns_authorize?appid=${appId}&response_type=code&scope=snsapi_login&state=${state}&redirect_uri=${encodeURIComponent(redirectUri)}`;
+    if (!corpId || !agentId) {
+      message.warning('企业微信登录未配置，请联系管理员');
+      return;
     }
 
-    if (authUrl) window.location.href = authUrl;
+    const redirectPath = searchParams.get('redirect') || '/platform';
+    const redirectUri  = `${window.location.origin}/login?provider=wechat-work`;
+
+    // ✅ 修复：企业微信网页扫码登录专用 URL
+    // 需在企业微信管理后台 → 应用 → 企业微信授权登录 → 可信域名 中添加 admin.zlsjos.cn
+    const authUrl = [
+      'https://open.work.weixin.qq.com/wwopen/sso/qrConnect',
+      `?appid=${corpId}`,
+      `&agentid=${agentId}`,
+      `&redirect_uri=${encodeURIComponent(redirectUri)}`,
+      `&state=${encodeURIComponent(redirectPath)}`,
+    ].join('');
+
+    window.location.href = authUrl;
   };
 
   // ── 密码登录 ──────────────────────────────────────────
@@ -98,10 +123,8 @@ const LoginPage: React.FC = () => {
     try {
       const success = await login(values.username, values.password);
       if (success) {
-        message.success('登录成功！');
-        setTimeout(() => navigate(searchParams.get('redirect') || '/'), 500);
-      } else {
-        message.error('登录失败，请检查用户名和密码');
+        const redirect = searchParams.get('redirect') || '/platform';
+        setTimeout(() => navigate(redirect, { replace: true }), 400);
       }
     } catch {
       message.error('登录失败，请稍后重试');
@@ -123,10 +146,10 @@ const LoginPage: React.FC = () => {
       <div className={styles.card}>
         {/* Logo 区 */}
         <div className={styles.header}>
-          <div className={styles.emoji}>🍜</div>
+          <div className={styles.emoji}>🐘</div>
           <h1 className={styles.brand}>屯象OS</h1>
           <p className={styles.subtitle}>
-            <RocketOutlined /> 餐饮人的好伙伴
+            <RocketOutlined /> 企业管理后台
           </p>
         </div>
 
@@ -145,11 +168,11 @@ const LoginPage: React.FC = () => {
 
         {/* Tab 内容 */}
         <div className={styles.tabContent}>
+          {activeTab === 'wework' && (
+            <WechatWorkPanel loading={loading} onLogin={handleWechatWorkLogin} />
+          )}
           {activeTab === 'password' && (
-            <PasswordForm
-              loading={loading}
-              onFinish={onPasswordFinish}
-            />
+            <PasswordForm loading={loading} onFinish={onPasswordFinish} />
           )}
           {activeTab === 'phone' && (
             <PhoneForm
@@ -157,45 +180,9 @@ const LoginPage: React.FC = () => {
               setLoading={setLoading}
               setToken={setToken}
               navigate={navigate}
-              redirectPath={searchParams.get('redirect') || '/'}
+              redirectPath={searchParams.get('redirect') || '/platform'}
             />
           )}
-          {activeTab === 'qrcode' && (
-            <QRCodeForm
-              setToken={setToken}
-              navigate={navigate}
-              redirectPath={searchParams.get('redirect') || '/'}
-            />
-          )}
-        </div>
-
-        {/* 企业账号登录 */}
-        <div className={styles.divider}>
-          <span>企业账号登录</span>
-        </div>
-
-        <div className={styles.oauthList}>
-          <button
-            className={styles.oauthBtn}
-            style={{ background: '#07c160' }}
-            onClick={() => handleOAuthLogin('wechat-work')}
-          >
-            <WechatOutlined /> 企业微信登录
-          </button>
-          <button
-            className={styles.oauthBtn}
-            style={{ background: '#00b96b' }}
-            onClick={() => handleOAuthLogin('feishu')}
-          >
-            🪶 飞书登录
-          </button>
-          <button
-            className={styles.oauthBtn}
-            style={{ background: '#0089ff' }}
-            onClick={() => handleOAuthLogin('dingtalk')}
-          >
-            💼 钉钉登录
-          </button>
         </div>
 
         {/* 快速登录 - 仅开发环境 */}
@@ -216,31 +203,89 @@ const LoginPage: React.FC = () => {
                 </div>
                 <LoginOutlined style={{ fontSize: 20 }} />
               </button>
-              <button
-                className={styles.quickCard}
-                style={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' }}
-                onClick={() => quickLogin('manager001', 'manager123')}
-              >
-                <div>
-                  <div className={styles.quickName}>💼 店长</div>
-                  <div className={styles.quickCred}>manager001 / manager123</div>
-                </div>
-                <LoginOutlined style={{ fontSize: 20 }} />
-              </button>
-              <button
-                className={styles.quickCard}
-                style={{ background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)' }}
-                onClick={() => quickLogin('waiter001', 'waiter123')}
-              >
-                <div>
-                  <div className={styles.quickName}>👤 服务员</div>
-                  <div className={styles.quickCred}>waiter001 / waiter123</div>
-                </div>
-                <LoginOutlined style={{ fontSize: 20 }} />
-              </button>
             </div>
           </>
         )}
+      </div>
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════
+//  企业微信扫码登录面板（主要登录方式）
+// ══════════════════════════════════════════════════════════════
+const WechatWorkPanel: React.FC<{
+  loading: boolean;
+  onLogin: () => void;
+}> = ({ loading, onLogin }) => {
+  const corpId  = import.meta.env.VITE_WECHAT_WORK_CORP_ID  || '';
+  const agentId = import.meta.env.VITE_WECHAT_WORK_AGENT_ID || '';
+  const isConfigured = !!(corpId && agentId);
+
+  return (
+    <div className={styles.weworkPanel}>
+      <div className={styles.weworkIcon}>
+        <WechatOutlined />
+      </div>
+
+      <div className={styles.weworkDesc}>
+        使用<strong>企业微信</strong>扫码登录
+        <br />
+        <span className={styles.weworkHint}>仅限屯象科技内部员工</span>
+      </div>
+
+      <button
+        className={styles.weworkBtn}
+        onClick={onLogin}
+        disabled={loading}
+      >
+        {loading ? (
+          <><ReloadOutlined spin /> 跳转中...</>
+        ) : (
+          <><WechatOutlined /> 企业微信扫码登录</>
+        )}
+      </button>
+
+      {!isConfigured && (
+        <div className={styles.weworkWarning}>
+          <strong>⚠️ 企业微信登录尚未激活</strong>，请完成以下配置后重新部署：
+          <ol className={styles.weworkConfigList}>
+            <li>
+              在<a href="https://work.weixin.qq.com/wework_admin/frame#apps" target="_blank" rel="noopener noreferrer">企业微信管理后台</a>
+              创建自建应用，获取 <code>CorpID</code>、<code>AgentID</code>、<code>Secret</code>
+            </li>
+            <li>应用详情 → 企业微信授权登录 → 可信域名添加 <code>admin.zlsjos.cn</code></li>
+            <li>
+              服务器 <code>.env.prod</code> 添加：<br />
+              <code>WECHAT_CORP_ID=wx...</code><br />
+              <code>WECHAT_CORP_SECRET=...</code><br />
+              <code>WECHAT_AGENT_ID=...</code>
+            </li>
+            <li>
+              前端 <code>.env.production</code> 添加：<br />
+              <code>VITE_WECHAT_WORK_CORP_ID=wx...</code><br />
+              <code>VITE_WECHAT_WORK_AGENT_ID=...</code>
+            </li>
+            <li>推送代码到 main 分支，GitHub Actions 自动重新部署</li>
+          </ol>
+        </div>
+      )}
+
+      <div className={styles.weworkSteps}>
+        <div className={styles.weworkStep}>
+          <span className={styles.stepNum}>1</span>
+          <span>点击按钮</span>
+        </div>
+        <span className={styles.stepArrow}>→</span>
+        <div className={styles.weworkStep}>
+          <span className={styles.stepNum}>2</span>
+          <span>企业微信扫码</span>
+        </div>
+        <span className={styles.stepArrow}>→</span>
+        <div className={styles.weworkStep}>
+          <span className={styles.stepNum}>3</span>
+          <span>手机确认</span>
+        </div>
       </div>
     </div>
   );
@@ -284,7 +329,7 @@ const PhoneForm: React.FC<{
   loading: boolean;
   setLoading: (v: boolean) => void;
   setToken: (accessToken: string, refreshToken: string) => Promise<void>;
-  navigate: (path: string) => void;
+  navigate: (path: string, opts?: object) => void;
   redirectPath: string;
 }> = ({ loading, setLoading, setToken, navigate, redirectPath }) => {
   const [phone, setPhone] = useState('');
@@ -293,60 +338,43 @@ const PhoneForm: React.FC<{
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, []);
 
   const startCountdown = () => {
     setCountdown(60);
     timerRef.current = setInterval(() => {
       setCountdown((prev) => {
-        if (prev <= 1) {
-          if (timerRef.current) clearInterval(timerRef.current);
-          return 0;
-        }
+        if (prev <= 1) { if (timerRef.current) clearInterval(timerRef.current); return 0; }
         return prev - 1;
       });
     }, 1000);
   };
 
   const handleSendCode = async () => {
-    if (!phone || phone.length !== 11) {
-      message.warning('请输入正确的11位手机号');
-      return;
-    }
+    if (!phone || phone.length !== 11) { message.warning('请输入正确的11位手机号'); return; }
     try {
       await axios.post('/api/v1/auth/sms/send', { phone });
       message.success('验证码已发送');
       startCountdown();
     } catch (err: any) {
-      const detail = err?.response?.data?.detail || '验证码发送失败';
-      message.error(detail);
+      message.error(err?.response?.data?.detail || '验证码发送失败');
     }
   };
 
   const handleSubmit = async () => {
-    if (!phone || phone.length !== 11) {
-      message.warning('请输入正确的11位手机号');
-      return;
-    }
-    if (!code || code.length !== 6) {
-      message.warning('请输入6位验证码');
-      return;
-    }
-
+    if (!phone || phone.length !== 11) { message.warning('请输入正确的11位手机号'); return; }
+    if (!code || code.length !== 6)    { message.warning('请输入6位验证码'); return; }
     setLoading(true);
     try {
       const response = await axios.post('/api/v1/auth/sms/login', { phone, code });
       if (response.data.access_token) {
         await setToken(response.data.access_token, response.data.refresh_token);
         message.success('登录成功！');
-        setTimeout(() => navigate(redirectPath), 500);
+        setTimeout(() => navigate(redirectPath, { replace: true }), 400);
       }
     } catch (err: any) {
-      const detail = err?.response?.data?.detail || '登录失败';
-      message.error(detail);
+      message.error(err?.response?.data?.detail || '登录失败');
     } finally {
       setLoading(false);
     }
@@ -365,7 +393,6 @@ const PhoneForm: React.FC<{
           onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
         />
       </div>
-
       <div className={styles.codeInputRow}>
         <input
           className={styles.codeInput}
@@ -375,183 +402,16 @@ const PhoneForm: React.FC<{
           value={code}
           onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
         />
-        <button
-          className={styles.sendCodeBtn}
-          disabled={countdown > 0}
-          onClick={handleSendCode}
-        >
+        <button className={styles.sendCodeBtn} disabled={countdown > 0} onClick={handleSendCode}>
           {countdown > 0 ? `${countdown}s` : '获取验证码'}
         </button>
       </div>
-
-      <button
-        className={styles.submitBtn}
-        disabled={loading}
-        onClick={handleSubmit}
-      >
+      <button className={styles.submitBtn} disabled={loading} onClick={handleSubmit}>
         <SafetyOutlined />
         {loading ? '登录中...' : '验证码登录'}
       </button>
     </div>
   );
-};
-
-// ══════════════════════════════════════════════════════════════
-//  扫码登录
-// ══════════════════════════════════════════════════════════════
-const QRCodeForm: React.FC<{
-  setToken: (accessToken: string, refreshToken: string) => Promise<void>;
-  navigate: (path: string) => void;
-  redirectPath: string;
-}> = ({ setToken, navigate, redirectPath }) => {
-  const [qrUrl, setQrUrl] = useState('');
-  const [qrId, setQrId] = useState('');
-  const [qrStatus, setQrStatus] = useState<'loading' | 'pending' | 'scanned' | 'confirmed' | 'expired'>('loading');
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const expireRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const cleanup = useCallback(() => {
-    if (pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
-    if (expireRef.current) {
-      clearTimeout(expireRef.current);
-      expireRef.current = null;
-    }
-  }, []);
-
-  const generateQR = useCallback(async () => {
-    cleanup();
-    setQrStatus('loading');
-
-    try {
-      const response = await axios.post('/api/v1/auth/qr/generate');
-      const { qr_id, qr_url, expires_in } = response.data;
-      setQrId(qr_id);
-      setQrUrl(qr_url);
-      setQrStatus('pending');
-
-      // 开始轮询
-      pollRef.current = setInterval(async () => {
-        try {
-          const statusResp = await axios.get(`/api/v1/auth/qr/status/${qr_id}`);
-          const { status: s } = statusResp.data;
-
-          if (s === 'scanned') {
-            setQrStatus('scanned');
-          } else if (s === 'confirmed') {
-            cleanup();
-            setQrStatus('confirmed');
-            await setToken(statusResp.data.access_token, statusResp.data.refresh_token);
-            message.success('扫码登录成功！');
-            setTimeout(() => navigate(redirectPath), 500);
-          } else if (s === 'expired') {
-            cleanup();
-            setQrStatus('expired');
-          }
-        } catch {
-          // 轮询异常忽略
-        }
-      }, 2000);
-
-      // 超时自动过期
-      expireRef.current = setTimeout(() => {
-        cleanup();
-        setQrStatus('expired');
-      }, (expires_in || 300) * 1000);
-    } catch {
-      message.error('QR 码生成失败');
-      setQrStatus('expired');
-    }
-  }, [cleanup, setToken, navigate, redirectPath]);
-
-  useEffect(() => {
-    generateQR();
-    return cleanup;
-  }, [generateQR, cleanup]);
-
-  return (
-    <div className={styles.qrContainer}>
-      <div className={styles.qrBox}>
-        {qrStatus === 'loading' && (
-          <div className={styles.qrPlaceholder}>
-            <ReloadOutlined spin style={{ fontSize: 32, color: '#0AAF9A' }} />
-            <p>正在生成二维码...</p>
-          </div>
-        )}
-
-        {(qrStatus === 'pending' || qrStatus === 'scanned') && qrUrl && (
-          <QRCanvas value={qrUrl} size={200} />
-        )}
-
-        {qrStatus === 'expired' && (
-          <div className={styles.qrPlaceholder}>
-            <p>二维码已过期</p>
-            <button className={styles.refreshQrBtn} onClick={generateQR}>
-              <ReloadOutlined /> 刷新二维码
-            </button>
-          </div>
-        )}
-
-        {qrStatus === 'confirmed' && (
-          <div className={styles.qrPlaceholder}>
-            <div style={{ fontSize: 48 }}>✅</div>
-            <p>登录成功，正在跳转...</p>
-          </div>
-        )}
-      </div>
-
-      <div className={styles.qrTip}>
-        {qrStatus === 'pending' && '请使用企业微信扫描二维码'}
-        {qrStatus === 'scanned' && '已扫码，请在手机上确认登录'}
-        {qrStatus === 'expired' && '二维码已过期，请刷新'}
-        {qrStatus === 'loading' && '加载中...'}
-      </div>
-    </div>
-  );
-};
-
-// ══════════════════════════════════════════════════════════════
-//  QR Canvas 渲染（纯 Canvas，无外部依赖）
-// ══════════════════════════════════════════════════════════════
-const QRCanvas: React.FC<{ value: string; size: number }> = ({ value, size }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    // 动态加载 qrcode 库，如果不可用则显示 URL 文字
-    import('qrcode')
-      .then((QRCode) => {
-        QRCode.toCanvas(canvas, value, {
-          width: size,
-          margin: 2,
-          color: { dark: '#1D1D1F', light: '#FFFFFF' },
-        });
-      })
-      .catch(() => {
-        // 降级：在 Canvas 上绘制提示文字
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          canvas.width = size;
-          canvas.height = size;
-          ctx.fillStyle = '#F5F5F7';
-          ctx.fillRect(0, 0, size, size);
-          ctx.fillStyle = '#1D1D1F';
-          ctx.font = '14px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('QR Code', size / 2, size / 2 - 10);
-          ctx.font = '10px sans-serif';
-          ctx.fillStyle = '#6E6E73';
-          ctx.fillText('请安装 qrcode 包', size / 2, size / 2 + 10);
-          ctx.fillText('pnpm add qrcode', size / 2, size / 2 + 26);
-        }
-      });
-  }, [value, size]);
-
-  return <canvas ref={canvasRef} className={styles.qrCanvas} />;
 };
 
 export default LoginPage;

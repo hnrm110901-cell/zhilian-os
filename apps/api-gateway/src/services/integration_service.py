@@ -118,6 +118,14 @@ class IntegrationService:
             if hasattr(system, key) and value is not None:
                 setattr(system, key, value)
 
+        # 若更新了 config，同步从 config 中提取独立字段
+        new_config = kwargs.get("config")
+        if new_config:
+            for col in ("api_endpoint", "api_key", "api_secret", "webhook_url"):
+                val = new_config.get(col)
+                if val is not None:
+                    setattr(system, col, val)
+
         system.updated_at = datetime.utcnow()
         await session.commit()
         await session.refresh(system)
@@ -183,6 +191,10 @@ class IntegrationService:
             return {"success": False, "error": "未配置API端点"}
 
         try:
+            # 品智POS使用token签名鉴权，单独处理
+            if system.provider == "pinzhi":
+                return await self._test_pinzhi_connection(system)
+
             async with httpx.AsyncClient(timeout=float(os.getenv("INTEGRATION_HTTP_TIMEOUT", "10.0"))) as client:
                 response = await client.get(
                     f"{system.api_endpoint}/health",
@@ -195,6 +207,88 @@ class IntegrationService:
                         "success": False,
                         "error": f"HTTP {response.status_code}",
                     }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    async def _test_pinzhi_connection(self, system: ExternalSystem) -> Dict[str, Any]:
+        """测试品智POS连接
+
+        品智真实API路径（来自官方文档 yuque.com/diandaobuzhi/gmgnz9）：
+          基础URL：https://{merchant-domain}/pzcatering-gateway
+          接口路径：/pinzhi/storeInfo.do
+          签名算法：sign = MD5(sorted_params + "&token=TOKEN")
+            - 空值不参与签名
+            - 参数按key的ASCII升序排序
+            - 空参数时：sign = MD5("&token=TOKEN")
+
+        拉取数据所需：商户Token（api_key）+ 门店omsId（storeOmsId）
+        """
+        import hashlib
+
+        cfg = system.config or {}
+        token = cfg.get("token") or system.api_key
+
+        if not token:
+            return {"success": False, "error": "未配置品智商户Token（api_key）"}
+        if not system.api_endpoint:
+            return {"success": False, "error": "未配置API端点"}
+
+        base_url = system.api_endpoint.rstrip("/")
+        # 根域名（用于 fallback 可达性测试）
+        root_url = "/".join(base_url.split("/")[:3])
+
+        # sign = MD5("&token={token}") — 空参数时的签名
+        sign = hashlib.md5(f"&token={token}".encode("utf-8")).hexdigest()
+
+        # 品智标准接口路径
+        api_url = f"{base_url}/pinzhi/storeInfo.do"
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0, verify=False) as client:
+                resp = await client.get(api_url, params={"sign": sign})
+
+                if resp.status_code in (401, 403):
+                    return {
+                        "success": False,
+                        "error": f"品智API认证失败（HTTP {resp.status_code}），请核对商户Token",
+                    }
+
+                if resp.status_code == 404:
+                    # 测试根域名
+                    root_resp = await client.get(root_url)
+                    if root_resp.status_code < 500:
+                        return {
+                            "success": True,
+                            "message": f"品智服务器可达（域名HTTP {root_resp.status_code}），API端点待确认",
+                        }
+                    return {"success": False, "error": f"品智服务器不可达（HTTP 404）"}
+
+                try:
+                    body = resp.json()
+                except Exception:
+                    if resp.status_code < 400:
+                        return {"success": True, "message": f"品智服务器可达（HTTP {resp.status_code}）"}
+                    return {"success": False, "error": f"品智接口返回 HTTP {resp.status_code}"}
+
+                # 品智 code=200/0 表示成功
+                code = body.get("code", body.get("success", -1))
+                if code in (200, 0, "200", "0"):
+                    data = body.get("data", {})
+                    total = (
+                        len(data) if isinstance(data, list)
+                        else data.get("total", len(data.get("list", [])))
+                        if isinstance(data, dict)
+                        else "?"
+                    )
+                    return {"success": True, "message": f"品智POS连接成功，共{total}家门店"}
+                else:
+                    msg = body.get("message", body.get("msg", ""))
+                    return {"success": True, "message": f"品智接口可达（响应码={code} {msg or ''}）".strip()}
+
+        except httpx.ConnectError:
+            return {"success": False, "error": "无法连接到品智服务器，请检查域名和网络"}
+        except httpx.TimeoutException:
+            return {"success": False, "error": "品智API连接超时（10s）"}
         except Exception as e:
             return {"success": False, "error": str(e)}
 

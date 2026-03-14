@@ -29,40 +29,40 @@ from .base import Base
 OpsFlowAgentTypeEnum = ENUM(
     "chain_alert", "order_anomaly", "inventory_intel",
     "quality_inspection", "ops_optimize",
-    name="ops_flow_agent_type_enum", create_type=False,
+    name="ops_flow_agent_type_enum", create_type=True,
 )
 
 OpsChainEventTypeEnum = ENUM(
     "order_anomaly", "inventory_low", "quality_fail",
     "order_spike", "inventory_expiry", "quality_pattern",
-    name="ops_chain_event_type_enum", create_type=False,
+    name="ops_chain_event_type_enum", create_type=True,
 )
 
 OpsChainEventSeverityEnum = ENUM(
     "info", "warning", "critical",
-    name="ops_chain_event_severity_enum", create_type=False,
+    name="ops_chain_event_severity_enum", create_type=True,
 )
 
 OpsOrderAnomalyTypeEnum = ENUM(
     "refund_spike", "complaint_rate", "delivery_timeout",
     "revenue_drop", "cancel_surge", "avg_order_drop",
-    name="ops_order_anomaly_type_enum", create_type=False,
+    name="ops_order_anomaly_type_enum", create_type=True,
 )
 
 OpsInventoryAlertTypeEnum = ENUM(
     "low_stock", "expiry_risk", "stockout_predicted",
     "overstock", "restock_overdue",
-    name="ops_inventory_alert_type_enum", create_type=False,
+    name="ops_inventory_alert_type_enum", create_type=True,
 )
 
 OpsQualityStatusEnum = ENUM(
     "pass", "warning", "fail",
-    name="ops_quality_status_enum", create_type=False,
+    name="ops_quality_status_enum", create_type=True,
 )
 
 OpsDecisionStatusEnum = ENUM(
     "pending", "accepted", "rejected", "auto_executed",
-    name="ops_decision_status_enum", create_type=False,
+    name="ops_decision_status_enum", create_type=True,
 )
 
 

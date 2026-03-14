@@ -30,7 +30,15 @@ class CreateSystemRequest(BaseModel):
     type: IntegrationType
     provider: str
     store_id: Optional[str] = None
-    config: Dict[str, Any]
+    config: Optional[Dict[str, Any]] = None
+    # 允许顶层直接传入，自动合并到 config
+    api_endpoint: Optional[str] = None
+    api_key: Optional[str] = None
+    api_secret: Optional[str] = None
+    webhook_url: Optional[str] = None
+    sync_enabled: Optional[bool] = None
+    sync_interval: Optional[int] = None
+    status: Optional[IntegrationStatus] = None
 
 
 class UpdateSystemRequest(BaseModel):
@@ -38,6 +46,10 @@ class UpdateSystemRequest(BaseModel):
     name: Optional[str] = None
     status: Optional[IntegrationStatus] = None
     config: Optional[Dict[str, Any]] = None
+    api_endpoint: Optional[str] = None
+    api_key: Optional[str] = None
+    api_secret: Optional[str] = None
+    webhook_url: Optional[str] = None
     sync_enabled: Optional[bool] = None
     sync_interval: Optional[int] = None
 
@@ -97,15 +109,33 @@ async def create_external_system(
     创建外部系统配置
     需要管理员或门店经理权限
     """
+    # 将顶层字段合并进 config，create_system 从 config 读取 api_endpoint 等
+    merged_config: Dict[str, Any] = dict(request.config or {})
+    for field in ("api_endpoint", "api_key", "api_secret", "webhook_url"):
+        val = getattr(request, field, None)
+        if val is not None:
+            merged_config[field] = val
+
     system = await integration_service.create_system(
         session=session,
         name=request.name,
         type=request.type,
         provider=request.provider,
-        config=request.config,
+        config=merged_config,
         created_by=str(current_user.id),
         store_id=request.store_id,
     )
+
+    # 如有顶层 sync_enabled/sync_interval/status，单独 update
+    extra = {}
+    if request.sync_enabled is not None:
+        extra["sync_enabled"] = request.sync_enabled
+    if request.sync_interval is not None:
+        extra["sync_interval"] = request.sync_interval
+    if request.status is not None:
+        extra["status"] = request.status
+    if extra:
+        await integration_service.update_system(session, str(system.id), **extra)
 
     return system.to_dict()
 

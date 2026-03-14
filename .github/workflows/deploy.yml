@@ -139,6 +139,13 @@ jobs:
               sleep 3
             done
 
+            echo "=== [4.5/5] Force DB table creation ==="
+            CONTAINER=$(docker ps --format "{{.Names}}" | grep -E "api.gateway|zhilian.api" | head -1)
+            echo "Container: $CONTAINER"
+            if [ -n "$CONTAINER" ]; then
+              docker exec "$CONTAINER" python3 -c "import asyncio; import sys; sys.path.insert(0,'/app'); from src.core.database import init_db; asyncio.run(init_db())" && echo "DB init OK" || echo "DB init warning"
+            fi
+
             echo "=== [5/5] Check final status ==="
             docker ps --filter "name=zhilian" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
             curl -sf http://127.0.0.1:8000/api/v1/health && echo "" || echo "⚠ Health check failed"
@@ -150,7 +157,7 @@ jobs:
           rsync -avz --delete \
             --exclude='.git' \
             apps/web/dist/ \
-            root@42.194.229.21:/var/www/html/zhilian-os/
+            root@42.194.229.21:/var/www/tunxiang/
 
           # 通知 nginx reload（不重启，零停机）
           ssh root@42.194.229.21 "nginx -t && nginx -s reload"

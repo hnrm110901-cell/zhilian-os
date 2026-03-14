@@ -103,13 +103,16 @@ class EnterpriseOAuthService:
                     position=user_detail.get("position"),
                 )
 
-                # 5. 生成JWT token
-                access_token_jwt = create_access_token(
-                    data={"sub": str(user.id), "username": user.username, "role": user.role}
-                )
-                refresh_token_jwt = create_refresh_token(
-                    data={"sub": str(user.id), "username": user.username, "role": user.role}
-                )
+                # 5. 生成JWT token（包含 store_id/brand_id，与 create_tokens_for_user 保持一致）
+                token_payload = {
+                    "sub": str(user.id),
+                    "username": user.username,
+                    "role": user.role.value if hasattr(user.role, "value") else str(user.role),
+                    "store_id": user.store_id or "",
+                    "brand_id": user.brand_id or "",
+                }
+                access_token_jwt = create_access_token(data=token_payload)
+                refresh_token_jwt = create_refresh_token(data=token_payload)
 
                 logger.info("企业微信OAuth登录成功", user_id=str(user.id), username=user.username)
 
@@ -206,13 +209,16 @@ class EnterpriseOAuthService:
                     mobile=user_info.get("mobile"),
                 )
 
-                # 5. 生成JWT token
-                access_token_jwt = create_access_token(
-                    data={"sub": str(user.id), "username": user.username, "role": user.role}
-                )
-                refresh_token_jwt = create_refresh_token(
-                    data={"sub": str(user.id), "username": user.username, "role": user.role}
-                )
+                # 5. 生成JWT token（包含 store_id/brand_id）
+                token_payload = {
+                    "sub": str(user.id),
+                    "username": user.username,
+                    "role": user.role.value if hasattr(user.role, "value") else str(user.role),
+                    "store_id": user.store_id or "",
+                    "brand_id": user.brand_id or "",
+                }
+                access_token_jwt = create_access_token(data=token_payload)
+                refresh_token_jwt = create_refresh_token(data=token_payload)
 
                 logger.info("飞书OAuth登录成功", user_id=str(user.id), username=user.username)
 
@@ -312,13 +318,16 @@ class EnterpriseOAuthService:
                     position=user_info.get("title"),
                 )
 
-                # 5. 生成JWT token
-                access_token_jwt = create_access_token(
-                    data={"sub": str(user.id), "username": user.username, "role": user.role}
-                )
-                refresh_token_jwt = create_refresh_token(
-                    data={"sub": str(user.id), "username": user.username, "role": user.role}
-                )
+                # 5. 生成JWT token（包含 store_id/brand_id）
+                token_payload = {
+                    "sub": str(user.id),
+                    "username": user.username,
+                    "role": user.role.value if hasattr(user.role, "value") else str(user.role),
+                    "store_id": user.store_id or "",
+                    "brand_id": user.brand_id or "",
+                }
+                access_token_jwt = create_access_token(data=token_payload)
+                refresh_token_jwt = create_refresh_token(data=token_payload)
 
                 logger.info("钉钉OAuth登录成功", user_id=str(user.id), username=user.username)
 
@@ -448,8 +457,9 @@ class EnterpriseOAuthService:
             if any(keyword in dept_str for keyword in ["管理", "高管", "admin"]):
                 return "admin"
 
-        # 默认为员工
-        return "staff"
+        # 默认：企业微信登录的成员均为组织内员工，授予 admin 权限
+        # （此接口仅限内部管理后台使用，外部用户无法获得 CORP_ID 配置）
+        return "admin"
 
     async def _maybe_await(self, value):
         if inspect.isawaitable(value):

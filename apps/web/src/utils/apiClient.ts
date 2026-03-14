@@ -12,7 +12,7 @@ class APIClient {
   private isRefreshing: boolean = false;
   private refreshPromise: Promise<boolean> | null = null;
 
-  constructor(baseURL: string = '/api/v1') {
+  constructor(baseURL: string = '') {
     this.baseURL = baseURL;
   }
 

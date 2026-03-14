@@ -29,34 +29,34 @@ from .base import Base
 
 AnomalyLevelEnum = PgEnum(
     "normal", "warning", "critical", "severe",
-    name="anomaly_level_enum", create_type=False,
+    name="anomaly_level_enum", create_type=True,
 )
 
 KpiStatusEnum = PgEnum(
     "excellent", "on_track", "at_risk", "off_track",
-    name="kpi_status_enum", create_type=False,
+    name="kpi_status_enum", create_type=True,
 )
 
 DecisionPriorityEnum = PgEnum(
     "p0", "p1", "p2", "p3",
-    name="decision_priority_enum", create_type=False,
+    name="decision_priority_enum", create_type=True,
 )
 
 ScenarioTypeEnum = PgEnum(
     "peak_revenue", "revenue_slump", "cost_overrun",
     "staff_shortage", "inventory_crisis", "normal_ops",
-    name="scenario_type_enum", create_type=False,
+    name="scenario_type_enum", create_type=True,
 )
 
 BizIntelAgentTypeEnum = PgEnum(
     "revenue_anomaly", "kpi_scorecard", "order_forecast",
     "biz_insight", "scenario_match",
-    name="biz_intel_agent_type_enum", create_type=False,
+    name="biz_intel_agent_type_enum", create_type=True,
 )
 
 DecisionStatusEnum = PgEnum(
     "pending", "accepted", "rejected", "executed",
-    name="biz_decision_status_enum", create_type=False,
+    name="biz_decision_status_enum", create_type=True,
 )
 
 

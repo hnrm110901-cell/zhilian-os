@@ -205,14 +205,31 @@ async def get_db(enable_tenant_isolation: bool = True):
             await session.close()
 
 
-async def init_db():
-    """Initialize database - create all tables"""
+async def init_db(retries: int = 5, delay: float = 3.0):
+    """Initialize database - create all tables（带重试，兼容 DB 启动慢的场景）"""
+    import asyncio
     from src.models import Base
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    last_exc = None
+    for attempt in range(1, retries + 1):
+        try:
+            async with engine.begin() as conn:
+                # checkfirst=True: 跳过已存在的表和 ENUM 类型，幂等安全
+                await conn.run_sync(Base.metadata.create_all, checkfirst=True)
+            logger.info("Database initialized successfully", attempt=attempt)
+            return
+        except Exception as exc:
+            last_exc = exc
+            logger.warning(
+                "Database init attempt failed, retrying",
+                attempt=attempt,
+                max_retries=retries,
+                error=str(exc),
+            )
+            if attempt < retries:
+                await asyncio.sleep(delay)
 
-    logger.info("Database initialized successfully")
+    raise RuntimeError(f"Database init failed after {retries} attempts: {last_exc}")
 
 
 async def close_db():

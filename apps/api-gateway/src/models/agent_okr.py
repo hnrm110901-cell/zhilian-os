@@ -27,7 +27,7 @@ from .base import Base
 AgentNameEnum = ENUM(
     "business_intel", "ops_flow", "people", "marketing",
     "banquet", "dish_rd", "supplier", "compliance", "ops", "fct",
-    name="agent_okr_agent_name_enum", create_type=False,
+    name="agent_okr_agent_name_enum", create_type=True,
 )
 
 AgentResponseStatusEnum = ENUM(
@@ -36,7 +36,7 @@ AgentResponseStatusEnum = ENUM(
     "rejected",   # 用户拒绝建议
     "auto",       # 系统自动执行
     "expired",    # 超时未响应
-    name="agent_response_status_enum", create_type=False,
+    name="agent_response_status_enum", create_type=True,
 )
 
 
