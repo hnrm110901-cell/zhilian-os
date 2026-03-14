@@ -98,3 +98,38 @@ def _risk_level(score: float) -> str:
     if score >= 0.3: return "medium"
     return "low"
 ```
+
+---
+
+## 前端 / 配置
+
+### L019 — API_BASE_URL 不能 fallback 到旧域名
+**问题**：`services/config.ts` 中 `API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://i7dc.com'`，域名迁移到 `zlsjos.cn` 后忘了改 fallback。开发环境所有 API 请求直接发往旧域名，旧域名返回 401，前端静默 catch 后显示空数据，表现为"所有页面无数据但不报错"。
+**规则**：API 基地址的 fallback 应为空字符串 `''`（让 Vite proxy 接管），或直接使用当前域名。域名迁移时必须全局搜索旧域名：`grep -r "i7dc.com" apps/web/src/`，确保零残留。
+
+### L020 — Vite proxy target 必须与实际后端域名一致
+**问题**：`vite.config.ts` 中 proxy target 仍指向 `https://i7dc.com`，开发环境 `/api` 请求被转发到已废弃的旧域名，认证全部失败。截图看起来是"登录不了"。
+**规则**：`vite.config.ts` 的 proxy target、`services/config.ts` 的 `API_BASE_URL`、`.env` 文件三处必须统一指向同一个后端域名。修改任一处时检查其他两处。
+
+### L021 — ZTable render 回调参数顺序：(value, row, index) 不是 (row)
+**问题**：ZTable 的 `render` 签名是 `render(value, row, index)`，第一个参数是通过 `dataIndex/key` 查找到的字段值，第二个才是完整行数据。PlatformIntegrationsPage 所有列的 render 都把第一个参数当 row 使用：`render: (row) => row.name`。当 `key='last_sync_at'` 且字段值为 `null` 时，`null.last_sync_at` 抛 TypeError 崩溃。
+**规则**：使用 ZTable 时 render 必须写 `(_value, row) => ...`。这也适用于 Ant Design Table 的 render 回调（同样签名）。新页面用 ZTable 时务必参考 `ZTable.tsx:9` 的接口定义确认参数顺序。
+
+### L022 — 生产部署后浏览器缓存旧 JS chunk 导致白屏
+**问题**：Vite 构建的 JS chunk 文件名带 hash（如 `StoreManagementPage-CAYaHK4J.js`），新版本 hash 变了，旧版本文件被 `cp -r dist/*` 覆盖删除。浏览器缓存的 HTML 仍引用旧 hash 的 JS 文件，404 后白屏报错 "Failed to fetch dynamically imported module"。
+**规则**：
+1. 部署新版本后，用户需**强刷**（Ctrl+Shift+R）或清除缓存
+2. Nginx 配置 `index.html` 的 `Cache-Control: no-cache`（每次检查新版本），静态资源用长缓存
+3. 前端 ErrorBoundary 捕获 `ChunkLoadError` 时自动 `window.location.reload()` 触发重新加载
+
+### L023 — 登录页 CSS 需要同步适配主题变更
+**问题**：全站从亮色主题迁移到暗色主题 `#0B1A20` 后，登录页 card 仍是白色 `#fff` 背景，在深色页面上视觉突兀且输入框样式错乱。Ant Design 的 Input 组件需要用 `:global()` 选择器覆盖暗色样式。
+**规则**：主题大改后，必须逐页检查以下独立样式页面：登录页、注册页、404页、公开预订页（BookingH5）。这些页面通常不在 Layout 内，不会自动继承主题变量。
+
+### L024 — CSS 变量 fallback 值必须与 token 同步
+**问题**：`variables.css` 中 `--primary-color` 的 fallback 仍是旧橙色 `#FF6B35`，当 `injectTokens()` 未执行或延迟时（SSR、静态预渲染），页面闪现橙色再变绿色。
+**规则**：修改 `design-system/tokens/colors.ts` 的品牌色后，必须同步更新 `styles/variables.css` 的 CSS fallback 值。两处必须保持一致。
+
+### L025 — git rebase 冲突后必须保留双方的新增内容
+**问题**：远程新增了 6 个平台页面（PlatformFeatureFlagsPage 等），本地新增了 SystemSettingsPage。rebase 冲突时如果只保留一方，会丢失另一方的页面注册，导致路由 404。
+**规则**：`App.tsx` 的 lazy import 和 Route 注册冲突，必须合并保留双方的新增行。解决完冲突后运行 `npx tsc --noEmit` 确认无遗漏引用。
