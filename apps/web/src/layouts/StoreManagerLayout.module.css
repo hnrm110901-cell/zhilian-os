@@ -43,9 +43,9 @@
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #FF8E53, #FF6B35);
+  background: linear-gradient(135deg, #26C9B4, #0AAF9A);
   border: none;
-  box-shadow: 0 4px 16px rgba(255,107,53,0.35);
+  box-shadow: 0 4px 16px rgba(10,175,154,0.35);
   font-size: 22px;
   display: flex;
   align-items: center;
@@ -57,7 +57,7 @@
 
 .voiceFab:active {
   transform: scale(0.92);
-  box-shadow: 0 2px 8px rgba(255,107,53,0.25);
+  box-shadow: 0 2px 8px rgba(10,175,154,0.25);
 }
 
 /* Bottom tab bar */

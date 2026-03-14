@@ -1,35 +1,35 @@
 /**
  * 屯象OS · Dark Theme Token Map
- * 基于 TunxiangOS UI Design Spec v1.0
- * 深色主题：Navy调暗色 (#0F1419)
+ * 基于 v2 prototype workspace.html 设计规范
+ * 深色主题：#0B1A20 深青色背景 + #0AAF9A mint 主色
  */
 import { brand, dark as darkColors, semantic } from '../tokens/colors';
 
 export const darkTheme = {
-  // Backgrounds
-  '--tx-bg':              darkColors.bg,
+  // Backgrounds (v2 prototype)
+  '--tx-bg':              darkColors.bg,        // #0B1A20
   '--tx-bg-primary':      darkColors.bg,
-  '--tx-bg-secondary':    darkColors.raised,
-  '--tx-bg-tertiary':     darkColors.sidebar,
+  '--tx-bg-secondary':    darkColors.raised,    // #0D2029
+  '--tx-bg-tertiary':     '#091518',
   '--tx-bg-elevated':     darkColors.raised,
 
-  // Text
-  '--tx-text-primary':    darkColors.t1,
-  '--tx-text-secondary':  darkColors.t2,
-  '--tx-text-tertiary':   darkColors.t3,
-  '--tx-text-disabled':   darkColors.t4,
+  // Text (opacity-based hierarchy from v2)
+  '--tx-text-primary':    darkColors.t1,        // 92%
+  '--tx-text-secondary':  darkColors.t2,        // 65%
+  '--tx-text-tertiary':   darkColors.t3,        // 38%
+  '--tx-text-disabled':   darkColors.t4,        // 8%
 
   // Border
   '--tx-border':          'rgba(255,255,255,0.10)',
-  '--tx-border-light':    darkColors.border,
+  '--tx-border-light':    darkColors.border,     // 8%
   '--tx-divider':         darkColors.border,
 
-  // Accent (Brand Orange, brighter in dark)
-  '--tx-accent':          brand[500],     // #FF6B35
-  '--tx-accent-hover':    brand[400],     // #FF7E4A
-  '--tx-accent-active':   brand[300],     // #FF9A6E
-  '--tx-accent-soft':     'rgba(255,107,53,0.15)',
-  '--tx-accent-bg':       'rgba(255,107,53,0.10)',
+  // Accent (Mint #0AAF9A)
+  '--tx-accent':          brand[500],            // #0AAF9A
+  '--tx-accent-hover':    brand[400],            // #26C9B4
+  '--tx-accent-active':   brand[300],            // #4DD3C2
+  '--tx-accent-soft':     'rgba(10,175,154,0.15)',
+  '--tx-accent-bg':       'rgba(10,175,154,0.10)',
 
   // Semantic (brighter in dark for contrast)
   '--tx-success':         '#34D399',
@@ -44,13 +44,13 @@ export const darkTheme = {
 
   // Surface
   '--tx-surface':         darkColors.raised,
-  '--tx-surface-hover':   '#243447',
+  '--tx-surface-hover':   '#132830',
 
-  // Shadows (darker in dark mode)
-  '--tx-shadow-sm':       '0 1px 2px rgba(0,0,0,0.2)',
-  '--tx-shadow-md':       '0 2px 8px rgba(0,0,0,0.3)',
-  '--tx-shadow-lg':       '0 4px 16px rgba(0,0,0,0.4)',
-  '--tx-shadow-xl':       '0 8px 24px rgba(0,0,0,0.5)',
+  // Shadows (high opacity for dark theme, v2 style)
+  '--tx-shadow-sm':       '0 1px 2px rgba(0,0,0,0.3)',
+  '--tx-shadow-md':       '0 2px 8px rgba(0,0,0,0.4)',
+  '--tx-shadow-lg':       '0 4px 16px rgba(0,0,0,0.5)',
+  '--tx-shadow-xl':       '0 8px 24px rgba(0,0,0,0.6)',
 
   // Chart
   '--tx-chart-grid':      'rgba(255,255,255,0.06)',

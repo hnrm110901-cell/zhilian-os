@@ -1,7 +1,6 @@
 /**
  * 屯象OS · Light Theme Token Map
- * 基于 TunxiangOS UI Design Spec v1.0
- * 由 injectTokens() 注入为 CSS 变量
+ * v2 设计系统 — 浅色备选主题（Mint #0AAF9A 主色）
  */
 import { brand, neutral, semantic, warm, navy } from '../tokens/colors';
 
@@ -24,18 +23,18 @@ export const lightTheme = {
   '--tx-border-light':    neutral[100],
   '--tx-divider':         neutral[100],
 
-  // Accent (Brand Orange)
-  '--tx-accent':          brand[500],     // #FF6B35
-  '--tx-accent-hover':    brand[600],     // #E85A24
-  '--tx-accent-active':   brand[700],     // #C44A1B
-  '--tx-accent-soft':     'rgba(255,107,53,0.08)',
-  '--tx-accent-bg':       brand[50],      // #FFF0E8
+  // Accent (Mint)
+  '--tx-accent':          brand[500],     // #0AAF9A
+  '--tx-accent-hover':    brand[600],     // #099987
+  '--tx-accent-active':   brand[700],     // #078070
+  '--tx-accent-soft':     'rgba(10,175,154,0.08)',
+  '--tx-accent-bg':       brand[50],      // #E6F7F5
 
-  // Semantic (Design Spec v1.0)
-  '--tx-success':         semantic.success,  // #27AE60
-  '--tx-warning':         semantic.warning,  // #F2994A
-  '--tx-danger':          semantic.danger,   // #EB5757
-  '--tx-info':            semantic.info,     // #2D9CDB
+  // Semantic
+  '--tx-success':         semantic.success,
+  '--tx-warning':         semantic.warning,
+  '--tx-danger':          semantic.danger,
+  '--tx-info':            semantic.info,
 
   // Warm
   '--tx-sun':             warm.sun,

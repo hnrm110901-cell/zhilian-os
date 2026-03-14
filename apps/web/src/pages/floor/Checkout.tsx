@@ -59,7 +59,7 @@ export default function Checkout() {
     <div className={styles.container}>
       <div className={styles.header}>
         <h2 className={styles.title}>收银结账</h2>
-        <Tag color="#FF6B35">{orders.length} 单待结</Tag>
+        <Tag color="#0AAF9A">{orders.length} 单待结</Tag>
       </div>
       <Card className={styles.card} size="small">
         <Table

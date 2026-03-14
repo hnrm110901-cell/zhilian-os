@@ -16,7 +16,7 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'https://i7dc.com',
+        target: 'https://zlsjos.cn',
         changeOrigin: true,
       },
     },

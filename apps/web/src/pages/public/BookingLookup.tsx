@@ -204,7 +204,7 @@ const BookingLookup: React.FC = () => {
             </div>
           )}
           <div style={{ textAlign: 'center', marginTop: 20 }}>
-            <a href="/book" style={{ color: '#FF6B2C', fontSize: 14 }}>去预订 →</a>
+            <a href="/book" style={{ color: '#0AAF9A', fontSize: 14 }}>去预订 →</a>
           </div>
         </div>
       )}

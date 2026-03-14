@@ -19,7 +19,7 @@ interface TableInfo {
 
 const STATUS_CONFIG: Record<string, { color: string; label: string; badge: string }> = {
   idle:     { color: '#27AE60', label: '空闲', badge: 'success' },
-  occupied: { color: '#FF6B35', label: '用餐中', badge: 'processing' },
+  occupied: { color: '#0AAF9A', label: '用餐中', badge: 'processing' },
   reserved: { color: '#2D9CDB', label: '已预订', badge: 'warning' },
   cleaning: { color: '#F2994A', label: '清理中', badge: 'default' },
 };

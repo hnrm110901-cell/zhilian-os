@@ -216,6 +216,7 @@ const PlatformAuditLogPage       = lazy(() => import('./pages/platform/PlatformA
 const PlatformDataSovereigntyPage  = lazy(() => import('./pages/platform/PlatformDataSovereigntyPage'));
 const PlatformSystemMonitorPage    = lazy(() => import('./pages/platform/PlatformSystemMonitorPage'));
 const PlatformBackupPage           = lazy(() => import('./pages/platform/PlatformBackupPage'));
+const SystemSettingsPage         = lazy(() => import('./pages/platform/SystemSettingsPage'));
 
 // Role-based views (Phase 2 — Chef /chef, Floor /floor, HQ /hq)
 const ChefLayout      = lazy(() => import('./layouts/ChefLayout'));
@@ -829,8 +830,8 @@ const AppContent: React.FC = () => {
                   <Route path="ontology" element={<PlatformOntologyPage />} />
                   {/* 数据主权 → 专用数据主权管理页 */}
                   <Route path="data-sovereignty" element={<PlatformDataSovereigntyPage />} />
-                  {/* 系统设置 → 复用用户管理页面 */}
-                  <Route path="settings" element={<UserManagementPage />} />
+                  {/* 系统设置 → 平台级配置管理 */}
+                  <Route path="settings" element={<SystemSettingsPage />} />
                 </Route>
 
                 {/* Role-based views — Store Manager (手机) */}

@@ -1,0 +1,446 @@
+/* ── Page ────────────────────────────────────────────────────────────────────*/
+
+.page {
+  max-width: 1080px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.pageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pageTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+  margin: 0;
+}
+
+.pageDesc {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.38);
+  margin: 4px 0 0;
+}
+
+/* ── Section Card ───────────────────────────────────────────────────────────*/
+
+.section {
+  background: var(--surface, #0D2029);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sectionIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.sectionIconMint {
+  background: rgba(10, 175, 154, 0.12);
+  color: #0AAF9A;
+}
+
+.sectionIconBlue {
+  background: rgba(45, 156, 219, 0.12);
+  color: #2D9CDB;
+}
+
+.sectionIconAmber {
+  background: rgba(242, 153, 74, 0.12);
+  color: #F2994A;
+}
+
+.sectionIconPurple {
+  background: rgba(155, 81, 224, 0.12);
+  color: #9B51E0;
+}
+
+.sectionTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  margin: 0;
+}
+
+.sectionDesc {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.38);
+  margin: 2px 0 0;
+}
+
+/* ── Form Row ───────────────────────────────────────────────────────────────*/
+
+.formGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.formRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.formLabel {
+  width: 140px;
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.65);
+  padding-top: 8px;
+}
+
+.formValue {
+  flex: 1;
+  min-width: 0;
+}
+
+.formInput {
+  width: 100%;
+  height: 38px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 8px;
+  padding: 0 12px;
+  font-size: 14px;
+  font-family: inherit;
+  color: rgba(255, 255, 255, 0.92);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.formInput:focus {
+  border-color: #0AAF9A;
+}
+
+.formInput::placeholder {
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.formInput:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.formInputSmall {
+  width: 120px;
+}
+
+.formSelect {
+  width: 100%;
+  height: 38px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 8px;
+  padding: 0 12px;
+  font-size: 14px;
+  font-family: inherit;
+  color: rgba(255, 255, 255, 0.92);
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='rgba(255,255,255,0.38)' viewBox='0 0 16 16'%3E%3Cpath d='M1.5 5.5l6.5 6.5 6.5-6.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+.formSelect:focus {
+  border-color: #0AAF9A;
+}
+
+.formHint {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.30);
+  margin-top: 4px;
+}
+
+.formStatic {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.65);
+  padding-top: 8px;
+}
+
+.formStaticMono {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 13px;
+  color: #0AAF9A;
+  padding-top: 8px;
+}
+
+/* ── Toggle Switch ──────────────────────────────────────────────────────────*/
+
+.toggleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.toggleRow:last-child {
+  border-bottom: none;
+}
+
+.toggleInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.toggleLabel {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.toggleDesc {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.toggle {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.toggle::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s;
+}
+
+.toggleOn {
+  background: #0AAF9A;
+}
+
+.toggleOn::after {
+  transform: translateX(20px);
+}
+
+/* ── Status Badges ──────────────────────────────────────────────────────────*/
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.statusOnline {
+  background: rgba(39, 174, 96, 0.12);
+  color: #27AE60;
+}
+
+.statusOffline {
+  background: rgba(235, 87, 87, 0.12);
+  color: #EB5757;
+}
+
+.statusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* ── Service Info Grid ──────────────────────────────────────────────────────*/
+
+.infoGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.infoCard {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.infoLabel {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.38);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.infoValue {
+  font-size: 16px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.infoValueMint {
+  color: #0AAF9A;
+}
+
+/* ── Merchant Config Table ──────────────────────────────────────────────────*/
+
+.merchantTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.merchantTable th {
+  text-align: left;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.38);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.merchantTable td {
+  padding: 12px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.merchantTable tr:last-child td {
+  border-bottom: none;
+}
+
+.merchantName {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.merchantTag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  background: rgba(10, 175, 154, 0.10);
+  color: #0AAF9A;
+}
+
+.merchantTagActive {
+  background: rgba(39, 174, 96, 0.12);
+  color: #27AE60;
+}
+
+.merchantTagPending {
+  background: rgba(242, 153, 74, 0.12);
+  color: #F2994A;
+}
+
+/* ── Actions Row ────────────────────────────────────────────────────────────*/
+
+.actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.btnPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 20px;
+  border: none;
+  border-radius: 8px;
+  background: #0AAF9A;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.btnPrimary:hover { opacity: 0.88; }
+.btnPrimary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btnSecondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btnSecondary:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* ── Loading / Error ────────────────────────────────────────────────────────*/
+
+.loadingWrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 60px 0;
+}
+
+.errorWrap {
+  text-align: center;
+  padding: 40px;
+  color: rgba(255, 255, 255, 0.50);
+  font-size: 14px;
+}
+
+@media (max-width: 768px) {
+  .formRow {
+    flex-direction: column;
+    gap: 6px;
+  }
+  .formLabel {
+    width: auto;
+    padding-top: 0;
+  }
+  .infoGrid {
+    grid-template-columns: 1fr;
+  }
+}

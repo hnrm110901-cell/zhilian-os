@@ -1,11 +1,11 @@
-/* ── Page (full-screen gradient bg) ─────────────────────────────────────────*/
+/* ── Page (full-screen dark bg with mint accent) ────────────────────────────*/
 
 .page {
   display: flex;
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background: linear-gradient(135deg, #0AAF9A 0%, #066E5D 100%);
+  background: #0B1A20;
   position: relative;
   overflow: hidden;
 }
@@ -14,14 +14,14 @@
 
 .blob {
   position: absolute;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(10, 175, 154, 0.08);
   border-radius: 50%;
-  filter: blur(60px);
+  filter: blur(80px);
   pointer-events: none;
 }
 
 .blobTopRight {
-  top: -50%;
+  top: -40%;
   right: -10%;
   width: 600px;
   height: 600px;
@@ -32,16 +32,18 @@
   left: -10%;
   width: 500px;
   height: 500px;
+  background: rgba(10, 175, 154, 0.06);
 }
 
 /* ── Card ────────────────────────────────────────────────────────────────────*/
 
 .card {
   width: 450px;
-  background: #fff;
+  background: #0D2029;
+  border: 1px solid rgba(255, 255, 255, 0.10);
   border-radius: 16px;
   padding: 32px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
   position: relative;
   z-index: 1;
   animation: fadeInUp 0.6s ease-out;
@@ -74,7 +76,7 @@
 
 .subtitle {
   font-size: 15px;
-  color: var(--text-secondary, #888);
+  color: rgba(255, 255, 255, 0.50);
   margin: 0;
 }
 
@@ -84,7 +86,7 @@
   display: flex;
   gap: 4px;
   margin-bottom: 20px;
-  background: #F5F5F7;
+  background: rgba(255, 255, 255, 0.04);
   border-radius: 10px;
   padding: 3px;
 }
@@ -99,7 +101,7 @@
   border: none;
   border-radius: 8px;
   background: transparent;
-  color: var(--text-secondary, #888);
+  color: rgba(255, 255, 255, 0.38);
   font-size: 13px;
   font-weight: 500;
   font-family: inherit;
@@ -109,20 +111,47 @@
 }
 
 .tab:hover {
-  color: var(--text-primary, #1D1D1F);
+  color: rgba(255, 255, 255, 0.65);
 }
 
 .tabActive {
-  background: #fff;
+  background: rgba(255, 255, 255, 0.08);
   color: #0AAF9A;
   font-weight: 600;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 /* ── Tab Content ─────────────────────────────────────────────────────────────*/
 
 .tabContent {
   min-height: 150px;
+}
+
+/* ── Ant Design Input overrides for dark card ────────────────────────────────*/
+
+.tabContent :global(.ant-input-affix-wrapper),
+.tabContent :global(.ant-input) {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.10) !important;
+  color: rgba(255, 255, 255, 0.92) !important;
+}
+
+.tabContent :global(.ant-input-affix-wrapper:hover),
+.tabContent :global(.ant-input:hover) {
+  border-color: rgba(255, 255, 255, 0.20) !important;
+}
+
+.tabContent :global(.ant-input-affix-wrapper-focused),
+.tabContent :global(.ant-input:focus) {
+  border-color: #0AAF9A !important;
+  box-shadow: 0 0 0 2px rgba(10, 175, 154, 0.15) !important;
+}
+
+.tabContent :global(.ant-input::placeholder) {
+  color: rgba(255, 255, 255, 0.30) !important;
+}
+
+.tabContent :global(.ant-input-password-icon) {
+  color: rgba(255, 255, 255, 0.38) !important;
 }
 
 /* ── Submit button ───────────────────────────────────────────────────────────*/
@@ -132,7 +161,7 @@
   height: 48px;
   border: none;
   border-radius: 8px;
-  background: linear-gradient(135deg, #0AAF9A 0%, #066E5D 100%);
+  background: linear-gradient(135deg, #0AAF9A 0%, #078070 100%);
   color: #fff;
   font-size: 16px;
   font-weight: 500;
@@ -155,7 +184,7 @@
   align-items: center;
   gap: 12px;
   margin: 24px 0;
-  color: var(--text-secondary, #aaa);
+  color: rgba(255, 255, 255, 0.30);
   font-size: 13px;
 }
 
@@ -164,7 +193,7 @@
   content: '';
   flex: 1;
   height: 1px;
-  background: #e8e8e8;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 /* ── Phone Form ──────────────────────────────────────────────────────────────*/
@@ -178,10 +207,11 @@
 .phoneInputRow {
   display: flex;
   align-items: center;
-  border: 1px solid #d9d9d9;
+  border: 1px solid rgba(255, 255, 255, 0.10);
   border-radius: 8px;
   overflow: hidden;
   transition: border-color 0.2s;
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .phoneInputRow:focus-within {
@@ -191,9 +221,9 @@
 .phonePrefix {
   padding: 0 12px;
   font-size: 14px;
-  color: var(--text-secondary, #666);
-  background: #FAFAFA;
-  border-right: 1px solid #d9d9d9;
+  color: rgba(255, 255, 255, 0.50);
+  background: rgba(255, 255, 255, 0.04);
+  border-right: 1px solid rgba(255, 255, 255, 0.10);
   line-height: 44px;
   flex-shrink: 0;
 }
@@ -207,10 +237,11 @@
   font-family: inherit;
   height: 44px;
   background: transparent;
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .phoneInput::placeholder {
-  color: #AEAEB2;
+  color: rgba(255, 255, 255, 0.30);
 }
 
 .codeInputRow {
@@ -221,7 +252,7 @@
 .codeInput {
   flex: 1;
   height: 44px;
-  border: 1px solid #d9d9d9;
+  border: 1px solid rgba(255, 255, 255, 0.10);
   border-radius: 8px;
   padding: 0 12px;
   font-size: 15px;
@@ -230,6 +261,8 @@
   transition: border-color 0.2s;
   letter-spacing: 4px;
   text-align: center;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .codeInput:focus {
@@ -237,7 +270,7 @@
 }
 
 .codeInput::placeholder {
-  color: #AEAEB2;
+  color: rgba(255, 255, 255, 0.30);
   letter-spacing: 0;
 }
 
@@ -257,12 +290,12 @@
 }
 
 .sendCodeBtn:hover:not(:disabled) {
-  background: rgba(10, 175, 154, 0.06);
+  background: rgba(10, 175, 154, 0.10);
 }
 
 .sendCodeBtn:disabled {
-  border-color: #d9d9d9;
-  color: #AEAEB2;
+  border-color: rgba(255, 255, 255, 0.10);
+  color: rgba(255, 255, 255, 0.25);
   cursor: not-allowed;
 }
 
@@ -281,9 +314,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #e8e8e8;
+  border: 1px solid rgba(255, 255, 255, 0.10);
   border-radius: 12px;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.04);
   margin-bottom: 16px;
 }
 
@@ -297,7 +330,7 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  color: var(--text-secondary, #888);
+  color: rgba(255, 255, 255, 0.50);
   font-size: 14px;
   text-align: center;
 }
@@ -322,12 +355,12 @@
 }
 
 .refreshQrBtn:hover {
-  background: rgba(10, 175, 154, 0.06);
+  background: rgba(10, 175, 154, 0.10);
 }
 
 .qrTip {
   font-size: 13px;
-  color: var(--text-secondary, #888);
+  color: rgba(255, 255, 255, 0.50);
   text-align: center;
 }
 
@@ -409,19 +442,20 @@
   font-size: 56px;
   line-height: 1;
   margin-bottom: 4px;
+  color: #07C160;
 }
 
 .weworkDesc {
   font-size: 15px;
-  color: #3D3D3D;
+  color: rgba(255, 255, 255, 0.65);
   line-height: 1.6;
 }
 
 .weworkHint {
   display: inline-block;
   font-size: 12px;
-  color: #6E6E73;
-  background: #F5F5F7;
+  color: rgba(255, 255, 255, 0.38);
+  background: rgba(255, 255, 255, 0.06);
   padding: 2px 8px;
   border-radius: 10px;
   margin-top: 4px;
@@ -455,19 +489,19 @@
 
 .weworkWarning {
   width: 100%;
-  background: #FFF8E6;
-  border: 1px solid #FFD666;
+  background: rgba(251, 191, 36, 0.10);
+  border: 1px solid rgba(251, 191, 36, 0.30);
   border-radius: 8px;
   padding: 12px 14px;
   text-align: left;
   font-size: 13px;
-  color: #7D4E00;
+  color: #FBBF24;
 }
 
 .weworkWarning strong {
   display: block;
   margin-bottom: 6px;
-  color: #5C3800;
+  color: #FBBF24;
 }
 
 .weworkConfigList {
@@ -487,6 +521,13 @@
   text-decoration: underline;
 }
 
+.weworkConfigList code {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
 .weworkSteps {
   display: flex;
   align-items: center;
@@ -502,7 +543,7 @@
   align-items: center;
   gap: 4px;
   font-size: 11px;
-  color: #6E6E73;
+  color: rgba(255, 255, 255, 0.38);
   text-align: center;
   max-width: 72px;
 }
@@ -523,7 +564,7 @@
 
 .stepArrow {
   font-size: 14px;
-  color: #AEAEB2;
+  color: rgba(255, 255, 255, 0.25);
   margin-top: -12px;
 }
 

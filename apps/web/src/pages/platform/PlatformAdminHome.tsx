@@ -55,7 +55,21 @@ interface MerchantCard {
   store_count: number;
   user_count: number;
   status: string;
+  avg_ticket_yuan?: number;
+  target_food_cost_pct?: number;
+  contact_person?: string;
+  contact_phone?: string;
+  group_name?: string;
 }
+
+// 菜系中文映射
+const CUISINE_LABEL: Record<string, string> = {
+  hunan: '湘菜',
+  guizhou: '贵州菜',
+  sichuan: '川菜',
+  cantonese: '粤菜',
+  chinese_formal: '中餐正餐',
+};
 
 interface SystemEvent {
   id: string;
@@ -214,6 +228,11 @@ const PlatformAdminHome: React.FC = () => {
         store_count: m.store_count ?? m.stores ?? 0,
         user_count: m.user_count ?? m.users ?? 0,
         status: m.status || 'active',
+        avg_ticket_yuan: m.avg_ticket_yuan,
+        target_food_cost_pct: m.target_food_cost_pct,
+        contact_person: m.contact_person,
+        contact_phone: m.contact_phone,
+        group_name: m.group_name,
       })));
     } catch {
       setMerchants([
@@ -434,12 +453,16 @@ const statusLabelMap: Record<string, { type: 'success' | 'warning' | 'info'; tex
 
 const MerchantCardItem: React.FC<{ merchant: MerchantCard; onClick: () => void }> = ({ merchant, onClick }) => {
   const badge = statusLabelMap[merchant.status] || { type: 'info' as const, text: merchant.status };
+  const cuisineLabel = CUISINE_LABEL[merchant.cuisine_type] || merchant.cuisine_type;
   return (
     <div className={styles.merchantCard} onClick={onClick}>
       <div className={styles.merchantCardHeader}>
         <div>
           <div className={styles.merchantCardName}>{merchant.brand_name}</div>
-          <div className={styles.merchantCardMeta}>{merchant.cuisine_type}</div>
+          <div className={styles.merchantCardMeta}>
+            {cuisineLabel}
+            {merchant.avg_ticket_yuan ? ` · 人均¥${merchant.avg_ticket_yuan}` : ''}
+          </div>
         </div>
         <ZBadge type={badge.type} text={badge.text} />
       </div>
@@ -453,6 +476,18 @@ const MerchantCardItem: React.FC<{ merchant: MerchantCard; onClick: () => void }
             <span className={styles.merchantStatVal}>{merchant.user_count}</span>
             <span className={styles.merchantStatLabel}>用户数</span>
           </div>
+          {merchant.target_food_cost_pct != null && (
+            <div className={styles.merchantStatItem}>
+              <span className={styles.merchantStatVal}>{merchant.target_food_cost_pct}%</span>
+              <span className={styles.merchantStatLabel}>食材成本目标</span>
+            </div>
+          )}
+          {merchant.contact_person && (
+            <div className={styles.merchantStatItem}>
+              <span className={styles.merchantStatVal} style={{ fontSize: 14 }}>{merchant.contact_person}</span>
+              <span className={styles.merchantStatLabel}>联系人</span>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -22,14 +22,14 @@ const BRAND_COLORS: Record<string, string> = {
   sichuan: '#CF1322',   // 川菜 — 正红
   cantonese: '#D4B106', // 粤菜 — 金色
   hunan: '#FA541C',     // 湘菜 — 橙红
-  default: '#FF6B35',   // 默认 — 屯象橙
+  default: '#0AAF9A',   // 默认 — 屯象mint
 };
 
 const DEFAULT_THEME: BrandTheme = {
   brandId: '',
   brandName: '屯象OS',
   logoUrl: '/logo-icon.svg',
-  accentColor: '#FF6B35',
+  accentColor: '#0AAF9A',
   cuisineType: '',
   loading: false,
 };

@@ -1,5 +1,5 @@
 // API服务配置
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://i7dc.com';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 export const API_ENDPOINTS = {
   // 健康检查

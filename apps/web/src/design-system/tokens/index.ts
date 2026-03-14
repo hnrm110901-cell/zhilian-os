@@ -1,7 +1,7 @@
 /**
  * 屯象OS Design Tokens
  * 品牌: 屯象 TUN XIANG · 餐饮人的好伙伴
- * 基于 TunxiangOS UI Design Spec v1.0
+ * v2 设计系统 — 深色主题 + Mint #0AAF9A 主色
  *
  * 使用方式:
  *   import { colors, typography, spacing } from '@/design-system/tokens';
@@ -23,60 +23,36 @@ import { darkTheme } from '../themes/dark';
 // ── CSS 变量注入（在 main.tsx 中调用 injectTokens()）──
 export function injectTokens() {
   const root = document.documentElement;
-  const isDark = root.getAttribute('data-theme') === 'dark' || root.classList.contains('dark');
+
+  // v2 设计系统默认使用深色主题
+  // 除非显式设置 data-theme="light"，否则默认 dark
+  const isLight = root.getAttribute('data-theme') === 'light';
+  if (!root.getAttribute('data-theme')) {
+    root.setAttribute('data-theme', 'dark');
+  }
 
   // ── 语义变量（主题感知）──
-  const themeVars: Record<string, string> = isDark ? {
-    // 背景
-    '--bg':              dark.bg,
-    '--surface':         dark.raised,
-    '--surface-hover':   '#243447',
-    // 文字
-    '--text-primary':    dark.t1,
-    '--text-secondary':  dark.t2,
-    '--text-tertiary':   dark.t3,
-    // 边框
-    '--border':          dark.border,
-    // 语义色
-    '--accent':          brand[500],
-    '--accent-soft':     'rgba(255,107,53,0.15)',
-    '--accent-hover':    brand[400],
-    '--accent-active':   brand[300],
-    '--accent-bg':       'rgba(255,107,53,0.10)',
-    '--green':           '#34D399',
-    '--red':             '#F87171',
-    '--yellow':          '#FBBF24',
-    '--blue':            '#60A5FA',
-    // Ant Design 兼容
-    '--bg-primary':      dark.bg,
-    '--bg-secondary':    dark.raised,
-    '--bg-tertiary':     dark.sidebar,
-    '--bg-elevated':     dark.raised,
-    '--border-color':    'rgba(255,255,255,0.10)',
-    '--border-light':    dark.border,
-    '--divider-color':   dark.border,
-    '--text-disabled':   dark.t4,
-  } : {
+  const themeVars: Record<string, string> = isLight ? {
     // 背景
     '--bg':              neutral[50],
     '--surface':         neutral[0],
     '--surface-hover':   neutral[100],
     // 文字
-    '--text-primary':    navy[700],     // #1E2A3A — Design Spec navy-900
+    '--text-primary':    navy[700],
     '--text-secondary':  neutral[600],
     '--text-tertiary':   neutral[400],
     // 边框
     '--border':          neutral[200],
-    // 语义色（Design Spec v1.0）
-    '--accent':          brand[500],    // #FF6B35
-    '--accent-soft':     'rgba(255,107,53,0.08)',
-    '--accent-hover':    brand[600],    // #E85A24
-    '--accent-active':   brand[700],    // #C44A1B
-    '--accent-bg':       brand[50],     // #FFF0E8
-    '--green':           semantic.success,  // #27AE60
-    '--red':             semantic.danger,   // #EB5757
-    '--yellow':          warm.amber,        // #F2994A
-    '--blue':            semantic.info,     // #2D9CDB
+    // 语义色
+    '--accent':          brand[500],
+    '--accent-soft':     'rgba(10,175,154,0.08)',
+    '--accent-hover':    brand[600],
+    '--accent-active':   brand[700],
+    '--accent-bg':       brand[50],
+    '--green':           semantic.success,
+    '--red':             semantic.danger,
+    '--yellow':          warm.amber,
+    '--blue':            semantic.info,
     // Ant Design 兼容
     '--bg-primary':      neutral[0],
     '--bg-secondary':    neutral[50],
@@ -86,11 +62,41 @@ export function injectTokens() {
     '--border-light':    neutral[100],
     '--divider-color':   neutral[100],
     '--text-disabled':   neutral[300],
+  } : {
+    // 背景 (v2 prototype)
+    '--bg':              dark.bg,         // #0B1A20
+    '--surface':         dark.raised,     // #0D2029
+    '--surface-hover':   '#132830',
+    // 文字 (opacity-based)
+    '--text-primary':    dark.t1,         // 92%
+    '--text-secondary':  dark.t2,         // 65%
+    '--text-tertiary':   dark.t3,         // 38%
+    // 边框
+    '--border':          dark.border,     // 8%
+    // 语义色 (Mint accent)
+    '--accent':          brand[500],      // #0AAF9A
+    '--accent-soft':     'rgba(10,175,154,0.15)',
+    '--accent-hover':    brand[400],
+    '--accent-active':   brand[300],
+    '--accent-bg':       'rgba(10,175,154,0.10)',
+    '--green':           '#34D399',
+    '--red':             '#F87171',
+    '--yellow':          '#FBBF24',
+    '--blue':            '#60A5FA',
+    // Ant Design 兼容
+    '--bg-primary':      dark.bg,
+    '--bg-secondary':    dark.raised,
+    '--bg-tertiary':     '#091518',
+    '--bg-elevated':     dark.raised,
+    '--border-color':    'rgba(255,255,255,0.10)',
+    '--border-light':    dark.border,
+    '--divider-color':   dark.border,
+    '--text-disabled':   dark.t4,
   };
 
   // ── 静态变量（不随主题变化）──
   const staticVars: Record<string, string> = {
-    // Brand色阶（替代旧mint，保持--tx-mint-*兼容）
+    // Brand色阶（mint主色）
     '--tx-mint-50':  brand[50],  '--tx-mint-100': brand[100], '--tx-mint-200': brand[200],
     '--tx-mint-300': brand[300], '--tx-mint-400': brand[400], '--tx-mint-500': brand[500],
     '--tx-mint-600': brand[600], '--tx-mint-700': brand[700], '--tx-mint-800': brand[800],
@@ -139,10 +145,14 @@ export function injectTokens() {
     '--transition-fast': `0.15s cubic-bezier(0.4, 0, 0.2, 1)`,
     '--transition-base': `0.2s cubic-bezier(0.4, 0, 0.2, 1)`,
     '--transition-slow': `0.3s cubic-bezier(0.4, 0, 0.2, 1)`,
+    // v2 主色快捷变量
+    '--primary-color':    brand[500],
+    '--primary-hover':    brand[600],
+    '--primary-active':   brand[700],
   };
 
   // ── tx-* 主题变量（新规范前缀）──
-  const txThemeVars = isDark ? darkTheme : lightTheme;
+  const txThemeVars = isLight ? lightTheme : darkTheme;
 
   Object.entries({ ...themeVars, ...staticVars, ...txThemeVars }).forEach(([k, v]) => {
     root.style.setProperty(k, v);

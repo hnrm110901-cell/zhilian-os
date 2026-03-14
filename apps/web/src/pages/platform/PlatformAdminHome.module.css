@@ -21,10 +21,10 @@
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
-  border: 1px solid #E8E8E8;
+  border: 1px solid rgba(255, 255, 255, 0.10);
   border-radius: 8px;
-  background: #fff;
-  color: #3D3D3D;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.65);
   font-size: 13px;
   font-weight: 500;
   font-family: inherit;
@@ -35,7 +35,7 @@
 .quickBtn:hover {
   border-color: #0AAF9A;
   color: #0AAF9A;
-  background: rgba(10, 175, 154, 0.04);
+  background: rgba(10, 175, 154, 0.08);
 }
 
 .quickBtnAccent {
@@ -45,9 +45,9 @@
 }
 
 .quickBtnAccent:hover {
-  background: #09997F;
+  background: #099987;
   color: #fff;
-  border-color: #09997F;
+  border-color: #099987;
 }
 
 /* ── 1. Hero KPI Bar ─────────────────────────────────────────────────────────*/
@@ -56,15 +56,15 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 0;
-  background: #fff;
-  border: 1px solid #E8E8E8;
+  background: var(--surface, #0D2029);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   overflow: hidden;
 }
 
 .heroBar > * {
   padding: 20px 24px;
-  border-right: 1px solid #F0F0F0;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .heroBar > *:last-child {
@@ -99,13 +99,13 @@
 
 .agentName {
   font-weight: 500;
-  color: #1D1D1F;
+  color: rgba(255, 255, 255, 0.92);
   font-size: 13px;
 }
 
 .responseMs {
   font-size: 12px;
-  color: #6E6E73;
+  color: rgba(255, 255, 255, 0.38);
   font-variant-numeric: tabular-nums;
 }
 
@@ -133,24 +133,24 @@
 .statusRowLabel {
   flex: 1;
   font-size: 13px;
-  color: #3D3D3D;
+  color: rgba(255, 255, 255, 0.65);
 }
 
 .statusRowVal {
   font-size: 12px;
-  color: #AEAEB2;
+  color: rgba(255, 255, 255, 0.38);
 }
 
 .trendLabel {
   font-size: 11px;
-  color: #AEAEB2;
+  color: rgba(255, 255, 255, 0.38);
   margin-bottom: 4px;
 }
 
 .refreshIconBtn {
   border: none;
   background: transparent;
-  color: #AEAEB2;
+  color: rgba(255, 255, 255, 0.38);
   cursor: pointer;
   padding: 4px;
   border-radius: 4px;
@@ -177,7 +177,7 @@
 .sectionTitle {
   font-size: 15px;
   font-weight: 600;
-  color: #1D1D1F;
+  color: rgba(255, 255, 255, 0.92);
   margin: 0;
 }
 
@@ -200,8 +200,8 @@
 }
 
 .merchantCard {
-  background: #fff;
-  border: 1px solid #E8E8E8;
+  background: var(--surface, #0D2029);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   padding: 16px;
   cursor: pointer;
@@ -210,7 +210,7 @@
 
 .merchantCard:hover {
   border-color: #0AAF9A;
-  box-shadow: 0 2px 12px rgba(10, 175, 154, 0.1);
+  box-shadow: 0 2px 12px rgba(10, 175, 154, 0.15);
   transform: translateY(-1px);
 }
 
@@ -225,12 +225,12 @@
 .merchantCardName {
   font-size: 15px;
   font-weight: 600;
-  color: #1D1D1F;
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .merchantCardMeta {
   font-size: 12px;
-  color: #AEAEB2;
+  color: rgba(255, 255, 255, 0.38);
   margin-top: 2px;
 }
 
@@ -256,14 +256,14 @@
 .merchantStatVal {
   font-size: 20px;
   font-weight: 700;
-  color: #1D1D1F;
+  color: rgba(255, 255, 255, 0.92);
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
 }
 
 .merchantStatLabel {
   font-size: 11px;
-  color: #AEAEB2;
+  color: rgba(255, 255, 255, 0.38);
 }
 
 /* ── 4. Bottom Row ───────────────────────────────────────────────────────────*/
@@ -293,7 +293,7 @@
   display: flex;
   gap: 10px;
   padding: 8px 0;
-  border-bottom: 1px solid #F5F5F7;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   align-items: flex-start;
 }
 
@@ -305,7 +305,7 @@
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: #F5F5F7;
+  background: rgba(255, 255, 255, 0.06);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -320,14 +320,14 @@
 
 .eventTime {
   font-size: 11px;
-  color: #AEAEB2;
+  color: rgba(255, 255, 255, 0.38);
   margin-right: 8px;
   font-variant-numeric: tabular-nums;
 }
 
 .eventContent {
   font-size: 13px;
-  color: #3D3D3D;
+  color: rgba(255, 255, 255, 0.65);
 }
 
 /* ── AI Suggestion List ──────────────────────────────────────────────────────*/
@@ -340,7 +340,7 @@
 
 .suggestionItem {
   padding: 10px 0;
-  border-bottom: 1px solid #F5F5F7;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .suggestionItem:last-child {
@@ -356,14 +356,14 @@
 
 .suggestionMerchant {
   font-size: 12px;
-  color: #AEAEB2;
+  color: rgba(255, 255, 255, 0.38);
   font-weight: 500;
 }
 
 .suggestionAction {
   font-size: 13px;
   font-weight: 600;
-  color: #1D1D1F;
+  color: rgba(255, 255, 255, 0.92);
   margin-bottom: 2px;
 }
 
@@ -391,7 +391,7 @@
 }
 
 .linkBtn:hover {
-  background: rgba(10, 175, 154, 0.08);
+  background: rgba(10, 175, 154, 0.10);
 }
 
 /* ── Legacy compatibility (keep for MerchantRow used by other pages) ─────────*/
@@ -406,8 +406,8 @@
   align-items: center;
   padding: 12px 16px;
   font-size: 13px;
-  color: #3D3D3D;
-  border-bottom: 1px solid #F0F0F0;
+  color: rgba(255, 255, 255, 0.65);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .merchantRow:last-child {
@@ -416,11 +416,11 @@
 
 .merchantName {
   font-weight: 600;
-  color: #1D1D1F;
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .merchantCell {
-  color: #6E6E73;
+  color: rgba(255, 255, 255, 0.50);
 }
 
 .merchantStatus {
@@ -430,7 +430,7 @@
   border-radius: 20px;
   font-size: 12px;
   font-weight: 500;
-  background: rgba(250, 173, 20, 0.1);
-  color: #d48806;
+  background: rgba(251, 191, 36, 0.15);
+  color: #FBBF24;
   justify-self: start;
 }

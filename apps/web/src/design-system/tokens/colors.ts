@@ -1,21 +1,21 @@
 /**
  * 屯象OS · 色彩Token
- * 品牌色: Orange #FF6B35 — Warm Professional
- * 基于 TunxiangOS UI Design Spec v1.0
+ * 品牌色: Mint #0AAF9A — v2 设计系统
+ * 基于 v2 prototype workspace.html 设计规范
  */
 
-// ── Orange 品牌主色阶 ──
+// ── Mint 品牌主色阶 ──
 export const brand = {
-  50:  '#FFF0E8',
-  100: '#FFD9C4',
-  200: '#FFB899',
-  300: '#FF9A6E',
-  400: '#FF7E4A',
-  500: '#FF6B35',  // Primary — --color-primary
-  600: '#E85A24',  // Hover
-  700: '#C44A1B',  // Active/Pressed
-  800: '#9E3B15',
-  900: '#7A2D10',
+  50:  '#E6F7F5',
+  100: '#B3EBE4',
+  200: '#80DFD3',
+  300: '#4DD3C2',
+  400: '#26C9B4',
+  500: '#0AAF9A',  // Primary — --color-primary
+  600: '#099987',  // Hover
+  700: '#078070',  // Active/Pressed
+  800: '#056659',
+  900: '#034D43',
 } as const;
 
 // ── 保留旧名 mint 作为别名，兼容现有引用 ──
@@ -58,7 +58,7 @@ export const neutral = {
   900: '#1D1D1F',
 } as const;
 
-// ── Semantic 语义色（Design Spec v1.0）──
+// ── Semantic 语义色 ──
 export const semantic = {
   success: '#27AE60',
   warning: '#F2994A',
@@ -66,22 +66,23 @@ export const semantic = {
   info:    '#2D9CDB',
 } as const;
 
-// ── Dark Mode 深色模式专用 ──
+// ── Dark Mode 深色模式专用（v2 prototype 色板）──
 export const dark = {
-  bg:      '#0F1419',
-  raised:  '#1A2332',
-  sidebar: '#0D1117',
-  topbar:  '#0D1117',
-  t1:      'rgba(255,255,255,0.92)',
-  t2:      'rgba(255,255,255,0.50)',
-  t3:      'rgba(255,255,255,0.25)',
-  t4:      'rgba(255,255,255,0.08)',
-  border:  'rgba(255,255,255,0.06)',
+  bg:      '#0B1A20',   // v2 主背景
+  raised:  '#0D2029',   // v2 raised surface
+  sidebar: '#0B1A20',   // sidebar 同主背景
+  topbar:  '#0B1A20',   // topbar 同主背景
+  t1:      'rgba(255,255,255,0.92)',   // 主文字
+  t2:      'rgba(255,255,255,0.65)',   // 次要文字
+  t3:      'rgba(255,255,255,0.38)',   // 辅助文字
+  t4:      'rgba(255,255,255,0.08)',   // 禁用/分割线
+  t5:      'rgba(255,255,255,0.04)',   // 微弱
+  border:  'rgba(255,255,255,0.08)',   // 边框
 } as const;
 
 // ── 快捷常量 ──
 export const colors = {
-  accent:  brand[500],
+  accent:  brand[500],   // #0AAF9A
   green:   semantic.success,
   red:     semantic.danger,
   yellow:  warm.sun,

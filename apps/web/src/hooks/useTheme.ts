@@ -35,7 +35,7 @@ const applyTheme = (theme: 'light' | 'dark') => {
 export const useTheme = () => {
   const [theme, setThemeState] = useState<Theme>(() => {
     const saved = localStorage.getItem(THEME_STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
-    return (saved as Theme) || 'auto';
+    return (saved as Theme) || 'dark';
   });
 
   // 实时跟踪系统主题，auto 模式下驱动重渲染

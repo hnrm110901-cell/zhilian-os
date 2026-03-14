@@ -1,22 +1,60 @@
 /* ═══ 屯象OS Design System · CSS Variables ═══ */
-/* 基于 TunxiangOS UI Design Spec v1.0 */
+/* v2 设计系统 — 深色主题 + Mint #0AAF9A */
 /* 注意: 大部分变量由 injectTokens() 在运行时注入 */
-/* 此文件仅定义 CSS-only 场景的 fallback 和不适合 JS 注入的值 */
+/* 此文件仅定义 CSS-only 场景的 fallback */
 
 :root {
-  /* ── 品牌色 (Orange #FF6B35) ── */
-  --primary-color:    #FF6B35;
-  --primary-hover:    #E85A24;
-  --primary-active:   #C44A1B;
-  --primary-gradient: linear-gradient(135deg, #FF8E53 0%, #FF6B35 100%);
+  /* ── 品牌色 (Mint #0AAF9A) ── */
+  --primary-color:    #0AAF9A;
+  --primary-hover:    #099987;
+  --primary-active:   #078070;
+  --primary-gradient: linear-gradient(135deg, #26C9B4 0%, #0AAF9A 100%);
 
-  /* ── 功能色 (Design Spec v1.0) ── */
+  /* ── 功能色 ── */
   --success-color: #27AE60;
   --warning-color: #F2994A;
   --error-color:   #EB5757;
   --info-color:    #2D9CDB;
+}
 
-  /* ── 浅色模式默认值 (被injectTokens覆盖) ── */
+/* ── 深色主题（默认） ── */
+[data-theme='dark'] {
+  --bg-primary:    #0B1A20;
+  --bg-secondary:  #0D2029;
+  --bg-tertiary:   #091518;
+  --bg-elevated:   #0D2029;
+
+  --text-primary:   rgba(255,255,255,0.92);
+  --text-secondary: rgba(255,255,255,0.65);
+  --text-tertiary:  rgba(255,255,255,0.38);
+  --text-disabled:  rgba(255,255,255,0.08);
+
+  --border-color: rgba(255,255,255,0.10);
+  --border-light: rgba(255,255,255,0.08);
+  --divider-color: rgba(255,255,255,0.08);
+
+  --bg:             #0B1A20;
+  --surface:        #0D2029;
+  --surface-hover:  #132830;
+  --border:         rgba(255,255,255,0.08);
+  --accent:         #0AAF9A;
+  --accent-soft:    rgba(10,175,154,0.15);
+  --accent-hover:   #26C9B4;
+  --accent-active:  #4DD3C2;
+  --accent-bg:      rgba(10,175,154,0.10);
+  --green:          #34D399;
+  --red:            #F87171;
+  --yellow:         #FBBF24;
+  --blue:           #60A5FA;
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-md: 0 2px 8px rgba(0,0,0,0.4);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.5);
+  --shadow-xl: 0 8px 24px rgba(0,0,0,0.6);
+}
+
+/* ── 浅色模式 fallback ── */
+[data-theme='light'] {
   --bg-primary:    #FFFFFF;
   --bg-secondary:  #FAFAFA;
   --bg-tertiary:   #F5F5F5;
@@ -35,46 +73,18 @@
   --surface:        #FFFFFF;
   --surface-hover:  #F5F5F5;
   --border:         #E8E8E8;
-  --accent:         #FF6B35;
-  --accent-soft:    rgba(255,107,53,0.08);
-  --accent-hover:   #E85A24;
-  --accent-active:  #C44A1B;
-  --accent-bg:      #FFF0E8;
+  --accent:         #0AAF9A;
+  --accent-soft:    rgba(10,175,154,0.08);
+  --accent-hover:   #099987;
+  --accent-active:  #078070;
+  --accent-bg:      #E6F7F5;
   --green:          #27AE60;
   --red:            #EB5757;
   --yellow:         #F2994A;
   --blue:           #2D9CDB;
-}
 
-/* ── 深色主题 fallback ── */
-[data-theme='dark'] {
-  --bg-primary:    #0F1419;
-  --bg-secondary:  #1A2332;
-  --bg-tertiary:   #0D1117;
-  --bg-elevated:   #1A2332;
-
-  --text-primary:   rgba(255,255,255,0.92);
-  --text-secondary: rgba(255,255,255,0.50);
-  --text-tertiary:  rgba(255,255,255,0.25);
-  --text-disabled:  rgba(255,255,255,0.08);
-
-  --border-color: rgba(255,255,255,0.10);
-  --border-light: rgba(255,255,255,0.06);
-  --divider-color: rgba(255,255,255,0.06);
-
-  --bg:             #0F1419;
-  --surface:        #1A2332;
-  --surface-hover:  #243447;
-  --border:         rgba(255,255,255,0.06);
-  --accent-soft:    rgba(255,107,53,0.15);
-  --accent-bg:      rgba(255,107,53,0.10);
-  --green:          #34D399;
-  --red:            #F87171;
-  --yellow:         #FBBF24;
-  --blue:           #60A5FA;
-
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.2);
-  --shadow-md: 0 2px 8px rgba(0,0,0,0.3);
-  --shadow-lg: 0 4px 16px rgba(0,0,0,0.4);
-  --shadow-xl: 0 8px 24px rgba(0,0,0,0.5);
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-md: 0 2px 8px rgba(0,0,0,0.08);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.10);
+  --shadow-xl: 0 8px 24px rgba(0,0,0,0.12);
 }

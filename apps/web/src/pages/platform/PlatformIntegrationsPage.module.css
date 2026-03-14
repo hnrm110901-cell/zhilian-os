@@ -57,12 +57,12 @@
 }
 
 .tab:hover {
-  color: var(--accent, #FF6B2C);
+  color: var(--accent, #0AAF9A);
 }
 
 .tabActive {
-  color: var(--accent, #FF6B2C);
-  border-bottom-color: var(--accent, #FF6B2C);
+  color: var(--accent, #0AAF9A);
+  border-bottom-color: var(--accent, #0AAF9A);
   font-weight: 600;
 }
 
@@ -81,8 +81,8 @@
 }
 
 .tabActive .tabCount {
-  background: color-mix(in srgb, var(--accent, #FF6B2C) 15%, transparent);
-  color: var(--accent, #FF6B2C);
+  background: color-mix(in srgb, var(--accent, #0AAF9A) 15%, transparent);
+  color: var(--accent, #0AAF9A);
 }
 
 /* ── 表格列样式 ──────────────────────────────────────────────────────────────── */
@@ -202,8 +202,8 @@
 }
 
 .input:focus {
-  border-color: var(--accent, #FF6B2C);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #FF6B2C) 15%, transparent);
+  border-color: var(--accent, #0AAF9A);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #0AAF9A) 15%, transparent);
 }
 
 .input:disabled {
@@ -229,8 +229,8 @@
 }
 
 .textarea:focus {
-  border-color: var(--accent, #FF6B2C);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #FF6B2C) 15%, transparent);
+  border-color: var(--accent, #0AAF9A);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #0AAF9A) 15%, transparent);
 }
 
 /* ── 提示区 ──────────────────────────────────────────────────────────────────── */

@@ -221,7 +221,8 @@ export default function PlatformIntegrationsPage() {
     setLoading(true);
     try {
       const res = await apiClient.get('/api/v1/integrations/systems');
-      setSystems(Array.isArray(res) ? res : (res?.systems ?? res?.data ?? []));
+      const raw = Array.isArray(res) ? res : (res?.systems ?? res?.data ?? []);
+      setSystems(raw.filter(Boolean));
     } catch {
       setSystems([]);
     } finally {

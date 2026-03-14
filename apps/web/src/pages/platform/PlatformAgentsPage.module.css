@@ -63,13 +63,13 @@
 }
 
 .brandTab:hover {
-  border-color: var(--accent, #FF6B2C);
-  color: var(--accent, #FF6B2C);
+  border-color: var(--accent, #0AAF9A);
+  color: var(--accent, #0AAF9A);
 }
 
 .brandTabActive {
-  background: var(--accent, #FF6B2C);
-  border-color: var(--accent, #FF6B2C);
+  background: var(--accent, #0AAF9A);
+  border-color: var(--accent, #0AAF9A);
   color: #fff;
   font-weight: 600;
 }
@@ -302,7 +302,7 @@
 }
 
 .configInput:focus {
-  border-color: var(--accent, #FF6B2C);
+  border-color: var(--accent, #0AAF9A);
 }
 
 .noConfig {
@@ -350,7 +350,7 @@
 }
 
 .toggle input:checked + .toggleTrack {
-  background: var(--accent, #FF6B2C);
+  background: var(--accent, #0AAF9A);
 }
 
 .toggle input:checked + .toggleTrack::after {

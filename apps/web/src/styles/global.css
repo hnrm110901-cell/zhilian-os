@@ -1,5 +1,5 @@
 /* ═══ 屯象OS · Global Styles ═══ */
-/* 基于 TunxiangOS UI Design Spec v1.0 */
+/* v2 设计系统 — 深色主题 + Inter/Noto Sans SC 字体 */
 
 * {
   box-sizing: border-box;
@@ -11,43 +11,47 @@ html,
 body,
 #root {
   height: 100%;
-  font-family: 'PingFang SC', 'HarmonyOS Sans SC', 'Noto Sans SC',
+  font-family: 'Inter', 'Noto Sans SC', 'PingFang SC', 'HarmonyOS Sans SC',
     -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-  background-color: var(--bg-secondary);
-  color: var(--text-primary);
+  background-color: var(--bg, #0B1A20);
+  color: var(--text-primary, rgba(255,255,255,0.92));
   transition: background-color var(--transition-base), color var(--transition-base);
 }
 
-/* ── Scrollbar ── */
+/* ── Scrollbar (v2 dark style) ── */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg-secondary);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 4px;
+  background: rgba(255,255,255,0.10);
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-tertiary);
+  background: rgba(255,255,255,0.20);
 }
 
-[data-theme='dark'] ::-webkit-scrollbar-thumb {
-  background: var(--border-color);
+[data-theme='light'] ::-webkit-scrollbar-track {
+  background: var(--bg-secondary, #FAFAFA);
 }
 
-[data-theme='dark'] ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-secondary);
+[data-theme='light'] ::-webkit-scrollbar-thumb {
+  background: var(--border-color, #E8E8E8);
+}
+
+[data-theme='light'] ::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary, #BFBFBF);
 }
 
 /* ── Utilities ── */
@@ -106,4 +110,43 @@ body {
     --spacing-lg: 16px;
     --spacing-xl: 24px;
   }
+}
+
+/* ── Ant Design dark theme overrides ── */
+[data-theme='dark'] .ant-table {
+  background: transparent;
+  color: rgba(255,255,255,0.92);
+}
+
+[data-theme='dark'] .ant-table-thead > tr > th {
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.65);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+[data-theme='dark'] .ant-table-tbody > tr > td {
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.92);
+}
+
+[data-theme='dark'] .ant-table-tbody > tr:hover > td {
+  background: rgba(10,175,154,0.06);
+}
+
+[data-theme='dark'] .ant-progress-text {
+  color: rgba(255,255,255,0.65);
+}
+
+[data-theme='dark'] .ant-tag {
+  border-color: rgba(255,255,255,0.10);
+}
+
+[data-theme='dark'] .ant-btn-primary {
+  background: #0AAF9A;
+  border-color: #0AAF9A;
+}
+
+[data-theme='dark'] .ant-btn-primary:hover {
+  background: #26C9B4;
+  border-color: #26C9B4;
 }

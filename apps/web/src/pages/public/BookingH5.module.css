@@ -10,7 +10,7 @@
 }
 
 .header {
-  background: #FF6B2C;
+  background: #0AAF9A;
   color: #fff;
   padding: 16px 20px;
   text-align: center;
@@ -45,7 +45,7 @@
 }
 
 .progressStepActive {
-  background: #FF6B2C;
+  background: #0AAF9A;
 }
 
 /* Step container */
@@ -87,8 +87,8 @@
 }
 
 .storeCardSelected {
-  border-color: #FF6B2C;
-  box-shadow: 0 2px 8px rgba(255, 107, 44, 0.15);
+  border-color: #0AAF9A;
+  box-shadow: 0 2px 8px rgba(10, 175, 154, 0.15);
 }
 
 .storeName {
@@ -123,14 +123,14 @@
 }
 
 .dateCellSelected {
-  background: #FF6B2C;
+  background: #0AAF9A;
   color: #fff;
-  border-color: #FF6B2C;
+  border-color: #0AAF9A;
 }
 
 .dateCellToday {
-  border-color: #FF6B2C;
-  color: #FF6B2C;
+  border-color: #0AAF9A;
+  color: #0AAF9A;
 }
 
 .timeSlots {
@@ -151,9 +151,9 @@
 }
 
 .timeSlotSelected {
-  background: #FF6B2C;
+  background: #0AAF9A;
   color: #fff;
-  border-color: #FF6B2C;
+  border-color: #0AAF9A;
 }
 
 .timeSlotDisabled {
@@ -194,7 +194,7 @@
 }
 
 .input:focus {
-  border-color: #FF6B2C;
+  border-color: #0AAF9A;
 }
 
 .textarea {
@@ -226,9 +226,9 @@
 }
 
 .partySizeBtnSelected {
-  background: #FF6B2C;
+  background: #0AAF9A;
   color: #fff;
-  border-color: #FF6B2C;
+  border-color: #0AAF9A;
 }
 
 /* SMS Verification */
@@ -244,7 +244,7 @@
 
 .sendCodeBtn {
   padding: 12px 16px;
-  background: #FF6B2C;
+  background: #0AAF9A;
   color: #fff;
   border: none;
   border-radius: 8px;
@@ -286,7 +286,7 @@
 .btnPrimary {
   flex: 1;
   padding: 14px;
-  background: #FF6B2C;
+  background: #0AAF9A;
   color: #fff;
   border: none;
   border-radius: 10px;
@@ -384,7 +384,7 @@
   width: 32px;
   height: 32px;
   border: 3px solid #eee;
-  border-top-color: #FF6B2C;
+  border-top-color: #0AAF9A;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }

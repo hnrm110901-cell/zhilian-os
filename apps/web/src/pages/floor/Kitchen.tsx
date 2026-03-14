@@ -42,7 +42,7 @@ export default function Kitchen() {
     <div className={styles.container}>
       <h2 className={styles.title}>厨房出品</h2>
       <div className={styles.summary}>
-        <Tag color="#FF6B35">{orders.filter(o => o.status === 'cooking').length} 道制作中</Tag>
+        <Tag color="#0AAF9A">{orders.filter(o => o.status === 'cooking').length} 道制作中</Tag>
         <Tag color="#27AE60">{orders.filter(o => o.status === 'ready').length} 道待上菜</Tag>
         <Tag>{orders.filter(o => o.status === 'queued').length} 道排队</Tag>
       </div>
@@ -64,7 +64,7 @@ export default function Kitchen() {
                 <Progress
                   percent={pct}
                   size="small"
-                  strokeColor={overdue ? '#EB5757' : '#FF6B35'}
+                  strokeColor={overdue ? '#EB5757' : '#0AAF9A'}
                   format={() => `${item.elapsed_min}/${item.target_min}分`}
                   style={{ width: 120 }}
                 />

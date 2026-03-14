@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════
-   MainLayout.module.css — 三层导航架构
+   MainLayout.module.css — v2 深色主题 + Mint 主色
    L1 顶部Tab栏 · L2 可折叠侧边栏 · L3 内容区
    ══════════════════════════════════════════════════════════════ */
 
@@ -8,7 +8,7 @@
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: var(--bg, #F7FAFA);
+  background: var(--bg, #0B1A20);
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -23,9 +23,8 @@
   justify-content: space-between;
   height: 56px;
   padding: 0 16px;
-  background: #FF6B35;
-  border-bottom: none;
-  box-shadow: 0 2px 8px rgba(255,107,53,0.15);
+  background: var(--bg, #0B1A20);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   gap: 12px;
   flex-shrink: 0;
 }
@@ -63,7 +62,7 @@
 .logoText {
   font-size: 15px;
   font-weight: 700;
-  color: #FFFFFF;
+  color: rgba(255, 255, 255, 0.92);
   letter-spacing: -0.02em;
   white-space: nowrap;
 }
@@ -71,7 +70,7 @@
 .divider {
   width: 1px;
   height: 20px;
-  background: rgba(255,255,255,0.25);
+  background: rgba(255, 255, 255, 0.12);
   flex-shrink: 0;
 }
 
@@ -86,7 +85,7 @@
   border-radius: 8px;
   font-size: 13px;
   font-weight: 400;
-  color: rgba(255,255,255,0.75);
+  color: rgba(255, 255, 255, 0.50);
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
@@ -96,19 +95,19 @@
 }
 
 .domainTab:hover {
-  color: #FFFFFF;
-  background: rgba(255,255,255,0.12);
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .domainTabActive {
   font-weight: 600;
-  color: #FFFFFF;
-  background: rgba(255,255,255,0.20);
+  color: #0AAF9A;
+  background: rgba(10, 175, 154, 0.12);
 }
 
 .domainTabActive:hover {
-  color: #FFFFFF;
-  background: rgba(255,255,255,0.24);
+  color: #0AAF9A;
+  background: rgba(10, 175, 154, 0.16);
 }
 
 /* ── Top Nav Right ── */
@@ -124,18 +123,18 @@
   gap: 8px;
   padding: 5px 14px;
   border-radius: 8px;
-  background: rgba(255,255,255,0.15);
-  border: 1px solid rgba(255,255,255,0.20);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.10);
   font-size: 12px;
-  color: rgba(255,255,255,0.75);
+  color: rgba(255, 255, 255, 0.50);
   cursor: pointer;
   min-width: 180px;
   transition: border-color 0.2s;
 }
 
 .searchTrigger:hover {
-  border-color: rgba(255,255,255,0.40);
-  background: rgba(255,255,255,0.20);
+  border-color: rgba(255, 255, 255, 0.20);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .searchKbd {
@@ -143,9 +142,9 @@
   font-size: 10px;
   padding: 1px 5px;
   border-radius: 4px;
-  background: rgba(255,255,255,0.15);
-  border: 1px solid rgba(255,255,255,0.20);
-  color: rgba(255,255,255,0.75);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  color: rgba(255, 255, 255, 0.38);
   font-family: -apple-system, 'SF Pro Display', sans-serif;
 }
 
@@ -155,16 +154,16 @@
   gap: 4px;
   padding: 5px 10px;
   border-radius: 8px;
-  background: var(--bg-secondary, #F5F5F7);
+  background: rgba(255, 255, 255, 0.06);
   font-size: 12px;
-  color: var(--text-secondary, #6E6E73);
+  color: rgba(255, 255, 255, 0.65);
   cursor: pointer;
   border: none;
   white-space: nowrap;
 }
 
 .storePicker:hover {
-  background: var(--surface-hover, rgba(0,0,0,0.05));
+  background: rgba(255, 255, 255, 0.10);
 }
 
 .topNavIcon {
@@ -175,7 +174,7 @@
   justify-content: center;
   border-radius: 8px;
   cursor: pointer;
-  color: rgba(255,255,255,0.85);
+  color: rgba(255, 255, 255, 0.50);
   background: transparent;
   border: none;
   font-size: 16px;
@@ -183,15 +182,15 @@
 }
 
 .topNavIcon:hover {
-  background: rgba(255,255,255,0.15);
-  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .userAvatar {
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: rgba(255,255,255,0.25);
+  background: linear-gradient(135deg, #26C9B4, #0AAF9A);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -216,8 +215,8 @@
    ══════════════════════════════════════════════════════════════ */
 .sidebar {
   width: 220px;
-  background: var(--bg-secondary, #FAFAFA);
-  border-right: 1px solid var(--border, rgba(0,0,0,0.06));
+  background: var(--bg, #0B1A20);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -240,14 +239,14 @@
 .quickAccess {
   padding-bottom: 8px;
   margin-bottom: 4px;
-  border-bottom: 1px solid var(--border, rgba(0,0,0,0.06));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .quickAccessTitle {
   padding: 4px 10px 4px;
   font-size: 10px;
   font-weight: 600;
-  color: var(--text-tertiary, #AEAEB2);
+  color: rgba(255, 255, 255, 0.38);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -260,13 +259,13 @@
   padding: 4px 8px;
   margin: 2px 0 6px;
   border-radius: 8px;
-  background: var(--surface, #fff);
-  border: 1px solid var(--border, rgba(0,0,0,0.06));
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   transition: border-color 0.2s;
 }
 
 .sidebarSearch:focus-within {
-  border-color: var(--accent, #0AAF9A);
+  border-color: #0AAF9A;
 }
 
 .sidebarSearchInput {
@@ -274,20 +273,20 @@
   border: none;
   background: transparent;
   font-size: 12px;
-  color: var(--text-primary, #1D1D1F);
+  color: rgba(255, 255, 255, 0.92);
   outline: none;
   padding: 3px 0;
   font-family: inherit;
 }
 
 .sidebarSearchInput::placeholder {
-  color: var(--text-tertiary, #AEAEB2);
+  color: rgba(255, 255, 255, 0.38);
 }
 
 .sidebarSearchClear {
   border: none;
   background: transparent;
-  color: var(--text-tertiary, #AEAEB2);
+  color: rgba(255, 255, 255, 0.38);
   cursor: pointer;
   font-size: 10px;
   padding: 2px 4px;
@@ -296,8 +295,8 @@
 }
 
 .sidebarSearchClear:hover {
-  color: var(--text-primary, #1D1D1F);
-  background: var(--surface-hover, rgba(0,0,0,0.04));
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 /* ── Sidebar Group Header ── */
@@ -305,7 +304,7 @@
   padding: 6px 10px;
   font-size: 10px;
   font-weight: 600;
-  color: var(--text-tertiary, #AEAEB2);
+  color: rgba(255, 255, 255, 0.38);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   display: flex;
@@ -346,7 +345,7 @@
   border-radius: 8px;
   font-size: 13px;
   font-weight: 400;
-  color: var(--text-primary, #1D1D1F);
+  color: rgba(255, 255, 255, 0.65);
   cursor: pointer;
   transition: all 0.15s ease;
   white-space: nowrap;
@@ -358,17 +357,18 @@
 }
 
 .sidebarItem:hover {
-  background: var(--surface-hover, rgba(0,0,0,0.04));
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .sidebarItemActive {
-  color: #FF6B35;
-  background: rgba(255, 107, 53, 0.08);
+  color: #0AAF9A;
+  background: rgba(10, 175, 154, 0.10);
   font-weight: 600;
 }
 
 .sidebarItemActive:hover {
-  background: rgba(255, 107, 53, 0.10);
+  background: rgba(10, 175, 154, 0.14);
 }
 
 .sidebarItemCollapsed {
@@ -395,18 +395,18 @@
 }
 
 .badgeBlue {
-  background: rgba(255, 107, 53, 0.12);
-  color: #FF6B35;
+  background: rgba(10, 175, 154, 0.15);
+  color: #0AAF9A;
 }
 
 .badgeRed {
-  background: rgba(255, 69, 58, 0.12);
-  color: #FF453A;
+  background: rgba(248, 113, 113, 0.15);
+  color: #F87171;
 }
 
 .badgeGreen {
-  background: rgba(48, 209, 88, 0.12);
-  color: #30D158;
+  background: rgba(52, 211, 153, 0.15);
+  color: #34D399;
 }
 
 /* ── Sidebar Toggle ── */
@@ -416,15 +416,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-top: 1px solid var(--border, rgba(0,0,0,0.06));
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
   cursor: pointer;
-  color: var(--text-tertiary, #AEAEB2);
+  color: rgba(255, 255, 255, 0.38);
   font-size: 14px;
   transition: color 0.15s;
 }
 
 .sidebarToggle:hover {
-  color: var(--text-primary, #1D1D1F);
+  color: rgba(255, 255, 255, 0.92);
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -443,13 +443,13 @@
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: var(--text-tertiary, #AEAEB2);
+  color: rgba(255, 255, 255, 0.38);
   margin-bottom: 16px;
 }
 
 .breadcrumb a,
 .breadcrumbLink {
-  color: var(--text-tertiary, #AEAEB2);
+  color: rgba(255, 255, 255, 0.38);
   cursor: pointer;
   text-decoration: none;
   transition: color 0.15s;
@@ -457,20 +457,20 @@
 
 .breadcrumb a:hover,
 .breadcrumbLink:hover {
-  color: var(--accent, #0A84FF);
+  color: #0AAF9A;
 }
 
 .breadcrumbCurrent {
-  color: var(--text-primary, #1D1D1F);
+  color: rgba(255, 255, 255, 0.92);
   font-weight: 500;
 }
 
 /* ── Content Card Wrapper ── */
 .contentInner {
-  background: var(--surface, #fff);
+  background: var(--surface, #0D2029);
   border-radius: 14px;
-  border: 1px solid var(--border, rgba(0,0,0,0.06));
-  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
   padding: 20px;
   min-height: calc(100vh - 140px);
 }
@@ -478,9 +478,9 @@
 /* ── Footer ── */
 .footer {
   text-align: center;
-  color: var(--text-tertiary, #AEAEB2);
+  color: rgba(255, 255, 255, 0.25);
   font-size: 11px;
   padding: 12px 0;
-  border-top: 1px solid var(--border, rgba(0,0,0,0.04));
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
   margin-top: 16px;
 }
