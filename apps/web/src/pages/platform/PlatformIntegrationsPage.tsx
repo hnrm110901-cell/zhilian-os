@@ -395,7 +395,7 @@ export default function PlatformIntegrationsPage() {
     {
       key: 'name',
       title: '配置名称',
-      render: (row: any) => (
+      render: (_v: any, row: any) => (
         <span className={styles.nameCell}>
           <span className={styles.nameText}>{row.name}</span>
           {row.store_id && <span className={styles.storeTag}>{row.store_id}</span>}
@@ -405,14 +405,14 @@ export default function PlatformIntegrationsPage() {
     {
       key: 'type',
       title: '系统类型',
-      render: (row: any) => (
+      render: (_v: any, row: any) => (
         <ZBadge type={TYPE_BADGE[row.type] ?? 'default'} text={TYPE_LABEL[row.type] ?? row.type} />
       ),
     },
     {
       key: 'provider',
       title: '服务商',
-      render: (row: any) => {
+      render: (_v: any, row: any) => {
         const schema = SYSTEM_SCHEMAS.find(s => s.provider === row.provider);
         return <span className={styles.providerTag}>{schema?.label ?? row.provider}</span>;
       },
@@ -420,7 +420,7 @@ export default function PlatformIntegrationsPage() {
     {
       key: 'api_endpoint',
       title: 'API地址',
-      render: (row: any) => (
+      render: (_v: any, row: any) => (
         <span className={styles.endpoint} title={row.api_endpoint}>
           {row.api_endpoint ? row.api_endpoint.replace(/^https?:\/\//, '').slice(0, 40) : '—'}
         </span>
@@ -429,21 +429,21 @@ export default function PlatformIntegrationsPage() {
     {
       key: 'status',
       title: '状态',
-      render: (row: any) => (
+      render: (_v: any, row: any) => (
         <ZBadge type={STATUS_BADGE[row.status] ?? 'default'} text={STATUS_LABEL[row.status] ?? row.status} />
       ),
     },
     {
       key: 'last_sync_at',
       title: '上次同步',
-      render: (row: any) => (
+      render: (_v: any, row: any) => (
         <span className={styles.timeCell}>{relativeTime(row.last_sync_at)}</span>
       ),
     },
     {
       key: 'actions',
       title: '操作',
-      render: (row: any) => (
+      render: (_v: any, row: any) => (
         <span className={styles.actionGroup}>
           <ZButton size="sm" variant="ghost" onClick={() => openEdit(row)}>编辑</ZButton>
           <ZButton
