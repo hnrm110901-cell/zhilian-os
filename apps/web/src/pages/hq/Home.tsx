@@ -10,6 +10,7 @@ import {
   ZCard, ZKpi, ZBadge, ZButton, ZSkeleton, ZEmpty,
   HealthRing,
 } from '../../design-system/components';
+import { message } from 'antd';
 import apiClient from '../../services/api';
 import RecommendationCard from '../../components/RecommendationCard';
 import styles from './HQHome.module.css';
@@ -112,11 +113,22 @@ export default function HQHome() {
       d.setMonth(d.getMonth() - 1);
       const prevMonth = d.toISOString().slice(0, 7);
 
-      const [hqResp, laborResp, prevResp] = await Promise.all([
+      const [hqRes, laborRes, prevRes] = await Promise.allSettled([
         apiClient.get<HQData>(`/api/v1/bff/hq${refresh ? '?refresh=true' : ''}`),
         apiClient.get<LaborRankingResponse>(`/api/v1/workforce/multi-store/labor-ranking`, { params: { month } }),
         apiClient.get<LaborRankingResponse>(`/api/v1/workforce/multi-store/labor-ranking`, { params: { month: prevMonth } }),
       ]);
+
+      // HQ summary is critical — rethrow if it fails
+      if (hqRes.status === 'rejected') throw hqRes.reason;
+
+      const hqResp = hqRes.value;
+      const laborResp = laborRes.status === 'fulfilled' ? laborRes.value : { rankings: [], group_avg_rate: 0 };
+      const prevResp  = prevRes.status  === 'fulfilled' ? prevRes.value  : { rankings: [] };
+
+      if (laborRes.status === 'rejected' || prevRes.status === 'rejected') {
+        message.warning('人工成本排名数据加载失败，已显示缓存');
+      }
 
       setData(hqResp);
       setLaborRanking(laborResp.rankings ?? []);
@@ -125,7 +137,7 @@ export default function HQHome() {
         Object.fromEntries((prevResp.rankings ?? []).map((item) => [item.store_id, Number(item.rank_in_group ?? 0)]))
       );
     } catch (e: any) {
-      setError(e?.response?.data?.detail || '数据加载失败');
+      setError(e?.message || e?.response?.data?.detail || '数据加载失败');
     } finally {
       setLoading(false);
     }
