@@ -1,0 +1,95 @@
+.page { padding: 24px; max-width: 1000px; margin: 0 auto; }
+.header { display: flex; align-items: center; gap: 24px; margin-bottom: 24px; }
+.title { font-size: 20px; font-weight: 600; color: rgba(255,255,255,0.92); margin: 0; }
+.tabs { display: flex; gap: 4px; }
+.tab {
+  padding: 6px 16px; border-radius: 6px; border: none;
+  background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.6);
+  cursor: pointer; font-size: 13px;
+}
+.tabActive { background: rgba(10,175,154,0.15); color: #0AAF9A; }
+
+/* 平台选择 */
+.platformPicker { display: flex; gap: 12px; margin-bottom: 20px; }
+.platformCard {
+  flex: 1; padding: 20px; border-radius: 10px; cursor: pointer;
+  background: rgba(255,255,255,0.04); border: 2px solid rgba(255,255,255,0.06);
+  text-align: center; transition: all 0.2s;
+}
+.platformCard:hover { border-color: rgba(255,255,255,0.15); }
+.platformActive { border-color: #0AAF9A; background: rgba(10,175,154,0.08); }
+.platformIcon { font-size: 32px; margin-bottom: 8px; }
+.platformName { font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.85); }
+.platformDesc { font-size: 11px; color: rgba(255,255,255,0.45); margin-top: 4px; }
+
+/* 表单 */
+.form { display: flex; flex-direction: column; gap: 14px; }
+.formGroup { display: flex; flex-direction: column; gap: 4px; }
+.formLabel { font-size: 12px; color: rgba(255,255,255,0.6); font-weight: 500; }
+.formInput {
+  padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.85); font-size: 13px;
+}
+.formInput::placeholder { color: rgba(255,255,255,0.3); }
+.formRow { display: flex; gap: 12px; }
+.formRow .formGroup { flex: 1; }
+
+.checkboxRow { display: flex; gap: 20px; align-items: center; }
+.checkboxLabel {
+  display: flex; align-items: center; gap: 6px; font-size: 13px;
+  color: rgba(255,255,255,0.7); cursor: pointer;
+}
+
+/* 按钮 */
+.btnRow { display: flex; gap: 10px; margin-top: 8px; }
+.btn {
+  padding: 8px 20px; border-radius: 6px; border: none;
+  background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.7);
+  cursor: pointer; font-size: 13px; font-weight: 500;
+}
+.btn:hover { background: rgba(255,255,255,0.12); }
+.btnPrimary { background: #0AAF9A; color: #0B1A20; }
+.btnPrimary:hover { background: #0CC4AD; }
+.btnPrimary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btnSync { background: rgba(10,175,154,0.15); color: #0AAF9A; }
+.btnSync:hover { background: rgba(10,175,154,0.25); }
+
+/* 状态卡 */
+.statusCard {
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px; padding: 16px; margin-bottom: 16px;
+}
+.statusHeader { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.statusTitle { font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.85); }
+.statusBadge {
+  display: inline-block; padding: 2px 10px; border-radius: 4px; font-size: 11px;
+}
+.statusSuccess { background: rgba(76,175,80,0.15); color: #4CAF50; }
+.statusFailed { background: rgba(244,67,54,0.15); color: #F44336; }
+.statusPartial { background: rgba(255,193,7,0.15); color: #FFC107; }
+.statusRunning { background: rgba(33,150,243,0.15); color: #2196F3; }
+.statsGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+.statItem { text-align: center; }
+.statNum { font-size: 20px; font-weight: 700; color: #0AAF9A; }
+.statLabel { font-size: 11px; color: rgba(255,255,255,0.45); }
+
+/* 测试结果 */
+.testResult {
+  padding: 12px 16px; border-radius: 8px; margin-top: 10px; font-size: 13px;
+}
+.testOk { background: rgba(76,175,80,0.1); color: #4CAF50; }
+.testFail { background: rgba(244,67,54,0.1); color: #F44336; }
+
+/* 日志表 */
+.tableWrap { overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.table th {
+  text-align: left; padding: 10px 12px; color: rgba(255,255,255,0.5);
+  font-weight: 500; border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.table td {
+  padding: 10px 12px; color: rgba(255,255,255,0.85);
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.empty { text-align: center; padding: 40px; color: rgba(255,255,255,0.38); }
+.loading { text-align: center; padding: 60px; color: rgba(255,255,255,0.38); }

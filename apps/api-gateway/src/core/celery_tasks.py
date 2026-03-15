@@ -5371,6 +5371,7 @@ def evaluate_decision_effects(self) -> Dict[str, Any]:
         raise self.retry(exc=exc)
 
 
+<<<<<<< Updated upstream
 # ── 奥琦玮供应链：每日库存 + 采购单拉取 ──────────────────────────────────────
 
 @celery_app.task(
@@ -5770,3 +5771,288 @@ def enrich_members_from_aoqiwei_crm(self) -> Dict[str, Any]:
     except Exception as exc:
         logger.error("enrich_members_from_aoqiwei_crm.failed", error=str(exc))
         raise self.retry(exc=exc)
+
+
+# ── IM 通讯录定时同步 ─────────────────────────────────────────────────────
+
+@celery_app.task(
+    base=CallbackTask,
+    bind=True,
+    max_retries=2,
+    default_retry_delay=300,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def scheduled_im_roster_sync(self) -> Dict[str, Any]:
+    """
+    定时同步所有已启用 sync_enabled 的品牌 IM 通讯录。
+    默认每日 02:00 执行（通过 beat_schedule 配置）。
+    """
+    async def _run():
+        from src.core.database import get_db_session
+        from src.models.brand_im_config import BrandIMConfig
+        from src.services.im_sync_service import IMSyncService
+        from sqlalchemy import select, and_
+
+        results = []
+        async with get_db_session() as db:
+            configs = await db.execute(
+                select(BrandIMConfig).where(
+                    and_(
+                        BrandIMConfig.sync_enabled.is_(True),
+                        BrandIMConfig.is_active.is_(True),
+                    )
+                )
+            )
+            brand_configs = configs.scalars().all()
+
+            for config in brand_configs:
+                try:
+                    sync_svc = IMSyncService(db)
+                    result = await sync_svc.sync_roster(
+                        brand_id=config.brand_id,
+                        trigger="scheduled",
+                    )
+                    results.append({
+                        "brand_id": config.brand_id,
+                        "status": "success",
+                        "added": result.get("added", 0),
+                        "updated": result.get("updated", 0),
+                        "disabled": result.get("disabled", 0),
+                    })
+                    logger.info(
+                        "scheduled_im_sync.brand_done",
+                        brand_id=config.brand_id,
+                        added=result.get("added", 0),
+                    )
+                except Exception as exc:
+                    results.append({
+                        "brand_id": config.brand_id,
+                        "status": "failed",
+                        "error": str(exc),
+                    })
+                    logger.error(
+                        "scheduled_im_sync.brand_failed",
+                        brand_id=config.brand_id,
+                        error=str(exc),
+                    )
+
+        summary = {
+            "total_brands": len(results),
+            "success": sum(1 for r in results if r["status"] == "success"),
+            "failed": sum(1 for r in results if r["status"] == "failed"),
+        }
+        logger.info("scheduled_im_sync.done", **summary)
+        return summary
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        logger.error("scheduled_im_sync.failed", error=str(exc))
+        raise self.retry(exc=exc)
+
+
+# ── 钉钉消息重试 ──────────────────────────────────────────────────────────
+
+@celery_app.task(bind=True, max_retries=1)
+def retry_failed_dingtalk_messages(self):
+    """每5分钟从失败队列取出钉钉消息重试（最多3次）"""
+    import asyncio
+
+    async def _run():
+        from src.services.dingtalk_service import dingtalk_service
+        await dingtalk_service.retry_failed_messages(max_retries=3, batch_size=10)
+
+    try:
+        asyncio.run(_run())
+    except Exception as exc:
+        logger.warning("retry_failed_dingtalk_messages.error", error=str(exc))
+
+
+# ── IM 考勤数据定时同步 ───────────────────────────────────────────────────
+
+@celery_app.task(
+    base=CallbackTask,
+    bind=True,
+    max_retries=2,
+    default_retry_delay=300,
+)
+def scheduled_im_attendance_sync(self) -> Dict[str, Any]:
+    """
+    每日 06:00 同步昨日 IM 打卡数据到屯象OS考勤表。
+    """
+    from datetime import date, timedelta
+
+    async def _run():
+        from src.core.database import get_db_session
+        from src.models.brand_im_config import BrandIMConfig
+        from src.services.im_attendance_sync import IMAttendanceSyncService
+        from sqlalchemy import select, and_
+
+        yesterday = date.today() - timedelta(days=1)
+        results = []
+
+        async with get_db_session() as db:
+            configs = await db.execute(
+                select(BrandIMConfig).where(
+                    and_(
+                        BrandIMConfig.sync_enabled.is_(True),
+                        BrandIMConfig.is_active.is_(True),
+                    )
+                )
+            )
+            for config in configs.scalars().all():
+                try:
+                    service = IMAttendanceSyncService(db)
+                    result = await service.sync_attendance(
+                        config.brand_id, yesterday, yesterday,
+                    )
+                    results.append({"brand_id": config.brand_id, **result})
+                except Exception as exc:
+                    results.append({"brand_id": config.brand_id, "error": str(exc)})
+                    logger.warning("scheduled_attendance_sync.brand_failed",
+                                   brand_id=config.brand_id, error=str(exc))
+
+        summary = {
+            "total_brands": len(results),
+            "total_synced": sum(r.get("synced", 0) for r in results),
+        }
+        logger.info("scheduled_attendance_sync.done", **summary)
+        return summary
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        logger.error("scheduled_attendance_sync.failed", error=str(exc))
+        raise self.retry(exc=exc)
+
+
+# ── Phase 4: 入职引导提醒 ────────────────────────────────────────────────
+
+@celery_app.task(bind=True, max_retries=1)
+def remind_incomplete_onboarding(self) -> Dict[str, Any]:
+    """
+    每日 09:00 提醒入职超过7天但任务未完成的新员工。
+    """
+    async def _run():
+        from src.core.database import get_db_session
+        from src.services.im_onboarding_robot import IMOnboardingRobot
+
+        async with get_db_session() as db:
+            robot = IMOnboardingRobot(db)
+            return await robot.remind_incomplete_onboarding(days_threshold=7)
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        logger.warning("remind_onboarding.failed", error=str(exc))
+        return {"error": str(exc)}
+
+
+# ── Phase 4: 里程碑通知扫描 ──────────────────────────────────────────────
+
+@celery_app.task(bind=True, max_retries=1)
+def sweep_milestone_notifications(self) -> Dict[str, Any]:
+    """
+    每日 10:00 扫描未推送的里程碑，批量发送 IM 庆祝通知。
+    """
+    async def _run():
+        from src.core.database import get_db_session
+        from src.services.im_milestone_notifier import IMMilestoneNotifier
+
+        async with get_db_session() as db:
+            notifier = IMMilestoneNotifier(db)
+            return await notifier.sweep_unnotified_milestones()
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        logger.warning("sweep_milestones.failed", error=str(exc))
+        return {"error": str(exc)}
+
+
+@celery_app.task(name="check_compliance_alerts")
+def check_compliance_alerts():
+    """每日合规扫描：健康证/合同/身份证到期告警"""
+    import asyncio
+    from src.core.database import AsyncSessionLocal
+    from src.services.compliance_alert_service import ComplianceAlertService
+    from src.models.store import Store
+    from sqlalchemy import select
+
+    async def _run():
+        async with AsyncSessionLocal() as db:
+            # 扫描所有活跃门店
+            result = await db.execute(
+                select(Store.id).where(Store.is_active.is_(True))
+            )
+            store_ids = [r[0] for r in result.all()]
+
+            total_alerts = 0
+            for store_id in store_ids:
+                try:
+                    svc = ComplianceAlertService(store_id)
+                    result = await svc.send_compliance_alerts(db)
+                    if result.get("sent"):
+                        total_alerts += result.get("sent_count", 0)
+                except Exception as e:
+                    logger.warning("compliance_check_failed", store_id=store_id, error=str(e))
+
+            logger.info("compliance_check_completed", stores=len(store_ids), alerts_sent=total_alerts)
+
+    asyncio.run(_run())
+
+
+# ── W2-1: 审批超期检查 ────────────────────────────────────────────────
+
+@celery_app.task(name="src.core.celery_tasks.run_decision_effect_reviews", bind=True, max_retries=1)
+def run_decision_effect_reviews(self) -> Dict[str, Any]:
+    """每日04:00 扫描已执行决策的30/60/90天效果回顾 — Palantir闭环核心"""
+
+    async def _run():
+        from src.core.database import get_db_session
+        from src.services.decision_flywheel_service import DecisionFlywheelService
+
+        service = DecisionFlywheelService()
+        async with get_db_session() as db:
+            result = await service.run_effect_reviews(db)
+            logger.info(
+                "decision_flywheel.effect_review.done",
+                reviewed_30d=result.get("reviewed_30d", 0),
+                reviewed_60d=result.get("reviewed_60d", 0),
+                reviewed_90d=result.get("reviewed_90d", 0),
+            )
+            return result
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        logger.warning("decision_flywheel.effect_review.failed", error=str(exc))
+        return {"error": str(exc)}
+
+
+@celery_app.task(name="check_approval_timeouts", bind=True, max_retries=1)
+def check_approval_timeouts(self) -> Dict[str, Any]:
+    """每小时检查超期审批 — 自动升级到下一级/推送催办通知"""
+
+    async def _run():
+        from src.core.database import get_db_session
+        from src.services.approval_engine import approval_engine
+
+        async with get_db_session() as db:
+            result = await approval_engine.check_timeouts(db)
+            logger.info(
+                "approval_timeout_check.done",
+                total=result.get("total_timed_out", 0),
+                escalated=result.get("escalated", 0),
+                reminded=result.get("reminded", 0),
+            )
+            return result
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        logger.warning("approval_timeout_check.failed", error=str(exc))
+        return {"error": str(exc)}
+>>>>>>> Stashed changes

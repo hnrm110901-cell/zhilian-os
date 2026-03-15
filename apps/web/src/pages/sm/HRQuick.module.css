@@ -1,0 +1,167 @@
+/* ── SM HR Quick ──────────────────────────────────────── */
+
+.page {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 100vh;
+  background: var(--bg, #0B1A20);
+}
+
+.header {
+  margin-bottom: 4px;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+  margin: 0;
+}
+
+.subtitle {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.38);
+  margin: 4px 0 0;
+}
+
+/* ── Stat Row ──────────────────────────────────────────── */
+
+.statRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.statItem {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 12px;
+  text-align: center;
+}
+
+.statNum {
+  font-size: 22px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.statNumMint { color: #0AAF9A; }
+.statNumWarn { color: #F2994A; }
+.statNumDanger { color: #EB5757; }
+
+.statLabel {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.38);
+  margin-top: 4px;
+}
+
+/* ── Cards ─────────────────────────────────────────────── */
+
+.card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.cardTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  margin-bottom: 12px;
+}
+
+/* ── Approval Item ─────────────────────────────────────── */
+
+.approvalItem {
+  display: flex;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  gap: 12px;
+}
+
+.approvalItem:last-child { border-bottom: none; }
+
+.approvalInfo { flex: 1; }
+
+.approvalName {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.approvalMeta {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.38);
+  margin-top: 2px;
+}
+
+.approvalBtns {
+  display: flex;
+  gap: 6px;
+}
+
+.btnApprove {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(39, 174, 96, 0.15);
+  color: #27AE60;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btnReject {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(235, 87, 87, 0.12);
+  color: #EB5757;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ── Quick Actions ─────────────────────────────────────── */
+
+.quickGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.quickBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.quickBtn:active { background: rgba(255, 255, 255, 0.08); }
+
+.quickIcon { font-size: 20px; }
+
+.quickLabel {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+/* ── Empty ─────────────────────────────────────────────── */
+
+.empty {
+  text-align: center;
+  padding: 24px;
+  color: rgba(255, 255, 255, 0.25);
+  font-size: 13px;
+}

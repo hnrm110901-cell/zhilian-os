@@ -337,6 +337,7 @@ class OAuthCallbackRequest(BaseModel):
     code: Optional[str] = None
     auth_code: Optional[str] = None
     state: Optional[str] = None
+    brand_id: Optional[str] = None  # 品牌ID，用于多品牌 IM 凭证隔离
 
 
 @router.post("/oauth/wechat-work/callback")
@@ -396,6 +397,7 @@ async def wechat_work_oauth_callback(request: OAuthCallbackRequest):
         token_data = await oauth_service.wechat_work_oauth_login(
             code=request.code,
             state=request.state,
+            brand_id=request.brand_id,
         )
         return token_data
     except ValueError as e:
@@ -538,6 +540,7 @@ async def dingtalk_oauth_callback(request: OAuthCallbackRequest):
         token_data = await oauth_service.dingtalk_oauth_login(
             auth_code=request.auth_code,
             state=request.state,
+            brand_id=request.brand_id,
         )
         return token_data
     except ValueError as e:

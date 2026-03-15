@@ -51,6 +51,7 @@ class User(Base, TimestampMixin):
     brand_id = Column(String(50), index=True)  # Associated brand (multi-brand isolation)
     phone = Column(String(20), unique=True, nullable=True, index=True)  # 手机号，用于短信验证码登录
     wechat_user_id = Column(String(100), index=True)  # WeChat Work user ID for push notifications
+    dingtalk_user_id = Column(String(100), index=True)  # DingTalk user ID
 
     def __repr__(self):
         return f"<User(username='{self.username}', role='{self.role}')>"

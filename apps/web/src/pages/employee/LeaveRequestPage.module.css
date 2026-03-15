@@ -1,0 +1,257 @@
+/* ── LeaveRequestPage ─────────────────────────────── */
+
+.page {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 100vh;
+  background: #f5f5f5;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #333;
+  margin: 0;
+}
+
+.newBtn {
+  padding: 8px 16px;
+  background: #0AAF9A;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.newBtn:active { opacity: 0.85; }
+
+.loading {
+  text-align: center;
+  padding: 48px;
+  color: #999;
+}
+
+/* ── Balance ──────────────────────────────────────── */
+
+.balanceCard {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.balanceGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.balanceItem {
+  text-align: center;
+  padding: 8px 4px;
+  background: #f9f9f9;
+  border-radius: 8px;
+}
+
+.balanceNum {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0AAF9A;
+}
+
+.balanceLabel {
+  font-size: 12px;
+  color: #333;
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.balanceSub {
+  font-size: 10px;
+  color: #bbb;
+  margin-top: 2px;
+}
+
+/* ── Card ─────────────────────────────────────────── */
+
+.card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.cardTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 12px;
+}
+
+.empty {
+  text-align: center;
+  padding: 24px;
+  color: #ccc;
+  font-size: 13px;
+}
+
+/* ── Form ─────────────────────────────────────────── */
+
+.formCard {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.formGroup {
+  margin-bottom: 12px;
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.formLabel {
+  display: block;
+  font-size: 12px;
+  color: #999;
+  margin-bottom: 4px;
+}
+
+.formSelect,
+.formInput {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #333;
+  background: #fff;
+  min-height: 44px;
+  box-sizing: border-box;
+}
+
+.formTextarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #333;
+  resize: vertical;
+  min-height: 44px;
+  box-sizing: border-box;
+}
+
+.formActions {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.cancelBtn {
+  flex: 1;
+  padding: 12px;
+  background: #f5f5f5;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #666;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.submitBtn {
+  flex: 2;
+  padding: 12px;
+  background: #0AAF9A;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.submitBtn:active { opacity: 0.85; }
+.submitBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Record ───────────────────────────────────────── */
+
+.recordItem {
+  display: flex;
+  align-items: flex-start;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+  gap: 12px;
+}
+
+.recordItem:last-child { border-bottom: none; }
+
+.recordInfo { flex: 1; }
+
+.recordType {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.recordDays {
+  font-size: 12px;
+  color: #999;
+  font-weight: 400;
+  margin-left: 8px;
+}
+
+.recordDates {
+  font-size: 12px;
+  color: #999;
+  margin-top: 2px;
+}
+
+.recordReason {
+  font-size: 12px;
+  color: #bbb;
+  margin-top: 2px;
+}
+
+/* ── Status Badges ────────────────────────────────── */
+
+.statusPending {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 4px;
+  background: rgba(242, 153, 74, 0.1);
+  color: #F2994A;
+  white-space: nowrap;
+}
+
+.statusApproved {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 4px;
+  background: rgba(39, 174, 96, 0.1);
+  color: #27AE60;
+  white-space: nowrap;
+}
+
+.statusRejected {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 4px;
+  background: rgba(235, 87, 87, 0.1);
+  color: #EB5757;
+  white-space: nowrap;
+}

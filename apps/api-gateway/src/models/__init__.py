@@ -499,3 +499,16 @@ from .settlement import SettlementRecord, SettlementStatus, SeparationType, Comp
 from .payslip import PayslipRecord
 # HR — 操作审计日志
 from .operation_audit_log import OperationAuditLog
+# HR — 补全缺失模型导入
+from .approval import ApprovalTemplate, ApprovalInstance, ApprovalRecord, ApprovalDelegation
+from .brand_im_config import BrandIMConfig, IMSyncLog
+from .city_wage_config import CityWageConfig
+from .commission import CommissionRule, CommissionRecord
+from .decision_record import DecisionRecord
+from .employee_growth import SkillDefinition, EmployeeSkill, CareerPath, EmployeeMilestone, EmployeeGrowthPlan, EmployeeWellbeing
+from .exit_interview import ExitInterview
+from .hr_business_rule import HRBusinessRule
+from .reward_penalty import RewardPenaltyRecord
+from .salary_item import SalaryItemDefinition, SalaryItemRecord
+from .schedule_demand import StoreStaffingDemand
+from .social_insurance import SocialInsuranceConfig, EmployeeSocialInsurance
