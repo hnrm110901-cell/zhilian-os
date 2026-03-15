@@ -4069,6 +4069,10 @@ def pull_pinzhi_daily_data(self) -> Dict[str, Any]:
                     finally:
                         await adapter.close()
 
+        except Exception as exc:
+            logger.error("pinzhi_pull.session_error", error=str(exc))
+            raise
+
         logger.info(
             "pinzhi_pull_daily_data.done",
             date=yesterday,
