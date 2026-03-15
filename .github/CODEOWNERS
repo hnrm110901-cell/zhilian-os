@@ -6,13 +6,17 @@
 #
 # GitHub 会根据此文件在 PR 中自动请求对应方 review
 
+# 默认兜底
+*                                    @hnrm110901-cell
+
 # ── 核心架构（Claude Code 主导）──────────────────────────
 /apps/api-gateway/src/core/          @hnrm110901-cell
 /apps/api-gateway/src/agents/        @hnrm110901-cell
 /apps/api-gateway/src/models/        @hnrm110901-cell
 /apps/api-gateway/src/services/      @hnrm110901-cell
 /apps/api-gateway/src/api/           @hnrm110901-cell
-/apps/api-gateway/src/middleware/     @hnrm110901-cell
+/apps/api-gateway/src/middleware/    @hnrm110901-cell
+/apps/api-gateway/alembic/           @hnrm110901-cell
 /packages/agents/                    @hnrm110901-cell
 /packages/api-adapters/              @hnrm110901-cell
 
@@ -33,5 +37,5 @@ Makefile                             @hnrm110901-cell
 # ── 共同维护 ────────────────────────────────────────────
 /apps/api-gateway/tests/             @hnrm110901-cell
 /apps/web/src/__tests__/             @hnrm110901-cell
-CLAUDE.md                           @hnrm110901-cell
-ARCHITECTURE.md                     @hnrm110901-cell
+CLAUDE.md                            @hnrm110901-cell
+ARCHITECTURE.md                      @hnrm110901-cell

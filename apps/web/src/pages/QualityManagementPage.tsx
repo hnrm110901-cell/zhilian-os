@@ -20,6 +20,7 @@ const QualityManagementPage: React.FC = () => {
   const [inspecting, setInspecting] = useState(false);
   const [form] = Form.useForm();
   const [imageB64, setImageB64] = useState('');
+  const [imageMediaType, setImageMediaType] = useState('image/jpeg');
 
   const loadStores = useCallback(async () => {
     try {
@@ -53,18 +54,20 @@ const QualityManagementPage: React.FC = () => {
         dish_name: values.dish_name,
         dish_id: values.dish_id,
         image_b64: imageB64,
-        media_type: 'image/jpeg',
+        media_type: imageMediaType,
       });
       showSuccess(`质检完成，评分：${res?.data?.score ?? '--'}`);
       setInspectModal(false);
       form.resetFields();
       setImageB64('');
+      setImageMediaType('image/jpeg');
       loadData();
     } catch (err: any) { handleApiError(err, '质检失败'); }
     finally { setInspecting(false); }
   };
 
   const handleImageUpload = (file: File) => {
+    setImageMediaType(file.type || 'image/jpeg');
     const reader = new FileReader();
     reader.onload = (e) => setImageB64((e.target?.result as string)?.split(',')[1] || '');
     reader.readAsDataURL(file);

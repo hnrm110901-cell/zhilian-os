@@ -6,6 +6,7 @@ Quality Service - 菜品质量检测服务
 - 生成质量评分和问题列表
 - 持久化检测记录
 """
+import base64
 import json
 import os
 import re
@@ -39,6 +40,27 @@ _SYSTEM_PROMPT = """你是一位专业的餐饮菜品质量检测专家。
 评分标准：90-100优秀，75-89合格，60-74需改进，60以下不合格。"""
 
 
+def _detect_media_type(image_b64: str) -> str:
+    """通过 base64 数据的魔数字节检测图片 MIME 类型，未知时降级为 image/jpeg。"""
+    _MAGIC: list[tuple[bytes, str]] = [
+        (b"\xff\xd8\xff", "image/jpeg"),
+        (b"\x89PNG\r\n", "image/png"),
+        (b"GIF87a", "image/gif"),
+        (b"GIF89a", "image/gif"),
+        (b"RIFF", "image/webp"),   # RIFF....WEBP
+        (b"\x00\x00\x00", "image/avif"),  # ftyp box prefix (宽松匹配)
+    ]
+    try:
+        # 只需要头部几个字节
+        header = base64.b64decode(image_b64[:16] + "==")
+        for magic, mime in _MAGIC:
+            if header.startswith(magic):
+                return mime
+    except Exception:
+        pass
+    return "image/jpeg"
+
+
 class QualityService:
     """菜品质量检测服务"""
 
@@ -46,7 +68,7 @@ class QualityService:
         self,
         image_b64: str,
         dish_name: str,
-        media_type: str = "image/jpeg",
+        media_type: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         调用视觉模型分析菜品图片。
@@ -59,6 +81,9 @@ class QualityService:
         Returns:
             包含 quality_score / issues / suggestions / reasoning 的字典
         """
+        if not media_type:
+            media_type = _detect_media_type(image_b64)
+
         llm = get_llm_client()
 
         messages = [

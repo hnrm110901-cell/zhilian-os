@@ -12,8 +12,8 @@ concurrency:
 # ── 环境变量 ──────────────────────────────────────────────
 env:
   SERVER_HOST: 42.194.229.21
-  PROD_DIR: /opt/zhilian-os/prod
-  STAGING_DIR: /opt/zhilian-os/staging
+  PROD_DIR: /opt/zhilian-os
+  STAGING_DIR: /opt/zhilian-os-staging
 
 jobs:
   # ── 1. 快速健康检查 ─────────────────────────────────────
@@ -117,43 +117,57 @@ jobs:
         run: |
           ssh root@${{ env.SERVER_HOST }} << 'ENDSSH'
             set -e
-            echo "=== [PROD 1/5] Pull latest code ==="
+            echo "=== [PROD 1/6] Pull latest code ==="
             cd /opt/zhilian-os
             git fetch origin main
             git reset --hard origin/main
             echo "Git HEAD: $(git log -1 --oneline)"
 
-            echo "=== [PROD 2/5] Stop old supervisor process ==="
+            echo "=== [PROD 2/6] Stop old supervisor process ==="
             supervisorctl stop tunxiang-os 2>/dev/null || true
             sed -i 's/^autostart=true/autostart=false/' /etc/supervisor/conf.d/tunxiang-os.conf 2>/dev/null || true
             supervisorctl reread 2>/dev/null || true
             supervisorctl update 2>/dev/null || true
 
-            echo "=== [PROD 3/5] Start Docker API container ==="
+            echo "=== [PROD 3/6] Build & start API container ==="
+            cd /opt/zhilian-os
             docker compose \
               --env-file .env.prod \
               -f docker-compose.prod.yml \
               up -d --no-deps --build api-gateway
 
-            echo "=== [PROD 4/5] Wait for API health ==="
+            echo "=== [PROD 4/6] Wait for API health ==="
+            HEALTHY=0
             for i in $(seq 1 20); do
               if curl -sf http://127.0.0.1:8000/api/v1/health > /dev/null 2>&1; then
-                echo "✓ API healthy after ${i}s"
+                echo "✓ API healthy after ${i}×3s"
+                HEALTHY=1
                 break
               fi
               echo "  waiting... ($i/20)"
               sleep 3
             done
-
-            echo "=== [PROD 4.5/5] Force DB table creation ==="
-            CONTAINER=$(docker ps --format "{{.Names}}" | grep -E "api.gateway|zhilian.api" | head -1)
-            if [ -n "$CONTAINER" ]; then
-              docker exec "$CONTAINER" python3 -c "import asyncio; import sys; sys.path.insert(0,'/app'); from src.core.database import init_db; asyncio.run(init_db())" && echo "DB init OK" || echo "DB init warning"
+            if [ "$HEALTHY" = "0" ]; then
+              echo "✗ API failed to start"
+              docker logs zhilian-api --tail 50 2>&1 || true
+              exit 1
             fi
 
-            echo "=== [PROD 5/5] Check final status ==="
+            echo "=== [PROD 5/6] Run Alembic migrations ==="
+            docker exec zhilian-api \
+              python -m alembic -c /app/alembic.ini upgrade head \
+              && echo "✓ Migrations applied" \
+              || echo "⚠ Migration warning (check logs)"
+
+            echo "=== [PROD 6/6] Restart Celery workers ==="
+            docker compose \
+              --env-file .env.prod \
+              -f docker-compose.prod.yml \
+              up -d --no-deps --build celery-worker celery-beat \
+              && echo "✓ Celery containers restarted" \
+              || echo "⚠ Celery restart warning"
+
             docker ps --filter "name=zhilian" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-            curl -sf http://127.0.0.1:8000/api/v1/health && echo "" || echo "⚠ Health check failed"
           ENDSSH
 
       # ── Staging 部署（develop 分支）──────────────────────
@@ -162,42 +176,59 @@ jobs:
         run: |
           ssh root@${{ env.SERVER_HOST }} << 'ENDSSH'
             set -e
-            STAGING_DIR="/opt/zhilian-os/staging"
+            STAGING_DIR="/opt/zhilian-os-staging"
 
-            echo "=== [STAGING 1/4] Ensure staging directory ==="
+            echo "=== [STAGING 1/5] Ensure staging directory ==="
             if [ ! -d "$STAGING_DIR" ]; then
               git clone --branch develop https://github.com/hnrm110901-cell/zhilian-os.git "$STAGING_DIR"
             fi
 
-            echo "=== [STAGING 2/4] Pull latest develop ==="
+            echo "=== [STAGING 2/5] Pull latest develop ==="
             cd "$STAGING_DIR"
             git fetch origin develop
             git reset --hard origin/develop
             echo "Git HEAD: $(git log -1 --oneline)"
 
-            echo "=== [STAGING 3/4] Start staging Docker container ==="
-            if [ -f docker-compose.staging.yml ]; then
-              docker compose \
-                --env-file .env.staging \
-                -f docker-compose.staging.yml \
-                up -d --no-deps --build api-gateway
-            else
-              echo "⚠ docker-compose.staging.yml not found, skipping container start"
-              echo "  Please create staging compose file for port 8001"
+            echo "=== [STAGING 3/5] Build & start staging API container ==="
+            docker compose \
+              --env-file .env.staging \
+              -f docker-compose.staging.yml \
+              up -d --no-deps --build api-gateway
+
+            echo "=== [STAGING 4/5] Wait for staging API health ==="
+            HEALTHY=0
+            for i in $(seq 1 20); do
+              if curl -sf http://127.0.0.1:8001/api/v1/health > /dev/null 2>&1; then
+                echo "✓ Staging API healthy after ${i}×3s"
+                HEALTHY=1
+                break
+              fi
+              echo "  waiting... ($i/20)"
+              sleep 3
+            done
+            if [ "$HEALTHY" = "0" ]; then
+              echo "✗ Staging API failed to start"
+              docker logs zhilian-api-staging --tail 50 2>&1 || true
+              exit 1
             fi
 
-            echo "=== [STAGING 4/4] Health check ==="
-            sleep 5
-            if curl -sf http://127.0.0.1:8001/api/v1/health > /dev/null 2>&1; then
-              echo "✓ Staging API healthy"
-            else
-              echo "⚠ Staging health check pending (may need docker-compose.staging.yml)"
-            fi
+            echo "=== [STAGING 5/5] Run Alembic migrations (staging DB) ==="
+            docker exec zhilian-api-staging \
+              python -m alembic -c /app/alembic.ini upgrade head \
+              && echo "✓ Staging migrations applied" \
+              || echo "⚠ Staging migration warning"
+
+            docker ps --filter "name=zhilian.*staging\|staging" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || \
+            docker ps --filter "name=zhilian-api-staging" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
           ENDSSH
 
       - name: Deploy frontend — rsync dist
         run: |
-          TARGET_DIR=${{ github.ref_name == 'main' && '/var/www/tunxiang/' || '/var/www/tunxiang-staging/' }}
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            TARGET_DIR="/var/www/tunxiang/"
+          else
+            TARGET_DIR="/var/www/tunxiang-staging/"
+          fi
           rsync -avz --delete \
             --exclude='.git' \
             apps/web/dist/ \
@@ -209,20 +240,26 @@ jobs:
         run: |
           sleep 5
           if [ "${{ github.ref_name }}" = "main" ]; then
-            API_URL="https://42.194.229.21/api/v1/health"
-            FRONT_URL="https://42.194.229.21/"
+            API_URL="https://${{ env.SERVER_HOST }}/api/v1/health"
+            FRONT_URL="https://${{ env.SERVER_HOST }}/"
             HOST_HEADER="zlsjos.cn"
           else
-            API_URL="http://42.194.229.21:8001/api/v1/health"
-            FRONT_URL="http://42.194.229.21:8081/"
+            API_URL="http://${{ env.SERVER_HOST }}:8001/api/v1/health"
+            FRONT_URL="http://${{ env.SERVER_HOST }}:8081/"
             HOST_HEADER="staging.zlsjos.cn"
           fi
 
           HTTP_CODE=$(curl -sk -o /dev/null -w "%{http_code}" -H "Host: $HOST_HEADER" "$API_URL")
           echo "API health HTTP code: $HTTP_CODE"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "⚠ API returned $HTTP_CODE (expected 200)"
+            exit 1
+          fi
+          echo "✓ API health OK"
 
           HTTP_FRONT=$(curl -sk -o /dev/null -w "%{http_code}" -H "Host: $HOST_HEADER" "$FRONT_URL")
           echo "Frontend HTTP code: $HTTP_FRONT"
+          [ "$HTTP_FRONT" = "200" ] && echo "✓ Frontend serving OK"
 
       - name: Notify deploy result
         if: always()

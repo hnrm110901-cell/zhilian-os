@@ -973,6 +973,31 @@ async def get_sync_status(
         },
     }
 
+    # 查询 ExternalSystem 表 — env 未配置时以 DB 记录补充 configured 状态
+    try:
+        async with get_db_session() as session:
+            ext_rows = await session.execute(
+                select(ExternalSystem).where(
+                    ExternalSystem.status == "active",
+                )
+            )
+            for ext in ext_rows.scalars().all():
+                provider = str(ext.provider or "")
+                if provider == "pinzhi":
+                    adapters_status["pinzhi"]["configured"] = True
+                    adapters_status["pinzhi"]["config_source"] = "ExternalSystem"
+                elif provider in ("aoqiwei", "aoqiwei_crm"):
+                    adapters_status["aoqiwei_crm"]["configured"] = True
+                    adapters_status["aoqiwei_crm"]["config_source"] = "ExternalSystem"
+                elif provider in ("tiancai", "tiancai-shanglong"):
+                    adapters_status["tiancai"]["configured"] = True
+                    adapters_status["tiancai"]["config_source"] = "ExternalSystem"
+                elif provider in ("aoqiwei_supply",):
+                    adapters_status["aoqiwei_supply"]["configured"] = True
+                    adapters_status["aoqiwei_supply"]["config_source"] = "ExternalSystem"
+    except Exception as exc:
+        logger.warning("pos_sync.status_ext_query_failed", error=str(exc))
+
     # 查询 daily_summaries 中各渠道最近同步日期
     try:
         async with get_db_session() as session:
@@ -1019,3 +1044,258 @@ async def get_sync_status(
         "adapters": adapters_status,
         "queried_at": datetime.now().isoformat(),
     }
+
+
+# ── 每门店集成健康状态 ─────────────────────────────────────────────────────────
+
+@router.get("/status/merchants", summary="查询各商户各门店的 POS 集成健康状态")
+async def get_merchants_status(
+    brand_id: Optional[str] = Query(None, description="过滤指定品牌，为空返回全部"),
+    current_user: User = Depends(get_current_active_user),
+) -> Dict[str, Any]:
+    """
+    基于 ExternalSystem 表返回每个门店的接入配置状态，包含：
+    - 品智 POS 是否已配置（api_endpoint + api_secret 非空）
+    - 奥琦玮 CRM 是否已配置（品牌级）
+    - 最近同步时间 last_sync_at / 最近同步状态 last_sync_status / 最近错误 last_error
+    - 近 7 天该门店在 DB 中的订单数和营收¥
+
+    可通过 `?brand_id=BRD_CZYZ0001` 过滤单商户。
+    """
+    merchants: Dict[str, Any] = {}
+
+    async with get_db_session() as session:
+        # 拉取所有活跃门店
+        store_stmt = select(Store).where(Store.is_active.is_(True))
+        if brand_id:
+            store_stmt = store_stmt.where(Store.brand_id == brand_id)
+        stores_result = await session.execute(store_stmt)
+        stores = {str(s.id): s for s in stores_result.scalars().all()}
+
+        # 拉取所有 ExternalSystem（POS + MEMBER）
+        ext_result = await session.execute(
+            select(ExternalSystem).where(
+                ExternalSystem.type.in_([IntegrationType.POS, IntegrationType.MEMBER])
+            )
+        )
+        ext_list = ext_result.scalars().all()
+
+        # 按 store_id + provider 组织
+        pos_by_store: Dict[str, ExternalSystem] = {}
+        crm_by_brand: Dict[str, ExternalSystem] = {}
+        for e in ext_list:
+            if e.provider == "pinzhi" and e.store_id:
+                pos_by_store[str(e.store_id)] = e
+            elif e.provider in ("aoqiwei", "aoqiwei_crm"):
+                cfg = e.config if isinstance(e.config, dict) else {}
+                bid = cfg.get("brand_id", "")
+                if bid:
+                    crm_by_brand[str(bid)] = e
+
+        # 近 7 天各门店订单数
+        order_rows = await session.execute(
+            text("""
+                SELECT store_id,
+                       COUNT(*)                         AS order_cnt,
+                       COALESCE(SUM(final_amount), 0)  AS revenue_cents
+                FROM orders
+                WHERE order_time >= NOW() - INTERVAL '7 days'
+                  AND sales_channel = 'pinzhi'
+                GROUP BY store_id
+            """)
+        )
+        orders_by_store: Dict[str, Dict] = {
+            str(r[0]): {"order_cnt": int(r[1]), "revenue_yuan": round(float(r[2]) / 100, 2)}
+            for r in order_rows.fetchall()
+        }
+
+        for sid, store in stores.items():
+            bid = str(getattr(store, "brand_id", "") or "")
+            pos_ext = pos_by_store.get(sid)
+            crm_ext = crm_by_brand.get(bid)
+            store_orders = orders_by_store.get(sid, {"order_cnt": 0, "revenue_yuan": 0.0})
+
+            pos_info: Dict[str, Any] = {"configured": False}
+            if pos_ext:
+                pos_info = {
+                    "configured": bool(pos_ext.api_endpoint and pos_ext.api_secret),
+                    "status": str(pos_ext.status.value if hasattr(pos_ext.status, "value") else pos_ext.status),
+                    "last_sync_at": str(pos_ext.last_sync_at) if pos_ext.last_sync_at else None,
+                    "last_sync_status": str(
+                        pos_ext.last_sync_status.value
+                        if hasattr(pos_ext.last_sync_status, "value")
+                        else pos_ext.last_sync_status
+                    ) if pos_ext.last_sync_status else None,
+                    "last_error": pos_ext.last_error,
+                }
+
+            crm_info: Dict[str, Any] = {"configured": False}
+            if crm_ext:
+                crm_info = {
+                    "configured": bool(crm_ext.api_key and crm_ext.api_secret),
+                    "merchant_id": (crm_ext.config or {}).get("aoqiwei_merchant_id"),
+                    "last_sync_at": str(crm_ext.last_sync_at) if crm_ext.last_sync_at else None,
+                    "last_error": crm_ext.last_error,
+                }
+
+            merchants[sid] = {
+                "store_name": store.name,
+                "brand_id": bid,
+                "city": getattr(store, "city", None),
+                "pinzhi_pos": pos_info,
+                "aoqiwei_crm": crm_info,
+                "recent_7d_orders": store_orders["order_cnt"],
+                "recent_7d_revenue_yuan": store_orders["revenue_yuan"],
+                "data_flowing": store_orders["order_cnt"] > 0,
+            }
+
+    total_configured = sum(1 for m in merchants.values() if m["pinzhi_pos"]["configured"])
+    total_flowing = sum(1 for m in merchants.values() if m["data_flowing"])
+    return {
+        "merchants": merchants,
+        "summary": {
+            "total_stores": len(merchants),
+            "pinzhi_configured": total_configured,
+            "data_flowing_stores": total_flowing,
+        },
+        "queried_at": datetime.now().isoformat(),
+    }
+
+
+# ── 历史数据回填（初次接入时批量拉取）────────────────────────────────────────────
+
+class BackfillRequest(BaseModel):
+    adapter: str = Field(
+        ...,
+        description="适配器类型：pinzhi / aoqiwei_crm",
+        pattern="^(pinzhi|tiancai|aoqiwei_supply|aoqiwei_crm)$",
+    )
+    start_date: str = Field(..., description="开始日期 YYYY-MM-DD（含）")
+    end_date: str = Field(..., description="结束日期 YYYY-MM-DD（含）")
+    store_ids: Optional[List[str]] = Field(None, description="指定门店，为空则全部")
+    max_days: int = Field(30, ge=1, le=90, description="最多回填天数，防止误操作过大范围")
+
+
+class BackfillDaySummary(BaseModel):
+    date: str
+    success: bool
+    stores_processed: int
+    total_orders: int
+    total_revenue_yuan: float
+    error: Optional[str] = None
+
+
+class BackfillResponse(BaseModel):
+    adapter: str
+    start_date: str
+    end_date: str
+    days_requested: int
+    days_processed: int
+    total_orders_written: int
+    total_revenue_yuan: float
+    days: List[BackfillDaySummary]
+    triggered_at: str
+
+
+@router.post(
+    "/backfill",
+    response_model=BackfillResponse,
+    summary="历史数据批量回填（新商户初次接入时使用）",
+)
+async def backfill_history(
+    body: BackfillRequest,
+    current_user: User = Depends(get_current_active_user),
+) -> BackfillResponse:
+    """
+    新商户初次接入后，批量拉取指定日期范围内的历史订单并写入 DB。
+
+    - 每天单独调用一次 POS 同步（与按需触发逻辑完全一致，幂等）
+    - 支持适配器：pinzhi / aoqiwei_crm
+    - 最多 90 天，防止误操作
+    - 单天失败不中断其他天，在 days[].error 中记录
+
+    **典型用法**（尝在一起接入后回填近30天）：
+    ```
+    POST /api/v1/integrations/pos-sync/backfill
+    {
+      "adapter": "pinzhi",
+      "start_date": "2026-02-14",
+      "end_date":   "2026-03-14",
+      "store_ids": ["CZYZ-2461", "CZYZ-7269", "CZYZ-19189"]
+    }
+    ```
+    """
+    handler = _ADAPTER_HANDLERS.get(body.adapter)
+    if not handler:
+        raise HTTPException(status_code=400, detail=f"不支持的适配器: {body.adapter}")
+
+    try:
+        start = date.fromisoformat(body.start_date)
+        end = date.fromisoformat(body.end_date)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"日期格式错误（YYYY-MM-DD）: {exc}") from exc
+
+    if end < start:
+        raise HTTPException(status_code=400, detail="end_date 不能早于 start_date")
+
+    days_delta = (end - start).days + 1
+    if days_delta > body.max_days:
+        raise HTTPException(
+            status_code=400,
+            detail=f"请求天数 {days_delta} 超过 max_days={body.max_days} 限制",
+        )
+
+    logger.info(
+        "pos_sync.backfill.started",
+        adapter=body.adapter,
+        start_date=body.start_date,
+        end_date=body.end_date,
+        days=days_delta,
+        user_id=str(getattr(current_user, "id", "unknown")),
+    )
+
+    day_results: List[BackfillDaySummary] = []
+    total_orders = 0
+    total_revenue = 0.0
+
+    current_day = start
+    while current_day <= end:
+        ds = current_day.strftime("%Y-%m-%d")
+        try:
+            resp: PosSyncResponse = await handler(ds, body.store_ids)
+            day_orders = resp.totals.get("db_total_orders") or sum(
+                s.orders_in_db for s in resp.stores
+            )
+            day_revenue = resp.totals.get("db_total_revenue") or sum(
+                s.revenue_in_db for s in resp.stores
+            )
+            total_orders += day_orders
+            total_revenue += day_revenue
+            day_results.append(BackfillDaySummary(
+                date=ds,
+                success=resp.success,
+                stores_processed=len(resp.stores),
+                total_orders=day_orders,
+                total_revenue_yuan=round(day_revenue, 2),
+                error=None if resp.success else (resp.skipped_reason or "部分门店失败"),
+            ))
+        except Exception as exc:
+            logger.error("pos_sync.backfill.day_error", date=ds, error=str(exc))
+            day_results.append(BackfillDaySummary(
+                date=ds, success=False, stores_processed=0,
+                total_orders=0, total_revenue_yuan=0.0,
+                error=str(exc),
+            ))
+        current_day += timedelta(days=1)
+
+    return BackfillResponse(
+        adapter=body.adapter,
+        start_date=body.start_date,
+        end_date=body.end_date,
+        days_requested=days_delta,
+        days_processed=len(day_results),
+        total_orders_written=total_orders,
+        total_revenue_yuan=round(total_revenue, 2),
+        days=day_results,
+        triggered_at=datetime.now().isoformat(),
+    )

@@ -25,9 +25,11 @@ RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 # 复制Python依赖
 COPY --from=builder /root/.local /root/.local
 
-# 复制应用代码、packages、启动脚本
+# 复制应用代码、packages、Alembic 迁移、启动脚本
 COPY ./apps/api-gateway/src ./src
 COPY ./packages ./packages
+COPY ./apps/api-gateway/alembic ./alembic
+COPY ./apps/api-gateway/alembic.ini ./alembic.ini
 COPY ./apps/api-gateway/docker-entrypoint.sh ./docker-entrypoint.sh
 
 # 设置环境变量

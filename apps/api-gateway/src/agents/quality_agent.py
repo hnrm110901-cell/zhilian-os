@@ -58,7 +58,7 @@ class QualityAgent(LLMEnhancedAgent):
         image_b64: str,
         dish_id: Optional[str] = None,
         image_url: Optional[str] = None,
-        media_type: str = "image/jpeg",
+        media_type: Optional[str] = None,
         recipient_ids: Optional[List[str]] = None,
     ) -> AgentResult:
         """
@@ -151,7 +151,7 @@ class QualityAgent(LLMEnhancedAgent):
             image_b64=params["image_b64"],
             dish_id=params.get("dish_id"),
             image_url=params.get("image_url"),
-            media_type=params.get("media_type", "image/jpeg"),
+            media_type=params.get("media_type"),
             recipient_ids=params.get("recipient_ids"),
         )
 

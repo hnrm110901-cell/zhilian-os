@@ -1,5 +1,6 @@
 # EditorConfig — 屯象OS 统一代码风格
 # 所有工具（Claude Code / Codex / CLI）共同遵守
+# 文档：https://editorconfig.org
 root = true
 
 [*]
@@ -10,18 +11,40 @@ trim_trailing_whitespace = true
 indent_style = space
 indent_size = 2
 
+# Python — PEP 8 要求 4 空格
 [*.py]
 indent_size = 4
 max_line_length = 120
 
-[*.{ts,tsx,js,jsx}]
+# TypeScript / JavaScript / TSX / JSX
+[*.{ts,tsx,js,jsx,mjs,cjs}]
 indent_size = 2
 
+# HTML / CSS / SCSS
+[*.{html,css,scss,module.css}]
+indent_size = 2
+
+# YAML（DevOps 标准 2 空格）
 [*.{yml,yaml}]
 indent_size = 2
 
+# JSON
+[*.{json,json5,jsonc}]
+indent_size = 2
+
+# Markdown（两空格换行是合法语法，不裁剪）
 [*.md]
 trim_trailing_whitespace = false
+indent_size = 2
 
+# Makefile 必须用 Tab
 [Makefile]
 indent_style = tab
+
+# Shell 脚本
+[*.sh]
+indent_size = 2
+
+# Dockerfile
+[Dockerfile*]
+indent_size = 4

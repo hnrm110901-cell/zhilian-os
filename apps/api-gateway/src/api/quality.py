@@ -21,7 +21,7 @@ class InspectRequest(BaseModel):
     image_b64: str = Field(..., description="base64 编码的菜品图片")
     dish_id: Optional[str] = None
     image_url: Optional[str] = None
-    media_type: str = "image/jpeg"
+    media_type: Optional[str] = None
     recipient_ids: Optional[List[str]] = Field(
         default=None, description="企业微信告警接收人ID列表"
     )
