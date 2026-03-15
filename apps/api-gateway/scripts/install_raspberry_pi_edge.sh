@@ -11,6 +11,7 @@ CONFIG_DIR="${CONFIG_DIR:-/etc/zhilian-edge}"
 STATE_DIR="${STATE_DIR:-/var/lib/zhilian-edge}"
 SERVICE_NAME="${SERVICE_NAME:-zhilian-edge-node.service}"
 SHOKZ_SERVICE_NAME="${SHOKZ_SERVICE_NAME:-zhilian-edge-shokz.service}"
+SHOKZ_AUTOPAIR_SERVICE_NAME="${SHOKZ_AUTOPAIR_SERVICE_NAME:-zhilian-edge-shokz-autopair.service}"
 
 API_BASE_URL="${EDGE_API_BASE_URL:-}"
 API_TOKEN="${EDGE_API_TOKEN:-}"
@@ -18,9 +19,24 @@ STORE_ID="${EDGE_STORE_ID:-}"
 DEVICE_NAME="${EDGE_DEVICE_NAME:-$(hostname)}"
 NETWORK_MODE="${EDGE_NETWORK_MODE:-cloud}"
 STATUS_INTERVAL="${EDGE_STATUS_INTERVAL_SECONDS:-30}"
+QUEUE_BATCH_SIZE="${EDGE_QUEUE_FLUSH_BATCH_SIZE:-20}"
+COMMAND_BATCH_SIZE="${EDGE_COMMAND_POLL_BATCH_SIZE:-10}"
 SHOKZ_BIND="${EDGE_SHOKZ_CALLBACK_BIND:-0.0.0.0}"
 SHOKZ_PORT="${EDGE_SHOKZ_CALLBACK_PORT:-9781}"
 SHOKZ_SECRET="${EDGE_SHOKZ_CALLBACK_SECRET:-}"
+SHOKZ_TARGET_MACS="${SHOKZ_TARGET_MACS:-}"
+SHOKZ_AUTO_CONNECT_INTERVAL_SECONDS="${SHOKZ_AUTO_CONNECT_INTERVAL_SECONDS:-30}"
+SHOKZ_SCAN_SECONDS="${SHOKZ_SCAN_SECONDS:-15}"
+
+render_service_unit() {
+  local source_file="$1"
+  local target_file="$2"
+
+  sed \
+    -e "s/^User=.*/User=${EDGE_USER}/" \
+    -e "s/^Group=.*/Group=${EDGE_USER}/" \
+    "${source_file}" > "${target_file}"
+}
 
 require_root() {
   if [[ "$(id -u)" -ne 0 ]]; then
@@ -49,9 +65,14 @@ Optional env:
   EDGE_DEVICE_NAME
   EDGE_NETWORK_MODE=cloud|edge|hybrid
   EDGE_STATUS_INTERVAL_SECONDS=30
+  EDGE_QUEUE_FLUSH_BATCH_SIZE=20
+  EDGE_COMMAND_POLL_BATCH_SIZE=10
   EDGE_SHOKZ_CALLBACK_BIND=0.0.0.0
   EDGE_SHOKZ_CALLBACK_PORT=9781
   EDGE_SHOKZ_CALLBACK_SECRET=shared-secret
+  SHOKZ_TARGET_MACS=AA:BB:CC:DD:EE:FF,11:22:33:44:55:66
+  SHOKZ_AUTO_CONNECT_INTERVAL_SECONDS=30
+  SHOKZ_SCAN_SECONDS=15
 
 Recovery:
   If the node shows "需重注册", update /etc/zhilian-edge/edge-node.env
@@ -77,38 +98,28 @@ if [[ -z "${API_BASE_URL}" || -z "${API_TOKEN}" || -z "${STORE_ID}" ]]; then
 fi
 
 apt-get update
-apt-get install -y python3 curl bluez
+apt-get install -y python3 curl bluez sqlite3
 
 if ! id -u "${EDGE_USER}" >/dev/null 2>&1; then
   useradd --system --create-home --home-dir "${STATE_DIR}" --shell /usr/sbin/nologin "${EDGE_USER}"
 fi
 
 mkdir -p "${INSTALL_DIR}" "${CONFIG_DIR}" "${STATE_DIR}"
-cp "${EDGE_DIR}/edge_node_agent.py"         "${INSTALL_DIR}/edge_node_agent.py"
-cp "${EDGE_DIR}/shokz_callback_daemon.py"   "${INSTALL_DIR}/shokz_callback_daemon.py"
-cp "${EDGE_DIR}/shokz_bluetooth_manager.py" "${INSTALL_DIR}/shokz_bluetooth_manager.py"
-cp "${EDGE_DIR}/edge_model_manager.py"      "${INSTALL_DIR}/edge_model_manager.py"
-cp "${EDGE_DIR}/edge_business_queue.py"     "${INSTALL_DIR}/edge_business_queue.py"
-cp "${EDGE_DIR}/edge_health_check.py"       "${INSTALL_DIR}/edge_health_check.py"
-cp "${SCRIPT_DIR}/install_raspberry_pi_edge.sh"          "${INSTALL_DIR}/install_raspberry_pi_edge.sh"
+cp "${EDGE_DIR}/edge_node_agent.py" "${INSTALL_DIR}/edge_node_agent.py"
+cp "${EDGE_DIR}/shokz_callback_daemon.py" "${INSTALL_DIR}/shokz_callback_daemon.py"
+cp "${EDGE_DIR}/shokz_autopair_agent.py" "${INSTALL_DIR}/shokz_autopair_agent.py"
+cp "${SCRIPT_DIR}/install_raspberry_pi_edge.sh" "${INSTALL_DIR}/install_raspberry_pi_edge.sh"
 cp "${SCRIPT_DIR}/enable_raspberry_pi_edge_autoprovision.sh" "${INSTALL_DIR}/enable_raspberry_pi_edge_autoprovision.sh"
 cp "${EDGE_DIR}/bootstrap_edge_firstboot.sh" "${INSTALL_DIR}/bootstrap_edge_firstboot.sh"
-cp "${EDGE_DIR}/${SERVICE_NAME}" "/etc/systemd/system/${SERVICE_NAME}"
-cp "${EDGE_DIR}/${SHOKZ_SERVICE_NAME}" "/etc/systemd/system/${SHOKZ_SERVICE_NAME}"
+render_service_unit "${EDGE_DIR}/${SERVICE_NAME}" "/etc/systemd/system/${SERVICE_NAME}"
+render_service_unit "${EDGE_DIR}/${SHOKZ_SERVICE_NAME}" "/etc/systemd/system/${SHOKZ_SERVICE_NAME}"
+render_service_unit "${EDGE_DIR}/${SHOKZ_AUTOPAIR_SERVICE_NAME}" "/etc/systemd/system/${SHOKZ_AUTOPAIR_SERVICE_NAME}"
 chmod 755 "${INSTALL_DIR}/edge_node_agent.py"
 chmod 755 "${INSTALL_DIR}/shokz_callback_daemon.py"
-chmod 755 "${INSTALL_DIR}/shokz_bluetooth_manager.py"
-chmod 755 "${INSTALL_DIR}/edge_model_manager.py"
-chmod 755 "${INSTALL_DIR}/edge_business_queue.py"
-chmod 755 "${INSTALL_DIR}/edge_health_check.py"
+chmod 755 "${INSTALL_DIR}/shokz_autopair_agent.py"
 chmod 755 "${INSTALL_DIR}/install_raspberry_pi_edge.sh"
 chmod 755 "${INSTALL_DIR}/enable_raspberry_pi_edge_autoprovision.sh"
 chmod 755 "${INSTALL_DIR}/bootstrap_edge_firstboot.sh"
-
-# 安装系统级软链（方便直接调用）
-ln -sf "${INSTALL_DIR}/edge_health_check.py"  /usr/local/bin/zhilian-check
-ln -sf "${INSTALL_DIR}/edge_model_manager.py" /usr/local/bin/zhilian-models
-ln -sf "${INSTALL_DIR}/edge_business_queue.py" /usr/local/bin/zhilian-queue
 
 cat > "${CONFIG_DIR}/edge-node.env" <<EOF
 EDGE_API_BASE_URL=${API_BASE_URL}
@@ -117,9 +128,16 @@ EDGE_STORE_ID=${STORE_ID}
 EDGE_DEVICE_NAME=${DEVICE_NAME}
 EDGE_NETWORK_MODE=${NETWORK_MODE}
 EDGE_STATUS_INTERVAL_SECONDS=${STATUS_INTERVAL}
+EDGE_QUEUE_FLUSH_BATCH_SIZE=${QUEUE_BATCH_SIZE}
+EDGE_COMMAND_POLL_BATCH_SIZE=${COMMAND_BATCH_SIZE}
 EDGE_SHOKZ_CALLBACK_BIND=${SHOKZ_BIND}
 EDGE_SHOKZ_CALLBACK_PORT=${SHOKZ_PORT}
 EDGE_SHOKZ_CALLBACK_SECRET=${SHOKZ_SECRET}
+SHOKZ_CALLBACK_PORT=${SHOKZ_PORT}
+SHOKZ_CALLBACK_SECRET=${SHOKZ_SECRET}
+SHOKZ_TARGET_MACS=${SHOKZ_TARGET_MACS}
+SHOKZ_AUTO_CONNECT_INTERVAL_SECONDS=${SHOKZ_AUTO_CONNECT_INTERVAL_SECONDS}
+SHOKZ_SCAN_SECONDS=${SHOKZ_SCAN_SECONDS}
 EDGE_STATE_DIR=${STATE_DIR}
 EOF
 
@@ -129,19 +147,28 @@ chmod 640 "${CONFIG_DIR}/edge-node.env"
 systemctl daemon-reload
 systemctl enable "${SERVICE_NAME}"
 systemctl enable "${SHOKZ_SERVICE_NAME}"
+if [[ -n "${SHOKZ_TARGET_MACS}" ]]; then
+  systemctl enable "${SHOKZ_AUTOPAIR_SERVICE_NAME}"
+fi
 systemctl restart "${SERVICE_NAME}"
 systemctl restart "${SHOKZ_SERVICE_NAME}"
+if [[ -n "${SHOKZ_TARGET_MACS}" ]]; then
+  systemctl restart "${SHOKZ_AUTOPAIR_SERVICE_NAME}"
+fi
 systemctl --no-pager --full status "${SERVICE_NAME}" || true
 systemctl --no-pager --full status "${SHOKZ_SERVICE_NAME}" || true
+if [[ -n "${SHOKZ_TARGET_MACS}" ]]; then
+  systemctl --no-pager --full status "${SHOKZ_AUTOPAIR_SERVICE_NAME}" || true
+fi
 
 echo
-echo "屯象OS 边缘节点安装完成。"
-echo "配置文件 : ${CONFIG_DIR}/edge-node.env"
-echo "状态文件 : ${STATE_DIR}/node_state.json"
-echo "Shokz状态: ${STATE_DIR}/shokz_state.json"
-echo "主服务   : ${SERVICE_NAME}"
-echo "Shokz服务: ${SHOKZ_SERVICE_NAME}"
-echo "日志查看 : journalctl -u ${SERVICE_NAME} -f"
-echo "健康检查 : zhilian-check"
-echo "模型管理 : zhilian-models list"
-echo "队列状态 : zhilian-queue stats"
+echo "Zhilian edge node installer completed."
+echo "Config file: ${CONFIG_DIR}/edge-node.env"
+echo "State file: ${STATE_DIR}/node_state.json"
+echo "Shokz state file: ${STATE_DIR}/shokz_state.json"
+echo "Service: ${SERVICE_NAME}"
+echo "Shokz callback service: ${SHOKZ_SERVICE_NAME}"
+if [[ -n "${SHOKZ_TARGET_MACS}" ]]; then
+  echo "Shokz autopair service: ${SHOKZ_AUTOPAIR_SERVICE_NAME}"
+fi
+echo "Logs: journalctl -u ${SERVICE_NAME} -f"

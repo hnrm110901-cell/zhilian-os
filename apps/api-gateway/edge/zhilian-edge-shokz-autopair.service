@@ -1,0 +1,19 @@
+[Unit]
+Description=Zhilian OS Shokz Auto Pair Agent
+After=bluetooth.service network-online.target
+Wants=bluetooth.service network-online.target
+
+[Service]
+Type=simple
+User=zhilian-edge
+Group=zhilian-edge
+EnvironmentFile=/etc/zhilian-edge/edge-node.env
+WorkingDirectory=/opt/zhilian-edge
+ExecStart=/usr/bin/python3 /opt/zhilian-edge/shokz_autopair_agent.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

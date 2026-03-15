@@ -45,6 +45,17 @@ class EdgeAgentConfig:
         self.state_file = self.state_dir / "node_state.json"
         self.queue_db_file = self.state_dir / "status_queue.db"
         self.queue_flush_batch_size = int(os.getenv("EDGE_QUEUE_FLUSH_BATCH_SIZE", "20"))
+        self.command_poll_batch_size = int(os.getenv("EDGE_COMMAND_POLL_BATCH_SIZE", "10"))
+        self.shokz_callback_port = int(
+            os.getenv("EDGE_SHOKZ_CALLBACK_PORT")
+            or os.getenv("SHOKZ_CALLBACK_PORT")
+            or "9781"
+        )
+        self.shokz_callback_secret = (
+            os.getenv("EDGE_SHOKZ_CALLBACK_SECRET")
+            or os.getenv("SHOKZ_CALLBACK_SECRET")
+            or ""
+        ).strip()
 
     @staticmethod
     def _required(name: str) -> str:
@@ -117,6 +128,7 @@ class EdgeNodeAgent:
         path: str,
         params: Optional[Dict[str, Any]] = None,
         use_device_secret: bool = True,
+        json_body: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         url = f"{self.config.api_base_url}{path}"
         if params:
@@ -124,6 +136,8 @@ class EdgeNodeAgent:
             url = f"{url}?{encoded}"
 
         body: Optional[bytes] = None
+        if json_body is not None:
+            body = json.dumps(json_body, ensure_ascii=True).encode("utf-8")
         request = urllib.request.Request(
             url,
             data=body,
@@ -249,12 +263,78 @@ class EdgeNodeAgent:
             logger.warning("device secret rejected, re-registering edge node")
             self.node_id = None
             self.device_secret = None
+            self._save_state()
             node_id = self.register()
             self._request(
                 "POST",
                 f"/api/v1/hardware/edge-node/{node_id}/status",
                 payload,
             )
+
+    def _local_shokz_request(self, action: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        url = f"http://127.0.0.1:{self.config.shokz_callback_port}/shokz/callback"
+        body = json.dumps(
+            {
+                "action": action,
+                "device_id": payload.get("device_id"),
+                "store_id": self.config.store_id,
+                "edge_node_id": self.node_id,
+                "payload": payload,
+            },
+            ensure_ascii=True,
+        ).encode("utf-8")
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+        if self.config.shokz_callback_secret:
+            headers["X-Edge-Callback-Secret"] = self.config.shokz_callback_secret
+        request = urllib.request.Request(url, data=body, headers=headers, method="POST")
+        with urllib.request.urlopen(request, timeout=10) as response:
+            raw = response.read().decode("utf-8")
+            return json.loads(raw) if raw else {}
+
+    def _execute_edge_command(self, command: Dict[str, Any]) -> Dict[str, Any]:
+        command_type = command.get("command_type")
+        payload = command.get("payload") or {}
+        if command_type in {"connect_device", "disconnect_device", "voice_output"}:
+            return self._local_shokz_request(command_type, payload)
+        raise RuntimeError(f"unsupported edge command: {command_type}")
+
+    def process_command_queue(self) -> int:
+        node_id = self.ensure_registered()
+        response = self._request(
+            "GET",
+            f"/api/v1/hardware/edge-node/{node_id}/commands",
+            {"limit": self.config.command_poll_batch_size},
+        )
+        commands = response.get("commands", [])
+        completed = 0
+
+        for command in commands:
+            command_id = command["command_id"]
+            try:
+                result = self._execute_edge_command(command)
+                self._request(
+                    "POST",
+                    f"/api/v1/hardware/edge-node/{node_id}/commands/{command_id}/ack",
+                    json_body={
+                        "status": "completed",
+                        "result": result,
+                    },
+                )
+                completed += 1
+            except Exception as exc:
+                self._request(
+                    "POST",
+                    f"/api/v1/hardware/edge-node/{node_id}/commands/{command_id}/ack",
+                    json_body={
+                        "status": "failed",
+                        "last_error": str(exc),
+                    },
+                )
+                logger.warning("edge command failed command_id=%s error=%s", command_id, exc)
+        return completed
 
     def flush_pending_statuses(self) -> int:
         flushed = 0
@@ -300,6 +380,7 @@ class EdgeNodeAgent:
         while True:
             try:
                 self.update_status()
+                self.process_command_queue()
             except Exception as exc:
                 logger.error("status update failed: %s", exc)
             time.sleep(self.config.status_interval)
@@ -397,6 +478,7 @@ def main(argv: list[str]) -> int:
         if once:
             agent.ensure_registered()
             agent.update_status()
+            agent.process_command_queue()
             return 0
         agent.run_forever()
         return 0

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Card, Table, Button, Tag, Statistic, Row, Col, Select, Tabs, Descriptions, Alert, Space, Popconfirm, Drawer, Timeline, Typography } from 'antd';
+import { Card, Table, Button, Tag, Statistic, Row, Col, Select, Tabs, Descriptions, Alert, Input, List, Space, Popconfirm, Drawer, Timeline, Typography } from 'antd';
 import { ReloadOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { apiClient } from '../services/api';
@@ -7,11 +7,82 @@ import { handleApiError, showSuccess } from '../utils/message';
 
 const { Option } = Select;
 
+export const getNetworkModeMeta = (networkMode?: string) => {
+  switch (networkMode) {
+    case 'cloud':
+      return { color: 'blue', label: '云端模式' };
+    case 'edge':
+      return { color: 'gold', label: '边缘模式' };
+    case 'hybrid':
+      return { color: 'purple', label: '混合模式' };
+    default:
+      return { color: 'default', label: networkMode || '-' };
+  }
+};
+
+export const getNodeStatusMeta = (status?: string) => {
+  switch (status) {
+    case 'online':
+      return { color: 'green', label: '在线' };
+    case 'syncing':
+      return { color: 'processing', label: '同步中' };
+    case 'error':
+      return { color: 'red', label: '异常' };
+    case 'offline':
+      return { color: 'default', label: '离线' };
+    default:
+      return { color: 'default', label: status || '-' };
+  }
+};
+
+export const getShokzStatusMeta = (status?: string) => {
+  switch (status) {
+    case 'connected':
+      return { color: 'green', label: '已连接' };
+    case 'pairing':
+      return { color: 'processing', label: '配对中' };
+    case 'charging':
+      return { color: 'blue', label: '充电中' };
+    case 'low_battery':
+      return { color: 'orange', label: '低电量' };
+    case 'disconnected':
+      return { color: 'default', label: '未连接' };
+    default:
+      return { color: 'default', label: status || '-' };
+  }
+};
+
+export const formatIsoDateTime = (value?: string | null) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('zh-CN', { hour12: false });
+};
+
+export const summarizeDeploymentCost = (payload: any) => {
+  const summary = payload?.summary || {};
+  return {
+    hardwareCost: Number(summary.total_hardware_cost || 0),
+    implementationCost: Number(summary.total_implementation_cost || 0),
+    totalCost: Number(summary.total_cost_per_store || 0),
+    deploymentTimeHours: Number(summary.deployment_time_hours || 0),
+    roiMonths: summary.roi_months ?? '-',
+    recommendedNodes: 1,
+    recommendedShokz: 2,
+  };
+};
+
+export const getChecklistStatusMeta = (passed?: boolean) => passed
+  ? { color: 'green', label: '通过' }
+  : { color: 'orange', label: '待处理' };
+
 const HardwarePage: React.FC = () => {
   const [edgeNodes, setEdgeNodes] = useState<any[]>([]);
   const [shokzDevices, setShokzDevices] = useState<any[]>([]);
   const [deploymentCost, setDeploymentCost] = useState<any>(null);
+  const [commissioning, setCommissioning] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [actionLoadingKey, setActionLoadingKey] = useState<string | null>(null);
   const [storeId, setStoreId] = useState('STORE001');
   const [stores, setStores] = useState<any[]>([]);
   const [auditDrawerOpen, setAuditDrawerOpen] = useState(false);
@@ -21,6 +92,7 @@ const HardwarePage: React.FC = () => {
   const [selectedNode, setSelectedNode] = useState<any>(null);
   const [nodeAuditLogs, setNodeAuditLogs] = useState<any[]>([]);
   const [recoveryGuide, setRecoveryGuide] = useState<any>(null);
+  const [testVoiceText, setTestVoiceText] = useState('测试播报：请确认 Shokz 耳机已连接，后厨催单联调开始。');
 
   const loadStores = useCallback(async () => {
     try {
@@ -121,23 +193,79 @@ const HardwarePage: React.FC = () => {
     }
   };
 
+  const loadCommissioning = useCallback(async () => {
+    try {
+      const res = await apiClient.get(`/api/v1/hardware/shokz/store/${storeId}/commissioning-diagnostic`);
+      setCommissioning(res.commissioning || null);
+    } catch (err: any) {
+      handleApiError(err, '加载联调诊断失败');
+    }
+  }, [storeId]);
+
+  useEffect(() => {
+    loadCommissioning();
+  }, [loadCommissioning]);
+
+  const runDeviceAction = async (actionKey: string, action: () => Promise<void>, successMessage: string) => {
+    setActionLoadingKey(actionKey);
+    try {
+      await action();
+      showSuccess(successMessage);
+      await Promise.all([loadData(), loadCommissioning()]);
+    } catch (err: any) {
+      handleApiError(err, '设备联调失败');
+    } finally {
+      setActionLoadingKey(null);
+    }
+  };
+
+  const connectShokz = async (deviceId: string) => runDeviceAction(
+    `connect:${deviceId}`,
+    async () => {
+      await apiClient.post(`/api/v1/hardware/shokz/${deviceId}/connect`);
+    },
+    '已下发连接指令'
+  );
+
+  const disconnectShokz = async (deviceId: string) => runDeviceAction(
+    `disconnect:${deviceId}`,
+    async () => {
+      await apiClient.post(`/api/v1/hardware/shokz/${deviceId}/disconnect`);
+    },
+    '已下发断开指令'
+  );
+
+  const testVoiceOutput = async (deviceId: string) => runDeviceAction(
+    `voice:${deviceId}`,
+    async () => {
+      await apiClient.post(
+        `/api/v1/hardware/shokz/${deviceId}/voice-output?text=${encodeURIComponent(testVoiceText)}&priority=high`
+      );
+    },
+    '测试播报已下发'
+  );
+
   const nodeColumns: ColumnsType<any> = [
     { title: '节点ID', dataIndex: 'node_id', key: 'node_id', render: (v: string, r: any) => v || r.id },
     { title: '名称', dataIndex: 'device_name', key: 'device_name', render: (v: string, r: any) => v || r.name || '-' },
     {
       title: '网络模式', dataIndex: 'network_mode', key: 'mode',
-      render: (v: string) => <Tag color={v === 'cloud' ? 'blue' : v === 'edge' ? 'orange' : 'purple'}>{v || '-'}</Tag>,
+      render: (v: string) => {
+        const meta = getNetworkModeMeta(v);
+        return <Tag color={meta.color}>{meta.label}</Tag>;
+      },
     },
     {
       title: '状态', dataIndex: 'status', key: 'status',
       render: (v: string) => {
-        const color = v === 'online' ? 'green' : v === 'syncing' ? 'gold' : v === 'error' ? 'red' : 'default';
-        const text = v === 'online' ? '在线' : v === 'syncing' ? '同步中' : v === 'error' ? '异常' : '离线';
-        return <Tag color={color}>{text}</Tag>;
+        const meta = getNodeStatusMeta(v);
+        return <Tag color={meta.color}>{meta.label}</Tag>;
       },
     },
     {
-      title: '凭证状态', dataIndex: 'credential_ok', key: 'credential_ok',
+      title: '凭证状态',
+      dataIndex: 'credential_ok',
+      key: 'credential_ok',
       render: (_: boolean, record: any) => {
         const credential = record.credential_status || {};
         if (!credential.device_secret_active) {
@@ -149,17 +277,25 @@ const HardwarePage: React.FC = () => {
         return <Tag color="green">正常</Tag>;
       },
     },
-    { title: '最后心跳', dataIndex: ['credential_status', 'last_heartbeat'], key: 'heartbeat', render: (v: string) => v || '-' },
     {
-      title: '最近凭证操作', key: 'audit_summary',
+      title: '待补发队列',
+      dataIndex: 'pending_status_queue',
+      key: 'pending_status_queue',
+      render: (v: number) => v ?? 0,
+    },
+    {
+      title: '最后心跳',
+      dataIndex: 'updated_at',
+      key: 'updated_at',
+      render: (v: string) => formatIsoDateTime(v),
+    },
+    {
+      title: '最近凭证操作',
+      key: 'audit_summary',
       render: (_: any, record: any) => {
         const summary = record.audit_summary || {};
-        if (!summary.available) {
-          return <Tag>审计不可用</Tag>;
-        }
-        if (!summary.latest_action) {
-          return <Tag>暂无记录</Tag>;
-        }
+        if (!summary.available) return <Tag>审计不可用</Tag>;
+        if (!summary.latest_action) return <Tag>暂无记录</Tag>;
         const color = summary.latest_action === 'edge_node_secret_revoke'
           ? 'red'
           : summary.latest_action === 'edge_node_secret_rotate'
@@ -173,13 +309,14 @@ const HardwarePage: React.FC = () => {
         return (
           <Space direction="vertical" size={2}>
             <Tag color={color}>{text}</Tag>
-            <span style={{ color: '#666', fontSize: 12 }}>{summary.latest_at || '-'}</span>
+            <span style={{ color: '#666', fontSize: 12 }}>{formatIsoDateTime(summary.latest_at)}</span>
           </Space>
         );
       },
     },
     {
-      title: '离线队列', key: 'offline_queue',
+      title: '离线队列',
+      key: 'offline_queue',
       render: (_: any, record: any) => {
         const queueDepth = record.pending_status_queue ?? record.credential_status?.pending_status_queue ?? 0;
         const lastError = record.last_queue_error ?? record.credential_status?.last_queue_error;
@@ -193,16 +330,6 @@ const HardwarePage: React.FC = () => {
         }
         return <Tag color="green">无积压</Tag>;
       },
-    },
-    {
-      title: '资源', key: 'resources',
-      render: (_: any, record: any) => (
-        <Space size={4}>
-          <Tag>{record.cpu_usage != null ? `CPU ${record.cpu_usage}%` : 'CPU -'}</Tag>
-          <Tag>{record.memory_usage != null ? `内存 ${record.memory_usage}%` : '内存 -'}</Tag>
-          <Tag>{record.temperature != null ? `温度 ${record.temperature}°C` : '温度 -'}</Tag>
-        </Space>
-      ),
     },
     {
       title: '操作', key: 'action',
@@ -229,14 +356,52 @@ const HardwarePage: React.FC = () => {
 
   const shokzColumns: ColumnsType<any> = [
     { title: '设备ID', dataIndex: 'device_id', key: 'device_id', render: (v: string, r: any) => v || r.id },
-    { title: '设备型号', dataIndex: 'model', key: 'model' },
-    { title: '绑定员工', dataIndex: 'employee_name', key: 'employee', render: (v: string) => v || '-' },
+    { title: '设备名称', dataIndex: 'device_name', key: 'device_name', render: (v: string) => v || '-' },
+    { title: '设备型号', dataIndex: 'device_model', key: 'device_model', render: (v: string) => v || '-' },
+    { title: '绑定角色', dataIndex: 'user_role', key: 'user_role', render: (v: string) => v || '-' },
+    { title: '绑定员工', dataIndex: 'user_id', key: 'user_id', render: (v: string) => v || '-' },
     {
-      title: '连接状态', dataIndex: 'connected', key: 'connected',
-      render: (v: boolean) => <Tag color={v ? 'green' : 'red'}>{v ? '已连接' : '未连接'}</Tag>,
+      title: '连接状态', dataIndex: 'status', key: 'status',
+      render: (v: string) => {
+        const meta = getShokzStatusMeta(v);
+        return <Tag color={meta.color}>{meta.label}</Tag>;
+      },
     },
     { title: '电量', dataIndex: 'battery_level', key: 'battery', render: (v: number) => v != null ? `${v}%` : '-' },
+    { title: '信号强度', dataIndex: 'signal_strength', key: 'signal_strength', render: (v: number) => v != null ? `${v} dBm` : '-' },
+    {
+      title: '联调动作',
+      key: 'actions',
+      render: (_: unknown, record: any) => (
+        <Space wrap>
+          <Button
+            size="small"
+            loading={actionLoadingKey === `connect:${record.device_id}`}
+            onClick={() => connectShokz(record.device_id)}
+          >
+            连接
+          </Button>
+          <Button
+            size="small"
+            loading={actionLoadingKey === `disconnect:${record.device_id}`}
+            onClick={() => disconnectShokz(record.device_id)}
+          >
+            断开
+          </Button>
+          <Button
+            size="small"
+            type="primary"
+            loading={actionLoadingKey === `voice:${record.device_id}`}
+            onClick={() => testVoiceOutput(record.device_id)}
+          >
+            测试播报
+          </Button>
+        </Space>
+      ),
+    },
   ];
+
+  const costSummary = summarizeDeploymentCost(deploymentCost);
 
   const tabItems = [
     {
@@ -269,22 +434,96 @@ const HardwarePage: React.FC = () => {
       children: deploymentCost ? (
         <div>
           <Row gutter={16} style={{ marginBottom: 16 }}>
-            <Col span={6}><Card><Statistic title="硬件总成本" prefix="¥" value={(deploymentCost.hardware_cost || 0).toFixed(0)} /></Card></Col>
-            <Col span={6}><Card><Statistic title="安装成本" prefix="¥" value={(deploymentCost.installation_cost || 0).toFixed(0)} /></Card></Col>
-            <Col span={6}><Card><Statistic title="维护成本/年" prefix="¥" value={(deploymentCost.annual_maintenance || 0).toFixed(0)} /></Card></Col>
-            <Col span={6}><Card><Statistic title="总部署成本" prefix="¥" value={(deploymentCost.total_cost || 0).toFixed(0)} /></Card></Col>
+            <Col span={6}><Card><Statistic title="硬件总成本" prefix="¥" value={costSummary.hardwareCost} precision={0} /></Card></Col>
+            <Col span={6}><Card><Statistic title="实施成本" prefix="¥" value={costSummary.implementationCost} precision={0} /></Card></Col>
+            <Col span={6}><Card><Statistic title="部署时长" suffix="小时" value={costSummary.deploymentTimeHours} precision={1} /></Card></Col>
+            <Col span={6}><Card><Statistic title="单店总成本" prefix="¥" value={costSummary.totalCost} precision={0} /></Card></Col>
           </Row>
           <Card title="推荐配置">
             <Descriptions bordered column={2}>
-              <Descriptions.Item label="树莓派数量">{deploymentCost.recommended_nodes || '-'} 台</Descriptions.Item>
-              <Descriptions.Item label="Shokz设备数量">{deploymentCost.recommended_shokz || '-'} 台</Descriptions.Item>
-              <Descriptions.Item label="预计回收周期">{deploymentCost.payback_months || '-'} 个月</Descriptions.Item>
-              <Descriptions.Item label="预计年节省">¥{(deploymentCost.annual_savings || 0).toFixed(0)}</Descriptions.Item>
+              <Descriptions.Item label="树莓派数量">{costSummary.recommendedNodes} 台</Descriptions.Item>
+              <Descriptions.Item label="Shokz设备数量">{costSummary.recommendedShokz} 台</Descriptions.Item>
+              <Descriptions.Item label="预计回收周期">{costSummary.roiMonths} 个月</Descriptions.Item>
+              <Descriptions.Item label="交付模式">远程预配置 + 到店蓝牙配对</Descriptions.Item>
             </Descriptions>
           </Card>
           <Alert message="硬件部署可显著提升离线可用性和语音交互体验" type="info" style={{ marginTop: 16 }} />
         </div>
       ) : <Card loading={loading} />,
+    },
+    {
+      key: 'commissioning',
+      label: '设备联调/验收',
+      children: (
+        <div>
+          <Row gutter={16} style={{ marginBottom: 16 }}>
+            <Col span={6}>
+              <Card>
+                <Statistic title="验收状态" value={commissioning?.ready ? '通过' : '待处理'} valueStyle={{ color: commissioning?.ready ? '#389e0d' : '#d48806' }} />
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card>
+                <Statistic title="在线节点" value={commissioning?.summary?.edge_nodes_online || 0} suffix={`/ ${commissioning?.summary?.edge_nodes_total || 0}`} />
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card>
+                <Statistic title="已连接耳机" value={commissioning?.summary?.shokz_connected || 0} suffix={`/ ${commissioning?.summary?.shokz_total || 0}`} />
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card>
+                <Statistic title="已登记目标 MAC" value={commissioning?.summary?.target_macs_registered || 0} suffix={`/ ${commissioning?.summary?.target_macs_total || 0}`} />
+              </Card>
+            </Col>
+          </Row>
+
+          <Card title="联调动作" style={{ marginBottom: 16 }}>
+            <Space direction="vertical" style={{ width: '100%' }} size="middle">
+              <Input.TextArea
+                rows={3}
+                value={testVoiceText}
+                onChange={(event) => setTestVoiceText(event.target.value)}
+                placeholder="请输入测试播报文本"
+              />
+              <Alert
+                type="info"
+                message="连接正常且有效的标准"
+                description="必须同时满足：树莓派在线、凭证有效、Shokz 已连接、离线队列无积压、测试播报能成功下发。"
+                showIcon
+              />
+            </Space>
+          </Card>
+
+          <Card title="验收检查清单" style={{ marginBottom: 16 }}>
+            <List
+              dataSource={commissioning?.checklist || []}
+              renderItem={(item: any) => {
+                const meta = getChecklistStatusMeta(item.passed);
+                return (
+                  <List.Item>
+                    <Space direction="vertical" size={0}>
+                      <Space>
+                        <strong>{item.label}</strong>
+                        <Tag color={meta.color}>{meta.label}</Tag>
+                      </Space>
+                      <span>{item.detail}</span>
+                    </Space>
+                  </List.Item>
+                );
+              }}
+            />
+          </Card>
+
+          <Card title="目标耳机 MAC">
+            <Descriptions bordered column={1}>
+              <Descriptions.Item label="目标 MAC">{(commissioning?.target_macs || []).join(', ') || '-'}</Descriptions.Item>
+              <Descriptions.Item label="未登记 / 未发现">{(commissioning?.missing_target_macs || []).join(', ') || '无'}</Descriptions.Item>
+            </Descriptions>
+          </Card>
+        </div>
+      ),
     },
   ];
 
@@ -358,21 +597,12 @@ const HardwarePage: React.FC = () => {
         <Timeline
           pending={auditLoading ? '加载中...' : undefined}
           items={nodeAuditLogs.map((log: any) => ({
-            color:
-              log.action === 'edge_node_secret_revoke' ? 'red' :
-                log.action === 'edge_node_secret_rotate' ? 'orange' :
-                  'green',
             children: (
-              <div>
-                <div style={{ fontWeight: 600 }}>{log.description || log.action}</div>
-                <div style={{ color: '#666', marginTop: 4 }}>
-                  {log.created_at || '-'} · {log.username || log.user_id || 'system'}
-                </div>
-                <div style={{ marginTop: 4 }}>
-                  <Tag>{log.action}</Tag>
-                  <Tag>{log.status || 'success'}</Tag>
-                </div>
-              </div>
+              <Space direction="vertical" size={0}>
+                <strong>{log.action}</strong>
+                <span>{log.description || '-'}</span>
+                <span style={{ color: '#666', fontSize: 12 }}>{formatIsoDateTime(log.created_at)}</span>
+              </Space>
             ),
           }))}
         />

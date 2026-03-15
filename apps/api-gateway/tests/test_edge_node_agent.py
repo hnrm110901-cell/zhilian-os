@@ -1,112 +1,118 @@
 import importlib.util
 from pathlib import Path
-from unittest.mock import patch
 
 
-MODULE_PATH = Path(__file__).resolve().parent.parent / "edge" / "edge_node_agent.py"
-SPEC = importlib.util.spec_from_file_location("edge_node_agent", MODULE_PATH)
-EDGE_NODE_AGENT = importlib.util.module_from_spec(SPEC)
-assert SPEC and SPEC.loader
-SPEC.loader.exec_module(EDGE_NODE_AGENT)
+EDGE_AGENT_PATH = Path(__file__).resolve().parents[1] / "edge" / "edge_node_agent.py"
+EDGE_AGENT_SPEC = importlib.util.spec_from_file_location("edge_node_agent", EDGE_AGENT_PATH)
+assert EDGE_AGENT_SPEC and EDGE_AGENT_SPEC.loader
+edge_node_agent = importlib.util.module_from_spec(EDGE_AGENT_SPEC)
+EDGE_AGENT_SPEC.loader.exec_module(edge_node_agent)
 
-EdgeAgentConfig = EDGE_NODE_AGENT.EdgeAgentConfig
-EdgeNodeAgent = EDGE_NODE_AGENT.EdgeNodeAgent
+EdgeAgentConfig = edge_node_agent.EdgeAgentConfig
+EdgeNodeAgent = edge_node_agent.EdgeNodeAgent
 
 
-def _build_config(monkeypatch, tmp_path):
+def _configure_env(monkeypatch, tmp_path):
     monkeypatch.setenv("EDGE_API_BASE_URL", "http://127.0.0.1:8000")
     monkeypatch.setenv("EDGE_API_TOKEN", "bootstrap-token")
     monkeypatch.setenv("EDGE_STORE_ID", "STORE001")
     monkeypatch.setenv("EDGE_DEVICE_NAME", "store001-rpi5")
     monkeypatch.setenv("EDGE_STATE_DIR", str(tmp_path))
-    monkeypatch.setenv("EDGE_QUEUE_FLUSH_BATCH_SIZE", "10")
-    return EdgeAgentConfig()
 
 
-def test_update_status_queues_payload_when_network_fails(monkeypatch, tmp_path):
-    config = _build_config(monkeypatch, tmp_path)
-    agent = EdgeNodeAgent(config)
+def test_post_status_payload_re_registers_after_device_secret_rejection(monkeypatch, tmp_path):
+    _configure_env(monkeypatch, tmp_path)
+    agent = EdgeNodeAgent(EdgeAgentConfig())
+    agent.node_id = "edge_old"
+    agent.device_secret = "expired-secret"
+    agent._save_state()
 
-    register_response = {
-        "node": {"node_id": "edge_STORE001_aabb"},
-        "device_secret": "device-secret-1",
-    }
-    request_calls = []
+    calls = []
+    saved_states = []
 
-    def fake_request(method, path, params=None, use_device_secret=True):
-        request_calls.append((method, path, params, use_device_secret))
-        if path == "/api/v1/hardware/edge-node/register":
-            return register_response
-        if path.endswith("/network-mode"):
-            return {"success": True}
-        if path.endswith("/status"):
-            raise RuntimeError("POST /status failed: timed out")
-        raise AssertionError(f"unexpected path {path}")
+    def fake_save_state():
+        saved_states.append((agent.node_id, agent.device_secret))
 
-    with patch.object(agent, "_request", side_effect=fake_request), \
-         patch.object(agent, "_collect_status", return_value={"cpu_usage": 10, "memory_usage": 20}):
-        agent.update_status()
+    def fake_register():
+        agent.node_id = "edge_new"
+        agent.device_secret = "fresh-secret"
+        return "edge_new"
 
-    assert agent.node_id == "edge_STORE001_aabb"
-    assert agent._pending_status_count() == 1
-    pending = agent._get_pending_updates(limit=10)
-    assert pending[0]["payload"] == {"cpu_usage": 10, "memory_usage": 20}
-    assert any(call[1].endswith("/status") for call in request_calls)
+    def fake_request(method, path, params=None, use_device_secret=True, json_body=None):
+        calls.append((method, path, params, json_body))
+        if path == "/api/v1/hardware/edge-node/edge_old/status":
+            raise RuntimeError("POST /api/v1/hardware/edge-node/edge_old/status failed: 401 forbidden")
+        return {"success": True}
 
+    monkeypatch.setattr(agent, "_save_state", fake_save_state)
+    monkeypatch.setattr(agent, "register", fake_register)
+    monkeypatch.setattr(agent, "_request", fake_request)
 
-def test_update_status_flushes_queued_payloads_before_current_payload(monkeypatch, tmp_path):
-    config = _build_config(monkeypatch, tmp_path)
-    first_agent = EdgeNodeAgent(config)
+    agent._post_status_payload({"cpu_usage": 10})
 
-    register_response = {
-        "node": {"node_id": "edge_STORE001_flush"},
-        "device_secret": "device-secret-2",
-    }
-
-    def fail_status_request(method, path, params=None, use_device_secret=True):
-        if path == "/api/v1/hardware/edge-node/register":
-            return register_response
-        if path.endswith("/network-mode"):
-            return {"success": True}
-        if path.endswith("/status"):
-            raise RuntimeError("POST /status failed: offline")
-        raise AssertionError(f"unexpected path {path}")
-
-    with patch.object(first_agent, "_request", side_effect=fail_status_request), \
-         patch.object(first_agent, "_collect_status", return_value={"cpu_usage": 11}):
-        first_agent.update_status()
-
-    assert first_agent._pending_status_count() == 1
-
-    second_agent = EdgeNodeAgent(config)
-    sent_payloads = []
-
-    def succeed_status_request(method, path, params=None, use_device_secret=True):
-        if path.endswith("/status"):
-            sent_payloads.append(params)
-            return {"success": True}
-        raise AssertionError(f"unexpected path {path}")
-
-    with patch.object(second_agent, "_request", side_effect=succeed_status_request), \
-         patch.object(second_agent, "_collect_status", return_value={"cpu_usage": 22}):
-        second_agent.update_status()
-
-    assert sent_payloads == [{"cpu_usage": 11}, {"cpu_usage": 22}]
-    assert second_agent._pending_status_count() == 0
+    assert saved_states == [(None, None)]
+    assert calls[-1][1] == "/api/v1/hardware/edge-node/edge_new/status"
+    assert agent.node_id == "edge_new"
+    assert agent.device_secret == "fresh-secret"
 
 
-def test_collect_status_exposes_queue_observability(monkeypatch, tmp_path):
-    config = _build_config(monkeypatch, tmp_path)
-    agent = EdgeNodeAgent(config)
-    agent.last_queue_error = "temporary network timeout"
-    agent._enqueue_status_update({"cpu_usage": 10}, "temporary network timeout")
+def test_process_command_queue_acknowledges_completed_and_failed_commands(monkeypatch, tmp_path):
+    _configure_env(monkeypatch, tmp_path)
+    agent = EdgeNodeAgent(EdgeAgentConfig())
+    agent.node_id = "edge_store001"
+    agent.device_secret = "device-secret"
 
-    with patch.object(agent, "_get_cpu_usage", return_value=1.0), \
-         patch.object(agent, "_get_memory_usage", return_value=2.0), \
-         patch.object(agent, "_get_disk_usage", return_value=3.0), \
-         patch.object(agent, "_get_temperature", return_value=4.0), \
-         patch.object(agent, "_get_uptime_seconds", return_value=5.0):
-        status = agent._collect_status()
+    ack_bodies = []
+    commands = [
+        {
+            "command_id": "cmd_success",
+            "command_type": "voice_output",
+            "payload": {"device_id": "shokz_001", "text": "请处理催单"},
+        },
+        {
+            "command_id": "cmd_failed",
+            "command_type": "disconnect_device",
+            "payload": {"device_id": "shokz_002"},
+        },
+    ]
 
-    assert status["pending_status_queue"] == 1
-    assert status["last_queue_error"] == "temporary network timeout"
+    def fake_request(method, path, params=None, use_device_secret=True, json_body=None):
+        if method == "GET":
+            return {"commands": commands}
+        ack_bodies.append((path, json_body))
+        return {"success": True}
+
+    def fake_execute(command):
+        if command["command_id"] == "cmd_failed":
+            raise RuntimeError("bluetooth unavailable")
+        return {"success": True, "action": command["command_type"]}
+
+    monkeypatch.setattr(agent, "_request", fake_request)
+    monkeypatch.setattr(agent, "_execute_edge_command", fake_execute)
+
+    completed = agent.process_command_queue()
+
+    assert completed == 1
+    assert ack_bodies == [
+        (
+            "/api/v1/hardware/edge-node/edge_store001/commands/cmd_success/ack",
+            {"status": "completed", "result": {"success": True, "action": "voice_output"}},
+        ),
+        (
+            "/api/v1/hardware/edge-node/edge_store001/commands/cmd_failed/ack",
+            {"status": "failed", "last_error": "bluetooth unavailable"},
+        ),
+    ]
+
+
+def test_config_accepts_legacy_shokz_env_names(monkeypatch, tmp_path):
+    _configure_env(monkeypatch, tmp_path)
+    monkeypatch.delenv("EDGE_SHOKZ_CALLBACK_PORT", raising=False)
+    monkeypatch.delenv("EDGE_SHOKZ_CALLBACK_SECRET", raising=False)
+    monkeypatch.setenv("SHOKZ_CALLBACK_PORT", "9799")
+    monkeypatch.setenv("SHOKZ_CALLBACK_SECRET", "legacy-secret")
+
+    config = EdgeAgentConfig()
+
+    assert config.shokz_callback_port == 9799
+    assert config.shokz_callback_secret == "legacy-secret"

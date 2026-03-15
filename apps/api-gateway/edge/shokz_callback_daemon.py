@@ -16,14 +16,6 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-# 真实蓝牙层（优雅降级：导入失败时回退到纯状态桥接模式）
-try:
-    from shokz_bluetooth_manager import get_bluetooth_manager as _get_bt_manager
-    _BT_AVAILABLE = True
-except ImportError:
-    _get_bt_manager = None  # type: ignore[assignment]
-    _BT_AVAILABLE = False
-
 
 logging.basicConfig(
     level=os.getenv("EDGE_LOG_LEVEL", "INFO").upper(),
@@ -35,8 +27,16 @@ logger = logging.getLogger("zhilian-edge-shokz")
 class ShokzCallbackConfig:
     def __init__(self) -> None:
         self.bind_host = os.getenv("EDGE_SHOKZ_CALLBACK_BIND", "0.0.0.0")
-        self.port = int(os.getenv("EDGE_SHOKZ_CALLBACK_PORT", "9781"))
-        self.secret = os.getenv("EDGE_SHOKZ_CALLBACK_SECRET", "").strip()
+        self.port = int(
+            os.getenv("EDGE_SHOKZ_CALLBACK_PORT")
+            or os.getenv("SHOKZ_CALLBACK_PORT")
+            or "9781"
+        )
+        self.secret = (
+            os.getenv("EDGE_SHOKZ_CALLBACK_SECRET")
+            or os.getenv("SHOKZ_CALLBACK_SECRET")
+            or ""
+        ).strip()
         self.state_dir = Path(os.getenv("EDGE_STATE_DIR", "/var/lib/zhilian-edge"))
         self.state_file = self.state_dir / "shokz_state.json"
 
@@ -93,43 +93,13 @@ class ShokzCommandProcessor:
 
         if action == "connect_device":
             device["connected"] = True
-            # 真实蓝牙层：触发实际连接
-            if _BT_AVAILABLE:
-                try:
-                    bt = _get_bt_manager()
-                    mac = payload.get("mac_address") or device_id
-                    bt.connect_device(mac)
-                    logger.info("bt connect_device dispatched mac=%s", mac)
-                except Exception as exc:
-                    logger.warning("bt connect_device failed: %s", exc)
         elif action == "disconnect_device":
             device["connected"] = False
-            if _BT_AVAILABLE:
-                try:
-                    bt = _get_bt_manager()
-                    mac = payload.get("mac_address") or device_id
-                    bt.disconnect_device(mac)
-                    logger.info("bt disconnect_device dispatched mac=%s", mac)
-                except Exception as exc:
-                    logger.warning("bt disconnect_device failed: %s", exc)
         elif action == "voice_output":
             if not device["connected"]:
                 raise ValueError(f"device not connected: {device_id}")
             device["last_text"] = payload.get("text")
             device["last_priority"] = payload.get("priority", "normal")
-            # 真实蓝牙层：触发 TTS 播报
-            if _BT_AVAILABLE:
-                try:
-                    bt = _get_bt_manager()
-                    mac = payload.get("mac_address") or device_id
-                    bt.speak(
-                        text=payload.get("text", ""),
-                        device_mac=mac,
-                        priority=payload.get("priority", "normal"),
-                    )
-                    logger.info("bt speak dispatched mac=%s text=%s", mac, str(payload.get("text", ""))[:30])
-                except Exception as exc:
-                    logger.warning("bt speak failed: %s", exc)
 
         device["last_action"] = action
         device["updated_at"] = now
@@ -154,20 +124,12 @@ class ShokzCommandProcessor:
         }
 
     def health(self) -> Dict[str, Any]:
-        bt_status: Dict[str, Any] = {"available": _BT_AVAILABLE}
-        if _BT_AVAILABLE:
-            try:
-                bt = _get_bt_manager()
-                bt_status.update(bt.status_snapshot())
-            except Exception as exc:
-                bt_status["error"] = str(exc)
         return {
             "success": True,
             "service": "zhilian-edge-shokz",
             "devices": len(self.state.get("devices", {})),
             "history_size": len(self.state.get("history", [])),
             "state_file": str(self.config.state_file),
-            "bluetooth": bt_status,
             "timestamp": int(time.time()),
         }
 

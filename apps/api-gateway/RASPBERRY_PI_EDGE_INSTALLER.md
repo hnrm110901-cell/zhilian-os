@@ -89,6 +89,13 @@ sqlite3 /var/lib/zhilian-edge/status_queue.db 'select count(*) from pending_stat
 cat /var/lib/zhilian-edge/shokz_state.json
 ```
 
+也可以直接执行统一交付检查脚本：
+
+```bash
+cd apps/api-gateway
+bash scripts/check_raspberry_pi_edge_delivery.sh
+```
+
 如果注册成功，`node_state.json` 里会出现 `node_id`。
 如果出现短时断网，待发送的状态上报会进入 `status_queue.db`，恢复联网后 agent 会自动按顺序补发。
 
@@ -181,6 +188,7 @@ journalctl -u zhilian-edge-node.service -f
 
 - 安装脚本：`scripts/install_raspberry_pi_edge.sh`
 - 远程安装脚本：`scripts/install_raspberry_pi_edge_remote.sh`
+- 交付检查脚本：`scripts/check_raspberry_pi_edge_delivery.sh`
 - 自动安装启用脚本：`scripts/enable_raspberry_pi_edge_autoprovision.sh`
 - 边缘 agent：`edge/edge_node_agent.py`
 - 本地 Shokz 守护进程：`edge/shokz_callback_daemon.py`

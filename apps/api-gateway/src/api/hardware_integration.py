@@ -4,6 +4,7 @@
 """
 from types import SimpleNamespace
 import secrets
+import os
 from fastapi import APIRouter, Depends, HTTPException, Header, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,6 +32,12 @@ from src.services.edge_bootstrap_token_service import get_edge_bootstrap_token_s
 
 router = APIRouter(prefix="/api/v1/hardware")
 edge_security = HTTPBearer(auto_error=False)
+
+
+class EdgeCommandAckRequest(BaseModel):
+    status: str
+    result: Optional[dict] = None
+    last_error: Optional[str] = None
 
 
 async def _safe_audit_log(
@@ -90,13 +97,87 @@ async def _get_edge_node_audit_summary(node_id: str) -> dict:
     }
 
 
+def _build_commissioning_summary(*, nodes: list[dict], devices: list[dict]) -> dict:
+    connected_devices = [device for device in devices if device.get("status") == "connected"]
+    low_battery_devices = [device for device in devices if device.get("status") == "low_battery"]
+    credential_ready_nodes = [node for node in nodes if node.get("credential_ok")]
+    online_nodes = [node for node in nodes if node.get("status") == "online"]
+    queue_backlog_nodes = [node for node in nodes if (node.get("pending_status_queue") or 0) > 0]
+
+    target_macs = [
+        mac.strip().upper()
+        for mac in os.getenv("SHOKZ_TARGET_MACS", "").split(",")
+        if mac.strip()
+    ]
+    registered_macs = {str(device.get("mac_address", "")).upper() for device in devices if device.get("mac_address")}
+    missing_target_macs = [mac for mac in target_macs if mac not in registered_macs]
+
+    ready = bool(online_nodes and credential_ready_nodes and connected_devices and not queue_backlog_nodes)
+
+    checklist = [
+        {
+            "key": "edge_online",
+            "label": "树莓派在线",
+            "passed": bool(online_nodes),
+            "detail": f"{len(online_nodes)}/{len(nodes)} 个边缘节点在线" if nodes else "当前门店未注册边缘节点",
+        },
+        {
+            "key": "credential_ready",
+            "label": "设备凭证有效",
+            "passed": bool(nodes) and len(credential_ready_nodes) == len(nodes),
+            "detail": f"{len(credential_ready_nodes)}/{len(nodes)} 个节点凭证有效" if nodes else "暂无节点凭证信息",
+        },
+        {
+            "key": "queue_clean",
+            "label": "离线队列无积压",
+            "passed": len(queue_backlog_nodes) == 0,
+            "detail": "无待补发状态队列" if not queue_backlog_nodes else f"{len(queue_backlog_nodes)} 个节点存在队列积压",
+        },
+        {
+            "key": "headset_connected",
+            "label": "Shokz 已连接",
+            "passed": bool(connected_devices),
+            "detail": f"{len(connected_devices)}/{len(devices)} 台耳机已连接" if devices else "当前门店未注册 Shokz 设备",
+        },
+        {
+            "key": "headset_battery",
+            "label": "Shokz 电量正常",
+            "passed": len(low_battery_devices) == 0,
+            "detail": "无低电量设备" if not low_battery_devices else f"{len(low_battery_devices)} 台设备低电量",
+        },
+        {
+            "key": "target_mac_registered",
+            "label": "目标 MAC 已登记",
+            "passed": len(missing_target_macs) == 0,
+            "detail": "目标耳机 MAC 已全部登记" if not missing_target_macs else f"缺少 {len(missing_target_macs)} 个目标 MAC",
+        },
+    ]
+
+    return {
+        "ready": ready,
+        "summary": {
+            "edge_nodes_total": len(nodes),
+            "edge_nodes_online": len(online_nodes),
+            "credential_ready_nodes": len(credential_ready_nodes),
+            "queue_backlog_nodes": len(queue_backlog_nodes),
+            "shokz_total": len(devices),
+            "shokz_connected": len(connected_devices),
+            "shokz_low_battery": len(low_battery_devices),
+            "target_macs_total": len(target_macs),
+            "target_macs_registered": len(target_macs) - len(missing_target_macs),
+        },
+        "target_macs": target_macs,
+        "missing_target_macs": missing_target_macs,
+        "checklist": checklist,
+    }
+
+
 async def get_edge_bootstrap_or_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(edge_security),
     session: AsyncSession = Depends(get_db),
 ):
     if credentials:
         token = credentials.credentials
-        # 1) 优先检查 Redis 动态 Token（运营人员从后台发放）
         try:
             token_svc = get_edge_bootstrap_token_service()
             if await token_svc.verify_token(token):
@@ -108,12 +189,9 @@ async def get_edge_bootstrap_or_user(
                     auth_type="edge_bootstrap_dynamic",
                 )
         except Exception:
-            pass  # Redis 不可用时降级到静态 token
+            pass
 
-        # 2) 兼容旧方案：静态 EDGE_BOOTSTRAP_TOKEN（env var）
-        if settings.EDGE_BOOTSTRAP_TOKEN and secrets.compare_digest(
-            token, settings.EDGE_BOOTSTRAP_TOKEN
-        ):
+        if settings.EDGE_BOOTSTRAP_TOKEN and secrets.compare_digest(token, settings.EDGE_BOOTSTRAP_TOKEN):
             return SimpleNamespace(
                 id="edge-bootstrap",
                 username="edge-bootstrap",
@@ -122,7 +200,6 @@ async def get_edge_bootstrap_or_user(
                 auth_type="edge_bootstrap_static",
             )
 
-        # 3) 普通用户 JWT
         return await get_current_user(credentials, session)
 
     raise HTTPException(
@@ -251,14 +328,6 @@ async def switch_network_mode(
     """
     service = get_raspberry_pi_edge_service()
     node = await service.switch_network_mode(node_id=node_id, mode=mode)
-    await _safe_audit_log(
-        action="edge_node_network_mode_switch",
-        resource_id=node_id,
-        description=f"切换边缘节点网络模式为 {mode}",
-        current_user=current_user,
-        store_id=node.store_id,
-        new_value={"mode": mode},
-    )
 
     return {
         "success": True,
@@ -316,6 +385,44 @@ async def sync_with_cloud(
     return {
         "success": True,
         "sync_result": result
+    }
+
+
+@router.get("/edge-node/{node_id}/commands")
+async def poll_edge_node_commands(
+    node_id: str,
+    limit: int = 10,
+    current_user=Depends(get_edge_node_or_user),
+):
+    """边缘节点主动拉取待执行命令。"""
+    service = get_raspberry_pi_edge_service()
+    commands = await service.poll_commands(node_id=node_id, limit=limit)
+    return {
+        "success": True,
+        "node_id": node_id,
+        "commands": [command.model_dump() for command in commands],
+    }
+
+
+@router.post("/edge-node/{node_id}/commands/{command_id}/ack")
+async def acknowledge_edge_node_command(
+    node_id: str,
+    command_id: str,
+    body: EdgeCommandAckRequest,
+    current_user=Depends(get_edge_node_or_user),
+):
+    """边缘节点回执命令执行结果。"""
+    service = get_raspberry_pi_edge_service()
+    command = await service.acknowledge_command(
+        node_id=node_id,
+        command_id=command_id,
+        status=body.status,
+        result=body.result,
+        last_error=body.last_error,
+    )
+    return {
+        "success": True,
+        "command": command.model_dump(),
     }
 
 
@@ -715,6 +822,37 @@ async def list_store_shokz_devices(
     }
 
 
+@router.get("/shokz/store/{store_id}/commissioning-diagnostic")
+async def get_store_shokz_commissioning_diagnostic(
+    store_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """获取门店 Shokz 联调/验收诊断摘要。"""
+    edge_service = get_raspberry_pi_edge_service()
+    shokz_service = get_shokz_device_service()
+
+    nodes = await edge_service.list_store_nodes(store_id=store_id)
+    devices = await shokz_service.list_store_devices(store_id=store_id)
+
+    enriched_nodes = []
+    for node in nodes:
+        credential_status = await edge_service.get_credential_status(node.node_id)
+        payload = node.model_dump()
+        payload["credential_ok"] = credential_status["device_secret_active"]
+        enriched_nodes.append(payload)
+
+    device_payloads = [device.model_dump() for device in devices]
+    commissioning = _build_commissioning_summary(nodes=enriched_nodes, devices=device_payloads)
+
+    return {
+        "success": True,
+        "store_id": store_id,
+        "commissioning": commissioning,
+        "nodes": enriched_nodes,
+        "devices": device_payloads,
+    }
+
+
 @router.get("/shokz/{device_id}/history")
 async def get_shokz_interaction_history(
     device_id: str,
@@ -837,130 +975,3 @@ async def get_total_deployment_cost(
             "fast_roi": True
         }
     }
-
-
-# ==================== 管理员：边缘节点总览 ====================
-
-
-@router.get("/admin/edge-nodes")
-async def list_all_edge_nodes(
-    current_user: User = Depends(get_current_user),
-):
-    """
-    列出所有已注册的边缘节点（跨门店）。
-    仅管理员可调用，用于硬件管理总览页。
-    """
-    service = get_raspberry_pi_edge_service()
-    all_nodes = list(service.edge_nodes.values())
-    enriched = []
-    for node in all_nodes:
-        credential_status = await service.get_credential_status(node.node_id)
-        enriched.append({
-            **node.model_dump(),
-            "credential_ok": credential_status.get("device_secret_active", False),
-        })
-    return {
-        "success": True,
-        "total": len(enriched),
-        "nodes": enriched,
-    }
-
-
-# ==================== Bootstrap Token 动态管理 ====================
-
-
-class IssueBootstrapTokenRequest(BaseModel):
-    note: str = ""                # 备注（如："尝在一起接入 2026-03-14"）
-    store_id: Optional[str] = None  # 限制适用门店（不填=不限制）
-    ttl_days: int = 7             # 有效天数（1~30）
-
-
-@router.post("/admin/bootstrap-token/issue")
-async def issue_bootstrap_token(
-    req: IssueBootstrapTokenRequest,
-    current_user: User = Depends(get_current_user),
-):
-    """
-    运营人员从后台发放 Bootstrap Token。
-
-    - 每个 Token 独立吊销，互不影响
-    - Token 明文**仅在响应中返回一次**，请立即复制保存
-    - 默认有效期 7 天，最长 30 天
-    """
-    ttl_days = max(1, min(req.ttl_days, 30))
-    token_svc = get_edge_bootstrap_token_service()
-    plain_token = await token_svc.issue_token(
-        created_by=getattr(current_user, "username", str(getattr(current_user, "id", "unknown"))),
-        note=req.note,
-        store_id=req.store_id,
-        ttl_seconds=ttl_days * 24 * 3600,
-    )
-    await _safe_audit_log(
-        action="edge_bootstrap_token_issue",
-        resource_id="bootstrap_token",
-        description=f"发放 Bootstrap Token，note={req.note}，store_id={req.store_id}",
-        current_user=current_user,
-        store_id=req.store_id,
-        new_value={"note": req.note, "store_id": req.store_id, "ttl_days": ttl_days},
-    )
-    return {
-        "success": True,
-        "token": plain_token,
-        "warning": "此 Token 仅显示一次，请立即复制保存",
-        "ttl_days": ttl_days,
-        "note": req.note,
-        "store_id": req.store_id,
-    }
-
-
-@router.get("/admin/bootstrap-token/list")
-async def list_bootstrap_tokens(
-    current_user: User = Depends(get_current_user),
-):
-    """列出所有有效/已吊销的 Bootstrap Token 元数据（不含明文 Token）。"""
-    token_svc = get_edge_bootstrap_token_service()
-    tokens = await token_svc.list_tokens()
-    import dataclasses
-    return {
-        "success": True,
-        "total": len(tokens),
-        "tokens": [dataclasses.asdict(t) for t in tokens],
-        "static_token_configured": bool(settings.EDGE_BOOTSTRAP_TOKEN),
-    }
-
-
-@router.post("/admin/bootstrap-token/revoke/{token_hash}")
-async def revoke_bootstrap_token(
-    token_hash: str,
-    current_user: User = Depends(get_current_user),
-):
-    """吊销指定 token_hash 对应的 Bootstrap Token。"""
-    token_svc = get_edge_bootstrap_token_service()
-    ok = await token_svc.revoke_token(token_hash)
-    if not ok:
-        raise HTTPException(status_code=404, detail="Token 不存在或已过期")
-    await _safe_audit_log(
-        action="edge_bootstrap_token_revoke",
-        resource_id="bootstrap_token",
-        description=f"吊销 Bootstrap Token hash={token_hash[:16]}…",
-        current_user=current_user,
-        new_value={"token_hash": token_hash},
-    )
-    return {"success": True, "message": "Token 已吊销"}
-
-
-@router.post("/admin/bootstrap-token/revoke-all")
-async def revoke_all_bootstrap_tokens(
-    current_user: User = Depends(get_current_user),
-):
-    """紧急：吊销所有动态 Bootstrap Token（安全事件响应用）。"""
-    token_svc = get_edge_bootstrap_token_service()
-    count = await token_svc.revoke_all_tokens()
-    await _safe_audit_log(
-        action="edge_bootstrap_token_revoke_all",
-        resource_id="bootstrap_token",
-        description=f"紧急吊销全部 Bootstrap Token，共 {count} 个",
-        current_user=current_user,
-        new_value={"revoked_count": count},
-    )
-    return {"success": True, "revoked_count": count, "message": "所有动态 Token 已吊销，静态 env Token 需手动更换"}

@@ -92,6 +92,15 @@ cat /var/lib/zhilian-edge/node_state.json
 cat /var/lib/zhilian-edge/shokz_state.json
 ```
 
+或者直接在开发机执行统一验收：
+
+```bash
+cd apps/api-gateway
+REMOTE_HOST=192.168.110.96 \
+REMOTE_USER=pi \
+bash scripts/check_raspberry_pi_edge_delivery.sh
+```
+
 如果启用了自动安装，再检查：
 
 ```bash
