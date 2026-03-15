@@ -1,723 +1,321 @@
 """
-天财商龙餐饮管理系统API适配器
-提供订单管理、菜品管理、会员管理、库存管理等功能
+天财商龙（吾享）餐饮开放 API 适配器
+
+Base URL:   https://cysms.wuuxiang.com
+文档来源:   http://doc.wuuxiang.com/showdoc/web/#/46
+鉴权方式:   OAuth2 Token 换取（二步流程）
+  Step 1: POST /api/auth/accesstoken  →  获取 access_token（expires_in 秒）
+  Step 2: 后续请求 Header 带 access_token + accessid + granttype:client
+
+核心接口:
+  账单明细(分页): POST /api/datatransfer/getserialdata
+  授权令牌获取:   POST /api/auth/accesstoken
+
+环境变量（优先级低于 config 字典）:
+  TIANCAI_BASE_URL   默认 https://cysms.wuuxiang.com
+  TIANCAI_APPID      Terminal ID
+  TIANCAI_ACCESSID   Terminal authorization ID
+  TIANCAI_CENTER_ID  集团 centerId
+  TIANCAI_SHOP_ID    门店 shopId
 """
+import asyncio
+import os
+import time
+from datetime import datetime, timezone
 from decimal import Decimal
-from datetime import datetime
-from typing import Dict, Any, Optional, List
-import structlog
+from typing import Any, Dict, List, Optional
+
 import httpx
-import hashlib
-import json
+import structlog
 
 logger = structlog.get_logger()
 
+_AUTH_PATH = "/api/auth/accesstoken"
+_SERIAL_PATH = "/api/datatransfer/getserialdata"
+_MAX_PAGE_SIZE = 500
+
 
 class TiancaiShanglongAdapter:
-    """天财商龙餐饮管理系统适配器"""
+    """
+    天财商龙餐饮开放 API 适配器。
 
-    def __init__(self, config: Dict[str, Any]):
-        """
-        初始化适配器
+    Config 参数:
+        base_url   : API 根地址（默认 https://cysms.wuuxiang.com）
+        appid      : Terminal ID（用于获取 token）
+        accessid   : Terminal authorization ID（用于获取 token + 请求 Header）
+        center_id  : 集团 ID（接口参数 centerId）
+        shop_id    : 门店 ID（接口参数 shopId）
+        timeout    : HTTP 超时秒数（默认 30）
+        retry_times: 重试次数（默认 3）
+    """
 
-        Args:
-            config: 配置字典，包含:
-                - base_url: API基础URL
-                - app_id: 应用ID
-                - app_secret: 应用密钥
-                - store_id: 门店ID
-                - timeout: 超时时间（秒）
-                - retry_times: 重试次数
-        """
-        self.config = config
-        self.base_url = config.get("base_url", "https://api.tiancai.com")
-        self.app_id = config.get("app_id")
-        self.app_secret = config.get("app_secret")
-        self.store_id = config.get("store_id")
-        self.timeout = config.get("timeout", 30)
-        self.retry_times = config.get("retry_times", 3)
+    def __init__(self, config: Dict[str, Any]) -> None:
+        self.base_url = config.get(
+            "base_url", os.getenv("TIANCAI_BASE_URL", "https://cysms.wuuxiang.com")
+        ).rstrip("/")
+        self.appid = config.get("appid", os.getenv("TIANCAI_APPID", ""))
+        self.accessid = config.get("accessid", os.getenv("TIANCAI_ACCESSID", ""))
+        self.center_id = config.get("center_id", os.getenv("TIANCAI_CENTER_ID", ""))
+        self.shop_id = config.get("shop_id", os.getenv("TIANCAI_SHOP_ID", ""))
+        self.timeout = config.get("timeout", int(os.getenv("TIANCAI_TIMEOUT", "30")))
+        self.retry_times = config.get(
+            "retry_times", int(os.getenv("TIANCAI_RETRY_TIMES", "3"))
+        )
 
-        if not self.app_id or not self.app_secret:
-            raise ValueError("app_id和app_secret不能为空")
+        if not self.appid or not self.accessid:
+            logger.warning("天财商龙 appid/accessid 未配置，将使用降级模式")
 
-        # 初始化HTTP客户端
-        self.client = httpx.AsyncClient(
+        # Token 缓存（延迟初始化）
+        self._access_token: str = ""
+        self._token_expires_at: float = 0.0  # unix timestamp
+
+        self._client = httpx.AsyncClient(
             base_url=self.base_url,
             timeout=self.timeout,
             follow_redirects=True,
         )
+        logger.info("天财商龙适配器初始化", base_url=self.base_url, shop_id=self.shop_id)
 
-        logger.info("天财商龙适配器初始化", base_url=self.base_url, store_id=self.store_id)
+    # ── Token 管理 ────────────────────────────────────────────────────────────
 
-    def _generate_sign(self, params: Dict[str, Any], timestamp: str) -> str:
+    async def _fetch_token(self) -> None:
         """
-        生成API签名
+        POST /api/auth/accesstoken 获取新 token 并缓存。
 
-        Args:
-            params: 请求参数
-            timestamp: 时间戳
-
-        Returns:
-            签名字符串
+        官方注意事项：
+          - token 有效期由 expires_in（秒）决定，提前 60s 主动刷新
+          - 重新获取会使旧 token 失效，高并发场景应避免并发获取
         """
-        # 按key排序
-        sorted_params = sorted(params.items())
-        # 拼接字符串
-        sign_str = f"app_id={self.app_id}&"
-        sign_str += "&".join([f"{k}={v}" for k, v in sorted_params])
-        sign_str += f"&timestamp={timestamp}&app_secret={self.app_secret}"
-        # MD5加密
-        return hashlib.md5(sign_str.encode()).hexdigest().upper()
+        resp = await self._client.post(
+            _AUTH_PATH,
+            json={
+                "appid": self.appid,
+                "accessid": self.accessid,
+                "response_type": "token",
+            },
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        if str(data.get("code", "-1")) != "0":
+            raise Exception(f"天财商龙获取token失败: {data.get('msg', '未知错误')}")
 
-    def authenticate(self) -> Dict[str, str]:
-        """
-        认证方法，返回认证头部
+        self._access_token = data["access_token"]
+        expires_in = int(data.get("expires_in", 1200))
+        self._token_expires_at = time.time() + expires_in - 60  # 提前60s刷新
+        logger.info("天财商龙 token 已刷新", expires_in=expires_in)
 
-        Returns:
-            认证头部字典
-        """
-        timestamp = str(int(datetime.now().timestamp()))
+    async def _ensure_token(self) -> str:
+        """返回有效 token，必要时自动刷新。"""
+        if not self._access_token or time.time() >= self._token_expires_at:
+            await self._fetch_token()
+        return self._access_token
+
+    def _api_headers(self, token: str) -> Dict[str, str]:
+        """构建 API 请求通用 Header。"""
         return {
             "Content-Type": "application/json",
-            "X-App-Id": self.app_id,
-            "X-Timestamp": timestamp,
+            "access_token": token,
+            "accessid": self.accessid,
+            "granttype": "client",
         }
+
+    # ── 核心请求方法 ─────────────────────────────────────────────────────────
 
     async def _request(
         self,
-        method: str,
-        endpoint: str,
-        data: Optional[Dict[str, Any]] = None,
+        path: str,
+        params: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
-        发送HTTP请求
-
-        Args:
-            method: HTTP方法 (GET/POST)
-            endpoint: API端点
-            data: 请求数据
-
-        Returns:
-            API响应数据
-
-        Raises:
-            Exception: 请求失败
+        POST 请求（含指数退避重试）。
+        天财商龙响应格式: {"code": "0", "msg": "success", "data": {...}}
         """
+        last_exc: Optional[Exception] = None
+
         for attempt in range(self.retry_times):
+            if attempt > 0:
+                await asyncio.sleep(0.5 * (2 ** (attempt - 1)))
+
             try:
-                timestamp = str(int(datetime.now().timestamp()))
-                request_data = data or {}
-
-                # 生成签名
-                sign = self._generate_sign(request_data, timestamp)
-
-                headers = self.authenticate()
-                headers["X-Sign"] = sign
-
-                if method.upper() == "GET":
-                    response = await self.client.get(endpoint, params=request_data, headers=headers)
-                elif method.upper() == "POST":
-                    response = await self.client.post(endpoint, json=request_data, headers=headers)
-                else:
-                    raise ValueError(f"不支持的HTTP方法: {method}")
-
-                response.raise_for_status()
-                result = response.json()
-                self.handle_error(result)
-                return result
-
-            except httpx.HTTPStatusError as e:
-                logger.error(
-                    "HTTP请求失败",
-                    endpoint=endpoint,
-                    status_code=e.response.status_code,
-                    attempt=attempt + 1,
+                token = await self._ensure_token()
+                resp = await self._client.post(
+                    path,
+                    json=params or {},
+                    headers=self._api_headers(token),
                 )
-                if attempt == self.retry_times - 1:
-                    raise Exception(f"HTTP请求失败: {e.response.status_code}")
+                resp.raise_for_status()
+                result = resp.json()
+
+                if str(result.get("code", "-1")) != "0":
+                    msg = result.get("msg", "未知错误")
+                    raise Exception(f"天财商龙业务错误: {msg}")
+
+                return result.get("data", result)
 
             except Exception as e:
-                logger.error(
-                    "请求异常",
-                    endpoint=endpoint,
-                    error=str(e),
-                    attempt=attempt + 1,
-                )
-                if attempt == self.retry_times - 1:
+                if "天财商龙业务错误" in str(e):
                     raise
+                last_exc = e
+                logger.warning(
+                    "天财商龙请求失败，准备重试",
+                    path=path,
+                    attempt=attempt + 1,
+                    error=str(e),
+                )
 
-        raise Exception("请求失败，已达到最大重试次数")
+        raise Exception(f"天财商龙请求失败，已重试 {self.retry_times} 次: {last_exc}")
 
-    def handle_error(self, response: Dict[str, Any]) -> None:
-        """
-        处理业务错误
+    # ── 账单明细接口 ─────────────────────────────────────────────────────────
 
-        Args:
-            response: API响应数据
-
-        Raises:
-            Exception: 业务错误
-        """
-        code = response.get("code", 0)
-        if code != 0 and code != 200:
-            message = response.get("message", "未知错误")
-            raise Exception(f"天财商龙API错误 [{code}]: {message}")
-
-    # ==================== 订单管理接口 ====================
-
-    async def query_order(
+    async def get_serial_data(
         self,
-        order_id: Optional[str] = None,
-        order_no: Optional[str] = None,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """
-        查询订单
-
-        Args:
-            order_id: 订单ID
-            order_no: 订单号
-            start_time: 开始时间 (YYYY-MM-DD HH:mm:ss)
-            end_time: 结束时间 (YYYY-MM-DD HH:mm:ss)
-
-        Returns:
-            订单信息
-        """
-        data = {"store_id": self.store_id}
-        if order_id:
-            data["order_id"] = order_id
-        if order_no:
-            data["order_no"] = order_no
-        if start_time:
-            data["start_time"] = start_time
-        if end_time:
-            data["end_time"] = end_time
-
-        logger.info("查询订单", data=data)
-
-        response = await self._request("POST", "/api/order/query", data=data)
-        return response.get("data", {})
-
-    async def create_order(
-        self,
-        table_no: str,
-        dishes: List[Dict[str, Any]],
-        member_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """
-        创建订单
-
-        Args:
-            table_no: 桌号
-            dishes: 菜品列表 [{"dish_id": "D001", "quantity": 2, "price": 4800}]
-            member_id: 会员ID
-
-        Returns:
-            订单信息
-        """
-        data = {
-            "store_id": self.store_id,
-            "table_no": table_no,
-            "dishes": dishes,
-        }
-        if member_id:
-            data["member_id"] = member_id
-
-        logger.info("创建订单", table_no=table_no, dishes_count=len(dishes))
-
-        response = await self._request("POST", "/api/order/create", data=data)
-        return response.get("data", {})
-
-    async def update_order_status(
-        self,
-        order_id: str,
-        status: int,
-        pay_type: Optional[int] = None,
-        pay_amount: Optional[int] = None,
-    ) -> Dict[str, Any]:
-        """
-        更新订单状态
-
-        Args:
-            order_id: 订单ID
-            status: 订单状态 (1-待支付 2-已支付 3-已取消)
-            pay_type: 支付方式 (1-现金 2-微信 3-支付宝 4-会员卡)
-            pay_amount: 支付金额（分）
-
-        Returns:
-            更新结果
-        """
-        data = {
-            "store_id": self.store_id,
-            "order_id": order_id,
-            "status": status,
-        }
-        if pay_type:
-            data["pay_type"] = pay_type
-        if pay_amount:
-            data["pay_amount"] = pay_amount
-
-        logger.info("更新订单状态", order_id=order_id, status=status)
-
-        response = await self._request("POST", "/api/order/update_status", data=data)
-        return response.get("data", {})
-
-    # ==================== 菜品管理接口 ====================
-
-    async def query_dish(
-        self,
-        dish_id: Optional[str] = None,
-        category_id: Optional[str] = None,
-        keyword: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
-        """
-        查询菜品
-
-        Args:
-            dish_id: 菜品ID
-            category_id: 分类ID
-            keyword: 关键词
-
-        Returns:
-            菜品列表
-        """
-        data = {"store_id": self.store_id}
-        if dish_id:
-            data["dish_id"] = dish_id
-        if category_id:
-            data["category_id"] = category_id
-        if keyword:
-            data["keyword"] = keyword
-
-        logger.info("查询菜品", data=data)
-
-        response = await self._request("POST", "/api/dish/query", data=data)
-        return response.get("data", [])
-
-    async def update_dish_status(
-        self,
-        dish_id: str,
-        status: int,
-    ) -> Dict[str, Any]:
-        """
-        更新菜品状态
-
-        Args:
-            dish_id: 菜品ID
-            status: 状态 (1-在售 0-停售)
-
-        Returns:
-            更新结果
-        """
-        data = {
-            "store_id": self.store_id,
-            "dish_id": dish_id,
-            "status": status,
-        }
-
-        logger.info("更新菜品状态", dish_id=dish_id, status=status)
-
-        response = await self._request("POST", "/api/dish/update_status", data=data)
-        return response.get("data", {})
-
-    # ==================== 会员管理接口 ====================
-
-    async def query_member(
-        self,
-        member_id: Optional[str] = None,
-        mobile: Optional[str] = None,
-        card_no: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """
-        查询会员
-
-        Args:
-            member_id: 会员ID
-            mobile: 手机号
-            card_no: 会员卡号
-
-        Returns:
-            会员信息
-        """
-        if not any([member_id, mobile, card_no]):
-            raise ValueError("至少需要提供一个查询条件")
-
-        data = {"store_id": self.store_id}
-        if member_id:
-            data["member_id"] = member_id
-        if mobile:
-            data["mobile"] = mobile
-        if card_no:
-            data["card_no"] = card_no
-
-        logger.info("查询会员", data=data)
-
-        response = await self._request("POST", "/api/member/query", data=data)
-        return response.get("data", {})
-
-    async def add_member(
-        self,
-        mobile: str,
-        name: str,
-        card_no: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """
-        新增会员
-
-        Args:
-            mobile: 手机号
-            name: 姓名
-            card_no: 会员卡号
-
-        Returns:
-            会员信息
-        """
-        data = {
-            "store_id": self.store_id,
-            "mobile": mobile,
-            "name": name,
-        }
-        if card_no:
-            data["card_no"] = card_no
-
-        logger.info("新增会员", mobile=mobile, name=name)
-
-        response = await self._request("POST", "/api/member/add", data=data)
-        return response.get("data", {})
-
-    async def member_recharge(
-        self,
-        member_id: str,
-        amount: int,
-        pay_type: int,
-    ) -> Dict[str, Any]:
-        """
-        会员充值
-
-        Args:
-            member_id: 会员ID
-            amount: 充值金额（分）
-            pay_type: 支付方式
-
-        Returns:
-            充值结果
-        """
-        data = {
-            "store_id": self.store_id,
-            "member_id": member_id,
-            "amount": amount,
-            "pay_type": pay_type,
-        }
-
-        logger.info("会员充值", member_id=member_id, amount=amount)
-
-        response = await self._request("POST", "/api/member/recharge", data=data)
-        return response.get("data", {})
-
-    # ==================== 库存管理接口 ====================
-
-    async def query_inventory(
-        self,
-        material_id: Optional[str] = None,
-        keyword: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
-        """
-        查询库存
-
-        Args:
-            material_id: 原料ID
-            keyword: 关键词
-
-        Returns:
-            库存列表
-        """
-        data = {"store_id": self.store_id}
-        if material_id:
-            data["material_id"] = material_id
-        if keyword:
-            data["keyword"] = keyword
-
-        logger.info("查询库存", data=data)
-
-        response = await self._request("POST", "/api/inventory/query", data=data)
-        return response.get("data", [])
-
-    async def update_inventory(
-        self,
-        material_id: str,
-        quantity: float,
-        operation_type: int,
-    ) -> Dict[str, Any]:
-        """
-        更新库存
-
-        Args:
-            material_id: 原料ID
-            quantity: 数量
-            operation_type: 操作类型 (1-入库 2-出库 3-盘点)
-
-        Returns:
-            更新结果
-        """
-        data = {
-            "store_id": self.store_id,
-            "material_id": material_id,
-            "quantity": quantity,
-            "operation_type": operation_type,
-        }
-
-        logger.info("更新库存", material_id=material_id, quantity=quantity)
-
-        response = await self._request("POST", "/api/inventory/update", data=data)
-        return response.get("data", {})
-
-    async def close(self):
-        """关闭适配器，释放资源"""
-        logger.info("关闭天财商龙适配器")
-        await self.client.aclose()
-
-    # ==================== 4个核心拉取接口（分页） ====================
-
-    async def fetch_store_info(self) -> Dict[str, Any]:
-        """
-        拉取门店基础信息（名称、地址、营业时间等）。
-
-        Returns:
-            标准化门店 dict：
-              pos_store_id, name, address, phone, open_time, close_time, is_active
-        """
-        response = await self._request("POST", "/api/store/info", data={"store_id": self.store_id})
-        raw = response.get("data", {})
-        return self._normalize_store(raw)
-
-    async def fetch_dishes(
-        self,
-        page: int = 1,
+        page_no: int = 1,
         page_size: int = 100,
-        category_id: Optional[str] = None,
+        settle_date: Optional[str] = None,
+        begin_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        date_type: Optional[int] = None,
+        is_need_member: int = 1,
+        order_type: Optional[str] = None,
+        need_pkg_detail: int = 0,
     ) -> Dict[str, Any]:
         """
-        分页拉取菜品列表。
+        账单明细查询（分页）。
+        settle_date 与 begin_date/end_date 二选一。
+
+        Args:
+            page_no:         页码（从1开始）
+            page_size:       每页条数（最大 500）
+            settle_date:     营业日期 yyyy-MM-dd（按营业日查询）
+            begin_date:      开始时间 yyyy-MM-dd HH:mm:ss（按时间范围）
+            end_date:        结束时间 yyyy-MM-dd HH:mm:ss
+            date_type:       时间过滤类型 1-5
+            is_need_member:  是否返回会员信息 1=是（默认）
+            order_type:      订单类型过滤 0-7
+            need_pkg_detail: 是否返回套餐明细 0=否（默认）
 
         Returns:
-            {
-                "items":      list of normalized dish dicts,
-                "page":       int,
-                "page_size":  int,
-                "total":      int,   # 总记录数（API 返回）
-                "has_more":   bool,
-            }
+            {"billList": [...], "pageInfo": {...}}
         """
-        data: Dict[str, Any] = {
-            "store_id": self.store_id,
-            "page":     page,
-            "page_size": page_size,
-        }
-        if category_id:
-            data["category_id"] = category_id
+        if not settle_date and not (begin_date and end_date):
+            raise ValueError("settle_date 或 begin_date/end_date 必须填写一个")
+        if not (1 <= page_size <= _MAX_PAGE_SIZE):
+            raise ValueError(f"page_size 必须在 1~{_MAX_PAGE_SIZE}，实际: {page_size}")
 
-        response = await self._request("POST", "/api/dish/list", data=data)
-        raw_data = response.get("data", {})
-        raw_items = raw_data.get("list", raw_data.get("items", []))
-        total = int(raw_data.get("total", len(raw_items)))
-
-        return {
-            "items":     [self.to_dish(item) for item in raw_items],
-            "page":      page,
-            "page_size": page_size,
-            "total":     total,
-            "has_more":  page * page_size < total,
+        body: Dict[str, Any] = {
+            "centerId": self.center_id,
+            "shopId": self.shop_id,
+            "pageNo": page_no,
+            "pageSize": page_size,
+            "isNeedMember": is_need_member,
+            "needPkgDetail": need_pkg_detail,
         }
+        if settle_date:
+            body["settleDate"] = settle_date
+        if begin_date:
+            body["beginDate"] = begin_date
+        if end_date:
+            body["endDate"] = end_date
+        if date_type is not None:
+            body["dateType"] = date_type
+        if order_type is not None:
+            body["orderType"] = order_type
+
+        logger.info("查询账单明细", settle_date=settle_date, page_no=page_no)
+        return await self._request(_SERIAL_PATH, body)
 
     async def fetch_orders_by_date(
         self,
         date_str: str,
         page: int = 1,
         page_size: int = 100,
-        status: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
-        分页拉取指定日期的订单列表。
-
-        Args:
-            date_str:  目标日期，格式 YYYY-MM-DD
-            page:      页码（从1开始）
-            page_size: 每页条数
-            status:    订单状态过滤（None=全部，2=已支付）
+        按营业日期分页拉取账单（统一分页格式，供 pull_daily_orders 使用）。
 
         Returns:
-            {
-                "items":     list of raw order dicts（未映射，供 to_order() 使用）,
-                "page":      int,
-                "page_size": int,
-                "total":     int,
-                "has_more":  bool,
-            }
+            {"items": [...raw bill dicts], "page": int, "page_size": int,
+             "total": int, "has_more": bool}
         """
-        data: Dict[str, Any] = {
-            "store_id":   self.store_id,
-            "start_time": f"{date_str} 00:00:00",
-            "end_time":   f"{date_str} 23:59:59",
-            "page":       page,
-            "page_size":  page_size,
-        }
-        if status is not None:
-            data["status"] = status
-
-        response = await self._request("POST", "/api/order/list", data=data)
-        raw_data = response.get("data", {})
-        raw_items = raw_data.get("list", raw_data.get("orders", []))
-        total = int(raw_data.get("total", len(raw_items)))
+        raw = await self.get_serial_data(
+            page_no=page,
+            page_size=page_size,
+            settle_date=date_str,
+            is_need_member=1,
+        )
+        bill_list = raw.get("billList", [])
+        page_info = raw.get("pageInfo", {})
+        total = int(page_info.get("total", len(bill_list)))
 
         return {
-            "items":     raw_items,
-            "page":      page,
+            "items": bill_list,
+            "page": page,
             "page_size": page_size,
-            "total":     total,
-            "has_more":  page * page_size < total,
+            "total": total,
+            "has_more": page * page_size < total,
         }
 
-    async def fetch_inventory(
-        self,
-        page: int = 1,
-        page_size: int = 200,
-        category: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """
-        分页拉取库存/原料列表。
-
-        Returns:
-            {
-                "items":     list of normalized inventory dicts,
-                "page":      int,
-                "page_size": int,
-                "total":     int,
-                "has_more":  bool,
-            }
-        """
-        data: Dict[str, Any] = {
-            "store_id":  self.store_id,
-            "page":      page,
-            "page_size": page_size,
-        }
-        if category:
-            data["category"] = category
-
-        response = await self._request("POST", "/api/inventory/list", data=data)
-        raw_data = response.get("data", {})
-        raw_items = raw_data.get("list", raw_data.get("materials", []))
-        total = int(raw_data.get("total", len(raw_items)))
-
-        return {
-            "items":     [self.to_inventory_item(item) for item in raw_items],
-            "page":      page,
-            "page_size": page_size,
-            "total":     total,
-            "has_more":  page * page_size < total,
-        }
-
-    # ==================== 高层日度全量拉取（自动分页） ====================
+    # ── 高层全量拉取（自动分页） ──────────────────────────────────────────────
 
     async def pull_daily_orders(
         self,
         date_str: str,
         brand_id: str,
-        status: int = 2,
         max_pages: int = 50,
     ) -> List[Any]:
         """
-        拉取指定日期的全量已支付订单，自动处理分页，返回 OrderSchema 列表。
+        拉取指定营业日的全量账单，自动翻页，返回 OrderSchema 列表。
 
         Args:
-            date_str:  目标日期 YYYY-MM-DD
-            brand_id:  品牌ID（传入 to_order() 映射器）
-            status:    订单状态（默认2=已支付）
-            max_pages: 最大拉取页数（防止无限循环，默认50页=5000条）
-
-        Returns:
-            List[OrderSchema]
+            date_str:  营业日期 YYYY-MM-DD
+            brand_id:  品牌 ID（传入 to_order()）
+            max_pages: 最大页数防护（默认 50 × 100 = 5000 条）
         """
         all_orders = []
         page = 1
 
         while page <= max_pages:
-            result = await self.fetch_orders_by_date(
-                date_str=date_str,
-                page=page,
-                page_size=100,
-                status=status,
-            )
-            raw_items = result["items"]
-            for raw in raw_items:
+            result = await self.fetch_orders_by_date(date_str, page=page)
+            for raw in result["items"]:
                 try:
-                    order = self.to_order(raw, self.store_id, brand_id)
-                    all_orders.append(order)
+                    all_orders.append(self.to_order(raw, self.shop_id, brand_id))
                 except Exception as exc:
                     logger.warning(
                         "tiancai_order_map_failed",
-                        order_id=raw.get("order_id"),
+                        bs_id=raw.get("bs_id"),
                         error=str(exc),
                     )
-
             if not result["has_more"]:
                 break
             page += 1
 
         logger.info(
-            "tiancai_pull_daily_orders_done",
+            "tiancai_pull_daily_done",
             date=date_str,
-            total_orders=len(all_orders),
-            pages_fetched=page,
+            total=len(all_orders),
+            pages=page,
         )
         return all_orders
 
-    async def pull_all_dishes(self, max_pages: int = 20) -> List[Dict[str, Any]]:
-        """
-        拉取全量菜品列表（自动分页）。
-
-        Returns:
-            List of normalized dish dicts
-        """
-        all_dishes: List[Dict[str, Any]] = []
-        page = 1
-        while page <= max_pages:
-            result = await self.fetch_dishes(page=page, page_size=100)
-            all_dishes.extend(result["items"])
-            if not result["has_more"]:
-                break
-            page += 1
-        logger.info("tiancai_pull_all_dishes_done", total=len(all_dishes))
-        return all_dishes
-
-    async def pull_all_inventory(self, max_pages: int = 20) -> List[Dict[str, Any]]:
-        """
-        拉取全量库存原料（自动分页）。
-
-        Returns:
-            List of normalized inventory item dicts
-        """
-        all_items: List[Dict[str, Any]] = []
-        page = 1
-        while page <= max_pages:
-            result = await self.fetch_inventory(page=page, page_size=200)
-            all_items.extend(result["items"])
-            if not result["has_more"]:
-                break
-            page += 1
-        logger.info("tiancai_pull_all_inventory_done", total=len(all_items))
-        return all_items
-
-    # ==================== 标准化数据总线接口 ====================
+    # ── 标准数据总线：字段映射 ────────────────────────────────────────────────
 
     def to_order(self, raw: Dict[str, Any], store_id: str, brand_id: str):
         """
-        将天财商龙原始订单字段映射到标准 OrderSchema
+        将天财商龙 getserialdata billList 单条记录映射到标准 OrderSchema。
 
-        天财商龙订单字段参考：
-          order_id, order_no, store_id, table_no, status, pay_amount,
-          dishes (dish_id, dish_name, quantity, price),
-          member_id, create_time, remark
+        关键字段对应（来源：官方文档 #/46 page_id=460）：
+          bs_id          → order_id
+          bs_code        → order_number
+          settle_time    → created_at（结账时间）
+          open_time      → 开台时间
+          point_code     → table_number（桌位编号）
+          last_total     → total（实收，分）
+          disc_total     → discount（折扣，分）
+          orig_total     → subtotal（折前合计，分）
+          state          → order_status (0=未结, 1=已结, 其他=特殊)
+          member_card_no → customer_id
+          waiter_code    → waiter_id
+          item[]         → items（品项明细）
         """
         import sys
         import os as _os
@@ -728,71 +326,72 @@ class TiancaiShanglongAdapter:
             sys.path.insert(0, _gateway_src)
 
         from schemas.restaurant_standard_schema import (
-            OrderSchema, OrderStatus, OrderType, OrderItemSchema, DishCategory
+            OrderSchema, OrderStatus, OrderType, OrderItemSchema, DishCategory,
         )
 
-        # 状态映射（天财商龙：1=待支付, 2=已支付, 3=已取消）
-        _STATUS_MAP = {
-            1: OrderStatus.PENDING,
-            2: OrderStatus.COMPLETED,
-            3: OrderStatus.CANCELLED,
-        }
-        order_status = _STATUS_MAP.get(int(raw.get("status", 1)), OrderStatus.PENDING)
+        # state: 0=未结 1=已结 其他=特殊（押金/存酒等）
+        state = int(raw.get("state", 0))
+        if state == 1:
+            order_status = OrderStatus.COMPLETED
+        elif state == 0:
+            order_status = OrderStatus.PENDING
+        else:
+            order_status = OrderStatus.COMPLETED  # 特殊态按已完成处理
 
-        # 订单项映射
+        # 品项明细映射
         items = []
-        for idx, item in enumerate(raw.get("dishes", raw.get("items", [])), start=1):
-            unit_price = Decimal(str(item.get("price", 0))) / 100  # 分 → 元
-            qty = int(item.get("quantity", item.get("qty", 1)))
+        for idx, item in enumerate(raw.get("item", []), start=1):
+            # orig_price / last_price 均以分为单位
+            unit_price_fen = int(item.get("last_price", item.get("orig_price", 0)))
+            unit_price = Decimal(unit_price_fen) / 100
+            qty = Decimal(str(item.get("last_qty", item.get("orig_qty", 1))))
+            subtotal = Decimal(str(item.get("last_total", 0))) / 100
+
             items.append(OrderItemSchema(
-                item_id=str(item.get("item_id", f"{raw.get('order_id', '')}_{idx}")),
-                dish_id=str(item.get("dish_id", item.get("good_id", ""))),
-                dish_name=str(item.get("dish_name", item.get("good_name", ""))),
+                item_id=str(item.get("item_id", f"{raw.get('bs_id', '')}_{idx}")),
+                dish_id=str(item.get("item_code", item.get("item_id", ""))),
+                dish_name=str(item.get("item_name", item.get("temp_item_name", ""))),
                 dish_category=DishCategory.MAIN_COURSE,
-                quantity=qty,
+                quantity=int(qty),
                 unit_price=unit_price,
-                subtotal=unit_price * qty,
-                special_requirements=item.get("remark"),
+                subtotal=subtotal,
+                special_requirements=None,
             ))
 
-        total = Decimal(str(raw.get("pay_amount", raw.get("total_amount", 0)))) / 100
-        discount = Decimal(str(raw.get("discount_amount", 0))) / 100
-        subtotal = total + discount
+        total = Decimal(str(raw.get("last_total", 0))) / 100
+        discount = Decimal(str(raw.get("disc_total", 0))) / 100
+        subtotal = Decimal(str(raw.get("orig_total", 0))) / 100
 
-        create_time_raw = raw.get("create_time", raw.get("order_time", ""))
+        # 时间解析：优先 settle_time，退化到 open_time
+        time_raw = raw.get("settle_time") or raw.get("open_time", "")
         try:
-            if isinstance(create_time_raw, (int, float)) and create_time_raw > 1e9:
-                created_at = datetime.fromtimestamp(create_time_raw)
-            else:
-                created_at = datetime.fromisoformat(str(create_time_raw).replace("T", " "))
-        except (ValueError, TypeError, OSError):
-            created_at = datetime.utcnow()
+            created_at = datetime.fromisoformat(str(time_raw).replace("T", " "))
+        except (ValueError, TypeError):
+            created_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
         return OrderSchema(
-            order_id=str(raw.get("order_id", "")),
-            order_number=str(raw.get("order_no", raw.get("order_id", ""))),
+            order_id=str(raw.get("bs_id", "")),
+            order_number=str(raw.get("bs_code", raw.get("bs_id", ""))),
             order_type=OrderType.DINE_IN,
             order_status=order_status,
             store_id=store_id,
             brand_id=brand_id,
-            table_number=raw.get("table_no"),
-            customer_id=raw.get("member_id"),
+            table_number=raw.get("point_code") or raw.get("point_name"),
+            customer_id=raw.get("member_card_no") or raw.get("member_id"),
             items=items,
             subtotal=subtotal,
             discount=discount,
-            service_charge=Decimal("0"),
+            service_charge=Decimal(str(raw.get("service_fee_income_money", 0))) / 100,
             total=total,
             created_at=created_at,
-            waiter_id=raw.get("waiter_id", raw.get("operator_id")),
-            notes=raw.get("remark"),
+            waiter_id=raw.get("waiter_code") or raw.get("waiter_name"),
+            notes=None,
         )
 
     def to_staff_action(self, raw: Dict[str, Any], store_id: str, brand_id: str):
         """
-        将天财商龙原始操作数据映射为标准 StaffAction
-
-        原始字段参考（POS 操作日志）：
-          action_type, operator_id, amount, reason, approved_by, create_time
+        将天财商龙操作记录映射为标准 StaffAction（付款修正、折扣操作等）。
+        对应接口：付款修正记录 [page_id=27276]
         """
         import sys
         import os as _os
@@ -804,96 +403,30 @@ class TiancaiShanglongAdapter:
 
         from schemas.restaurant_standard_schema import StaffAction
 
-        action_time_raw = raw.get("action_time", raw.get("create_time", ""))
+        time_raw = raw.get("action_time", raw.get("settle_time", raw.get("create_time", "")))
         try:
-            if isinstance(action_time_raw, (int, float)) and action_time_raw > 1e9:
-                created_at = datetime.fromtimestamp(action_time_raw)
-            else:
-                created_at = datetime.fromisoformat(str(action_time_raw).replace("T", " "))
-        except (ValueError, TypeError, OSError):
-            created_at = datetime.utcnow()
+            created_at = datetime.fromisoformat(str(time_raw).replace("T", " "))
+        except (ValueError, TypeError):
+            created_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
-        amount_raw = raw.get("amount", raw.get("pay_amount"))
+        amount_raw = raw.get("amount", raw.get("pay_money", raw.get("last_total")))
         amount = Decimal(str(amount_raw)) / 100 if amount_raw is not None else None
 
         return StaffAction(
             action_type=str(raw.get("action_type", raw.get("type", "unknown"))),
             brand_id=brand_id,
             store_id=store_id,
-            operator_id=str(raw.get("operator_id", raw.get("staff_id", ""))),
+            operator_id=str(raw.get("operator_id", raw.get("waiter_code", ""))),
             amount=amount,
             reason=raw.get("reason"),
             approved_by=raw.get("approved_by"),
             created_at=created_at,
         )
 
-    def _normalize_store(self, raw: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        将天财商龙门店原始字段标准化。
+    # ── 生命周期 ─────────────────────────────────────────────────────────────
 
-        天财商龙门店字段参考：
-          store_id, store_name, address, phone, open_time, close_time, status
-        """
-        return {
-            "pos_store_id": str(raw.get("store_id", self.store_id)),
-            "name":         str(raw.get("store_name", raw.get("name", ""))),
-            "address":      raw.get("address", ""),
-            "phone":        raw.get("phone", raw.get("tel", "")),
-            "open_time":    raw.get("open_time", ""),
-            "close_time":   raw.get("close_time", ""),
-            "is_active":    int(raw.get("status", 1)) == 1,
-        }
+    async def aclose(self) -> None:
+        await self._client.aclose()
 
-    def to_dish(self, raw: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        将天财商龙原始菜品字段标准化。
-
-        天财商龙菜品字段参考：
-          dish_id, dish_name, category_id, category_name, price (分),
-          status (1=在售 0=停售), unit
-        """
-        price_raw = raw.get("price", raw.get("sale_price", 0))
-        price_yuan = round(int(price_raw) / 100, 2) if price_raw else 0.0
-
-        cost_raw = raw.get("cost", raw.get("cost_price", 0))
-        cost_fen = int(cost_raw) if cost_raw else 0
-
-        return {
-            "pos_dish_id":   str(raw.get("dish_id", raw.get("good_id", ""))),
-            "name":          str(raw.get("dish_name", raw.get("good_name", ""))),
-            "category":      str(raw.get("category_name", raw.get("category_id", ""))),
-            "price_yuan":    price_yuan,
-            "cost_fen":      cost_fen,
-            "cost_yuan":     round(cost_fen / 100, 2),
-            "unit":          raw.get("unit", "份"),
-            "is_available":  int(raw.get("status", 1)) == 1,
-        }
-
-    def to_inventory_item(self, raw: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        将天财商龙原始库存原料字段标准化。
-
-        天财商龙原料字段参考：
-          material_id, material_name, category, unit,
-          current_qty, min_qty, unit_cost (分 或 元), supplier_name
-        """
-        # unit_cost：天财商龙可能以分或元返回，根据量级判断
-        unit_cost_raw = raw.get("unit_cost", raw.get("price", 0))
-        unit_cost_val = float(unit_cost_raw) if unit_cost_raw else 0.0
-        # 如果数值小于 1000 且有小数，推断为元；否则推断为分
-        if unit_cost_val > 0 and unit_cost_val < 1000:
-            unit_cost_fen = int(unit_cost_val * 100)
-        else:
-            unit_cost_fen = int(unit_cost_val)
-
-        return {
-            "pos_material_id": str(raw.get("material_id", raw.get("id", ""))),
-            "name":            str(raw.get("material_name", raw.get("name", ""))),
-            "category":        str(raw.get("category", "")),
-            "unit":            raw.get("unit", "kg"),
-            "current_quantity": float(raw.get("current_qty", raw.get("qty", 0))),
-            "min_quantity":    float(raw.get("min_qty", raw.get("reorder_point", 0))),
-            "unit_cost_fen":   unit_cost_fen,
-            "unit_cost_yuan":  round(unit_cost_fen / 100, 2),
-            "supplier_name":   raw.get("supplier_name", raw.get("supplier", "")),
-        }
+    async def __aexit__(self, *args: Any) -> None:
+        await self.aclose()
