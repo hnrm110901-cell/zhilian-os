@@ -153,6 +153,20 @@ from .banquet import (
     BanquetAgentTypeEnum,
 )
 
+# Month 1 (P0) — 外部集成模型
+from .e_invoice import EInvoice, EInvoiceItem, InvoicePlatform, InvoiceType, InvoiceStatus
+from .payment_reconciliation import (
+    PaymentRecord, ReconciliationBatch, ReconciliationDiff,
+    PaymentChannel, MatchStatus,
+)
+# Month 2 (P0+P1)
+from .food_safety import FoodTraceRecord, FoodSafetyInspection
+from .health_certificate import HealthCertificate
+# Month 3 (P1+P2)
+from .supplier_b2b import B2BPurchaseOrder, B2BPurchaseItem
+from .dianping_review import DianpingReview
+from .bank_reconciliation import BankStatement, BankReconciliationBatch
+
 __all__ = [
     "Base",
     "User",
@@ -378,6 +392,12 @@ __all__ = [
     "PeopleAttendanceAlert",
     "PeopleStaffingDecision",
     "PeopleAgentLog",
+    # HR W1-2 — 敏感数据审计
+    "SensitiveDataAuditLog",
+    # HR W2-3 — 工资条推送记录
+    "PayslipRecord",
+    # HR — 操作审计日志
+    "OperationAuditLog",
 ]
 
 from .business_intel import (
@@ -403,7 +423,7 @@ from .fct_advanced import (
     FCTTaxDeclaration, FCTTaxExtractRule,
 )
 # Data Dictionary models — 数据字典补齐
-from .organization import Group, Brand, Region
+from .organization import Group, Brand, Region, Organization
 from .ingredient_master import IngredientMaster
 from .inventory_ext import InventoryBatch, InventoryCount
 from .purchase_order_item import PurchaseOrderItem
@@ -435,3 +455,37 @@ from .reservation_pre_order import ReservationPreOrder, PreOrderStatus
 # Sprint 1 — CDP 地基层
 from .consumer_identity import ConsumerIdentity
 from .consumer_id_mapping import ConsumerIdMapping, IdType
+# HR 模块 — 薪酬/假勤/审批/招聘/绩效/合同/生命周期
+from .payroll import (
+    SalaryStructure, PayrollRecord, TaxDeclaration,
+    PayrollStatus, SalaryType, TaxStatus,
+)
+from .approval_flow import (
+    ApprovalFlowTemplate, ApprovalInstance, ApprovalNodeRecord,
+    ApprovalType, ApprovalStatus as HRApprovalStatus, ApprovalNodeType,
+)
+from .leave import (
+    LeaveTypeConfig, LeaveBalance, LeaveRequest, OvertimeRequest,
+    LeaveCategory, LeaveRequestStatus, OvertimeType, OvertimeRequestStatus,
+)
+from .employee_lifecycle import EmployeeChange, ChangeType
+from .recruitment import (
+    JobPosting, Candidate, Interview, Offer,
+    JobStatus, CandidateStage, InterviewResult, OfferStatus,
+)
+from .performance_review import (
+    PerformanceTemplate, PerformanceReview,
+    ReviewCycle, ReviewStatus, ReviewLevel,
+)
+from .employee_contract import EmployeeContract, ContractType, ContractStatus
+# HR Phase 4 — 培训认证/师徒制
+from .training import TrainingCourse, TrainingEnrollment, TrainingExam, ExamAttempt
+from .mentorship import Mentorship
+# HR W1-2 — 敏感数据审计日志
+from .sensitive_audit_log import SensitiveDataAuditLog
+# HR W2-2 — 离职结算
+from .settlement import SettlementRecord, SettlementStatus, SeparationType, CompensationType
+# HR W2-3 — 工资条推送记录
+from .payslip import PayslipRecord
+# HR — 操作审计日志
+from .operation_audit_log import OperationAuditLog

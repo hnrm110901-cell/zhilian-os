@@ -1,0 +1,426 @@
+/* SupplierB2BPage.module.css — 供应商B2B采购单 */
+
+/* ── 页面容器 ─────────────────────────────────────────────────────────────── */
+.page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 28px;
+}
+
+/* ── 页头 ──────────────────────────────────────────────────────────────────── */
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 16px;
+}
+
+.pageTitle {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin: 0 0 4px;
+  letter-spacing: -0.3px;
+}
+
+.pageSubtitle {
+  font-size: 13px;
+  color: var(--text-tertiary, #9ca3af);
+  margin: 0;
+}
+
+.headerActions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ── 统计行 ────────────────────────────────────────────────────────────────── */
+.statsRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.statCard {
+  padding: 16px 20px !important;
+  text-align: center;
+}
+
+.statNum {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text-primary, #111827);
+  line-height: 1.1;
+  margin-bottom: 4px;
+  letter-spacing: -0.5px;
+}
+
+.statGreen  { color: #22c55e; }
+.statOrange { color: var(--accent, #FF6B2C); }
+.statRed    { color: #ef4444; }
+.statBlue   { color: #3b82f6; }
+
+.statLabel {
+  font-size: 12px;
+  color: var(--text-tertiary, #9ca3af);
+  font-weight: 500;
+}
+
+/* ── 筛选工具栏 ───────────────────────────────────────────────────────────── */
+.toolbar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.filterSelect {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-primary, #111827);
+  background: var(--surface, #fff);
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  min-width: 120px;
+}
+
+.filterSelect:focus {
+  border-color: var(--accent, #FF6B2C);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #FF6B2C) 12%, transparent);
+}
+
+.searchInput {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-primary, #111827);
+  background: var(--surface, #fff);
+  font-family: inherit;
+  outline: none;
+  min-width: 180px;
+}
+
+.searchInput:focus {
+  border-color: var(--accent, #FF6B2C);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #FF6B2C) 12%, transparent);
+}
+
+.toolbarSpacer {
+  flex: 1;
+}
+
+/* ── 表格卡片 ─────────────────────────────────────────────────────────────── */
+.tableCard {
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+/* ── 单元格 ───────────────────────────────────────────────────────────────── */
+.amountCell {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+  font-family: 'SF Mono', 'Fira Mono', monospace;
+}
+
+.timeCell {
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+  white-space: nowrap;
+}
+
+.orderNumber {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent, #FF6B2C);
+  cursor: pointer;
+}
+
+.orderNumber:hover {
+  text-decoration: underline;
+}
+
+.supplierCell {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+}
+
+/* ── 操作组 ───────────────────────────────────────────────────────────────── */
+.actionGroup {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+/* ── 状态流可视化 ─────────────────────────────────────────────────────────── */
+.statusFlow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.statusStep {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-tertiary, #9ca3af);
+}
+
+.statusStepActive {
+  composes: statusStep;
+  color: var(--accent, #FF6B2C);
+  font-weight: 700;
+}
+
+.statusStepDone {
+  composes: statusStep;
+  color: #22c55e;
+}
+
+.statusArrow {
+  font-size: 10px;
+  color: var(--text-quaternary, #d1d5db);
+}
+
+/* ── Modal 内部 ──────────────────────────────────────────────────────────── */
+.modalBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.modalErr {
+  margin-bottom: 12px;
+}
+
+/* ── 表单字段 ─────────────────────────────────────────────────────────────── */
+.fieldRow {
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.fieldLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+}
+
+.fieldRequired {
+  color: #ef4444;
+  margin-left: 2px;
+}
+
+.fieldInput {
+  width: 100%;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-primary, #111827);
+  background: var(--surface, #fff);
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.fieldInput:focus {
+  border-color: var(--accent, #FF6B2C);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #FF6B2C) 12%, transparent);
+}
+
+.fieldGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* ── 明细行 ───────────────────────────────────────────────────────────────── */
+.itemsSection {
+  margin-top: 8px;
+  border-top: 1px solid var(--border, #e5e7eb);
+  padding-top: 12px;
+}
+
+.itemsSectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.itemsSectionTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+}
+
+.itemRow {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr auto;
+  gap: 8px;
+  margin-bottom: 8px;
+  align-items: center;
+}
+
+.itemInput {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text-primary, #111827);
+  background: var(--surface, #fff);
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.itemInput:focus {
+  border-color: var(--accent, #FF6B2C);
+}
+
+.removeItemBtn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: #fef2f2;
+  color: #ef4444;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  transition: background 0.15s;
+}
+
+.removeItemBtn:hover {
+  background: #fee2e2;
+}
+
+.itemLabels {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr auto;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary, #9ca3af);
+}
+
+/* ── Drawer 详情 ──────────────────────────────────────────────────────────── */
+.detailSection {
+  margin-bottom: 20px;
+}
+
+.detailSectionTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+}
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 20px;
+}
+
+.detailItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.detailLabel {
+  font-size: 11px;
+  color: var(--text-tertiary, #9ca3af);
+  font-weight: 500;
+}
+
+.detailValue {
+  font-size: 13px;
+  color: var(--text-primary, #111827);
+  font-weight: 600;
+}
+
+/* ── 收货表单 ──────────────────────────────────────────────────────────────── */
+.receiveRow {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 6px;
+  align-items: center;
+  font-size: 12px;
+}
+
+.receiveHeader {
+  composes: receiveRow;
+  font-weight: 600;
+  color: var(--text-tertiary, #9ca3af);
+  font-size: 11px;
+}
+
+.receiveInput {
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 6px;
+  font-size: 12px;
+  outline: none;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+/* ── 响应式 ──────────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .statsRow {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .fieldGrid {
+    grid-template-columns: 1fr;
+  }
+  .itemRow, .itemLabels {
+    grid-template-columns: 1fr 1fr;
+  }
+  .detailGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .statsRow {
+    grid-template-columns: 1fr;
+  }
+  .toolbar {
+    flex-direction: column;
+  }
+}

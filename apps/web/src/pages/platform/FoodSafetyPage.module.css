@@ -1,0 +1,323 @@
+/* FoodSafetyPage.module.css */
+
+/* ── 页面容器 ─────────────────────────────────────────────────────────────── */
+.page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 28px;
+}
+
+/* ── 页头 ──────────────────────────────────────────────────────────────────── */
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 16px;
+}
+
+.pageTitle {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin: 0 0 4px;
+  letter-spacing: -0.3px;
+}
+
+.pageSubtitle {
+  font-size: 13px;
+  color: var(--text-tertiary, #9ca3af);
+  margin: 0;
+}
+
+.headerActions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ── 统计行 ────────────────────────────────────────────────────────────────── */
+.statsRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.statCard {
+  padding: 16px 20px !important;
+  text-align: center;
+}
+
+.statNum {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text-primary, #111827);
+  line-height: 1.1;
+  margin-bottom: 4px;
+  letter-spacing: -0.5px;
+}
+
+.statGreen  { color: #22c55e; }
+.statOrange { color: var(--accent, #FF6B2C); }
+.statRed    { color: #ef4444; }
+.statBlue   { color: #3b82f6; }
+
+.statLabel {
+  font-size: 12px;
+  color: var(--text-tertiary, #9ca3af);
+  font-weight: 500;
+}
+
+/* ── Tab 栏 ────────────────────────────────────────────────────────────────── */
+.tabBar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+  margin-bottom: 16px;
+}
+
+.tabItem {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-tertiary, #9ca3af);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  font-family: inherit;
+}
+
+.tabItem:hover {
+  color: var(--text-primary, #111827);
+}
+
+.tabItemActive {
+  color: var(--accent, #FF6B2C);
+  border-bottom-color: var(--accent, #FF6B2C);
+}
+
+/* ── 筛选工具栏 ───────────────────────────────────────────────────────────── */
+.toolbar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.filterSelect {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-primary, #111827);
+  background: var(--surface, #fff);
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  min-width: 120px;
+}
+
+.filterSelect:focus {
+  border-color: var(--accent, #FF6B2C);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #FF6B2C) 12%, transparent);
+}
+
+.searchInput {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-primary, #111827);
+  background: var(--surface, #fff);
+  font-family: inherit;
+  outline: none;
+  min-width: 180px;
+}
+
+.searchInput:focus {
+  border-color: var(--accent, #FF6B2C);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #FF6B2C) 12%, transparent);
+}
+
+.toolbarSpacer {
+  flex: 1;
+}
+
+/* ── 表格卡片 ─────────────────────────────────────────────────────────────── */
+.tableCard {
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+/* ── 单元格 ───────────────────────────────────────────────────────────────── */
+.timeCell {
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+  white-space: nowrap;
+}
+
+.actionGroup {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+/* ── Modal 内部 ──────────────────────────────────────────────────────────── */
+.modalBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.modalErr {
+  margin-bottom: 12px;
+}
+
+/* ── 表单字段 ─────────────────────────────────────────────────────────────── */
+.fieldRow {
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.fieldLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+}
+
+.fieldRequired {
+  color: #ef4444;
+  margin-left: 2px;
+}
+
+.fieldInput {
+  width: 100%;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-primary, #111827);
+  background: var(--surface, #fff);
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.fieldInput:focus {
+  border-color: var(--accent, #FF6B2C);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #FF6B2C) 12%, transparent);
+}
+
+.fieldTextarea {
+  width: 100%;
+  min-height: 60px;
+  padding: 8px 12px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-primary, #111827);
+  background: var(--surface, #fff);
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+  resize: vertical;
+}
+
+.fieldTextarea:focus {
+  border-color: var(--accent, #FF6B2C);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #FF6B2C) 12%, transparent);
+}
+
+.fieldGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* ── 预警卡片 ─────────────────────────────────────────────────────────────── */
+.alertGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+}
+
+.alertCard {
+  padding: 16px !important;
+}
+
+.alertCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.alertCardName {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+}
+
+.alertCountdown {
+  font-size: 13px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.alertUrgent {
+  color: #ef4444;
+  background: #fef2f2;
+}
+
+.alertWarn {
+  color: var(--accent, #FF6B2C);
+  background: #fff7ed;
+}
+
+.alertCardMeta {
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+  line-height: 1.6;
+}
+
+/* ── 响应式 ──────────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .statsRow {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .fieldGrid {
+    grid-template-columns: 1fr;
+  }
+  .alertGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .statsRow {
+    grid-template-columns: 1fr;
+  }
+  .toolbar {
+    flex-direction: column;
+  }
+  .tabItem {
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+}

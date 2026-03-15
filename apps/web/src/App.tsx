@@ -219,6 +219,18 @@ const PlatformDataSovereigntyPage  = lazy(() => import('./pages/platform/Platfor
 const PlatformSystemMonitorPage    = lazy(() => import('./pages/platform/PlatformSystemMonitorPage'));
 const PlatformBackupPage           = lazy(() => import('./pages/platform/PlatformBackupPage'));
 const SystemSettingsPage         = lazy(() => import('./pages/platform/SystemSettingsPage'));
+// Month 1 (P0) — 外部集成页面
+const EInvoicePage               = lazy(() => import('./pages/platform/EInvoicePage'));
+const ElemePage                  = lazy(() => import('./pages/platform/ElemePage'));
+const PaymentReconciliationPage  = lazy(() => import('./pages/platform/PaymentReconciliationPage'));
+// Month 2 (P0+P1) — 抖音 / 食品安全 / 健康证
+const DouyinPage                 = lazy(() => import('./pages/platform/DouyinPage'));
+const FoodSafetyPage             = lazy(() => import('./pages/platform/FoodSafetyPage'));
+const HealthCertPage             = lazy(() => import('./pages/platform/HealthCertPage'));
+// Month 3 (P1+P2) — 供应商B2B / 大众点评 / 银行对账
+const SupplierB2BPage            = lazy(() => import('./pages/platform/SupplierB2BPage'));
+const DianpingPage               = lazy(() => import('./pages/platform/DianpingPage'));
+const BankReconciliationPage     = lazy(() => import('./pages/platform/BankReconciliationPage'));
 
 // HR 模块页面
 const PayrollPage = lazy(() => import('./pages/hr/PayrollPage'));
@@ -955,6 +967,18 @@ const AppContent: React.FC = () => {
                   <Route path="data-sovereignty" element={<PlatformDataSovereigntyPage />} />
                   {/* 系统设置 → 平台级配置管理 */}
                   <Route path="settings" element={<SystemSettingsPage />} />
+                  {/* Month 1 (P0) — 外部集成 */}
+                  <Route path="e-invoices" element={<EInvoicePage />} />
+                  <Route path="eleme" element={<ElemePage />} />
+                  <Route path="payment-recon" element={<PaymentReconciliationPage />} />
+                  {/* Month 2 (P0+P1) — 抖音 / 食品安全 / 健康证 */}
+                  <Route path="douyin" element={<DouyinPage />} />
+                  <Route path="food-safety" element={<FoodSafetyPage />} />
+                  <Route path="health-certs" element={<HealthCertPage />} />
+                  {/* Month 3 (P1+P2) — 供应商B2B / 大众点评 / 银行对账 */}
+                  <Route path="supplier-b2b" element={<SupplierB2BPage />} />
+                  <Route path="dianping" element={<DianpingPage />} />
+                  <Route path="bank-recon" element={<BankReconciliationPage />} />
                 </Route>
 
                 {/* Role-based views — Store Manager (手机) */}

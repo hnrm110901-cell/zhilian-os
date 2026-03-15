@@ -111,6 +111,22 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    groupKey: 'integrations-ext',
+    title: '外部集成',
+    groupIcon: <ApiOutlined />,
+    items: [
+      { key: 'e-invoices',    path: '/platform/e-invoices',    label: '电子发票',   icon: <BarChartOutlined /> },
+      { key: 'eleme',         path: '/platform/eleme',         label: '饿了么',     icon: <ShopOutlined /> },
+      { key: 'payment-recon', path: '/platform/payment-recon', label: '支付对账',   icon: <SafetyOutlined /> },
+      { key: 'douyin',        path: '/platform/douyin',        label: '抖音团购',   icon: <AppstoreOutlined /> },
+      { key: 'food-safety',   path: '/platform/food-safety',   label: '食品安全',   icon: <SafetyOutlined /> },
+      { key: 'health-certs',  path: '/platform/health-certs',  label: '健康证',     icon: <UserOutlined /> },
+      { key: 'supplier-b2b', path: '/platform/supplier-b2b', label: '供应商B2B',  icon: <GlobalOutlined /> },
+      { key: 'dianping',     path: '/platform/dianping',     label: '点评监控',   icon: <BarChartOutlined /> },
+      { key: 'bank-recon',   path: '/platform/bank-recon',   label: '银行对账',   icon: <DatabaseOutlined /> },
+    ],
+  },
+  {
     groupKey: 'config',
     title: '系统配置',
     groupIcon: <SettingOutlined />,

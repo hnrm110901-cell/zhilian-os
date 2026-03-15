@@ -1,0 +1,257 @@
+/* PaymentReconciliationPage.module.css — 支付对账 */
+
+/* ── 页面容器 ─────────────────────────────────────────────────────────────── */
+.page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 28px;
+}
+
+/* ── 页头 ──────────────────────────────────────────────────────────────────── */
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 16px;
+}
+
+.pageTitle {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin: 0 0 4px;
+  letter-spacing: -0.3px;
+}
+
+.pageSubtitle {
+  font-size: 13px;
+  color: var(--text-tertiary, #9ca3af);
+  margin: 0;
+}
+
+.headerActions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ── 统计行 ────────────────────────────────────────────────────────────────── */
+.statsRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.statCard {
+  padding: 16px 20px !important;
+  text-align: center;
+}
+
+.statNum {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text-primary, #111827);
+  line-height: 1.2;
+}
+
+.statNumWarn {
+  composes: statNum;
+  color: var(--color-warning, #f59e0b);
+}
+
+.statNumGreen {
+  composes: statNum;
+  color: var(--color-success, #10b981);
+}
+
+.statLabel {
+  font-size: 12px;
+  color: var(--text-tertiary, #9ca3af);
+  margin-top: 4px;
+}
+
+/* ── 工具栏 ────────────────────────────────────────────────────────────────── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.toolbarRight {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+/* ── 表格容器 ──────────────────────────────────────────────────────────────── */
+.tableCard {
+  margin-bottom: 16px;
+}
+
+.clickableRow {
+  cursor: pointer;
+}
+
+.clickableRow:hover {
+  background: var(--bg-hover, #f3f4f6);
+}
+
+/* ── 匹配率柱 ─────────────────────────────────────────────────────────────── */
+.rateBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rateTrack {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-tertiary, #e5e7eb);
+  border-radius: 3px;
+  overflow: hidden;
+  min-width: 48px;
+  max-width: 80px;
+}
+
+.rateFill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.rateFillGood {
+  composes: rateFill;
+  background: var(--color-success, #10b981);
+}
+
+.rateFillWarn {
+  composes: rateFill;
+  background: var(--color-warning, #f59e0b);
+}
+
+.rateFillBad {
+  composes: rateFill;
+  background: var(--color-error, #ef4444);
+}
+
+.rateText {
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 42px;
+  text-align: right;
+}
+
+/* ── 详情面板 ──────────────────────────────────────────────────────────────── */
+.detailPanel {
+  margin-bottom: 16px;
+}
+
+.detailHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.detailTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+}
+
+.detailStats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.detailStat {
+  text-align: center;
+  padding: 12px;
+  background: var(--bg-secondary, #f9fafb);
+  border-radius: 8px;
+}
+
+.detailStatNum {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+}
+
+.detailStatLabel {
+  font-size: 11px;
+  color: var(--text-tertiary, #9ca3af);
+  margin-top: 2px;
+}
+
+/* ── 差异类型标签 ──────────────────────────────────────────────────────────── */
+.diffType {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.diffTypePosOnly {
+  composes: diffType;
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.diffTypeChannelOnly {
+  composes: diffType;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.diffTypeAmountMismatch {
+  composes: diffType;
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+/* ── 上传模态 ──────────────────────────────────────────────────────────────── */
+.uploadHint {
+  font-size: 13px;
+  color: var(--text-tertiary, #9ca3af);
+  margin-top: 8px;
+  line-height: 1.6;
+}
+
+.formItem {
+  margin-bottom: 16px;
+}
+
+.formLabel {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary, #4b5563);
+  margin-bottom: 6px;
+}
+
+/* ── 响应式 ───────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .statsRow {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .detailStats {
+    grid-template-columns: 1fr;
+  }
+
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toolbarRight {
+    margin-left: 0;
+  }
+}

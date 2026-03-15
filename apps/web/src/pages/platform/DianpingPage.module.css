@@ -1,0 +1,228 @@
+/* DianpingPage.module.css — 大众点评评论监控页样式 */
+
+/* ── 页面容器 ─────────────────────────────────────────────────────── */
+.page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 28px;
+}
+
+/* ── 页头 ─────────────────────────────────────────────────────────── */
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 16px;
+}
+
+.pageHeaderActions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ── 统计行 ───────────────────────────────────────────────────────── */
+.statsRow {
+  margin-bottom: 20px;
+}
+
+.statsCard {
+  border-radius: 8px;
+}
+
+/* ── 工具栏 ───────────────────────────────────────────────────────── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── 评论卡片 ─────────────────────────────────────────────────────── */
+.reviewCard {
+  margin-bottom: 12px;
+  border-radius: 8px;
+  transition: box-shadow 0.2s;
+}
+
+.reviewCard:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
+}
+
+.reviewCardUnread {
+  border-left: 3px solid #1677ff;
+}
+
+.reviewHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.authorInfo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.authorName {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.reviewMeta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+
+/* ── 评分星星 ─────────────────────────────────────────────────────── */
+.ratingStars {
+  display: inline-flex;
+  gap: 2px;
+  font-size: 14px;
+  color: #fadb14;
+}
+
+.starEmpty {
+  color: #d9d9d9;
+}
+
+/* ── 评论内容 ─────────────────────────────────────────────────────── */
+.reviewContent {
+  margin: 8px 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: rgba(0, 0, 0, 0.85);
+}
+
+/* ── 评论图片 ─────────────────────────────────────────────────────── */
+.reviewImages {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0;
+  flex-wrap: wrap;
+}
+
+.reviewImage {
+  width: 80px;
+  height: 80px;
+  border-radius: 6px;
+  object-fit: cover;
+  cursor: pointer;
+  border: 1px solid #f0f0f0;
+}
+
+/* ── 情感标签 ─────────────────────────────────────────────────────── */
+.sentimentTag {
+  font-size: 12px;
+}
+
+/* ── 关键词标签 ───────────────────────────────────────────────────── */
+.keywordsRow {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+/* ── 商家回复区 ───────────────────────────────────────────────────── */
+.replySection {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #fafafa;
+  border-radius: 6px;
+  border-left: 3px solid #1677ff;
+}
+
+.replyLabel {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  margin-bottom: 4px;
+}
+
+.replyText {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+/* ── 卡片底栏 ─────────────────────────────────────────────────────── */
+.reviewFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid #f0f0f0;
+}
+
+/* ── 关键词云 ─────────────────────────────────────────────────────── */
+.keywordCloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 16px 0;
+  align-items: center;
+}
+
+.keywordItem {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 16px;
+  background: #f5f5f5;
+  cursor: default;
+  transition: background 0.2s;
+}
+
+.keywordItem:hover {
+  background: #e6f4ff;
+}
+
+/* ── 空状态 / 加载 ───────────────────────────────────────────────── */
+.spinCenter {
+  display: flex;
+  justify-content: center;
+  padding: 60px 0;
+}
+
+/* ── 响应式 ───────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .page {
+    padding: 16px;
+  }
+
+  .pageHeader {
+    flex-direction: column;
+  }
+
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filters {
+    flex-direction: column;
+  }
+
+  .reviewImages {
+    gap: 4px;
+  }
+
+  .reviewImage {
+    width: 60px;
+    height: 60px;
+  }
+}

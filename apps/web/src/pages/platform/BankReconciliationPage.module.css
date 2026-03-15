@@ -1,0 +1,333 @@
+/* BankReconciliationPage.module.css — 银行流水对账 */
+
+/* ── 页面容器 ─────────────────────────────────────────────────────────────── */
+.page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 28px;
+}
+
+/* ── 页头 ──────────────────────────────────────────────────────────────────── */
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 16px;
+}
+
+.pageTitle {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin: 0 0 4px;
+  letter-spacing: -0.3px;
+}
+
+.pageSubtitle {
+  font-size: 13px;
+  color: var(--text-tertiary, #9ca3af);
+  margin: 0;
+}
+
+.headerActions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ── 统计行 ────────────────────────────────────────────────────────────────── */
+.statsRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.statCard {
+  padding: 16px 20px !important;
+  text-align: center;
+}
+
+.statNum {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text-primary, #111827);
+  line-height: 1.2;
+}
+
+.statNumGreen {
+  composes: statNum;
+  color: var(--color-success, #10b981);
+}
+
+.statNumWarn {
+  composes: statNum;
+  color: var(--color-warning, #f59e0b);
+}
+
+.statNumRed {
+  composes: statNum;
+  color: var(--color-error, #ef4444);
+}
+
+.statLabel {
+  font-size: 12px;
+  color: var(--text-tertiary, #9ca3af);
+  margin-top: 4px;
+}
+
+/* ── Tab 栏 ─────────────────────────────────────────────────────────────── */
+.tabBar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border-primary, #e5e7eb);
+  margin-bottom: 16px;
+}
+
+.tab {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-tertiary, #9ca3af);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+}
+
+.tab:hover {
+  color: var(--text-secondary, #4b5563);
+}
+
+.tabActive {
+  composes: tab;
+  color: var(--accent, #FF6B2C);
+  border-bottom-color: var(--accent, #FF6B2C);
+  font-weight: 600;
+}
+
+/* ── 工具栏 ────────────────────────────────────────────────────────────────── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.toolbarRight {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+/* ── 表格容器 ──────────────────────────────────────────────────────────────── */
+.tableCard {
+  margin-bottom: 16px;
+}
+
+/* ── 类型标签 ──────────────────────────────────────────────────────────────── */
+.tagCredit {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.tagDebit {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.tagCategory {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.tagMatched {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.tagUnmatched {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #fef3c7;
+  color: #92400e;
+}
+
+/* ── 状态标签 ──────────────────────────────────────────────────────────────── */
+.statusPending {
+  composes: tagCategory;
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.statusProcessing {
+  composes: tagCategory;
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.statusCompleted {
+  composes: tagCategory;
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.statusError {
+  composes: tagCategory;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* ── 详情面板 ──────────────────────────────────────────────────────────────── */
+.detailPanel {
+  margin-bottom: 16px;
+}
+
+.detailHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.detailTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+}
+
+.detailStats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.detailStat {
+  text-align: center;
+  padding: 12px;
+  background: var(--bg-secondary, #f9fafb);
+  border-radius: 8px;
+}
+
+.detailStatNum {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+}
+
+.detailStatLabel {
+  font-size: 11px;
+  color: var(--text-tertiary, #9ca3af);
+  margin-top: 2px;
+}
+
+/* ── 现金流汇总 ────────────────────────────────────────────────────────────── */
+.cashFlowRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.cashFlowCard {
+  padding: 20px !important;
+}
+
+.cashFlowTitle {
+  font-size: 13px;
+  color: var(--text-tertiary, #9ca3af);
+  margin-bottom: 8px;
+}
+
+.cashFlowAmount {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+}
+
+.cashFlowAmountGreen {
+  composes: cashFlowAmount;
+  color: var(--color-success, #10b981);
+}
+
+.cashFlowAmountRed {
+  composes: cashFlowAmount;
+  color: var(--color-error, #ef4444);
+}
+
+/* ── 表单 ──────────────────────────────────────────────────────────────────── */
+.formItem {
+  margin-bottom: 16px;
+}
+
+.formLabel {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary, #4b5563);
+  margin-bottom: 6px;
+}
+
+.uploadHint {
+  font-size: 13px;
+  color: var(--text-tertiary, #9ca3af);
+  margin-top: 8px;
+  line-height: 1.6;
+}
+
+/* ── 响应式 ───────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .statsRow {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .detailStats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .cashFlowRow {
+    grid-template-columns: 1fr;
+  }
+
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toolbarRight {
+    margin-left: 0;
+  }
+
+  .tabBar {
+    overflow-x: auto;
+  }
+}
