@@ -7,7 +7,13 @@ import asyncio
 import inspect
 import os
 import re
+import sys
 import structlog
+
+# 确保项目根目录在 sys.path 上，使 `packages.api_adapters.*` 可直接 import
+_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.."))
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
 
 # 表名只允许小写字母/数字/下划线，防止通过 backup_jobs.tables 字段注入任意 SQL
 _SAFE_TABLE_RE = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -3718,7 +3724,7 @@ def pull_tiancai_daily_orders(self) -> Dict[str, Any]:
         brand_id = os.getenv("TIANCAI_BRAND_ID", "")
         yesterday = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
 
-        from packages.api_adapters.tiancai_shanglong.src.adapter import TiancaiShanglongAdapter
+        from packages.api_adapters.tiancai_shanglong.src.adapter import TiancaiShanglongAdapter  # noqa: E402
 
         stores_processed = 0
         orders_upserted = 0
@@ -3728,43 +3734,28 @@ def pull_tiancai_daily_orders(self) -> Dict[str, Any]:
             result = await session.execute(select(Store).where(Store.is_active == True))
             stores = result.scalars().all()
 
-            # 天财商龙鉴权凭据：全局共享（appid/accessid 是 Terminal 级别，非门店级别）
-            appid = os.getenv("TIANCAI_APPID", "")
-            accessid = os.getenv("TIANCAI_ACCESSID", "")
-            center_id = os.getenv("TIANCAI_CENTER_ID", "")
-
-            if not appid or not accessid:
-                logger.warning(
-                    "tiancai_pull.skipped",
-                    reason="TIANCAI_APPID or TIANCAI_ACCESSID not configured",
-                )
-                return {
-                    "success": True,
-                    "skipped": True,
-                    "stores_processed": 0,
-                    "orders_upserted": 0,
-                    "errors": [{"reason": "TIANCAI_APPID/ACCESSID 未配置"}],
-                }
+            # 全局凭据（各门店可用 TIANCAI_APP_ID_{store_id} 覆盖）
+            global_app_id = os.getenv("TIANCAI_APP_ID", "")
+            global_app_secret = os.getenv("TIANCAI_APP_SECRET", "")
 
             for store in stores:
                 sid = str(store.id)
-                # 门店 shopId：优先读门店级 env，回退全局，最终用 store.code 或 UUID
-                shop_id = (
-                    os.getenv(f"TIANCAI_SHOP_ID_{sid}")
-                    or os.getenv("TIANCAI_SHOP_ID", "")
-                    or getattr(store, "code", None)
-                    or sid
-                )
+                # 门店级凭据优先于全局凭据
+                app_id = os.getenv(f"TIANCAI_APP_ID_{sid}") or global_app_id
+                app_secret = os.getenv(f"TIANCAI_APP_SECRET_{sid}") or global_app_secret
+
+                # 无凭据 → 静默跳过（不计入 errors）
+                if not app_id or not app_secret:
+                    logger.debug("tiancai_pull.store_skipped", store_id=sid, reason="no credentials")
+                    continue
 
                 try:
                     adapter = TiancaiShanglongAdapter({
                         "base_url": base_url,
-                        "appid": appid,
-                        "accessid": accessid,
-                        "center_id": center_id,
-                        "shop_id": shop_id,
-                        "timeout": 30,
-                        "retry_times": 2,
+                        "app_id": app_id,
+                        "app_secret": app_secret,
+                        "store_id": sid,
+                        "brand_id": brand_id,
                     })
                     order_list = await adapter.pull_daily_orders(yesterday, brand_id)
 
@@ -4172,9 +4163,7 @@ def pull_historical_backfill(
         # ── 天财商龙适配器 ─────────────────────────────────────────────────────
         if adapter == "tiancai":
             from datetime import date, timedelta
-            from packages.api_adapters.tiancai_shanglong.src.adapter import (
-                TiancaiShanglongAdapter,
-            )
+            from packages.api_adapters.tiancai_shanglong.src.adapter import TiancaiShanglongAdapter  # noqa: E402
 
             base_url = credentials.get("base_url") or os.getenv("TIANCAI_BASE_URL", "")
             if not base_url:
