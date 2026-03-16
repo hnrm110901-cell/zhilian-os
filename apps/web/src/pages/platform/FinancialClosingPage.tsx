@@ -394,9 +394,9 @@ function FinancialClosingPage() {
       <ZCard>
         <div className={styles.calendarContainer}>
           <div className={styles.calendarNav}>
-            <ZButton size="small" variant="ghost" onClick={prevMonth}>&lt;</ZButton>
+            <ZButton size="sm" variant="ghost" onClick={prevMonth}>&lt;</ZButton>
             <span className={styles.calendarMonth}>{calYear}年{calMonth}月</span>
-            <ZButton size="small" variant="ghost" onClick={nextMonth}>&gt;</ZButton>
+            <ZButton size="sm" variant="ghost" onClick={nextMonth}>&gt;</ZButton>
           </div>
 
           {loading ? (
@@ -641,7 +641,7 @@ function FinancialClosingPage() {
           <div className={styles.detailDrawer}>
             <div className={styles.detailHeader}>
               <h3 className={styles.detailTitle}>日结报告详情</h3>
-              <ZButton size="small" variant="ghost" onClick={() => setDrawerOpen(false)}>关闭</ZButton>
+              <ZButton size="sm" variant="ghost" onClick={() => setDrawerOpen(false)}>关闭</ZButton>
             </div>
 
             {detailLoading ? (

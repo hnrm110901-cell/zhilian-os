@@ -13,7 +13,10 @@ import json
 logger = structlog.get_logger()
 
 
-class MeituanSaasAdapter:
+from .reservation import MeituanReservationMixin
+
+
+class MeituanSaasAdapter(MeituanReservationMixin):
     """美团餐饮SAAS平台适配器"""
 
     def __init__(self, config: Dict[str, Any]):
