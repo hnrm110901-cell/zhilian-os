@@ -448,7 +448,7 @@ function BuildingStep({ storeId, onNext }: { storeId: string; onNext: () => void
   const [error, setError]               = useState('');
   const [started, setStarted]           = useState(false);
   const pollRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const pollFnRef = useRef<() => void>();
+  const pollFnRef = useRef<() => void>(undefined);
 
   const poll = useCallback(async () => {
     try {
