@@ -240,7 +240,7 @@ def upgrade() -> None:
     )
     op.create_index('ix_ai_store_id', 'approval_instances', ['store_id'])
     op.create_index('ix_ai_type', 'approval_instances', ['approval_type'])
-    op.create_index('ix_ai_status', 'approval_instances', ['status'])
+    op.create_index('ix_approval_inst_status', 'approval_instances', ['status'])
     op.create_index('ix_ai_applicant', 'approval_instances', ['applicant_id'])
 
     # ── 6. approval_node_records ──────────────────────────
@@ -436,7 +436,7 @@ def downgrade() -> None:
     op.drop_table('approval_node_records')
 
     op.drop_index('ix_ai_applicant', table_name='approval_instances')
-    op.drop_index('ix_ai_status', table_name='approval_instances')
+    op.drop_index('ix_approval_inst_status', table_name='approval_instances')
     op.drop_index('ix_ai_type', table_name='approval_instances')
     op.drop_index('ix_ai_store_id', table_name='approval_instances')
     op.drop_table('approval_instances')
