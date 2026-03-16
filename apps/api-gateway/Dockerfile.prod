@@ -1,5 +1,5 @@
 # 生产环境构建
-FROM python:3.9-slim AS builder
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
@@ -15,7 +15,7 @@ COPY ./apps/api-gateway/requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
 # 生产环境运行
-FROM python:3.9-slim
+FROM python:3.11-slim
 
 WORKDIR /app
 

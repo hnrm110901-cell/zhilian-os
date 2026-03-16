@@ -13,6 +13,7 @@
 
 import base64
 import os
+from typing import Optional
 
 import structlog
 
@@ -42,7 +43,7 @@ class FieldCrypto:
 
     _PREFIX = "ENC:"
 
-    def __init__(self, key: bytes | None = None):
+    def __init__(self, key: Optional[bytes] = None):
         if key is None:
             key_b64 = os.environ.get("FIELD_ENCRYPTION_KEY", "")
             if not key_b64:
