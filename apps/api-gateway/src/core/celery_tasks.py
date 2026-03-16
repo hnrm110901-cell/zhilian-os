@@ -665,6 +665,128 @@ def generate_and_send_weekly_report(self) -> Dict[str, Any]:
         raise self.retry(exc=exc)
 
 
+# ── 定时报表执行器（每 10 分钟扫描 ScheduledReport）─────────────────────────
+
+
+@celery_app.task(bind=True, max_retries=2, default_retry_delay=60)
+def execute_scheduled_reports(self) -> Dict[str, Any]:
+    """
+    扫描 scheduled_reports 表中 next_run_at <= NOW() 且 is_active=True 的记录，
+    按模板生成报表文件并通过配置的渠道（email/system）投递。
+
+    完成后更新 last_run_at 并计算 next_run_at。
+    每次最多处理 50 条，防止单次执行过长。
+    """
+    import asyncio
+
+    async def _run() -> Dict[str, Any]:
+        from datetime import datetime
+
+        from sqlalchemy import select, text as sa_text
+
+        from src.core.database import get_db_session
+        from src.models.report_template import ScheduledReport
+        from src.services.custom_report_service import custom_report_service
+
+        executed = 0
+        emailed = 0
+        errors = []
+
+        async with get_db_session() as session:
+            now_iso = datetime.utcnow().isoformat()
+            stmt = (
+                select(ScheduledReport)
+                .where(
+                    ScheduledReport.is_active.is_(True),
+                    ScheduledReport.next_run_at.isnot(None),
+                    ScheduledReport.next_run_at <= now_iso,
+                )
+                .limit(50)
+            )
+            result = await session.execute(stmt)
+            due_reports = list(result.scalars().all())
+
+            if not due_reports:
+                return {"executed": 0, "emailed": 0, "total_due": 0}
+
+            for sr in due_reports:
+                try:
+                    # 1. 生成报表文件
+                    file_bytes, filename, media_type = await custom_report_service.generate_report(
+                        template_id=str(sr.template_id),
+                        user_id=str(sr.user_id),
+                        fmt=sr.format,
+                    )
+
+                    # 2. 按渠道投递
+                    channels = sr.channels or []
+                    recipients = sr.recipients or []
+
+                    if "email" in channels and recipients:
+                        from src.services.multi_channel_notification import (
+                            EmailNotificationHandler,
+                        )
+
+                        handler = EmailNotificationHandler()
+                        for email_addr in recipients:
+                            try:
+                                ok = await handler.send(
+                                    recipient=email_addr,
+                                    title=f"定时报表: {filename}",
+                                    content=f"您订阅的定时报表已生成，请查看附件。\n文件: {filename}",
+                                    extra_data={
+                                        "attachments": [
+                                            {"filename": filename, "data": file_bytes},
+                                        ],
+                                    },
+                                )
+                                if ok:
+                                    emailed += 1
+                            except Exception as e:
+                                logger.warning(
+                                    "scheduled_report.email_failed",
+                                    recipient=email_addr,
+                                    error=str(e)[:100],
+                                )
+
+                    # 3. 更新 last_run_at + 计算 next_run_at
+                    sr.last_run_at = datetime.utcnow().isoformat()
+                    sr.next_run_at = custom_report_service._calc_next_run(
+                        sr.frequency, sr.run_at, sr.day_of_week, sr.day_of_month,
+                    )
+                    executed += 1
+
+                except Exception as e:
+                    errors.append({"scheduled_id": str(sr.id), "error": str(e)[:100]})
+                    logger.warning(
+                        "scheduled_report.exec_failed",
+                        scheduled_id=str(sr.id),
+                        error=str(e),
+                    )
+
+            await session.commit()
+
+        logger.info(
+            "execute_scheduled_reports.done",
+            total_due=len(due_reports),
+            executed=executed,
+            emailed=emailed,
+            errors=len(errors),
+        )
+        return {
+            "total_due": len(due_reports),
+            "executed": executed,
+            "emailed": emailed,
+            "errors": errors[:5],
+        }
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        logger.error("execute_scheduled_reports.failed", error=str(exc))
+        raise self.retry(exc=exc)
+
+
 @celery_app.task(
     base=CallbackTask,
     bind=True,
