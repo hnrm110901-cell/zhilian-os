@@ -183,6 +183,10 @@ celery_app.conf.update(
             "queue": "default",
             "routing_key": "default",
         },
+        "src.core.celery_tasks.execute_scheduled_reports": {
+            "queue": "default",
+            "routing_key": "default",
+        },
         "src.core.celery_tasks.refresh_private_domain_rfm": {
             "queue": "low_priority",
             "routing_key": "low_priority",
@@ -818,6 +822,13 @@ celery_app.conf.update(
             ),
             "args": (),
             "options": {"queue": "default", "priority": 5},
+        },
+        # 定时报表执行器：每 10 分钟扫描 ScheduledReport 并投递（email/system）
+        "execute-scheduled-reports": {
+            "task": "src.core.celery_tasks.execute_scheduled_reports",
+            "schedule": crontab(minute="*/10"),
+            "args": (),
+            "options": {"queue": "default", "priority": 6},
         },
     },
 )

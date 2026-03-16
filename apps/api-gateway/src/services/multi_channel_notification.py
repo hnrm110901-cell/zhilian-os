@@ -139,8 +139,9 @@ class EmailNotificationHandler(NotificationChannelHandler):
                 )
                 return False
 
-            # 创建邮件
-            msg = MIMEMultipart("alternative")
+            # 创建邮件（有附件时用 mixed，否则 alternative）
+            has_attachments = bool(extra_data and extra_data.get("attachments"))
+            msg = MIMEMultipart("mixed" if has_attachments else "alternative")
             msg["Subject"] = title
             msg["From"] = formataddr((email_config.SMTP_FROM_NAME, email_config.SMTP_USER))
             msg["To"] = recipient
@@ -153,6 +154,21 @@ class EmailNotificationHandler(NotificationChannelHandler):
             if extra_data and "html_content" in extra_data:
                 html_part = MIMEText(extra_data["html_content"], "html", "utf-8")
                 msg.attach(html_part)
+
+            # 如果提供了文件附件,添加附件
+            if extra_data and "attachments" in extra_data:
+                from email.mime.base import MIMEBase
+                from email import encoders
+
+                for att in extra_data["attachments"]:
+                    part = MIMEBase("application", "octet-stream")
+                    part.set_payload(att["data"])
+                    encoders.encode_base64(part)
+                    part.add_header(
+                        "Content-Disposition",
+                        f'attachment; filename="{att["filename"]}"',
+                    )
+                    msg.attach(part)
 
             # 发送邮件
             await asyncio.get_event_loop().run_in_executor(None, self._send_email_sync, msg, recipient)
