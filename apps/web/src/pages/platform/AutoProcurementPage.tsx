@@ -490,7 +490,7 @@ export default function AutoProcurementPage() {
       </div>
 
       {error && (
-        <ZAlert type="error" message={error} style={{ marginBottom: 12 }} />
+        <ZAlert variant="error" style={{ marginBottom: 12 }}>{error}</ZAlert>
       )}
 
       {/* 统计概览 */}
@@ -668,7 +668,7 @@ export default function AutoProcurementPage() {
         onClose={() => setShowRuleModal(false)}
       >
         <div className={styles.modalBody}>
-          {ruleErr && <ZAlert type="error" message={ruleErr} style={{ marginBottom: 12 }} />}
+          {ruleErr && <ZAlert variant="error" style={{ marginBottom: 12 }}>{ruleErr}</ZAlert>}
 
           <div className={styles.fieldGrid}>
             <div className={styles.fieldRow}>
