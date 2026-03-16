@@ -29,12 +29,7 @@ from typing import Any, Dict, Optional
 import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.models.member_lifecycle import (
-    LifecycleState,
-    MemberLifecycleHistory,
-    StateTransitionTrigger,
-)
+from src.models.member_lifecycle import LifecycleState, MemberLifecycleHistory, StateTransitionTrigger
 
 logger = structlog.get_logger()
 
@@ -45,12 +40,13 @@ async def _maybe_await(value: Any) -> Any:
         return await value
     return value
 
+
 # ── 阈值（环境变量可覆盖）─────────────────────────────────────────────────────
 _CHURN_WARNING_DAYS = int(os.getenv("LC_CHURN_WARNING_DAYS", "45"))
-_DORMANT_DAYS       = int(os.getenv("LC_DORMANT_DAYS",       "90"))
-_HIGH_FREQ_ORDERS   = int(os.getenv("LC_HIGH_FREQ_ORDERS",   "5"))
-_HIGH_FREQ_WINDOW   = int(os.getenv("LC_HIGH_FREQ_WINDOW",   "30"))
-_VIP_MONETARY_FEN   = int(os.getenv("LC_VIP_MONETARY_FEN",   "100000"))  # ¥1000
+_DORMANT_DAYS = int(os.getenv("LC_DORMANT_DAYS", "90"))
+_HIGH_FREQ_ORDERS = int(os.getenv("LC_HIGH_FREQ_ORDERS", "5"))
+_HIGH_FREQ_WINDOW = int(os.getenv("LC_HIGH_FREQ_WINDOW", "30"))
+_VIP_MONETARY_FEN = int(os.getenv("LC_VIP_MONETARY_FEN", "100000"))  # ¥1000
 
 # 合法状态转移表：from_state → {trigger → to_state}
 TRANSITION_RULES: Dict[LifecycleState, Dict[StateTransitionTrigger, LifecycleState]] = {
@@ -64,32 +60,33 @@ TRANSITION_RULES: Dict[LifecycleState, Dict[StateTransitionTrigger, LifecycleSta
         StateTransitionTrigger.FIRST_ORDER: LifecycleState.REPEAT,
     },
     LifecycleState.REPEAT: {
-        StateTransitionTrigger.REPEAT_ORDER:             LifecycleState.REPEAT,
+        StateTransitionTrigger.REPEAT_ORDER: LifecycleState.REPEAT,
         StateTransitionTrigger.HIGH_FREQUENCY_MILESTONE: LifecycleState.HIGH_FREQUENCY,
-        StateTransitionTrigger.CHURN_WARNING:            LifecycleState.AT_RISK,
+        StateTransitionTrigger.CHURN_WARNING: LifecycleState.AT_RISK,
     },
     LifecycleState.HIGH_FREQUENCY: {
-        StateTransitionTrigger.VIP_UPGRADE:              LifecycleState.VIP,
-        StateTransitionTrigger.CHURN_WARNING:            LifecycleState.AT_RISK,
-        StateTransitionTrigger.INACTIVITY_LONG:          LifecycleState.DORMANT,
+        StateTransitionTrigger.VIP_UPGRADE: LifecycleState.VIP,
+        StateTransitionTrigger.CHURN_WARNING: LifecycleState.AT_RISK,
+        StateTransitionTrigger.INACTIVITY_LONG: LifecycleState.DORMANT,
     },
     LifecycleState.VIP: {
-        StateTransitionTrigger.CHURN_WARNING:            LifecycleState.AT_RISK,
-        StateTransitionTrigger.INACTIVITY_LONG:          LifecycleState.AT_RISK,
+        StateTransitionTrigger.CHURN_WARNING: LifecycleState.AT_RISK,
+        StateTransitionTrigger.INACTIVITY_LONG: LifecycleState.AT_RISK,
     },
     LifecycleState.AT_RISK: {
-        StateTransitionTrigger.REPEAT_ORDER:             LifecycleState.REPEAT,
-        StateTransitionTrigger.INACTIVITY_LONG:          LifecycleState.DORMANT,
+        StateTransitionTrigger.REPEAT_ORDER: LifecycleState.REPEAT,
+        StateTransitionTrigger.INACTIVITY_LONG: LifecycleState.DORMANT,
     },
     LifecycleState.DORMANT: {
-        StateTransitionTrigger.REPEAT_ORDER:             LifecycleState.REPEAT,
-        StateTransitionTrigger.INACTIVITY_LONG:          LifecycleState.LOST,
+        StateTransitionTrigger.REPEAT_ORDER: LifecycleState.REPEAT,
+        StateTransitionTrigger.INACTIVITY_LONG: LifecycleState.LOST,
     },
     LifecycleState.LOST: {},  # terminal
 }
 
 
 # ── 纯函数 ────────────────────────────────────────────────────────────────────
+
 
 def classify_lifecycle(
     recency_days: int,
@@ -153,6 +150,7 @@ def is_terminal(state: LifecycleState) -> bool:
 
 # ── 服务类 ────────────────────────────────────────────────────────────────────
 
+
 class LifecycleStateMachine:
     """
     会员生命周期状态机服务。
@@ -215,10 +213,10 @@ class LifecycleStateMachine:
         )
         stats = await _maybe_await(stats_row.fetchone())
 
-        total_orders  = int(stats.total_orders)  if stats else 0
-        recency_days  = int(stats.recency_days)  if stats else 9999
+        total_orders = int(stats.total_orders) if stats else 0
+        recency_days = int(stats.recency_days) if stats else 9999
         frequency_30d = int(stats.frequency_30d) if stats else 0
-        monetary_fen  = int(stats.monetary_fen)  if stats else 0
+        monetary_fen = int(stats.monetary_fen) if stats else 0
         is_registered = member is not None
 
         return classify_lifecycle(
@@ -256,7 +254,7 @@ class LifecycleStateMachine:
             }
         """
         current = await self.detect_state(customer_id, store_id, db)
-        target  = next_state(current, trigger)
+        target = next_state(current, trigger)
 
         if target is None:
             logger.info(

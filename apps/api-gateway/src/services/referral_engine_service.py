@@ -9,15 +9,15 @@ ReferralEngine Service — CDP驱动的裂变追踪（Sprint 4）
 
 Sprint 4 KPI: 裂变新客占比 ≥ 5%
 """
+
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, List
+from typing import List, Optional
 
-from sqlalchemy import select, func, and_, text
+from sqlalchemy import and_, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.models.order import Order
 from src.models.consumer_identity import ConsumerIdentity
+from src.models.order import Order
 from src.models.private_domain import PrivateDomainMember
 from src.models.reservation import Reservation
 
@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 # ── 纯函数 ──────────────────────────────────────────────────────
+
 
 def compute_k_factor(
     invites_sent: int,
@@ -145,18 +146,24 @@ class ReferralEngineService:
             total_k += scene["k_estimate"]
 
         # 新客占比（本期新 consumer vs 总 consumer）
-        new_consumers = await db.scalar(
-            select(func.count(ConsumerIdentity.id)).where(
-                ConsumerIdentity.created_at >= cutoff,
-                ConsumerIdentity.is_merged.is_(False),
+        new_consumers = (
+            await db.scalar(
+                select(func.count(ConsumerIdentity.id)).where(
+                    ConsumerIdentity.created_at >= cutoff,
+                    ConsumerIdentity.is_merged.is_(False),
+                )
             )
-        ) or 0
+            or 0
+        )
 
-        total_consumers = await db.scalar(
-            select(func.count(ConsumerIdentity.id)).where(
-                ConsumerIdentity.is_merged.is_(False),
+        total_consumers = (
+            await db.scalar(
+                select(func.count(ConsumerIdentity.id)).where(
+                    ConsumerIdentity.is_merged.is_(False),
+                )
             )
-        ) or 0
+            or 0
+        )
 
         # 平均客单价
         avg_result = await db.execute(
@@ -215,13 +222,15 @@ class ReferralEngineService:
 
         referrers = []
         for row in result.all():
-            referrers.append({
-                "consumer_id": str(row[0]) if row[0] else None,
-                "customer_name": row[3],
-                "large_table_count": row[1],
-                "total_guests_brought": row[2] or 0,
-                "avg_party_size": round((row[2] or 0) / row[1], 1) if row[1] > 0 else 0,
-            })
+            referrers.append(
+                {
+                    "consumer_id": str(row[0]) if row[0] else None,
+                    "customer_name": row[3],
+                    "large_table_count": row[1],
+                    "total_guests_brought": row[2] or 0,
+                    "avg_party_size": round((row[2] or 0) / row[1], 1) if row[1] > 0 else 0,
+                }
+            )
         return referrers
 
 

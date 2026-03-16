@@ -10,21 +10,22 @@ BossAgent Service — 老板每日经营智能（Sprint 3）
 
 定位：老板看得见，管得住，能落地
 """
+
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, List
+from typing import List, Optional
 
-from sqlalchemy import select, func, and_
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.models.consumer_identity import ConsumerIdentity
-from src.models.private_domain import PrivateDomainMember
 from src.models.order import Order
+from src.models.private_domain import PrivateDomainMember
 
 logger = logging.getLogger(__name__)
 
 
 # ── 纯函数 ──────────────────────────────────────────────────────
+
 
 def format_boss_brief(
     revenue_yuan: float,
@@ -76,13 +77,7 @@ def compute_member_health_score(
     total = s1_count + s2_count + s3_count + s4_count + s5_count
     if total == 0:
         return 0.0
-    score = (
-        s1_count * 100
-        + s2_count * 80
-        + s3_count * 60
-        + s4_count * 30
-        + s5_count * 0
-    ) / total
+    score = (s1_count * 100 + s2_count * 80 + s3_count * 60 + s4_count * 30 + s5_count * 0) / total
     return round(score, 1)
 
 
@@ -120,15 +115,19 @@ class BossAgentService:
         revenue_yuan = revenue if revenue < 100000 else revenue / 100
 
         # 新增消费者（今日创建的 ConsumerIdentity）
-        new_consumers = await db.scalar(
-            select(func.count(ConsumerIdentity.id)).where(
-                ConsumerIdentity.created_at >= today_start,
-                ConsumerIdentity.is_merged.is_(False),
+        new_consumers = (
+            await db.scalar(
+                select(func.count(ConsumerIdentity.id)).where(
+                    ConsumerIdentity.created_at >= today_start,
+                    ConsumerIdentity.is_merged.is_(False),
+                )
             )
-        ) or 0
+            or 0
+        )
 
         # 唤醒进度（本周）
         from src.services.member_agent_service import member_agent_service
+
         wakeup = await member_agent_service.get_wakeup_metrics(db, store_id)
 
         # VIP预警
@@ -204,24 +203,29 @@ class BossAgentService:
 
         # 各等级占比
         for lv in distribution:
-            distribution[lv]["percentage"] = round(
-                distribution[lv]["count"] / total * 100, 1
-            ) if total > 0 else 0.0
+            distribution[lv]["percentage"] = round(distribution[lv]["count"] / total * 100, 1) if total > 0 else 0.0
 
         # 健康评分
         health_score = compute_member_health_score(
-            counts["S1"], counts["S2"], counts["S3"], counts["S4"], counts["S5"],
+            counts["S1"],
+            counts["S2"],
+            counts["S3"],
+            counts["S4"],
+            counts["S5"],
         )
 
         # CDP 关联率
-        linked = await db.scalar(
-            select(func.count(PrivateDomainMember.id)).where(
-                and_(
-                    *where,
-                    PrivateDomainMember.consumer_id.isnot(None),
+        linked = (
+            await db.scalar(
+                select(func.count(PrivateDomainMember.id)).where(
+                    and_(
+                        *where,
+                        PrivateDomainMember.consumer_id.isnot(None),
+                    )
                 )
             )
-        ) or 0
+            or 0
+        )
 
         return {
             "total_members": total,
@@ -271,21 +275,24 @@ class BossAgentService:
         stores = []
         for sid, data in store_data.items():
             score = compute_member_health_score(
-                data["S1"], data["S2"], data["S3"], data["S4"], data["S5"],
+                data["S1"],
+                data["S2"],
+                data["S3"],
+                data["S4"],
+                data["S5"],
             )
-            at_risk_rate = (
-                (data["S4"] + data["S5"]) / data["total"]
-                if data["total"] > 0 else 0.0
+            at_risk_rate = (data["S4"] + data["S5"]) / data["total"] if data["total"] > 0 else 0.0
+            stores.append(
+                {
+                    "store_id": sid,
+                    "total_members": data["total"],
+                    "health_score": score,
+                    "s1_count": data["S1"],
+                    "at_risk_count": data["S4"] + data["S5"],
+                    "at_risk_rate": round(at_risk_rate, 4),
+                    "needs_attention": at_risk_rate > 0.3 or score < 40,
+                }
             )
-            stores.append({
-                "store_id": sid,
-                "total_members": data["total"],
-                "health_score": score,
-                "s1_count": data["S1"],
-                "at_risk_count": data["S4"] + data["S5"],
-                "at_risk_rate": round(at_risk_rate, 4),
-                "needs_attention": at_risk_rate > 0.3 or score < 40,
-            })
 
         stores.sort(key=lambda x: x["health_score"])
         return stores

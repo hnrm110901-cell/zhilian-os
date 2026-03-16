@@ -6,7 +6,7 @@ Create Date: 2026-03-12
 """
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, ENUM as PG_ENUM
 
 revision = "z45"
 down_revision = "z44"
@@ -14,16 +14,23 @@ branch_labels = None
 depends_on = None
 
 
+def _create_enum_safe(name: str, values: list) -> None:
+    """安全创建 PostgreSQL ENUM（已存在则跳过，兼容 offline SQL 生成模式）"""
+    vals = ", ".join(f"'{v}'" for v in values)
+    op.execute(sa.text(
+        f"DO $$ BEGIN "
+        f"CREATE TYPE {name} AS ENUM ({vals}); "
+        f"EXCEPTION WHEN duplicate_object THEN NULL; "
+        f"END $$"
+    ))
+
+
 def upgrade() -> None:
     # ── Enums ──
-    variance_severity = sa.Enum("ok", "watch", "warning", "critical", name="varianceseverity")
-    variance_severity.create(op.get_bind(), checkfirst=True)
-
-    attribution_factor = sa.Enum(
+    _create_enum_safe("varianceseverity", ["ok", "watch", "warning", "critical"])
+    _create_enum_safe("attributionfactor", [
         "price_change", "usage_overrun", "waste_loss", "yield_variance", "mix_shift",
-        name="attributionfactor",
-    )
-    attribution_factor.create(op.get_bind(), checkfirst=True)
+    ])
 
     # ── cost_truth_daily ──
     op.create_table(
@@ -41,7 +48,7 @@ def upgrade() -> None:
         sa.Column("actual_pct", sa.Float, server_default="0"),
         sa.Column("variance_pct", sa.Float, server_default="0"),
 
-        sa.Column("severity", variance_severity, server_default="ok"),
+        sa.Column("severity", PG_ENUM("ok", "watch", "warning", "critical", name="varianceseverity", create_type=False), server_default="ok"),
 
         sa.Column("mtd_actual_pct", sa.Float, nullable=True),
         sa.Column("predicted_eom_pct", sa.Float, nullable=True),
@@ -95,7 +102,7 @@ def upgrade() -> None:
         sa.Column("store_id", sa.String(50), sa.ForeignKey("stores.id"), nullable=False),
         sa.Column("truth_date", sa.Date, nullable=False),
 
-        sa.Column("factor", attribution_factor, nullable=False),
+        sa.Column("factor", PG_ENUM("price_change", "usage_overrun", "waste_loss", "yield_variance", "mix_shift", name="attributionfactor", create_type=False), nullable=False),
         sa.Column("contribution_fen", sa.Integer, server_default="0"),
         sa.Column("contribution_pct", sa.Float, server_default="0"),
         sa.Column("description", sa.Text),
@@ -113,5 +120,5 @@ def downgrade() -> None:
     op.drop_table("cost_variance_attribution")
     op.drop_table("cost_truth_dish_detail")
     op.drop_table("cost_truth_daily")
-    sa.Enum(name="attributionfactor").drop(op.get_bind(), checkfirst=True)
-    sa.Enum(name="varianceseverity").drop(op.get_bind(), checkfirst=True)
+    op.execute("DROP TYPE IF EXISTS attributionfactor")
+    op.execute("DROP TYPE IF EXISTS varianceseverity")

@@ -2,15 +2,17 @@
 Agent基础接口定义
 定义所有Agent必须遵循的统一接口规范
 """
-from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, List
-from dataclasses import dataclass, asdict
-from enum import Enum
+
 import time
+from abc import ABC, abstractmethod
+from dataclasses import asdict, dataclass
+from enum import Enum
+from typing import Any, Dict, List, Optional
 
 
 class AgentStatus(Enum):
     """Agent状态枚举"""
+
     IDLE = "idle"
     RUNNING = "running"
     SUCCESS = "success"
@@ -20,6 +22,7 @@ class AgentStatus(Enum):
 @dataclass
 class AgentResponse:
     """统一的Agent响应格式"""
+
     success: bool
     data: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
@@ -111,6 +114,7 @@ class BaseAgent(ABC):
         agent_type = getattr(self, "agent_type", self.__class__.__name__.lower().replace("agent", ""))
         try:
             from src.core.skill_registry import SkillRegistry
+
             return SkillRegistry.get().query(agent_type=agent_type)
         except Exception:
             return []
@@ -136,7 +140,7 @@ class BaseAgent(ABC):
                 return AgentResponse(
                     success=False,
                     error=f"不支持的操作: {action}。支持的操作: {', '.join(self.get_supported_actions())}",
-                    execution_time=time.time() - start_time
+                    execution_time=time.time() - start_time,
                 )
 
             # 验证参数
@@ -144,9 +148,7 @@ class BaseAgent(ABC):
             if not valid:
                 self.status = AgentStatus.ERROR
                 return AgentResponse(
-                    success=False,
-                    error=f"参数验证失败: {error_msg}",
-                    execution_time=time.time() - start_time
+                    success=False, error=f"参数验证失败: {error_msg}", execution_time=time.time() - start_time
                 )
 
             # 执行操作
@@ -158,8 +160,4 @@ class BaseAgent(ABC):
 
         except Exception as e:
             self.status = AgentStatus.ERROR
-            return AgentResponse(
-                success=False,
-                error=str(e),
-                execution_time=time.time() - start_time
-            )
+            return AgentResponse(success=False, error=str(e), execution_time=time.time() - start_time)

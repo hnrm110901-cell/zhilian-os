@@ -2,11 +2,12 @@
 竞争分析 API
 提供竞品管理、市场份额分析、价格对比、价格敏感度分析
 """
-from typing import List, Optional
+
 from datetime import date
+from typing import List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-
 from src.core.dependencies import get_current_active_user, require_role
 from src.models import User
 from src.models.user import UserRole
@@ -18,6 +19,7 @@ router = APIRouter(prefix="/api/v1/competitive", tags=["competitive_analysis"])
 # ------------------------------------------------------------------ #
 # Pydantic 模型                                                        #
 # ------------------------------------------------------------------ #
+
 
 class CompetitorCreateRequest(BaseModel):
     name: str = Field(..., max_length=100)
@@ -55,6 +57,7 @@ class PriceRecordRequest(BaseModel):
 # ------------------------------------------------------------------ #
 # 竞品门店管理                                                          #
 # ------------------------------------------------------------------ #
+
 
 @router.get("/competitors")
 async def list_competitors(
@@ -116,6 +119,7 @@ async def delete_competitor(
 # 竞品价格管理                                                          #
 # ------------------------------------------------------------------ #
 
+
 @router.get("/competitors/{competitor_id}/prices")
 async def get_competitor_prices(
     competitor_id: str,
@@ -162,6 +166,7 @@ async def add_price_record(
 # ------------------------------------------------------------------ #
 # 分析端点                                                              #
 # ------------------------------------------------------------------ #
+
 
 @router.get("/market-share")
 async def analyze_market_share(

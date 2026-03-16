@@ -1,18 +1,21 @@
 """
 Inventory Models
 """
-from sqlalchemy import Column, String, Integer, ForeignKey, Enum, DateTime, Float
+
+import enum
+import uuid
+from datetime import datetime
+
+from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, Integer, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-import uuid
-import enum
-from datetime import datetime
 
 from .base import Base, TimestampMixin
 
 
 class InventoryStatus(str, enum.Enum):
     """Inventory status"""
+
     NORMAL = "normal"
     LOW = "low"
     CRITICAL = "critical"
@@ -21,6 +24,7 @@ class InventoryStatus(str, enum.Enum):
 
 class TransactionType(str, enum.Enum):
     """Inventory transaction type"""
+
     PURCHASE = "purchase"  # 采购入库
     USAGE = "usage"  # 使用出库
     WASTE = "waste"  # 损耗

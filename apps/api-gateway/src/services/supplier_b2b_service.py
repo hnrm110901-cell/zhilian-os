@@ -2,15 +2,15 @@
 供应商B2B采购单服务
 创建/查询/提交/收货/取消采购单，统计概览
 """
-import uuid
-from datetime import datetime, date
-from typing import Optional, List, Dict, Any
 
-from sqlalchemy import select, func, and_, extract
+import uuid
+from datetime import date, datetime
+from typing import Any, Dict, List, Optional
+
+from sqlalchemy import and_, extract, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-
-from src.models.supplier_b2b import B2BPurchaseOrder, B2BPurchaseItem
+from src.models.supplier_b2b import B2BPurchaseItem, B2BPurchaseOrder
 
 
 class SupplierB2BService:
@@ -34,8 +34,7 @@ class SupplierB2BService:
 
         # 查询今天最大序号
         result = await db.execute(
-            select(func.max(B2BPurchaseOrder.order_number))
-            .where(B2BPurchaseOrder.order_number.like(f"{prefix}%"))
+            select(func.max(B2BPurchaseOrder.order_number)).where(B2BPurchaseOrder.order_number.like(f"{prefix}%"))
         )
         max_number = result.scalar_one_or_none()
 
@@ -61,15 +60,17 @@ class SupplierB2BService:
             amount = int(float(qty) * unit_price)
             total_amount_fen += amount
 
-            order_items.append(B2BPurchaseItem(
-                id=uuid.uuid4(),
-                ingredient_name=item_data["ingredient_name"],
-                ingredient_id=item_data.get("ingredient_id"),
-                quantity=qty,
-                unit=item_data.get("unit", "kg"),
-                unit_price_fen=unit_price,
-                amount_fen=amount,
-            ))
+            order_items.append(
+                B2BPurchaseItem(
+                    id=uuid.uuid4(),
+                    ingredient_name=item_data["ingredient_name"],
+                    ingredient_id=item_data.get("ingredient_id"),
+                    quantity=qty,
+                    unit=item_data.get("unit", "kg"),
+                    unit_price_fen=unit_price,
+                    amount_fen=amount,
+                )
+            )
 
         # 解析预期交货日期
         expected_date = data.get("expected_delivery_date")
@@ -115,9 +116,7 @@ class SupplierB2BService:
         where_clause = and_(*conditions)
 
         # 总数
-        count_result = await db.execute(
-            select(func.count(B2BPurchaseOrder.id)).where(where_clause)
-        )
+        count_result = await db.execute(select(func.count(B2BPurchaseOrder.id)).where(where_clause))
         total = count_result.scalar_one()
 
         # 分页查询
@@ -142,23 +141,17 @@ class SupplierB2BService:
     async def get_order(self, db: AsyncSession, order_id: str) -> Optional[Dict[str, Any]]:
         """获取采购单详情（含明细）"""
         result = await db.execute(
-            select(B2BPurchaseOrder)
-            .options(selectinload(B2BPurchaseOrder.items))
-            .where(B2BPurchaseOrder.id == order_id)
+            select(B2BPurchaseOrder).options(selectinload(B2BPurchaseOrder.items)).where(B2BPurchaseOrder.id == order_id)
         )
         order = result.scalar_one_or_none()
         if not order:
             return None
         return order.to_dict()
 
-    async def update_order_status(
-        self, db: AsyncSession, order_id: str, new_status: str
-    ) -> Dict[str, Any]:
+    async def update_order_status(self, db: AsyncSession, order_id: str, new_status: str) -> Dict[str, Any]:
         """更新采购单状态（含状态机校验）"""
         result = await db.execute(
-            select(B2BPurchaseOrder)
-            .options(selectinload(B2BPurchaseOrder.items))
-            .where(B2BPurchaseOrder.id == order_id)
+            select(B2BPurchaseOrder).options(selectinload(B2BPurchaseOrder.items)).where(B2BPurchaseOrder.id == order_id)
         )
         order = result.scalar_one_or_none()
         if not order:
@@ -187,14 +180,10 @@ class SupplierB2BService:
         """提交采购单给供应商"""
         return await self.update_order_status(db, order_id, "submitted")
 
-    async def receive_order(
-        self, db: AsyncSession, order_id: str, received_items: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    async def receive_order(self, db: AsyncSession, order_id: str, received_items: List[Dict[str, Any]]) -> Dict[str, Any]:
         """收货：更新各明细的收货数量和质量状态"""
         result = await db.execute(
-            select(B2BPurchaseOrder)
-            .options(selectinload(B2BPurchaseOrder.items))
-            .where(B2BPurchaseOrder.id == order_id)
+            select(B2BPurchaseOrder).options(selectinload(B2BPurchaseOrder.items)).where(B2BPurchaseOrder.id == order_id)
         )
         order = result.scalar_one_or_none()
         if not order:
@@ -220,14 +209,10 @@ class SupplierB2BService:
         await db.refresh(order, attribute_names=["items"])
         return order.to_dict()
 
-    async def cancel_order(
-        self, db: AsyncSession, order_id: str, reason: Optional[str] = None
-    ) -> Dict[str, Any]:
+    async def cancel_order(self, db: AsyncSession, order_id: str, reason: Optional[str] = None) -> Dict[str, Any]:
         """取消采购单"""
         result = await db.execute(
-            select(B2BPurchaseOrder)
-            .options(selectinload(B2BPurchaseOrder.items))
-            .where(B2BPurchaseOrder.id == order_id)
+            select(B2BPurchaseOrder).options(selectinload(B2BPurchaseOrder.items)).where(B2BPurchaseOrder.id == order_id)
         )
         order = result.scalar_one_or_none()
         if not order:
@@ -264,8 +249,7 @@ class SupplierB2BService:
             select(
                 func.coalesce(func.sum(B2BPurchaseOrder.total_amount_fen), 0),
                 func.count(B2BPurchaseOrder.id),
-            )
-            .where(
+            ).where(
                 and_(
                     B2BPurchaseOrder.brand_id == brand_id,
                     B2BPurchaseOrder.status.in_(["received", "completed"]),
@@ -286,7 +270,9 @@ class SupplierB2BService:
             "received_count": status_counts.get("received", 0),
             "completed_count": status_counts.get("completed", 0),
             "cancelled_count": status_counts.get("cancelled", 0),
-            "pending_count": status_counts.get("submitted", 0) + status_counts.get("confirmed", 0) + status_counts.get("shipping", 0),
+            "pending_count": status_counts.get("submitted", 0)
+            + status_counts.get("confirmed", 0)
+            + status_counts.get("shipping", 0),
             "monthly_spend_fen": int(monthly_spend_fen),
             "monthly_completed": monthly_completed,
         }

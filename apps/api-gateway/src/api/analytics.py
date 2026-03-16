@@ -2,10 +2,10 @@
 Analytics API
 数据分析API - 销售预测、异常检测、关联分析、时间模式分析
 """
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-import structlog
-
 from src.core.database import get_db
 from src.core.dependencies import get_current_active_user
 from src.models.user import User
@@ -66,10 +66,10 @@ async def analyze_associations(
 
 @router.get("/revenue-trend")
 async def revenue_trend(
-    store_id:    str = Query(..., description="门店ID"),
-    days:        int = Query(30, ge=7, le=365, description="统计天数"),
+    store_id: str = Query(..., description="门店ID"),
+    days: int = Query(30, ge=7, le=365, description="统计天数"),
     granularity: str = Query("daily", pattern="^(daily|weekly)$", description="颗粒度: daily / weekly"),
-    db:          AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
     """营收趋势 — 日/周颗粒度的营收时间序列及环比变化"""
@@ -84,8 +84,8 @@ async def revenue_trend(
 @router.get("/customer-traffic")
 async def customer_traffic(
     store_id: str = Query(..., description="门店ID"),
-    days:     int = Query(30, ge=7, le=365, description="统计天数"),
-    db:       AsyncSession = Depends(get_db),
+    days: int = Query(30, ge=7, le=365, description="统计天数"),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
     """客流分析 — 以订单数为客流代理指标，返回每日趋势及时段分布"""
@@ -100,9 +100,9 @@ async def customer_traffic(
 @router.get("/dish-contribution")
 async def dish_contribution(
     store_id: str = Query(..., description="门店ID"),
-    days:     int = Query(30, ge=7, le=365, description="统计天数"),
-    top_n:    int = Query(20, ge=5, le=100, description="返回前N名菜品"),
-    db:       AsyncSession = Depends(get_db),
+    days: int = Query(30, ge=7, le=365, description="统计天数"),
+    top_n: int = Query(20, ge=5, le=100, description="返回前N名菜品"),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
     """菜品贡献度 — 帕累托分析（A/B/C 分级），返回各菜品营收占比及累计曲线"""
@@ -117,8 +117,8 @@ async def dish_contribution(
 @router.get("/time-heatmap")
 async def time_heatmap(
     store_id: str = Query(..., description="门店ID"),
-    days:     int = Query(30, ge=7, le=365, description="统计天数"),
-    db:       AsyncSession = Depends(get_db),
+    days: int = Query(30, ge=7, le=365, description="统计天数"),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
     """时段热力图 — 7（周）× 24（时）平均营收矩阵，供前端渲染热力图"""

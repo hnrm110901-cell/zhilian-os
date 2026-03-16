@@ -2,18 +2,21 @@
 External System Integration Models
 外部系统集成模型
 """
+
 import enum
+import uuid
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import Column, String, DateTime, Enum, Text, Boolean, Integer, Float, JSON, Numeric
+
+from sqlalchemy import JSON, Boolean, Column, DateTime, Enum, Float, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import UUID
-import uuid
 
 from .base import Base
 
 
 class IntegrationType(str, enum.Enum):
     """集成类型"""
+
     POS = "pos"  # POS系统
     SUPPLIER = "supplier"  # 供应商系统
     MEMBER = "member"  # 会员系统
@@ -25,6 +28,7 @@ class IntegrationType(str, enum.Enum):
 
 class IntegrationStatus(str, enum.Enum):
     """集成状态"""
+
     ACTIVE = "active"  # 激活
     INACTIVE = "inactive"  # 未激活
     ERROR = "error"  # 错误
@@ -33,6 +37,7 @@ class IntegrationStatus(str, enum.Enum):
 
 class SyncStatus(str, enum.Enum):
     """同步状态"""
+
     PENDING = "pending"  # 待同步
     SYNCING = "syncing"  # 同步中
     SUCCESS = "success"  # 成功
@@ -42,21 +47,18 @@ class SyncStatus(str, enum.Enum):
 
 class ExternalSystem(Base):
     """外部系统配置"""
+
     __tablename__ = "external_systems"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(100), nullable=False, comment="系统名称")
-    type = Column(
-        Enum(IntegrationType, values_callable=lambda x: [e.value for e in x]),
-        nullable=False,
-        comment="集成类型"
-    )
+    type = Column(Enum(IntegrationType, values_callable=lambda x: [e.value for e in x]), nullable=False, comment="集成类型")
     provider = Column(String(100), comment="提供商名称")
     version = Column(String(50), comment="版本")
     status = Column(
         Enum(IntegrationStatus, values_callable=lambda x: [e.value for e in x]),
         default=IntegrationStatus.INACTIVE,
-        comment="状态"
+        comment="状态",
     )
     store_id = Column(String(50), comment="关联门店ID")
 
@@ -72,10 +74,7 @@ class ExternalSystem(Base):
     sync_enabled = Column(Boolean, default=True, comment="是否启用同步")
     sync_interval = Column(Integer, default=300, comment="同步间隔(秒)")
     last_sync_at = Column(DateTime, comment="最后同步时间")
-    last_sync_status = Column(
-        Enum(SyncStatus, values_callable=lambda x: [e.value for e in x]),
-        comment="最后同步状态"
-    )
+    last_sync_status = Column(Enum(SyncStatus, values_callable=lambda x: [e.value for e in x]), comment="最后同步状态")
     last_error = Column(Text, comment="最后错误信息")
 
     # 元数据
@@ -106,16 +105,13 @@ class ExternalSystem(Base):
 
 class SyncLog(Base):
     """同步日志"""
+
     __tablename__ = "sync_logs"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     system_id = Column(UUID(as_uuid=True), nullable=False, comment="外部系统ID")
     sync_type = Column(String(50), nullable=False, comment="同步类型")
-    status = Column(
-        Enum(SyncStatus, values_callable=lambda x: [e.value for e in x]),
-        nullable=False,
-        comment="同步状态"
-    )
+    status = Column(Enum(SyncStatus, values_callable=lambda x: [e.value for e in x]), nullable=False, comment="同步状态")
 
     # 同步详情
     records_total = Column(Integer, default=0, comment="总记录数")
@@ -157,6 +153,7 @@ class SyncLog(Base):
 
 class POSTransaction(Base):
     """POS交易记录"""
+
     __tablename__ = "pos_transactions"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -181,9 +178,7 @@ class POSTransaction(Base):
 
     # 同步状态
     sync_status = Column(
-        Enum(SyncStatus, values_callable=lambda x: [e.value for e in x]),
-        default=SyncStatus.PENDING,
-        comment="同步状态"
+        Enum(SyncStatus, values_callable=lambda x: [e.value for e in x]), default=SyncStatus.PENDING, comment="同步状态"
     )
     synced_at = Column(DateTime, comment="同步时间")
 
@@ -217,6 +212,7 @@ class POSTransaction(Base):
 
 class SupplierOrder(Base):
     """供应商订单"""
+
     __tablename__ = "supplier_orders"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -247,9 +243,7 @@ class SupplierOrder(Base):
 
     # 同步状态
     sync_status = Column(
-        Enum(SyncStatus, values_callable=lambda x: [e.value for e in x]),
-        default=SyncStatus.PENDING,
-        comment="同步状态"
+        Enum(SyncStatus, values_callable=lambda x: [e.value for e in x]), default=SyncStatus.PENDING, comment="同步状态"
     )
     synced_at = Column(DateTime, comment="同步时间")
 
@@ -284,6 +278,7 @@ class SupplierOrder(Base):
 
 class MemberSync(Base):
     """会员同步记录"""
+
     __tablename__ = "member_syncs"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -303,9 +298,7 @@ class MemberSync(Base):
 
     # 同步状态
     sync_status = Column(
-        Enum(SyncStatus, values_callable=lambda x: [e.value for e in x]),
-        default=SyncStatus.PENDING,
-        comment="同步状态"
+        Enum(SyncStatus, values_callable=lambda x: [e.value for e in x]), default=SyncStatus.PENDING, comment="同步状态"
     )
     synced_at = Column(DateTime, comment="同步时间")
     last_activity = Column(DateTime, comment="最后活动时间")
@@ -337,6 +330,7 @@ class MemberSync(Base):
 
 class ReservationSync(Base):
     """预订同步记录"""
+
     __tablename__ = "reservation_syncs"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -364,7 +358,9 @@ class ReservationSync(Base):
     area = Column(String(50), comment="区域")
 
     # 预订状态
-    status = Column(String(50), nullable=False, comment="预订状态: pending/confirmed/arrived/seated/completed/cancelled/no_show")
+    status = Column(
+        String(50), nullable=False, comment="预订状态: pending/confirmed/arrived/seated/completed/cancelled/no_show"
+    )
 
     # 特殊要求
     special_requirements = Column(Text, comment="特殊要求")
@@ -381,9 +377,7 @@ class ReservationSync(Base):
 
     # 同步状态
     sync_status = Column(
-        Enum(SyncStatus, values_callable=lambda x: [e.value for e in x]),
-        default=SyncStatus.PENDING,
-        comment="同步状态"
+        Enum(SyncStatus, values_callable=lambda x: [e.value for e in x]), default=SyncStatus.PENDING, comment="同步状态"
     )
     synced_at = Column(DateTime, comment="同步时间")
 

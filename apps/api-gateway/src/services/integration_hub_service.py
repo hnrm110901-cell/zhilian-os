@@ -2,13 +2,14 @@
 Integration Hub Service
 集成中心服务 — 统一管理所有外部集成的健康状态和同步记录
 """
+
 import os
 from datetime import datetime, timedelta
 from typing import Optional
 
-from sqlalchemy import select, func, update
-from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
+from sqlalchemy import func, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.integration_hub import IntegrationHubStatus
 
@@ -78,9 +79,7 @@ class IntegrationHubService:
 
     async def _ensure_defaults(self, db: AsyncSession) -> None:
         """确保默认集成记录存在，不存在则批量创建"""
-        result = await db.execute(
-            select(IntegrationHubStatus.integration_key)
-        )
+        result = await db.execute(select(IntegrationHubStatus.integration_key))
         existing_keys = {row[0] for row in result.fetchall()}
 
         new_records = []
@@ -198,11 +197,7 @@ class IntegrationHubService:
         error_msg: Optional[str] = None,
     ) -> dict:
         """更新指定集成的状态"""
-        result = await db.execute(
-            select(IntegrationHubStatus).where(
-                IntegrationHubStatus.integration_key == key
-            )
-        )
+        result = await db.execute(select(IntegrationHubStatus).where(IntegrationHubStatus.integration_key == key))
         row = result.scalar_one_or_none()
         if not row:
             raise ValueError(f"未知的集成标识: {key}")
@@ -224,11 +219,7 @@ class IntegrationHubService:
         error_msg: Optional[str] = None,
     ) -> dict:
         """记录一次同步事件（成功或失败）"""
-        result = await db.execute(
-            select(IntegrationHubStatus).where(
-                IntegrationHubStatus.integration_key == key
-            )
-        )
+        result = await db.execute(select(IntegrationHubStatus).where(IntegrationHubStatus.integration_key == key))
         row = result.scalar_one_or_none()
         if not row:
             raise ValueError(f"未知的集成标识: {key}")
@@ -296,10 +287,7 @@ class IntegrationHubService:
 
     async def reset_daily_counts(self, db: AsyncSession) -> int:
         """重置每日计数器（凌晨定时调用）"""
-        stmt = (
-            update(IntegrationHubStatus)
-            .values(sync_count_today=0, error_count_today=0, updated_at=datetime.utcnow())
-        )
+        stmt = update(IntegrationHubStatus).values(sync_count_today=0, error_count_today=0, updated_at=datetime.utcnow())
         result = await db.execute(stmt)
         await db.flush()
         count = result.rowcount

@@ -8,14 +8,14 @@ TrustedExecutor 负责：
 4. 写入审计日志（ExecutionRecord）
 5. 30分钟窗口内支持回滚
 """
+
 import uuid
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
+
 import structlog
 
-from .execution_registry import (
-    COMMAND_REGISTRY, CommandDef, ExecutionLevel, get_command_def
-)
+from .execution_registry import COMMAND_REGISTRY, CommandDef, ExecutionLevel, get_command_def
 
 logger = structlog.get_logger()
 
@@ -28,6 +28,7 @@ ROLLBACK_WINDOW_MINUTES = 30
 
 class ExecutionError(Exception):
     """可信执行层错误"""
+
     def __init__(self, message: str, error_code: str = "EXECUTION_ERROR"):
         super().__init__(message)
         self.error_code = error_code
@@ -35,26 +36,19 @@ class ExecutionError(Exception):
 
 class PermissionDeniedError(ExecutionError):
     def __init__(self, actor_role: str, command_type: str):
-        super().__init__(
-            f"角色 '{actor_role}' 无权执行指令 '{command_type}'",
-            error_code="PERMISSION_DENIED"
-        )
+        super().__init__(f"角色 '{actor_role}' 无权执行指令 '{command_type}'", error_code="PERMISSION_DENIED")
 
 
 class ApprovalRequiredError(ExecutionError):
     def __init__(self, command_type: str, reason: str):
-        super().__init__(
-            f"指令 '{command_type}' 需要审批: {reason}",
-            error_code="APPROVAL_REQUIRED"
-        )
+        super().__init__(f"指令 '{command_type}' 需要审批: {reason}", error_code="APPROVAL_REQUIRED")
         self.reason = reason
 
 
 class RollbackWindowExpiredError(ExecutionError):
     def __init__(self, execution_id: str):
         super().__init__(
-            f"执行记录 '{execution_id}' 已超过 {ROLLBACK_WINDOW_MINUTES} 分钟回滚窗口",
-            error_code="ROLLBACK_WINDOW_EXPIRED"
+            f"执行记录 '{execution_id}' 已超过 {ROLLBACK_WINDOW_MINUTES} 分钟回滚窗口", error_code="ROLLBACK_WINDOW_EXPIRED"
         )
 
 
@@ -134,10 +128,7 @@ class TrustedExecutor:
             and float(amount) > cmd_def.amount_circuit_breaker
         ):
             effective_level = ExecutionLevel.APPROVE
-            circuit_reason = (
-                f"金额 {amount} 超过熔断阈值 {cmd_def.amount_circuit_breaker} 元，"
-                f"自动升级为 APPROVE"
-            )
+            circuit_reason = f"金额 {amount} 超过熔断阈值 {cmd_def.amount_circuit_breaker} 元，" f"自动升级为 APPROVE"
             logger.warning(
                 "trusted_executor.circuit_breaker_triggered",
                 execution_id=execution_id,
@@ -177,6 +168,7 @@ class TrustedExecutor:
             if command_type == "discount_apply" and store_id:
                 try:
                     from src.core.celery_tasks import realtime_anomaly_check
+
                     anomaly_event = {
                         "action_type": command_type,
                         # detect_anomaly 期望 amount 单位为分
@@ -253,10 +245,7 @@ class TrustedExecutor:
         # 从审计日志查询执行记录
         record = await self._get_audit_record(execution_id)
         if not record:
-            raise ExecutionError(
-                f"执行记录 '{execution_id}' 不存在",
-                error_code="EXECUTION_NOT_FOUND"
-            )
+            raise ExecutionError(f"执行记录 '{execution_id}' 不存在", error_code="EXECUTION_NOT_FOUND")
 
         # 检查回滚窗口
         executed_at = record.get("executed_at")
@@ -342,17 +331,16 @@ class TrustedExecutor:
         logger.warning("trusted_executor.unknown_command_type", command_type=command_type)
         return {"command_type": command_type, "executed": True, "timestamp": now}
 
-    async def _exec_discount_apply(
-        self, payload: Dict[str, Any], actor: Dict[str, Any], now: str
-    ) -> Dict[str, Any]:
+    async def _exec_discount_apply(self, payload: Dict[str, Any], actor: Dict[str, Any], now: str) -> Dict[str, Any]:
         """执行折扣申请：在 discount_records 表写入已批准折扣。"""
         if not self._db:
             return {"command_type": "discount_apply", "executed": True, "timestamp": now, "note": "no_db"}
         from sqlalchemy import text
-        order_id  = payload.get("order_id") or payload.get("ref_id") or ""
-        amount    = float(payload.get("amount", 0))
-        store_id  = payload.get("store_id", "")
-        reason    = payload.get("reason", "trusted_executor")
+
+        order_id = payload.get("order_id") or payload.get("ref_id") or ""
+        amount = float(payload.get("amount", 0))
+        store_id = payload.get("store_id", "")
+        reason = payload.get("reason", "trusted_executor")
         try:
             await self._db.execute(
                 text("""
@@ -368,18 +356,23 @@ class TrustedExecutor:
             await self._db.commit()
         except Exception as exc:
             logger.warning("discount_apply_db_failed", order_id=order_id, error=str(exc))
-        return {"command_type": "discount_apply", "executed": True, "order_id": order_id, "amount_yuan": amount, "timestamp": now}
+        return {
+            "command_type": "discount_apply",
+            "executed": True,
+            "order_id": order_id,
+            "amount_yuan": amount,
+            "timestamp": now,
+        }
 
-    async def _exec_price_adjustment(
-        self, payload: Dict[str, Any], actor: Dict[str, Any], now: str
-    ) -> Dict[str, Any]:
+    async def _exec_price_adjustment(self, payload: Dict[str, Any], actor: Dict[str, Any], now: str) -> Dict[str, Any]:
         """执行菜品价格调整：更新 dishes 表的 price 字段。"""
         if not self._db:
             return {"command_type": "price_adjustment", "executed": True, "timestamp": now, "note": "no_db"}
         from sqlalchemy import text
-        dish_id  = payload.get("dish_id") or payload.get("ref_id") or ""
+
+        dish_id = payload.get("dish_id") or payload.get("ref_id") or ""
         new_price = float(payload.get("new_price") or payload.get("amount", 0))
-        store_id  = payload.get("store_id", "")
+        store_id = payload.get("store_id", "")
         try:
             await self._db.execute(
                 text("UPDATE dishes SET price = :p, updated_at = NOW() WHERE id = :did AND store_id = :sid"),
@@ -388,19 +381,24 @@ class TrustedExecutor:
             await self._db.commit()
         except Exception as exc:
             logger.warning("price_adjustment_db_failed", dish_id=dish_id, error=str(exc))
-        return {"command_type": "price_adjustment", "executed": True, "dish_id": dish_id, "new_price_yuan": new_price, "timestamp": now}
+        return {
+            "command_type": "price_adjustment",
+            "executed": True,
+            "dish_id": dish_id,
+            "new_price_yuan": new_price,
+            "timestamp": now,
+        }
 
-    async def _exec_inventory_write_off(
-        self, payload: Dict[str, Any], actor: Dict[str, Any], now: str
-    ) -> Dict[str, Any]:
+    async def _exec_inventory_write_off(self, payload: Dict[str, Any], actor: Dict[str, Any], now: str) -> Dict[str, Any]:
         """执行库存核销：在 inventory_transactions 记录损耗核销，更新 inventory_items 数量。"""
         if not self._db:
             return {"command_type": "inventory_write_off", "executed": True, "timestamp": now, "note": "no_db"}
         from sqlalchemy import text
-        item_id   = payload.get("item_id") or payload.get("ref_id") or ""
-        qty       = float(payload.get("quantity", 0))
-        store_id  = payload.get("store_id", "")
-        reason    = payload.get("reason", "write_off")
+
+        item_id = payload.get("item_id") or payload.get("ref_id") or ""
+        qty = float(payload.get("quantity", 0))
+        store_id = payload.get("store_id", "")
+        reason = payload.get("reason", "write_off")
         try:
             await self._db.execute(
                 text("""
@@ -415,7 +413,9 @@ class TrustedExecutor:
                 {"iid": item_id, "sid": store_id, "qty": qty, "rsn": reason, "by": actor.get("user_id", "system")},
             )
             await self._db.execute(
-                text("UPDATE inventory_items SET current_quantity = GREATEST(current_quantity - :qty, 0), updated_at = NOW() WHERE id = :iid AND store_id = :sid"),
+                text(
+                    "UPDATE inventory_items SET current_quantity = GREATEST(current_quantity - :qty, 0), updated_at = NOW() WHERE id = :iid AND store_id = :sid"
+                ),
                 {"qty": qty, "iid": item_id, "sid": store_id},
             )
             await self._db.commit()
@@ -430,14 +430,24 @@ class TrustedExecutor:
         current_qty = payload.get("current_quantity", 0)
         min_qty = payload.get("min_quantity", 0)
         try:
-            from src.services.wechat_work_message_service import WeChatWorkMessageService
             import os
+
+            from src.services.wechat_work_message_service import WeChatWorkMessageService
+
             recipient = os.getenv(f"WECHAT_RECIPIENT_{store_id.upper()}", f"store_{store_id}")
-            msg = f"⚠️ 库存告警\n门店：{store_id}\n物料：{item_name}\n当前库存：{current_qty}，最低要求：{min_qty}\n请及时补货。"
+            msg = (
+                f"⚠️ 库存告警\n门店：{store_id}\n物料：{item_name}\n当前库存：{current_qty}，最低要求：{min_qty}\n请及时补货。"
+            )
             await WeChatWorkMessageService.send_text(recipient_user_id=recipient, content=msg)
         except Exception as exc:
             logger.warning("stock_alert_send_failed", store_id=store_id, error=str(exc))
-        return {"command_type": "stock_alert", "executed": True, "store_id": store_id, "item_name": item_name, "timestamp": now}
+        return {
+            "command_type": "stock_alert",
+            "executed": True,
+            "store_id": store_id,
+            "item_name": item_name,
+            "timestamp": now,
+        }
 
     async def _write_audit(
         self,
@@ -455,6 +465,7 @@ class TrustedExecutor:
     ) -> Dict[str, Any]:
         """写入审计日志"""
         import json
+
         record = {
             "execution_id": execution_id,
             "command_type": command_type,
@@ -473,6 +484,7 @@ class TrustedExecutor:
         if self._db:
             try:
                 from ..models.execution_audit import ExecutionRecord
+
                 db_record = ExecutionRecord(
                     id=execution_id,
                     command_type=command_type,
@@ -498,6 +510,7 @@ class TrustedExecutor:
         if self._db:
             try:
                 from ..models.execution_audit import ExecutionRecord
+
                 record = await self._db.get(ExecutionRecord, execution_id)
                 if record:
                     return {
@@ -523,6 +536,7 @@ class TrustedExecutor:
         if self._db:
             try:
                 from ..models.execution_audit import ExecutionRecord
+
                 record = await self._db.get(ExecutionRecord, execution_id)
                 if record:
                     record.status = "rolled_back"

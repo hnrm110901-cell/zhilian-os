@@ -3,15 +3,17 @@
 跨系统聚合仪表盘：实时概览、事件流、KPI矩阵、行动调度、系统脉搏。
 仅限平台管理员(ADMIN)访问。
 """
+
 from typing import Optional
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-import structlog
 
-from ..models.user import User, UserRole
-from ..core.dependencies import require_role
 from ..core.database import get_db
+from ..core.dependencies import require_role
+from ..models.user import User, UserRole
 from ..services.command_center_service import command_center_service
 
 logger = structlog.get_logger()
@@ -20,13 +22,16 @@ router = APIRouter(prefix="/api/v1/command-center", tags=["指挥中心"])
 
 # ── 请求模型 ──────────────────────────────────────────────────────────────────
 
+
 class DispatchRequest(BaseModel):
     """行动调度请求"""
+
     action_type: str  # sync_all / run_closing / check_procurement / generate_alerts
     params: dict = {}
 
 
 # ── 端点 ──────────────────────────────────────────────────────────────────────
+
 
 @router.get("/overview")
 async def get_live_overview(
@@ -80,9 +85,7 @@ async def dispatch_action(
 ):
     """行动调度 — 触发全量同步/日结/采购检查/告警生成"""
     try:
-        result = await command_center_service.dispatch_action(
-            db, brand_id, body.action_type, body.params
-        )
+        result = await command_center_service.dispatch_action(db, brand_id, body.action_type, body.params)
         if not result.get("success"):
             raise HTTPException(status_code=400, detail=result.get("message", "操作失败"))
         return result

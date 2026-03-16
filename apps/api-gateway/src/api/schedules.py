@@ -2,23 +2,24 @@
 Schedule Management API
 排班管理API
 """
+
+import uuid
+from datetime import date, datetime, time
+from typing import List, Literal, Optional
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional, List, Literal
-from datetime import date, time, datetime
-import uuid
-import structlog
+from sqlalchemy import and_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user, require_role
+from ..models.audit_log import AuditAction, AuditLog, ResourceType
 from ..models.schedule import Schedule, Shift
-from ..models.audit_log import AuditLog, ResourceType, AuditAction
 from ..models.user import User, UserRole
 from ..repositories import ScheduleRepository
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
-from sqlalchemy.orm import selectinload
-
 from ..services.schedule_conflict_service import detect_schedule_conflicts
 
 logger = structlog.get_logger()
@@ -109,13 +110,16 @@ async def list_schedules(
 ):
     """获取排班列表"""
     result = await session.execute(
-        select(Schedule).options(selectinload(Schedule.shifts)).where(
+        select(Schedule)
+        .options(selectinload(Schedule.shifts))
+        .where(
             and_(
                 Schedule.store_id == store_id,
                 Schedule.schedule_date >= start_date,
                 Schedule.schedule_date <= end_date,
             )
-        ).order_by(Schedule.schedule_date)
+        )
+        .order_by(Schedule.schedule_date)
     )
     schedules = result.scalars().all()
     return [_to_schedule_response(s) for s in schedules]
@@ -128,9 +132,7 @@ async def get_schedule(
     current_user: User = Depends(get_current_active_user),
 ):
     """获取排班详情"""
-    result = await session.execute(
-        select(Schedule).options(selectinload(Schedule.shifts)).where(Schedule.id == schedule_id)
-    )
+    result = await session.execute(select(Schedule).options(selectinload(Schedule.shifts)).where(Schedule.id == schedule_id))
     schedule = result.scalar_one_or_none()
     if not schedule:
         raise HTTPException(status_code=404, detail="排班不存在")
@@ -194,9 +196,7 @@ async def create_schedule(
     )
 
     await session.commit()
-    result2 = await session.execute(
-        select(Schedule).options(selectinload(Schedule.shifts)).where(Schedule.id == schedule.id)
-    )
+    result2 = await session.execute(select(Schedule).options(selectinload(Schedule.shifts)).where(Schedule.id == schedule.id))
     schedule = result2.scalar_one()
     logger.info("schedule_created", schedule_id=str(schedule.id), date=str(req.schedule_date))
     return _to_schedule_response(schedule)
@@ -209,9 +209,7 @@ async def publish_schedule(
     current_user: User = Depends(require_role(UserRole.STORE_MANAGER)),
 ):
     """发布排班"""
-    result = await session.execute(
-        select(Schedule).options(selectinload(Schedule.shifts)).where(Schedule.id == schedule_id)
-    )
+    result = await session.execute(select(Schedule).options(selectinload(Schedule.shifts)).where(Schedule.id == schedule_id))
     schedule = result.scalar_one_or_none()
     if not schedule:
         raise HTTPException(status_code=404, detail="排班不存在")
@@ -248,8 +246,9 @@ async def auto_generate_schedule(
     current_user: User = Depends(require_role(UserRole.STORE_MANAGER)),
 ):
     """AI智能排班：根据员工技能自动生成当日排班"""
-    from ..repositories import EmployeeRepository
     from datetime import time as dtime
+
+    from ..repositories import EmployeeRepository
 
     existing = await ScheduleRepository.get_by_date(session, req.store_id, req.schedule_date)
     if existing:
@@ -262,9 +261,9 @@ async def auto_generate_schedule(
 
     # 默认班次规则
     shift_rules = req.shift_rules or {
-        "morning":   {"start": "08:00", "end": "14:00", "needs": ["waiter", "cashier", "chef"]},
+        "morning": {"start": "08:00", "end": "14:00", "needs": ["waiter", "cashier", "chef"]},
         "afternoon": {"start": "14:00", "end": "20:00", "needs": ["waiter", "cashier", "chef"]},
-        "evening":   {"start": "20:00", "end": "23:00", "needs": ["waiter", "manager"]},
+        "evening": {"start": "20:00", "end": "23:00", "needs": ["waiter", "manager"]},
     }
 
     # 简单贪心分配：按技能匹配，循环分配班次
@@ -280,13 +279,15 @@ async def auto_generate_schedule(
                 candidates = active_emps  # fallback
             emp = candidates[emp_idx % len(candidates)]
             emp_idx += 1
-            shifts_data.append(CreateShiftRequest(
-                employee_id=emp.id,
-                shift_type=shift_type,
-                start_time=dtime(start_h, start_m),
-                end_time=dtime(end_h, end_m),
-                position=needed_skill,
-            ))
+            shifts_data.append(
+                CreateShiftRequest(
+                    employee_id=emp.id,
+                    shift_type=shift_type,
+                    start_time=dtime(start_h, start_m),
+                    end_time=dtime(end_h, end_m),
+                    position=needed_skill,
+                )
+            )
 
     conflicts = detect_schedule_conflicts(
         [
@@ -334,9 +335,7 @@ async def auto_generate_schedule(
     )
 
     await session.commit()
-    result2 = await session.execute(
-        select(Schedule).options(selectinload(Schedule.shifts)).where(Schedule.id == schedule.id)
-    )
+    result2 = await session.execute(select(Schedule).options(selectinload(Schedule.shifts)).where(Schedule.id == schedule.id))
     schedule = result2.scalar_one()
     logger.info("auto_schedule_generated", schedule_id=str(schedule.id), date=str(req.schedule_date))
     return _to_schedule_response(schedule)
@@ -351,15 +350,11 @@ async def confirm_shift(
     current_user: User = Depends(get_current_active_user),
 ):
     """确认班次"""
-    result = await session.execute(
-        select(Shift).where(and_(Shift.id == shift_id, Shift.schedule_id == schedule_id))
-    )
+    result = await session.execute(select(Shift).where(and_(Shift.id == shift_id, Shift.schedule_id == schedule_id)))
     shift = result.scalar_one_or_none()
     if not shift:
         raise HTTPException(status_code=404, detail="班次不存在")
-    schedule_store_result = await session.execute(
-        select(Schedule.store_id).where(Schedule.id == schedule_id)
-    )
+    schedule_store_result = await session.execute(select(Schedule.store_id).where(Schedule.id == schedule_id))
     schedule_store_id = schedule_store_result.scalar_one_or_none() or ""
     shift.is_confirmed = True
     if req.notes:
@@ -377,9 +372,13 @@ async def confirm_shift(
     await session.commit()
     await session.refresh(shift)
     return ShiftResponse(
-        id=str(shift.id), employee_id=shift.employee_id, shift_type=shift.shift_type,
-        start_time=shift.start_time, end_time=shift.end_time,
-        position=shift.position, is_confirmed=shift.is_confirmed,
+        id=str(shift.id),
+        employee_id=shift.employee_id,
+        shift_type=shift.shift_type,
+        start_time=shift.start_time,
+        end_time=shift.end_time,
+        position=shift.position,
+        is_confirmed=shift.is_confirmed,
     )
 
 
@@ -401,12 +400,14 @@ async def get_schedule_history(
     limit_value = limit if isinstance(limit, int) else 50
 
     result = await session.execute(
-        select(AuditLog).where(
+        select(AuditLog)
+        .where(
             and_(
                 AuditLog.resource_type == ResourceType.SCHEDULE,
                 AuditLog.resource_id == schedule_id,
             )
-        ).limit(200)
+        )
+        .limit(200)
     )
     rows = result.scalars().all()
     if action_value:
@@ -414,7 +415,8 @@ async def get_schedule_history(
     if keyword_value:
         kw = keyword_value.strip().lower()
         rows = [
-            item for item in rows
+            item
+            for item in rows
             if kw in f"{item.description or ''} {item.username or ''} {item.user_id or ''} {item.action or ''}".lower()
         ]
     rows.sort(
@@ -449,13 +451,16 @@ async def get_my_schedule(
 
     week_end = week_start + timedelta(days=6)
     result = await session.execute(
-        select(Schedule).options(selectinload(Schedule.shifts)).where(
+        select(Schedule)
+        .options(selectinload(Schedule.shifts))
+        .where(
             and_(
                 Schedule.schedule_date >= week_start,
                 Schedule.schedule_date <= week_end,
                 Schedule.is_published == True,
             )
-        ).order_by(Schedule.schedule_date)
+        )
+        .order_by(Schedule.schedule_date)
     )
     schedules = result.scalars().all()
 
@@ -463,16 +468,18 @@ async def get_my_schedule(
     for sched in schedules:
         for sh in sched.shifts:
             if sh.employee_id == str(current_user.id):
-                my_shifts.append({
-                    "date": sched.schedule_date.isoformat(),
-                    "store_id": sched.store_id,
-                    "shift_id": str(sh.id),
-                    "shift_type": sh.shift_type,
-                    "start_time": sh.start_time.strftime("%H:%M"),
-                    "end_time": sh.end_time.strftime("%H:%M"),
-                    "position": sh.position,
-                    "is_confirmed": sh.is_confirmed or False,
-                })
+                my_shifts.append(
+                    {
+                        "date": sched.schedule_date.isoformat(),
+                        "store_id": sched.store_id,
+                        "shift_id": str(sh.id),
+                        "shift_type": sh.shift_type,
+                        "start_time": sh.start_time.strftime("%H:%M"),
+                        "end_time": sh.end_time.strftime("%H:%M"),
+                        "position": sh.position,
+                        "is_confirmed": sh.is_confirmed or False,
+                    }
+                )
 
     return {
         "week_start": week_start.isoformat(),
@@ -481,7 +488,6 @@ async def get_my_schedule(
         "shifts": my_shifts,
         "total_shifts": len(my_shifts),
     }
-
 
 
 @router.get("/schedules/week-view")
@@ -493,17 +499,21 @@ async def get_week_view(
 ):
     """获取一周排班视图"""
     from datetime import timedelta
+
     from ..repositories import EmployeeRepository
 
     week_end = week_start + timedelta(days=6)
     result = await session.execute(
-        select(Schedule).options(selectinload(Schedule.shifts)).where(
+        select(Schedule)
+        .options(selectinload(Schedule.shifts))
+        .where(
             and_(
                 Schedule.store_id == store_id,
                 Schedule.schedule_date >= week_start,
                 Schedule.schedule_date <= week_end,
             )
-        ).order_by(Schedule.schedule_date)
+        )
+        .order_by(Schedule.schedule_date)
     )
     schedules = result.scalars().all()
     employees = await EmployeeRepository.get_by_store(session, store_id)
@@ -516,22 +526,26 @@ async def get_week_view(
         shifts = []
         if sched:
             for sh in sched.shifts:
-                shifts.append({
-                    "shift_id": str(sh.id),
-                    "employee_id": sh.employee_id,
-                    "employee_name": emp_map.get(sh.employee_id, sh.employee_id),
-                    "shift_type": sh.shift_type,
-                    "start_time": sh.start_time.strftime("%H:%M"),
-                    "end_time": sh.end_time.strftime("%H:%M"),
-                    "position": sh.position,
-                    "is_confirmed": sh.is_confirmed,
-                })
-        days.append({
-            "date": d.isoformat(),
-            "schedule_id": str(sched.id) if sched else None,
-            "is_published": sched.is_published if sched else False,
-            "shifts": shifts,
-        })
+                shifts.append(
+                    {
+                        "shift_id": str(sh.id),
+                        "employee_id": sh.employee_id,
+                        "employee_name": emp_map.get(sh.employee_id, sh.employee_id),
+                        "shift_type": sh.shift_type,
+                        "start_time": sh.start_time.strftime("%H:%M"),
+                        "end_time": sh.end_time.strftime("%H:%M"),
+                        "position": sh.position,
+                        "is_confirmed": sh.is_confirmed,
+                    }
+                )
+        days.append(
+            {
+                "date": d.isoformat(),
+                "schedule_id": str(sched.id) if sched else None,
+                "is_published": sched.is_published if sched else False,
+                "shifts": shifts,
+            }
+        )
     return {"week_start": week_start.isoformat(), "week_end": week_end.isoformat(), "days": days}
 
 
@@ -547,7 +561,9 @@ async def get_schedule_stats(
     from ..repositories import EmployeeRepository
 
     result = await session.execute(
-        select(Schedule).options(selectinload(Schedule.shifts)).where(
+        select(Schedule)
+        .options(selectinload(Schedule.shifts))
+        .where(
             and_(
                 Schedule.store_id == store_id,
                 Schedule.schedule_date >= start_date,
@@ -564,7 +580,13 @@ async def get_schedule_stats(
         for sh in sched.shifts:
             eid = sh.employee_id
             if eid not in stats:
-                stats[eid] = {"employee_id": eid, "employee_name": emp_map.get(eid, eid), "total_shifts": 0, "total_hours": 0.0, "shift_breakdown": {}}
+                stats[eid] = {
+                    "employee_id": eid,
+                    "employee_name": emp_map.get(eid, eid),
+                    "total_shifts": 0,
+                    "total_hours": 0.0,
+                    "shift_breakdown": {},
+                }
             hours = (sh.end_time.hour * 60 + sh.end_time.minute - sh.start_time.hour * 60 - sh.start_time.minute) / 60
             stats[eid]["total_shifts"] += 1
             stats[eid]["total_hours"] = round(stats[eid]["total_hours"] + hours, 1)
@@ -581,13 +603,16 @@ def _to_schedule_response(s: Schedule) -> ScheduleResponse:
         total_employees=s.total_employees,
         total_hours=s.total_hours,
         is_published=s.is_published or False,
-        shifts=[ShiftResponse(
-            id=str(sh.id),
-            employee_id=sh.employee_id,
-            shift_type=sh.shift_type,
-            start_time=sh.start_time,
-            end_time=sh.end_time,
-            position=sh.position,
-            is_confirmed=sh.is_confirmed or False,
-        ) for sh in (s.shifts or [])],
+        shifts=[
+            ShiftResponse(
+                id=str(sh.id),
+                employee_id=sh.employee_id,
+                shift_type=sh.shift_type,
+                start_time=sh.start_time,
+                end_time=sh.end_time,
+                position=sh.position,
+                is_confirmed=sh.is_confirmed or False,
+            )
+            for sh in (s.shifts or [])
+        ],
     )

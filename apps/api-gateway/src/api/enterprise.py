@@ -2,18 +2,19 @@
 企业微信和飞书集成API
 Enterprise WeChat and Feishu Integration API
 """
+
 import json
 import os
-from fastapi import APIRouter, Depends, HTTPException, Request, Body, Query
-from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
-import structlog
+from typing import Any, Dict, Optional
 
-from src.core.dependencies import get_current_active_user
+import structlog
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
+from pydantic import BaseModel, Field
 from src.core.config import settings
-from src.services.wechat_service import wechat_service
-from src.services.feishu_service import feishu_service
+from src.core.dependencies import get_current_active_user
 from src.models import User
+from src.services.feishu_service import feishu_service
+from src.services.wechat_service import wechat_service
 from src.utils.wechat_crypto import WeChatCrypto
 
 logger = structlog.get_logger()
@@ -26,9 +27,14 @@ try:
     _token = settings.WECHAT_TOKEN
     _aes_key = settings.WECHAT_ENCODING_AES_KEY
     _corp_id = settings.WECHAT_CORP_ID
-    if (isinstance(_token, str) and _token
-            and isinstance(_aes_key, str) and _aes_key
-            and isinstance(_corp_id, str) and _corp_id):
+    if (
+        isinstance(_token, str)
+        and _token
+        and isinstance(_aes_key, str)
+        and _aes_key
+        and isinstance(_corp_id, str)
+        and _corp_id
+    ):
         wechat_crypto = WeChatCrypto(
             token=_token,
             encoding_aes_key=_aes_key,
@@ -43,6 +49,7 @@ except Exception:
 
 class SendMessageRequest(BaseModel):
     """发送消息请求"""
+
     content: str = Field(..., description="消息内容")
     touser: Optional[str] = Field(None, description="接收用户ID")
     message_type: str = Field("text", description="消息类型: text, markdown, card")
@@ -52,6 +59,7 @@ class SendMessageRequest(BaseModel):
 
 class FeishuMessageRequest(BaseModel):
     """飞书消息请求"""
+
     content: str = Field(..., description="消息内容")
     receive_id: str = Field(..., description="接收者ID")
     receive_id_type: str = Field("user_id", description="ID类型")
@@ -175,27 +183,33 @@ def _build_enterprise_readiness_report() -> Dict[str, Any]:
     feishu_status = _get_feishu_status_payload()
 
     wechat_missing = [
-        key for key, present in {
+        key
+        for key, present in {
             "WECHAT_CORP_ID": bool(settings.WECHAT_CORP_ID),
             "WECHAT_CORP_SECRET": bool(settings.WECHAT_CORP_SECRET),
             "WECHAT_AGENT_ID": bool(settings.WECHAT_AGENT_ID),
             "WECHAT_TOKEN": bool(settings.WECHAT_TOKEN),
             "WECHAT_ENCODING_AES_KEY": bool(settings.WECHAT_ENCODING_AES_KEY),
-        }.items() if not present
+        }.items()
+        if not present
     ]
     feishu_missing = [
-        key for key, present in {
+        key
+        for key, present in {
             "FEISHU_APP_ID": bool(settings.FEISHU_APP_ID),
             "FEISHU_APP_SECRET": bool(settings.FEISHU_APP_SECRET),
             "FEISHU_VERIFICATION_TOKEN": bool(settings.FEISHU_VERIFICATION_TOKEN),
             "FEISHU_ENCRYPT_KEY": bool(settings.FEISHU_ENCRYPT_KEY),
-        }.items() if not present
+        }.items()
+        if not present
     ]
     dingtalk_missing = [
-        key for key, present in {
+        key
+        for key, present in {
             "DINGTALK_APP_KEY": bool(settings.DINGTALK_APP_KEY),
             "DINGTALK_APP_SECRET": bool(settings.DINGTALK_APP_SECRET),
-        }.items() if not present
+        }.items()
+        if not present
     ]
 
     report = {
@@ -266,8 +280,7 @@ async def send_wechat_message(
     """
     if not wechat_service.is_configured():
         raise HTTPException(
-            status_code=503,
-            detail="企业微信未配置，请在环境变量中设置WECHAT_CORP_ID、WECHAT_CORP_SECRET和WECHAT_AGENT_ID"
+            status_code=503, detail="企业微信未配置，请在环境变量中设置WECHAT_CORP_ID、WECHAT_CORP_SECRET和WECHAT_AGENT_ID"
         )
 
     try:
@@ -283,10 +296,7 @@ async def send_wechat_message(
             )
         elif request.message_type == "card":
             if not request.title or not request.url:
-                raise HTTPException(
-                    status_code=400,
-                    detail="卡片消息需要提供title和url"
-                )
+                raise HTTPException(status_code=400, detail="卡片消息需要提供title和url")
             result = await wechat_service.send_card_message(
                 title=request.title,
                 description=request.content,
@@ -294,10 +304,7 @@ async def send_wechat_message(
                 touser=request.touser,
             )
         else:
-            raise HTTPException(
-                status_code=400,
-                detail=f"不支持的消息类型: {request.message_type}"
-            )
+            raise HTTPException(status_code=400, detail=f"不支持的消息类型: {request.message_type}")
 
         return {
             "success": True,
@@ -317,7 +324,7 @@ async def wechat_webhook(
     msg_signature: str = Query(..., description="消息签名"),
     timestamp: str = Query(..., description="时间戳"),
     nonce: str = Query(..., description="随机字符串"),
-    echostr: Optional[str] = Query(None, description="验证URL时的加密字符串")
+    echostr: Optional[str] = Query(None, description="验证URL时的加密字符串"),
 ):
     """
     企业微信消息回调接口
@@ -329,10 +336,7 @@ async def wechat_webhook(
         # 检查是否配置了加解密工具
         if not wechat_crypto:
             logger.error("企业微信回调配置未完成")
-            raise HTTPException(
-                status_code=503,
-                detail="企业微信回调配置未完成，请配置WECHAT_TOKEN和WECHAT_ENCODING_AES_KEY"
-            )
+            raise HTTPException(status_code=503, detail="企业微信回调配置未完成，请配置WECHAT_TOKEN和WECHAT_ENCODING_AES_KEY")
 
         # GET请求：URL验证
         if request.method == "GET":
@@ -385,11 +389,7 @@ async def wechat_webhook(
         from_user = message_data.get("FromUserName") or ""
         msg_type = message_data.get("MsgType") or ""
 
-        logger.info(
-            "收到企业微信消息",
-            msg_type=msg_type,
-            from_user=from_user
-        )
+        logger.info("收到企业微信消息", msg_type=msg_type, from_user=from_user)
 
         # 私域运营 Agent 对话入口（P0）：文本消息 → nl_query → 企微回复
         if msg_type == "text" and from_user:
@@ -398,6 +398,7 @@ async def wechat_webhook(
                 try:
                     import sys
                     from pathlib import Path
+
                     from sqlalchemy import select
 
                     # 私域 Agent 与 base_agent 路径（与 private_domain 路由一致）
@@ -416,10 +417,9 @@ async def wechat_webhook(
                     try:
                         from src.core.database import get_db_session
                         from src.models.user import User as UserModel
+
                         async with get_db_session(enable_tenant_isolation=False) as session:
-                            r = await session.execute(
-                                select(UserModel).where(UserModel.wechat_user_id == from_user).limit(1)
-                            )
+                            r = await session.execute(select(UserModel).where(UserModel.wechat_user_id == from_user).limit(1))
                             u = r.scalar_one_or_none()
                             if u and getattr(u, "store_id", None):
                                 store_id = u.store_id or "default"
@@ -430,11 +430,7 @@ async def wechat_webhook(
                     result = await agent.execute("nl_query", {"query": content, "store_id": store_id})
 
                     if result.success and result.data:
-                        answer = (
-                            result.data.get("answer")
-                            or result.data.get("summary")
-                            or "已收到，请稍后再试。"
-                        )
+                        answer = result.data.get("answer") or result.data.get("summary") or "已收到，请稍后再试。"
                         # 企微文本消息长度限制，截断并避免截断中文
                         reply_text = (answer[:2000] + "…") if len(answer) > 2000 else answer
                         await wechat_service.send_text_message(content=reply_text, touser=from_user)
@@ -462,10 +458,7 @@ async def get_wechat_users(
 ):
     """获取企业微信部门用户列表"""
     if not wechat_service.is_configured():
-        raise HTTPException(
-            status_code=503,
-            detail="企业微信未配置"
-        )
+        raise HTTPException(status_code=503, detail="企业微信未配置")
 
     try:
         users = await wechat_service.get_department_users(department_id)
@@ -487,10 +480,7 @@ async def get_wechat_user(
 ):
     """获取企业微信用户详细信息"""
     if not wechat_service.is_configured():
-        raise HTTPException(
-            status_code=503,
-            detail="企业微信未配置"
-        )
+        raise HTTPException(status_code=503, detail="企业微信未配置")
 
     try:
         user_info = await wechat_service.get_user_info(userid)
@@ -521,14 +511,8 @@ async def get_enterprise_support_matrix(
     return {
         "summary": {
             "providers": len(matrix),
-            "messaging_ready": [
-                name for name, item in matrix.items()
-                if item["production_ready"].get("messaging")
-            ],
-            "webhook_ready": [
-                name for name, item in matrix.items()
-                if item["production_ready"].get("webhook")
-            ],
+            "messaging_ready": [name for name, item in matrix.items() if item["production_ready"].get("messaging")],
+            "webhook_ready": [name for name, item in matrix.items() if item["production_ready"].get("webhook")],
         },
         "providers": matrix,
     }
@@ -559,10 +543,7 @@ async def send_feishu_message(
     - interactive: 交互式卡片
     """
     if not feishu_service.is_configured():
-        raise HTTPException(
-            status_code=503,
-            detail="飞书未配置，请在环境变量中设置FEISHU_APP_ID和FEISHU_APP_SECRET"
-        )
+        raise HTTPException(status_code=503, detail="飞书未配置，请在环境变量中设置FEISHU_APP_ID和FEISHU_APP_SECRET")
 
     try:
         if request.message_type == "text":
@@ -573,10 +554,7 @@ async def send_feishu_message(
             )
         elif request.message_type == "post":
             if not request.title or not request.post_content:
-                raise HTTPException(
-                    status_code=400,
-                    detail="post消息需要提供title和post_content"
-                )
+                raise HTTPException(status_code=400, detail="post消息需要提供title和post_content")
             result = await feishu_service.send_post_message(
                 title=request.title,
                 content=request.post_content,
@@ -585,20 +563,14 @@ async def send_feishu_message(
             )
         elif request.message_type == "interactive":
             if not request.card_content:
-                raise HTTPException(
-                    status_code=400,
-                    detail="interactive消息需要提供card_content"
-                )
+                raise HTTPException(status_code=400, detail="interactive消息需要提供card_content")
             result = await feishu_service.send_interactive_card(
                 card_content=request.card_content,
                 receive_id=request.receive_id,
                 receive_id_type=request.receive_id_type,
             )
         else:
-            raise HTTPException(
-                status_code=400,
-                detail=f"不支持的消息类型: {request.message_type}"
-            )
+            raise HTTPException(status_code=400, detail=f"不支持的消息类型: {request.message_type}")
 
         return {
             "success": True,
@@ -669,10 +641,7 @@ async def get_feishu_users(
 ):
     """获取飞书部门用户列表"""
     if not feishu_service.is_configured():
-        raise HTTPException(
-            status_code=503,
-            detail="飞书未配置"
-        )
+        raise HTTPException(status_code=503, detail="飞书未配置")
 
     try:
         users = await feishu_service.get_department_users(department_id, page_size)
@@ -694,10 +663,7 @@ async def get_feishu_user(
 ):
     """获取飞书用户详细信息"""
     if not feishu_service.is_configured():
-        raise HTTPException(
-            status_code=503,
-            detail="飞书未配置"
-        )
+        raise HTTPException(status_code=503, detail="飞书未配置")
 
     try:
         user_info = await feishu_service.get_user_info(user_id)

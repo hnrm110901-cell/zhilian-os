@@ -2,18 +2,18 @@
 供应商智能评分服务
 融合 B2B采购单、食品安全溯源、供应商档案，计算四维度评分卡
 """
+
 import uuid
-from datetime import datetime, date
-from typing import Optional, List, Dict, Any, Tuple
 from collections import defaultdict
+from datetime import date, datetime
+from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import select, func, and_, extract, case, desc, asc
+from sqlalchemy import and_, asc, case, desc, extract, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.models.supplier_intelligence import SupplierScorecard
-from src.models.supplier_b2b import B2BPurchaseOrder, B2BPurchaseItem
 from src.models.food_safety import FoodTraceRecord
 from src.models.supplier_agent import SupplierProfile
+from src.models.supplier_b2b import B2BPurchaseItem, B2BPurchaseOrder
+from src.models.supplier_intelligence import SupplierScorecard
 
 
 class SupplierIntelligenceService:
@@ -205,9 +205,7 @@ class SupplierIntelligenceService:
         scorecard_id: str,
     ) -> Optional[Dict[str, Any]]:
         """获取评分卡详情"""
-        result = await db.execute(
-            select(SupplierScorecard).where(SupplierScorecard.id == scorecard_id)
-        )
+        result = await db.execute(select(SupplierScorecard).where(SupplierScorecard.id == scorecard_id))
         card = result.scalar_one_or_none()
         return card.to_dict() if card else None
 
@@ -252,12 +250,14 @@ class SupplierIntelligenceService:
 
         trends: List[Dict[str, Any]] = []
         for row in result.all():
-            trends.append({
-                "period": f"{int(row.yr):04d}-{int(row.mo):02d}",
-                "ingredient_name": row.ingredient_name,
-                "avg_price_yuan": round(float(row.avg_price_fen) / 100, 2),
-                "total_yuan": round(float(row.total_fen) / 100, 2),
-            })
+            trends.append(
+                {
+                    "period": f"{int(row.yr):04d}-{int(row.mo):02d}",
+                    "ingredient_name": row.ingredient_name,
+                    "avg_price_yuan": round(float(row.avg_price_fen) / 100, 2),
+                    "total_yuan": round(float(row.total_fen) / 100, 2),
+                }
+            )
 
         return trends
 
@@ -275,9 +275,7 @@ class SupplierIntelligenceService:
 
         # 排名列表
         result = await db.execute(
-            select(SupplierScorecard)
-            .where(and_(*conditions))
-            .order_by(desc(SupplierScorecard.overall_score))
+            select(SupplierScorecard).where(and_(*conditions)).order_by(desc(SupplierScorecard.overall_score))
         )
         cards = result.scalars().all()
 
@@ -286,10 +284,12 @@ class SupplierIntelligenceService:
         ranking = []
         for idx, card in enumerate(cards, 1):
             tier_dist[card.tier] = tier_dist.get(card.tier, 0) + 1
-            ranking.append({
-                "rank": idx,
-                **card.to_dict(),
-            })
+            ranking.append(
+                {
+                    "rank": idx,
+                    **card.to_dict(),
+                }
+            )
 
         return {
             "period": period,
@@ -313,9 +313,7 @@ class SupplierIntelligenceService:
         alerts: List[Dict[str, Any]] = []
 
         # 最新周期的 D 级或低分供应商
-        latest_period_q = select(func.max(SupplierScorecard.score_period)).where(
-            SupplierScorecard.brand_id == brand_id
-        )
+        latest_period_q = select(func.max(SupplierScorecard.score_period)).where(SupplierScorecard.brand_id == brand_id)
         latest_period = (await db.execute(latest_period_q)).scalar_one_or_none()
 
         if not latest_period:
@@ -346,17 +344,19 @@ class SupplierIntelligenceService:
 
             if reasons:
                 recommended_action = self._risk_action(card)
-                alerts.append({
-                    "scorecard_id": str(card.id),
-                    "supplier_id": card.supplier_id,
-                    "supplier_name": card.supplier_name,
-                    "tier": card.tier,
-                    "overall_score": card.overall_score,
-                    "reasons": reasons,
-                    "recommended_action": recommended_action,
-                    "total_amount_yuan": round(card.total_amount_fen / 100, 2),
-                    "period": card.score_period,
-                })
+                alerts.append(
+                    {
+                        "scorecard_id": str(card.id),
+                        "supplier_id": card.supplier_id,
+                        "supplier_name": card.supplier_name,
+                        "tier": card.tier,
+                        "overall_score": card.overall_score,
+                        "reasons": reasons,
+                        "recommended_action": recommended_action,
+                        "total_amount_yuan": round(card.total_amount_fen / 100, 2),
+                        "period": card.score_period,
+                    }
+                )
 
         # 按风险严重度排序（综合分越低越靠前）
         alerts.sort(key=lambda a: a["overall_score"])
@@ -408,8 +408,7 @@ class SupplierIntelligenceService:
                         else_=0,
                     )
                 ).label("late_count"),
-            )
-            .where(
+            ).where(
                 and_(
                     B2BPurchaseOrder.brand_id == brand_id,
                     B2BPurchaseOrder.supplier_id == supplier_id,
@@ -437,21 +436,13 @@ class SupplierIntelligenceService:
                 func.count(FoodTraceRecord.id).label("total_records"),
                 func.max(FoodTraceRecord.supplier_name).label("supplier_name"),
                 # 正常状态
-                func.sum(
-                    case((FoodTraceRecord.status == "normal", 1), else_=0)
-                ).label("normal_count"),
+                func.sum(case((FoodTraceRecord.status == "normal", 1), else_=0)).label("normal_count"),
                 # 召回
-                func.sum(
-                    case((FoodTraceRecord.status == "recalled", 1), else_=0)
-                ).label("recalled_count"),
+                func.sum(case((FoodTraceRecord.status == "recalled", 1), else_=0)).label("recalled_count"),
                 # 预警
-                func.sum(
-                    case((FoodTraceRecord.status == "warning", 1), else_=0)
-                ).label("warning_count"),
+                func.sum(case((FoodTraceRecord.status == "warning", 1), else_=0)).label("warning_count"),
                 # 有证书
-                func.sum(
-                    case((FoodTraceRecord.certificate_url.isnot(None), 1), else_=0)
-                ).label("cert_count"),
+                func.sum(case((FoodTraceRecord.certificate_url.isnot(None), 1), else_=0)).label("cert_count"),
                 # 温控达标（冷链 0-8 度范围内视为达标）
                 func.sum(
                     case(
@@ -467,11 +458,8 @@ class SupplierIntelligenceService:
                     )
                 ).label("temp_ok_count"),
                 # 有温度记录
-                func.sum(
-                    case((FoodTraceRecord.temperature_on_receive.isnot(None), 1), else_=0)
-                ).label("temp_recorded_count"),
-            )
-            .where(
+                func.sum(case((FoodTraceRecord.temperature_on_receive.isnot(None), 1), else_=0)).label("temp_recorded_count"),
+            ).where(
                 and_(
                     FoodTraceRecord.brand_id == brand_id,
                     FoodTraceRecord.supplier_id == supplier_id,

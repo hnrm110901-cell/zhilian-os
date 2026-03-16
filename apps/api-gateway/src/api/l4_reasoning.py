@@ -27,21 +27,18 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.core.dependencies import get_current_user
 from src.models.reasoning import ReasoningReport
 from src.models.user import User
 from src.services.diagnosis_service import DiagnosisService
-from src.services.reasoning_engine import (
-    ALL_DIMENSIONS,
-    UniversalReasoningEngine,
-)
+from src.services.reasoning_engine import ALL_DIMENSIONS, UniversalReasoningEngine
 
 router = APIRouter(prefix="/api/v1/l4", tags=["l4_reasoning"])
 
 
 # ── Pydantic Schemas ──────────────────────────────────────────────────────────
+
 
 class DiagnoseIn(BaseModel):
     kpi_context: Dict[str, Any] = Field(
@@ -50,10 +47,7 @@ class DiagnoseIn(BaseModel):
     )
     dimensions: Optional[List[str]] = Field(
         None,
-        description=(
-            "指定推理维度（默认全部 6 维度）："
-            " waste / efficiency / quality / cost / inventory / cross_store"
-        ),
+        description=("指定推理维度（默认全部 6 维度）：" " waste / efficiency / quality / cost / inventory / cross_store"),
     )
 
 
@@ -82,6 +76,7 @@ class ActionIn(BaseModel):
 
 # ── 全维度诊断 ────────────────────────────────────────────────────────────────
 
+
 @router.post(
     "/stores/{store_id}/diagnose",
     summary="全维度推理诊断",
@@ -89,9 +84,9 @@ class ActionIn(BaseModel):
 )
 async def diagnose_store(
     store_id: str,
-    body:     DiagnoseIn,
-    db:       AsyncSession = Depends(get_db),
-    _:        User         = Depends(get_current_user),
+    body: DiagnoseIn,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """
     对目标门店执行 L4 全维度推理诊断。
@@ -105,7 +100,7 @@ async def diagnose_store(
 
     返回 StoreHealthReport（整体分 / 维度详情 / 优先行动 / 因果洞察）。
     """
-    svc    = DiagnosisService(db)
+    svc = DiagnosisService(db)
     report = await svc.run_full_diagnosis(
         store_id=store_id,
         kpi_context=body.kpi_context,
@@ -114,24 +109,24 @@ async def diagnose_store(
     await db.commit()
 
     return {
-        "store_id":         report.store_id,
-        "report_date":      report.report_date.isoformat(),
-        "overall_score":    report.overall_score,
+        "store_id": report.store_id,
+        "report_date": report.report_date.isoformat(),
+        "overall_score": report.overall_score,
         "severity_summary": report.severity_summary,
-        "peer_group":       report.peer_group,
+        "peer_group": report.peer_group,
         "priority_actions": report.priority_actions,
-        "causal_insights":  report.causal_insights,
+        "causal_insights": report.causal_insights,
         "cross_store_hints": report.cross_store_hints,
         "dimensions": {
             dim: {
-                "severity":            c.severity,
-                "root_cause":          c.root_cause,
-                "confidence":          round(c.confidence, 3),
-                "evidence_chain":      c.evidence_chain,
-                "triggered_rules":     c.triggered_rules,
+                "severity": c.severity,
+                "root_cause": c.root_cause,
+                "confidence": round(c.confidence, 3),
+                "evidence_chain": c.evidence_chain,
+                "triggered_rules": c.triggered_rules,
                 "recommended_actions": c.recommended_actions,
-                "peer_percentile":     c.peer_percentile,
-                "kpi_values":          c.kpi_values,
+                "peer_percentile": c.peer_percentile,
+                "kpi_values": c.kpi_values,
             }
             for dim, c in report.dimensions.items()
         },
@@ -140,16 +135,17 @@ async def diagnose_store(
 
 # ── 单维度轻量推理 ────────────────────────────────────────────────────────────
 
+
 @router.post(
     "/stores/{store_id}/reason/{dimension}",
     summary="单维度轻量推理",
 )
 async def reason_single_dimension(
-    store_id:  str,
+    store_id: str,
     dimension: str,
-    body:      ReasonSingleIn,
-    db:        AsyncSession = Depends(get_db),
-    _:         User         = Depends(get_current_user),
+    body: ReasonSingleIn,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """
     对指定门店的单一维度执行轻量推理。
@@ -164,7 +160,7 @@ async def reason_single_dimension(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"不支持的维度: {dimension}，可选: {ALL_DIMENSIONS}",
         )
-    engine     = UniversalReasoningEngine(db)
+    engine = UniversalReasoningEngine(db)
     conclusion = await engine.reason_single(
         store_id=store_id,
         dimension=dimension,
@@ -173,20 +169,21 @@ async def reason_single_dimension(
     )
     await db.commit()
     return {
-        "store_id":            store_id,
-        "dimension":           conclusion.dimension,
-        "severity":            conclusion.severity,
-        "root_cause":          conclusion.root_cause,
-        "confidence":          round(conclusion.confidence, 3),
-        "evidence_chain":      conclusion.evidence_chain,
-        "triggered_rules":     conclusion.triggered_rules,
+        "store_id": store_id,
+        "dimension": conclusion.dimension,
+        "severity": conclusion.severity,
+        "root_cause": conclusion.root_cause,
+        "confidence": round(conclusion.confidence, 3),
+        "evidence_chain": conclusion.evidence_chain,
+        "triggered_rules": conclusion.triggered_rules,
         "recommended_actions": conclusion.recommended_actions,
-        "peer_percentile":     conclusion.peer_percentile,
-        "kpi_values":          conclusion.kpi_values,
+        "peer_percentile": conclusion.peer_percentile,
+        "kpi_values": conclusion.kpi_values,
     }
 
 
 # ── 历史推理报告 ──────────────────────────────────────────────────────────────
+
 
 @router.get(
     "/stores/{store_id}/reports",
@@ -194,13 +191,13 @@ async def reason_single_dimension(
     response_model=List[dict],
 )
 async def list_reports(
-    store_id:   str,
-    days:       int          = Query(30, ge=1, le=365),
-    dimension:  Optional[str] = Query(None),
-    severity:   Optional[str] = Query(None, pattern="^(P1|P2|P3|OK)$"),
-    limit:      int          = Query(50, ge=1, le=200),
-    db:         AsyncSession = Depends(get_db),
-    _:          User         = Depends(get_current_user),
+    store_id: str,
+    days: int = Query(30, ge=1, le=365),
+    dimension: Optional[str] = Query(None),
+    severity: Optional[str] = Query(None, pattern="^(P1|P2|P3|OK)$"),
+    limit: int = Query(50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """查询门店历史推理报告，支持维度和严重程度过滤，可用于趋势图表展示。"""
     svc = DiagnosisService(db)
@@ -216,48 +213,47 @@ async def list_reports(
     summary="推理报告详情（含完整证据链）",
 )
 async def get_report_detail(
-    store_id:  str,
+    store_id: str,
     report_id: str,
-    db:        AsyncSession = Depends(get_db),
-    _:         User         = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """获取单条推理报告的完整详情，包括证据链、触发规则和 KPI 快照。"""
     import uuid as _uuid
+
     try:
         rid = _uuid.UUID(report_id)
     except ValueError:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                            detail="report_id 格式错误")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="report_id 格式错误")
 
     stmt = select(ReasoningReport).where(
         and_(
-            ReasoningReport.id       == rid,
+            ReasoningReport.id == rid,
             ReasoningReport.store_id == store_id,
         )
     )
     report = (await db.execute(stmt)).scalar_one_or_none()
     if not report:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail="推理报告不存在")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="推理报告不存在")
     return {
-        "report_id":           str(report.id),
-        "store_id":            report.store_id,
-        "report_date":         report.report_date.isoformat(),
-        "dimension":           report.dimension,
-        "severity":            report.severity,
-        "root_cause":          report.root_cause,
-        "confidence":          report.confidence,
-        "evidence_chain":      report.evidence_chain,
+        "report_id": str(report.id),
+        "store_id": report.store_id,
+        "report_date": report.report_date.isoformat(),
+        "dimension": report.dimension,
+        "severity": report.severity,
+        "root_cause": report.root_cause,
+        "confidence": report.confidence,
+        "evidence_chain": report.evidence_chain,
         "triggered_rule_codes": report.triggered_rule_codes,
         "recommended_actions": report.recommended_actions,
-        "peer_group":          report.peer_group,
-        "peer_context":        report.peer_context,
-        "peer_percentile":     report.peer_percentile,
-        "kpi_snapshot":        report.kpi_snapshot,
-        "is_actioned":         report.is_actioned,
-        "actioned_by":         report.actioned_by,
-        "actioned_at":         report.actioned_at.isoformat() if report.actioned_at else None,
-        "created_at":          report.created_at.isoformat() if report.created_at else None,
+        "peer_group": report.peer_group,
+        "peer_context": report.peer_context,
+        "peer_percentile": report.peer_percentile,
+        "kpi_snapshot": report.kpi_snapshot,
+        "is_actioned": report.is_actioned,
+        "actioned_by": report.actioned_by,
+        "actioned_at": report.actioned_at.isoformat() if report.actioned_at else None,
+        "created_at": report.created_at.isoformat() if report.created_at else None,
     }
 
 
@@ -266,20 +262,21 @@ async def get_report_detail(
     summary="标记推理报告已行动（Human-in-the-Loop 闭环）",
 )
 async def mark_report_actioned(
-    store_id:  str,
+    store_id: str,
     report_id: str,
-    body:      ActionIn,
-    db:        AsyncSession = Depends(get_db),
-    _:         User         = Depends(get_current_user),
+    body: ActionIn,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """将推理报告标记为已行动，完成 P1/P2 告警的人工处理闭环。"""
     engine = UniversalReasoningEngine(db)
-    ok     = await engine.mark_actioned(report_id, body.actioned_by)
+    ok = await engine.mark_actioned(report_id, body.actioned_by)
     await db.commit()
     return {"success": ok, "report_id": report_id, "actioned_by": body.actioned_by}
 
 
 # ── 因果链查询（实时 Neo4j） ──────────────────────────────────────────────────
+
 
 @router.get(
     "/stores/{store_id}/causal-chain",
@@ -287,9 +284,9 @@ async def mark_report_actioned(
     response_model=List[str],
 )
 async def get_causal_chain(
-    store_id:    str,
+    store_id: str,
     window_days: int = Query(14, ge=1, le=90),
-    _:           User = Depends(get_current_user),
+    _: User = Depends(get_current_user),
 ):
     """
     实时查询 Neo4j 图谱，返回目标门店的综合因果证据（最多 12 条）。
@@ -297,6 +294,7 @@ async def get_causal_chain(
     包含：根因分布 / 供应链溯源 / BOM 合规 / 设备故障 / 员工误差时段
     """
     from src.services.causal_graph_service import CausalGraphService
+
     svc = CausalGraphService()
     try:
         return await svc.get_full_causal_summary(store_id, window_days=window_days)
@@ -306,15 +304,16 @@ async def get_causal_chain(
 
 # ── 跨店改善方案 ──────────────────────────────────────────────────────────────
 
+
 @router.get(
     "/stores/{store_id}/improvement-plan",
     summary="跨店学习改善方案",
 )
 async def get_improvement_plan(
-    store_id:    str,
+    store_id: str,
     metric_name: str = Query("waste_rate", description="目标优化指标"),
-    db:          AsyncSession = Depends(get_db),
-    _:           User         = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """
     基于 SIMILAR_TO 图谱边，识别表现更好的相似门店，生成跨店学习改善方案。
@@ -327,18 +326,19 @@ async def get_improvement_plan(
 
 # ── 全平台 P1/P2 告警报告 ─────────────────────────────────────────────────────
 
+
 @router.get(
     "/reports/alerts",
     summary="全平台 P1/P2 告警报告",
     response_model=List[dict],
 )
 async def get_platform_alerts(
-    severity:  str          = Query("P1", pattern="^(P1|P2)$"),
-    days:      int          = Query(7, ge=1, le=30),
+    severity: str = Query("P1", pattern="^(P1|P2)$"),
+    days: int = Query(7, ge=1, le=30),
     dimension: Optional[str] = Query(None),
-    limit:     int          = Query(100, ge=1, le=500),
-    db:        AsyncSession = Depends(get_db),
-    _:         User         = Depends(get_current_user),
+    limit: int = Query(100, ge=1, le=500),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """
     查询全平台最近 N 天内的 P1/P2 未行动推理告警报告。
@@ -347,35 +347,31 @@ async def get_platform_alerts(
     """
     since = date.today() - timedelta(days=days)
     conditions = [
-        ReasoningReport.severity    == severity,
+        ReasoningReport.severity == severity,
         ReasoningReport.report_date >= since,
         ReasoningReport.is_actioned == False,  # noqa: E712
     ]
     if dimension:
         conditions.append(ReasoningReport.dimension == dimension)
 
-    stmt = (
-        select(ReasoningReport)
-        .where(and_(*conditions))
-        .order_by(ReasoningReport.report_date.desc())
-        .limit(limit)
-    )
+    stmt = select(ReasoningReport).where(and_(*conditions)).order_by(ReasoningReport.report_date.desc()).limit(limit)
     rows = (await db.execute(stmt)).scalars().all()
     return [
         {
-            "report_id":   str(r.id),
-            "store_id":    r.store_id,
+            "report_id": str(r.id),
+            "store_id": r.store_id,
             "report_date": r.report_date.isoformat(),
-            "dimension":   r.dimension,
-            "severity":    r.severity,
-            "root_cause":  r.root_cause,
-            "confidence":  r.confidence,
+            "dimension": r.dimension,
+            "severity": r.severity,
+            "root_cause": r.root_cause,
+            "confidence": r.confidence,
         }
         for r in rows
     ]
 
 
 # ── 批量扫描（触发 Celery 夜间任务） ─────────────────────────────────────────
+
 
 @router.post(
     "/scan/batch",
@@ -384,7 +380,7 @@ async def get_platform_alerts(
 )
 async def trigger_batch_scan(
     body: BatchScanIn = BatchScanIn(),
-    _:    User        = Depends(get_current_user),
+    _: User = Depends(get_current_user),
 ):
     """
     触发 Celery 夜间全平台推理扫描任务（nightly_reasoning_scan）。
@@ -398,10 +394,11 @@ async def trigger_batch_scan(
     """
     try:
         from src.core.celery_tasks import nightly_reasoning_scan
+
         task = nightly_reasoning_scan.delay(store_ids=body.store_ids)
         return {
-            "status":   "accepted",
-            "task_id":  task.id,
+            "status": "accepted",
+            "task_id": task.id,
             "store_ids": body.store_ids,
         }
     except Exception as e:

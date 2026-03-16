@@ -1,181 +1,188 @@
 """
 Database Models
 """
-from .base import Base
-from .user import User
-from .store import Store
-from .employee import Employee
-from .order import Order, OrderItem
-from .inventory import InventoryItem, InventoryTransaction
-from .schedule import Schedule, Shift
-from .reservation import Reservation
-from .kpi import KPI, KPIRecord
-from .supply_chain import Supplier, PurchaseOrder
-from .finance import FinancialTransaction, Budget, Invoice, FinancialReport
-from .task import Task, TaskStatus, TaskPriority
-from .daily_report import DailyReport
-from .reconciliation import ReconciliationRecord, ReconciliationStatus
-from .notification import Notification, NotificationType, NotificationPriority, NotificationPreference, NotificationRule
-from .audit_log import AuditLog, AuditAction, ResourceType
-from .queue import Queue, QueueStatus
-from .integration import (
-    ExternalSystem,
-    SyncLog,
-    POSTransaction,
-    SupplierOrder,
-    MemberSync,
-    ReservationSync,
-    IntegrationType,
-    IntegrationStatus,
-    SyncStatus,
+
+# Phase 3-8 新增 model（后期添加，确保 Alembic autogenerate 能检测到）
+from .action_plan import ActionOutcome, ActionPlan, DispatchStatus
+from .ai_model import AIModel, DataContributionRecord, ModelLevel, ModelPurchaseRecord, ModelStatus, ModelType, PurchaseStatus
+from .audit_log import AuditAction, AuditLog, ResourceType
+
+# Batch 3 — 自动化闭环层
+from .auto_procurement import ProcurementExecution, ProcurementRule
+from .backup_job import BackupJob, BackupStatus, BackupType
+from .bank_reconciliation import BankReconciliationBatch, BankStatement
+
+# Phase 9 — Banquet Agent
+from .banquet import (
+    BanquetAgentActionLog,
+    BanquetAgentRule,
+    BanquetAgentTypeEnum,
+    BanquetContract,
+    BanquetCustomer,
+    BanquetHall,
+    BanquetHallBooking,
+    BanquetHallType,
+    BanquetKpiDaily,
+    BanquetLead,
+    BanquetOrder,
+    BanquetPaymentRecord,
+    BanquetProfitSnapshot,
+    BanquetQuote,
+    BanquetTypeEnum,
+    DepositStatusEnum,
+    ExecutionException,
+    ExecutionTask,
+    ExecutionTemplate,
+    LeadFollowupRecord,
+    LeadStageEnum,
+    MenuPackage,
+    MenuPackageItem,
+    OrderStatusEnum,
+    PaymentTypeEnum,
+    TaskOwnerRoleEnum,
+    TaskStatusEnum,
 )
-from .decision_log import DecisionLog, DecisionType, DecisionStatus, DecisionOutcome
-from .compliance import ComplianceLicense, LicenseType, LicenseStatus
-from .quality import QualityInspection, InspectionStatus
-from .neural_event_log import NeuralEventLog, EventProcessingStatus
-from .dish import DishCategory, Dish, DishIngredient
-from .bom import BOMTemplate, BOMItem
-from .dish_master import DishMaster, BrandMenu, StoreMenu
-from .edge_hub import EdgeHub, EdgeDevice, EdgeAlert, HeadsetBinding
+from .banquet_event_order import BanquetEventOrder, BEOStatus
+from .banquet_lifecycle import BanquetStage, BanquetStageHistory
+from .base import Base
+from .bom import BOMItem, BOMTemplate
 from .channel_config import SalesChannelConfig
+from .competitor import CompetitorPrice, CompetitorStore
+from .compliance import ComplianceLicense, LicenseStatus, LicenseType
+from .compliance_engine import ComplianceAlert, ComplianceScore
+from .cross_store import CrossStoreMetric, StorePeerGroup, StoreSimilarityCache
+from .customer_key import CustomerKey, EncryptedField, KeyAlgorithm, KeyStatus
+from .daily_report import DailyReport
+from .decision_log import DecisionLog, DecisionOutcome, DecisionStatus, DecisionType
+from .dianping_review import DianpingReview
+from .dish import Dish, DishCategory, DishIngredient
 from .dish_channel import DishChannelConfig
-from .ai_model import AIModel, ModelPurchaseRecord, DataContributionRecord, ModelType, ModelLevel, ModelStatus, PurchaseStatus
-from .federated_learning import FLTrainingRound, FLModelUpload, RoundStatus
-from .marketing_campaign import MarketingCampaign
-from .report_template import ReportTemplate, ScheduledReport, ReportFormat, ScheduleFrequency
-from .competitor import CompetitorStore, CompetitorPrice
+from .dish_master import BrandMenu, DishMaster, StoreMenu
+
+# Month 1 (P0) — 外部集成模型
+from .e_invoice import EInvoice, EInvoiceItem, InvoicePlatform, InvoiceStatus, InvoiceType
+from .edge_hub import EdgeAlert, EdgeDevice, EdgeHub, HeadsetBinding
+from .employee import Employee
+from .employee_metric import EmployeeMetricRecord
+from .execution_audit import ExecutionRecord
 from .export_job import ExportJob, ExportStatus
-from .backup_job import BackupJob, BackupType, BackupStatus
 from .fct import (
-    FCTTaxRecord,
-    FCTCashFlowItem,
+    CashFlowDirection,
+    FCTApprovalRecord,
     FCTBudgetControl,
+    FCTCashFlowItem,
+    FCTPeriod,
     FCTPettyCash,
     FCTPettyCashRecord,
-    FCTApprovalRecord,
-    FCTPeriod,
-    TaxType,
+    FCTTaxRecord,
     TaxpayerType,
-    CashFlowDirection,
+    TaxType,
     Voucher,
     VoucherLine,
 )
-from .banquet_lifecycle import BanquetStage, BanquetStageHistory
-from .banquet_event_order import BanquetEventOrder, BEOStatus
-from .waste_event import WasteEvent, WasteEventType, WasteEventStatus
-# Phase 3-8 新增 model（后期添加，确保 Alembic autogenerate 能检测到）
-from .action_plan import ActionPlan, DispatchStatus, ActionOutcome
-from .knowledge_rule import KnowledgeRule, RuleExecution, IndustryBenchmark, RuleCategory, RuleType, RuleStatus
-from .private_domain import (
-    PrivateDomainMember, PrivateDomainSignal, PrivateDomainJourney,
-    StoreQuadrantRecord, RFMLevel, StoreQuadrant, SignalType, JourneyType, JourneyStatus,
-)
-from .ontology_action import OntologyAction, ActionStatus, ActionPriority
-from .ops import OpsEvent, OpsAsset, OpsMaintenancePlan, OpsEventSeverity, OpsEventStatus, OpsAssetType, OpsMaintenancePriority
-from .reasoning import ReasoningReport, SeverityLevel, ReasoningDimension
-from .bom import BOMTemplate, BOMItem
-from .cross_store import CrossStoreMetric, StoreSimilarityCache, StorePeerGroup
-from .ingredient_mapping import IngredientMapping, FusionAuditLog, FusionMethod
-from .execution_audit import ExecutionRecord
-from .customer_key import CustomerKey, EncryptedField, KeyStatus, KeyAlgorithm
-from .workflow import DailyWorkflow, WorkflowPhase, DecisionVersion, WorkflowStatus, PhaseStatus, GenerationMode
+from .federated_learning import FLModelUpload, FLTrainingRound, RoundStatus
+from .finance import Budget, FinancialReport, FinancialTransaction, Invoice
+from .financial_closing import DailyClosingReport
+
+# Month 2 (P0+P1)
+from .food_safety import FoodSafetyInspection, FoodTraceRecord
 from .forecast import ForecastResult
-from .meal_period import MealPeriod
-from .employee_metric import EmployeeMetricRecord
-from .member_lifecycle import (
-    LifecycleState,
-    StateTransitionTrigger,
-    MemberLifecycleHistory,
-)
-from .workforce import (
-    LaborDemandForecast,
-    LaborCostSnapshot,
-    StaffingAdvice,
-    StaffingAdviceConfirmation,
-    StoreLaborBudget,
-    LaborCostRanking,
-    StaffingPattern,
-    MealPeriodType,
-    StaffingAdviceStatus,
-    ConfirmationAction,
-    BudgetPeriodType,
-    RankingPeriodType,
-)
-# Phase 11 — Supplier Agent
-from .supplier_agent import (
-    SupplierProfile,
-    MaterialCatalog,
-    SupplierQuote,
-    SupplierContract,
-    SupplierDelivery,
-    PriceComparison,
-    SupplierEvaluation,
-    SourcingRecommendation,
-    ContractAlert,
-    SupplyRiskEvent,
-    SupplierAgentLog,
-    SupplierTierEnum,
-    QuoteStatusEnum,
-    ContractStatusEnum,
-    DeliveryStatusEnum,
-    RiskLevelEnum,
-    AlertTypeEnum,
-    SupplierAgentTypeEnum,
-)
-# Phase 9 — Banquet Agent
-from .banquet import (
-    BanquetHall,
-    BanquetHallType,
-    BanquetCustomer,
-    BanquetLead,
-    LeadFollowupRecord,
-    BanquetQuote,
-    MenuPackage,
-    MenuPackageItem,
-    BanquetOrder,
-    BanquetHallBooking,
-    ExecutionTemplate,
-    ExecutionTask,
-    ExecutionException,
-    BanquetPaymentRecord,
-    BanquetContract,
-    BanquetProfitSnapshot,
-    BanquetKpiDaily,
-    BanquetAgentRule,
-    BanquetAgentActionLog,
-    BanquetTypeEnum,
-    LeadStageEnum,
-    OrderStatusEnum,
-    DepositStatusEnum,
-    TaskStatusEnum,
-    TaskOwnerRoleEnum,
-    PaymentTypeEnum,
-    BanquetAgentTypeEnum,
+from .health_certificate import HealthCertificate
+from .ingredient_mapping import FusionAuditLog, FusionMethod, IngredientMapping
+from .integration import (
+    ExternalSystem,
+    IntegrationStatus,
+    IntegrationType,
+    MemberSync,
+    POSTransaction,
+    ReservationSync,
+    SupplierOrder,
+    SyncLog,
+    SyncStatus,
 )
 
-# Month 1 (P0) — 外部集成模型
-from .e_invoice import EInvoice, EInvoiceItem, InvoicePlatform, InvoiceType, InvoiceStatus
-from .payment_reconciliation import (
-    PaymentRecord, ReconciliationBatch, ReconciliationDiff,
-    PaymentChannel, MatchStatus,
-)
-# Month 2 (P0+P1)
-from .food_safety import FoodTraceRecord, FoodSafetyInspection
-from .health_certificate import HealthCertificate
-# Month 3 (P1+P2)
-from .supplier_b2b import B2BPurchaseOrder, B2BPurchaseItem
-from .dianping_review import DianpingReview
-from .bank_reconciliation import BankStatement, BankReconciliationBatch
 # Batch 1 — 数据融合层
 from .integration_hub import IntegrationHubStatus
-from .tri_reconciliation import TriReconciliationRecord
+from .inventory import InventoryItem, InventoryTransaction
+from .knowledge_rule import IndustryBenchmark, KnowledgeRule, RuleCategory, RuleExecution, RuleStatus, RuleType
+from .kpi import KPI, KPIRecord
+from .marketing_campaign import MarketingCampaign
+from .meal_period import MealPeriod
+from .member_lifecycle import LifecycleState, MemberLifecycleHistory, StateTransitionTrigger
+from .neural_event_log import EventProcessingStatus, NeuralEventLog
+from .notification import Notification, NotificationPreference, NotificationPriority, NotificationRule, NotificationType
+from .ontology_action import ActionPriority, ActionStatus, OntologyAction
+from .ops import OpsAsset, OpsAssetType, OpsEvent, OpsEventSeverity, OpsEventStatus, OpsMaintenancePlan, OpsMaintenancePriority
+from .order import Order, OrderItem
+from .payment_reconciliation import MatchStatus, PaymentChannel, PaymentRecord, ReconciliationBatch, ReconciliationDiff
+from .private_domain import (
+    JourneyStatus,
+    JourneyType,
+    PrivateDomainJourney,
+    PrivateDomainMember,
+    PrivateDomainSignal,
+    RFMLevel,
+    SignalType,
+    StoreQuadrant,
+    StoreQuadrantRecord,
+)
+from .quality import InspectionStatus, QualityInspection
+from .queue import Queue, QueueStatus
+from .reasoning import ReasoningDimension, ReasoningReport, SeverityLevel
+from .reconciliation import ReconciliationRecord, ReconciliationStatus
+from .report_template import ReportFormat, ReportTemplate, ScheduledReport, ScheduleFrequency
+from .reservation import Reservation
+from .review_action import ReviewActionLog, ReviewActionRule
+from .schedule import Schedule, Shift
+from .store import Store
+
+# Phase 11 — Supplier Agent
+from .supplier_agent import (
+    AlertTypeEnum,
+    ContractAlert,
+    ContractStatusEnum,
+    DeliveryStatusEnum,
+    MaterialCatalog,
+    PriceComparison,
+    QuoteStatusEnum,
+    RiskLevelEnum,
+    SourcingRecommendation,
+    SupplierAgentLog,
+    SupplierAgentTypeEnum,
+    SupplierContract,
+    SupplierDelivery,
+    SupplierEvaluation,
+    SupplierProfile,
+    SupplierQuote,
+    SupplierTierEnum,
+    SupplyRiskEvent,
+)
+
+# Month 3 (P1+P2)
+from .supplier_b2b import B2BPurchaseItem, B2BPurchaseOrder
+
 # Batch 2 — 智能决策层
 from .supplier_intelligence import SupplierScorecard
-from .review_action import ReviewActionRule, ReviewActionLog
-from .compliance_engine import ComplianceScore, ComplianceAlert
-# Batch 3 — 自动化闭环层
-from .auto_procurement import ProcurementRule, ProcurementExecution
-from .financial_closing import DailyClosingReport
+from .supply_chain import PurchaseOrder, Supplier
+from .task import Task, TaskPriority, TaskStatus
+from .tri_reconciliation import TriReconciliationRecord
+from .user import User
+from .waste_event import WasteEvent, WasteEventStatus, WasteEventType
+from .workflow import DailyWorkflow, DecisionVersion, GenerationMode, PhaseStatus, WorkflowPhase, WorkflowStatus
+from .workforce import (
+    BudgetPeriodType,
+    ConfirmationAction,
+    LaborCostRanking,
+    LaborCostSnapshot,
+    LaborDemandForecast,
+    MealPeriodType,
+    RankingPeriodType,
+    StaffingAdvice,
+    StaffingAdviceConfirmation,
+    StaffingAdviceStatus,
+    StaffingPattern,
+    StoreLaborBudget,
+)
 
 __all__ = [
     "Base",
@@ -410,92 +417,124 @@ __all__ = [
     "OperationAuditLog",
 ]
 
-from .business_intel import (
-    BizMetricSnapshot, RevenueAlert, KpiScorecard, OrderForecast,
-    BizDecision, ScenarioRecord, BizIntelLog,
-    AnomalyLevelEnum, KpiStatusEnum, DecisionPriorityEnum,
-    ScenarioTypeEnum, BizIntelAgentTypeEnum, DecisionStatusEnum,
-)
-from .people_agent import (
-    PeopleShiftRecord, PeoplePerformanceScore, PeopleLaborCostRecord,
-    PeopleAttendanceAlert, PeopleStaffingDecision, PeopleAgentLog,
-)
-from .ops_flow_agent import (
-    OpsChainEvent, OpsChainLinkage, OpsOrderAnomaly,
-    OpsInventoryAlert, OpsQualityRecord, OpsFlowDecision, OpsFlowAgentLog,
-)
-from .agent_okr import AgentResponseLog, AgentOKRSnapshot
-from .agent_collab import AgentConflict, GlobalOptimizationLog, AgentCollabSnapshot
-from .cost_truth import CostTruthDaily, CostTruthDishDetail, CostVarianceAttribution
-from .fct_advanced import (
-    FCTBankAccount, FCTBankTransaction, FCTBankMatchRule,
-    FCTEntity, FCTConsolidationRun, FCTIntercompanyItem,
-    FCTTaxDeclaration, FCTTaxExtractRule,
-)
-# Data Dictionary models — 数据字典补齐
-from .organization import Group, Brand, Region, Organization
-from .ingredient_master import IngredientMaster
-from .inventory_ext import InventoryBatch, InventoryCount
-from .purchase_order_item import PurchaseOrderItem
-from .daily_summary import DailyRevenueSummary, DailyWasteSummary, DailyPnlSummary
+from .agent_collab import AgentCollabSnapshot, AgentConflict, GlobalOptimizationLog
+from .agent_okr import AgentOKRSnapshot, AgentResponseLog
+from .approval_flow import ApprovalFlowTemplate, ApprovalInstance, ApprovalNodeRecord, ApprovalNodeType
+from .approval_flow import ApprovalStatus as HRApprovalStatus
+from .approval_flow import ApprovalType
 from .attendance import AttendanceLog
-from .member_rfm import MemberRfmSnapshot
-from .price_benchmark import PriceBenchmarkPool, PriceBenchmarkReport
-from .decision_lifecycle import DecisionLifecycle
-# Phase P1 — 预订Agent: 渠道中台 + 客户风控
-from .reservation_channel import ReservationChannel, ChannelType
-from .customer_ownership import (
-    CustomerOwnership, TransferReason,
-    CustomerRiskAlert, RiskLevel, RiskType,
-)
+
 # Phase P2 — 宴会销控
 from .banquet_sales import (
-    BanquetDateConfig, AuspiciousLevel, DateBookingStatus,
-    SalesFunnelRecord, FunnelStage,
+    AuspiciousLevel,
     BanquetCompetitor,
+    BanquetDateConfig,
+    DateBookingStatus,
+    FunnelStage,
+    SalesFunnelRecord,
 )
-# Phase P3 — EO执行引擎
-from .event_staff import EventStaff, StaffRole, StaffConfirmStatus
-from .hall_showcase import HallShowcase
-# 替换易订 — R3 桌台平面图 + R4 AI邀请函
-from .floor_plan import TableDefinition, TableShape, TableStatus
-from .invitation import Invitation, InvitationRSVP, InvitationTemplate, RSVPStatus
-# P0 补齐 — 预排菜模型
-from .reservation_pre_order import ReservationPreOrder, PreOrderStatus
+from .business_intel import (
+    AnomalyLevelEnum,
+    BizDecision,
+    BizIntelAgentTypeEnum,
+    BizIntelLog,
+    BizMetricSnapshot,
+    DecisionPriorityEnum,
+    DecisionStatusEnum,
+    KpiScorecard,
+    KpiStatusEnum,
+    OrderForecast,
+    RevenueAlert,
+    ScenarioRecord,
+    ScenarioTypeEnum,
+)
+from .consumer_id_mapping import ConsumerIdMapping, IdType
+
 # Sprint 1 — CDP 地基层
 from .consumer_identity import ConsumerIdentity
-from .consumer_id_mapping import ConsumerIdMapping, IdType
-# HR 模块 — 薪酬/假勤/审批/招聘/绩效/合同/生命周期
-from .payroll import (
-    SalaryStructure, PayrollRecord, TaxDeclaration,
-    PayrollStatus, SalaryType, TaxStatus,
+from .cost_truth import CostTruthDaily, CostTruthDishDetail, CostVarianceAttribution
+from .customer_ownership import CustomerOwnership, CustomerRiskAlert, RiskLevel, RiskType, TransferReason
+from .daily_summary import DailyPnlSummary, DailyRevenueSummary, DailyWasteSummary
+from .decision_lifecycle import DecisionLifecycle
+from .employee_contract import ContractStatus, ContractType, EmployeeContract
+from .employee_lifecycle import ChangeType, EmployeeChange
+
+# Phase P3 — EO执行引擎
+from .event_staff import EventStaff, StaffConfirmStatus, StaffRole
+from .fct_advanced import (
+    FCTBankAccount,
+    FCTBankMatchRule,
+    FCTBankTransaction,
+    FCTConsolidationRun,
+    FCTEntity,
+    FCTIntercompanyItem,
+    FCTTaxDeclaration,
+    FCTTaxExtractRule,
 )
-from .approval_flow import (
-    ApprovalFlowTemplate, ApprovalInstance, ApprovalNodeRecord,
-    ApprovalType, ApprovalStatus as HRApprovalStatus, ApprovalNodeType,
-)
+
+# 替换易订 — R3 桌台平面图 + R4 AI邀请函
+from .floor_plan import TableDefinition, TableShape, TableStatus
+from .hall_showcase import HallShowcase
+from .ingredient_master import IngredientMaster
+from .inventory_ext import InventoryBatch, InventoryCount
+from .invitation import Invitation, InvitationRSVP, InvitationTemplate, RSVPStatus
 from .leave import (
-    LeaveTypeConfig, LeaveBalance, LeaveRequest, OvertimeRequest,
-    LeaveCategory, LeaveRequestStatus, OvertimeType, OvertimeRequestStatus,
+    LeaveBalance,
+    LeaveCategory,
+    LeaveRequest,
+    LeaveRequestStatus,
+    LeaveTypeConfig,
+    OvertimeRequest,
+    OvertimeRequestStatus,
+    OvertimeType,
 )
-from .employee_lifecycle import EmployeeChange, ChangeType
-from .recruitment import (
-    JobPosting, Candidate, Interview, Offer,
-    JobStatus, CandidateStage, InterviewResult, OfferStatus,
-)
-from .performance_review import (
-    PerformanceTemplate, PerformanceReview,
-    ReviewCycle, ReviewStatus, ReviewLevel,
-)
-from .employee_contract import EmployeeContract, ContractType, ContractStatus
-# HR Phase 4 — 培训认证/师徒制
-from .training import TrainingCourse, TrainingEnrollment, TrainingExam, ExamAttempt
+from .member_rfm import MemberRfmSnapshot
 from .mentorship import Mentorship
-# HR W1-2 — 敏感数据审计日志
-from .sensitive_audit_log import SensitiveDataAuditLog
-# HR W2-2 — 离职结算
-from .settlement import SettlementRecord, SettlementStatus, SeparationType, CompensationType
-# HR W2-3 — 工资条推送记录
-from .payslip import PayslipRecord
+
 # HR — 操作审计日志
 from .operation_audit_log import OperationAuditLog
+from .ops_flow_agent import (
+    OpsChainEvent,
+    OpsChainLinkage,
+    OpsFlowAgentLog,
+    OpsFlowDecision,
+    OpsInventoryAlert,
+    OpsOrderAnomaly,
+    OpsQualityRecord,
+)
+
+# Data Dictionary models — 数据字典补齐
+from .organization import Brand, Group, Organization, Region
+
+# HR 模块 — 薪酬/假勤/审批/招聘/绩效/合同/生命周期
+from .payroll import PayrollRecord, PayrollStatus, SalaryStructure, SalaryType, TaxDeclaration, TaxStatus
+
+# HR W2-3 — 工资条推送记录
+from .payslip import PayslipRecord
+from .people_agent import (
+    PeopleAgentLog,
+    PeopleAttendanceAlert,
+    PeopleLaborCostRecord,
+    PeoplePerformanceScore,
+    PeopleShiftRecord,
+    PeopleStaffingDecision,
+)
+from .performance_review import PerformanceReview, PerformanceTemplate, ReviewCycle, ReviewLevel, ReviewStatus
+from .price_benchmark import PriceBenchmarkPool, PriceBenchmarkReport
+from .purchase_order_item import PurchaseOrderItem
+from .recruitment import Candidate, CandidateStage, Interview, InterviewResult, JobPosting, JobStatus, Offer, OfferStatus
+
+# Phase P1 — 预订Agent: 渠道中台 + 客户风控
+from .reservation_channel import ChannelType, ReservationChannel
+
+# P0 补齐 — 预排菜模型
+from .reservation_pre_order import PreOrderStatus, ReservationPreOrder
+
+# HR W1-2 — 敏感数据审计日志
+from .sensitive_audit_log import SensitiveDataAuditLog
+
+# HR W2-2 — 离职结算
+from .settlement import CompensationType, SeparationType, SettlementRecord, SettlementStatus
+
+# HR Phase 4 — 培训认证/师徒制
+from .training import ExamAttempt, TrainingCourse, TrainingEnrollment, TrainingExam

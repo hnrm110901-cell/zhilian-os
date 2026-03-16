@@ -28,34 +28,34 @@ from datetime import datetime
 
 from sqlalchemy import Column, DateTime, Index, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB
-
 from src.models.base import Base
-
 
 # ── 枚举 ─────────────────────────────────────────────────────────────────────
 
+
 class BanquetStage(str, enum.Enum):
     """宴会销售漏斗 7 阶段（参考 宴荟佳 / 宴专家 PPT）。"""
-    LEAD        = "lead"         # 商机：初次接触，客户表达初步需求
-    INTENT      = "intent"       # 意向：进入选台/报价阶段
-    ROOM_LOCK   = "room_lock"    # 锁台：日期+场地软预留（未签约）
-    SIGNED      = "signed"       # 签约：合同已签，定金已付
+
+    LEAD = "lead"  # 商机：初次接触，客户表达初步需求
+    INTENT = "intent"  # 意向：进入选台/报价阶段
+    ROOM_LOCK = "room_lock"  # 锁台：日期+场地软预留（未签约）
+    SIGNED = "signed"  # 签约：合同已签，定金已付
     PREPARATION = "preparation"  # 准备：BEO 执行，物料/排班就位
-    SERVICE     = "service"      # 服务：宴会当天进行中
-    COMPLETED   = "completed"    # 完成：宴会圆满结束，尾款结清
-    CANCELLED   = "cancelled"    # 取消（任何阶段均可，terminal）
+    SERVICE = "service"  # 服务：宴会当天进行中
+    COMPLETED = "completed"  # 完成：宴会圆满结束，尾款结清
+    CANCELLED = "cancelled"  # 取消（任何阶段均可，terminal）
 
 
 # 合法阶段转换表（from → allowed_to_list）
 STAGE_TRANSITIONS: dict[str, list[str]] = {
-    BanquetStage.LEAD:        [BanquetStage.INTENT,   BanquetStage.CANCELLED],
-    BanquetStage.INTENT:      [BanquetStage.ROOM_LOCK, BanquetStage.CANCELLED],
-    BanquetStage.ROOM_LOCK:   [BanquetStage.SIGNED,   BanquetStage.LEAD, BanquetStage.CANCELLED],
-    BanquetStage.SIGNED:      [BanquetStage.PREPARATION, BanquetStage.CANCELLED],
-    BanquetStage.PREPARATION: [BanquetStage.SERVICE,  BanquetStage.CANCELLED],
-    BanquetStage.SERVICE:     [BanquetStage.COMPLETED, BanquetStage.CANCELLED],
-    BanquetStage.COMPLETED:   [],  # terminal，不可再转换
-    BanquetStage.CANCELLED:   [],  # terminal，不可再转换
+    BanquetStage.LEAD: [BanquetStage.INTENT, BanquetStage.CANCELLED],
+    BanquetStage.INTENT: [BanquetStage.ROOM_LOCK, BanquetStage.CANCELLED],
+    BanquetStage.ROOM_LOCK: [BanquetStage.SIGNED, BanquetStage.LEAD, BanquetStage.CANCELLED],
+    BanquetStage.SIGNED: [BanquetStage.PREPARATION, BanquetStage.CANCELLED],
+    BanquetStage.PREPARATION: [BanquetStage.SERVICE, BanquetStage.CANCELLED],
+    BanquetStage.SERVICE: [BanquetStage.COMPLETED, BanquetStage.CANCELLED],
+    BanquetStage.COMPLETED: [],  # terminal，不可再转换
+    BanquetStage.CANCELLED: [],  # terminal，不可再转换
 }
 
 # 初始阶段（新建宴会预约时的默认起点）
@@ -66,6 +66,7 @@ ROOM_LOCK_TIMEOUT_DAYS = int(__import__("os").getenv("ROOM_LOCK_TIMEOUT_DAYS", "
 
 
 # ── ORM 模型 ──────────────────────────────────────────────────────────────────
+
 
 class BanquetStageHistory(Base):
     """
@@ -129,7 +130,7 @@ class BanquetStageHistory(Base):
 
     __table_args__ = (
         Index("ix_stage_history_reservation", "reservation_id", "changed_at"),
-        Index("ix_stage_history_store_date",  "store_id",       "changed_at"),
+        Index("ix_stage_history_store_date", "store_id", "changed_at"),
     )
 
     def __repr__(self) -> str:

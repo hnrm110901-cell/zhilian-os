@@ -14,20 +14,21 @@
 
 from datetime import datetime
 from typing import List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.core.dependencies import get_current_user
 from src.models.user import User
-from src.models.waste_event import WasteEventStatus, WasteEventType, WasteEvent
+from src.models.waste_event import WasteEvent, WasteEventStatus, WasteEventType
 from src.services.waste_event_service import WasteEventService
 
 router = APIRouter(prefix="/api/v1/waste-events", tags=["waste_events"])
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
+
 
 class WasteEventCreateIn(BaseModel):
     store_id: str
@@ -77,6 +78,7 @@ class WasteEventOut(BaseModel):
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
+
 
 @router.post("/", response_model=WasteEventOut, status_code=status.HTTP_201_CREATED)
 async def create_waste_event(
@@ -160,6 +162,7 @@ async def trigger_analysis(
 
     try:
         from src.ontology.reasoning import WasteReasoningEngine
+
         engine = WasteReasoningEngine()
         result = engine.infer_root_cause(event_id)
     except Exception as e:
@@ -240,6 +243,7 @@ async def get_root_cause_distribution(
 
 
 # ── 辅助 ──────────────────────────────────────────────────────────────────────
+
 
 def _to_out(e: WasteEvent) -> dict:
     return {

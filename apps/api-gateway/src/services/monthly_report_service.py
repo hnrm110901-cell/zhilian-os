@@ -21,7 +21,6 @@ from typing import Any, Dict, List, Optional
 
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.services.case_story_generator import CaseStoryGenerator
 
 logger = structlog.get_logger()
@@ -33,6 +32,7 @@ BRAND_NAME = os.getenv("BRAND_NAME", "屯象经营助手")
 # ════════════════════════════════════════════════════════════════════════════════
 # 纯函数：报告内容构建
 # ════════════════════════════════════════════════════════════════════════════════
+
 
 def build_executive_summary(monthly_story: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -61,19 +61,19 @@ def build_executive_summary(monthly_story: Dict[str, Any]) -> Dict[str, Any]:
         headline_parts.append(f"本月经营整体{status_label}")
 
     return {
-        "period":                period,
-        "headline":              " | ".join(headline_parts),
-        "revenue_yuan":          cm["revenue_yuan"],
-        "actual_cost_pct":       cm["actual_cost_pct"],
-        "cost_rate_status":      cm["cost_rate_status"],
-        "cost_rate_label":       status_label,
-        "waste_cost_yuan":       cm["waste_cost_yuan"],
-        "waste_pct":             cm["waste_pct"],
+        "period": period,
+        "headline": " | ".join(headline_parts),
+        "revenue_yuan": cm["revenue_yuan"],
+        "actual_cost_pct": cm["actual_cost_pct"],
+        "cost_rate_status": cm["cost_rate_status"],
+        "cost_rate_label": status_label,
+        "waste_cost_yuan": cm["waste_cost_yuan"],
+        "waste_pct": cm["waste_pct"],
         "decision_adoption_pct": dm["adoption_rate_pct"],
-        "total_saving_yuan":     dm["total_saving_yuan"],
-        "decisions_approved":    dm["approved"],
-        "decisions_total":       dm["total"],
-        "narrative":             monthly_story["narrative"],
+        "total_saving_yuan": dm["total_saving_yuan"],
+        "decisions_approved": dm["approved"],
+        "decisions_total": dm["total"],
+        "narrative": monthly_story["narrative"],
     }
 
 
@@ -84,34 +84,31 @@ def build_weekly_trend_chart(weekly_trend: List[Dict[str, Any]]) -> Dict[str, An
     Returns:
         {x_axis: [...], cost_rate_series: [...], revenue_series: [...]}
     """
-    x_axis         = [w["week_start"] for w in weekly_trend]
+    x_axis = [w["week_start"] for w in weekly_trend]
     cost_rate_data = [w["actual_cost_pct"] for w in weekly_trend]
-    revenue_data   = [w["revenue_yuan"] for w in weekly_trend]
-    status_colors  = {
-        "ok":       "#52c41a",
-        "warning":  "#faad14",
+    revenue_data = [w["revenue_yuan"] for w in weekly_trend]
+    status_colors = {
+        "ok": "#52c41a",
+        "warning": "#faad14",
         "critical": "#f5222d",
     }
-    point_colors = [
-        status_colors.get(w.get("cost_rate_status", "ok"), "#1890ff")
-        for w in weekly_trend
-    ]
+    point_colors = [status_colors.get(w.get("cost_rate_status", "ok"), "#1890ff") for w in weekly_trend]
 
     return {
-        "x_axis":         x_axis,
+        "x_axis": x_axis,
         "cost_rate_data": cost_rate_data,
-        "revenue_data":   revenue_data,
-        "point_colors":   point_colors,
+        "revenue_data": revenue_data,
+        "point_colors": point_colors,
     }
 
 
 def render_html_report(
-    store_id:         str,
-    year:             int,
-    month:            int,
+    store_id: str,
+    year: int,
+    month: int,
     executive_summary: Dict[str, Any],
-    top3_decisions:   List[Dict[str, Any]],
-    weekly_chart:     Dict[str, Any],
+    top3_decisions: List[Dict[str, Any]],
+    weekly_chart: Dict[str, Any],
 ) -> str:
     """
     将报告数据渲染为 HTML 字符串（可在浏览器打印为 PDF）。
@@ -119,11 +116,11 @@ def render_html_report(
     样式：极简打印友好，无外部依赖，Ant Design 色系。
     """
     period = executive_summary["period"]
-    rev    = executive_summary["revenue_yuan"]
-    cost   = executive_summary["actual_cost_pct"]
-    waste  = executive_summary["waste_cost_yuan"]
-    save   = executive_summary["total_saving_yuan"]
-    adopt  = executive_summary["decision_adoption_pct"]
+    rev = executive_summary["revenue_yuan"]
+    cost = executive_summary["actual_cost_pct"]
+    waste = executive_summary["waste_cost_yuan"]
+    save = executive_summary["total_saving_yuan"]
+    adopt = executive_summary["decision_adoption_pct"]
 
     # Top3 决策节
     top3_rows = ""
@@ -141,14 +138,14 @@ def render_html_report(
 
     # 周趋势表格（文字版，无需图表库）
     trend_rows = ""
-    x_axis     = weekly_chart.get("x_axis", [])
-    cost_data  = weekly_chart.get("cost_rate_data", [])
-    rev_data   = weekly_chart.get("revenue_data", [])
-    colors     = weekly_chart.get("point_colors", [])
+    x_axis = weekly_chart.get("x_axis", [])
+    cost_data = weekly_chart.get("cost_rate_data", [])
+    rev_data = weekly_chart.get("revenue_data", [])
+    colors = weekly_chart.get("point_colors", [])
 
     for i, week in enumerate(x_axis):
         c = cost_data[i] if i < len(cost_data) else 0
-        r = rev_data[i]  if i < len(rev_data)  else 0
+        r = rev_data[i] if i < len(rev_data) else 0
         color = colors[i] if i < len(colors) else "#1890ff"
         trend_rows += f"""
         <tr>
@@ -248,15 +245,16 @@ def render_html_report(
 # MonthlyReportService
 # ════════════════════════════════════════════════════════════════════════════════
 
+
 class MonthlyReportService:
     """月度经营报告服务：聚合数据 → 构建报告 → 输出 JSON / HTML"""
 
     @staticmethod
     async def generate(
         store_id: str,
-        year:     int,
-        month:    int,
-        db:       AsyncSession,
+        year: int,
+        month: int,
+        db: AsyncSession,
     ) -> Dict[str, Any]:
         """
         生成月度报告 JSON 数据结构。
@@ -271,9 +269,7 @@ class MonthlyReportService:
         """
         from src.services.behavior_score_engine import BehaviorScoreEngine
 
-        monthly_story = await CaseStoryGenerator.generate_monthly_story(
-            store_id=store_id, year=year, month=month, db=db
-        )
+        monthly_story = await CaseStoryGenerator.generate_monthly_story(store_id=store_id, year=year, month=month, db=db)
 
         # 用 BehaviorScoreEngine 替代 CaseStoryGenerator 的手工采纳率汇总（更准确）
         try:
@@ -286,9 +282,9 @@ class MonthlyReportService:
             )
             # 覆盖 decision_summary 中的采纳率字段
             monthly_story["decision_summary"]["adoption_rate_pct"] = behavior["adoption_rate_pct"]
-            monthly_story["decision_summary"]["total_saving_yuan"]  = behavior["total_saving_yuan"]
-            monthly_story["decision_summary"]["total"]              = behavior["total_sent"]
-            monthly_story["decision_summary"]["approved"]           = behavior["total_adopted"]
+            monthly_story["decision_summary"]["total_saving_yuan"] = behavior["total_saving_yuan"]
+            monthly_story["decision_summary"]["total"] = behavior["total_sent"]
+            monthly_story["decision_summary"]["approved"] = behavior["total_adopted"]
         except Exception as exc:
             logger.warning(
                 "monthly_report.behavior_engine_failed",
@@ -297,51 +293,53 @@ class MonthlyReportService:
             )
 
         executive_summary = build_executive_summary(monthly_story)
-        weekly_chart      = build_weekly_trend_chart(monthly_story["weekly_trend"])
+        weekly_chart = build_weekly_trend_chart(monthly_story["weekly_trend"])
 
         logger.info(
             "monthly_report_generated",
-            store_id=store_id, year=year, month=month,
+            store_id=store_id,
+            year=year,
+            month=month,
             cost_pct=monthly_story["cost_metrics"]["actual_cost_pct"],
         )
 
         return {
-            "store_id":              store_id,
-            "year":                  year,
-            "month":                 month,
-            "period_label":          monthly_story["period_label"],
-            "executive_summary":     executive_summary,
-            "weekly_trend_chart":    weekly_chart,
-            "top3_decisions":        monthly_story["top3_decisions"],
-            "cost_metrics":          monthly_story["cost_metrics"],
-            "decision_summary":      monthly_story["decision_summary"],
-            "generated_at":          monthly_story["generated_at"],
+            "store_id": store_id,
+            "year": year,
+            "month": month,
+            "period_label": monthly_story["period_label"],
+            "executive_summary": executive_summary,
+            "weekly_trend_chart": weekly_chart,
+            "top3_decisions": monthly_story["top3_decisions"],
+            "cost_metrics": monthly_story["cost_metrics"],
+            "decision_summary": monthly_story["decision_summary"],
+            "generated_at": monthly_story["generated_at"],
         }
 
     @staticmethod
     async def generate_html(
         store_id: str,
-        year:     int,
-        month:    int,
-        db:       AsyncSession,
+        year: int,
+        month: int,
+        db: AsyncSession,
     ) -> str:
         """生成月度报告 HTML（供浏览器打印为 PDF）"""
         report = await MonthlyReportService.generate(store_id, year, month, db)
         return render_html_report(
-            store_id          = store_id,
-            year              = year,
-            month             = month,
-            executive_summary = report["executive_summary"],
-            top3_decisions    = report["top3_decisions"],
-            weekly_chart      = report["weekly_trend_chart"],
+            store_id=store_id,
+            year=year,
+            month=month,
+            executive_summary=report["executive_summary"],
+            top3_decisions=report["top3_decisions"],
+            weekly_chart=report["weekly_trend_chart"],
         )
 
     @staticmethod
     async def generate_excel(
         store_id: str,
-        year:     int,
-        month:    int,
-        db:       AsyncSession,
+        year: int,
+        month: int,
+        db: AsyncSession,
     ) -> bytes:
         """
         生成月度报告 Excel（.xlsx）字节流，供下载。
@@ -352,8 +350,9 @@ class MonthlyReportService:
           Sheet3 Top3决策  — 本月最高价值决策明细
         """
         import io
+
         import openpyxl
-        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
         from openpyxl.utils import get_column_letter
 
         report = await MonthlyReportService.generate(store_id, year, month, db)
@@ -361,21 +360,23 @@ class MonthlyReportService:
         wb = openpyxl.Workbook()
 
         # ── 通用样式 ──────────────────────────────────────────────
-        HDR_FILL  = PatternFill("solid", fgColor="FF6B2C")  # 品牌橙
-        HDR_FONT  = Font(bold=True, color="FFFFFF", size=11)
+        HDR_FILL = PatternFill("solid", fgColor="FF6B2C")  # 品牌橙
+        HDR_FONT = Font(bold=True, color="FFFFFF", size=11)
         TITLE_FONT = Font(bold=True, size=13)
-        BORDER    = Border(
-            left=Side(style="thin"), right=Side(style="thin"),
-            top=Side(style="thin"),  bottom=Side(style="thin"),
+        BORDER = Border(
+            left=Side(style="thin"),
+            right=Side(style="thin"),
+            top=Side(style="thin"),
+            bottom=Side(style="thin"),
         )
-        CENTER    = Alignment(horizontal="center", vertical="center")
-        RIGHT     = Alignment(horizontal="right")
+        CENTER = Alignment(horizontal="center", vertical="center")
+        RIGHT = Alignment(horizontal="right")
 
         def _set_header(ws, row: int, cols: list[str]) -> None:
             for c, label in enumerate(cols, start=1):
                 cell = ws.cell(row=row, column=c, value=label)
-                cell.fill   = HDR_FILL
-                cell.font   = HDR_FONT
+                cell.fill = HDR_FILL
+                cell.font = HDR_FONT
                 cell.border = BORDER
                 cell.alignment = CENTER
 
@@ -397,7 +398,7 @@ class MonthlyReportService:
         ws1.merge_cells("A1:C1")
         title_cell = ws1["A1"]
         title_cell.value = f"{BRAND_NAME} — {period} 月度经营报告"
-        title_cell.font  = TITLE_FONT
+        title_cell.font = TITLE_FONT
         title_cell.alignment = CENTER
 
         es = report["executive_summary"]
@@ -405,16 +406,15 @@ class MonthlyReportService:
         dm = report["decision_summary"]
 
         kpis = [
-            ("指标",          "数值",          "单位"),
-            ("营业额",         es.get("revenue_yuan", "—"),    "元"),
-            ("食材成本率",      f"{cm.get('actual_cost_pct', 0):.2f}%",  "%"),
-            ("成本率状态",      {"ok": "正常", "warning": "偏高", "critical": "超标"}.get(
-                cm.get("cost_rate_status", ""), "—"), ""),
-            ("损耗成本",       es.get("waste_cost_yuan", "—"),  "元"),
-            ("决策采纳率",     f"{dm.get('adoption_rate_pct', 0):.1f}%", "%"),
-            ("累计节省",       dm.get("total_saving_yuan", 0),   "元"),
-            ("发出决策数",     dm.get("total", 0),               "条"),
-            ("已执行决策数",   dm.get("approved", 0),            "条"),
+            ("指标", "数值", "单位"),
+            ("营业额", es.get("revenue_yuan", "—"), "元"),
+            ("食材成本率", f"{cm.get('actual_cost_pct', 0):.2f}%", "%"),
+            ("成本率状态", {"ok": "正常", "warning": "偏高", "critical": "超标"}.get(cm.get("cost_rate_status", ""), "—"), ""),
+            ("损耗成本", es.get("waste_cost_yuan", "—"), "元"),
+            ("决策采纳率", f"{dm.get('adoption_rate_pct', 0):.1f}%", "%"),
+            ("累计节省", dm.get("total_saving_yuan", 0), "元"),
+            ("发出决策数", dm.get("total", 0), "条"),
+            ("已执行决策数", dm.get("approved", 0), "条"),
         ]
         _set_header(ws1, 2, kpis[0])
         for r_offset, (label, val, unit) in enumerate(kpis[1:], start=3):
@@ -432,13 +432,13 @@ class MonthlyReportService:
         ws2.merge_cells("A1:D1")
         t2 = ws2["A1"]
         t2.value = f"{period} 周趋势数据"
-        t2.font  = TITLE_FONT
+        t2.font = TITLE_FONT
         t2.alignment = CENTER
 
         wc = report.get("weekly_trend_chart", {})
-        weeks   = wc.get("weeks", [])
+        weeks = wc.get("weeks", [])
         cost_rates = wc.get("cost_rate_pcts", [])
-        revenues   = wc.get("revenues", [])
+        revenues = wc.get("revenues", [])
 
         _set_header(ws2, 2, ["周次", "成本率(%)", "营业额(元)", "目标成本率(%)"])
         target_pct = cm.get("target_cost_pct", "—")
@@ -446,7 +446,7 @@ class MonthlyReportService:
             r = i + 3
             _set_cell(ws2, r, 1, week)
             _set_cell(ws2, r, 2, cost_rates[i] if i < len(cost_rates) else None, "0.00")
-            _set_cell(ws2, r, 3, revenues[i]   if i < len(revenues)   else None, "#,##0.00")
+            _set_cell(ws2, r, 3, revenues[i] if i < len(revenues) else None, "#,##0.00")
             _set_cell(ws2, r, 4, target_pct)
 
         for col_idx in range(1, 5):
@@ -459,7 +459,7 @@ class MonthlyReportService:
         ws3.merge_cells("A1:E1")
         t3 = ws3["A1"]
         t3.value = f"{period} 高价值决策明细"
-        t3.font  = TITLE_FONT
+        t3.font = TITLE_FONT
         t3.alignment = CENTER
 
         _set_header(ws3, 2, ["排名", "决策标题", "决策叙述", "节省金额(元)", "置信度(%)"])
@@ -481,4 +481,3 @@ class MonthlyReportService:
         buf = io.BytesIO()
         wb.save(buf)
         return buf.getvalue()
-

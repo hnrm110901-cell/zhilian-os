@@ -2,22 +2,23 @@
 Model Marketplace API - 模型交易市场API
 联邦学习商业化 - 售卖行业最佳实践
 """
+
+from typing import List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional, List
-
-from src.core.dependencies import get_db, get_current_user
+from src.core.dependencies import get_current_user, get_db
+from src.models.user import User
 from src.services.model_marketplace_service import (
-    get_model_marketplace_service,
-    ModelMarketplaceService,
-    ModelType,
-    ModelLevel,
+    DataContribution,
     IndustryCategory,
     ModelInfo,
+    ModelLevel,
+    ModelMarketplaceService,
     ModelPurchase,
-    DataContribution
+    ModelType,
+    get_model_marketplace_service,
 )
-from src.models.user import User
 
 router = APIRouter(prefix="/api/v1/model-marketplace")
 
@@ -28,7 +29,7 @@ async def list_models(
     model_level: Optional[ModelLevel] = None,
     industry_category: Optional[IndustryCategory] = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     列出可用的模型
@@ -39,23 +40,15 @@ async def list_models(
     """
     service = get_model_marketplace_service(db)
     models = await service.list_available_models(
-        model_type=model_type,
-        model_level=model_level,
-        industry_category=industry_category
+        model_type=model_type, model_level=model_level, industry_category=industry_category
     )
 
-    return {
-        "total": len(models),
-        "models": [m.model_dump() for m in models]
-    }
+    return {"total": len(models), "models": [m.model_dump() for m in models]}
 
 
 @router.post("/purchase")
 async def purchase_model(
-    store_id: str,
-    model_id: str,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    store_id: str, model_id: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """
     购买模型
@@ -65,11 +58,7 @@ async def purchase_model(
     service = get_model_marketplace_service(db)
     purchase = await service.purchase_model(store_id, model_id)
 
-    return {
-        "success": True,
-        "purchase": purchase.model_dump(),
-        "message": "模型购买成功，已激活"
-    }
+    return {"success": True, "purchase": purchase.model_dump(), "message": "模型购买成功，已激活"}
 
 
 @router.post("/contribute-data")
@@ -79,7 +68,7 @@ async def contribute_data(
     data_points: int,
     quality_score: float,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     贡献数据参与联邦学习
@@ -89,43 +78,30 @@ async def contribute_data(
     """
     service = get_model_marketplace_service(db)
     contribution = await service.contribute_data(
-        store_id=store_id,
-        model_id=model_id,
-        data_points=data_points,
-        quality_score=quality_score
+        store_id=store_id, model_id=model_id, data_points=data_points, quality_score=quality_score
     )
 
     return {
         "success": True,
         "contribution": contribution.model_dump(),
-        "message": f"数据贡献成功，预计分成 ¥{contribution.revenue_share:,.2f}"
+        "message": f"数据贡献成功，预计分成 ¥{contribution.revenue_share:,.2f}",
     }
 
 
 @router.get("/my-models/{store_id}")
-async def get_my_models(
-    store_id: str,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+async def get_my_models(store_id: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     获取门店已购买的模型
     """
     service = get_model_marketplace_service(db)
     purchases = await service.get_store_purchased_models(store_id)
 
-    return {
-        "store_id": store_id,
-        "total": len(purchases),
-        "purchases": [p.model_dump() for p in purchases]
-    }
+    return {"store_id": store_id, "total": len(purchases), "purchases": [p.model_dump() for p in purchases]}
 
 
 @router.get("/my-contributions/{store_id}")
 async def get_my_contributions(
-    store_id: str,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    store_id: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """
     获取门店的数据贡献记录
@@ -139,15 +115,12 @@ async def get_my_contributions(
         "store_id": store_id,
         "total_contributions": len(contributions),
         "total_revenue_share": total_revenue_share,
-        "contributions": [c.model_dump() for c in contributions]
+        "contributions": [c.model_dump() for c in contributions],
     }
 
 
 @router.get("/network-effect")
-async def get_network_effect(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+async def get_network_effect(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     获取网络效应指标
 
@@ -162,16 +135,16 @@ async def get_network_effect(
     return {
         "network_effect": network_effect,
         "vision": {
-            "title": "屯象OS = 餐饮行业的\"集体大脑\"",
+            "title": '屯象OS = 餐饮行业的"集体大脑"',
             "description": [
                 f"{network_effect['total_stores']:,}家门店的运营经验",
                 f"{network_effect['total_data_points']:,}条交易数据",
                 "持续进化的AI模型",
-                "不可复制的网络效应"
+                "不可复制的网络效应",
             ],
             "moat": {
-                "strength": network_effect['moat_strength'],
-                "explanation": "大厂可以复制代码，但无法复制网络效应。用的店越多，壁垒越高。"
-            }
-        }
+                "strength": network_effect["moat_strength"],
+                "explanation": "大厂可以复制代码，但无法复制网络效应。用的店越多，壁垒越高。",
+            },
+        },
     }

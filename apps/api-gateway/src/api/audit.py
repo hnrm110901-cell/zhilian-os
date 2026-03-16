@@ -1,25 +1,27 @@
 """
 审计日志API
 """
+
+import io
+from datetime import date, datetime
 from typing import Optional
-from datetime import datetime, date
-from fastapi import APIRouter, Depends, Query, HTTPException
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
-import io
-
 from src.core.database import get_db
 from src.core.dependencies import get_current_active_user, require_permission
 from src.core.permissions import Permission
-from src.services.audit_log_service import audit_log_service
 from src.models import User
+from src.services.audit_log_service import audit_log_service
 
 router = APIRouter()
 
 
 class AuditLogResponse(BaseModel):
     """审计日志响应"""
+
     id: str
     action: str
     resource_type: str
@@ -76,7 +78,7 @@ async def get_audit_logs(
         search_query=search,
         skip=skip,
         limit=limit,
-        db=db
+        db=db,
     )
 
     return {
@@ -99,11 +101,7 @@ async def get_user_activity_stats(
 
     需要AUDIT_READ权限
     """
-    stats = await audit_log_service.get_user_activity_stats(
-        user_id=user_id,
-        days=days,
-        db=db
-    )
+    stats = await audit_log_service.get_user_activity_stats(user_id=user_id, days=days, db=db)
 
     return stats
 
@@ -119,10 +117,7 @@ async def get_system_activity_stats(
 
     需要AUDIT_READ权限
     """
-    stats = await audit_log_service.get_system_activity_stats(
-        days=days,
-        db=db
-    )
+    stats = await audit_log_service.get_system_activity_stats(days=days, db=db)
 
     return stats
 
@@ -138,10 +133,7 @@ async def cleanup_old_logs(
 
     需要AUDIT_DELETE权限
     """
-    count = await audit_log_service.delete_old_logs(
-        days=days,
-        db=db
-    )
+    count = await audit_log_service.delete_old_logs(days=days, db=db)
 
     return {
         "success": True,
@@ -159,10 +151,7 @@ async def get_available_actions(
     """
     from src.models.audit_log import AuditAction
 
-    actions = [
-        attr for attr in dir(AuditAction)
-        if not attr.startswith('_') and isinstance(getattr(AuditAction, attr), str)
-    ]
+    actions = [attr for attr in dir(AuditAction) if not attr.startswith("_") and isinstance(getattr(AuditAction, attr), str)]
 
     return {
         "actions": actions,
@@ -180,8 +169,7 @@ async def get_available_resource_types(
     from src.models.audit_log import ResourceType
 
     resource_types = [
-        attr for attr in dir(ResourceType)
-        if not attr.startswith('_') and isinstance(getattr(ResourceType, attr), str)
+        attr for attr in dir(ResourceType) if not attr.startswith("_") and isinstance(getattr(ResourceType, attr), str)
     ]
 
     return {

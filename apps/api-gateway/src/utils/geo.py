@@ -2,13 +2,12 @@
 Geographic utility functions
 地理位置相关工具函数
 """
+
 import math
 from typing import Tuple
 
 
-def haversine_distance(
-    lat1: float, lon1: float, lat2: float, lon2: float
-) -> float:
+def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """
     Calculate the great circle distance between two points on Earth
     使用Haversine公式计算两个地理坐标之间的距离
@@ -37,10 +36,7 @@ def haversine_distance(
     delta_lon = math.radians(lon2 - lon1)
 
     # Haversine公式
-    a = (
-        math.sin(delta_lat / 2) ** 2
-        + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(delta_lon / 2) ** 2
-    )
+    a = math.sin(delta_lat / 2) ** 2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(delta_lon / 2) ** 2
     c = 2 * math.asin(math.sqrt(a))
 
     # 计算距离
@@ -49,9 +45,7 @@ def haversine_distance(
     return distance
 
 
-def is_within_radius(
-    lat1: float, lon1: float, lat2: float, lon2: float, radius: float
-) -> bool:
+def is_within_radius(lat1: float, lon1: float, lat2: float, lon2: float, radius: float) -> bool:
     """
     Check if two points are within a specified radius
     检查两个点是否在指定半径内

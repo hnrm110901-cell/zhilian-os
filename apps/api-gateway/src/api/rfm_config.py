@@ -6,15 +6,17 @@ RFM 阈值管理 API — P1 补齐（易订PRO 2.2 客户价值设置）
 - 支持自定义 S1-S5 各档位的划分阈值
 - 用于 dining_journey_service._calc_rfm_level() 动态读取
 """
+
+import json
+from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
-import json
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
 from ..models.user import User
-from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 
@@ -79,13 +81,13 @@ async def get_store_rfm_config(
         }
 
     # 尝试从数据库读取（存在 stores 表的 metadata 字段中）
-    from ..models.store import Store
     from sqlalchemy import select
-    result = await session.execute(
-        select(Store).where(Store.id == store_id)
-    )
+
+    from ..models.store import Store
+
+    result = await session.execute(select(Store).where(Store.id == store_id))
     store = result.scalar_one_or_none()
-    if store and hasattr(store, 'metadata_json'):
+    if store and hasattr(store, "metadata_json"):
         meta = store.metadata_json or {}
         if isinstance(meta, dict) and "rfm_thresholds" in meta:
             thresholds = meta["rfm_thresholds"]
@@ -131,13 +133,13 @@ async def update_store_rfm_config(
 
     # 持久化到 store metadata（尝试写入）
     try:
-        from ..models.store import Store
         from sqlalchemy import select
-        result = await session.execute(
-            select(Store).where(Store.id == store_id)
-        )
+
+        from ..models.store import Store
+
+        result = await session.execute(select(Store).where(Store.id == store_id))
         store = result.scalar_one_or_none()
-        if store and hasattr(store, 'metadata_json'):
+        if store and hasattr(store, "metadata_json"):
             meta = store.metadata_json or {}
             if not isinstance(meta, dict):
                 meta = {}
@@ -171,6 +173,7 @@ async def reset_store_rfm_config(
 
 
 # ── 供 Service 层调用的公开函数 ──────────────────────────────────
+
 
 def get_rfm_thresholds(store_id: str) -> Dict[str, Any]:
     """获取门店RFM阈值（同步接口，供service层调用）"""

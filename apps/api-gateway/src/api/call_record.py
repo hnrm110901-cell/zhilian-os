@@ -10,16 +10,18 @@
 - 为预订客户生成门店导航链接
 - 通过短信/企微推送到店路线
 """
+
+import uuid
+from datetime import date, datetime, timedelta
+from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
-from datetime import datetime, date, timedelta
-import uuid
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
 from ..models.user import User
-from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 
@@ -83,10 +85,9 @@ async def list_call_records(
     since = (datetime.utcnow() - timedelta(days=days)).isoformat()
 
     records = [
-        r for r in _call_records
-        if r["store_id"] == store_id
-        and r["created_at"] >= since
-        and (not caller_phone or r["caller_phone"] == caller_phone)
+        r
+        for r in _call_records
+        if r["store_id"] == store_id and r["created_at"] >= since and (not caller_phone or r["caller_phone"] == caller_phone)
     ]
 
     return {
@@ -137,13 +138,13 @@ async def cti_webhook(
     return {"status": "ok", "record_id": record["id"]}
 
 
-async def _identify_customer(
-    session: AsyncSession, phone: str, store_id: str
-) -> Dict[str, Any]:
+async def _identify_customer(session: AsyncSession, phone: str, store_id: str) -> Dict[str, Any]:
     """来电自动识别客户档案"""
     try:
+        from sqlalchemy import and_, select
+
         from ..models.customer_ownership import CustomerOwnership
-        from sqlalchemy import select, and_
+
         result = await session.execute(
             select(CustomerOwnership).where(
                 and_(
@@ -172,6 +173,7 @@ async def _identify_customer(
 # 路线发送（到店导航）
 # ══════════════════════════════════════════════════════════════════
 
+
 class SendRouteRequest(BaseModel):
     reservation_id: str
     channel: str = "sms"  # sms / wechat
@@ -189,26 +191,23 @@ async def send_route(
 
     生成腾讯/高德地图导航链接，通过短信或企微推送。
     """
-    from ..models.reservation import Reservation
-    from ..models.store import Store
     from sqlalchemy import select
 
+    from ..models.reservation import Reservation
+    from ..models.store import Store
+
     # 获取预订信息
-    res_result = await session.execute(
-        select(Reservation).where(Reservation.id == reservation_id)
-    )
+    res_result = await session.execute(select(Reservation).where(Reservation.id == reservation_id))
     r = res_result.scalar_one_or_none()
     if not r:
         raise HTTPException(status_code=404, detail="预订不存在")
 
     # 获取门店信息
-    store_result = await session.execute(
-        select(Store).where(Store.id == r.store_id)
-    )
+    store_result = await session.execute(select(Store).where(Store.id == r.store_id))
     store = store_result.scalar_one_or_none()
 
     store_name = store.name if store else r.store_id
-    store_address = store.address if store and hasattr(store, 'address') else ""
+    store_address = store.address if store and hasattr(store, "address") else ""
 
     # 生成导航链接（腾讯地图URI Scheme）
     # 生产环境应从 store 表读取经纬度
@@ -228,15 +227,20 @@ async def send_route(
     try:
         if req.channel == "sms":
             from ..services.sms_service import sms_service
+
             await sms_service.send_sms(r.customer_phone, message)
             sent = True
         elif req.channel == "wechat":
             from ..services.wechat_trigger_service import wechat_trigger_service
-            await wechat_trigger_service.trigger("route.sent", {
-                "customer_phone": r.customer_phone,
-                "store_name": store_name,
-                "nav_url": nav_url,
-            })
+
+            await wechat_trigger_service.trigger(
+                "route.sent",
+                {
+                    "customer_phone": r.customer_phone,
+                    "store_name": store_name,
+                    "nav_url": nav_url,
+                },
+            )
             sent = True
     except Exception:
         pass

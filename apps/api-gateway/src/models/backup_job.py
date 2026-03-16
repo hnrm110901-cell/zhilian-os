@@ -2,17 +2,19 @@
 增量备份任务模型
 跟踪全量/增量备份任务的状态和结果文件
 """
-import uuid
+
 import enum
-from sqlalchemy import Column, String, Integer, Text, JSON
+import uuid
+
+from sqlalchemy import JSON, Column, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 
 from .base import Base, TimestampMixin
 
 
 class BackupType(str, enum.Enum):
-    FULL = "full"               # 全量备份
-    INCREMENTAL = "incremental" # 增量备份
+    FULL = "full"  # 全量备份
+    INCREMENTAL = "incremental"  # 增量备份
 
 
 class BackupStatus(str, enum.Enum):

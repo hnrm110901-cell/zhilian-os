@@ -3,16 +3,22 @@
 用于记录AI Agent的决策建议、店长的实际决策和最终结果
 支持Human-in-the-loop和联邦学习
 """
-from sqlalchemy import Column, String, Integer, Float, DateTime, Text, JSON, Enum as SQLEnum, ForeignKey, Numeric
+
+import enum
+from datetime import datetime
+
+from sqlalchemy import JSON, Column, DateTime
+from sqlalchemy import Enum as SQLEnum
+from sqlalchemy import Float, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-from datetime import datetime
-import enum
+
 from .base import Base
 
 
 class DecisionType(str, enum.Enum):
     """决策类型"""
+
     REVENUE_ANOMALY = "revenue_anomaly"  # 营收异常
     INVENTORY_ALERT = "inventory_alert"  # 库存预警
     PURCHASE_SUGGESTION = "purchase_suggestion"  # 采购建议
@@ -25,6 +31,7 @@ class DecisionType(str, enum.Enum):
 
 class DecisionStatus(str, enum.Enum):
     """决策状态"""
+
     PENDING = "pending"  # 待审批
     APPROVED = "approved"  # 已批准
     REJECTED = "rejected"  # 已拒绝
@@ -35,6 +42,7 @@ class DecisionStatus(str, enum.Enum):
 
 class DecisionOutcome(str, enum.Enum):
     """决策结果"""
+
     SUCCESS = "success"  # 成功
     FAILURE = "failure"  # 失败
     PARTIAL = "partial"  # 部分成功
@@ -43,12 +51,15 @@ class DecisionOutcome(str, enum.Enum):
 
 class DecisionLog(Base):
     """决策日志表"""
+
     __tablename__ = "decision_logs"
 
     id = Column(String(36), primary_key=True)
 
     # 决策基本信息
-    decision_type = Column(SQLEnum(DecisionType, values_callable=lambda x: [e.value for e in x]), nullable=False, index=True, comment="决策类型")
+    decision_type = Column(
+        SQLEnum(DecisionType, values_callable=lambda x: [e.value for e in x]), nullable=False, index=True, comment="决策类型"
+    )
     agent_type = Column(String(50), nullable=False, index=True, comment="Agent类型")
     agent_method = Column(String(100), nullable=False, comment="Agent方法名")
 
@@ -66,7 +77,12 @@ class DecisionLog(Base):
     manager_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), index=True, comment="店长ID")
     manager_decision = Column(JSON, comment="店长实际决策")
     manager_feedback = Column(Text, comment="店长反馈意见")
-    decision_status = Column(SQLEnum(DecisionStatus, values_callable=lambda x: [e.value for e in x]), default=DecisionStatus.PENDING, index=True, comment="决策状态")
+    decision_status = Column(
+        SQLEnum(DecisionStatus, values_callable=lambda x: [e.value for e in x]),
+        default=DecisionStatus.PENDING,
+        index=True,
+        comment="决策状态",
+    )
 
     # 决策时间
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, comment="创建时间")
@@ -130,5 +146,5 @@ class DecisionLog(Base):
             "context_data": self.context_data,
             "rag_context": self.rag_context,
             "approval_chain": self.approval_chain,
-            "notes": self.notes
+            "notes": self.notes,
         }

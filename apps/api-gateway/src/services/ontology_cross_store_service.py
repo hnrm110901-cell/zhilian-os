@@ -1,13 +1,13 @@
 """
 跨店分析（Phase 3）：多门店损耗对比、连锁级 KPI 雏形
 """
+
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.models import Store
 from src.ontology import get_ontology_repository
 from src.services.waste_reasoning_service import run_waste_reasoning
@@ -28,9 +28,7 @@ async def cross_store_waste_comparison(
         # 从图谱取门店列表
         repo = get_ontology_repository()
         if repo:
-            rows = repo.run_read_only_query(
-                "MATCH (s:Store) RETURN s.store_id AS store_id, s.name AS name"
-            )
+            rows = repo.run_read_only_query("MATCH (s:Store) RETURN s.store_id AS store_id, s.name AS name")
             store_ids = [r["store_id"] for r in rows if r.get("store_id")]
         if not store_ids:
             # 从 PG 取
@@ -50,14 +48,24 @@ async def cross_store_waste_comparison(
             )
             top3 = report.get("top3_root_causes") or []
             variances = report.get("step1_inventory_variance") or []
-            by_store.append({
-                "store_id": sid,
-                "top3_root_causes": top3,
-                "variance_count": len(variances),
-                "max_diff_rate_pct": max((abs(v.get("diff_rate_pct", 0)) for v in variances) if variances else [0]),
-            })
+            by_store.append(
+                {
+                    "store_id": sid,
+                    "top3_root_causes": top3,
+                    "variance_count": len(variances),
+                    "max_diff_rate_pct": max((abs(v.get("diff_rate_pct", 0)) for v in variances) if variances else [0]),
+                }
+            )
         except Exception:
-            by_store.append({"store_id": sid, "error": "reasoning_failed", "top3_root_causes": [], "variance_count": 0, "max_diff_rate_pct": 0})
+            by_store.append(
+                {
+                    "store_id": sid,
+                    "error": "reasoning_failed",
+                    "top3_root_causes": [],
+                    "variance_count": 0,
+                    "max_diff_rate_pct": 0,
+                }
+            )
 
     return {
         "tenant_id": tenant_id,

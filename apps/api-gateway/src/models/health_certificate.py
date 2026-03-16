@@ -1,7 +1,10 @@
 """健康证管理模型 — 员工健康证录入/到期预警/合规追踪"""
+
 import uuid
-from sqlalchemy import Column, String, Date, Text
+
+from sqlalchemy import Column, Date, String, Text
 from sqlalchemy.dialects.postgresql import UUID
+
 from .base import Base, TimestampMixin
 
 

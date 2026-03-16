@@ -8,11 +8,12 @@ RAG信号路由器 - 解决向量检索无法区分数值差异的问题
   - 数值/结构化查询 → PostgreSQL 精确查询
   - 语义/案例查询   → Qdrant 向量检索（保持原有路径）
 """
-import re
+
 import os
-from enum import Enum
-from typing import Dict, Any, Optional
+import re
 from datetime import date, timedelta
+from enum import Enum
+from typing import Any, Dict, Optional
 
 import structlog
 
@@ -22,9 +23,10 @@ logger = structlog.get_logger()
 # Query classification
 # ---------------------------------------------------------------------------
 
+
 class QuerySignal(str, Enum):
-    NUMERICAL = "numerical"   # 数值类：损耗率、营收、KPI 指标
-    SEMANTIC  = "semantic"    # 语义类：SOP 查询、历史案例
+    NUMERICAL = "numerical"  # 数值类：损耗率、营收、KPI 指标
+    SEMANTIC = "semantic"  # 语义类：SOP 查询、历史案例
 
 
 _NUMERICAL_PATTERNS = [
@@ -63,7 +65,7 @@ _DATA_DAYS = int(os.getenv("RAG_DATA_DAYS", "30"))
 
 async def _query_loss_rate(session, store_id: str) -> Dict[str, Any]:
     """计算近 N 天损耗率 = 损耗量 / (使用量 + 损耗量)"""
-    from sqlalchemy import select, func
+    from sqlalchemy import func, select
     from src.models.inventory import InventoryTransaction, TransactionType
 
     cutoff = date.today() - timedelta(days=_DATA_DAYS)
@@ -75,9 +77,7 @@ async def _query_loss_rate(session, store_id: str) -> Dict[str, Any]:
         .where(
             InventoryTransaction.store_id == store_id,
             InventoryTransaction.transaction_time >= cutoff,
-            InventoryTransaction.transaction_type.in_(
-                [TransactionType.WASTE, TransactionType.USAGE]
-            ),
+            InventoryTransaction.transaction_type.in_([TransactionType.WASTE, TransactionType.USAGE]),
         )
         .group_by(InventoryTransaction.transaction_type)
     )
@@ -98,7 +98,7 @@ async def _query_loss_rate(session, store_id: str) -> Dict[str, Any]:
 
 async def _query_revenue(session, store_id: str) -> Dict[str, Any]:
     """查询近 N 天营收汇总"""
-    from sqlalchemy import select, func
+    from sqlalchemy import func, select
     from src.models.daily_report import DailyReport
 
     cutoff = date.today() - timedelta(days=_DATA_DAYS)
@@ -116,7 +116,7 @@ async def _query_revenue(session, store_id: str) -> Dict[str, Any]:
     )
     row = result.one()
     total_yuan = round((row.total or 0) / 100, 2)
-    avg_yuan   = round((row.avg_daily or 0) / 100, 2)
+    avg_yuan = round((row.avg_daily or 0) / 100, 2)
     return {
         "metric": "revenue",
         "period_days": _DATA_DAYS,
@@ -125,17 +125,13 @@ async def _query_revenue(session, store_id: str) -> Dict[str, Any]:
         "total_customers": row.customers or 0,
         "avg_revenue_change_rate_pct": round(row.avg_change or 0, 2),
         "data_days": row.days or 0,
-        "summary": (
-            f"近{_DATA_DAYS}天总营收 {total_yuan} 元，"
-            f"日均 {avg_yuan} 元，"
-            f"累计客流 {row.customers or 0} 人次"
-        ),
+        "summary": (f"近{_DATA_DAYS}天总营收 {total_yuan} 元，" f"日均 {avg_yuan} 元，" f"累计客流 {row.customers or 0} 人次"),
     }
 
 
 async def _query_kpi(session, store_id: str) -> Dict[str, Any]:
     """查询近 N 天综合 KPI"""
-    from sqlalchemy import select, func
+    from sqlalchemy import func, select
     from src.models.daily_report import DailyReport
 
     cutoff = date.today() - timedelta(days=_DATA_DAYS)
@@ -174,21 +170,15 @@ async def _query_kpi(session, store_id: str) -> Dict[str, Any]:
 
 async def _query_inventory(session, store_id: str) -> Dict[str, Any]:
     """查询当前库存状态"""
-    from sqlalchemy import select, func
+    from sqlalchemy import func, select
     from src.models.inventory import InventoryItem, InventoryStatus
 
     result = await session.execute(
         select(
             func.count(InventoryItem.id).label("total"),
-            func.count(InventoryItem.id).filter(
-                InventoryItem.status == InventoryStatus.LOW
-            ).label("low"),
-            func.count(InventoryItem.id).filter(
-                InventoryItem.status == InventoryStatus.CRITICAL
-            ).label("critical"),
-            func.count(InventoryItem.id).filter(
-                InventoryItem.status == InventoryStatus.OUT_OF_STOCK
-            ).label("out"),
+            func.count(InventoryItem.id).filter(InventoryItem.status == InventoryStatus.LOW).label("low"),
+            func.count(InventoryItem.id).filter(InventoryItem.status == InventoryStatus.CRITICAL).label("critical"),
+            func.count(InventoryItem.id).filter(InventoryItem.status == InventoryStatus.OUT_OF_STOCK).label("out"),
         ).where(InventoryItem.store_id == store_id)
     )
     row = result.one()
@@ -211,10 +201,10 @@ async def _query_inventory(session, store_id: str) -> Dict[str, Any]:
 # Router entry point
 # ---------------------------------------------------------------------------
 
-_LOSS_RE    = re.compile(r"损耗[率量]|waste.{0,5}rate|loss.{0,5}rate", re.IGNORECASE)
+_LOSS_RE = re.compile(r"损耗[率量]|waste.{0,5}rate|loss.{0,5}rate", re.IGNORECASE)
 _REVENUE_RE = re.compile(r"营收|销售额|收入|revenue|sales|客单价", re.IGNORECASE)
-_KPI_RE     = re.compile(r"kpi|指标|完成率|环比|同比|增长率", re.IGNORECASE)
-_INV_RE     = re.compile(r"库存[量数]|inventory.{0,5}level|缺货|低库存", re.IGNORECASE)
+_KPI_RE = re.compile(r"kpi|指标|完成率|环比|同比|增长率", re.IGNORECASE)
+_INV_RE = re.compile(r"库存[量数]|inventory.{0,5}level|缺货|低库存", re.IGNORECASE)
 
 
 async def route_numerical_query(query: str, store_id: str) -> Optional[Dict[str, Any]]:

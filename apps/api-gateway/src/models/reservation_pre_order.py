@@ -7,10 +7,11 @@
 2. 宴会预订锁定套餐菜单
 3. 厨房提前备料（提升出餐效率）
 """
+
 import enum
 import uuid
 
-from sqlalchemy import Column, String, Integer, Boolean, Numeric, ForeignKey, Index, Text, Enum
+from sqlalchemy import Boolean, Column, Enum, ForeignKey, Index, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 
 from .base import Base, TimestampMixin
@@ -18,10 +19,11 @@ from .base import Base, TimestampMixin
 
 class PreOrderStatus(str, enum.Enum):
     """预排菜状态"""
-    DRAFT = "draft"            # 草稿（客户选择中）
-    CONFIRMED = "confirmed"    # 已确认（客户/门店确认）
-    PREPARING = "preparing"    # 备料中（厨房已接单）
-    CANCELLED = "cancelled"    # 已取消
+
+    DRAFT = "draft"  # 草稿（客户选择中）
+    CONFIRMED = "confirmed"  # 已确认（客户/门店确认）
+    PREPARING = "preparing"  # 备料中（厨房已接单）
+    CANCELLED = "cancelled"  # 已取消
 
 
 class ReservationPreOrder(Base, TimestampMixin):
@@ -44,8 +46,8 @@ class ReservationPreOrder(Base, TimestampMixin):
     subtotal = Column(Integer, nullable=False, default=0)  # 小计（分）= unit_price * quantity
 
     # 口味与备注
-    taste_note = Column(String(200), nullable=True)   # 口味要求：少盐/加辣/不要香菜
-    serving_size = Column(String(50), nullable=True)   # 规格：大份/中份/小份
+    taste_note = Column(String(200), nullable=True)  # 口味要求：少盐/加辣/不要香菜
+    serving_size = Column(String(50), nullable=True)  # 规格：大份/中份/小份
 
     # 状态
     status = Column(Enum(PreOrderStatus), default=PreOrderStatus.DRAFT, nullable=False)
@@ -55,9 +57,9 @@ class ReservationPreOrder(Base, TimestampMixin):
     sort_order = Column(Integer, default=0)
 
     __table_args__ = (
-        Index('idx_pre_order_reservation', 'reservation_id'),
-        Index('idx_pre_order_store', 'store_id'),
-        Index('idx_pre_order_dish', 'dish_id'),
+        Index("idx_pre_order_reservation", "reservation_id"),
+        Index("idx_pre_order_store", "store_id"),
+        Index("idx_pre_order_dish", "dish_id"),
     )
 
     def __repr__(self):

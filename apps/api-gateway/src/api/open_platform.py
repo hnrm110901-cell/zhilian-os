@@ -4,6 +4,7 @@ ISV 开发者自助注册 + API Key 管理 + 能力目录
 
 路由前缀：/api/v1/open
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -30,52 +31,132 @@ router = APIRouter(prefix="/api/v1/open", tags=["open_platform"])
 
 CAPABILITIES: List[Dict[str, Any]] = [
     # Level 1 — 数据同步
-    {"level": 1, "key": "sync_orders", "name": "订单同步", "description": "批量同步 POS/外卖平台订单到屯象", "tier_required": "free"},
-    {"level": 1, "key": "sync_dishes", "name": "菜品同步", "description": "同步菜品信息、价格、库存到屯象", "tier_required": "free"},
+    {
+        "level": 1,
+        "key": "sync_orders",
+        "name": "订单同步",
+        "description": "批量同步 POS/外卖平台订单到屯象",
+        "tier_required": "free",
+    },
+    {
+        "level": 1,
+        "key": "sync_dishes",
+        "name": "菜品同步",
+        "description": "同步菜品信息、价格、库存到屯象",
+        "tier_required": "free",
+    },
     {"level": 1, "key": "sync_inventory", "name": "库存同步", "description": "实时同步食材库存数据", "tier_required": "free"},
-    {"level": 1, "key": "sync_members", "name": "会员同步", "description": "同步会员信息、积分、消费记录", "tier_required": "free"},
+    {
+        "level": 1,
+        "key": "sync_members",
+        "name": "会员同步",
+        "description": "同步会员信息、积分、消费记录",
+        "tier_required": "free",
+    },
     # Level 2 — 智能决策
-    {"level": 2, "key": "predict_sales", "name": "销量预测", "description": "基于历史数据预测菜品日销量", "tier_required": "basic"},
-    {"level": 2, "key": "suggest_schedule", "name": "智能排班", "description": "根据客流预测生成最优排班方案", "tier_required": "basic"},
-    {"level": 2, "key": "suggest_purchase", "name": "采购建议", "description": "基于销量预测生成食材采购清单", "tier_required": "basic"},
-    {"level": 2, "key": "suggest_pricing", "name": "定价建议", "description": "竞品+成本+弹性分析给出定价区间", "tier_required": "basic"},
+    {
+        "level": 2,
+        "key": "predict_sales",
+        "name": "销量预测",
+        "description": "基于历史数据预测菜品日销量",
+        "tier_required": "basic",
+    },
+    {
+        "level": 2,
+        "key": "suggest_schedule",
+        "name": "智能排班",
+        "description": "根据客流预测生成最优排班方案",
+        "tier_required": "basic",
+    },
+    {
+        "level": 2,
+        "key": "suggest_purchase",
+        "name": "采购建议",
+        "description": "基于销量预测生成食材采购清单",
+        "tier_required": "basic",
+    },
+    {
+        "level": 2,
+        "key": "suggest_pricing",
+        "name": "定价建议",
+        "description": "竞品+成本+弹性分析给出定价区间",
+        "tier_required": "basic",
+    },
     # Level 3 — 营销能力
-    {"level": 3, "key": "customer_profile", "name": "客户画像", "description": "RFM 模型 + 流失风险评分", "tier_required": "pro"},
-    {"level": 3, "key": "recommend_dishes", "name": "个性化推荐", "description": "协同过滤 + 内容匹配推荐菜品", "tier_required": "pro"},
-    {"level": 3, "key": "coupon_strategy", "name": "发券策略", "description": "AI 生成差异化优惠券方案", "tier_required": "pro"},
-    {"level": 3, "key": "marketing_campaign", "name": "营销活动", "description": "触发企微批量挽回/促活活动", "tier_required": "pro"},
+    {
+        "level": 3,
+        "key": "customer_profile",
+        "name": "客户画像",
+        "description": "RFM 模型 + 流失风险评分",
+        "tier_required": "pro",
+    },
+    {
+        "level": 3,
+        "key": "recommend_dishes",
+        "name": "个性化推荐",
+        "description": "协同过滤 + 内容匹配推荐菜品",
+        "tier_required": "pro",
+    },
+    {
+        "level": 3,
+        "key": "coupon_strategy",
+        "name": "发券策略",
+        "description": "AI 生成差异化优惠券方案",
+        "tier_required": "pro",
+    },
+    {
+        "level": 3,
+        "key": "marketing_campaign",
+        "name": "营销活动",
+        "description": "触发企微批量挽回/促活活动",
+        "tier_required": "pro",
+    },
     # Level 4 — 高级能力
-    {"level": 4, "key": "query_sop", "name": "SOP 知识库", "description": "自然语言查询餐饮运营 SOP 最佳实践", "tier_required": "enterprise"},
-    {"level": 4, "key": "federated_model", "name": "联邦学习模型", "description": "获取跨店联邦训练的共享模型参数", "tier_required": "enterprise"},
+    {
+        "level": 4,
+        "key": "query_sop",
+        "name": "SOP 知识库",
+        "description": "自然语言查询餐饮运营 SOP 最佳实践",
+        "tier_required": "enterprise",
+    },
+    {
+        "level": 4,
+        "key": "federated_model",
+        "name": "联邦学习模型",
+        "description": "获取跨店联邦训练的共享模型参数",
+        "tier_required": "enterprise",
+    },
 ]
 
 TIER_CONFIG = {
-    "free":       {"rate_limit_rpm": 60,   "label": "免费版",  "price_yuan": 0},
-    "basic":      {"rate_limit_rpm": 300,  "label": "基础版",  "price_yuan": 999},
-    "pro":        {"rate_limit_rpm": 1000, "label": "专业版",  "price_yuan": 2999},
-    "enterprise": {"rate_limit_rpm": 5000, "label": "企业版",  "price_yuan": 9999},
+    "free": {"rate_limit_rpm": 60, "label": "免费版", "price_yuan": 0},
+    "basic": {"rate_limit_rpm": 300, "label": "基础版", "price_yuan": 999},
+    "pro": {"rate_limit_rpm": 1000, "label": "专业版", "price_yuan": 2999},
+    "enterprise": {"rate_limit_rpm": 5000, "label": "企业版", "price_yuan": 9999},
 }
 
 
 # ── Request / Response schemas ─────────────────────────────────────────────────
 
+
 class RegisterDeveloperRequest(BaseModel):
     name: str
     email: str
     company: Optional[str] = None
-    tier: str = "free"   # free / basic / pro / enterprise
+    tier: str = "free"  # free / basic / pro / enterprise
 
 
 class RegisterDeveloperResponse(BaseModel):
     developer_id: str
     api_key: str
-    api_secret: str          # 只在注册时返回一次，之后不可再查
+    api_secret: str  # 只在注册时返回一次，之后不可再查
     rate_limit_rpm: int
     tier: str
     message: str
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
+
 
 def _hash_secret(secret: str) -> str:
     return hashlib.sha256(secret.encode()).hexdigest()
@@ -90,6 +171,7 @@ async def _email_exists(session: AsyncSession, email: str) -> bool:
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
+
 
 @router.get("/capabilities")
 async def list_capabilities(
@@ -232,8 +314,10 @@ async def get_developer_info(
         "created_at": dev["created_at"].isoformat() if dev["created_at"] else None,
         "api_keys": keys,
         "capabilities_accessible": [
-            c for c in CAPABILITIES
-            if c["tier_required"] in (["free", "basic", "pro", "enterprise"][: ["free", "basic", "pro", "enterprise"].index(tier) + 1])
+            c
+            for c in CAPABILITIES
+            if c["tier_required"]
+            in (["free", "basic", "pro", "enterprise"][: ["free", "basic", "pro", "enterprise"].index(tier) + 1])
         ],
     }
 

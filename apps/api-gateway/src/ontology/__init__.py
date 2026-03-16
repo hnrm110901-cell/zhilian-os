@@ -1,11 +1,12 @@
 """
 Ontology 包公共导出
 """
+
 import os
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
-from .schema import NodeLabel, RelType, ExtensionNodeLabel
+from .schema import ExtensionNodeLabel, NodeLabel, RelType
 
 if TYPE_CHECKING:
     from .repository import OntologyRepository

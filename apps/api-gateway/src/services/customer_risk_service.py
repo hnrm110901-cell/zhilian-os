@@ -2,18 +2,16 @@
 客户风控 Service — Phase P1 (客必得能力)
 客户归属管理、离职交接、流失预警扫描
 """
-from datetime import datetime, date, timedelta
-from typing import List, Dict, Any, Optional
-from sqlalchemy import select, func, and_, or_, update
-from sqlalchemy.ext.asyncio import AsyncSession
-import uuid
-import structlog
 
+import uuid
+from datetime import date, datetime, timedelta
+from typing import Any, Dict, List, Optional
+
+import structlog
+from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_db_session
-from src.models.customer_ownership import (
-    CustomerOwnership, TransferReason,
-    CustomerRiskAlert, RiskLevel, RiskType,
-)
+from src.models.customer_ownership import CustomerOwnership, CustomerRiskAlert, RiskLevel, RiskType, TransferReason
 from src.models.reservation import Reservation, ReservationStatus
 
 logger = structlog.get_logger()
@@ -35,11 +33,13 @@ class CustomerRiskService:
         """分配客户归属"""
         # 检查是否已有归属
         existing = await session.execute(
-            select(CustomerOwnership).where(and_(
-                CustomerOwnership.store_id == store_id,
-                CustomerOwnership.customer_phone == customer_phone,
-                CustomerOwnership.is_active == True,
-            ))
+            select(CustomerOwnership).where(
+                and_(
+                    CustomerOwnership.store_id == store_id,
+                    CustomerOwnership.customer_phone == customer_phone,
+                    CustomerOwnership.is_active == True,
+                )
+            )
         )
         old = existing.scalar_one_or_none()
         if old:
@@ -71,11 +71,13 @@ class CustomerRiskService:
     ) -> Dict[str, Any]:
         """批量交接客户（离职场景）"""
         result = await session.execute(
-            select(CustomerOwnership).where(and_(
-                CustomerOwnership.store_id == store_id,
-                CustomerOwnership.owner_employee_id == from_employee_id,
-                CustomerOwnership.is_active == True,
-            ))
+            select(CustomerOwnership).where(
+                and_(
+                    CustomerOwnership.store_id == store_id,
+                    CustomerOwnership.owner_employee_id == from_employee_id,
+                    CustomerOwnership.is_active == True,
+                )
+            )
         )
         records = list(result.scalars().all())
 
@@ -103,10 +105,9 @@ class CustomerRiskService:
             transferred_count += 1
 
         await session.flush()
-        logger.info("customers_transferred",
-                     from_employee=from_employee_id,
-                     to_employee=to_employee_id,
-                     count=transferred_count)
+        logger.info(
+            "customers_transferred", from_employee=from_employee_id, to_employee=to_employee_id, count=transferred_count
+        )
 
         return {
             "transferred_count": transferred_count,
@@ -123,10 +124,12 @@ class CustomerRiskService:
         level: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """查询客户归属列表"""
-        query = select(CustomerOwnership).where(and_(
-            CustomerOwnership.store_id == store_id,
-            CustomerOwnership.is_active == True,
-        ))
+        query = select(CustomerOwnership).where(
+            and_(
+                CustomerOwnership.store_id == store_id,
+                CustomerOwnership.is_active == True,
+            )
+        )
         if employee_id:
             query = query.where(CustomerOwnership.owner_employee_id == employee_id)
         if level:
@@ -145,14 +148,16 @@ class CustomerRiskService:
         query = (
             select(
                 CustomerOwnership.owner_employee_id,
-                func.count().label('customer_count'),
-                func.sum(CustomerOwnership.total_spent).label('total_revenue'),
-                func.avg(CustomerOwnership.total_visits).label('avg_visits'),
+                func.count().label("customer_count"),
+                func.sum(CustomerOwnership.total_spent).label("total_revenue"),
+                func.avg(CustomerOwnership.total_visits).label("avg_visits"),
             )
-            .where(and_(
-                CustomerOwnership.store_id == store_id,
-                CustomerOwnership.is_active == True,
-            ))
+            .where(
+                and_(
+                    CustomerOwnership.store_id == store_id,
+                    CustomerOwnership.is_active == True,
+                )
+            )
             .group_by(CustomerOwnership.owner_employee_id)
             .order_by(func.sum(CustomerOwnership.total_spent).desc())
         )
@@ -180,14 +185,16 @@ class CustomerRiskService:
         cutoff = now - timedelta(days=dormant_days)
 
         # 找出超过 dormant_days 未消费的客户
-        query = select(CustomerOwnership).where(and_(
-            CustomerOwnership.store_id == store_id,
-            CustomerOwnership.is_active == True,
-            or_(
-                CustomerOwnership.last_visit_at < cutoff,
-                CustomerOwnership.last_visit_at.is_(None),
-            ),
-        ))
+        query = select(CustomerOwnership).where(
+            and_(
+                CustomerOwnership.store_id == store_id,
+                CustomerOwnership.is_active == True,
+                or_(
+                    CustomerOwnership.last_visit_at < cutoff,
+                    CustomerOwnership.last_visit_at.is_(None),
+                ),
+            )
+        )
         result = await session.execute(query)
         at_risk = list(result.scalars().all())
 
@@ -210,17 +217,19 @@ class CustomerRiskService:
 
             # 检查是否已有未解决的预警
             existing = await session.execute(
-                select(CustomerRiskAlert).where(and_(
-                    CustomerRiskAlert.store_id == store_id,
-                    CustomerRiskAlert.customer_phone == customer.customer_phone,
-                    CustomerRiskAlert.is_resolved == False,
-                ))
+                select(CustomerRiskAlert).where(
+                    and_(
+                        CustomerRiskAlert.store_id == store_id,
+                        CustomerRiskAlert.customer_phone == customer.customer_phone,
+                        CustomerRiskAlert.is_resolved == False,
+                    )
+                )
             )
             if existing.scalar_one_or_none():
                 continue
 
             # 生成AI建议
-            if customer.customer_level in ('VIP', 'GOLD'):
+            if customer.customer_level in ("VIP", "GOLD"):
                 suggested_action = f"高价值客户{days_since}天未到店，建议店长亲自致电关怀，赠送专属优惠券"
                 suggested_offer = "满300减80专属券"
             else:
@@ -259,9 +268,7 @@ class CustomerRiskService:
         unresolved_only: bool = True,
     ) -> List[Dict[str, Any]]:
         """查询流失预警列表"""
-        query = select(CustomerRiskAlert).where(
-            CustomerRiskAlert.store_id == store_id
-        )
+        query = select(CustomerRiskAlert).where(CustomerRiskAlert.store_id == store_id)
         if unresolved_only:
             query = query.where(CustomerRiskAlert.is_resolved == False)
         if risk_level:
@@ -279,9 +286,7 @@ class CustomerRiskService:
         action_result: str,
     ) -> Dict[str, Any]:
         """标记预警已处理"""
-        result = await session.execute(
-            select(CustomerRiskAlert).where(CustomerRiskAlert.id == alert_id)
-        )
+        result = await session.execute(select(CustomerRiskAlert).where(CustomerRiskAlert.id == alert_id))
         alert = result.scalar_one_or_none()
         if not alert:
             raise ValueError(f"预警不存在: {alert_id}")
@@ -320,8 +325,8 @@ class CustomerRiskService:
             "store_id": a.store_id,
             "customer_phone": a.customer_phone,
             "customer_name": a.customer_name,
-            "risk_level": a.risk_level.value if hasattr(a.risk_level, 'value') else str(a.risk_level),
-            "risk_type": a.risk_type.value if hasattr(a.risk_type, 'value') else str(a.risk_type),
+            "risk_level": a.risk_level.value if hasattr(a.risk_level, "value") else str(a.risk_level),
+            "risk_type": a.risk_type.value if hasattr(a.risk_type, "value") else str(a.risk_type),
             "risk_score": a.risk_score,
             "last_visit_days": a.last_visit_days,
             "predicted_churn_probability": a.predicted_churn_probability,

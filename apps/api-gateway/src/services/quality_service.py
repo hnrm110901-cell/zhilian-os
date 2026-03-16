@@ -6,11 +6,13 @@ Quality Service - 菜品质量检测服务
 - 生成质量评分和问题列表
 - 持久化检测记录
 """
+
 import base64
 import json
 import os
 import re
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
+
 import structlog
 
 from ..core.llm import get_llm_client
@@ -47,7 +49,7 @@ def _detect_media_type(image_b64: str) -> str:
         (b"\x89PNG\r\n", "image/png"),
         (b"GIF87a", "image/gif"),
         (b"GIF89a", "image/gif"),
-        (b"RIFF", "image/webp"),   # RIFF....WEBP
+        (b"RIFF", "image/webp"),  # RIFF....WEBP
         (b"\x00\x00\x00", "image/avif"),  # ftyp box prefix (宽松匹配)
     ]
     try:
@@ -201,13 +203,17 @@ class QualityService:
     ) -> List[Dict[str, Any]]:
         """查询门店检测记录"""
         from sqlalchemy import select
+
         from ..core.database import get_db_session
         from ..models.quality import QualityInspection
 
         async with get_db_session() as session:
-            q = select(QualityInspection).where(
-                QualityInspection.store_id == store_id
-            ).order_by(QualityInspection.created_at.desc()).limit(limit)
+            q = (
+                select(QualityInspection)
+                .where(QualityInspection.store_id == store_id)
+                .order_by(QualityInspection.created_at.desc())
+                .limit(limit)
+            )
 
             if status:
                 q = q.where(QualityInspection.status == InspectionStatus(status))
@@ -229,7 +235,8 @@ class QualityService:
 
     async def get_summary(self, store_id: str) -> Dict[str, Any]:
         """门店质量检测汇总统计"""
-        from sqlalchemy import select, func
+        from sqlalchemy import func, select
+
         from ..core.database import get_db_session
         from ..models.quality import QualityInspection
 
@@ -238,12 +245,12 @@ class QualityService:
                 select(
                     func.count(QualityInspection.id).label("total"),
                     func.avg(QualityInspection.quality_score).label("avg_score"),
-                    func.count(QualityInspection.id).filter(
-                        QualityInspection.status == InspectionStatus.PASS
-                    ).label("pass_count"),
-                    func.count(QualityInspection.id).filter(
-                        QualityInspection.status == InspectionStatus.FAIL
-                    ).label("fail_count"),
+                    func.count(QualityInspection.id)
+                    .filter(QualityInspection.status == InspectionStatus.PASS)
+                    .label("pass_count"),
+                    func.count(QualityInspection.id)
+                    .filter(QualityInspection.status == InspectionStatus.FAIL)
+                    .label("fail_count"),
                 ).where(QualityInspection.store_id == store_id)
             )
             row = result.one()

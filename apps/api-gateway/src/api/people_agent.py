@@ -3,39 +3,41 @@ PeopleAgent API — Phase 12B
 人员智能体：排班优化 / 绩效评分 / 人力成本 / 考勤预警 / 人员配置
 前缀: /api/v1/people
 """
+
 from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import select, and_, desc
+from sqlalchemy import and_, desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.models.people_agent import (
-    PeopleShiftRecord,
-    PeoplePerformanceScore,
-    PeopleLaborCostRecord,
-    PeopleAttendanceAlert,
-    PeopleStaffingDecision,
     PeopleAgentLog,
+    PeopleAttendanceAlert,
+    PeopleLaborCostRecord,
+    PeoplePerformanceScore,
+    PeopleShiftRecord,
+    PeopleStaffingDecision,
 )
 
 router = APIRouter(prefix="/api/v1/people")
 
 # ─── 懒加载 Agent ─────────────────────────────────────────────────────────────
 
+
 def _agents():
     from packages.agents.people_agent.src.agent import (
-        ShiftOptimizerAgent,
-        PerformanceScoreAgent,
-        LaborCostAgent,
         AttendanceWarnAgent,
+        LaborCostAgent,
+        PerformanceScoreAgent,
+        ShiftOptimizerAgent,
         StaffingPlanAgent,
     )
+
     return (
         ShiftOptimizerAgent(),
         PerformanceScoreAgent(),
@@ -46,6 +48,7 @@ def _agents():
 
 
 # ─── Pydantic Schemas ─────────────────────────────────────────────────────────
+
 
 class ShiftOptimizeIn(BaseModel):
     brand_id: str
@@ -115,6 +118,7 @@ class StaffingAcceptIn(BaseModel):
 
 # ─── 1. 排班优化 Agent ────────────────────────────────────────────────────────
 
+
 @router.post("/agents/shift-optimize", summary="排班优化 Agent")
 async def shift_optimize(body: ShiftOptimizeIn, db: AsyncSession = Depends(get_db)):
     """
@@ -144,6 +148,7 @@ async def shift_optimize(body: ShiftOptimizeIn, db: AsyncSession = Depends(get_d
 
 # ─── 2. 绩效评分 Agent ────────────────────────────────────────────────────────
 
+
 @router.post("/agents/performance-score", summary="员工绩效评分 Agent")
 async def performance_score(body: PerformanceScoreIn, db: AsyncSession = Depends(get_db)):
     """
@@ -172,6 +177,7 @@ async def performance_score(body: PerformanceScoreIn, db: AsyncSession = Depends
 
 
 # ─── 3. 人力成本分析 Agent ────────────────────────────────────────────────────
+
 
 @router.post("/agents/labor-cost", summary="人力成本分析 Agent")
 async def labor_cost_analyze(body: LaborCostIn, db: AsyncSession = Depends(get_db)):
@@ -204,6 +210,7 @@ async def labor_cost_analyze(body: LaborCostIn, db: AsyncSession = Depends(get_d
 
 # ─── 4. 考勤预警 Agent ────────────────────────────────────────────────────────
 
+
 @router.post("/agents/attendance-warn", summary="考勤预警 Agent")
 async def attendance_warn(body: AttendanceWarnIn, db: AsyncSession = Depends(get_db)):
     """
@@ -233,6 +240,7 @@ async def attendance_warn(body: AttendanceWarnIn, db: AsyncSession = Depends(get
 
 # ─── 5. 人员配置建议 Agent ────────────────────────────────────────────────────
 
+
 @router.post("/agents/staffing-plan", summary="人员配置建议 Agent")
 async def staffing_plan(body: StaffingPlanIn, db: AsyncSession = Depends(get_db)):
     """
@@ -260,6 +268,7 @@ async def staffing_plan(body: StaffingPlanIn, db: AsyncSession = Depends(get_db)
 
 # ─── 查询端点 ─────────────────────────────────────────────────────────────────
 
+
 @router.get("/shifts", summary="查询排班优化记录")
 async def list_shifts(
     brand_id: str,
@@ -268,19 +277,25 @@ async def list_shifts(
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
-        select(PeopleShiftRecord).where(
-            and_(PeopleShiftRecord.brand_id == brand_id, PeopleShiftRecord.store_id == store_id)
-        ).order_by(desc(PeopleShiftRecord.shift_date)).limit(limit)
+        select(PeopleShiftRecord)
+        .where(and_(PeopleShiftRecord.brand_id == brand_id, PeopleShiftRecord.store_id == store_id))
+        .order_by(desc(PeopleShiftRecord.shift_date))
+        .limit(limit)
     )
     records = result.scalars().all()
-    return {"count": len(records), "shifts": [
-        {
-            "id": r.id, "shift_date": str(r.shift_date),
-            "coverage_rate": r.coverage_rate, "status": r.status,
-            "labor_cost_pct": r.labor_cost_per_revenue_pct,
-        }
-        for r in records
-    ]}
+    return {
+        "count": len(records),
+        "shifts": [
+            {
+                "id": r.id,
+                "shift_date": str(r.shift_date),
+                "coverage_rate": r.coverage_rate,
+                "status": r.status,
+                "labor_cost_pct": r.labor_cost_per_revenue_pct,
+            }
+            for r in records
+        ],
+    }
 
 
 @router.get("/performance", summary="查询员工绩效评分")
@@ -301,19 +316,25 @@ async def list_performance(
     if employee_id:
         conditions.append(PeoplePerformanceScore.employee_id == employee_id)
     result = await db.execute(
-        select(PeoplePerformanceScore).where(and_(*conditions))
-        .order_by(desc(PeoplePerformanceScore.created_at)).limit(limit)
+        select(PeoplePerformanceScore).where(and_(*conditions)).order_by(desc(PeoplePerformanceScore.created_at)).limit(limit)
     )
     records = result.scalars().all()
-    return {"count": len(records), "scores": [
-        {
-            "id": r.id, "employee_id": r.employee_id,
-            "employee_name": r.employee_name, "role": r.role,
-            "period": r.period, "overall_score": r.overall_score,
-            "rating": r.rating, "total_commission_yuan": float(r.total_commission_yuan or 0),
-        }
-        for r in records
-    ]}
+    return {
+        "count": len(records),
+        "scores": [
+            {
+                "id": r.id,
+                "employee_id": r.employee_id,
+                "employee_name": r.employee_name,
+                "role": r.role,
+                "period": r.period,
+                "overall_score": r.overall_score,
+                "rating": r.rating,
+                "total_commission_yuan": float(r.total_commission_yuan or 0),
+            }
+            for r in records
+        ],
+    }
 
 
 @router.get("/labor-cost", summary="查询人力成本记录")
@@ -331,19 +352,22 @@ async def list_labor_cost(
     if period:
         conditions.append(PeopleLaborCostRecord.period == period)
     result = await db.execute(
-        select(PeopleLaborCostRecord).where(and_(*conditions))
-        .order_by(desc(PeopleLaborCostRecord.period)).limit(limit)
+        select(PeopleLaborCostRecord).where(and_(*conditions)).order_by(desc(PeopleLaborCostRecord.period)).limit(limit)
     )
     records = result.scalars().all()
-    return {"count": len(records), "records": [
-        {
-            "id": r.id, "period": r.period,
-            "labor_cost_ratio": r.labor_cost_ratio,
-            "revenue_per_employee_yuan": float(r.revenue_per_employee_yuan or 0),
-            "optimization_potential_yuan": float(r.optimization_potential_yuan or 0),
-        }
-        for r in records
-    ]}
+    return {
+        "count": len(records),
+        "records": [
+            {
+                "id": r.id,
+                "period": r.period,
+                "labor_cost_ratio": r.labor_cost_ratio,
+                "revenue_per_employee_yuan": float(r.revenue_per_employee_yuan or 0),
+                "optimization_potential_yuan": float(r.optimization_potential_yuan or 0),
+            }
+            for r in records
+        ],
+    }
 
 
 @router.get("/attendance-alerts", summary="查询考勤预警")
@@ -361,20 +385,24 @@ async def list_attendance_alerts(
     if not include_resolved:
         conditions.append(PeopleAttendanceAlert.is_resolved == False)
     result = await db.execute(
-        select(PeopleAttendanceAlert).where(and_(*conditions))
-        .order_by(desc(PeopleAttendanceAlert.alert_date)).limit(limit)
+        select(PeopleAttendanceAlert).where(and_(*conditions)).order_by(desc(PeopleAttendanceAlert.alert_date)).limit(limit)
     )
     records = result.scalars().all()
-    return {"count": len(records), "alerts": [
-        {
-            "id": r.id, "alert_date": str(r.alert_date),
-            "alert_type": r.alert_type, "severity": r.severity,
-            "employee_name": r.employee_name,
-            "estimated_impact_yuan": float(r.estimated_impact_yuan or 0),
-            "is_resolved": r.is_resolved,
-        }
-        for r in records
-    ]}
+    return {
+        "count": len(records),
+        "alerts": [
+            {
+                "id": r.id,
+                "alert_date": str(r.alert_date),
+                "alert_type": r.alert_type,
+                "severity": r.severity,
+                "employee_name": r.employee_name,
+                "estimated_impact_yuan": float(r.estimated_impact_yuan or 0),
+                "is_resolved": r.is_resolved,
+            }
+            for r in records
+        ],
+    }
 
 
 @router.patch("/attendance-alerts/{alert_id}/resolve", summary="标记考勤预警已处理")
@@ -383,9 +411,7 @@ async def resolve_alert(
     body: AlertResolveIn,
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(PeopleAttendanceAlert).where(PeopleAttendanceAlert.id == alert_id)
-    )
+    result = await db.execute(select(PeopleAttendanceAlert).where(PeopleAttendanceAlert.id == alert_id))
     alert = result.scalar_one_or_none()
     if not alert:
         raise HTTPException(404, "考勤预警不存在")
@@ -403,22 +429,28 @@ async def list_staffing_decisions(
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
-        select(PeopleStaffingDecision).where(
-            and_(PeopleStaffingDecision.brand_id == brand_id, PeopleStaffingDecision.store_id == store_id)
-        ).order_by(desc(PeopleStaffingDecision.decision_date)).limit(limit)
+        select(PeopleStaffingDecision)
+        .where(and_(PeopleStaffingDecision.brand_id == brand_id, PeopleStaffingDecision.store_id == store_id))
+        .order_by(desc(PeopleStaffingDecision.decision_date))
+        .limit(limit)
     )
     records = result.scalars().all()
-    return {"count": len(records), "decisions": [
-        {
-            "id": r.id, "decision_date": str(r.decision_date),
-            "priority": r.priority, "status": r.status,
-            "current_headcount": r.current_headcount,
-            "optimal_headcount": r.optimal_headcount,
-            "total_impact_yuan": float(r.total_impact_yuan),
-            "top_recommendation": r.recommendations[0] if r.recommendations else None,
-        }
-        for r in records
-    ]}
+    return {
+        "count": len(records),
+        "decisions": [
+            {
+                "id": r.id,
+                "decision_date": str(r.decision_date),
+                "priority": r.priority,
+                "status": r.status,
+                "current_headcount": r.current_headcount,
+                "optimal_headcount": r.optimal_headcount,
+                "total_impact_yuan": float(r.total_impact_yuan),
+                "top_recommendation": r.recommendations[0] if r.recommendations else None,
+            }
+            for r in records
+        ],
+    }
 
 
 @router.patch("/staffing-decisions/{decision_id}/accept", summary="采纳人员配置建议")
@@ -427,9 +459,7 @@ async def accept_staffing_decision(
     body: StaffingAcceptIn,
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(PeopleStaffingDecision).where(PeopleStaffingDecision.id == decision_id)
-    )
+    result = await db.execute(select(PeopleStaffingDecision).where(PeopleStaffingDecision.id == decision_id))
     decision = result.scalar_one_or_none()
     if not decision:
         raise HTTPException(404, "人员配置决策不存在")
@@ -441,6 +471,7 @@ async def accept_staffing_decision(
 
 # ─── 驾驶舱 BFF ───────────────────────────────────────────────────────────────
 
+
 @router.get("/dashboard", summary="人员智能体驾驶舱（首屏BFF）")
 async def dashboard(
     brand_id: str,
@@ -450,39 +481,46 @@ async def dashboard(
     """首屏一次性加载：排班状态 + 绩效概览 + 人力成本 + 未处理预警"""
     # 最新排班
     shift_result = await db.execute(
-        select(PeopleShiftRecord).where(
-            and_(PeopleShiftRecord.brand_id == brand_id,
-                 PeopleShiftRecord.store_id == store_id)
-        ).order_by(desc(PeopleShiftRecord.shift_date)).limit(1)
+        select(PeopleShiftRecord)
+        .where(and_(PeopleShiftRecord.brand_id == brand_id, PeopleShiftRecord.store_id == store_id))
+        .order_by(desc(PeopleShiftRecord.shift_date))
+        .limit(1)
     )
     latest_shift = shift_result.scalar_one_or_none()
 
     # 最新人力成本
     cost_result = await db.execute(
-        select(PeopleLaborCostRecord).where(
-            and_(PeopleLaborCostRecord.brand_id == brand_id,
-                 PeopleLaborCostRecord.store_id == store_id)
-        ).order_by(desc(PeopleLaborCostRecord.period)).limit(1)
+        select(PeopleLaborCostRecord)
+        .where(and_(PeopleLaborCostRecord.brand_id == brand_id, PeopleLaborCostRecord.store_id == store_id))
+        .order_by(desc(PeopleLaborCostRecord.period))
+        .limit(1)
     )
     latest_cost = cost_result.scalar_one_or_none()
 
     # 未处理考勤预警
     alert_result = await db.execute(
         select(PeopleAttendanceAlert).where(
-            and_(PeopleAttendanceAlert.brand_id == brand_id,
-                 PeopleAttendanceAlert.store_id == store_id,
-                 PeopleAttendanceAlert.is_resolved == False)
+            and_(
+                PeopleAttendanceAlert.brand_id == brand_id,
+                PeopleAttendanceAlert.store_id == store_id,
+                PeopleAttendanceAlert.is_resolved == False,
+            )
         )
     )
     open_alerts = alert_result.scalars().all()
 
     # 最新待处理配置决策
     decision_result = await db.execute(
-        select(PeopleStaffingDecision).where(
-            and_(PeopleStaffingDecision.brand_id == brand_id,
-                 PeopleStaffingDecision.store_id == store_id,
-                 PeopleStaffingDecision.status == "pending")
-        ).order_by(desc(PeopleStaffingDecision.created_at)).limit(1)
+        select(PeopleStaffingDecision)
+        .where(
+            and_(
+                PeopleStaffingDecision.brand_id == brand_id,
+                PeopleStaffingDecision.store_id == store_id,
+                PeopleStaffingDecision.status == "pending",
+            )
+        )
+        .order_by(desc(PeopleStaffingDecision.created_at))
+        .limit(1)
     )
     pending_decision = decision_result.scalar_one_or_none()
 
@@ -517,6 +555,7 @@ async def dashboard(
 
 # ─── 内部辅助 ─────────────────────────────────────────────────────────────────
 
+
 def _log(
     db: AsyncSession,
     brand_id: str,
@@ -528,6 +567,7 @@ def _log(
 ) -> None:
     """异步写 Agent 调用日志（fire-and-forget，不 await）"""
     import uuid as _uuid
+
     log = PeopleAgentLog(
         id=str(_uuid.uuid4()),
         brand_id=brand_id,

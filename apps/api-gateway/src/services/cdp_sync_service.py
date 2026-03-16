@@ -9,15 +9,15 @@ Sprint 1 地基层：
 1. Celery 定时任务（每5分钟，紧跟 POS 同步之后）
 2. 手动触发 API（/api/v1/cdp/backfill/orders）
 """
+
 import logging
 from typing import Optional
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.models.order import Order
-from src.models.reservation import Reservation
 from src.models.queue import Queue
+from src.models.reservation import Reservation
 from src.services.identity_resolution_service import identity_resolution_service
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,9 @@ class CDPSyncService:
         返回：{"total": N, "resolved": M, "failed": K, "skipped": S}
         """
         result = await identity_resolution_service.backfill_orders(
-            db, store_id, batch_size=batch_size,
+            db,
+            store_id,
+            batch_size=batch_size,
         )
         # 额外统计跳过的（无手机号）
         skipped = await db.scalar(
@@ -59,7 +61,9 @@ class CDPSyncService:
     ) -> dict:
         """为指定门店的新预订解析 consumer_id"""
         return await identity_resolution_service.backfill_reservations(
-            db, store_id, batch_size=batch_size,
+            db,
+            store_id,
+            batch_size=batch_size,
         )
 
     async def sync_all_stores(

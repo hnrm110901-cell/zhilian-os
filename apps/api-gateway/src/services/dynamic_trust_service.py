@@ -5,14 +5,15 @@ Replaces static time-based TrustPhase with accuracy-driven phase calculation.
 Phase is determined by DecisionLog history (adoption rate, success rate, confidence)
 combined with a minimum observation window.
 """
-from datetime import datetime, timedelta, date
-from typing import Dict, Any, Optional
-from sqlalchemy import select, func, and_
-import os
-import structlog
 
+import os
+from datetime import date, datetime, timedelta
+from typing import Any, Dict, Optional
+
+import structlog
+from sqlalchemy import and_, func, select
 from src.core.database import get_db_session
-from src.models.decision_log import DecisionLog, DecisionStatus, DecisionOutcome
+from src.models.decision_log import DecisionLog, DecisionOutcome, DecisionStatus
 
 logger = structlog.get_logger()
 
@@ -45,12 +46,14 @@ async def compute_trust_metrics(store_id: str, days: int = METRICS_WINDOW_DAYS) 
                 DecisionLog.outcome,
                 func.avg(DecisionLog.ai_confidence).label("avg_confidence"),
                 func.count(DecisionLog.id).label("count"),
-            ).where(
+            )
+            .where(
                 and_(
                     DecisionLog.store_id == store_id,
                     DecisionLog.created_at >= cutoff,
                 )
-            ).group_by(DecisionLog.decision_status, DecisionLog.outcome)
+            )
+            .group_by(DecisionLog.decision_status, DecisionLog.outcome)
         )
         rows = result.all()
 
@@ -65,22 +68,12 @@ async def compute_trust_metrics(store_id: str, days: int = METRICS_WINDOW_DAYS) 
         }
 
     total = sum(r.count for r in rows)
-    adopted = sum(
-        r.count for r in rows
-        if r.decision_status in (DecisionStatus.APPROVED, DecisionStatus.EXECUTED)
-    )
-    successful = sum(
-        r.count for r in rows
-        if r.outcome == DecisionOutcome.SUCCESS
-    )
+    adopted = sum(r.count for r in rows if r.decision_status in (DecisionStatus.APPROVED, DecisionStatus.EXECUTED))
+    successful = sum(r.count for r in rows if r.outcome == DecisionOutcome.SUCCESS)
     completed = sum(
-        r.count for r in rows
-        if r.outcome in (DecisionOutcome.SUCCESS, DecisionOutcome.FAILURE, DecisionOutcome.PARTIAL)
+        r.count for r in rows if r.outcome in (DecisionOutcome.SUCCESS, DecisionOutcome.FAILURE, DecisionOutcome.PARTIAL)
     )
-    escalated = sum(
-        r.count for r in rows
-        if r.decision_status == DecisionStatus.PENDING
-    )
+    escalated = sum(r.count for r in rows if r.decision_status == DecisionStatus.PENDING)
     confidences = [r.avg_confidence * r.count for r in rows if r.avg_confidence is not None]
     avg_conf = sum(confidences) / total if confidences else 0.0
 
@@ -113,9 +106,7 @@ async def compute_dynamic_phase(store_id: str) -> Dict[str, Any]:
 
     # --- days since onboarding ---
     async with get_db_session() as session:
-        result = await session.execute(
-            select(Store.created_at).where(Store.id == store_id)
-        )
+        result = await session.execute(select(Store.created_at).where(Store.id == store_id))
         created_at = result.scalar_one_or_none()
 
     days_since_onboarding = (date.today() - created_at.date()).days if created_at else 0
@@ -128,18 +119,16 @@ async def compute_dynamic_phase(store_id: str) -> Dict[str, Any]:
     total_decisions = metrics["total_decisions"]
 
     # --- phase logic ---
-    if (
-        days_since_onboarding < MIN_OBSERVATION_DAYS
-        or total_decisions < 10
-        or adoption_rate < ASSISTANCE_ADOPTION_THRESHOLD
-    ):
+    if days_since_onboarding < MIN_OBSERVATION_DAYS or total_decisions < 10 or adoption_rate < ASSISTANCE_ADOPTION_THRESHOLD:
         phase = "OBSERVATION"
         reason = (
             f"days={days_since_onboarding} < {MIN_OBSERVATION_DAYS}"
             if days_since_onboarding < MIN_OBSERVATION_DAYS
-            else f"adoption_rate={adoption_rate:.0%} < {ASSISTANCE_ADOPTION_THRESHOLD:.0%}"
-            if adoption_rate < ASSISTANCE_ADOPTION_THRESHOLD
-            else f"insufficient data (n={total_decisions})"
+            else (
+                f"adoption_rate={adoption_rate:.0%} < {ASSISTANCE_ADOPTION_THRESHOLD:.0%}"
+                if adoption_rate < ASSISTANCE_ADOPTION_THRESHOLD
+                else f"insufficient data (n={total_decisions})"
+            )
         )
     elif (
         days_since_onboarding >= AUTONOMOUS_MIN_DAYS
@@ -147,18 +136,10 @@ async def compute_dynamic_phase(store_id: str) -> Dict[str, Any]:
         and success_rate >= AUTONOMOUS_SUCCESS_THRESHOLD
     ):
         phase = "AUTONOMOUS"
-        reason = (
-            f"days={days_since_onboarding}, "
-            f"adoption={adoption_rate:.0%}, "
-            f"success={success_rate:.0%}"
-        )
+        reason = f"days={days_since_onboarding}, " f"adoption={adoption_rate:.0%}, " f"success={success_rate:.0%}"
     else:
         phase = "ASSISTANCE"
-        reason = (
-            f"days={days_since_onboarding}, "
-            f"adoption={adoption_rate:.0%}, "
-            f"success={success_rate:.0%}"
-        )
+        reason = f"days={days_since_onboarding}, " f"adoption={adoption_rate:.0%}, " f"success={success_rate:.0%}"
 
     logger.info(
         "dynamic_trust_phase_computed",

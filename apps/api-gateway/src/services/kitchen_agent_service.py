@@ -9,13 +9,13 @@ KitchenAgent Service — 后厨效率智能（Sprint 5）
 
 定位：厨师长的效率管控仪表盘
 """
+
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, List
+from typing import List, Optional
 
-from sqlalchemy import select, func, and_, case, extract
+from sqlalchemy import and_, case, extract, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.models.order import Order, OrderItem
 from src.models.waste_event import WasteEvent, WasteEventType
 
@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 # ── 纯函数 ──────────────────────────────────────────────────────
+
 
 def compute_dish_speed_score(avg_minutes: float) -> str:
     """
@@ -93,9 +94,7 @@ class KitchenAgentService:
         # 出品速度（order_time → completed_at）
         speed_result = await db.execute(
             select(
-                func.avg(
-                    extract("epoch", Order.completed_at - Order.order_time) / 60
-                ),
+                func.avg(extract("epoch", Order.completed_at - Order.order_time) / 60),
                 func.count(Order.id),
             ).where(
                 Order.store_id == store_id,
@@ -110,49 +109,63 @@ class KitchenAgentService:
         speed_score = compute_dish_speed_score(avg_speed_min)
 
         # 总出品数
-        total_items = await db.scalar(
-            select(func.coalesce(func.sum(OrderItem.quantity), 0))
-            .join(Order, Order.id == OrderItem.order_id)
-            .where(
-                Order.store_id == store_id,
-                Order.order_time >= cutoff,
-                Order.status != "cancelled",
+        total_items = (
+            await db.scalar(
+                select(func.coalesce(func.sum(OrderItem.quantity), 0))
+                .join(Order, Order.id == OrderItem.order_id)
+                .where(
+                    Order.store_id == store_id,
+                    Order.order_time >= cutoff,
+                    Order.status != "cancelled",
+                )
             )
-        ) or 0
+            or 0
+        )
 
         # 退菜数（cancelled 状态的订单项 — 近似：cancelled订单的总菜品数）
-        returned_items = await db.scalar(
-            select(func.coalesce(func.sum(OrderItem.quantity), 0))
-            .join(Order, Order.id == OrderItem.order_id)
-            .where(
-                Order.store_id == store_id,
-                Order.order_time >= cutoff,
-                Order.status == "cancelled",
+        returned_items = (
+            await db.scalar(
+                select(func.coalesce(func.sum(OrderItem.quantity), 0))
+                .join(Order, Order.id == OrderItem.order_id)
+                .where(
+                    Order.store_id == store_id,
+                    Order.order_time >= cutoff,
+                    Order.status == "cancelled",
+                )
             )
-        ) or 0
+            or 0
+        )
         return_rate = compute_return_rate(returned_items, total_items + returned_items)
 
         # 损耗事件
-        waste_count = await db.scalar(
-            select(func.count(WasteEvent.id)).where(
-                WasteEvent.store_id == store_id,
-                WasteEvent.occurred_at >= cutoff,
+        waste_count = (
+            await db.scalar(
+                select(func.count(WasteEvent.id)).where(
+                    WasteEvent.store_id == store_id,
+                    WasteEvent.occurred_at >= cutoff,
+                )
             )
-        ) or 0
+            or 0
+        )
 
         # 烹饪损耗占比
-        cooking_waste = await db.scalar(
-            select(func.count(WasteEvent.id)).where(
-                WasteEvent.store_id == store_id,
-                WasteEvent.occurred_at >= cutoff,
-                WasteEvent.event_type == WasteEventType.COOKING_LOSS,
+        cooking_waste = (
+            await db.scalar(
+                select(func.count(WasteEvent.id)).where(
+                    WasteEvent.store_id == store_id,
+                    WasteEvent.occurred_at >= cutoff,
+                    WasteEvent.event_type == WasteEventType.COOKING_LOSS,
+                )
             )
-        ) or 0
+            or 0
+        )
         cooking_waste_rate = round(cooking_waste / waste_count, 4) if waste_count > 0 else 0.0
 
         # 综合评级
         efficiency = classify_kitchen_efficiency(
-            speed_score, return_rate, cooking_waste_rate,
+            speed_score,
+            return_rate,
+            cooking_waste_rate,
         )
 
         return {
@@ -187,9 +200,7 @@ class KitchenAgentService:
                 OrderItem.item_id,
                 OrderItem.item_name,
                 func.count(OrderItem.id).label("count"),
-                func.avg(
-                    extract("epoch", Order.completed_at - Order.order_time) / 60
-                ).label("avg_min"),
+                func.avg(extract("epoch", Order.completed_at - Order.order_time) / 60).label("avg_min"),
             )
             .join(Order, Order.id == OrderItem.order_id)
             .where(
@@ -200,9 +211,7 @@ class KitchenAgentService:
             )
             .group_by(OrderItem.item_id, OrderItem.item_name)
             .having(func.count(OrderItem.id) >= 3)
-            .order_by(func.avg(
-                extract("epoch", Order.completed_at - Order.order_time) / 60
-            ).desc())
+            .order_by(func.avg(extract("epoch", Order.completed_at - Order.order_time) / 60).desc())
             .limit(limit)
         )
         result = await db.execute(stmt)
@@ -210,13 +219,15 @@ class KitchenAgentService:
         dishes = []
         for row in result.all():
             avg_min = round(float(row[3] or 0), 1)
-            dishes.append({
-                "item_id": row[0],
-                "item_name": row[1],
-                "order_count": row[2],
-                "avg_minutes": avg_min,
-                "speed_score": compute_dish_speed_score(avg_min),
-            })
+            dishes.append(
+                {
+                    "item_id": row[0],
+                    "item_name": row[1],
+                    "order_count": row[2],
+                    "avg_minutes": avg_min,
+                    "speed_score": compute_dish_speed_score(avg_min),
+                }
+            )
         return dishes
 
     async def get_waste_by_type(
@@ -248,10 +259,12 @@ class KitchenAgentService:
 
         types = []
         for row in result.all():
-            types.append({
-                "type": row[0].value if hasattr(row[0], 'value') else str(row[0]),
-                "count": row[1],
-            })
+            types.append(
+                {
+                    "type": row[0].value if hasattr(row[0], "value") else str(row[0]),
+                    "count": row[1],
+                }
+            )
         return types
 
 

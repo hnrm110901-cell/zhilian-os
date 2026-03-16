@@ -6,23 +6,25 @@
 - 手动触发宴会采购桥接
 - 手动触发订单→CDP闭环
 """
-from fastapi import APIRouter, HTTPException, Query, Depends
-from pydantic import BaseModel
+
 from typing import Optional
 
-from src.core.dependencies import get_current_user
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from src.core.database import get_db
+from src.core.dependencies import get_current_user
 from src.services.lifecycle_bridge import (
     get_customer_lifecycle_view,
-    trigger_procurement_from_beo,
     on_order_completed,
     prepare_order_from_reservation,
+    trigger_procurement_from_beo,
 )
 
 router = APIRouter(prefix="/api/v1/lifecycle", tags=["lifecycle"])
 
 
 # ── 客户360生命周期视图 ──────────────────────────────────
+
 
 @router.get("/customer-view")
 async def customer_lifecycle_view(
@@ -41,6 +43,7 @@ async def customer_lifecycle_view(
 
 
 # ── 手动触发桥接 ──────────────────────────────────────────
+
 
 class ManualOrderBridgeRequest(BaseModel):
     reservation_id: str

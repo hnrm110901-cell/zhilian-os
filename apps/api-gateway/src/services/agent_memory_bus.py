@@ -24,6 +24,7 @@ Usage:
     # read recent findings from all agents for this store
     findings = await agent_memory_bus.subscribe(store_id="store_001", last_n=20)
 """
+
 import json
 import os
 from typing import Any, Dict, List, Optional
@@ -50,6 +51,7 @@ class AgentMemoryBus:
     async def _get_redis(self):
         if self._redis is None:
             import redis.asyncio as aioredis
+
             self._redis = await aioredis.from_url(
                 settings.REDIS_URL,
                 encoding="utf-8",

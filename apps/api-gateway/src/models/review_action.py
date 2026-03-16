@@ -3,15 +3,12 @@
 ReviewActionRule: 评论自动处理规则
 ReviewActionLog: 规则执行日志
 """
+
 import uuid
 from datetime import datetime
 
-from sqlalchemy import (
-    Boolean, Column, DateTime, ForeignKey, Integer, String, Text,
-    Index,
-)
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSON, UUID
-
 from src.models.base import Base, TimestampMixin
 
 
@@ -20,6 +17,7 @@ class ReviewActionRule(Base, TimestampMixin):
     评论行动规则表
     定义当评论满足特定条件时自动触发的行动
     """
+
     __tablename__ = "review_action_rules"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -73,6 +71,7 @@ class ReviewActionLog(Base, TimestampMixin):
     评论行动执行日志表
     记录每次规则触发的执行详情和结果
     """
+
     __tablename__ = "review_action_logs"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -100,10 +99,7 @@ class ReviewActionLog(Base, TimestampMixin):
     )
 
     def __repr__(self):
-        return (
-            f"<ReviewActionLog(id={self.id}, action_type={self.action_type}, "
-            f"status={self.status})>"
-        )
+        return f"<ReviewActionLog(id={self.id}, action_type={self.action_type}, " f"status={self.status})>"
 
     def to_dict(self):
         return {

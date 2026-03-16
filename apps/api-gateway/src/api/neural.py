@@ -2,20 +2,16 @@
 Neural System API
 Provides REST API access to Zhilian OS neural system capabilities
 """
-import os
-from fastapi import APIRouter, HTTPException, Query
-from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field
+
 import os
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
+
+from ..schemas.restaurant_standard_schema import DishSchema, NeuralEventSchema, OrderSchema, StaffSchema
 from ..services.neural_system import NeuralSystemOrchestrator
-from ..schemas.restaurant_standard_schema import (
-    NeuralEventSchema,
-    OrderSchema,
-    DishSchema,
-    StaffSchema
-)
 
 router = APIRouter()
 neural_system = NeuralSystemOrchestrator()
@@ -24,6 +20,7 @@ neural_system = NeuralSystemOrchestrator()
 # Request/Response Models
 class EventEmissionRequest(BaseModel):
     """Request to emit a neural event"""
+
     event_type: str = Field(..., description="Event type (order, dish, staff, payment, inventory)")
     store_id: str = Field(..., description="Store identifier")
     data: Dict[str, Any] = Field(..., description="Event data")
@@ -32,6 +29,7 @@ class EventEmissionRequest(BaseModel):
 
 class EventEmissionResponse(BaseModel):
     """Response after emitting event"""
+
     success: bool
     event_id: str
     message: str
@@ -39,14 +37,18 @@ class EventEmissionResponse(BaseModel):
 
 class SemanticSearchRequest(BaseModel):
     """Request for semantic search"""
+
     query: str = Field(..., description="Search query text")
     store_id: str = Field(..., description="Store identifier for data isolation")
-    top_k: int = Field(default=int(os.getenv("NEURAL_SEARCH_TOP_K", "10")), ge=1, le=100, description="Number of results to return")
+    top_k: int = Field(
+        default=int(os.getenv("NEURAL_SEARCH_TOP_K", "10")), ge=1, le=100, description="Number of results to return"
+    )
     filters: Optional[Dict[str, Any]] = Field(default=None, description="Additional filters")
 
 
 class SemanticSearchResult(BaseModel):
     """Single search result"""
+
     id: str
     score: float
     data: Dict[str, Any]
@@ -54,6 +56,7 @@ class SemanticSearchResult(BaseModel):
 
 class SemanticSearchResponse(BaseModel):
     """Response from semantic search"""
+
     query: str
     results: List[SemanticSearchResult]
     total: int
@@ -61,6 +64,7 @@ class SemanticSearchResponse(BaseModel):
 
 class FederatedLearningParticipationRequest(BaseModel):
     """Request to participate in federated learning"""
+
     store_id: str = Field(..., description="Store identifier")
     local_model_path: str = Field(..., description="Path to local model file")
     training_samples: int = Field(..., ge=1, description="Number of training samples")
@@ -69,6 +73,7 @@ class FederatedLearningParticipationRequest(BaseModel):
 
 class FederatedLearningParticipationResponse(BaseModel):
     """Response after federated learning participation"""
+
     success: bool
     round_number: int
     message: str
@@ -76,6 +81,7 @@ class FederatedLearningParticipationResponse(BaseModel):
 
 class SystemStatusResponse(BaseModel):
     """Neural system status"""
+
     status: str
     total_events: int
     total_stores: int
@@ -85,6 +91,7 @@ class SystemStatusResponse(BaseModel):
 
 
 # API Endpoints
+
 
 @router.post("/events/emit", response_model=EventEmissionResponse)
 async def emit_event(request: EventEmissionRequest):
@@ -98,19 +105,13 @@ async def emit_event(request: EventEmissionRequest):
     """
     try:
         await neural_system.emit_event(
-            event_type=request.event_type,
-            event_source="api",
-            data=request.data,
-            store_id=request.store_id,
-            priority=0
+            event_type=request.event_type, event_source="api", data=request.data, store_id=request.store_id, priority=0
         )
 
         event_id = f"{request.event_type}_{request.store_id}_{datetime.now().timestamp()}"
 
         return EventEmissionResponse(
-            success=True,
-            event_id=event_id,
-            message=f"Event {request.event_type} emitted successfully"
+            success=True, event_id=event_id, message=f"Event {request.event_type} emitted successfully"
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to emit event: {str(e)}")
@@ -126,25 +127,14 @@ async def search_orders(request: SemanticSearchRequest):
     """
     try:
         results = await neural_system.semantic_search_orders(
-            query=request.query,
-            store_id=request.store_id,
-            limit=request.top_k
+            query=request.query, store_id=request.store_id, limit=request.top_k
         )
 
         search_results = [
-            SemanticSearchResult(
-                id=result["id"],
-                score=result["score"],
-                data=result["payload"]
-            )
-            for result in results
+            SemanticSearchResult(id=result["id"], score=result["score"], data=result["payload"]) for result in results
         ]
 
-        return SemanticSearchResponse(
-            query=request.query,
-            results=search_results,
-            total=len(search_results)
-        )
+        return SemanticSearchResponse(query=request.query, results=search_results, total=len(search_results))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
@@ -159,25 +149,14 @@ async def search_dishes(request: SemanticSearchRequest):
     """
     try:
         results = await neural_system.semantic_search_dishes(
-            query=request.query,
-            store_id=request.store_id,
-            limit=request.top_k
+            query=request.query, store_id=request.store_id, limit=request.top_k
         )
 
         search_results = [
-            SemanticSearchResult(
-                id=result["id"],
-                score=result["score"],
-                data=result["payload"]
-            )
-            for result in results
+            SemanticSearchResult(id=result["id"], score=result["score"], data=result["payload"]) for result in results
         ]
 
-        return SemanticSearchResponse(
-            query=request.query,
-            results=search_results,
-            total=len(search_results)
-        )
+        return SemanticSearchResponse(query=request.query, results=search_results, total=len(search_results))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
@@ -191,25 +170,14 @@ async def search_events(request: SemanticSearchRequest):
     """
     try:
         results = await neural_system.semantic_search_events(
-            query=request.query,
-            store_id=request.store_id,
-            limit=request.top_k
+            query=request.query, store_id=request.store_id, limit=request.top_k
         )
 
         search_results = [
-            SemanticSearchResult(
-                id=result["id"],
-                score=result["score"],
-                data=result["payload"]
-            )
-            for result in results
+            SemanticSearchResult(id=result["id"], score=result["score"], data=result["payload"]) for result in results
         ]
 
-        return SemanticSearchResponse(
-            query=request.query,
-            results=search_results,
-            total=len(search_results)
-        )
+        return SemanticSearchResponse(query=request.query, results=search_results, total=len(search_results))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
@@ -224,14 +192,13 @@ async def participate_in_federated_learning(request: FederatedLearningParticipat
     """
     try:
         result = await neural_system.participate_in_federated_learning(
-            store_id=request.store_id,
-            model_type="demand_prediction"  # Default model type
+            store_id=request.store_id, model_type="demand_prediction"  # Default model type
         )
 
         return FederatedLearningParticipationResponse(
             success=result.get("success", False),
             round_number=result.get("round", 0),
-            message=result.get("message", "Participated in federated learning")
+            message=result.get("message", "Participated in federated learning"),
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Participation failed: {str(e)}")
@@ -246,12 +213,7 @@ async def get_system_status():
     """
     try:
         # Get statistics from various components
-        vector_db_stats = {
-            "orders": 0,  # Would query actual collection sizes
-            "dishes": 0,
-            "staff": 0,
-            "events": 0
-        }
+        vector_db_stats = {"orders": 0, "dishes": 0, "staff": 0, "events": 0}  # Would query actual collection sizes
 
         return SystemStatusResponse(
             status="operational",
@@ -259,7 +221,7 @@ async def get_system_status():
             total_stores=0,  # Removed federated learning
             federated_learning_round=0,  # Removed federated learning
             vector_db_collections=vector_db_stats,
-            uptime_seconds=0.0  # Would calculate actual uptime
+            uptime_seconds=0.0,  # Would calculate actual uptime
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get status: {str(e)}")
@@ -272,32 +234,33 @@ async def health_check():
 
     Simple endpoint to verify the neural system is responsive.
     """
-    return {
-        "status": "healthy",
-        "service": "neural_system",
-        "timestamp": datetime.now().isoformat()
-    }
+    return {"status": "healthy", "service": "neural_system", "timestamp": datetime.now().isoformat()}
 
 
 # ==================== Batch Indexing Endpoints ====================
 
+
 class BatchIndexOrdersRequest(BaseModel):
     """Request to batch index orders"""
+
     orders: List[Dict[str, Any]] = Field(..., description="List of orders to index")
 
 
 class BatchIndexDishesRequest(BaseModel):
     """Request to batch index dishes"""
+
     dishes: List[Dict[str, Any]] = Field(..., description="List of dishes to index")
 
 
 class BatchIndexEventsRequest(BaseModel):
     """Request to batch index events"""
+
     events: List[Dict[str, Any]] = Field(..., description="List of events to index")
 
 
 class BatchIndexResponse(BaseModel):
     """Response from batch indexing operation"""
+
     success: bool = Field(..., description="Overall operation success")
     total: int = Field(..., description="Total items submitted")
     indexed: int = Field(..., description="Successfully indexed items")
@@ -318,6 +281,7 @@ def _local_batch_result(
     required_fields: List[str],
 ) -> Dict[str, Any]:
     import time
+
     start = time.time()
     success = 0
     failure = 0
@@ -375,7 +339,7 @@ async def batch_index_orders(request: BatchIndexOrdersRequest):
             indexed=result["success"],
             failed=result["failure"],
             errors=result["errors"],
-            duration_seconds=result["duration_seconds"]
+            duration_seconds=result["duration_seconds"],
         )
     except HTTPException:
         raise
@@ -413,7 +377,7 @@ async def batch_index_dishes(request: BatchIndexDishesRequest):
             indexed=result["success"],
             failed=result["failure"],
             errors=result["errors"],
-            duration_seconds=result["duration_seconds"]
+            duration_seconds=result["duration_seconds"],
         )
     except HTTPException:
         raise
@@ -451,7 +415,7 @@ async def batch_index_events(request: BatchIndexEventsRequest):
             indexed=result["success"],
             failed=result["failure"],
             errors=result["errors"],
-            duration_seconds=result["duration_seconds"]
+            duration_seconds=result["duration_seconds"],
         )
     except HTTPException:
         raise

@@ -10,6 +10,7 @@ Prophet 时序预测服务
 
 降级策略：Prophet 未安装或数据不足时，回退到 EnhancedForecastService。
 """
+
 import json
 import os
 from datetime import date, datetime, timedelta
@@ -29,6 +30,7 @@ def _chinese_holidays_df():
     """生成中国节假日 DataFrame 供 Prophet 使用"""
     try:
         import pandas as pd
+
         holidays = []
         for year in range(2023, 2028):
             holidays += [
@@ -53,6 +55,7 @@ class ProphetForecastService:
     async def _get_redis(self):
         if self._redis is None:
             import redis.asyncio as aioredis
+
             self._redis = aioredis.from_url(os.getenv("REDIS_URL", "redis://localhost:6379"))
         return self._redis
 
@@ -104,10 +107,7 @@ class ProphetForecastService:
             logger.warning("历史数据不足，跳过 Prophet 训练", points=len(history), required=MIN_TRAINING_POINTS)
             return None
 
-        df = pd.DataFrame([
-            {"ds": pd.to_datetime(r["date"]), "y": float(r["value"])}
-            for r in history
-        ]).dropna()
+        df = pd.DataFrame([{"ds": pd.to_datetime(r["date"]), "y": float(r["value"])} for r in history]).dropna()
 
         if len(df) < MIN_TRAINING_POINTS:
             return None
@@ -171,6 +171,7 @@ class ProphetForecastService:
 
         try:
             import pandas as pd
+
             future = model.make_future_dataframe(periods=horizon_days)
             forecast_df = model.predict(future)
             # 只取未来部分
@@ -214,8 +215,12 @@ class ProphetForecastService:
         """降级预测：7日移动平均 + 线性趋势外推"""
         if not history:
             return {
-                "store_id": store_id, "metric": metric, "horizon_days": horizon_days,
-                "forecasts": [], "model": "fallback", "training_points": 0,
+                "store_id": store_id,
+                "metric": metric,
+                "horizon_days": horizon_days,
+                "forecasts": [],
+                "model": "fallback",
+                "training_points": 0,
             }
 
         values = [float(r["value"]) for r in sorted(history, key=lambda x: x["date"])]
@@ -236,12 +241,14 @@ class ProphetForecastService:
         forecasts = []
         for i in range(1, horizon_days + 1):
             pred = max(0, base + daily_trend * i)
-            forecasts.append({
-                "date": (last_date + timedelta(days=i)).isoformat(),
-                "predicted": round(pred, 2),
-                "lower": round(max(0, pred - 1.96 * std), 2),
-                "upper": round(pred + 1.96 * std, 2),
-            })
+            forecasts.append(
+                {
+                    "date": (last_date + timedelta(days=i)).isoformat(),
+                    "predicted": round(pred, 2),
+                    "lower": round(max(0, pred - 1.96 * std), 2),
+                    "upper": round(pred + 1.96 * std, 2),
+                }
+            )
 
         return {
             "store_id": store_id,

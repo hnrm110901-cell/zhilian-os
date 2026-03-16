@@ -2,17 +2,17 @@
 食品安全追溯服务 — FoodSafetyService
 提供食材溯源记录管理、食品安全检查管理、预警统计等功能。
 """
+
 from __future__ import annotations
 
-from typing import Optional, List, Dict, Any, Tuple
-from datetime import date, timedelta
 import uuid
+from datetime import date, timedelta
+from typing import Any, Dict, List, Optional, Tuple
+
 import structlog
-
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.models.food_safety import FoodTraceRecord, FoodSafetyInspection
+from src.models.food_safety import FoodSafetyInspection, FoodTraceRecord
 
 logger = structlog.get_logger()
 
@@ -76,9 +76,7 @@ class FoodSafetyService:
         if status:
             conditions.append(FoodTraceRecord.status == status)
         if ingredient_name:
-            conditions.append(
-                FoodTraceRecord.ingredient_name.ilike(f"%{ingredient_name}%")
-            )
+            conditions.append(FoodTraceRecord.ingredient_name.ilike(f"%{ingredient_name}%"))
 
         where_clause = and_(*conditions)
 
@@ -238,11 +236,7 @@ class FoodSafetyService:
         deadline = today + timedelta(days=7)
 
         # 溯源记录总数
-        total_q = (
-            select(func.count())
-            .select_from(FoodTraceRecord)
-            .where(FoodTraceRecord.brand_id == brand_id)
-        )
+        total_q = select(func.count()).select_from(FoodTraceRecord).where(FoodTraceRecord.brand_id == brand_id)
         total_records = (await db.execute(total_q)).scalar() or 0
 
         # 即将过期数量
@@ -276,9 +270,7 @@ class FoodSafetyService:
 
         # 检查通过率
         inspection_total_q = (
-            select(func.count())
-            .select_from(FoodSafetyInspection)
-            .where(FoodSafetyInspection.brand_id == brand_id)
+            select(func.count()).select_from(FoodSafetyInspection).where(FoodSafetyInspection.brand_id == brand_id)
         )
         inspection_total = (await db.execute(inspection_total_q)).scalar() or 0
 
@@ -294,17 +286,10 @@ class FoodSafetyService:
         )
         inspection_passed = (await db.execute(inspection_passed_q)).scalar() or 0
 
-        pass_rate = (
-            round(inspection_passed / inspection_total * 100, 1)
-            if inspection_total > 0
-            else 0
-        )
+        pass_rate = round(inspection_passed / inspection_total * 100, 1) if inspection_total > 0 else 0
 
         # 最近检查日期
-        latest_q = (
-            select(func.max(FoodSafetyInspection.inspection_date))
-            .where(FoodSafetyInspection.brand_id == brand_id)
-        )
+        latest_q = select(func.max(FoodSafetyInspection.inspection_date)).where(FoodSafetyInspection.brand_id == brand_id)
         latest_date = (await db.execute(latest_q)).scalar()
 
         return {

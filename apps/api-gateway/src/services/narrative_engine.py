@@ -34,9 +34,10 @@ BRIEF_MAX_CHARS = 200  # 简报字数硬上限
 # 纯函数（无 DB 依赖，便于单元测试）
 # ════════════════════════════════════════════════════════════════════════════════
 
+
 def _build_overview(
-    store_label:      str,
-    cost_metrics:     Dict[str, Any],
+    store_label: str,
+    cost_metrics: Dict[str, Any],
     decision_summary: Dict[str, Any],
 ) -> str:
     """
@@ -44,11 +45,11 @@ def _build_overview(
 
     示例：芙蓉区店今日营收¥12,400，成本率31.2%（正常），决策采纳2/3
     """
-    revenue      = cost_metrics.get("revenue_yuan", 0.0)
-    cost_pct     = cost_metrics.get("actual_cost_pct", 0.0)
+    revenue = cost_metrics.get("revenue_yuan", 0.0)
+    cost_pct = cost_metrics.get("actual_cost_pct", 0.0)
     status_label = cost_metrics.get("cost_rate_label", "正常")
-    approved     = decision_summary.get("approved", 0)
-    total_dec    = decision_summary.get("total", 0)
+    approved = decision_summary.get("approved", 0)
+    total_dec = decision_summary.get("total", 0)
 
     overview = f"{store_label}今日营收¥{revenue:,.0f}，成本率{cost_pct:.1f}%（{status_label}）"
     if total_dec > 0:
@@ -57,8 +58,8 @@ def _build_overview(
 
 
 def _detect_anomalies(
-    cost_metrics:  Dict[str, Any],
-    waste_top5:    Optional[List[Dict[str, Any]]],
+    cost_metrics: Dict[str, Any],
+    waste_top5: Optional[List[Dict[str, Any]]],
     pending_count: int,
     top_decisions: List[Dict[str, Any]],
 ) -> List[str]:
@@ -71,7 +72,7 @@ def _detect_anomalies(
 
     # 1. 成本率异常（最高优先级）
     cost_status = cost_metrics.get("cost_rate_status", "ok")
-    cost_pct    = cost_metrics.get("actual_cost_pct", 0.0)
+    cost_pct = cost_metrics.get("actual_cost_pct", 0.0)
     if cost_status == "critical":
         candidates.append((0, f"🔴 食材成本严重超标：{cost_pct:.1f}%，需立即干预"))
     elif cost_status == "warning":
@@ -81,18 +82,20 @@ def _detect_anomalies(
     if waste_top5:
         top = waste_top5[0]
         waste_yuan = top.get("waste_cost_yuan", 0.0)
-        item_name  = top.get("item_name", "")
-        reason     = top.get("action", "") or "建议核查"
+        item_name = top.get("item_name", "")
+        reason = top.get("action", "") or "建议核查"
         if waste_yuan > 0 and item_name:
-            candidates.append((
-                1 if cost_status == "critical" else 2,
-                f"⚠️ {item_name}损耗¥{waste_yuan:.0f}居首，{reason[:18]}",
-            ))
+            candidates.append(
+                (
+                    1 if cost_status == "critical" else 2,
+                    f"⚠️ {item_name}损耗¥{waste_yuan:.0f}居首，{reason[:18]}",
+                )
+            )
 
     # 3. 待审批决策
     if pending_count > 0:
         total_saving = _sum_saving(top_decisions)
-        saving_text  = f"¥{total_saving:.0f}" if total_saving > 0 else "待统计"
+        saving_text = f"¥{total_saving:.0f}" if total_saving > 0 else "待统计"
         candidates.append((2, f"⏳ {pending_count}条决策待审批，预期节省{saving_text}"))
 
     candidates.sort(key=lambda x: x[0])
@@ -101,15 +104,12 @@ def _detect_anomalies(
 
 def _sum_saving(decisions: List[Dict[str, Any]]) -> float:
     """汇总决策预期节省金额"""
-    return sum(
-        d.get("expected_saving_yuan", 0.0) or d.get("net_benefit_yuan", 0.0)
-        for d in decisions
-    )
+    return sum(d.get("expected_saving_yuan", 0.0) or d.get("net_benefit_yuan", 0.0) for d in decisions)
 
 
 def _build_action(
     top_decisions: List[Dict[str, Any]],
-    cost_metrics:  Dict[str, Any],
+    cost_metrics: Dict[str, Any],
 ) -> str:
     """
     生成明日1个具体行动建议。
@@ -131,12 +131,12 @@ def _build_action(
 
 
 def compose_brief(
-    store_label:      str,
-    cost_metrics:     Dict[str, Any],
+    store_label: str,
+    cost_metrics: Dict[str, Any],
     decision_summary: Dict[str, Any],
-    waste_top5:       Optional[List[Dict[str, Any]]],
-    pending_count:    int,
-    top_decisions:    List[Dict[str, Any]],
+    waste_top5: Optional[List[Dict[str, Any]]],
+    pending_count: int,
+    top_decisions: List[Dict[str, Any]],
 ) -> str:
     """
     合成 ≤200字 的经营简报（纯函数，无副作用）。
@@ -151,9 +151,9 @@ def compose_brief(
     Returns:
         str: 截断至 BRIEF_MAX_CHARS 的简报文字
     """
-    overview  = _build_overview(store_label, cost_metrics, decision_summary)
+    overview = _build_overview(store_label, cost_metrics, decision_summary)
     anomalies = _detect_anomalies(cost_metrics, waste_top5, pending_count, top_decisions)
-    action    = _build_action(top_decisions, cost_metrics)
+    action = _build_action(top_decisions, cost_metrics)
 
     parts = [overview] + anomalies + [action]
     brief = "\n".join(parts)
@@ -167,6 +167,7 @@ def compose_brief(
 # ════════════════════════════════════════════════════════════════════════════════
 # NarrativeEngine（含 DB 查询的完整入口）
 # ════════════════════════════════════════════════════════════════════════════════
+
 
 class NarrativeEngine:
     """
@@ -183,10 +184,10 @@ class NarrativeEngine:
 
     @staticmethod
     async def generate_store_brief(
-        store_id:      str,
-        target_date:   date,
-        db:            Any,
-        store_label:   str = "",
+        store_id: str,
+        target_date: date,
+        db: Any,
+        store_label: str = "",
         top_decisions: Optional[List[Dict[str, Any]]] = None,
         pending_count: int = 0,
     ) -> str:
@@ -212,12 +213,12 @@ class NarrativeEngine:
 
         # ── 当日经营快照（cost_metrics + decision_summary）────────────────────
         try:
-            daily_story      = await CaseStoryGenerator.generate_daily_story(
+            daily_story = await CaseStoryGenerator.generate_daily_story(
                 store_id=store_id,
                 target_date=target_date,
                 db=db,
             )
-            cost_metrics     = daily_story["cost_metrics"]
+            cost_metrics = daily_story["cost_metrics"]
             decision_summary = daily_story["decision_summary"]
         except Exception as exc:
             logger.warning(
@@ -226,10 +227,10 @@ class NarrativeEngine:
                 error=str(exc),
             )
             cost_metrics = {
-                "revenue_yuan":      0.0,
-                "actual_cost_pct":   0.0,
-                "cost_rate_status":  "ok",
-                "cost_rate_label":   "正常",
+                "revenue_yuan": 0.0,
+                "actual_cost_pct": 0.0,
+                "cost_rate_status": "ok",
+                "cost_rate_label": "正常",
             }
             decision_summary = {"total": 0, "approved": 0}
 

@@ -1,9 +1,9 @@
 """三角对账模型 — Order ↔ Payment ↔ Bank Statement ↔ Invoice 四方匹配记录"""
+
 import uuid
-from datetime import datetime, date
-from sqlalchemy import (
-    Column, String, Integer, DateTime, Date, Text, Index,
-)
+from datetime import date, datetime
+
+from sqlalchemy import Column, Date, DateTime, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 
 from .base import Base, TimestampMixin

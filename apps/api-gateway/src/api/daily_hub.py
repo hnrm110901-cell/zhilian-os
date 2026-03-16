@@ -24,7 +24,6 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.core.dependencies import get_current_user
 from src.models.user import User
@@ -35,129 +34,132 @@ router = APIRouter(prefix="/api/v1/daily-hub", tags=["daily_hub"])
 
 # ── Pydantic Response Schemas ─────────────────────────────────────────────────
 
+
 class WeatherInfo(BaseModel):
-    temperature:   Optional[float] = None
-    condition:     Optional[str]   = None
+    temperature: Optional[float] = None
+    condition: Optional[str] = None
     impact_factor: Optional[float] = None
 
 
 class HolidayInfo(BaseModel):
-    name:          str
+    name: str
     impact_factor: float
 
 
 class AuspiciousInfo(BaseModel):
-    label:         str
+    label: str
     demand_factor: float
-    sources:       List[str] = []
+    sources: List[str] = []
 
 
 class BanquetItem(BaseModel):
-    reservation_id:   Optional[str]   = None
-    customer_name:    Optional[str]   = None
-    party_size:       Optional[int]   = None
+    reservation_id: Optional[str] = None
+    customer_name: Optional[str] = None
+    party_size: Optional[int] = None
     estimated_budget: Optional[float] = None
-    reservation_time: Optional[str]   = None
+    reservation_time: Optional[str] = None
 
 
 class BanquetTrack(BaseModel):
-    active:                bool
-    banquets:              List[BanquetItem]
+    active: bool
+    banquets: List[BanquetItem]
     deterministic_revenue: float
 
 
 class RegularTrack(BaseModel):
-    predicted_revenue:   float
+    predicted_revenue: float
     confidence_interval: Optional[Dict[str, float]] = None
-    confidence_level:    str
+    confidence_level: str
 
 
 class TomorrowForecast(BaseModel):
-    weather:                 Optional[WeatherInfo]    = None
-    holiday:                 Optional[HolidayInfo]    = None
-    auspicious:              Optional[AuspiciousInfo] = None   # 好日子感知
-    banquet_track:           BanquetTrack
-    regular_track:           RegularTrack
+    weather: Optional[WeatherInfo] = None
+    holiday: Optional[HolidayInfo] = None
+    auspicious: Optional[AuspiciousInfo] = None  # 好日子感知
+    banquet_track: BanquetTrack
+    regular_track: RegularTrack
     total_predicted_revenue: float
-    total_lower:             float
-    total_upper:             float
+    total_lower: float
+    total_upper: float
 
 
 class PurchaseItem(BaseModel):
-    item_name:            Optional[str]   = None
-    current_stock:        Optional[float] = None
+    item_name: Optional[str] = None
+    current_stock: Optional[float] = None
     recommended_quantity: Optional[float] = None
-    alert_level:          Optional[str]   = None
-    supplier_name:        Optional[str]   = None
+    alert_level: Optional[str] = None
+    supplier_name: Optional[str] = None
 
 
 class StaffingPlan(BaseModel):
-    shifts:      List[Dict[str, Any]]
+    shifts: List[Dict[str, Any]]
     total_staff: int
 
 
 class FoodCostInfo(BaseModel):
-    actual_pct:      float
+    actual_pct: float
     theoretical_pct: float
-    variance_pct:    float
-    variance_status: str                       # ok / warning / critical
+    variance_pct: float
+    variance_status: str  # ok / warning / critical
     top_ingredients: List[Dict[str, Any]] = []
 
 
 class YesterdayReview(BaseModel):
     total_revenue: float
-    order_count:   int
-    health_score:  Optional[float]    = None
-    highlights:    List[str]
-    alerts:        List[str]
-    food_cost:     Optional[FoodCostInfo] = None
+    order_count: int
+    health_score: Optional[float] = None
+    highlights: List[str]
+    alerts: List[str]
+    food_cost: Optional[FoodCostInfo] = None
 
 
 class WorkflowPhaseInfo(BaseModel):
-    phase_name:     str
-    phase_order:    int
-    status:         str
-    deadline:       Optional[str] = None
-    countdown:      Optional[str] = None
+    phase_name: str
+    phase_order: int
+    status: str
+    deadline: Optional[str] = None
+    countdown: Optional[str] = None
     latest_version: int
-    is_overdue:     bool
+    is_overdue: bool
 
 
 class DailyHubBoard(BaseModel):
-    store_id:          str
-    target_date:       str
-    generated_at:      str
-    approval_status:   str                       # pending / approved / adjusted
-    approved_by:       Optional[str]             = None
-    approved_at:       Optional[str]             = None
-    adjustments:       Optional[Dict[str, Any]]  = None
-    yesterday_review:  YesterdayReview
+    store_id: str
+    target_date: str
+    generated_at: str
+    approval_status: str  # pending / approved / adjusted
+    approved_by: Optional[str] = None
+    approved_at: Optional[str] = None
+    adjustments: Optional[Dict[str, Any]] = None
+    yesterday_review: YesterdayReview
     tomorrow_forecast: TomorrowForecast
-    purchase_order:    List[PurchaseItem]
-    staffing_plan:     StaffingPlan
-    workflow_phases:   Optional[List[WorkflowPhaseInfo]] = None
-    data_sources:      Optional[Dict[str, str]]          = None
+    purchase_order: List[PurchaseItem]
+    staffing_plan: StaffingPlan
+    workflow_phases: Optional[List[WorkflowPhaseInfo]] = None
+    data_sources: Optional[Dict[str, str]] = None
 
 
 class HubStatusResponse(BaseModel):
-    store_id:        str
-    target_date:     str
-    approval_status: str                # pending / approved / adjusted / not_generated
-    approved_by:     Optional[str]      = None
-    approved_at:     Optional[str]      = None
-    has_workflow:    bool
-    workflow_phase:  Optional[str]      = None
+    store_id: str
+    target_date: str
+    approval_status: str  # pending / approved / adjusted / not_generated
+    approved_by: Optional[str] = None
+    approved_at: Optional[str] = None
+    has_workflow: bool
+    workflow_phase: Optional[str] = None
 
 
 # ── Request Schemas ───────────────────────────────────────────────────────────
 
+
 class ApproveRequest(BaseModel):
-    target_date:   str                      = Field(..., description="规划日期 YYYY-MM-DD")
-    adjustments:   Optional[Dict[str, Any]] = Field(None, description="店长微调内容（覆盖系统建议）")
-    notify_wechat: bool                     = Field(True,  description="审批后是否推送企微通知")
+    target_date: str = Field(..., description="规划日期 YYYY-MM-DD")
+    adjustments: Optional[Dict[str, Any]] = Field(None, description="店长微调内容（覆盖系统建议）")
+    notify_wechat: bool = Field(True, description="审批后是否推送企微通知")
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
+
 
 @router.get(
     "/reports/summary",
@@ -165,7 +167,7 @@ class ApproveRequest(BaseModel):
 )
 async def get_platform_summary(
     db: AsyncSession = Depends(get_db),
-    _:  User         = Depends(get_current_user),
+    _: User = Depends(get_current_user),
 ):
     """
     全平台今日备战板汇总，供大屏展示：
@@ -181,10 +183,10 @@ async def get_platform_summary(
     response_model=HubStatusResponse,
 )
 async def get_hub_status(
-    store_id:    str,
+    store_id: str,
     target_date: Optional[str] = Query(None, description="YYYY-MM-DD，默认=明天"),
-    db:          AsyncSession  = Depends(get_db),
-    _:           User          = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """
     轻量查询审批状态和工作流当前阶段，不触发完整数据聚合（适合前端每 30 秒轮询）。
@@ -198,10 +200,10 @@ async def get_hub_status(
     summary="获取备战板关联的工作流阶段状态（含倒计时）",
 )
 async def get_workflow_phases(
-    store_id:    str,
+    store_id: str,
     target_date: Optional[str] = Query(None, description="YYYY-MM-DD，默认=明天"),
-    db:          AsyncSession  = Depends(get_db),
-    _:           User          = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """
     获取门店与备战板关联的 6 阶段工作流状态（deadline 倒计时、锁定情况、最新版本号）。
@@ -217,11 +219,11 @@ async def get_workflow_phases(
     summary="获取门店当日备战板（五模块聚合）",
 )
 async def get_daily_hub(
-    store_id:    str,
+    store_id: str,
     target_date: Optional[str] = Query(None, description="YYYY-MM-DD，默认=明天"),
-    refresh:     bool          = Query(False, description="强制跳过 Redis 缓存重新生成"),
-    db:          AsyncSession  = Depends(get_db),
-    _:           User          = Depends(get_current_user),
+    refresh: bool = Query(False, description="强制跳过 Redis 缓存重新生成"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """
     获取门店备战板，聚合五个模块：
@@ -251,9 +253,9 @@ async def get_daily_hub(
 )
 async def approve_hub(
     store_id: str,
-    body:     ApproveRequest,
-    db:       AsyncSession = Depends(get_db),
-    user:     User         = Depends(get_current_user),
+    body: ApproveRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
     """
     店长一键审批当日备战板：
@@ -267,7 +269,7 @@ async def approve_hub(
 
     审批后状态持久化到 Redis（24h），后续查询直接返回已审批状态。
     """
-    td       = _parse_date(body.target_date)
+    td = _parse_date(body.target_date)
     approver = str(user.id) if hasattr(user, "id") else "store_manager"
 
     return await daily_hub_service.approve_battle_board(
@@ -281,6 +283,7 @@ async def approve_hub(
 
 
 # ── 内部工具 ──────────────────────────────────────────────────────────────────
+
 
 def _parse_date(raw: str) -> date:
     try:

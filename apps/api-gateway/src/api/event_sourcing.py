@@ -2,15 +2,17 @@
 事件溯源 API
 查询 Neural System 事件的完整处理链路
 """
-from fastapi import APIRouter, Depends, Query, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
-from typing import Optional
+
 from datetime import datetime, timedelta
+from typing import Optional
+
 import structlog
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import and_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
-from ..models.neural_event_log import NeuralEventLog, EventProcessingStatus
+from ..models.neural_event_log import EventProcessingStatus, NeuralEventLog
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/api/v1/event-sourcing", tags=["event_sourcing"])
@@ -38,11 +40,7 @@ async def list_events(
         conditions.append(NeuralEventLog.processing_status == status)
 
     result = await db.execute(
-        select(NeuralEventLog)
-        .where(and_(*conditions))
-        .order_by(NeuralEventLog.queued_at.desc())
-        .limit(limit)
-        .offset(offset)
+        select(NeuralEventLog).where(and_(*conditions)).order_by(NeuralEventLog.queued_at.desc()).limit(limit).offset(offset)
     )
     events = result.scalars().all()
     return {"store_id": store_id, "total": len(events), "events": [e.to_dict() for e in events]}
@@ -80,10 +78,10 @@ async def replay_event(
 
     prev_status = log.processing_status
     log.processing_status = EventProcessingStatus.PENDING
-    log.started_at         = None
-    log.processed_at       = None
-    log.error_message      = None
-    log.retry_count        = (log.retry_count or 0) + 1
+    log.started_at = None
+    log.processed_at = None
+    log.error_message = None
+    log.retry_count = (log.retry_count or 0) + 1
 
     await db.commit()
 
@@ -96,13 +94,13 @@ async def replay_event(
     )
 
     return {
-        "event_id":      event_id,
-        "store_id":      log.store_id,
-        "event_type":    log.event_type,
-        "prev_status":   prev_status,
-        "new_status":    EventProcessingStatus.PENDING,
-        "retry_count":   log.retry_count,
-        "replayed_at":   datetime.utcnow().isoformat(),
+        "event_id": event_id,
+        "store_id": log.store_id,
+        "event_type": log.event_type,
+        "prev_status": prev_status,
+        "new_status": EventProcessingStatus.PENDING,
+        "retry_count": log.retry_count,
+        "replayed_at": datetime.utcnow().isoformat(),
     }
 
 
@@ -118,10 +116,10 @@ async def event_snapshot(
     - 平均处理时长
     - 待处理 / 失败事件列表（各最多 5 条）
     """
-    from sqlalchemy import func, case
+    from sqlalchemy import case, func
 
-    now   = datetime.utcnow()
-    h24   = now - timedelta(hours=24)
+    now = datetime.utcnow()
+    h24 = now - timedelta(hours=24)
 
     # ── 全量状态分布 ──
     all_stats_result = await db.execute(
@@ -152,10 +150,7 @@ async def event_snapshot(
     # ── 平均处理时长（秒） ──
     avg_result = await db.execute(
         select(
-            func.avg(
-                func.extract("epoch", NeuralEventLog.processed_at) -
-                func.extract("epoch", NeuralEventLog.started_at)
-            )
+            func.avg(func.extract("epoch", NeuralEventLog.processed_at) - func.extract("epoch", NeuralEventLog.started_at))
         ).where(
             and_(
                 NeuralEventLog.store_id == store_id,
@@ -169,10 +164,12 @@ async def event_snapshot(
     # ── 待处理 + 失败事件样本 ──
     pending_result = await db.execute(
         select(NeuralEventLog)
-        .where(and_(
-            NeuralEventLog.store_id == store_id,
-            NeuralEventLog.processing_status == EventProcessingStatus.PENDING,
-        ))
+        .where(
+            and_(
+                NeuralEventLog.store_id == store_id,
+                NeuralEventLog.processing_status == EventProcessingStatus.PENDING,
+            )
+        )
         .order_by(NeuralEventLog.queued_at.asc())
         .limit(5)
     )
@@ -180,24 +177,26 @@ async def event_snapshot(
 
     failed_result = await db.execute(
         select(NeuralEventLog)
-        .where(and_(
-            NeuralEventLog.store_id == store_id,
-            NeuralEventLog.processing_status == EventProcessingStatus.FAILED,
-        ))
+        .where(
+            and_(
+                NeuralEventLog.store_id == store_id,
+                NeuralEventLog.processing_status == EventProcessingStatus.FAILED,
+            )
+        )
         .order_by(NeuralEventLog.queued_at.desc())
         .limit(5)
     )
     failed_events = [e.to_dict() for e in failed_result.scalars().all()]
 
     return {
-        "store_id":            store_id,
-        "snapshot_at":         now.isoformat(),
-        "all_time":            all_stats,
-        "last_24h":            recent_stats,
-        "top_event_types":     top_types,
+        "store_id": store_id,
+        "snapshot_at": now.isoformat(),
+        "all_time": all_stats,
+        "last_24h": recent_stats,
+        "top_event_types": top_types,
         "avg_processing_secs": avg_processing_s,
-        "pending_sample":      pending_events,
-        "failed_sample":       failed_events,
+        "pending_sample": pending_events,
+        "failed_sample": failed_events,
     }
 
 
@@ -209,13 +208,16 @@ async def event_stats(
 ):
     """门店事件处理统计（各状态计数）"""
     from sqlalchemy import func
+
     since = datetime.utcnow() - timedelta(hours=hours)
     result = await db.execute(
         select(NeuralEventLog.processing_status, func.count().label("count"))
-        .where(and_(
-            NeuralEventLog.store_id == store_id,
-            NeuralEventLog.queued_at >= since,
-        ))
+        .where(
+            and_(
+                NeuralEventLog.store_id == store_id,
+                NeuralEventLog.queued_at >= since,
+            )
+        )
         .group_by(NeuralEventLog.processing_status)
     )
     rows = result.all()

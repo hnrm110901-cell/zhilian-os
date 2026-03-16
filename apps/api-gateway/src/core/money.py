@@ -15,7 +15,7 @@
     fee = mul_rate(total_saved, "0.20")     # Decimal × 费率 → Decimal
 """
 
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Union
 
 Number = Union[int, float, str, Decimal]

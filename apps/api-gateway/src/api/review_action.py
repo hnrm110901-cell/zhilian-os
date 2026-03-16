@@ -4,13 +4,13 @@
 
 提供规则 CRUD、批量处理、执行日志查询和统计接口
 """
+
 from typing import Any, Dict, List, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db_session
 from src.core.dependencies import require_role
 from src.models.user import UserRole
@@ -23,8 +23,10 @@ router = APIRouter(prefix="/api/v1/review-actions", tags=["review-actions"])
 
 # ── Pydantic 请求模型 ────────────────────────────────────────────────
 
+
 class CreateRuleRequest(BaseModel):
     """创建规则请求"""
+
     brand_id: str
     rule_name: str = Field(..., max_length=100)
     trigger_condition: Dict[str, Any] = Field(default_factory=dict)
@@ -36,6 +38,7 @@ class CreateRuleRequest(BaseModel):
 
 class UpdateRuleRequest(BaseModel):
     """更新规则请求"""
+
     rule_name: Optional[str] = None
     trigger_condition: Optional[Dict[str, Any]] = None
     action_type: Optional[str] = None
@@ -46,10 +49,12 @@ class UpdateRuleRequest(BaseModel):
 
 class BatchProcessRequest(BaseModel):
     """批量处理请求"""
+
     brand_id: str
 
 
 # ── 规则管理端点 ──────────────────────────────────────────────────────
+
 
 @router.post("/rules")
 async def create_rule(
@@ -111,6 +116,7 @@ async def delete_rule(
 
 # ── 批量处理 ──────────────────────────────────────────────────────────
 
+
 @router.post("/process")
 async def batch_process(
     req: BatchProcessRequest,
@@ -124,6 +130,7 @@ async def batch_process(
 
 # ── 日志查询 ──────────────────────────────────────────────────────────
 
+
 @router.get("/logs")
 async def get_logs(
     brand_id: str = Query(...),
@@ -135,11 +142,16 @@ async def get_logs(
 ):
     """查询行动执行日志"""
     return await review_action_service.get_action_logs(
-        db, brand_id, page, page_size, action_type,
+        db,
+        brand_id,
+        page,
+        page_size,
+        action_type,
     )
 
 
 # ── 统计 ──────────────────────────────────────────────────────────────
+
 
 @router.get("/stats")
 async def get_stats(

@@ -2,15 +2,17 @@
 Multi-Store Management API
 多门店管理API端点
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import List, Optional
-from pydantic import BaseModel, Field
-import structlog
 
-from ..services.store_service import store_service
+from typing import List, Optional
+
+import structlog
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
+
 from ..core.dependencies import get_current_active_user
-from ..models.user import User
 from ..models.store import StoreStatus
+from ..models.user import User
+from ..services.store_service import store_service
 
 logger = structlog.get_logger()
 
@@ -173,17 +175,19 @@ async def compare_stores(
             avg_order_value = comparison.get("data", {}).get("avg_order_value", {}).get(sid)
             if avg_order_value is None:
                 avg_order_value = (revenue / orders) if orders else 0
-            stores_out.append({
-                "id": sid,
-                "name": s.get("name"),
-                "region": s.get("region"),
-                "metrics": {
-                    "revenue": revenue,
-                    "orders": orders,
-                    "customers": comparison.get("data", {}).get("customers", {}).get(sid, 0),
-                    "avg_order_value": avg_order_value,
-                },
-            })
+            stores_out.append(
+                {
+                    "id": sid,
+                    "name": s.get("name"),
+                    "region": s.get("region"),
+                    "metrics": {
+                        "revenue": revenue,
+                        "orders": orders,
+                        "customers": comparison.get("data", {}).get("customers", {}).get(sid, 0),
+                        "avg_order_value": avg_order_value,
+                    },
+                }
+            )
 
         # 兼容老结构（metrics/data）+ 新结构（stores[].metrics）
         return {
@@ -254,13 +258,15 @@ async def get_regional_summary_compat(
                 total_revenue += stats.get("today_revenue", 0)
                 total_orders += stats.get("today_orders", 0)
                 total_customers += stats.get("today_customers", 0)
-            regions.append({
-                "region": region,
-                "store_count": len(stores),
-                "total_revenue": total_revenue,
-                "total_orders": total_orders,
-                "total_customers": total_customers,
-            })
+            regions.append(
+                {
+                    "region": region,
+                    "store_count": len(stores),
+                    "total_revenue": total_revenue,
+                    "total_orders": total_orders,
+                    "total_customers": total_customers,
+                }
+            )
         return {"regions": regions}
     except Exception as e:
         logger.error("获取区域汇总失败(compat)", error=str(e))
@@ -297,10 +303,12 @@ async def get_performance_ranking_compat(
         ranking = await store_service.get_performance_ranking(metric, limit)
         normalized = []
         for item in ranking:
-            normalized.append({
-                **item,
-                "growth_rate": float(item.get("growth_rate") or 0.0),
-            })
+            normalized.append(
+                {
+                    **item,
+                    "growth_rate": float(item.get("growth_rate") or 0.0),
+                }
+            )
         return {"metric": metric, "ranking": normalized}
     except Exception as e:
         logger.error("获取业绩排名失败(compat)", error=str(e))
@@ -450,11 +458,13 @@ async def delete_store(
         logger.error("删除门店失败", error=str(e))
         raise HTTPException(status_code=500, detail=f"删除门店失败: {str(e)}")
 
+
 # ==================== P1-1 增强：跨店排班协调 + 总部配置下发 ====================
 
 
 class CrossStoreShiftRequest(BaseModel):
     """跨店借调排班请求"""
+
     from_store_id: str = Field(..., description="借出门店")
     to_store_id: str = Field(..., description="借入门店")
     employee_id: str = Field(..., description="员工ID")
@@ -464,6 +474,7 @@ class CrossStoreShiftRequest(BaseModel):
 
 class HQConfigBroadcastRequest(BaseModel):
     """总部配置下发请求"""
+
     config_type: str = Field(..., description="配置类型：business_hours/price/policy/menu")
     config_data: dict = Field(..., description="配置内容")
     target_store_ids: Optional[List[str]] = Field(None, description="目标门店，None=全部")
@@ -507,14 +518,16 @@ async def get_cross_store_staff_availability(
         stores = await store_service.list_stores(limit=50)
         result = []
         for store in stores:
-            result.append({
-                "store_id": store.id,
-                "store_name": store.name,
-                "date": date,
-                "scheduled_count": 0,
-                "available_for_transfer": 0,
-                "note": "需连接排班服务获取实时数据",
-            })
+            result.append(
+                {
+                    "store_id": store.id,
+                    "store_name": store.name,
+                    "date": date,
+                    "scheduled_count": 0,
+                    "available_for_transfer": 0,
+                    "note": "需连接排班服务获取实时数据",
+                }
+            )
         return {"date": date, "stores": result}
     except Exception as e:
         logger.error("获取跨店可用员工失败", error=str(e))
@@ -528,6 +541,7 @@ async def hq_config_broadcast(
 ):
     """总部统一配置下发到指定门店（或全部门店）"""
     from ..models.user import UserRole
+
     if current_user.role not in (UserRole.ADMIN,):
         raise HTTPException(status_code=403, detail="仅总部管理员可下发配置")
 

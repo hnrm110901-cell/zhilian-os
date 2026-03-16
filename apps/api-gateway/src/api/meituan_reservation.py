@@ -3,13 +3,14 @@
 - Webhook接收美团预订推送（签名验证）
 - 本地状态同步到美团
 """
+
 import hashlib
 import hmac
 import os
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Header, HTTPException, Request, Depends
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -102,9 +103,7 @@ async def sync_status_to_meituan(
     在屯象OS中确认/取消/标记no-show后，推回美团平台。
     """
     try:
-        result = await meituan_reservation_service.sync_to_meituan(
-            session, req.reservation_id, req.action
-        )
+        result = await meituan_reservation_service.sync_to_meituan(session, req.reservation_id, req.action)
         return {"success": True, **result}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -2,10 +2,11 @@
 RAG增强服务 - 集成行业基线数据
 解决AI冷启动问题
 """
-from typing import Dict, List, Optional, Any
-import structlog
-import os
 
+import os
+from typing import Any, Dict, List, Optional
+
+import structlog
 from src.services.baseline_data_service import BaselineDataService
 
 logger = structlog.get_logger()
@@ -59,14 +60,10 @@ class EnhancedRAGService:
 
         # 2. 如果数据充足，使用客户自己的数据
         if data_sufficiency["is_sufficient"]:
-            return await self._query_with_customer_data(
-                query_text, query_type, context, data_sufficiency
-            )
+            return await self._query_with_customer_data(query_text, query_type, context, data_sufficiency)
 
         # 3. 如果数据不足，使用行业基线数据
-        return await self._query_with_baseline_data(
-            query_text, query_type, context, data_sufficiency
-        )
+        return await self._query_with_baseline_data(query_text, query_type, context, data_sufficiency)
 
     async def _check_data_sufficiency(self, query_type: str) -> Dict[str, Any]:
         """
@@ -78,31 +75,23 @@ class EnhancedRAGService:
         Returns:
             数据充足性评估结果
         """
-        from sqlalchemy import select, func
+        from sqlalchemy import func, select
         from src.core.database import get_db_session
-        from src.models.order import Order
         from src.models.daily_report import DailyReport
         from src.models.inventory import InventoryItem
+        from src.models.order import Order
         from src.models.reservation import Reservation
 
         async with get_db_session() as session:
-            orders_result = await session.execute(
-                select(func.count(Order.id)).where(Order.store_id == self.store_id)
-            )
+            orders_result = await session.execute(select(func.count(Order.id)).where(Order.store_id == self.store_id))
             days_result = await session.execute(
-                select(func.count(func.distinct(DailyReport.report_date))).where(
-                    DailyReport.store_id == self.store_id
-                )
+                select(func.count(func.distinct(DailyReport.report_date))).where(DailyReport.store_id == self.store_id)
             )
             inventory_result = await session.execute(
-                select(func.count(InventoryItem.id)).where(
-                    InventoryItem.store_id == self.store_id
-                )
+                select(func.count(InventoryItem.id)).where(InventoryItem.store_id == self.store_id)
             )
             reservation_result = await session.execute(
-                select(func.count(Reservation.id)).where(
-                    Reservation.store_id == self.store_id
-                )
+                select(func.count(Reservation.id)).where(Reservation.store_id == self.store_id)
             )
 
         data_counts = {
@@ -162,12 +151,13 @@ class EnhancedRAGService:
             查询结果
         """
         # 根据query_type从数据库检索相关数据作为上下文
+        from datetime import date, timedelta
+
+        from sqlalchemy import func, select
         from src.core.database import get_db_session
-        from src.models.order import Order, OrderStatus
         from src.models.daily_report import DailyReport
         from src.models.inventory import InventoryItem
-        from sqlalchemy import select, func
-        from datetime import date, timedelta
+        from src.models.order import Order, OrderStatus
 
         logger.info(
             "Querying with customer data",
@@ -208,9 +198,9 @@ class EnhancedRAGService:
                 result = await session.execute(
                     select(
                         func.count(InventoryItem.id).label("total"),
-                        func.count(InventoryItem.id).filter(
-                            InventoryItem.current_quantity <= InventoryItem.min_quantity
-                        ).label("low_stock"),
+                        func.count(InventoryItem.id)
+                        .filter(InventoryItem.current_quantity <= InventoryItem.min_quantity)
+                        .label("low_stock"),
                     ).where(InventoryItem.store_id == self.store_id)
                 )
                 row = result.one()
@@ -274,9 +264,7 @@ class EnhancedRAGService:
         )
 
         # 使用基线数据服务生成建议
-        baseline_recommendation = self.baseline_service.get_baseline_recommendation(
-            query_type, context
-        )
+        baseline_recommendation = self.baseline_service.get_baseline_recommendation(query_type, context)
 
         return {
             "answer": baseline_recommendation["recommendation"],
@@ -314,13 +302,15 @@ class EnhancedRAGService:
             dimension_progress = min(current / threshold * 100, 100)
             total_progress += dimension_progress
 
-            progress["dimensions"].append({
-                "name": key,
-                "current": current,
-                "required": threshold,
-                "progress": dimension_progress,
-                "status": "sufficient" if current >= threshold else "insufficient",
-            })
+            progress["dimensions"].append(
+                {
+                    "name": key,
+                    "current": current,
+                    "required": threshold,
+                    "progress": dimension_progress,
+                    "status": "sufficient" if current >= threshold else "insufficient",
+                }
+            )
 
         progress["overall_progress"] = total_progress / len(self.DATA_SUFFICIENCY_THRESHOLDS)
 
@@ -341,8 +331,10 @@ class EnhancedRAGService:
                     else:
                         days_needed = int(remaining / max(daily_order_rate, 1))
                     max_days_needed = max(max_days_needed, days_needed)
-            progress["estimated_days_to_sufficient"] = max_days_needed if max_days_needed > 0 else int(
-                (100 - progress["overall_progress"]) / max(daily_order_rate, 1)
+            progress["estimated_days_to_sufficient"] = (
+                max_days_needed
+                if max_days_needed > 0
+                else int((100 - progress["overall_progress"]) / max(daily_order_rate, 1))
             )
 
         logger.info(
@@ -358,10 +350,7 @@ class EnhancedRAGService:
 async def example_usage():
     """使用示例"""
     # 初始化服务
-    rag_service = EnhancedRAGService(
-        store_id="STORE001",
-        restaurant_type="正餐"
-    )
+    rag_service = EnhancedRAGService(store_id="STORE001", restaurant_type="正餐")
 
     # 查询客流预测
     result = await rag_service.query(
@@ -370,7 +359,7 @@ async def example_usage():
         context={
             "day_type": "工作日",
             "meal_period": "午餐",
-        }
+        },
     )
 
     print(f"回答: {result['answer']}")

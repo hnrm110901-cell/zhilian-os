@@ -1,10 +1,13 @@
 """电子发票模型 — 支持诺诺/百旺平台的数电票开具/红冲/查验"""
+
+import enum
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Integer, DateTime, Text, ForeignKey
+
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
+
 from .base import Base, TimestampMixin
-import enum
 
 
 class InvoicePlatform(str, enum.Enum):

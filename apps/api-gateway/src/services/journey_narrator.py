@@ -30,12 +30,14 @@ logger = structlog.get_logger()
 
 # ── 会员画像 ──────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class MemberProfile:
     """旅程个性化所需的会员核心画像（从 private_domain_members 读取）。"""
-    frequency: int = 0                   # 历史订单总笔数
-    monetary: int = 0                    # 历史消费总金额（分）
-    recency_days: Optional[int] = None   # 距最近消费的天数（None=从未消费）
+
+    frequency: int = 0  # 历史订单总笔数
+    monetary: int = 0  # 历史消费总金额（分）
+    recency_days: Optional[int] = None  # 距最近消费的天数（None=从未消费）
     lifecycle_state: Optional[str] = None  # 当前生命周期状态
 
 
@@ -89,44 +91,27 @@ def classify_maslow_level(profile: MemberProfile) -> int:
 # ── 旅程步骤目的说明 ──────────────────────────────────────────────────────────
 
 _TEMPLATE_PURPOSE: dict[str, str] = {
-    "journey_welcome":
-        "新会员入会后的第一条消息：欢迎加入，建立品牌第一印象",
-    "journey_profile_prompt":
-        "入会1天后：引导完善个人信息（生日/口味偏好），提升后续推荐精准度",
-    "journey_first_visit_offer":
-        "入会3天仍未到店：提供限时首单优惠，消除犹豫，促成第一次到店",
-    "journey_menu_recommend":
-        "注册6小时仍未下单：推荐当季招牌菜，激发食欲和好奇心",
-    "journey_first_order_coupon":
-        "注册1天仍未下单：发放首单折扣券，直接降低决策门槛",
-    "journey_seasonal_content":
-        "沉睡唤醒第一步：用内容而非折扣重建连接，唤起美好记忆",
-    "journey_comeback_coupon":
-        "沉睡唤醒第二步：发放回归优惠券，给顾客到店的具体理由",
-    "journey_proactive_remind":
-        "需求预测主动提醒：顾客即将进入消费周期，在他想来之前先打招呼，提升选择我们的概率",
+    "journey_welcome": "新会员入会后的第一条消息：欢迎加入，建立品牌第一印象",
+    "journey_profile_prompt": "入会1天后：引导完善个人信息（生日/口味偏好），提升后续推荐精准度",
+    "journey_first_visit_offer": "入会3天仍未到店：提供限时首单优惠，消除犹豫，促成第一次到店",
+    "journey_menu_recommend": "注册6小时仍未下单：推荐当季招牌菜，激发食欲和好奇心",
+    "journey_first_order_coupon": "注册1天仍未下单：发放首单折扣券，直接降低决策门槛",
+    "journey_seasonal_content": "沉睡唤醒第一步：用内容而非折扣重建连接，唤起美好记忆",
+    "journey_comeback_coupon": "沉睡唤醒第二步：发放回归优惠券，给顾客到店的具体理由",
+    "journey_proactive_remind": "需求预测主动提醒：顾客即将进入消费周期，在他想来之前先打招呼，提升选择我们的概率",
 }
 
 # 静态降级模板（API 不可用时兜底）
 _FALLBACK_TEMPLATES: dict[str, str] = {
-    "journey_welcome":
-        "欢迎加入！您已获得新会员专属优惠券，下次到店出示即可使用",
-    "journey_profile_prompt":
-        "您好！完善个人信息（生日/口味偏好）后可享受专属推荐，点击填写",
-    "journey_first_visit_offer":
-        "专属首单优惠限时领取，到店下单立减 ¥30，有效期3天，欢迎光临",
-    "journey_menu_recommend":
-        "为您精选当季招牌菜，点击查看今日推荐",
-    "journey_first_order_coupon":
-        "首单专属折扣券已发放，7天内有效，欢迎携友到店体验",
-    "journey_seasonal_content":
-        "时隔许久，我们想念您了！近期新品上线，欢迎回来品鉴",
-    "journey_comeback_coupon":
-        "专属回归礼遇券已送达，凭此券到店享受85折优惠，期待再见",
-    "birthday_wish":
-        "生日快乐！感谢一路陪伴，您的专属生日礼包已准备好，到店出示即可兑换",
-    "anniversary_wish":
-        "感谢一年来的陪伴！您已是我们的老朋友，专属周年礼已送达，欢迎到店领取",
+    "journey_welcome": "欢迎加入！您已获得新会员专属优惠券，下次到店出示即可使用",
+    "journey_profile_prompt": "您好！完善个人信息（生日/口味偏好）后可享受专属推荐，点击填写",
+    "journey_first_visit_offer": "专属首单优惠限时领取，到店下单立减 ¥30，有效期3天，欢迎光临",
+    "journey_menu_recommend": "为您精选当季招牌菜，点击查看今日推荐",
+    "journey_first_order_coupon": "首单专属折扣券已发放，7天内有效，欢迎携友到店体验",
+    "journey_seasonal_content": "时隔许久，我们想念您了！近期新品上线，欢迎回来品鉴",
+    "journey_comeback_coupon": "专属回归礼遇券已送达，凭此券到店享受85折优惠，期待再见",
+    "birthday_wish": "生日快乐！感谢一路陪伴，您的专属生日礼包已准备好，到店出示即可兑换",
+    "anniversary_wish": "感谢一年来的陪伴！您已是我们的老朋友，专属周年礼已送达，欢迎到店领取",
 }
 
 _SYSTEM_PROMPT = """你是一位连锁餐饮品牌的私域运营专家，负责撰写发给顾客的企业微信消息。
@@ -146,6 +131,7 @@ _SYSTEM_PROMPT = """你是一位连锁餐饮品牌的私域运营专家，负责
 
 
 # ── 核心引擎 ──────────────────────────────────────────────────────────────────
+
 
 class JourneyNarrator:
     """
@@ -171,9 +157,10 @@ class JourneyNarrator:
             return None
         try:
             from src.core.llm import AnthropicClient, LLMModel
+
             self._llm = AnthropicClient(
                 api_key=api_key,
-                model=LLMModel.CLAUDE_HAIKU,   # 消息生成用 Haiku，快且省成本
+                model=LLMModel.CLAUDE_HAIKU,  # 消息生成用 Haiku，快且省成本
             )
             return self._llm
         except Exception as exc:
@@ -188,11 +175,7 @@ class JourneyNarrator:
         profile: MemberProfile,
     ) -> str:
         purpose = _TEMPLATE_PURPOSE.get(template_id, f"旅程步骤消息（{template_id}）")
-        recency_desc = (
-            f"{profile.recency_days}天未到店"
-            if profile.recency_days is not None
-            else "首次加入"
-        )
+        recency_desc = f"{profile.recency_days}天未到店" if profile.recency_days is not None else "首次加入"
         monetary_yuan = round((profile.monetary or 0) / 100)
 
         return (

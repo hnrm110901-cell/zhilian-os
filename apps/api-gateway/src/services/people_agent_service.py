@@ -10,21 +10,22 @@ PeopleAgent Service — 人力经营智能（Sprint 6）
 
 定位：老板的人力成本管控，店长的排班决策助手
 """
+
 import logging
-from datetime import datetime, timedelta, date
-from typing import Optional, List
+from datetime import date, datetime, timedelta
+from typing import List, Optional
 
-from sqlalchemy import select, func, and_, case, extract
+from sqlalchemy import and_, case, extract, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.models.order import Order
 from src.models.employee import Employee
+from src.models.order import Order
 from src.models.schedule import Schedule, Shift
 
 logger = logging.getLogger(__name__)
 
 
 # ── 纯函数 ──────────────────────────────────────────────────────
+
 
 def compute_labor_efficiency(
     revenue_yuan: float,
@@ -113,12 +114,15 @@ class PeopleAgentService:
         cutoff = datetime.utcnow() - timedelta(days=days)
 
         # 在职员工数
-        active_count = await db.scalar(
-            select(func.count(Employee.id)).where(
-                Employee.store_id == store_id,
-                Employee.is_active.is_(True),
+        active_count = (
+            await db.scalar(
+                select(func.count(Employee.id)).where(
+                    Employee.store_id == store_id,
+                    Employee.is_active.is_(True),
+                )
             )
-        ) or 0
+            or 0
+        )
 
         # 按岗位分布
         position_stmt = (
@@ -216,12 +220,14 @@ class PeopleAgentService:
         for row in result.all():
             orders = row[1] or 0
             rev = float(row[2] or 0)
-            performers.append({
-                "employee_id": row[0],
-                "order_count": orders,
-                "revenue_yuan": round(rev, 2),
-                "avg_ticket_yuan": round(rev / orders, 2) if orders > 0 else 0.0,
-            })
+            performers.append(
+                {
+                    "employee_id": row[0],
+                    "order_count": orders,
+                    "revenue_yuan": round(rev, 2),
+                    "avg_ticket_yuan": round(rev / orders, 2) if orders > 0 else 0.0,
+                }
+            )
         return performers
 
     async def get_staffing_gaps(
@@ -279,13 +285,15 @@ class PeopleAgentService:
             # 简单推荐：每15单需要1个服务员
             recommended = max(1, orders // 15)
             health = classify_staffing_health(staff, recommended)
-            gaps.append({
-                "date": ds,
-                "actual_staff": staff,
-                "order_count": orders,
-                "recommended_staff": recommended,
-                "staffing_health": health,
-            })
+            gaps.append(
+                {
+                    "date": ds,
+                    "actual_staff": staff,
+                    "order_count": orders,
+                    "recommended_staff": recommended,
+                    "staffing_health": health,
+                }
+            )
         return gaps
 
 

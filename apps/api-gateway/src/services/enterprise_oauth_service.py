@@ -3,18 +3,20 @@
 Enterprise OAuth Login Service
 支持企业微信、钉钉、飞书的OAuth 2.0登录
 """
-import os
-from typing import Dict, Any, Optional
+
 import inspect
+import os
+from datetime import datetime, timedelta
+from typing import Any, Dict, Optional
+
 import httpx
 import structlog
-from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.config import settings
 from ..core.database import get_db_session
-from ..models.user import User, UserRole
 from ..core.security import create_access_token, create_refresh_token, get_password_hash
+from ..models.user import User, UserRole
 from .auth_service import AuthService
 
 logger = structlog.get_logger()
@@ -22,14 +24,11 @@ logger = structlog.get_logger()
 
 class EnterpriseOAuthService:
     """企业OAuth登录服务"""
+
     def __init__(self) -> None:
         self.auth_service = AuthService()
 
-    async def wechat_work_oauth_login(
-        self,
-        code: str,
-        state: Optional[str] = None
-    ) -> Dict[str, Any]:
+    async def wechat_work_oauth_login(self, code: str, state: Optional[str] = None) -> Dict[str, Any]:
         """
         企业微信OAuth登录
 
@@ -50,7 +49,7 @@ class EnterpriseOAuthService:
                         "corpid": settings.WECHAT_CORP_ID,
                         "corpsecret": settings.WECHAT_CORP_SECRET,
                     },
-                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0")),
                 )
                 token_data = token_response.json()
 
@@ -67,7 +66,7 @@ class EnterpriseOAuthService:
                         "access_token": access_token,
                         "code": code,
                     },
-                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0")),
                 )
                 userinfo_data = userinfo_response.json()
 
@@ -84,7 +83,7 @@ class EnterpriseOAuthService:
                         "access_token": access_token,
                         "userid": userid,
                     },
-                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0")),
                 )
                 user_detail = user_detail_response.json()
 
@@ -129,18 +128,14 @@ class EnterpriseOAuthService:
                         "role": user.role,
                         "store_id": user.store_id,
                         "is_active": user.is_active,
-                    }
+                    },
                 }
 
         except Exception as e:
             logger.error("企业微信OAuth登录失败", error=str(e))
             raise
 
-    async def feishu_oauth_login(
-        self,
-        code: str,
-        state: Optional[str] = None
-    ) -> Dict[str, Any]:
+    async def feishu_oauth_login(self, code: str, state: Optional[str] = None) -> Dict[str, Any]:
         """
         飞书OAuth登录
 
@@ -161,7 +156,7 @@ class EnterpriseOAuthService:
                         "app_id": settings.FEISHU_APP_ID,
                         "app_secret": settings.FEISHU_APP_SECRET,
                     },
-                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0")),
                 )
                 token_data = token_response.json()
 
@@ -176,7 +171,7 @@ class EnterpriseOAuthService:
                     user_token_url,
                     json={"grant_type": "authorization_code", "code": code},
                     headers={"Authorization": f"Bearer {app_access_token}"},
-                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0")),
                 )
                 user_token_data = user_token_response.json()
 
@@ -190,7 +185,7 @@ class EnterpriseOAuthService:
                 userinfo_response = await client.get(
                     userinfo_url,
                     headers={"Authorization": f"Bearer {user_access_token}"},
-                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0")),
                 )
                 userinfo_data = userinfo_response.json()
 
@@ -235,18 +230,14 @@ class EnterpriseOAuthService:
                         "role": user.role,
                         "store_id": user.store_id,
                         "is_active": user.is_active,
-                    }
+                    },
                 }
 
         except Exception as e:
             logger.error("飞书OAuth登录失败", error=str(e))
             raise
 
-    async def dingtalk_oauth_login(
-        self,
-        auth_code: str,
-        state: Optional[str] = None
-    ) -> Dict[str, Any]:
+    async def dingtalk_oauth_login(self, auth_code: str, state: Optional[str] = None) -> Dict[str, Any]:
         """
         钉钉OAuth登录
 
@@ -267,7 +258,7 @@ class EnterpriseOAuthService:
                         "appkey": settings.DINGTALK_APP_KEY,
                         "appsecret": settings.DINGTALK_APP_SECRET,
                     },
-                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0")),
                 )
                 token_data = token_response.json()
 
@@ -282,7 +273,7 @@ class EnterpriseOAuthService:
                     userinfo_url,
                     params={"access_token": access_token},
                     json={"code": auth_code},
-                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0")),
                 )
                 userinfo_data = userinfo_response.json()
 
@@ -297,7 +288,7 @@ class EnterpriseOAuthService:
                     user_detail_url,
                     params={"access_token": access_token},
                     json={"userid": userid},
-                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0")),
                 )
                 user_detail = user_detail_response.json()
 
@@ -344,7 +335,7 @@ class EnterpriseOAuthService:
                         "role": user.role,
                         "store_id": user.store_id,
                         "is_active": user.is_active,
-                    }
+                    },
                 }
 
         except Exception as e:
@@ -421,11 +412,7 @@ class EnterpriseOAuthService:
         logger.info("创建新用户", username=username, role=role_str, provider=provider)
         return new_user
 
-    def _determine_role(
-        self,
-        position: Optional[str],
-        department: Optional[Any]
-    ) -> str:
+    def _determine_role(self, position: Optional[str], department: Optional[Any]) -> str:
         """
         根据职位和部门确定用户角色
 

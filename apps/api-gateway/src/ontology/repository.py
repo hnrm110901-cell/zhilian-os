@@ -1,6 +1,7 @@
 """
 OntologyRepository：封装 Neo4j Cypher 访问，提供本体 CRUD 与图遍历
 """
+
 from __future__ import annotations
 
 import uuid
@@ -10,7 +11,7 @@ from typing import Any, Dict, List, Optional
 import structlog
 from neo4j import GraphDatabase
 
-from .schema import NodeLabel, RelType, NODE_ID_PROP, ExtensionNodeLabel, EXTENSION_ID_PROP
+from .schema import EXTENSION_ID_PROP, NODE_ID_PROP, ExtensionNodeLabel, NodeLabel, RelType
 
 logger = structlog.get_logger()
 
@@ -32,9 +33,7 @@ class OntologyRepository:
     @property
     def driver(self):
         if self._driver is None:
-            self._driver = GraphDatabase.driver(
-                self._uri, auth=(self._user, self._password)
-            )
+            self._driver = GraphDatabase.driver(self._uri, auth=(self._user, self._password))
         return self._driver
 
     @contextmanager
@@ -47,7 +46,8 @@ class OntologyRepository:
 
     def init_schema(self, tenant_id: str) -> None:
         """创建约束与索引（幂等）。tenant_id 用于多租户命名空间（可选）。含徐记扩展约束。"""
-        from .cypher_schema import constraints_cypher, indexes_cypher, extension_constraints_cypher
+        from .cypher_schema import constraints_cypher, extension_constraints_cypher, indexes_cypher
+
         with self.session() as session:
             for cypher in constraints_cypher():
                 try:
@@ -81,10 +81,7 @@ class OntologyRepository:
         if tenant_id is not None:
             props["tenant_id"] = tenant_id
         with self.session() as session:
-            cypher = (
-                f"MERGE (n:{label} {{ {id_prop}: $id_value }}) "
-                "SET n += $props RETURN n"
-            )
+            cypher = f"MERGE (n:{label} {{ {id_prop}: $id_value }}) " "SET n += $props RETURN n"
             result = session.run(
                 cypher,
                 id_value=id_value,
@@ -162,9 +159,13 @@ class OntologyRepository:
             tenant_id=tenant_id,
         )
         self.merge_relation(
-            NodeLabel.Dish.value, "dish_id", dish_id,
+            NodeLabel.Dish.value,
+            "dish_id",
+            dish_id,
             RelType.HAS_BOM.value,
-            NodeLabel.BOM.value, "bom_id", bom_id,
+            NodeLabel.BOM.value,
+            "bom_id",
+            bom_id,
             {"version": version},
         )
         return bom_id
@@ -181,9 +182,13 @@ class OntologyRepository:
         waste_factor: 损耗系数（默认 1.0；1.05 = 额外备 5%）。
         """
         self.merge_relation(
-            NodeLabel.BOM.value, "bom_id", bom_id,
+            NodeLabel.BOM.value,
+            "bom_id",
+            bom_id,
             RelType.REQUIRES.value,
-            NodeLabel.Ingredient.value, "ing_id", ing_id,
+            NodeLabel.Ingredient.value,
+            "ing_id",
+            ing_id,
             {"qty": qty, "unit": unit, "waste_factor": waste_factor},
         )
 
@@ -192,6 +197,7 @@ class OntologyRepository:
         无 BOM 关联时返回环境变量 INVENTORY_DEFAULT_WASTE_FACTOR（默认 1.05）。
         """
         import os
+
         try:
             with self.session() as session:
                 result = session.run(
@@ -238,9 +244,13 @@ class OntologyRepository:
             tenant_id=tenant_id,
         )
         self.merge_relation(
-            NodeLabel.InventorySnapshot.value, "snapshot_id", snapshot_id,
+            NodeLabel.InventorySnapshot.value,
+            "snapshot_id",
+            snapshot_id,
             RelType.LOCATED_AT.value,
-            NodeLabel.Ingredient.value, "ing_id", ing_id,
+            NodeLabel.Ingredient.value,
+            "ing_id",
+            ing_id,
             {},
         )
         return snapshot_id
@@ -262,10 +272,26 @@ class OntologyRepository:
             ExtensionNodeLabel.LiveSeafood.value,
             EXTENSION_ID_PROP[ExtensionNodeLabel.LiveSeafood.value],
             live_seafood_id,
-            {"store_id": store_id, "species": species, "weight_kg": weight_kg, "price_cents": price_cents, "pool_time": pool_time, "mortality_rate": mortality_rate},
+            {
+                "store_id": store_id,
+                "species": species,
+                "weight_kg": weight_kg,
+                "price_cents": price_cents,
+                "pool_time": pool_time,
+                "mortality_rate": mortality_rate,
+            },
             tenant_id=tenant_id,
         )
-        self.merge_relation(ExtensionNodeLabel.LiveSeafood.value, "live_seafood_id", live_seafood_id, RelType.BELONGS_TO.value, NodeLabel.Store.value, "store_id", store_id, {})
+        self.merge_relation(
+            ExtensionNodeLabel.LiveSeafood.value,
+            "live_seafood_id",
+            live_seafood_id,
+            RelType.BELONGS_TO.value,
+            NodeLabel.Store.value,
+            "store_id",
+            store_id,
+            {},
+        )
 
     def merge_seafood_pool(
         self,
@@ -282,10 +308,25 @@ class OntologyRepository:
             ExtensionNodeLabel.SeafoodPool.value,
             EXTENSION_ID_PROP[ExtensionNodeLabel.SeafoodPool.value],
             pool_id,
-            {"store_id": store_id, "capacity": capacity, "temperature": temperature, "salinity": salinity, "equipment_status": equipment_status},
+            {
+                "store_id": store_id,
+                "capacity": capacity,
+                "temperature": temperature,
+                "salinity": salinity,
+                "equipment_status": equipment_status,
+            },
             tenant_id=tenant_id,
         )
-        self.merge_relation(ExtensionNodeLabel.SeafoodPool.value, "pool_id", pool_id, RelType.BELONGS_TO.value, NodeLabel.Store.value, "store_id", store_id, {})
+        self.merge_relation(
+            ExtensionNodeLabel.SeafoodPool.value,
+            "pool_id",
+            pool_id,
+            RelType.BELONGS_TO.value,
+            NodeLabel.Store.value,
+            "store_id",
+            store_id,
+            {},
+        )
 
     def merge_portion_weight(
         self,
@@ -303,13 +344,38 @@ class OntologyRepository:
             ExtensionNodeLabel.PortionWeight.value,
             EXTENSION_ID_PROP[ExtensionNodeLabel.PortionWeight.value],
             portion_id,
-            {"store_id": store_id, "dish_id": dish_id, "actual_g": actual_g, "standard_g": standard_g, "staff_id": staff_id, "ts": ts},
+            {
+                "store_id": store_id,
+                "dish_id": dish_id,
+                "actual_g": actual_g,
+                "standard_g": standard_g,
+                "staff_id": staff_id,
+                "ts": ts,
+            },
             tenant_id=tenant_id,
         )
         if dish_id:
-            self.merge_relation(ExtensionNodeLabel.PortionWeight.value, "portion_id", portion_id, RelType.LOCATED_AT.value, NodeLabel.Dish.value, "dish_id", dish_id, {})
+            self.merge_relation(
+                ExtensionNodeLabel.PortionWeight.value,
+                "portion_id",
+                portion_id,
+                RelType.LOCATED_AT.value,
+                NodeLabel.Dish.value,
+                "dish_id",
+                dish_id,
+                {},
+            )
         if staff_id:
-            self.merge_relation(ExtensionNodeLabel.PortionWeight.value, "portion_id", portion_id, RelType.TRIGGERED_BY.value, NodeLabel.Staff.value, "staff_id", staff_id, {})
+            self.merge_relation(
+                ExtensionNodeLabel.PortionWeight.value,
+                "portion_id",
+                portion_id,
+                RelType.TRIGGERED_BY.value,
+                NodeLabel.Staff.value,
+                "staff_id",
+                staff_id,
+                {},
+            )
 
     def merge_purchase_invoice(
         self,
@@ -327,10 +393,26 @@ class OntologyRepository:
             ExtensionNodeLabel.PurchaseInvoice.value,
             EXTENSION_ID_PROP[ExtensionNodeLabel.PurchaseInvoice.value],
             invoice_id,
-            {"store_id": store_id, "supplier_id": supplier_id, "batch": batch, "price_cents": price_cents, "receiver_staff_id": receiver_staff_id, "ts": ts},
+            {
+                "store_id": store_id,
+                "supplier_id": supplier_id,
+                "batch": batch,
+                "price_cents": price_cents,
+                "receiver_staff_id": receiver_staff_id,
+                "ts": ts,
+            },
             tenant_id=tenant_id,
         )
-        self.merge_relation(ExtensionNodeLabel.PurchaseInvoice.value, "invoice_id", invoice_id, RelType.BELONGS_TO.value, NodeLabel.Store.value, "store_id", store_id, {})
+        self.merge_relation(
+            ExtensionNodeLabel.PurchaseInvoice.value,
+            "invoice_id",
+            invoice_id,
+            RelType.BELONGS_TO.value,
+            NodeLabel.Store.value,
+            "store_id",
+            store_id,
+            {},
+        )
 
     def merge_waste_event(
         self,
@@ -348,11 +430,26 @@ class OntologyRepository:
             NodeLabel.WasteEvent.value,
             "event_id",
             event_id,
-            {"store_id": store_id, "type": event_type, "amount": amount, "root_cause": root_cause or "", "tenant_id": tenant_id or ""},
+            {
+                "store_id": store_id,
+                "type": event_type,
+                "amount": amount,
+                "root_cause": root_cause or "",
+                "tenant_id": tenant_id or "",
+            },
             tenant_id=tenant_id,
         )
         if staff_id:
-            self.merge_relation(NodeLabel.WasteEvent.value, "event_id", event_id, RelType.TRIGGERED_BY.value, NodeLabel.Staff.value, "staff_id", staff_id, {})
+            self.merge_relation(
+                NodeLabel.WasteEvent.value,
+                "event_id",
+                event_id,
+                RelType.TRIGGERED_BY.value,
+                NodeLabel.Staff.value,
+                "staff_id",
+                staff_id,
+                {},
+            )
 
     def merge_equipment(
         self,
@@ -377,9 +474,13 @@ class OntologyRepository:
             tenant_id=tenant_id,
         )
         self.merge_relation(
-            NodeLabel.Equipment.value, "equip_id", equip_id,
+            NodeLabel.Equipment.value,
+            "equip_id",
+            equip_id,
             RelType.BELONGS_TO.value,
-            NodeLabel.Store.value, "store_id", store_id,
+            NodeLabel.Store.value,
+            "store_id",
+            store_id,
         )
         return out
 
@@ -447,9 +548,7 @@ class OntologyRepository:
             )
             return [dict(record) for record in result]
 
-    def get_dish_bom_ingredients_as_of(
-        self, dish_id: str, as_of_date: str
-    ) -> List[Dict[str, Any]]:
+    def get_dish_bom_ingredients_as_of(self, dish_id: str, as_of_date: str) -> List[Dict[str, Any]]:
         """时间旅行：按 as_of 日期查询当时生效的 BOM 及用料。as_of_date 格式 YYYY-MM-DD。"""
         with self.session() as session:
             result = session.run(
@@ -560,7 +659,13 @@ class OntologyRepository:
         counts: Dict[str, int] = {}
         with self.session() as session:
             if store_ids:
-                for label, id_prop in [("InventorySnapshot", "snapshot_id"), ("BOM", "bom_id"), ("Dish", "dish_id"), ("Ingredient", "ing_id"), ("Store", "store_id")]:
+                for label, id_prop in [
+                    ("InventorySnapshot", "snapshot_id"),
+                    ("BOM", "bom_id"),
+                    ("Dish", "dish_id"),
+                    ("Ingredient", "ing_id"),
+                    ("Store", "store_id"),
+                ]:
                     q = f"MATCH (n:{label}) WHERE n.{id_prop} IS NOT NULL AND n.store_id IN $store_ids DETACH DELETE n"
                     try:
                         r = session.run(q, store_ids=store_ids)
@@ -622,9 +727,13 @@ class OntologyRepository:
     ) -> None:
         """建立 (Staff)-[:COMPLETED_TRAINING {score, completed_at}]->(TrainingModule)。"""
         self.merge_relation(
-            NodeLabel.Staff.value, "staff_id", staff_id,
+            NodeLabel.Staff.value,
+            "staff_id",
+            staff_id,
             RelType.COMPLETED_TRAINING.value,
-            NodeLabel.TrainingModule.value, "module_id", module_id,
+            NodeLabel.TrainingModule.value,
+            "module_id",
+            module_id,
             {"score": score, "completed_at": completed_at},
         )
 
@@ -638,9 +747,13 @@ class OntologyRepository:
     ) -> None:
         """建立 (Staff)-[:NEEDS_TRAINING {waste_event_id, urgency, deadline}]->(TrainingModule)。"""
         self.merge_relation(
-            NodeLabel.Staff.value, "staff_id", staff_id,
+            NodeLabel.Staff.value,
+            "staff_id",
+            staff_id,
             RelType.NEEDS_TRAINING.value,
-            NodeLabel.TrainingModule.value, "module_id", module_id,
+            NodeLabel.TrainingModule.value,
+            "module_id",
+            module_id,
             {
                 "waste_event_id": waste_event_id,
                 "urgency": urgency,
@@ -692,6 +805,7 @@ class OntologyRepository:
     ) -> None:
         """建立 (Store)-[:SIMILAR_TO {score, reason}]->(Store) 双向关系（幂等）。"""
         from datetime import datetime as _dt
+
         now = _dt.utcnow().isoformat()
         with self.session() as session:
             session.run(

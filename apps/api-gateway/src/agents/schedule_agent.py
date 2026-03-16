@@ -1,13 +1,15 @@
 """
 ScheduleAgent - 排班优化Agent (Claude Tool Use 增强)
 """
-from typing import Dict, Any, List, Optional
+
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 import structlog
 
-from .llm_agent import LLMEnhancedAgent, AgentResult
+from ..core.monitoring import ErrorCategory, ErrorSeverity, error_monitor
 from ..services.decision_validator import DecisionValidator, ValidationResult
-from ..core.monitoring import error_monitor, ErrorSeverity, ErrorCategory
+from .llm_agent import AgentResult, LLMEnhancedAgent
 
 logger = structlog.get_logger()
 
@@ -39,7 +41,7 @@ class ScheduleAgent(LLMEnhancedAgent):
         date: str,
         current_staff_count: int,
         expected_customer_flow: Optional[int] = None,
-        validation_context: Optional[Dict] = None
+        validation_context: Optional[Dict] = None,
     ) -> AgentResult:
         """
         优化排班
@@ -64,17 +66,17 @@ class ScheduleAgent(LLMEnhancedAgent):
             )
 
             logger.info(
-                "Optimizing schedule with Tool Use",
-                store_id=store_id,
-                date=date,
-                current_staff_count=current_staff_count
+                "Optimizing schedule with Tool Use", store_id=store_id, date=date, current_staff_count=current_staff_count
             )
 
             result = await self.execute_with_tools(
                 user_message=user_message,
                 store_id=store_id,
-                context={"date": date, "current_staff_count": current_staff_count,
-                         "expected_customer_flow": expected_customer_flow}
+                context={
+                    "date": date,
+                    "current_staff_count": current_staff_count,
+                    "expected_customer_flow": expected_customer_flow,
+                },
             )
 
             if not result.success:
@@ -82,14 +84,9 @@ class ScheduleAgent(LLMEnhancedAgent):
 
             # 合规性校验（人力成本预算）
             if validation_context:
-                decision = {
-                    "action": "schedule_optimization",
-                    **validation_context.get("decision_overrides", {})
-                }
+                decision = {"action": "schedule_optimization", **validation_context.get("decision_overrides", {})}
                 validation = await self.validator.validate_decision(
-                    decision=decision,
-                    context=validation_context,
-                    rules_to_apply=["budget_check"]
+                    decision=decision, context=validation_context, rules_to_apply=["budget_check"]
                 )
 
                 if validation["result"] == ValidationResult.REJECTED.value:
@@ -117,9 +114,12 @@ class ScheduleAgent(LLMEnhancedAgent):
                     message="排班优化完成" + ("（含合规警告）" if has_warning else ""),
                     reasoning=result.reasoning,
                     confidence=result.confidence,
-                    source_data={"store_id": store_id, "date": date,
-                                 "current_staff_count": current_staff_count,
-                                 "validation": validation},
+                    source_data={
+                        "store_id": store_id,
+                        "date": date,
+                        "current_staff_count": current_staff_count,
+                        "validation": validation,
+                    },
                 )
 
             return self.format_response(
@@ -135,8 +135,7 @@ class ScheduleAgent(LLMEnhancedAgent):
                 message="排班优化完成",
                 reasoning=result.reasoning,
                 confidence=result.confidence,
-                source_data={"store_id": store_id, "date": date,
-                             "current_staff_count": current_staff_count},
+                source_data={"store_id": store_id, "date": date, "current_staff_count": current_staff_count},
             )
 
         except Exception as e:
@@ -146,19 +145,18 @@ class ScheduleAgent(LLMEnhancedAgent):
                 severity=ErrorSeverity.ERROR,
                 category=ErrorCategory.AGENT,
                 exception=e,
-                context={"store_id": store_id, "date": date}
+                context={"store_id": store_id, "date": date},
             )
             return self.format_response(
-                success=False, data=None, message=f"优化失败: {str(e)}",
-                reasoning=f"优化过程中发生异常: {str(e)}", confidence=0.0,
+                success=False,
+                data=None,
+                message=f"优化失败: {str(e)}",
+                reasoning=f"优化过程中发生异常: {str(e)}",
+                confidence=0.0,
                 source_data={"store_id": store_id},
             )
 
-    async def predict_staffing_needs(
-        self,
-        store_id: str,
-        date_range: str = "7d"
-    ) -> AgentResult:
+    async def predict_staffing_needs(self, store_id: str, date_range: str = "7d") -> AgentResult:
         """预测人力需求"""
         try:
             user_message = (
@@ -167,13 +165,10 @@ class ScheduleAgent(LLMEnhancedAgent):
                 f"给出每日建议人数、高峰时段配置和弹性调整建议。"
             )
 
-            logger.info("Predicting staffing needs with Tool Use",
-                        store_id=store_id, date_range=date_range)
+            logger.info("Predicting staffing needs with Tool Use", store_id=store_id, date_range=date_range)
 
             result = await self.execute_with_tools(
-                user_message=user_message,
-                store_id=store_id,
-                context={"date_range": date_range}
+                user_message=user_message, store_id=store_id, context={"date_range": date_range}
             )
 
             if not result.success:
@@ -196,16 +191,15 @@ class ScheduleAgent(LLMEnhancedAgent):
         except Exception as e:
             logger.error("Staffing needs prediction failed", store_id=store_id, error=str(e), exc_info=e)
             return self.format_response(
-                success=False, data=None, message=f"预测失败: {str(e)}",
-                reasoning=f"预测过程中发生异常: {str(e)}", confidence=0.0,
+                success=False,
+                data=None,
+                message=f"预测失败: {str(e)}",
+                reasoning=f"预测过程中发生异常: {str(e)}",
+                confidence=0.0,
                 source_data={"store_id": store_id},
             )
 
-    async def analyze_shift_efficiency(
-        self,
-        store_id: str,
-        shift_id: str
-    ) -> AgentResult:
+    async def analyze_shift_efficiency(self, store_id: str, shift_id: str) -> AgentResult:
         """分析班次效率"""
         try:
             user_message = (
@@ -214,13 +208,10 @@ class ScheduleAgent(LLMEnhancedAgent):
                 f"客户满意度和员工工作负荷，给出效率评估、改进建议和最佳实践参考。"
             )
 
-            logger.info("Analyzing shift efficiency with Tool Use",
-                        store_id=store_id, shift_id=shift_id)
+            logger.info("Analyzing shift efficiency with Tool Use", store_id=store_id, shift_id=shift_id)
 
             result = await self.execute_with_tools(
-                user_message=user_message,
-                store_id=store_id,
-                context={"shift_id": shift_id}
+                user_message=user_message, store_id=store_id, context={"shift_id": shift_id}
             )
 
             if not result.success:
@@ -243,17 +234,15 @@ class ScheduleAgent(LLMEnhancedAgent):
         except Exception as e:
             logger.error("Shift efficiency analysis failed", store_id=store_id, error=str(e), exc_info=e)
             return self.format_response(
-                success=False, data=None, message=f"分析失败: {str(e)}",
-                reasoning=f"分析过程中发生异常: {str(e)}", confidence=0.0,
+                success=False,
+                data=None,
+                message=f"分析失败: {str(e)}",
+                reasoning=f"分析过程中发生异常: {str(e)}",
+                confidence=0.0,
                 source_data={"store_id": store_id},
             )
 
-    async def balance_workload(
-        self,
-        store_id: str,
-        staff_ids: List[str],
-        time_period: str = "week"
-    ) -> AgentResult:
+    async def balance_workload(self, store_id: str, staff_ids: List[str], time_period: str = "week") -> AgentResult:
         """平衡员工工作量"""
         try:
             user_message = (
@@ -263,13 +252,12 @@ class ScheduleAgent(LLMEnhancedAgent):
                 f"识别过载和空闲员工，考虑技能和偏好，给出公平的调整建议和预期效果。"
             )
 
-            logger.info("Balancing workload with Tool Use",
-                        store_id=store_id, staff_count=len(staff_ids), time_period=time_period)
+            logger.info(
+                "Balancing workload with Tool Use", store_id=store_id, staff_count=len(staff_ids), time_period=time_period
+            )
 
             result = await self.execute_with_tools(
-                user_message=user_message,
-                store_id=store_id,
-                context={"staff_ids": staff_ids, "time_period": time_period}
+                user_message=user_message, store_id=store_id, context={"staff_ids": staff_ids, "time_period": time_period}
             )
 
             if not result.success:
@@ -287,14 +275,16 @@ class ScheduleAgent(LLMEnhancedAgent):
                 message="工作量平衡完成",
                 reasoning=result.reasoning,
                 confidence=result.confidence,
-                source_data={"store_id": store_id, "staff_count": len(staff_ids),
-                             "time_period": time_period},
+                source_data={"store_id": store_id, "staff_count": len(staff_ids), "time_period": time_period},
             )
 
         except Exception as e:
             logger.error("Workload balancing failed", store_id=store_id, error=str(e), exc_info=e)
             return self.format_response(
-                success=False, data=None, message=f"平衡失败: {str(e)}",
-                reasoning=f"平衡过程中发生异常: {str(e)}", confidence=0.0,
+                success=False,
+                data=None,
+                message=f"平衡失败: {str(e)}",
+                reasoning=f"平衡过程中发生异常: {str(e)}",
+                confidence=0.0,
                 source_data={"store_id": store_id},
             )

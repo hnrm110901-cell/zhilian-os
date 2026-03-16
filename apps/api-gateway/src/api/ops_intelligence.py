@@ -16,12 +16,12 @@ Ops Intelligence API — Sprint 5
     GET  /store/scorecard       — 门店经营记分卡
     GET  /store/ranking         — 跨门店排名
 """
+
 import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.core.dependencies import get_current_user
 
@@ -32,6 +32,7 @@ router = APIRouter(prefix="/api/v1/cdp/ops", tags=["CDP-Ops"])
 
 # ── CostAgent ─────────────────────────────────────────────────────
 
+
 @router.get("/cost/dashboard")
 async def get_cost_dashboard(
     store_id: str = Query(...),
@@ -41,6 +42,7 @@ async def get_cost_dashboard(
 ):
     """成本综合仪表盘（食材成本率 + 损耗率 + 优化空间¥）"""
     from src.services.cost_agent_service import cost_agent_service
+
     return await cost_agent_service.get_cost_dashboard(db, store_id, days=days)
 
 
@@ -53,6 +55,7 @@ async def get_cost_categories(
 ):
     """品类成本结构"""
     from src.services.cost_agent_service import cost_agent_service
+
     return await cost_agent_service.get_cost_by_category(db, store_id, days=days)
 
 
@@ -65,10 +68,12 @@ async def get_cost_waste(
 ):
     """损耗类型分析"""
     from src.services.cost_agent_service import cost_agent_service
+
     return await cost_agent_service.get_waste_analysis(db, store_id, days=days)
 
 
 # ── KitchenAgent ──────────────────────────────────────────────────
+
 
 @router.get("/kitchen/dashboard")
 async def get_kitchen_dashboard(
@@ -79,6 +84,7 @@ async def get_kitchen_dashboard(
 ):
     """后厨综合仪表盘（出品速度 + 退菜率 + 效率评级）"""
     from src.services.kitchen_agent_service import kitchen_agent_service
+
     return await kitchen_agent_service.get_kitchen_dashboard(db, store_id, days=days)
 
 
@@ -92,6 +98,7 @@ async def get_dish_speed(
 ):
     """菜品出品速度排名"""
     from src.services.kitchen_agent_service import kitchen_agent_service
+
     return await kitchen_agent_service.get_dish_production_speed(db, store_id, days=days, limit=limit)
 
 
@@ -104,10 +111,12 @@ async def get_waste_types(
 ):
     """损耗类型分布"""
     from src.services.kitchen_agent_service import kitchen_agent_service
+
     return await kitchen_agent_service.get_waste_by_type(db, store_id, days=days)
 
 
 # ── StoreAgent ────────────────────────────────────────────────────
+
 
 @router.get("/store/scorecard")
 async def get_store_scorecard(
@@ -118,6 +127,7 @@ async def get_store_scorecard(
 ):
     """门店经营记分卡（5维度评分 + Top3建议）"""
     from src.services.store_agent_service import store_agent_service
+
     return await store_agent_service.get_store_scorecard(db, store_id, days=days)
 
 
@@ -130,5 +140,6 @@ async def get_store_ranking(
 ):
     """跨门店排名"""
     from src.services.store_agent_service import store_agent_service
+
     ids = store_ids.split(",") if store_ids else None
     return await store_agent_service.get_cross_store_ranking(db, store_ids=ids, days=days)

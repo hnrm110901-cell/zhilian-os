@@ -10,6 +10,7 @@
   discontinue    — 低效菜品建议下架
   bundle         — 问题菜纳入套餐捆绑提升曝光
 """
+
 from __future__ import annotations
 
 import logging
@@ -22,53 +23,54 @@ from sqlalchemy.ext.asyncio import AsyncSession
 logger = logging.getLogger(__name__)
 
 # ── 常量 ──────────────────────────────────────────────────────────────────────
-REC_TYPES = ['price_increase', 'cost_reduction', 'promote', 'discontinue', 'bundle']
+REC_TYPES = ["price_increase", "cost_reduction", "promote", "discontinue", "bundle"]
 
 REC_LABELS: dict[str, str] = {
-    'price_increase': '提价空间',
-    'cost_reduction': '降本优化',
-    'promote':        '推广增量',
-    'discontinue':    '建议下架',
-    'bundle':         '套餐捆绑',
+    "price_increase": "提价空间",
+    "cost_reduction": "降本优化",
+    "promote": "推广增量",
+    "discontinue": "建议下架",
+    "bundle": "套餐捆绑",
 }
 
 REC_TITLES: dict[str, str] = {
-    'price_increase': '明星菜品具备提价空间',
-    'cost_reduction': '食材成本率偏高需优化',
-    'promote':        '高毛利菜品需加强推广',
-    'discontinue':    '低效菜品建议下架',
-    'bundle':         '建议纳入套餐提升曝光',
+    "price_increase": "明星菜品具备提价空间",
+    "cost_reduction": "食材成本率偏高需优化",
+    "promote": "高毛利菜品需加强推广",
+    "discontinue": "低效菜品建议下架",
+    "bundle": "建议纳入套餐提升曝光",
 }
 
 REC_ACTIONS: dict[str, str] = {
-    'price_increase': '建议小幅上调定价5-10%，同步监控复购率与客诉',
-    'cost_reduction': '审查BOM配方与采购单价，与供应商重新谈判',
-    'promote':        '在菜单黄金区域重点展示，搭配限时折扣或套餐推荐',
-    'discontinue':    '本期末下架此菜，备料预算转移至明星菜',
-    'bundle':         '将此菜纳入套餐组合，利用明星菜带动曝光',
+    "price_increase": "建议小幅上调定价5-10%，同步监控复购率与客诉",
+    "cost_reduction": "审查BOM配方与采购单价，与供应商重新谈判",
+    "promote": "在菜单黄金区域重点展示，搭配限时折扣或套餐推荐",
+    "discontinue": "本期末下架此菜，备料预算转移至明星菜",
+    "bundle": "将此菜纳入套餐组合，利用明星菜带动曝光",
 }
 
 # 提价参数
-PRICE_INCREASE_MIN_GPM    = 60.0   # 毛利率 ≥ 60% 才建议提价
-PRICE_INCREASE_LIFT_PCT   = 7.0    # 建议提价幅度 %
-PRICE_DEMAND_RETENTION    = 0.92   # 提价后保留的需求比例
+PRICE_INCREASE_MIN_GPM = 60.0  # 毛利率 ≥ 60% 才建议提价
+PRICE_INCREASE_LIFT_PCT = 7.0  # 建议提价幅度 %
+PRICE_DEMAND_RETENTION = 0.92  # 提价后保留的需求比例
 
 # 降本参数
 COST_REDUCTION_FCR_THRESHOLD = 38.0  # 食材成本率 > 38% 触发降本建议
-COST_REDUCTION_TARGET_FCR    = 35.0  # 目标食材成本率 %
+COST_REDUCTION_TARGET_FCR = 35.0  # 目标食材成本率 %
 
 # 推广参数
-PROMOTE_LIFT_PCT = 30.0   # 推广后预期销量提升 %
-BUNDLE_LIFT_PCT  = 20.0   # 套餐捆绑后预期销量提升 %
+PROMOTE_LIFT_PCT = 30.0  # 推广后预期销量提升 %
+BUNDLE_LIFT_PCT = 20.0  # 套餐捆绑后预期销量提升 %
 
 # 下架参数（同时满足两条件才触发）
-DISCONTINUE_MAX_ORDERS = 15    # 月销量 ≤ N 单
-DISCONTINUE_MAX_GPM    = 30.0  # 毛利率 ≤ 30%
+DISCONTINUE_MAX_ORDERS = 15  # 月销量 ≤ N 单
+DISCONTINUE_MAX_GPM = 30.0  # 毛利率 ≤ 30%
 
 # 优先级打分
-PROFIT_IMPACT_DIVISOR = 500.0   # ¥500 = 1 影响分
+PROFIT_IMPACT_DIVISOR = 500.0  # ¥500 = 1 影响分
 
 # ── 纯函数 ────────────────────────────────────────────────────────────────────
+
 
 def compute_price_increase_impact(
     avg_selling_price: float,
@@ -83,15 +85,15 @@ def compute_price_increase_impact(
     """
     if avg_selling_price <= 0 or order_count <= 0:
         return {"revenue_delta": 0.0, "profit_delta": 0.0, "new_price": avg_selling_price}
-    new_price   = avg_selling_price * (1 + lift_pct / 100)
-    new_orders  = order_count * demand_retention
+    new_price = avg_selling_price * (1 + lift_pct / 100)
+    new_orders = order_count * demand_retention
     revenue_delta = new_price * new_orders - avg_selling_price * order_count
     # 利润增量 = 单位提价额 × 留存订单数（变动成本不变）
-    profit_delta  = avg_selling_price * (lift_pct / 100) * new_orders
+    profit_delta = avg_selling_price * (lift_pct / 100) * new_orders
     return {
         "revenue_delta": round(revenue_delta, 2),
-        "profit_delta":  round(profit_delta,  2),
-        "new_price":     round(new_price,     2),
+        "profit_delta": round(profit_delta, 2),
+        "new_price": round(new_price, 2),
     }
 
 
@@ -116,13 +118,13 @@ def compute_promote_impact(
     """推广使销量提升 lift_pct% 带来的¥利润增量。"""
     if order_count <= 0 or avg_selling_price <= 0:
         return {"order_delta": 0, "revenue_delta": 0.0, "profit_delta": 0.0}
-    extra_orders  = order_count * lift_pct / 100.0
+    extra_orders = order_count * lift_pct / 100.0
     revenue_delta = extra_orders * avg_selling_price
-    profit_delta  = revenue_delta * gross_profit_margin / 100.0
+    profit_delta = revenue_delta * gross_profit_margin / 100.0
     return {
-        "order_delta":   round(extra_orders),
+        "order_delta": round(extra_orders),
         "revenue_delta": round(revenue_delta, 2),
-        "profit_delta":  round(profit_delta,  2),
+        "profit_delta": round(profit_delta, 2),
     }
 
 
@@ -136,12 +138,12 @@ def compute_discontinue_impact(
     损失：该菜品当前毛利（若为负则 0）
     """
     kitchen_savings = 300.0
-    lost_profit     = max(0.0, gross_profit_yuan)
-    profit_delta    = kitchen_savings - lost_profit
+    lost_profit = max(0.0, gross_profit_yuan)
+    profit_delta = kitchen_savings - lost_profit
     return {
         "kitchen_savings": kitchen_savings,
-        "lost_profit":     round(lost_profit,  2),
-        "profit_delta":    round(profit_delta, 2),
+        "lost_profit": round(lost_profit, 2),
+        "profit_delta": round(profit_delta, 2),
     }
 
 
@@ -162,7 +164,7 @@ def compute_priority_score(
 ) -> float:
     """优先级评分 0-100。¥影响越大、置信度越高 → 分越高。"""
     impact_score = min(50.0, abs(profit_impact_yuan) / PROFIT_IMPACT_DIVISOR)
-    conf_score   = min(50.0, confidence_pct * 0.5)
+    conf_score = min(50.0, confidence_pct * 0.5)
     return min(100.0, round(impact_score + conf_score, 1))
 
 
@@ -184,28 +186,26 @@ def generate_rec_description(
 ) -> str:
     """生成不超过 200 字的建议描述。"""
     desc_map = {
-        'price_increase': (
+        "price_increase": (
             f"{dish_name}属明星菜（人气+毛利双高），毛利率{current_gpm:.1f}%，"
             f"食材成本率{current_fcr:.1f}%，适度提价{PRICE_INCREASE_LIFT_PCT:.0f}%"
             f"预计增利¥{profit_impact:.0f}"
         ),
-        'cost_reduction': (
+        "cost_reduction": (
             f"{dish_name}食材成本率{current_fcr:.1f}%偏高，"
             f"通过优化BOM或供应商价格降至{COST_REDUCTION_TARGET_FCR:.0f}%，"
             f"预计增利¥{profit_impact:.0f}"
         ),
-        'promote': (
+        "promote": (
             f"{dish_name}毛利率{current_gpm:.1f}%优秀但月销仅{order_count}次，"
             f"加强推广预计增销{int(order_count * PROMOTE_LIFT_PCT / 100)}次，"
             f"增利¥{profit_impact:.0f}"
         ),
-        'discontinue': (
-            f"{dish_name}月销{order_count}次、毛利率{current_gpm:.1f}%，"
-            f"下架可释放厨房产能，净增效¥{profit_impact:.0f}"
+        "discontinue": (
+            f"{dish_name}月销{order_count}次、毛利率{current_gpm:.1f}%，" f"下架可释放厨房产能，净增效¥{profit_impact:.0f}"
         ),
-        'bundle': (
-            f"{dish_name}毛利率{current_gpm:.1f}%高但月销仅{order_count}次，"
-            f"纳入套餐组合预计增利¥{profit_impact:.0f}"
+        "bundle": (
+            f"{dish_name}毛利率{current_gpm:.1f}%高但月销仅{order_count}次，" f"纳入套餐组合预计增利¥{profit_impact:.0f}"
         ),
     }
     return desc_map.get(rec_type, f"{dish_name}优化建议")[:200]
@@ -221,30 +221,27 @@ def build_dish_recommendations(dish: dict) -> list[dict]:
       dog           → discontinue（若达到下架条件）或 cost_reduction / promote
     """
     quadrant = dish.get("bcg_quadrant", "dog")
-    fcr      = float(dish.get("food_cost_rate",      0.0) or 0.0)
-    gpm      = float(dish.get("gross_profit_margin", 0.0) or 0.0)
-    cnt      = int(dish.get("order_count",            0)  or 0)
-    price    = float(dish.get("avg_selling_price",    0.0) or 0.0)
-    revenue  = float(dish.get("revenue_yuan",         0.0) or 0.0)
-    profit   = float(dish.get("gross_profit_yuan",    0.0) or 0.0)
-    name     = dish.get("dish_name", "")
+    fcr = float(dish.get("food_cost_rate", 0.0) or 0.0)
+    gpm = float(dish.get("gross_profit_margin", 0.0) or 0.0)
+    cnt = int(dish.get("order_count", 0) or 0)
+    price = float(dish.get("avg_selling_price", 0.0) or 0.0)
+    revenue = float(dish.get("revenue_yuan", 0.0) or 0.0)
+    profit = float(dish.get("gross_profit_yuan", 0.0) or 0.0)
+    name = dish.get("dish_name", "")
 
-    def _make(rec_type: str, rev_delta: float, cost_delta: float,
-              profit_delta: float, confidence: float) -> dict:
+    def _make(rec_type: str, rev_delta: float, cost_delta: float, profit_delta: float, confidence: float) -> dict:
         score = compute_priority_score(rec_type, profit_delta, confidence)
         return {
-            "rec_type":                      rec_type,
-            "title":                         REC_TITLES[rec_type],
-            "action":                        REC_ACTIONS[rec_type],
-            "description":                   generate_rec_description(
-                rec_type, name, profit_delta, fcr, gpm, cnt
-            ),
-            "expected_revenue_impact_yuan":  round(rev_delta,    2),
-            "expected_cost_impact_yuan":     round(cost_delta,   2),
-            "expected_profit_impact_yuan":   round(profit_delta, 2),
-            "confidence_pct":                confidence,
-            "priority_score":                score,
-            "urgency":                       classify_urgency(score),
+            "rec_type": rec_type,
+            "title": REC_TITLES[rec_type],
+            "action": REC_ACTIONS[rec_type],
+            "description": generate_rec_description(rec_type, name, profit_delta, fcr, gpm, cnt),
+            "expected_revenue_impact_yuan": round(rev_delta, 2),
+            "expected_cost_impact_yuan": round(cost_delta, 2),
+            "expected_profit_impact_yuan": round(profit_delta, 2),
+            "confidence_pct": confidence,
+            "priority_score": score,
+            "urgency": classify_urgency(score),
         }
 
     recs: list[dict] = []
@@ -266,10 +263,10 @@ def build_dish_recommendations(dish: dict) -> list[dict]:
             recs.append(_make("price_increase", imp2["revenue_delta"], 0.0, imp2["profit_delta"], 60.0))
 
     elif quadrant == "question_mark":
-        imp  = compute_promote_impact(cnt, price, gpm)
+        imp = compute_promote_impact(cnt, price, gpm)
         imp2 = compute_bundle_impact(cnt, price, gpm)
-        recs.append(_make("promote", imp["revenue_delta"],  0.0, imp["profit_delta"],  65.0))
-        recs.append(_make("bundle",  imp2["revenue_delta"], 0.0, imp2["profit_delta"], 55.0))
+        recs.append(_make("promote", imp["revenue_delta"], 0.0, imp["profit_delta"], 65.0))
+        recs.append(_make("bundle", imp2["revenue_delta"], 0.0, imp2["profit_delta"], 55.0))
 
     else:  # dog
         if cnt <= DISCONTINUE_MAX_ORDERS and gpm <= DISCONTINUE_MAX_GPM:
@@ -289,42 +286,38 @@ def build_dish_recommendations(dish: dict) -> list[dict]:
 
 def summarize_recommendations(records: list[dict]) -> dict:
     """纯函数：聚合建议列表的¥影响和计数。"""
-    totals: dict[str, dict] = {
-        rt: {"count": 0, "total_profit_impact_yuan": 0.0, "adopted": 0}
-        for rt in REC_TYPES
-    }
+    totals: dict[str, dict] = {rt: {"count": 0, "total_profit_impact_yuan": 0.0, "adopted": 0} for rt in REC_TYPES}
     for r in records:
         rt = r.get("rec_type", "")
         if rt in totals:
             totals[rt]["count"] += 1
-            totals[rt]["total_profit_impact_yuan"] += float(
-                r.get("expected_profit_impact_yuan") or 0.0
-            )
+            totals[rt]["total_profit_impact_yuan"] += float(r.get("expected_profit_impact_yuan") or 0.0)
             if r.get("status") == "adopted":
                 totals[rt]["adopted"] += 1
 
-    total_impact  = sum(v["total_profit_impact_yuan"] for v in totals.values())
+    total_impact = sum(v["total_profit_impact_yuan"] for v in totals.values())
     pending_count = sum(1 for r in records if r.get("status") == "pending")
     adopted_count = sum(1 for r in records if r.get("status") == "adopted")
     return {
         "by_type": [
             {
                 "rec_type": rt,
-                "label":    REC_LABELS[rt],
-                "count":    v["count"],
+                "label": REC_LABELS[rt],
+                "count": v["count"],
                 "total_profit_impact_yuan": round(v["total_profit_impact_yuan"], 2),
-                "adopted":  v["adopted"],
+                "adopted": v["adopted"],
             }
             for rt, v in totals.items()
         ],
-        "total_count":              sum(v["count"] for v in totals.values()),
+        "total_count": sum(v["count"] for v in totals.values()),
         "total_profit_impact_yuan": round(total_impact, 2),
-        "pending_count":            pending_count,
-        "adopted_count":            adopted_count,
+        "pending_count": pending_count,
+        "adopted_count": adopted_count,
     }
 
 
 # ── DB 辅助 ───────────────────────────────────────────────────────────────────
+
 
 def _to_float(val) -> float:
     if val is None:
@@ -337,9 +330,8 @@ def _to_float(val) -> float:
 
 # ── DB 函数 ───────────────────────────────────────────────────────────────────
 
-async def _fetch_profitability_records(
-    db: AsyncSession, store_id: str, period: str
-) -> list[dict]:
+
+async def _fetch_profitability_records(db: AsyncSession, store_id: str, period: str) -> list[dict]:
     sql = text("""
         SELECT
             dish_id, dish_name, category, bcg_quadrant,
@@ -354,18 +346,24 @@ async def _fetch_profitability_records(
     result = await db.execute(sql, {"sid": store_id, "period": period})
     rows = result.fetchall()
     keys = [
-        "dish_id", "dish_name", "category", "bcg_quadrant",
-        "order_count", "avg_selling_price",
-        "revenue_yuan", "food_cost_yuan", "food_cost_rate",
-        "gross_profit_yuan", "gross_profit_margin",
-        "popularity_percentile", "profit_percentile",
+        "dish_id",
+        "dish_name",
+        "category",
+        "bcg_quadrant",
+        "order_count",
+        "avg_selling_price",
+        "revenue_yuan",
+        "food_cost_yuan",
+        "food_cost_rate",
+        "gross_profit_yuan",
+        "gross_profit_margin",
+        "popularity_percentile",
+        "profit_percentile",
     ]
     return [dict(zip(keys, row)) for row in rows]
 
 
-async def _upsert_recommendation(
-    db: AsyncSession, store_id: str, period: str, dish: dict, rec: dict
-) -> None:
+async def _upsert_recommendation(db: AsyncSession, store_id: str, period: str, dish: dict, rec: dict) -> None:
     sql = text("""
         INSERT INTO menu_optimization_records (
             store_id, period, dish_id, dish_name, category, bcg_quadrant,
@@ -403,35 +401,36 @@ async def _upsert_recommendation(
             updated_at                   = NOW()
         WHERE menu_optimization_records.status = 'pending'
     """)
-    await db.execute(sql, {
-        "sid":         store_id,
-        "period":      period,
-        "dish_id":     dish["dish_id"],
-        "dish_name":   dish["dish_name"],
-        "category":    dish.get("category"),
-        "bcg_quadrant": dish.get("bcg_quadrant"),
-        "rec_type":    rec["rec_type"],
-        "title":       rec["title"],
-        "description": rec["description"],
-        "action":      rec["action"],
-        "rev_impact":  rec["expected_revenue_impact_yuan"],
-        "cost_impact": rec["expected_cost_impact_yuan"],
-        "profit_impact": rec["expected_profit_impact_yuan"],
-        "confidence":  rec["confidence_pct"],
-        "priority":    rec["priority_score"],
-        "urgency":     rec["urgency"],
-        "fcr":     _to_float(dish.get("food_cost_rate")),
-        "gpm":     _to_float(dish.get("gross_profit_margin")),
-        "cnt":     dish.get("order_count", 0),
-        "price":   _to_float(dish.get("avg_selling_price")),
-        "revenue": _to_float(dish.get("revenue_yuan")),
-        "profit":  _to_float(dish.get("gross_profit_yuan")),
-    })
+    await db.execute(
+        sql,
+        {
+            "sid": store_id,
+            "period": period,
+            "dish_id": dish["dish_id"],
+            "dish_name": dish["dish_name"],
+            "category": dish.get("category"),
+            "bcg_quadrant": dish.get("bcg_quadrant"),
+            "rec_type": rec["rec_type"],
+            "title": rec["title"],
+            "description": rec["description"],
+            "action": rec["action"],
+            "rev_impact": rec["expected_revenue_impact_yuan"],
+            "cost_impact": rec["expected_cost_impact_yuan"],
+            "profit_impact": rec["expected_profit_impact_yuan"],
+            "confidence": rec["confidence_pct"],
+            "priority": rec["priority_score"],
+            "urgency": rec["urgency"],
+            "fcr": _to_float(dish.get("food_cost_rate")),
+            "gpm": _to_float(dish.get("gross_profit_margin")),
+            "cnt": dish.get("order_count", 0),
+            "price": _to_float(dish.get("avg_selling_price")),
+            "revenue": _to_float(dish.get("revenue_yuan")),
+            "profit": _to_float(dish.get("gross_profit_yuan")),
+        },
+    )
 
 
-async def generate_menu_recommendations(
-    db: AsyncSession, store_id: str, period: str
-) -> dict:
+async def generate_menu_recommendations(db: AsyncSession, store_id: str, period: str) -> dict:
     """从 dish_profitability_records 读取 BCG 数据，生成并持久化优化建议。幂等操作。"""
     dishes = await _fetch_profitability_records(db, store_id, period)
     if not dishes:
@@ -440,8 +439,7 @@ async def generate_menu_recommendations(
     total_recs = 0
     for dish in dishes:
         # 统一 float 类型（DB 可能返回 Decimal）
-        for k in ("food_cost_rate", "gross_profit_margin", "avg_selling_price",
-                  "revenue_yuan", "gross_profit_yuan"):
+        for k in ("food_cost_rate", "gross_profit_margin", "avg_selling_price", "revenue_yuan", "gross_profit_yuan"):
             dish[k] = _to_float(dish.get(k))
 
         recs = build_dish_recommendations(dish)
@@ -451,10 +449,10 @@ async def generate_menu_recommendations(
 
     await db.commit()
     return {
-        "store_id":   store_id,
-        "period":     period,
+        "store_id": store_id,
+        "period": period,
         "dish_count": len(dishes),
-        "rec_count":  total_recs,
+        "rec_count": total_recs,
     }
 
 
@@ -474,21 +472,42 @@ _REC_SELECT = """
 """
 
 _REC_KEYS = [
-    "id", "dish_id", "dish_name", "category", "bcg_quadrant",
-    "rec_type", "title", "description", "action",
-    "expected_revenue_impact_yuan", "expected_cost_impact_yuan",
+    "id",
+    "dish_id",
+    "dish_name",
+    "category",
+    "bcg_quadrant",
+    "rec_type",
+    "title",
+    "description",
+    "action",
+    "expected_revenue_impact_yuan",
+    "expected_cost_impact_yuan",
     "expected_profit_impact_yuan",
-    "confidence_pct", "priority_score", "urgency",
-    "current_fcr", "current_gpm", "current_order_count",
-    "current_avg_price", "current_revenue_yuan", "current_profit_yuan",
-    "status", "computed_at",
+    "confidence_pct",
+    "priority_score",
+    "urgency",
+    "current_fcr",
+    "current_gpm",
+    "current_order_count",
+    "current_avg_price",
+    "current_revenue_yuan",
+    "current_profit_yuan",
+    "status",
+    "computed_at",
 ]
 
 _FLOAT_KEYS = {
-    "expected_revenue_impact_yuan", "expected_cost_impact_yuan",
-    "expected_profit_impact_yuan", "confidence_pct", "priority_score",
-    "current_fcr", "current_gpm", "current_avg_price",
-    "current_revenue_yuan", "current_profit_yuan",
+    "expected_revenue_impact_yuan",
+    "expected_cost_impact_yuan",
+    "expected_profit_impact_yuan",
+    "confidence_pct",
+    "priority_score",
+    "current_fcr",
+    "current_gpm",
+    "current_avg_price",
+    "current_revenue_yuan",
+    "current_profit_yuan",
 }
 
 
@@ -499,9 +518,7 @@ def _parse_rec_rows(rows) -> list[dict]:
         d["rec_label"] = REC_LABELS.get(d["rec_type"], d["rec_type"])
         for k in _FLOAT_KEYS:
             d[k] = _to_float(d.get(k))
-        d["computed_at"] = (
-            d["computed_at"].isoformat() if d.get("computed_at") else None
-        )
+        d["computed_at"] = d["computed_at"].isoformat() if d.get("computed_at") else None
         out.append(d)
     return out
 
@@ -511,36 +528,32 @@ async def get_menu_recommendations(
     store_id: str,
     period: str,
     rec_type: Optional[str] = None,
-    status:   Optional[str] = None,
-    limit:    int = 50,
+    status: Optional[str] = None,
+    limit: int = 50,
 ) -> list[dict]:
     """查询菜单优化建议，支持按 rec_type 和 status 过滤。"""
     # L011: 条件数量固定（4种组合），用 if/else 选择独立 text() 分支
     if rec_type is not None and status is not None:
         sql = text(
-            _REC_SELECT
-            + "WHERE store_id=:sid AND period=:period AND rec_type=:rt AND status=:st "
+            _REC_SELECT + "WHERE store_id=:sid AND period=:period AND rec_type=:rt AND status=:st "
             "ORDER BY priority_score DESC, expected_profit_impact_yuan DESC LIMIT :lim"
         )
         params = {"sid": store_id, "period": period, "rt": rec_type, "st": status, "lim": limit}
     elif rec_type is not None:
         sql = text(
-            _REC_SELECT
-            + "WHERE store_id=:sid AND period=:period AND rec_type=:rt "
+            _REC_SELECT + "WHERE store_id=:sid AND period=:period AND rec_type=:rt "
             "ORDER BY priority_score DESC, expected_profit_impact_yuan DESC LIMIT :lim"
         )
         params = {"sid": store_id, "period": period, "rt": rec_type, "lim": limit}
     elif status is not None:
         sql = text(
-            _REC_SELECT
-            + "WHERE store_id=:sid AND period=:period AND status=:st "
+            _REC_SELECT + "WHERE store_id=:sid AND period=:period AND status=:st "
             "ORDER BY priority_score DESC, expected_profit_impact_yuan DESC LIMIT :lim"
         )
         params = {"sid": store_id, "period": period, "st": status, "lim": limit}
     else:
         sql = text(
-            _REC_SELECT
-            + "WHERE store_id=:sid AND period=:period "
+            _REC_SELECT + "WHERE store_id=:sid AND period=:period "
             "ORDER BY priority_score DESC, expected_profit_impact_yuan DESC LIMIT :lim"
         )
         params = {"sid": store_id, "period": period, "lim": limit}
@@ -549,9 +562,7 @@ async def get_menu_recommendations(
     return _parse_rec_rows(result.fetchall())
 
 
-async def get_recommendation_summary(
-    db: AsyncSession, store_id: str, period: str
-) -> dict:
+async def get_recommendation_summary(db: AsyncSession, store_id: str, period: str) -> dict:
     """按 rec_type × status 聚合¥影响。"""
     sql = text("""
         SELECT rec_type, status, COUNT(*) AS cnt,
@@ -564,8 +575,7 @@ async def get_recommendation_summary(
     rows = result.fetchall()
 
     by_type: dict[str, dict] = {
-        rt: {"count": 0, "total_profit_impact_yuan": 0.0, "adopted": 0, "pending": 0}
-        for rt in REC_TYPES
+        rt: {"count": 0, "total_profit_impact_yuan": 0.0, "adopted": 0, "pending": 0} for rt in REC_TYPES
     }
     pending_impact = 0.0
     for row in rows:
@@ -583,21 +593,19 @@ async def get_recommendation_summary(
         "by_type": [
             {
                 "rec_type": rt,
-                "label":    REC_LABELS[rt],
+                "label": REC_LABELS[rt],
                 **v,
                 "total_profit_impact_yuan": round(v["total_profit_impact_yuan"], 2),
             }
             for rt, v in by_type.items()
         ],
         "total_pending_profit_impact_yuan": round(pending_impact, 2),
-        "pending_count": sum(v["pending"]  for v in by_type.values()),
-        "adopted_count": sum(v["adopted"]  for v in by_type.values()),
+        "pending_count": sum(v["pending"] for v in by_type.values()),
+        "adopted_count": sum(v["adopted"] for v in by_type.values()),
     }
 
 
-async def update_recommendation_status(
-    db: AsyncSession, rec_id: int, new_status: str
-) -> dict:
+async def update_recommendation_status(db: AsyncSession, rec_id: int, new_status: str) -> dict:
     if new_status not in ("adopted", "dismissed"):
         return {"updated": False, "reason": "invalid_status"}
 
@@ -623,9 +631,7 @@ async def update_recommendation_status(
     return {"updated": False, "reason": "not_found_or_not_pending"}
 
 
-async def get_dish_recommendations(
-    db: AsyncSession, store_id: str, dish_id: str, periods: int = 6
-) -> list[dict]:
+async def get_dish_recommendations(db: AsyncSession, store_id: str, dish_id: str, periods: int = 6) -> list[dict]:
     """查询指定菜品近 N 期的历史优化建议。"""
     sql = text("""
         SELECT period, rec_type, title,
@@ -639,15 +645,15 @@ async def get_dish_recommendations(
     result = await db.execute(sql, {"sid": store_id, "did": dish_id, "lim": periods * 3})
     return [
         {
-            "period":                      row[0],
-            "rec_type":                    row[1],
-            "rec_label":                   REC_LABELS.get(row[1], row[1]),
-            "title":                       row[2],
+            "period": row[0],
+            "rec_type": row[1],
+            "rec_label": REC_LABELS.get(row[1], row[1]),
+            "title": row[2],
             "expected_profit_impact_yuan": _to_float(row[3]),
-            "confidence_pct":              _to_float(row[4]),
-            "priority_score":              _to_float(row[5]),
-            "urgency":                     row[6],
-            "status":                      row[7],
+            "confidence_pct": _to_float(row[4]),
+            "priority_score": _to_float(row[5]),
+            "urgency": row[6],
+            "status": row[7],
         }
         for row in result.fetchall()
     ]

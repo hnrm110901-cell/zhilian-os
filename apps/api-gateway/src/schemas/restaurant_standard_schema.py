@@ -5,11 +5,13 @@ Restaurant Business Standard Schema
 覆盖订单、菜品、人员、时间、金额五个核心维度
 屯象OS作为餐饮门店的神经系统，统一数据标准
 """
-from pydantic import BaseModel, Field, PlainSerializer
-from typing import Optional, List, Dict, Any, Annotated
+
 from datetime import datetime
-from enum import Enum
 from decimal import Decimal
+from enum import Enum
+from typing import Annotated, Any, Dict, List, Optional
+
+from pydantic import BaseModel, Field, PlainSerializer
 
 # Decimal that serializes to float in JSON (Pydantic v2 PlainSerializer pattern)
 JsonDecimal = Annotated[Decimal, PlainSerializer(float, return_type=float, when_used="json")]
@@ -20,6 +22,7 @@ JsonDecimal = Annotated[Decimal, PlainSerializer(float, return_type=float, when_
 
 class OrderStatus(str, Enum):
     """订单状态"""
+
     PENDING = "pending"  # 待处理
     CONFIRMED = "confirmed"  # 已确认
     PREPARING = "preparing"  # 制作中
@@ -31,6 +34,7 @@ class OrderStatus(str, Enum):
 
 class OrderType(str, Enum):
     """订单类型"""
+
     DINE_IN = "dine_in"  # 堂食
     TAKEOUT = "takeout"  # 外带
     DELIVERY = "delivery"  # 外卖
@@ -39,20 +43,22 @@ class OrderType(str, Enum):
 
 class SalesChannel(str, Enum):
     """销售渠道"""
-    DINE_IN = "dine_in"          # 堂食
-    TAKEOUT = "takeout"          # 外带
-    MEITUAN = "meituan"          # 美团外卖
-    ELEME = "eleme"              # 饿了么
-    WAIMAI_OWN = "waimai_own"    # 自营外卖
-    GROUP_BUY = "group_buy"      # 团购
+
+    DINE_IN = "dine_in"  # 堂食
+    TAKEOUT = "takeout"  # 外带
+    MEITUAN = "meituan"  # 美团外卖
+    ELEME = "eleme"  # 饿了么
+    WAIMAI_OWN = "waimai_own"  # 自营外卖
+    GROUP_BUY = "group_buy"  # 团购
     RESERVATION = "reservation"  # 预订
-    CATERING = "catering"        # 外宴/餐饮服务
+    CATERING = "catering"  # 外宴/餐饮服务
     SELF_PICKUP = "self_pickup"  # 自提
-    OTHER = "other"              # 其他
+    OTHER = "other"  # 其他
 
 
 class DishCategory(str, Enum):
     """菜品分类"""
+
     APPETIZER = "appetizer"  # 开胃菜
     MAIN_COURSE = "main_course"  # 主菜
     SIDE_DISH = "side_dish"  # 配菜
@@ -64,6 +70,7 @@ class DishCategory(str, Enum):
 
 class StaffRole(str, Enum):
     """员工角色"""
+
     MANAGER = "manager"  # 店长
     CHEF = "chef"  # 厨师
     COOK = "cook"  # 配菜员
@@ -74,6 +81,7 @@ class StaffRole(str, Enum):
 
 class ShiftType(str, Enum):
     """班次类型"""
+
     MORNING = "morning"  # 早班
     AFTERNOON = "afternoon"  # 中班
     EVENING = "evening"  # 晚班
@@ -82,6 +90,7 @@ class ShiftType(str, Enum):
 
 class PaymentMethod(str, Enum):
     """支付方式"""
+
     CASH = "cash"  # 现金
     CARD = "card"  # 刷卡
     WECHAT = "wechat"  # 微信
@@ -94,6 +103,7 @@ class PaymentMethod(str, Enum):
 
 class OrderItemSchema(BaseModel):
     """订单项标准Schema"""
+
     item_id: str = Field(..., description="订单项ID")
     dish_id: str = Field(..., description="菜品ID")
     dish_name: str = Field(..., description="菜品名称")
@@ -107,6 +117,7 @@ class OrderItemSchema(BaseModel):
 
 class OrderSchema(BaseModel):
     """订单标准Schema"""
+
     # 基础信息
     order_id: str = Field(..., description="订单ID")
     order_number: str = Field(..., description="订单号")
@@ -147,6 +158,7 @@ class OrderSchema(BaseModel):
 
 class NutritionInfo(BaseModel):
     """营养信息"""
+
     calories: Optional[float] = Field(None, description="卡路里")
     protein: Optional[float] = Field(None, description="蛋白质(g)")
     fat: Optional[float] = Field(None, description="脂肪(g)")
@@ -155,6 +167,7 @@ class NutritionInfo(BaseModel):
 
 class IngredientSchema(BaseModel):
     """食材标准Schema"""
+
     ingredient_id: str = Field(..., description="食材ID")
     name: str = Field(..., description="食材名称")
     quantity: float = Field(..., ge=0, description="用量")
@@ -164,6 +177,7 @@ class IngredientSchema(BaseModel):
 
 class DishSchema(BaseModel):
     """菜品标准Schema"""
+
     # 基础信息
     dish_id: str = Field(..., description="菜品ID")
     name: str = Field(..., description="菜品名称")
@@ -202,6 +216,7 @@ class DishSchema(BaseModel):
 
 class ShiftSchema(BaseModel):
     """班次标准Schema"""
+
     shift_id: str = Field(..., description="班次ID")
     shift_type: ShiftType = Field(..., description="班次类型")
     start_time: datetime = Field(..., description="开始时间")
@@ -211,6 +226,7 @@ class ShiftSchema(BaseModel):
 
 class StaffSchema(BaseModel):
     """员工标准Schema"""
+
     # 基础信息
     staff_id: str = Field(..., description="员工ID")
     name: str = Field(..., description="姓名")
@@ -243,6 +259,7 @@ class StaffSchema(BaseModel):
 
 class TimeSlotSchema(BaseModel):
     """时间段标准Schema"""
+
     slot_id: str = Field(..., description="时间段ID")
     date: datetime = Field(..., description="日期")
     start_time: datetime = Field(..., description="开始时间")
@@ -260,6 +277,7 @@ class TimeSlotSchema(BaseModel):
 
 class BusinessHoursSchema(BaseModel):
     """营业时间标准Schema"""
+
     store_id: str = Field(..., description="门店ID")
     day_of_week: int = Field(..., ge=0, le=6, description="星期几（0=周一）")
     open_time: str = Field(..., description="开门时间（HH:MM）")
@@ -274,6 +292,7 @@ class BusinessHoursSchema(BaseModel):
 
 class TransactionSchema(BaseModel):
     """交易标准Schema"""
+
     # 基础信息
     transaction_id: str = Field(..., description="交易ID")
     transaction_number: str = Field(..., description="交易号")
@@ -305,6 +324,7 @@ class TransactionSchema(BaseModel):
 
 class FinancialSummarySchema(BaseModel):
     """财务汇总标准Schema"""
+
     # 时间范围
     period_start: datetime = Field(..., description="开始时间")
     period_end: datetime = Field(..., description="结束时间")
@@ -340,6 +360,7 @@ class FinancialSummarySchema(BaseModel):
 
 class StaffAction(BaseModel):
     """员工操作记录标准Schema（用于可信执行层审计）"""
+
     action_type: str = Field(..., description="操作类型（如 discount_apply, shift_report, stock_alert）")
     brand_id: str = Field(..., description="品牌ID")
     store_id: str = Field(..., description="门店ID")
@@ -358,6 +379,7 @@ class NeuralEventSchema(BaseModel):
 
     屯象OS作为餐饮门店的神经系统，所有业务事件都通过此Schema传递
     """
+
     # 事件基础信息
     event_id: str = Field(..., description="事件ID")
     event_type: str = Field(..., description="事件类型")

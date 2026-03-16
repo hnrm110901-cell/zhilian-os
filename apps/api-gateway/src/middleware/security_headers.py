@@ -2,7 +2,9 @@
 安全响应头中间件
 为所有响应添加浏览器安全防护头，防止 XSS、点击劫持、MIME 嗅探等攻击
 """
+
 import os
+
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
@@ -36,8 +38,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
         # 权限策略：禁用不必要的浏览器特性
         response.headers["Permissions-Policy"] = (
-            "geolocation=(), microphone=(), camera=(), "
-            "payment=(), usb=(), magnetometer=(), gyroscope=()"
+            "geolocation=(), microphone=(), camera=(), " "payment=(), usb=(), magnetometer=(), gyroscope=()"
         )
 
         # 内容安全策略
@@ -53,9 +54,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
         # HSTS：仅在生产环境强制 HTTPS（开发环境 HTTP 也要能用）
         if _APP_ENV == "production":
-            response.headers["Strict-Transport-Security"] = (
-                "max-age=31536000; includeSubDomains; preload"
-            )
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
 
         # 移除 server 信息泄露
         if "server" in response.headers:

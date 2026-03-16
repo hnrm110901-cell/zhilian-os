@@ -27,19 +27,19 @@ Bridge 5: 跨智能体事件总线扩展
   - 统一事件发射器（emit_lifecycle_event）
   - 订阅器注册（可扩展新路由）
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, date, timedelta
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from datetime import date, datetime, timedelta
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import structlog
-from sqlalchemy import and_, select, func, text
+from sqlalchemy import and_, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.models.reservation import Reservation, ReservationStatus
 from src.models.order import Order, OrderItem, OrderStatus
 from src.models.queue import Queue
+from src.models.reservation import Reservation, ReservationStatus
 
 if TYPE_CHECKING:
     from src.core.business_context import BusinessContext
@@ -50,6 +50,7 @@ logger = structlog.get_logger()
 # ══════════════════════════════════════════════════════════════════
 # Bridge 1: 预订 → 订单
 # ══════════════════════════════════════════════════════════════════
+
 
 async def prepare_order_from_reservation(
     session: AsyncSession,
@@ -64,9 +65,7 @@ async def prepare_order_from_reservation(
     3. 创建 Order + OrderItem
     4. 关联 consumer_id
     """
-    result = await session.execute(
-        select(Reservation).where(Reservation.id == reservation_id)
-    )
+    result = await session.execute(select(Reservation).where(Reservation.id == reservation_id))
     reservation = result.scalar_one_or_none()
     if not reservation:
         return {"error": f"预订 {reservation_id} 不存在"}
@@ -90,17 +89,22 @@ async def prepare_order_from_reservation(
     order_items = []
     pre_order_total = 0
     try:
-        from src.models.reservation_pre_order import ReservationPreOrder, PreOrderStatus
+        from src.models.reservation_pre_order import PreOrderStatus, ReservationPreOrder
+
         po_result = await session.execute(
-            select(ReservationPreOrder).where(
+            select(ReservationPreOrder)
+            .where(
                 and_(
                     ReservationPreOrder.reservation_id == reservation_id,
-                    ReservationPreOrder.status.in_([
-                        PreOrderStatus.CONFIRMED,
-                        PreOrderStatus.PREPARING,
-                    ]),
+                    ReservationPreOrder.status.in_(
+                        [
+                            PreOrderStatus.CONFIRMED,
+                            PreOrderStatus.PREPARING,
+                        ]
+                    ),
                 )
-            ).order_by(ReservationPreOrder.sort_order)
+            )
+            .order_by(ReservationPreOrder.sort_order)
         )
         pre_orders = po_result.scalars().all()
 
@@ -184,9 +188,7 @@ async def sync_order_completion_to_reservation(
 
     通过 order_metadata.reservation_id 查找关联预订。
     """
-    result = await session.execute(
-        select(Order).where(Order.id == order_id)
-    )
+    result = await session.execute(select(Order).where(Order.id == order_id))
     order = result.scalar_one_or_none()
     if not order or not order.order_metadata:
         return None
@@ -195,9 +197,7 @@ async def sync_order_completion_to_reservation(
     if not res_id:
         return None
 
-    res_result = await session.execute(
-        select(Reservation).where(Reservation.id == res_id)
-    )
+    res_result = await session.execute(select(Reservation).where(Reservation.id == res_id))
     reservation = res_result.scalar_one_or_none()
     if reservation and reservation.status == ReservationStatus.SEATED:
         reservation.status = ReservationStatus.COMPLETED
@@ -210,6 +210,7 @@ async def sync_order_completion_to_reservation(
 # ══════════════════════════════════════════════════════════════════
 # Bridge 2: 宴会 → 采购
 # ══════════════════════════════════════════════════════════════════
+
 
 async def trigger_procurement_from_beo(
     session: AsyncSession,
@@ -228,9 +229,7 @@ async def trigger_procurement_from_beo(
         return {"message": "BEO 无采购附加项", "items": 0}
 
     # 获取预订信息
-    result = await session.execute(
-        select(Reservation).where(Reservation.id == reservation_id)
-    )
+    result = await session.execute(select(Reservation).where(Reservation.id == reservation_id))
     reservation = result.scalar_one_or_none()
     if not reservation:
         return {"error": f"预订 {reservation_id} 不存在"}
@@ -246,15 +245,17 @@ async def trigger_procurement_from_beo(
         multiplier = addon.get("multiplier", 1.0)
 
         for item in items:
-            procurement_items.append({
-                "category": category,
-                "item_name": item.get("name", category),
-                "base_quantity": item.get("quantity", 0),
-                "adjusted_quantity": round(item.get("quantity", 0) * multiplier * (party_size / 10), 1),
-                "unit": item.get("unit", "份"),
-                "estimated_cost_yuan": round(item.get("cost", 0) * multiplier * (party_size / 10) / 100, 2),
-                "priority": "high" if event_date and (event_date - date.today()).days <= 3 else "normal",
-            })
+            procurement_items.append(
+                {
+                    "category": category,
+                    "item_name": item.get("name", category),
+                    "base_quantity": item.get("quantity", 0),
+                    "adjusted_quantity": round(item.get("quantity", 0) * multiplier * (party_size / 10), 1),
+                    "unit": item.get("unit", "份"),
+                    "estimated_cost_yuan": round(item.get("cost", 0) * multiplier * (party_size / 10) / 100, 2),
+                    "priority": "high" if event_date and (event_date - date.today()).days <= 3 else "normal",
+                }
+            )
 
     # 写入神经事件（供采购Agent消费）
     try:
@@ -276,6 +277,7 @@ async def trigger_procurement_from_beo(
     # 触发企微通知（fire-and-forget）
     try:
         from src.services.wechat_trigger_service import wechat_trigger_service
+
         if hasattr(wechat_trigger_service, "trigger"):
             days_until = (event_date - date.today()).days if event_date else "?"
             items_summary = ", ".join(f"{i['item_name']}×{i['adjusted_quantity']}" for i in procurement_items[:5])
@@ -312,6 +314,7 @@ async def trigger_procurement_from_beo(
 # Bridge 3: 订单 → CDP/私域
 # ══════════════════════════════════════════════════════════════════
 
+
 async def on_order_completed(
     session: AsyncSession,
     order_id: str,
@@ -326,9 +329,7 @@ async def on_order_completed(
     4. 评估活跃旅程的 success_metrics
     5. 反向更新关联预订状态
     """
-    result = await session.execute(
-        select(Order).where(Order.id == order_id)
-    )
+    result = await session.execute(select(Order).where(Order.id == order_id))
     order = result.scalar_one_or_none()
     if not order:
         return {"error": f"订单 {order_id} 不存在"}
@@ -345,6 +346,7 @@ async def on_order_completed(
     if not consumer_id and order.customer_phone:
         try:
             from src.services.identity_resolution_service import IdentityResolutionService
+
             svc = IdentityResolutionService(session)
             consumer = await svc.resolve(order.customer_phone)
             if consumer:
@@ -377,7 +379,9 @@ async def on_order_completed(
     if consumer_id:
         try:
             await _update_rfm_on_order(
-                session, str(consumer_id), order.store_id,
+                session,
+                str(consumer_id),
+                order.store_id,
                 float(order.total_amount or 0),
             )
             actions_taken.append("rfm_updated")
@@ -388,7 +392,9 @@ async def on_order_completed(
     if consumer_id:
         try:
             evaluated = await _evaluate_journey_success(
-                session, str(consumer_id), order.store_id,
+                session,
+                str(consumer_id),
+                order.store_id,
             )
             if evaluated:
                 actions_taken.append(f"journeys_evaluated:{evaluated}")
@@ -431,18 +437,17 @@ async def _update_rfm_on_order(
     """更新消费者的 RFM 指标"""
     try:
         from src.models.consumer_identity import ConsumerIdentity
-        result = await session.execute(
-            select(ConsumerIdentity).where(ConsumerIdentity.id == consumer_id)
-        )
+
+        result = await session.execute(select(ConsumerIdentity).where(ConsumerIdentity.id == consumer_id))
         consumer = result.scalar_one_or_none()
         if consumer:
             # Recency: 最近消费日期
             consumer.last_order_at = datetime.utcnow()
             # Frequency: 消费次数+1
-            if hasattr(consumer, 'order_count'):
+            if hasattr(consumer, "order_count"):
                 consumer.order_count = (consumer.order_count or 0) + 1
             # Monetary: 累计消费
-            if hasattr(consumer, 'total_spent'):
+            if hasattr(consumer, "total_spent"):
                 consumer.total_spent = (consumer.total_spent or 0) + int(amount_yuan * 100)
             logger.info("rfm_updated", consumer_id=consumer_id, amount=amount_yuan)
     except Exception as e:
@@ -476,6 +481,7 @@ async def _evaluate_journey_success(
         active_journeys = rows.fetchall()
 
         from src.services.journey_orchestrator import BUILTIN_JOURNEYS
+
         for journey in active_journeys:
             j_id, j_type, j_status = journey[0], journey[1], journey[2]
             definition = BUILTIN_JOURNEYS.get(j_type)
@@ -502,6 +508,7 @@ async def _evaluate_journey_success(
 # Bridge 4: 私域→预订闭环
 # ══════════════════════════════════════════════════════════════════
 
+
 async def check_active_journeys_on_reservation(
     session: AsyncSession,
     customer_phone: str,
@@ -518,6 +525,7 @@ async def check_active_journeys_on_reservation(
     try:
         # 通过手机号查找消费者ID
         from src.services.identity_resolution_service import IdentityResolutionService
+
         svc = IdentityResolutionService(session)
         consumer = await svc.resolve(customer_phone)
         if not consumer:
@@ -536,13 +544,16 @@ async def check_active_journeys_on_reservation(
         for row in rows.fetchall():
             j_id, j_type, j_status, j_started = row
             from src.services.journey_orchestrator import BUILTIN_JOURNEYS
+
             definition = BUILTIN_JOURNEYS.get(j_type)
-            active_journeys.append({
-                "journey_id": str(j_id),
-                "journey_type": j_type,
-                "journey_name": definition.name if definition else j_type,
-                "started_at": j_started.isoformat() if j_started else None,
-            })
+            active_journeys.append(
+                {
+                    "journey_id": str(j_id),
+                    "journey_type": j_type,
+                    "journey_name": definition.name if definition else j_type,
+                    "started_at": j_started.isoformat() if j_started else None,
+                }
+            )
 
             # 更新旅程进度
             await session.execute(
@@ -570,6 +581,7 @@ async def check_active_journeys_on_reservation(
 # ══════════════════════════════════════════════════════════════════
 # Bridge 5: 统一事件发射器
 # ══════════════════════════════════════════════════════════════════
+
 
 async def _emit_lifecycle_event(
     session: AsyncSession,
@@ -612,6 +624,7 @@ async def _emit_lifecycle_event(
 # 综合闭环 API（供 API 层调用）
 # ══════════════════════════════════════════════════════════════════
 
+
 async def get_customer_lifecycle_view(
     session: AsyncSession,
     customer_phone: str,
@@ -630,23 +643,29 @@ async def get_customer_lifecycle_view(
     # 1. 预订历史
     try:
         res_result = await session.execute(
-            select(Reservation).where(
+            select(Reservation)
+            .where(
                 and_(
                     Reservation.customer_phone == customer_phone,
                     Reservation.store_id == store_id,
                 )
-            ).order_by(Reservation.reservation_date.desc()).limit(10)
+            )
+            .order_by(Reservation.reservation_date.desc())
+            .limit(10)
         )
         reservations = res_result.scalars().all()
         view["reservations"] = {
             "total": len(reservations),
-            "recent": [{
-                "id": r.id,
-                "date": r.reservation_date.isoformat() if r.reservation_date else None,
-                "status": r.status.value if hasattr(r.status, "value") else str(r.status),
-                "party_size": r.party_size,
-                "type": r.reservation_type.value if hasattr(r.reservation_type, "value") else str(r.reservation_type),
-            } for r in reservations[:5]],
+            "recent": [
+                {
+                    "id": r.id,
+                    "date": r.reservation_date.isoformat() if r.reservation_date else None,
+                    "status": r.status.value if hasattr(r.status, "value") else str(r.status),
+                    "party_size": r.party_size,
+                    "type": r.reservation_type.value if hasattr(r.reservation_type, "value") else str(r.reservation_type),
+                }
+                for r in reservations[:5]
+            ],
         }
     except Exception:
         view["reservations"] = {"total": 0, "recent": []}
@@ -654,12 +673,15 @@ async def get_customer_lifecycle_view(
     # 2. 订单历史
     try:
         order_result = await session.execute(
-            select(Order).where(
+            select(Order)
+            .where(
                 and_(
                     Order.customer_phone == customer_phone,
                     Order.store_id == store_id,
                 )
-            ).order_by(Order.order_time.desc()).limit(10)
+            )
+            .order_by(Order.order_time.desc())
+            .limit(10)
         )
         orders = order_result.scalars().all()
         total_spent = sum(float(o.total_amount or 0) for o in orders)
@@ -675,13 +697,14 @@ async def get_customer_lifecycle_view(
     # 3. CDP 消费者画像
     try:
         from src.services.identity_resolution_service import IdentityResolutionService
+
         svc = IdentityResolutionService(session)
         consumer = await svc.resolve(customer_phone)
         if consumer:
             view["cdp"] = {
                 "consumer_id": str(consumer.id),
-                "tags": consumer.tags if hasattr(consumer, 'tags') else [],
-                "rfm_level": consumer.rfm_level if hasattr(consumer, 'rfm_level') else None,
+                "tags": consumer.tags if hasattr(consumer, "tags") else [],
+                "rfm_level": consumer.rfm_level if hasattr(consumer, "rfm_level") else None,
             }
         else:
             view["cdp"] = None
@@ -691,7 +714,9 @@ async def get_customer_lifecycle_view(
     # 4. 活跃旅程
     try:
         journey_info = await check_active_journeys_on_reservation(
-            session, customer_phone, store_id,
+            session,
+            customer_phone,
+            store_id,
         )
         view["active_journeys"] = journey_info
     except Exception:

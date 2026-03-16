@@ -18,10 +18,11 @@ Scoring: Each module returns a 0-100 health score:
   90-100: 优秀 (green)  | 70-89: 良好 (blue)
   50-69:  需关注 (yellow) | 0-49: 风险 (red)
 """
+
 from __future__ import annotations
 
 import json
-from datetime import datetime, date
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
 import structlog
@@ -34,9 +35,9 @@ logger = structlog.get_logger()
 
 _SCORE_LABELS = {
     (90, 100): ("优秀", "green"),
-    (70, 89):  ("良好", "blue"),
-    (50, 69):  ("需关注", "yellow"),
-    (0,  49):  ("风险",  "red"),
+    (70, 89): ("良好", "blue"),
+    (50, 69): ("需关注", "yellow"),
+    (0, 49): ("风险", "red"),
 }
 
 
@@ -62,21 +63,19 @@ class DiagnosticService:
         await svc._load_raw_data()
 
         modules = await svc._build_all_modules()
-        total_score = round(
-            sum(m["health_score"] for m in modules.values()) / len(modules)
-        )
+        total_score = round(sum(m["health_score"] for m in modules.values()) / len(modules))
         label, color = _label(total_score)
 
         # Store report in onboarding_tasks
         await svc._persist_report(modules, total_score)
 
         return {
-            "store_id":    store_id,
+            "store_id": store_id,
             "generated_at": datetime.utcnow().isoformat(),
-            "total_score":  total_score,
-            "total_label":  label,
-            "total_color":  color,
-            "modules":      modules,
+            "total_score": total_score,
+            "total_label": label,
+            "total_color": color,
+            "modules": modules,
             "agent_init_params": svc._build_agent_init_params(modules),
         }
 
@@ -90,14 +89,14 @@ class DiagnosticService:
 
     async def _build_all_modules(self) -> Dict[str, Dict]:
         return {
-            "经营概况":    await self._module_revenue_overview(),
-            "菜品健康度":   await self._module_menu_health(),
-            "成本结构":    await self._module_cost_structure(),
-            "门店效率":    await self._module_store_efficiency(),
-            "供应链风险":   await self._module_supply_chain(),
-            "客群画像":    await self._module_customer_portrait(),
-            "口碑诊断":    await self._module_reputation(),
-            "数字化成熟度":  await self._module_digital_maturity(),
+            "经营概况": await self._module_revenue_overview(),
+            "菜品健康度": await self._module_menu_health(),
+            "成本结构": await self._module_cost_structure(),
+            "门店效率": await self._module_store_efficiency(),
+            "供应链风险": await self._module_supply_chain(),
+            "客群画像": await self._module_customer_portrait(),
+            "口碑诊断": await self._module_reputation(),
+            "数字化成熟度": await self._module_digital_maturity(),
         }
 
     async def _module_revenue_overview(self) -> Dict:
@@ -130,14 +129,14 @@ class DiagnosticService:
 
         label, color = _label(score)
         return {
-            "health_score":   score,
-            "label":          label,
-            "color":          color,
+            "health_score": score,
+            "label": label,
+            "color": color,
             "metrics": {
-                "avg_monthly_revenue_yuan":  round(avg_revenue, 2),
-                "avg_profit_pct":            round(avg_profit_pct, 2),
-                "avg_food_cost_pct":         round(avg_food_pct, 2),
-                "months_of_data":            len(rows),
+                "avg_monthly_revenue_yuan": round(avg_revenue, 2),
+                "avg_profit_pct": round(avg_profit_pct, 2),
+                "avg_food_cost_pct": round(avg_food_pct, 2),
+                "months_of_data": len(rows),
             },
             "insight": f"月均营收 ¥{avg_revenue:,.0f}，利润率 {avg_profit_pct:.1f}%",
             "suggestions": self._revenue_suggestions(avg_profit_pct, avg_food_pct),
@@ -168,14 +167,14 @@ class DiagnosticService:
 
         return {
             "health_score": score,
-            "label":        label,
-            "color":        color,
+            "label": label,
+            "color": color,
             "metrics": {
-                "total_sku":           len(rows),
+                "total_sku": len(rows),
                 "avg_gross_margin_pct": round(avg_margin, 2),
-                "high_margin_count":   len(high_margin_items),
-                "low_margin_count":    len(low_margin_items),
-                "low_margin_items":    low_margin_items[:5],
+                "high_margin_count": len(high_margin_items),
+                "low_margin_count": len(low_margin_items),
+                "low_margin_items": low_margin_items[:5],
             },
             "insight": f"均毛利率 {avg_margin:.1f}%，{len(low_margin_items)} 个SKU毛利低于40%",
             "suggestions": [
@@ -217,14 +216,14 @@ class DiagnosticService:
 
         return {
             "health_score": score,
-            "label":        label,
-            "color":        color,
+            "label": label,
+            "color": color,
             "metrics": {
-                "food_cost_pct":     round(food_pct, 2),
-                "labor_cost_pct":    round(labor_pct, 2),
-                "rent_cost_pct":     round(rent_pct, 2),
+                "food_cost_pct": round(food_pct, 2),
+                "labor_cost_pct": round(labor_pct, 2),
+                "rent_cost_pct": round(rent_pct, 2),
                 "marketing_cost_pct": round(marketing_pct, 2),
-                "baseline":          BASELINE,
+                "baseline": BASELINE,
             },
             "insight": f"食材{food_pct:.1f}% 人力{labor_pct:.1f}% 租金{rent_pct:.1f}%",
             "suggestions": anomalies or ["成本结构处于合理范围"],
@@ -247,14 +246,16 @@ class DiagnosticService:
             rent = float(s.get("月租金", 0) or 0)
             rev_per_sqm = total_revenue / area if area > 0 else None
             rent_to_rev = rent / total_revenue * 100 if total_revenue > 0 else None
-            store_metrics.append({
-                "name":            s.get("门店名", ""),
-                "area":            area,
-                "tables":          tables,
-                "monthly_rent_yuan": rent,
-                "rev_per_sqm_yuan": round(rev_per_sqm, 2) if rev_per_sqm else None,
-                "rent_to_rev_pct":  round(rent_to_rev, 2) if rent_to_rev else None,
-            })
+            store_metrics.append(
+                {
+                    "name": s.get("门店名", ""),
+                    "area": area,
+                    "tables": tables,
+                    "monthly_rent_yuan": rent,
+                    "rev_per_sqm_yuan": round(rev_per_sqm, 2) if rev_per_sqm else None,
+                    "rent_to_rev_pct": round(rent_to_rev, 2) if rent_to_rev else None,
+                }
+            )
 
         avg_rev_sqm = [m["rev_per_sqm_yuan"] for m in store_metrics if m["rev_per_sqm_yuan"]]
         score = 72 if avg_rev_sqm else 50
@@ -262,11 +263,11 @@ class DiagnosticService:
 
         return {
             "health_score": score,
-            "label":        label,
-            "color":        color,
-            "metrics":      {"stores": store_metrics, "store_count": len(d03_rows)},
-            "insight":      f"{len(d03_rows)} 家门店数据已分析",
-            "suggestions":  ["对比各店坪效，优化低效门店运营策略"],
+            "label": label,
+            "color": color,
+            "metrics": {"stores": store_metrics, "store_count": len(d03_rows)},
+            "insight": f"{len(d03_rows)} 家门店数据已分析",
+            "suggestions": ["对比各店坪效，优化低效门店运营策略"],
         }
 
     async def _module_supply_chain(self) -> Dict:
@@ -286,15 +287,15 @@ class DiagnosticService:
 
         return {
             "health_score": score,
-            "label":        label,
-            "color":        color,
+            "label": label,
+            "color": color,
             "metrics": {
-                "total_supplier_count":   len(rows),
-                "category_distribution":  category_counts,
-                "top_category_pct":       round(top_category_pct, 1),
+                "total_supplier_count": len(rows),
+                "category_distribution": category_counts,
+                "top_category_pct": round(top_category_pct, 1),
             },
-            "insight":      f"共 {len(rows)} 家供应商，品类集中度 {top_category_pct:.0f}%",
-            "suggestions":  ["分散供应商风险，避免单一品类依赖超过50%"] if top_category_pct > 50 else ["供应链集中度合理"],
+            "insight": f"共 {len(rows)} 家供应商，品类集中度 {top_category_pct:.0f}%",
+            "suggestions": ["分散供应商风险，避免单一品类依赖超过50%"] if top_category_pct > 50 else ["供应链集中度合理"],
         }
 
     async def _module_customer_portrait(self) -> Dict:
@@ -316,19 +317,19 @@ class DiagnosticService:
 
         return {
             "health_score": score,
-            "label":        label,
-            "color":        color,
+            "label": label,
+            "color": color,
             "metrics": {
-                "total_member_count":  len(rows),
+                "total_member_count": len(rows),
                 "avg_total_spend_yuan": round(avg_spend, 2),
                 "rfm_segments": {
-                    "high_value":  high_value,
-                    "mid_value":   mid_value,
-                    "low_value":   low_value,
+                    "high_value": high_value,
+                    "mid_value": mid_value,
+                    "low_value": low_value,
                 },
             },
-            "insight":      f"{len(rows)} 名会员，人均历史消费 ¥{avg_spend:,.0f}",
-            "suggestions":  [
+            "insight": f"{len(rows)} 名会员，人均历史消费 ¥{avg_spend:,.0f}",
+            "suggestions": [
                 f"高价值会员 {high_value} 名，建议制定专属VIP维系策略",
                 f"低活跃会员 {low_value} 名，建议激活唤醒活动",
             ],
@@ -349,18 +350,16 @@ class DiagnosticService:
 
         return {
             "health_score": score,
-            "label":        label,
-            "color":        color,
+            "label": label,
+            "color": color,
             "metrics": {
-                "total_reviews":    len(rows),
-                "avg_rating":       round(avg_rating, 2),
-                "negative_count":   len(negative),
-                "negative_pct":     round(len(negative) / len(rows) * 100, 1) if rows else 0,
+                "total_reviews": len(rows),
+                "avg_rating": round(avg_rating, 2),
+                "negative_count": len(negative),
+                "negative_pct": round(len(negative) / len(rows) * 100, 1) if rows else 0,
             },
-            "insight":      f"{len(rows)} 条评价，均分 {avg_rating:.1f}，差评 {len(negative)} 条",
-            "suggestions":  [
-                "分析差评主题，重点关注服务和出品速度" if negative else "口碑良好，保持当前服务水准"
-            ],
+            "insight": f"{len(rows)} 条评价，均分 {avg_rating:.1f}，差评 {len(negative)} 条",
+            "suggestions": ["分析差评主题，重点关注服务和出品速度" if negative else "口碑良好，保持当前服务水准"],
         }
 
     async def _module_digital_maturity(self) -> Dict:
@@ -372,8 +371,7 @@ class DiagnosticService:
         required_done = sum(1 for dt in required_types if imported.get(dt))
         optional_done = sum(1 for dt in optional_types if imported.get(dt))
 
-        completeness = (required_done / len(required_types) * 60 +
-                        optional_done / len(optional_types) * 40)
+        completeness = required_done / len(required_types) * 60 + optional_done / len(optional_types) * 40
         score = int(completeness)
         label, color = _label(score)
 
@@ -382,18 +380,19 @@ class DiagnosticService:
 
         return {
             "health_score": score,
-            "label":        label,
-            "color":        color,
+            "label": label,
+            "color": color,
             "metrics": {
-                "required_completed":  required_done,
-                "required_total":      len(required_types),
-                "optional_completed":  optional_done,
-                "optional_total":      len(optional_types),
+                "required_completed": required_done,
+                "required_total": len(required_types),
+                "optional_completed": optional_done,
+                "optional_total": len(optional_types),
                 "data_completeness_pct": round(completeness, 1),
             },
-            "insight":      f"数据完整度 {completeness:.0f}%（必填 {required_done}/{len(required_types)}）",
-            "suggestions":  (
-                [f"补充必填数据: {', '.join(missing_required)}"] if missing_required
+            "insight": f"数据完整度 {completeness:.0f}%（必填 {required_done}/{len(required_types)}）",
+            "suggestions": (
+                [f"补充必填数据: {', '.join(missing_required)}"]
+                if missing_required
                 else [f"可补充更多数据提升诊断精度: {', '.join(missing_optional[:3])}"]
             ),
         }
@@ -466,10 +465,14 @@ class DiagnosticService:
             task.extra = report_summary
             task.updated_at = datetime.utcnow()
         else:
-            self.db.add(OnboardingTask(
-                store_id=self.store_id, step="diagnose", status="completed",
-                extra=report_summary,
-            ))
+            self.db.add(
+                OnboardingTask(
+                    store_id=self.store_id,
+                    step="diagnose",
+                    status="completed",
+                    extra=report_summary,
+                )
+            )
         await self.db.commit()
 
     @staticmethod
@@ -477,11 +480,11 @@ class DiagnosticService:
         label, color = _label(score)
         return {
             "health_score": score,
-            "label":        label,
-            "color":        color,
-            "metrics":      {},
-            "insight":      reason,
-            "suggestions":  [reason] if is_warning else [],
+            "label": label,
+            "color": color,
+            "metrics": {},
+            "insight": reason,
+            "suggestions": [reason] if is_warning else [],
         }
 
     @staticmethod
@@ -498,6 +501,7 @@ class DiagnosticService:
 
 # ── PDF rendering ──────────────────────────────────────────────────────────────
 
+
 def _render_pdf(report: Dict) -> bytes:
     """
     Render diagnostic report as PDF.
@@ -505,6 +509,7 @@ def _render_pdf(report: Dict) -> bytes:
     """
     try:
         from weasyprint import HTML
+
         html = _report_to_html(report)
         return HTML(string=html).write_pdf()
     except ImportError:
@@ -512,6 +517,7 @@ def _render_pdf(report: Dict) -> bytes:
 
     try:
         from fpdf import FPDF
+
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Helvetica", size=12)

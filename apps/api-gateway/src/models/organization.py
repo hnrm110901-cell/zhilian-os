@@ -1,7 +1,8 @@
 """
 Organization hierarchy: Group → Brand → Region
 """
-from sqlalchemy import Column, String, Numeric, Boolean, Text
+
+from sqlalchemy import Boolean, Column, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import ARRAY
 
 from .base import Base, TimestampMixin
@@ -9,6 +10,7 @@ from .base import Base, TimestampMixin
 
 class Group(Base, TimestampMixin):
     """集团"""
+
     __tablename__ = "groups"
 
     group_id = Column(String(50), primary_key=True)
@@ -23,6 +25,7 @@ class Group(Base, TimestampMixin):
 
 class Brand(Base, TimestampMixin):
     """品牌"""
+
     __tablename__ = "brands"
 
     brand_id = Column(String(50), primary_key=True)
@@ -40,6 +43,7 @@ class Brand(Base, TimestampMixin):
 
 class Region(Base, TimestampMixin):
     """区域"""
+
     __tablename__ = "regions"
 
     region_id = Column(String(50), primary_key=True)

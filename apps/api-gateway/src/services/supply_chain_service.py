@@ -1,13 +1,13 @@
 """
 供应链服务
 """
+
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.exceptions import NotFoundError
 from src.models.supply_chain import PurchaseOrder, Supplier
 
@@ -38,7 +38,9 @@ class SupplyChainService:
         suppliers = result.scalars().all()
 
         # 获取总数（复用同一查询结果）
-        from sqlalchemy import func, select as sa_select
+        from sqlalchemy import func
+        from sqlalchemy import select as sa_select
+
         count_stmt = sa_select(func.count()).select_from(Supplier)
         if status:
             count_stmt = count_stmt.where(Supplier.status == status)
@@ -155,8 +157,7 @@ class SupplyChainService:
 
         total = len(orders)
         on_time = sum(
-            1 for o in orders
-            if o.actual_delivery and o.expected_delivery and o.actual_delivery <= o.expected_delivery
+            1 for o in orders if o.actual_delivery and o.expected_delivery and o.actual_delivery <= o.expected_delivery
         )
         total_amount = sum(o.total_amount or 0 for o in orders)
 

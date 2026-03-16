@@ -38,9 +38,11 @@ _BFF_CACHE_TTL = 30  # seconds
 
 # ── Redis 缓存助手 ────────────────────────────────────────────────────────────
 
+
 async def _cache_get(key: str) -> Optional[Dict]:
     try:
         from src.services.redis_cache_service import RedisCacheService
+
         svc = RedisCacheService()
         return await svc.get(key)
     except Exception as exc:
@@ -51,6 +53,7 @@ async def _cache_get(key: str) -> Optional[Dict]:
 async def _cache_set(key: str, value: Dict) -> None:
     try:
         from src.services.redis_cache_service import RedisCacheService
+
         svc = RedisCacheService()
         await svc.set(key, value, expire=_BFF_CACHE_TTL)
     except Exception as exc:
@@ -58,6 +61,7 @@ async def _cache_set(key: str, value: Dict) -> None:
 
 
 # ── 子调用降级包装 ─────────────────────────────────────────────────────────────
+
 
 async def _safe(coro, default=None):
     """执行协程；任何异常返回 default，不中断整体响应。"""
@@ -70,13 +74,14 @@ async def _safe(coro, default=None):
 
 # ── GET /api/v1/bff/sm/{store_id} ─────────────────────────────────────────────
 
+
 @router.get("/sm/{store_id}", summary="店长手机主屏聚合数据")
 async def sm_home(
-    store_id:          str,
+    store_id: str,
     monthly_revenue_yuan: float = Query(default=0.0, description="月营收（元），用于财务影响评分"),
-    refresh:           bool  = Query(default=False, description="强制刷新缓存"),
+    refresh: bool = Query(default=False, description="强制刷新缓存"),
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession   = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     店长手机主屏一次性聚合：
@@ -93,40 +98,40 @@ async def sm_home(
             return {**cached, "_from_cache": True}
 
     # 并行拉取所有子数据
-    health_task    = _fetch_health_score(store_id, db)
-    top3_task      = _fetch_top3_decisions(store_id, monthly_revenue_yuan, db)
-    queue_task     = _fetch_queue_status(store_id, db)
-    pending_task   = _fetch_pending_count(store_id, db)
-    revenue_task   = _fetch_today_revenue(store_id, db)
-    fc_task        = _fetch_food_cost_quick(store_id, db)
-    alerts_task    = _fetch_unread_alerts_count(store_id, db)
-    hub_task       = _fetch_edge_hub_status(store_id, db)
-    trust_task     = _fetch_ai_trust_summary(store_id, db)
+    health_task = _fetch_health_score(store_id, db)
+    top3_task = _fetch_top3_decisions(store_id, monthly_revenue_yuan, db)
+    queue_task = _fetch_queue_status(store_id, db)
+    pending_task = _fetch_pending_count(store_id, db)
+    revenue_task = _fetch_today_revenue(store_id, db)
+    fc_task = _fetch_food_cost_quick(store_id, db)
+    alerts_task = _fetch_unread_alerts_count(store_id, db)
+    hub_task = _fetch_edge_hub_status(store_id, db)
+    trust_task = _fetch_ai_trust_summary(store_id, db)
 
     health, top3, queue, pending, revenue, fc, alerts_count, hub_status, trust = await asyncio.gather(
-        _safe(health_task,  default=None),
-        _safe(top3_task,    default=[]),
-        _safe(queue_task,   default=None),
+        _safe(health_task, default=None),
+        _safe(top3_task, default=[]),
+        _safe(queue_task, default=None),
         _safe(pending_task, default=0),
         _safe(revenue_task, default=None),
-        _safe(fc_task,      default=None),
-        _safe(alerts_task,  default=0),
-        _safe(hub_task,     default=None),
-        _safe(trust_task,   default=None),
+        _safe(fc_task, default=None),
+        _safe(alerts_task, default=0),
+        _safe(hub_task, default=None),
+        _safe(trust_task, default=None),
     )
 
     payload = {
-        "store_id":                store_id,
-        "as_of":                   datetime.utcnow().isoformat(),
-        "health_score":            health,
-        "top3_decisions":          top3,
-        "queue_status":            queue,
+        "store_id": store_id,
+        "as_of": datetime.utcnow().isoformat(),
+        "health_score": health,
+        "top3_decisions": top3,
+        "queue_status": queue,
         "pending_approvals_count": pending,
-        "today_revenue_yuan":      revenue,
-        "food_cost_summary":       fc,
-        "unread_alerts_count":     alerts_count,
-        "edge_hub_status":         hub_status,
-        "ai_trust_summary":        trust,
+        "today_revenue_yuan": revenue,
+        "food_cost_summary": fc,
+        "unread_alerts_count": alerts_count,
+        "edge_hub_status": hub_status,
+        "ai_trust_summary": trust,
     }
 
     await _cache_set(cache_key, payload)
@@ -135,12 +140,13 @@ async def sm_home(
 
 # ── GET /api/v1/bff/chef/{store_id} ───────────────────────────────────────────
 
+
 @router.get("/chef/{store_id}", summary="厨师长手机屏聚合数据")
 async def chef_home(
-    store_id:  str,
-    refresh:   bool = Query(default=False),
+    store_id: str,
+    refresh: bool = Query(default=False),
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession   = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     厨师长手机屏一次性聚合：
@@ -154,22 +160,22 @@ async def chef_home(
         if cached:
             return {**cached, "_from_cache": True}
 
-    fc_task   = _fetch_food_cost_variance(store_id, db)
+    fc_task = _fetch_food_cost_variance(store_id, db)
     waste_task = _fetch_waste_top5(store_id, db)
-    inv_task  = _fetch_inventory_alerts(store_id, db)
+    inv_task = _fetch_inventory_alerts(store_id, db)
 
     fc, waste, inv = await asyncio.gather(
-        _safe(fc_task,    default=None),
+        _safe(fc_task, default=None),
         _safe(waste_task, default=[]),
-        _safe(inv_task,   default=[]),
+        _safe(inv_task, default=[]),
     )
 
     payload = {
-        "store_id":           store_id,
-        "as_of":              datetime.utcnow().isoformat(),
+        "store_id": store_id,
+        "as_of": datetime.utcnow().isoformat(),
         "food_cost_variance": fc,
-        "waste_top5":         waste,
-        "inventory_alerts":   inv,
+        "waste_top5": waste,
+        "inventory_alerts": inv,
     }
 
     await _cache_set(cache_key, payload)
@@ -178,13 +184,14 @@ async def chef_home(
 
 # ── GET /api/v1/bff/floor/{store_id} ──────────────────────────────────────────
 
+
 @router.get("/floor/{store_id}", summary="楼面经理平板屏聚合数据")
 async def floor_home(
-    store_id:  str,
+    store_id: str,
     target_date: Optional[date] = None,
-    refresh:   bool = Query(default=False),
+    refresh: bool = Query(default=False),
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession   = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     楼面经理平板屏一次性聚合：
@@ -199,21 +206,21 @@ async def floor_home(
             return {**cached, "_from_cache": True}
 
     queue_task = _fetch_queue_status(store_id, db)
-    resv_task  = _fetch_today_reservations(store_id, target_date, db)
-    svc_task   = _fetch_service_alerts(store_id, db)
+    resv_task = _fetch_today_reservations(store_id, target_date, db)
+    svc_task = _fetch_service_alerts(store_id, db)
 
     queue, reservations, svc = await asyncio.gather(
         _safe(queue_task, default=None),
-        _safe(resv_task,  default=[]),
-        _safe(svc_task,   default=[]),
+        _safe(resv_task, default=[]),
+        _safe(svc_task, default=[]),
     )
 
     payload = {
-        "store_id":          store_id,
-        "as_of":             datetime.utcnow().isoformat(),
-        "queue_status":      queue,
+        "store_id": store_id,
+        "as_of": datetime.utcnow().isoformat(),
+        "queue_status": queue,
         "today_reservations": reservations,
-        "service_alerts":    svc,
+        "service_alerts": svc,
     }
 
     await _cache_set(cache_key, payload)
@@ -222,11 +229,12 @@ async def floor_home(
 
 # ── GET /api/v1/bff/hq ────────────────────────────────────────────────────────
 
+
 @router.get("/hq", summary="总部桌面大屏聚合数据")
 async def hq_overview(
-    refresh:   bool = Query(default=False),
+    refresh: bool = Query(default=False),
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession   = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     总部桌面大屏一次性聚合：
@@ -241,46 +249,43 @@ async def hq_overview(
         if cached:
             return {**cached, "_from_cache": True}
 
-    health_task       = _fetch_all_stores_health(db)
-    fc_rank_task      = _fetch_hq_food_cost_ranking(db)
-    pending_task      = _fetch_pending_count(store_id=None, db=db)
-    trend_task        = _fetch_revenue_trend(db)
-    decisions_task    = _fetch_cross_store_decisions(db)
-    hub_summary_task  = _fetch_hq_edge_hub_summary(db)
-    trust_task        = _fetch_hq_ai_trust_overview(db)
+    health_task = _fetch_all_stores_health(db)
+    fc_rank_task = _fetch_hq_food_cost_ranking(db)
+    pending_task = _fetch_pending_count(store_id=None, db=db)
+    trend_task = _fetch_revenue_trend(db)
+    decisions_task = _fetch_cross_store_decisions(db)
+    hub_summary_task = _fetch_hq_edge_hub_summary(db)
+    trust_task = _fetch_hq_ai_trust_overview(db)
 
     health_ranking, fc_ranking, pending, revenue_trend, cross_decisions, hub_summary, trust_overview = await asyncio.gather(
-        _safe(health_task,       default=[]),
-        _safe(fc_rank_task,      default=[]),
-        _safe(pending_task,      default=0),
-        _safe(trend_task,        default={}),
-        _safe(decisions_task,    default=[]),
-        _safe(hub_summary_task,  default=None),
-        _safe(trust_task,        default=None),
+        _safe(health_task, default=[]),
+        _safe(fc_rank_task, default=[]),
+        _safe(pending_task, default=0),
+        _safe(trend_task, default={}),
+        _safe(decisions_task, default=[]),
+        _safe(hub_summary_task, default=None),
+        _safe(trust_task, default=None),
     )
 
     # 计算汇总指标
-    avg_health = (
-        round(sum(s.get("score", 0) for s in health_ranking) / len(health_ranking), 1)
-        if health_ranking else 0.0
-    )
+    avg_health = round(sum(s.get("score", 0) for s in health_ranking) / len(health_ranking), 1) if health_ranking else 0.0
     total_revenue_yuan = round(sum(s.get("revenue_yuan", 0) or 0 for s in health_ranking), 2)
-    critical_count     = sum(1 for s in health_ranking if s.get("level") == "critical")
-    warning_count      = sum(1 for s in health_ranking if s.get("level") == "warning")
+    critical_count = sum(1 for s in health_ranking if s.get("level") == "critical")
+    warning_count = sum(1 for s in health_ranking if s.get("level") == "warning")
 
     payload = {
-        "as_of":                    datetime.utcnow().isoformat(),
-        "stores_health_ranking":    health_ranking,
-        "food_cost_ranking":        fc_ranking,
-        "pending_approvals_count":  pending,
-        "revenue_trend":            revenue_trend,
-        "cross_store_decisions":    cross_decisions,
+        "as_of": datetime.utcnow().isoformat(),
+        "stores_health_ranking": health_ranking,
+        "food_cost_ranking": fc_ranking,
+        "pending_approvals_count": pending,
+        "revenue_trend": revenue_trend,
+        "cross_store_decisions": cross_decisions,
         "hq_summary": {
-            "store_count":          len(health_ranking),
-            "avg_health_score":     avg_health,
-            "total_revenue_yuan":   total_revenue_yuan,
+            "store_count": len(health_ranking),
+            "avg_health_score": avg_health,
+            "total_revenue_yuan": total_revenue_yuan,
             "critical_store_count": critical_count,
-            "warning_store_count":  warning_count,
+            "warning_store_count": warning_count,
         },
         "edge_hub_summary": hub_summary,
         "ai_trust_overview": trust_overview,
@@ -292,12 +297,13 @@ async def hq_overview(
 
 # ── GET /api/v1/bff/sm/{store_id}/notifications ───────────────────────────────
 
+
 @router.get("/sm/{store_id}/notifications", summary="店长通知列表")
 async def sm_notifications(
-    store_id:  str,
-    limit:     int  = Query(default=20, le=50),
+    store_id: str,
+    limit: int = Query(default=20, le=50),
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession   = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     获取店长待处理通知（决策推送 + KPI告警 + 审批请求）。
@@ -316,44 +322,45 @@ async def sm_notifications(
         .order_by(DecisionLog.created_at.desc())
         .limit(limit)
     )
-    result  = await db.execute(stmt)
+    result = await db.execute(stmt)
     records = result.scalars().all()
 
     notifications = []
     for r in records:
         suggestion = r.ai_suggestion or {}
-        notifications.append({
-            "id":                   r.id,
-            "type":                 "pending_decision",
-            "decision_type":        r.decision_type or "",
-            "title":                suggestion.get("action", "待审批决策"),
-            "expected_saving_yuan": suggestion.get("expected_saving_yuan", 0.0),
-            "confidence_pct":       round(float(r.ai_confidence or 0) * 100, 1),
-            "trust_score":          round(float(r.trust_score or 0), 1),
-            "ai_reasoning":         suggestion.get("reasoning", ""),
-            "created_at":           r.created_at.isoformat() if r.created_at else None,
-        })
+        notifications.append(
+            {
+                "id": r.id,
+                "type": "pending_decision",
+                "decision_type": r.decision_type or "",
+                "title": suggestion.get("action", "待审批决策"),
+                "expected_saving_yuan": suggestion.get("expected_saving_yuan", 0.0),
+                "confidence_pct": round(float(r.ai_confidence or 0) * 100, 1),
+                "trust_score": round(float(r.trust_score or 0), 1),
+                "ai_reasoning": suggestion.get("reasoning", ""),
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+        )
 
     return {
         "store_id": store_id,
-        "total":    len(notifications),
-        "items":    notifications,
+        "total": len(notifications),
+        "items": notifications,
     }
 
 
 # ── 内部子调用实现 ─────────────────────────────────────────────────────────────
 
+
 async def _fetch_health_score(store_id: str, db: AsyncSession) -> Optional[Dict]:
     from src.services.store_health_service import StoreHealthService
-    return await StoreHealthService.get_store_score(
-        store_id=store_id, target_date=date.today(), db=db
-    )
+
+    return await StoreHealthService.get_store_score(store_id=store_id, target_date=date.today(), db=db)
 
 
-async def _fetch_top3_decisions(
-    store_id: str, monthly_revenue_yuan: float, db: AsyncSession
-) -> List[Dict]:
+async def _fetch_top3_decisions(store_id: str, monthly_revenue_yuan: float, db: AsyncSession) -> List[Dict]:
     from src.services.decision_priority_engine import DecisionPriorityEngine
+
     engine = DecisionPriorityEngine(store_id=store_id)
     return await engine.get_top3(db=db, monthly_revenue_yuan=monthly_revenue_yuan)
 
@@ -401,24 +408,24 @@ async def _fetch_queue_status(store_id: str, db: AsyncSession) -> Optional[Dict]
     )
     queue_items = [
         {
-            "ticket_no":  r[0],
+            "ticket_no": r[0],
             "party_size": r[1],
-            "wait_min":   round(float(r[2]), 0),
-            "status":     r[3],
+            "wait_min": round(float(r[2]), 0),
+            "status": r[3],
         }
         for r in items_res.fetchall()
     ]
 
     return {
-        "waiting_count":   int(row[0]),
-        "avg_wait_min":    round(float(row[1]), 1),
-        "served_today":    served_today,
-        "queue_items":     queue_items,
+        "waiting_count": int(row[0]),
+        "avg_wait_min": round(float(row[1]), 1),
+        "served_today": served_today,
+        "queue_items": queue_items,
     }
 
 
 async def _fetch_pending_count(store_id: Optional[str], db: AsyncSession) -> int:
-    from sqlalchemy import select, func
+    from sqlalchemy import func, select
     from src.models.decision_log import DecisionLog, DecisionStatus
 
     stmt = select(func.count()).where(DecisionLog.decision_status == DecisionStatus.PENDING)
@@ -429,20 +436,18 @@ async def _fetch_pending_count(store_id: Optional[str], db: AsyncSession) -> int
 
 async def _fetch_food_cost_variance(store_id: str, db: AsyncSession) -> Optional[Dict]:
     from src.services.food_cost_service import FoodCostService
-    end   = date.today()
+
+    end = date.today()
     start = end - timedelta(days=7)
-    return await FoodCostService.get_store_food_cost_variance(
-        store_id=store_id, start_date=start, end_date=end, db=db
-    )
+    return await FoodCostService.get_store_food_cost_variance(store_id=store_id, start_date=start, end_date=end, db=db)
 
 
 async def _fetch_waste_top5(store_id: str, db: AsyncSession) -> List[Dict]:
     from src.services.waste_guard_service import WasteGuardService
-    end   = date.today()
+
+    end = date.today()
     start = end - timedelta(days=7)
-    result = await WasteGuardService.get_top5_waste(
-        store_id=store_id, start_date=start, end_date=end, db=db
-    )
+    result = await WasteGuardService.get_top5_waste(store_id=store_id, start_date=start, end_date=end, db=db)
     if not isinstance(result, dict):
         return []
     return result.get("top5") or result.get("items") or []
@@ -450,6 +455,7 @@ async def _fetch_waste_top5(store_id: str, db: AsyncSession) -> List[Dict]:
 
 async def _fetch_inventory_alerts(store_id: str, db: AsyncSession) -> List[Dict]:
     from sqlalchemy import text
+
     result = await db.execute(
         text("""
             SELECT name, current_quantity, min_quantity, unit,
@@ -470,22 +476,21 @@ async def _fetch_inventory_alerts(store_id: str, db: AsyncSession) -> List[Dict]
     rows = result.fetchall()
     return [
         {
-            "ingredient_name":  r[0],
-            "current_stock":    float(r[1]),
-            "reorder_point":    float(r[2]),
-            "unit":             r[3],
-            "alert_type":       "low",
-            "severity":         r[4],
+            "ingredient_name": r[0],
+            "current_stock": float(r[1]),
+            "reorder_point": float(r[2]),
+            "unit": r[3],
+            "alert_type": "low",
+            "severity": r[4],
             "suggested_action": f"补货 {r[0]}，当前库存 {r[1]} {r[3]}",
         }
         for r in rows
     ]
 
 
-async def _fetch_today_reservations(
-    store_id: str, target_date: Optional[date], db: AsyncSession
-) -> List[Dict]:
+async def _fetch_today_reservations(store_id: str, target_date: Optional[date], db: AsyncSession) -> List[Dict]:
     from sqlalchemy import text
+
     # 若未指定日期，用 DB 端的 UTC 当日（与 Python date.today() 保持一致，避免服务器时区差异）
     if target_date:
         date_clause = ":tdate"
@@ -539,6 +544,7 @@ async def _fetch_today_reservations(
 
 async def _fetch_service_alerts(store_id: str, db: AsyncSession) -> List[Dict]:
     from sqlalchemy import text
+
     result = await db.execute(
         text("""
             SELECT event_type, severity, description, created_at
@@ -554,37 +560,33 @@ async def _fetch_service_alerts(store_id: str, db: AsyncSession) -> List[Dict]:
     rows = result.fetchall()
     return [
         {
-            "alert_type":  r[0],
-            "severity":    r[1],
+            "alert_type": r[0],
+            "severity": r[1],
             "description": r[2],
-            "created_at":  r[3].isoformat() if hasattr(r[3], "isoformat") else str(r[3]),
+            "created_at": r[3].isoformat() if hasattr(r[3], "isoformat") else str(r[3]),
         }
         for r in rows
     ]
 
 
 async def _fetch_all_stores_health(db: AsyncSession) -> List[Dict]:
-    from src.services.store_health_service import StoreHealthService
     from sqlalchemy import text
-    result = await db.execute(
-        text("SELECT id FROM stores WHERE is_active = true ORDER BY id LIMIT 50")
-    )
+    from src.services.store_health_service import StoreHealthService
+
+    result = await db.execute(text("SELECT id FROM stores WHERE is_active = true ORDER BY id LIMIT 50"))
     store_ids = [r[0] for r in result.fetchall()]
     if not store_ids:
         return []
-    return await StoreHealthService.get_multi_store_scores(
-        store_ids=store_ids, target_date=date.today(), db=db
-    )
+    return await StoreHealthService.get_multi_store_scores(store_ids=store_ids, target_date=date.today(), db=db)
 
 
 async def _fetch_hq_food_cost_ranking(db: AsyncSession) -> List[Dict]:
-    from src.services.food_cost_service import FoodCostService
     from sqlalchemy import text
-    end   = date.today()
+    from src.services.food_cost_service import FoodCostService
+
+    end = date.today()
     start = end - timedelta(days=7)
-    result = await FoodCostService.get_hq_food_cost_ranking(
-        start_date=start, end_date=end, db=db
-    )
+    result = await FoodCostService.get_hq_food_cost_ranking(start_date=start, end_date=end, db=db)
     stores = result.get("stores", []) if isinstance(result, dict) else []
 
     # 若 BOM 数据缺失（全部 actual_cost_pct=0），回退读 kpi_records
@@ -597,7 +599,8 @@ async def _fetch_hq_food_cost_ranking(db: AsyncSession) -> List[Dict]:
 async def _food_cost_ranking_from_kpi(db: AsyncSession) -> List[Dict]:
     """从 kpi_records 读取各店近30天 KPI_COST_RATE 均值，生成食材成本排名。"""
     from sqlalchemy import text
-    end   = date.today()
+
+    end = date.today()
     start = end - timedelta(days=29)
     rows = await db.execute(
         text("""
@@ -619,26 +622,25 @@ async def _food_cost_ranking_from_kpi(db: AsyncSession) -> List[Dict]:
     for i, r in enumerate(rows.fetchall(), start=1):
         actual = float(r[2])
         target = float(r[3])
-        result.append({
-            "store_id":       r[0],
-            "store_name":     r[1],
-            "actual_cost_pct": actual,
-            "theoretical_pct": target,
-            "variance_pct":   round(actual - target, 2),
-            "variance_status": (
-                "critical" if actual - target > 3
-                else "warning" if actual - target > 1
-                else "ok"
-            ),
-            "rank": i,
-        })
+        result.append(
+            {
+                "store_id": r[0],
+                "store_name": r[1],
+                "actual_cost_pct": actual,
+                "theoretical_pct": target,
+                "variance_pct": round(actual - target, 2),
+                "variance_status": ("critical" if actual - target > 3 else "warning" if actual - target > 1 else "ok"),
+                "rank": i,
+            }
+        )
     return result
 
 
 async def _fetch_revenue_trend(db: AsyncSession) -> Dict:
     """近7天全平台按门店每日营收趋势（从 kpi_records 读取）。"""
     from sqlalchemy import text
-    end   = date.today()
+
+    end = date.today()
     start = end - timedelta(days=6)
     rows = await db.execute(
         text("""
@@ -667,11 +669,13 @@ async def _fetch_revenue_trend(db: AsyncSession) -> Dict:
 
     stores = []
     for sid, info in store_map.items():
-        stores.append({
-            "store_id":   sid,
-            "store_name": info["store_name"],
-            "values":     [info["values"].get(d, 0) for d in dates],
-        })
+        stores.append(
+            {
+                "store_id": sid,
+                "store_name": info["store_name"],
+                "values": [info["values"].get(d, 0) for d in dates],
+            }
+        )
 
     return {"dates": dates, "stores": stores}
 
@@ -709,79 +713,86 @@ async def _fetch_food_cost_quick(store_id: str, db: AsyncSession) -> Optional[Di
     """获取近7天食材成本率概要。"""
     from src.services.food_cost_service import FoodCostService
 
-    end   = date.today()
+    end = date.today()
     start = end - timedelta(days=6)
-    result = await FoodCostService.get_store_food_cost_variance(
-        store_id=store_id, start_date=start, end_date=end, db=db
-    )
+    result = await FoodCostService.get_store_food_cost_variance(store_id=store_id, start_date=start, end_date=end, db=db)
     if not result:
         return None
     return {
         "actual_cost_pct": round(float(result.get("actual_cost_pct") or 0), 1),
-        "target_pct":      round(float(result.get("theoretical_pct") or 33.0), 1),
-        "variance_pct":    round(float(result.get("variance_pct") or 0), 1),
+        "target_pct": round(float(result.get("theoretical_pct") or 33.0), 1),
+        "variance_pct": round(float(result.get("variance_pct") or 0), 1),
         "variance_status": result.get("variance_status", "ok"),
     }
 
 
 async def _fetch_hq_edge_hub_summary(db: AsyncSession) -> Dict:
     """全平台边缘硬件汇总：离线主机数 + 未解决告警数。"""
-    from ..models.edge_hub import EdgeHub, EdgeAlert, AlertStatus, AlertLevel, HubStatus
-    from sqlalchemy import select, and_, func as sqlfunc
+    from sqlalchemy import and_
+    from sqlalchemy import func as sqlfunc
+    from sqlalchemy import select
 
-    hub_rows = (await db.execute(
-        select(EdgeHub.status, sqlfunc.count(EdgeHub.id).label("cnt"))
-        .group_by(EdgeHub.status)
-    )).all()
+    from ..models.edge_hub import AlertLevel, AlertStatus, EdgeAlert, EdgeHub, HubStatus
 
-    total_hubs   = sum(r.cnt for r in hub_rows)
-    online_hubs  = sum(r.cnt for r in hub_rows if r.status == HubStatus.ONLINE)
+    hub_rows = (
+        await db.execute(select(EdgeHub.status, sqlfunc.count(EdgeHub.id).label("cnt")).group_by(EdgeHub.status))
+    ).all()
+
+    total_hubs = sum(r.cnt for r in hub_rows)
+    online_hubs = sum(r.cnt for r in hub_rows if r.status == HubStatus.ONLINE)
     offline_hubs = total_hubs - online_hubs
 
-    alert_rows = (await db.execute(
-        select(EdgeAlert.level, sqlfunc.count(EdgeAlert.id).label("cnt"))
-        .where(EdgeAlert.status == AlertStatus.OPEN)
-        .group_by(EdgeAlert.level)
-    )).all()
+    alert_rows = (
+        await db.execute(
+            select(EdgeAlert.level, sqlfunc.count(EdgeAlert.id).label("cnt"))
+            .where(EdgeAlert.status == AlertStatus.OPEN)
+            .group_by(EdgeAlert.level)
+        )
+    ).all()
 
     total_open_alerts = sum(r.cnt for r in alert_rows)
-    p1_open_alerts    = sum(r.cnt for r in alert_rows if r.level == AlertLevel.P1)
+    p1_open_alerts = sum(r.cnt for r in alert_rows if r.level == AlertLevel.P1)
 
     return {
-        "total_hubs":         total_hubs,
-        "online_hubs":        online_hubs,
-        "offline_hubs":       offline_hubs,
-        "open_alert_count":   total_open_alerts,
-        "p1_alert_count":     p1_open_alerts,
+        "total_hubs": total_hubs,
+        "online_hubs": online_hubs,
+        "offline_hubs": offline_hubs,
+        "open_alert_count": total_open_alerts,
+        "p1_alert_count": p1_open_alerts,
     }
 
 
 async def _fetch_edge_hub_status(store_id: str, db: AsyncSession) -> Optional[Dict]:
     """返回门店边缘主机在线状态与未解决告警数量。"""
-    from ..models.edge_hub import EdgeHub, EdgeAlert, AlertStatus, AlertLevel, HubStatus
-    from sqlalchemy import select, and_, func as sqlfunc
+    from sqlalchemy import and_
+    from sqlalchemy import func as sqlfunc
+    from sqlalchemy import select
 
-    hub = (await db.execute(
-        select(EdgeHub).where(EdgeHub.store_id == store_id).limit(1)
-    )).scalar_one_or_none()
+    from ..models.edge_hub import AlertLevel, AlertStatus, EdgeAlert, EdgeHub, HubStatus
 
-    rows = (await db.execute(
-        select(EdgeAlert.level, sqlfunc.count(EdgeAlert.id).label("cnt"))
-        .where(and_(
-            EdgeAlert.store_id == store_id,
-            EdgeAlert.status == AlertStatus.OPEN,
-        ))
-        .group_by(EdgeAlert.level)
-    )).all()
+    hub = (await db.execute(select(EdgeHub).where(EdgeHub.store_id == store_id).limit(1))).scalar_one_or_none()
+
+    rows = (
+        await db.execute(
+            select(EdgeAlert.level, sqlfunc.count(EdgeAlert.id).label("cnt"))
+            .where(
+                and_(
+                    EdgeAlert.store_id == store_id,
+                    EdgeAlert.status == AlertStatus.OPEN,
+                )
+            )
+            .group_by(EdgeAlert.level)
+        )
+    ).all()
 
     total_open = sum(r.cnt for r in rows)
-    p1_open    = sum(r.cnt for r in rows if r.level == AlertLevel.P1)
+    p1_open = sum(r.cnt for r in rows if r.level == AlertLevel.P1)
 
     return {
-        "hub_online":       hub is not None and hub.status == HubStatus.ONLINE,
+        "hub_online": hub is not None and hub.status == HubStatus.ONLINE,
         "open_alert_count": total_open,
-        "p1_alert_count":   p1_open,
-        "last_heartbeat":   hub.last_heartbeat.isoformat() if hub and hub.last_heartbeat else None,
+        "p1_alert_count": p1_open,
+        "last_heartbeat": hub.last_heartbeat.isoformat() if hub and hub.last_heartbeat else None,
     }
 
 
@@ -804,8 +815,10 @@ async def _fetch_unread_alerts_count(store_id: str, db: AsyncSession) -> int:
 async def _fetch_ai_trust_summary(store_id: str, db: AsyncSession) -> Optional[Dict]:
     """门店AI信任分摘要：平均信任分 + 近30天评估成功率 + 累计¥节省。"""
     from sqlalchemy import text
-    row = (await db.execute(
-        text("""
+
+    row = (
+        await db.execute(
+            text("""
             SELECT
                 ROUND(AVG(trust_score)::numeric, 1) AS avg_trust,
                 COUNT(CASE WHEN outcome IS NOT NULL THEN 1 END) AS evaluated,
@@ -815,26 +828,29 @@ async def _fetch_ai_trust_summary(store_id: str, db: AsyncSession) -> Optional[D
             WHERE store_id = :sid
               AND created_at >= NOW() - INTERVAL '30 days'
         """),
-        {"sid": store_id},
-    )).fetchone()
+            {"sid": store_id},
+        )
+    ).fetchone()
     if not row or row[0] is None:
         return None
     evaluated = int(row[1])
     success = int(row[2])
     return {
-        "avg_trust_score":    float(row[0]),
-        "evaluated_count":    evaluated,
-        "success_count":      success,
-        "success_rate_pct":   round(success / evaluated * 100, 1) if evaluated else 0.0,
-        "total_saved_yuan":   round(float(row[3]), 2),
+        "avg_trust_score": float(row[0]),
+        "evaluated_count": evaluated,
+        "success_count": success,
+        "success_rate_pct": round(success / evaluated * 100, 1) if evaluated else 0.0,
+        "total_saved_yuan": round(float(row[3]), 2),
     }
 
 
 async def _fetch_hq_ai_trust_overview(db: AsyncSession) -> Optional[Dict]:
     """全平台AI信任分概览：各门店平均信任分 + 全局评估统计。"""
     from sqlalchemy import text
-    rows = (await db.execute(
-        text("""
+
+    rows = (
+        await db.execute(
+            text("""
             SELECT
                 dl.store_id,
                 s.name AS store_name,
@@ -848,7 +864,8 @@ async def _fetch_hq_ai_trust_overview(db: AsyncSession) -> Optional[Dict]:
             GROUP BY dl.store_id, s.name
             ORDER BY avg_trust DESC
         """),
-    )).fetchall()
+        )
+    ).fetchall()
     if not rows:
         return None
 
@@ -860,19 +877,21 @@ async def _fetch_hq_ai_trust_overview(db: AsyncSession) -> Optional[Dict]:
         success = int(r[4])
         total_evaluated += evaluated
         total_success += success
-        stores.append({
-            "store_id":    r[0],
-            "store_name":  r[1] or r[0],
-            "avg_trust":   float(r[2]),
-            "evaluated":   evaluated,
-            "success":     success,
-        })
+        stores.append(
+            {
+                "store_id": r[0],
+                "store_name": r[1] or r[0],
+                "avg_trust": float(r[2]),
+                "evaluated": evaluated,
+                "success": success,
+            }
+        )
 
     return {
         "store_trust_ranking": stores,
-        "platform_avg_trust":  round(sum(s["avg_trust"] for s in stores) / len(stores), 1) if stores else 0.0,
-        "total_evaluated":     total_evaluated,
-        "total_success":       total_success,
+        "platform_avg_trust": round(sum(s["avg_trust"] for s in stores) / len(stores), 1) if stores else 0.0,
+        "total_evaluated": total_evaluated,
+        "total_success": total_success,
         "platform_success_rate_pct": round(total_success / total_evaluated * 100, 1) if total_evaluated else 0.0,
     }
 
@@ -880,23 +899,20 @@ async def _fetch_hq_ai_trust_overview(db: AsyncSession) -> Optional[Dict]:
 async def _fetch_cross_store_decisions(db: AsyncSession) -> List[Dict]:
     """跨门店紧急决策汇总：取库存告警最多5家店的 Top1 决策，合并排序。"""
     from sqlalchemy import text
+
     # 查有 critical/out_of_stock 库存告警的门店，最多取5家
-    rows = await db.execute(
-        text("""
+    rows = await db.execute(text("""
             SELECT DISTINCT store_id FROM inventory_items
             WHERE status IN ('critical', 'out_of_stock')
             LIMIT 5
-        """)
-    )
+        """))
     store_ids = [r[0] for r in rows.fetchall()]
     if not store_ids:
         return []
 
     from src.services.decision_priority_engine import DecisionPriorityEngine
-    tasks = [
-        _safe(DecisionPriorityEngine(store_id=sid).get_top3(db=db), default=[])
-        for sid in store_ids
-    ]
+
+    tasks = [_safe(DecisionPriorityEngine(store_id=sid).get_top3(db=db), default=[]) for sid in store_ids]
     results = await asyncio.gather(*tasks)
 
     merged = []
@@ -910,6 +926,7 @@ async def _fetch_cross_store_decisions(db: AsyncSession) -> List[Dict]:
 
 
 # ── GET /api/v1/bff/banquet/{store_id} ────────────────────────────────────────
+
 
 @router.get("/banquet/{store_id}", summary="宴会管理首屏聚合数据")
 async def banquet_home(
@@ -932,14 +949,13 @@ async def banquet_home(
             return {**cached, "_from_cache": True}
 
     from datetime import date, timedelta
-    from sqlalchemy import select, and_, func
-    from src.models.banquet import (
-        BanquetOrder, BanquetHall, BanquetLead,
-        OrderStatusEnum,
-    )
+
+    from sqlalchemy import and_, func, select
+    from src.models.banquet import BanquetHall, BanquetLead, BanquetOrder, OrderStatusEnum
 
     async def _fetch_banquet_dashboard():
         from src.models.banquet import BanquetKpiDaily
+
         today = date.today()
         kpi_result = await db.execute(
             select(
@@ -960,13 +976,14 @@ async def banquet_home(
         if not row:
             return None
         revenue_yuan = (row.revenue_fen or 0) / 100
-        profit_yuan  = (row.profit_fen  or 0) / 100
-        order_count  = row.order_count or 0
-        lead_count   = row.lead_count  or 0
-        utilization  = round(row.utilization or 0, 1)
-        conversion   = round(order_count / lead_count * 100, 1) if lead_count > 0 else 0
+        profit_yuan = (row.profit_fen or 0) / 100
+        order_count = row.order_count or 0
+        lead_count = row.lead_count or 0
+        utilization = round(row.utilization or 0, 1)
+        conversion = round(order_count / lead_count * 100, 1) if lead_count > 0 else 0
         return {
-            "year": today.year, "month": today.month,
+            "year": today.year,
+            "month": today.month,
             "revenue_yuan": revenue_yuan,
             "gross_profit_yuan": profit_yuan,
             "order_count": order_count,
@@ -978,22 +995,23 @@ async def banquet_home(
     async def _fetch_stale_leads():
         """FollowupAgent dry_run 扫描"""
         from packages.agents.banquet.src.agent import FollowupAgent
+
         agent = FollowupAgent()
         return await agent.scan_stale_leads(store_id=store_id, db=db, dry_run=True)
 
     async def _fetch_upcoming_orders():
         today = date.today()
         result = await db.execute(
-            select(BanquetOrder).where(
+            select(BanquetOrder)
+            .where(
                 and_(
                     BanquetOrder.store_id == store_id,
                     BanquetOrder.banquet_date >= today,
                     BanquetOrder.banquet_date <= today + timedelta(days=7),
-                    BanquetOrder.order_status.notin_([
-                        OrderStatusEnum.CANCELLED, OrderStatusEnum.CLOSED
-                    ]),
+                    BanquetOrder.order_status.notin_([OrderStatusEnum.CANCELLED, OrderStatusEnum.CLOSED]),
                 )
-            ).order_by(BanquetOrder.banquet_date)
+            )
+            .order_by(BanquetOrder.banquet_date)
         )
         orders = result.scalars().all()
         return [
@@ -1010,9 +1028,7 @@ async def banquet_home(
 
     async def _fetch_hall_summary():
         result = await db.execute(
-            select(func.count()).where(
-                and_(BanquetHall.store_id == store_id, BanquetHall.is_active == True)
-            )
+            select(func.count()).where(and_(BanquetHall.store_id == store_id, BanquetHall.is_active == True))
         )
         return {"active_hall_count": result.scalar() or 0}
 
@@ -1028,7 +1044,7 @@ async def banquet_home(
         "as_of": datetime.utcnow().isoformat(),
         "dashboard": dashboard,
         "stale_lead_count": len(stale_leads),
-        "stale_leads": stale_leads[:5],          # 最多展示5条提醒
+        "stale_leads": stale_leads[:5],  # 最多展示5条提醒
         "upcoming_orders": upcoming_orders,
         "hall_summary": hall_summary,
     }

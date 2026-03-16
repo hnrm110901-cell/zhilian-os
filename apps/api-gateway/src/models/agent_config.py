@@ -1,10 +1,11 @@
 """
 Agent 配置模型 — 每个品牌可独立配置各类 Agent 的推送规则和参数
 """
+
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Column, String, Boolean, DateTime, Text
+from sqlalchemy import Boolean, Column, DateTime, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from .base import Base
@@ -12,6 +13,7 @@ from .base import Base
 
 class AgentConfig(Base):
     """品牌级 Agent 配置（一个品牌 × 一个 agent_type 唯一）"""
+
     __tablename__ = "agent_configs"
 
     id = Column(String(50), primary_key=True, default=lambda: f"AGCFG_{uuid.uuid4().hex[:8].upper()}")

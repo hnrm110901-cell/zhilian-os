@@ -2,10 +2,11 @@
 桌台平面图模型
 定义桌台位置、形状、容量等信息
 """
+
 import enum
 import uuid
 
-from sqlalchemy import Column, String, Integer, Float, Boolean, Enum, ForeignKey, Index
+from sqlalchemy import Boolean, Column, Enum, Float, ForeignKey, Index, Integer, String
 from sqlalchemy.dialects.postgresql import UUID
 
 from .base import Base, TimestampMixin
@@ -13,20 +14,23 @@ from .base import Base, TimestampMixin
 
 class TableShape(str, enum.Enum):
     """桌台形状"""
+
     RECT = "rect"
     CIRCLE = "circle"
 
 
 class TableStatus(str, enum.Enum):
     """桌台状态"""
-    AVAILABLE = "available"      # 空闲
-    RESERVED = "reserved"        # 已预订（未到场）
-    OCCUPIED = "occupied"        # 在座
+
+    AVAILABLE = "available"  # 空闲
+    RESERVED = "reserved"  # 已预订（未到场）
+    OCCUPIED = "occupied"  # 在座
     MAINTENANCE = "maintenance"  # 维护/停用
 
 
 class TableDefinition(Base, TimestampMixin):
     """桌台定义"""
+
     __tablename__ = "table_definitions"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -55,8 +59,8 @@ class TableDefinition(Base, TimestampMixin):
     is_active = Column(Boolean, default=True)
 
     __table_args__ = (
-        Index('idx_table_store_floor', 'store_id', 'floor'),
-        Index('idx_table_store_number', 'store_id', 'table_number', unique=True),
+        Index("idx_table_store_floor", "store_id", "floor"),
+        Index("idx_table_store_number", "store_id", "table_number", unique=True),
     )
 
     def __repr__(self):

@@ -4,6 +4,7 @@ ISV 生命周期管理 API — Phase 2 Month 3
 
 路由前缀：/api/v1/open/isv
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -30,25 +31,27 @@ TIER_LABELS = {"free": "免费版", "basic": "基础版", "pro": "专业版", "e
 
 # ── Schemas ────────────────────────────────────────────────────────────────────
 
+
 class RequestUpgradeBody(BaseModel):
-    target_tier: str              # basic / pro / enterprise
-    reason: str                   # 升级理由，至少 20 字
+    target_tier: str  # basic / pro / enterprise
+    reason: str  # 升级理由，至少 20 字
 
 
 class SetWebhookBody(BaseModel):
-    webhook_url: str              # https:// 开头
+    webhook_url: str  # https:// 开头
 
 
 class ReviewUpgradeBody(BaseModel):
     approved: bool
-    note: Optional[str] = None   # 审核意见（驳回时必填）
+    note: Optional[str] = None  # 审核意见（驳回时必填）
 
 
 class UpdateStatusBody(BaseModel):
-    status: str                   # active / suspended
+    status: str  # active / suspended
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
+
 
 async def _get_developer(session: AsyncSession, developer_id: str) -> Dict[str, Any]:
     row = await session.execute(
@@ -72,6 +75,7 @@ def _fmt_dt(dt: Optional[datetime]) -> Optional[str]:
 
 
 # ── ISV 自助接口 ───────────────────────────────────────────────────────────────
+
 
 @router.post("/{developer_id}/verify")
 async def verify_developer(
@@ -187,18 +191,23 @@ async def get_developer_status(
         "is_verified": dev["is_verified"],
         "verified_at": _fmt_dt(dev["verified_at"]),
         "webhook_url": dev["webhook_url"],
-        "upgrade_request": {
-            "target_tier": dev["upgrade_request_tier"],
-            "reason": dev["upgrade_request_reason"],
-            "requested_at": _fmt_dt(dev["upgrade_requested_at"]),
-            "status": upgrade_status,
-            "reviewed_at": _fmt_dt(dev["upgrade_reviewed_at"]),
-            "review_note": dev["upgrade_review_note"],
-        } if dev["upgrade_request_tier"] else None,
+        "upgrade_request": (
+            {
+                "target_tier": dev["upgrade_request_tier"],
+                "reason": dev["upgrade_request_reason"],
+                "requested_at": _fmt_dt(dev["upgrade_requested_at"]),
+                "status": upgrade_status,
+                "reviewed_at": _fmt_dt(dev["upgrade_reviewed_at"]),
+                "review_note": dev["upgrade_review_note"],
+            }
+            if dev["upgrade_request_tier"]
+            else None
+        ),
     }
 
 
 # ── 管理员接口 ─────────────────────────────────────────────────────────────────
+
 
 @router.get("/admin/list")
 async def admin_list_developers(
@@ -335,8 +344,12 @@ async def admin_update_status(
         )
     await db.commit()
 
-    logger.info("isv_status_changed", developer_id=developer_id, new_status=body.status,
-                operator=current_user.username if current_user else "system")
+    logger.info(
+        "isv_status_changed",
+        developer_id=developer_id,
+        new_status=body.status,
+        operator=current_user.username if current_user else "system",
+    )
     return {"message": f"账号已{'暂停' if body.status == 'suspended' else '恢复'}", "status": body.status}
 
 

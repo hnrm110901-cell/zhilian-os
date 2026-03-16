@@ -23,12 +23,12 @@ from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import structlog
-from sqlalchemy import select, and_, func
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.services.decision_flow_state import DecisionFlowState
 from src.services.decision_priority_engine import DecisionPriorityEngine
 from src.services.waste_guard_service import WasteGuardService
+
 try:
     from src.services.wechat_service import wechat_service
 except Exception:
@@ -49,11 +49,13 @@ def _get_wechat_service():
     global wechat_service
     if wechat_service is None:
         from src.services.wechat_service import wechat_service as _wechat_service
+
         wechat_service = _wechat_service
     return wechat_service
 
 
 # ── 卡片描述格式化 ─────────────────────────────────────────────────────────────
+
 
 def _format_card_description(decisions: List[Dict[str, Any]]) -> str:
     """
@@ -67,18 +69,16 @@ def _format_card_description(decisions: List[Dict[str, Any]]) -> str:
     lines = []
     for d in decisions[:3]:
         saving = d.get("expected_saving_yuan", 0.0)
-        conf   = d.get("confidence_pct", 0.0)
-        diff   = d.get("execution_difficulty", "medium")
-        rank   = d.get("rank", 1)
-        title  = d.get("title", "未知决策")
+        conf = d.get("confidence_pct", 0.0)
+        diff = d.get("execution_difficulty", "medium")
+        rank = d.get("rank", 1)
+        title = d.get("title", "未知决策")
         action = d.get("action", "")
-        trust  = d.get("trust_score", 0.0)
+        trust = d.get("trust_score", 0.0)
 
         trust_label = f" | 信任分{trust:.0f}" if trust > 0 else ""
         lines.append(
-            f"{rank}. 【{title}】\n"
-            f"   {action}\n"
-            f"   💰¥{saving:.0f} | 置信度{conf:.0f}%{trust_label} | 难度:{diff}"
+            f"{rank}. 【{title}】\n" f"   {action}\n" f"   💰¥{saving:.0f} | 置信度{conf:.0f}%{trust_label} | 难度:{diff}"
         )
 
     desc = "\n\n".join(lines) if lines else "今日无高优先级决策"
@@ -98,9 +98,7 @@ def _format_anomaly_description(
         total = waste_report.get("total_waste_yuan", 0.0)
         if status != "ok":
             emoji = "🔴" if status == "critical" else "⚠️"
-            lines.append(
-                f"{emoji} 损耗率 {rate:.1f}%（¥{total:.0f}），状态：{status}"
-            )
+            lines.append(f"{emoji} 损耗率 {rate:.1f}%（¥{total:.0f}），状态：{status}")
         top5 = waste_report.get("top5", [])
         if top5:
             top_item = top5[0]
@@ -114,10 +112,8 @@ def _format_anomaly_description(
 
     for d in decisions[:2]:
         saving = d.get("expected_saving_yuan", 0.0)
-        conf   = d.get("confidence_pct", 0.0)
-        lines.append(
-            f"• {d.get('title', '')}（¥{saving:.0f}，置信度{conf:.0f}%）"
-        )
+        conf = d.get("confidence_pct", 0.0)
+        lines.append(f"• {d.get('title', '')}（¥{saving:.0f}，置信度{conf:.0f}%）")
 
     desc = "\n".join(lines)
     return desc[:_DESC_MAX]
@@ -129,22 +125,18 @@ def _format_prebattle_description(
 ) -> str:
     """17:30战前推：聚焦库存+排班类决策"""
     inventory_decs = [d for d in decisions if d.get("source") == "inventory"]
-    other_decs     = [d for d in decisions if d.get("source") != "inventory"]
+    other_decs = [d for d in decisions if d.get("source") != "inventory"]
 
     lines = [f"【{store_name}】晚高峰备战核查"]
     if inventory_decs:
         lines.append("📦 库存决策：")
         for d in inventory_decs[:2]:
-            lines.append(
-                f"  • {d.get('title', '')} — {d.get('action', '')[:40]}"
-            )
+            lines.append(f"  • {d.get('title', '')} — {d.get('action', '')[:40]}")
     if other_decs:
         lines.append("📊 其他建议：")
         for d in other_decs[:1]:
             saving = d.get("expected_saving_yuan", 0.0)
-            lines.append(
-                f"  • {d.get('title', '')}（¥{saving:.0f}）"
-            )
+            lines.append(f"  • {d.get('title', '')}（¥{saving:.0f}）")
     if not inventory_decs and not other_decs:
         lines.append("✅ 库存与经营指标均正常")
 
@@ -166,9 +158,7 @@ def _format_evening_description(
 
     for d in decisions[:3]:
         conf = d.get("confidence_pct", 0.0)
-        lines.append(
-            f"• {d.get('title', '')} — 置信度{conf:.0f}%"
-        )
+        lines.append(f"• {d.get('title', '')} — 置信度{conf:.0f}%")
 
     if not lines:
         lines.append("✅ 今日经营正常，无待处理决策")
@@ -177,6 +167,7 @@ def _format_evening_description(
 
 
 # ── DecisionPushService ────────────────────────────────────────────────────────
+
 
 class DecisionPushService:
     """
@@ -193,11 +184,11 @@ class DecisionPushService:
 
     @staticmethod
     async def push_morning_decisions(
-        store_id:           str,
-        brand_id:           str,
-        recipient_user_id:  str,
-        db:                 AsyncSession,
-        store_name:         str = "",
+        store_id: str,
+        brand_id: str,
+        recipient_user_id: str,
+        db: AsyncSession,
+        store_name: str = "",
         monthly_revenue_yuan: float = 0.0,
     ) -> Dict[str, Any]:
         """
@@ -260,11 +251,11 @@ class DecisionPushService:
 
     @staticmethod
     async def push_noon_anomaly(
-        store_id:          str,
-        brand_id:          str,
+        store_id: str,
+        brand_id: str,
         recipient_user_id: str,
-        db:                AsyncSession,
-        store_name:        str = "",
+        db: AsyncSession,
+        store_name: str = "",
     ) -> Dict[str, Any]:
         """
         12:00午推：上午损耗/异常汇总卡片。
@@ -275,7 +266,7 @@ class DecisionPushService:
         wechat = _get_wechat_service()
 
         today = date.today()
-        start  = today.replace(day=1)   # 本月1日
+        start = today.replace(day=1)  # 本月1日
 
         # 获取损耗摘要
         try:
@@ -298,9 +289,8 @@ class DecisionPushService:
             decisions = []
 
         # 仅在有实质性异常时推送
-        has_anomaly = (
-            (waste_summary and waste_summary.get("waste_rate_status") in ("warning", "critical"))
-            or any(d.get("source") in ("food_cost", "reasoning") for d in decisions)
+        has_anomaly = (waste_summary and waste_summary.get("waste_rate_status") in ("warning", "critical")) or any(
+            d.get("source") in ("food_cost", "reasoning") for d in decisions
         )
         if not has_anomaly:
             logger.info("decision_push.noon.no_anomaly", store_id=store_id)
@@ -342,11 +332,11 @@ class DecisionPushService:
 
     @staticmethod
     async def push_prebattle_decisions(
-        store_id:          str,
-        brand_id:          str,
+        store_id: str,
+        brand_id: str,
         recipient_user_id: str,
-        db:                AsyncSession,
-        store_name:        str = "",
+        db: AsyncSession,
+        store_name: str = "",
         monthly_revenue_yuan: float = 0.0,
     ) -> Dict[str, Any]:
         """
@@ -368,8 +358,7 @@ class DecisionPushService:
             decisions = []
 
         # 战前推：仅在有库存或紧急决策时推送
-        actionable = [d for d in decisions if d.get("source") == "inventory"
-                      or d.get("urgency_hours", 99) < 4]
+        actionable = [d for d in decisions if d.get("source") == "inventory" or d.get("urgency_hours", 99) < 4]
         if not actionable:
             logger.info("decision_push.prebattle.no_actionable", store_id=store_id)
             return {"sent": False, "decision_count": 0, "message_id": None, "flow_id": state.flow_id}
@@ -410,11 +399,11 @@ class DecisionPushService:
 
     @staticmethod
     async def push_evening_recap(
-        store_id:          str,
-        brand_id:          str,
+        store_id: str,
+        brand_id: str,
         recipient_user_id: str,
-        db:                AsyncSession,
-        store_name:        str = "",
+        db: AsyncSession,
+        store_name: str = "",
         monthly_revenue_yuan: float = 0.0,
     ) -> Dict[str, Any]:
         """
@@ -502,11 +491,13 @@ class DecisionPushService:
 
 # ── 辅助函数 ───────────────────────────────────────────────────────────────────
 
+
 async def _count_pending_approvals(store_id: str, db: AsyncSession) -> int:
     """查询指定门店的待审批决策数量。"""
     try:
-        from src.models.decision_log import DecisionLog, DecisionStatus
         from sqlalchemy import select
+        from src.models.decision_log import DecisionLog, DecisionStatus
+
         result = await db.execute(
             select(func.count(DecisionLog.id)).where(
                 and_(

@@ -16,37 +16,39 @@ from datetime import datetime
 
 from sqlalchemy import Column, DateTime, Index, Integer, String
 from sqlalchemy.dialects.postgresql import UUID
-
 from src.models.base import Base
-
 
 # ── 枚举 ─────────────────────────────────────────────────────────────────────
 
+
 class LifecycleState(str, enum.Enum):
     """会员生命周期状态（9个）"""
-    LEAD                = "lead"                   # 初始接触（未注册）
-    REGISTERED          = "registered"             # 已注册，尚无订单（同 first_order_pending）
-    FIRST_ORDER_PENDING = "first_order_pending"    # 已注册，等待首单
-    REPEAT              = "repeat"                 # 回头客（1+单，活跃）
-    HIGH_FREQUENCY      = "high_frequency"         # 高频会员（30天内5+单）
-    VIP                 = "vip"                    # VIP会员（高频+高消费）
-    AT_RISK             = "at_risk"                # 流失风险（45天无订单）
-    DORMANT             = "dormant"                # 沉睡（90天无订单）
-    LOST                = "lost"                   # 已流失（terminal）
+
+    LEAD = "lead"  # 初始接触（未注册）
+    REGISTERED = "registered"  # 已注册，尚无订单（同 first_order_pending）
+    FIRST_ORDER_PENDING = "first_order_pending"  # 已注册，等待首单
+    REPEAT = "repeat"  # 回头客（1+单，活跃）
+    HIGH_FREQUENCY = "high_frequency"  # 高频会员（30天内5+单）
+    VIP = "vip"  # VIP会员（高频+高消费）
+    AT_RISK = "at_risk"  # 流失风险（45天无订单）
+    DORMANT = "dormant"  # 沉睡（90天无订单）
+    LOST = "lost"  # 已流失（terminal）
 
 
 class StateTransitionTrigger(str, enum.Enum):
     """状态转移触发器（7个）"""
-    REGISTER                 = "register"
-    FIRST_ORDER              = "first_order"
-    REPEAT_ORDER             = "repeat_order"
+
+    REGISTER = "register"
+    FIRST_ORDER = "first_order"
+    REPEAT_ORDER = "repeat_order"
     HIGH_FREQUENCY_MILESTONE = "high_frequency_milestone"  # 30天内≥5单
-    VIP_UPGRADE              = "vip_upgrade"
-    CHURN_WARNING            = "churn_warning"             # 45天无订单
-    INACTIVITY_LONG          = "inactivity_long"           # 90天无订单
+    VIP_UPGRADE = "vip_upgrade"
+    CHURN_WARNING = "churn_warning"  # 45天无订单
+    INACTIVITY_LONG = "inactivity_long"  # 90天无订单
 
 
 # ── ORM 模型 ──────────────────────────────────────────────────────────────────
+
 
 class MemberLifecycleHistory(Base):
     """

@@ -2,22 +2,24 @@
 Inventory Management API
 库存管理API
 """
+
+from typing import List, Optional
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional, List
-import structlog
+from sqlalchemy import desc, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..core.clock import now_utc, utcnow_naive
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user, require_role
-from ..models.inventory import InventoryItem, InventoryStatus, TransactionType, InventoryTransaction
+from ..models.decision_log import DecisionLog, DecisionStatus, DecisionType
+from ..models.inventory import InventoryItem, InventoryStatus, InventoryTransaction, TransactionType
 from ..models.user import User, UserRole
-from ..models.decision_log import DecisionLog, DecisionType, DecisionStatus
 from ..repositories import InventoryRepository
-from ..services.redis_cache_service import RedisCacheService
 from ..services.approval_service import approval_service
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc
-from ..core.clock import now_utc, utcnow_naive
+from ..services.redis_cache_service import RedisCacheService
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -101,12 +103,21 @@ async def list_inventory(
         items = await InventoryRepository.get_low_stock(session, store_id)
     else:
         items = await InventoryRepository.get_by_store(session, store_id)
-    return [InventoryItemResponse(
-        id=i.id, store_id=i.store_id, name=i.name, category=i.category,
-        unit=i.unit, current_quantity=i.current_quantity, min_quantity=i.min_quantity,
-        max_quantity=i.max_quantity, unit_cost=i.unit_cost,
-        status=i.status.value if hasattr(i.status, "value") else i.status
-    ) for i in items]
+    return [
+        InventoryItemResponse(
+            id=i.id,
+            store_id=i.store_id,
+            name=i.name,
+            category=i.category,
+            unit=i.unit,
+            current_quantity=i.current_quantity,
+            min_quantity=i.min_quantity,
+            max_quantity=i.max_quantity,
+            unit_cost=i.unit_cost,
+            status=i.status.value if hasattr(i.status, "value") else i.status,
+        )
+        for i in items
+    ]
 
 
 @router.post("/inventory", response_model=InventoryItemResponse, status_code=201)
@@ -117,19 +128,31 @@ async def create_inventory_item(
 ):
     """创建库存项"""
     item = InventoryItem(
-        id=req.id, store_id=req.store_id, name=req.name, category=req.category,
-        unit=req.unit, current_quantity=req.current_quantity, min_quantity=req.min_quantity,
-        max_quantity=req.max_quantity, unit_cost=req.unit_cost,
+        id=req.id,
+        store_id=req.store_id,
+        name=req.name,
+        category=req.category,
+        unit=req.unit,
+        current_quantity=req.current_quantity,
+        min_quantity=req.min_quantity,
+        max_quantity=req.max_quantity,
+        unit_cost=req.unit_cost,
     )
     session.add(item)
     await session.commit()
     await session.refresh(item)
     logger.info("inventory_item_created", item_id=item.id)
     return InventoryItemResponse(
-        id=item.id, store_id=item.store_id, name=item.name, category=item.category,
-        unit=item.unit, current_quantity=item.current_quantity, min_quantity=item.min_quantity,
-        max_quantity=item.max_quantity, unit_cost=item.unit_cost,
-        status=item.status.value if hasattr(item.status, "value") else item.status
+        id=item.id,
+        store_id=item.store_id,
+        name=item.name,
+        category=item.category,
+        unit=item.unit,
+        current_quantity=item.current_quantity,
+        min_quantity=item.min_quantity,
+        max_quantity=item.max_quantity,
+        unit_cost=item.unit_cost,
+        status=item.status.value if hasattr(item.status, "value") else item.status,
     )
 
 
@@ -150,10 +173,16 @@ async def update_inventory_item(
     await session.commit()
     await session.refresh(item)
     return InventoryItemResponse(
-        id=item.id, store_id=item.store_id, name=item.name, category=item.category,
-        unit=item.unit, current_quantity=item.current_quantity, min_quantity=item.min_quantity,
-        max_quantity=item.max_quantity, unit_cost=item.unit_cost,
-        status=item.status.value if hasattr(item.status, "value") else item.status
+        id=item.id,
+        store_id=item.store_id,
+        name=item.name,
+        category=item.category,
+        unit=item.unit,
+        current_quantity=item.current_quantity,
+        min_quantity=item.min_quantity,
+        max_quantity=item.max_quantity,
+        unit_cost=item.unit_cost,
+        status=item.status.value if hasattr(item.status, "value") else item.status,
     )
 
 
@@ -179,10 +208,16 @@ async def get_inventory_stats(
         "category_distribution": category_dist,
         "status_distribution": status_dist,
         "alert_items": [
-            {"id": i.id, "name": i.name,
-             "status": i.status.value if hasattr(i.status, "value") else (i.status or "normal"),
-             "current_quantity": i.current_quantity, "min_quantity": i.min_quantity, "unit": i.unit}
-            for i in items if i.status and (i.status.value if hasattr(i.status, "value") else i.status) != "normal"
+            {
+                "id": i.id,
+                "name": i.name,
+                "status": i.status.value if hasattr(i.status, "value") else (i.status or "normal"),
+                "current_quantity": i.current_quantity,
+                "min_quantity": i.min_quantity,
+                "unit": i.unit,
+            }
+            for i in items
+            if i.status and (i.status.value if hasattr(i.status, "value") else i.status) != "normal"
         ],
     }
 
@@ -199,15 +234,14 @@ async def create_purchase_request(
     current_user: User = Depends(get_current_active_user),
 ):
     """生成采购审批请求（不直接执行，需店长审批后才补货）"""
-    from ..services.approval_service import approval_service
     from ..models.decision_log import DecisionType
+    from ..services.approval_service import approval_service
 
     if req.item_ids:
         from sqlalchemy import and_
+
         result = await session.execute(
-            select(InventoryItem).where(
-                and_(InventoryItem.store_id == store_id, InventoryItem.id.in_(req.item_ids))
-            )
+            select(InventoryItem).where(and_(InventoryItem.store_id == store_id, InventoryItem.id.in_(req.item_ids)))
         )
         items = result.scalars().all()
     else:
@@ -222,15 +256,17 @@ async def create_purchase_request(
         if item.current_quantity >= target:
             continue
         restock_qty = target - item.current_quantity
-        suggestions.append({
-            "item_id": item.id,
-            "item_name": item.name,
-            "current_quantity": item.current_quantity,
-            "target_quantity": target,
-            "restock_quantity": restock_qty,
-            "unit": item.unit,
-            "estimated_cost": int(restock_qty * (item.unit_cost or 0)),
-        })
+        suggestions.append(
+            {
+                "item_id": item.id,
+                "item_name": item.name,
+                "current_quantity": item.current_quantity,
+                "target_quantity": target,
+                "restock_quantity": restock_qty,
+                "unit": item.unit,
+                "estimated_cost": int(restock_qty * (item.unit_cost or 0)),
+            }
+        )
 
     if not suggestions:
         return {"message": "所有库存充足，无需补货", "items": []}
@@ -269,10 +305,9 @@ async def batch_restock(
     """批量补货：将低库存品补至 max_quantity（或 min*3）"""
     if req.item_ids:
         from sqlalchemy import and_
+
         result = await session.execute(
-            select(InventoryItem).where(
-                and_(InventoryItem.store_id == store_id, InventoryItem.id.in_(req.item_ids))
-            )
+            select(InventoryItem).where(and_(InventoryItem.store_id == store_id, InventoryItem.id.in_(req.item_ids)))
         )
         items = result.scalars().all()
     else:
@@ -480,22 +515,24 @@ async def list_transfer_requests(
         status_value = row.decision_status.value if hasattr(row.decision_status, "value") else str(row.decision_status)
         if status_filter and status_value != status_filter:
             continue
-        items.append({
-            "decision_id": row.id,
-            "status": status_value,
-            "source_store_id": suggestion.get("source_store_id", row.store_id),
-            "target_store_id": suggestion.get("target_store_id"),
-            "source_item_id": suggestion.get("source_item_id"),
-            "target_item_id": suggestion.get("target_item_id"),
-            "item_name": suggestion.get("item_name"),
-            "quantity": suggestion.get("quantity"),
-            "unit": suggestion.get("unit"),
-            "reason": suggestion.get("reason"),
-            "manager_feedback": row.manager_feedback,
-            "created_at": row.created_at.isoformat() if row.created_at else None,
-            "approved_at": row.approved_at.isoformat() if row.approved_at else None,
-            "executed_at": row.executed_at.isoformat() if row.executed_at else None,
-        })
+        items.append(
+            {
+                "decision_id": row.id,
+                "status": status_value,
+                "source_store_id": suggestion.get("source_store_id", row.store_id),
+                "target_store_id": suggestion.get("target_store_id"),
+                "source_item_id": suggestion.get("source_item_id"),
+                "target_item_id": suggestion.get("target_item_id"),
+                "item_name": suggestion.get("item_name"),
+                "quantity": suggestion.get("quantity"),
+                "unit": suggestion.get("unit"),
+                "reason": suggestion.get("reason"),
+                "manager_feedback": row.manager_feedback,
+                "created_at": row.created_at.isoformat() if row.created_at else None,
+                "approved_at": row.approved_at.isoformat() if row.approved_at else None,
+                "executed_at": row.executed_at.isoformat() if row.executed_at else None,
+            }
+        )
 
     return {"total": len(items), "items": items}
 
@@ -520,7 +557,9 @@ async def approve_transfer_request(
     if not decision:
         raise HTTPException(status_code=404, detail="调货申请不存在")
 
-    status_value = decision.decision_status.value if hasattr(decision.decision_status, "value") else str(decision.decision_status)
+    status_value = (
+        decision.decision_status.value if hasattr(decision.decision_status, "value") else str(decision.decision_status)
+    )
     if status_value not in {DecisionStatus.PENDING.value, "pending"}:
         raise HTTPException(status_code=400, detail="仅待审批的调货申请可批准")
 
@@ -573,12 +612,14 @@ async def approve_transfer_request(
     decision.approved_at = utcnow_naive()
     decision.executed_at = utcnow_naive()
     chain = decision.approval_chain or []
-    chain.append({
-        "action": "approved_transfer",
-        "manager_id": str(current_user.id),
-        "timestamp": now_utc().isoformat(),
-        "feedback": req.manager_feedback,
-    })
+    chain.append(
+        {
+            "action": "approved_transfer",
+            "manager_id": str(current_user.id),
+            "timestamp": now_utc().isoformat(),
+            "feedback": req.manager_feedback,
+        }
+    )
     decision.approval_chain = chain
 
     await session.commit()
@@ -611,7 +652,9 @@ async def reject_transfer_request(
     if not decision:
         raise HTTPException(status_code=404, detail="调货申请不存在")
 
-    status_value = decision.decision_status.value if hasattr(decision.decision_status, "value") else str(decision.decision_status)
+    status_value = (
+        decision.decision_status.value if hasattr(decision.decision_status, "value") else str(decision.decision_status)
+    )
     if status_value not in {DecisionStatus.PENDING.value, "pending"}:
         raise HTTPException(status_code=400, detail="仅待审批的调货申请可拒绝")
 
@@ -620,12 +663,14 @@ async def reject_transfer_request(
     decision.manager_feedback = req.manager_feedback
     decision.approved_at = utcnow_naive()
     chain = decision.approval_chain or []
-    chain.append({
-        "action": "rejected_transfer",
-        "manager_id": str(current_user.id),
-        "timestamp": now_utc().isoformat(),
-        "feedback": req.manager_feedback,
-    })
+    chain.append(
+        {
+            "action": "rejected_transfer",
+            "manager_id": str(current_user.id),
+            "timestamp": now_utc().isoformat(),
+            "feedback": req.manager_feedback,
+        }
+    )
     decision.approval_chain = chain
 
     await session.commit()
@@ -644,10 +689,16 @@ async def get_inventory_item(
     if not item:
         raise HTTPException(status_code=404, detail="库存项不存在")
     return InventoryItemResponse(
-        id=item.id, store_id=item.store_id, name=item.name, category=item.category,
-        unit=item.unit, current_quantity=item.current_quantity, min_quantity=item.min_quantity,
-        max_quantity=item.max_quantity, unit_cost=item.unit_cost,
-        status=item.status.value if hasattr(item.status, "value") else item.status
+        id=item.id,
+        store_id=item.store_id,
+        name=item.name,
+        category=item.category,
+        unit=item.unit,
+        current_quantity=item.current_quantity,
+        min_quantity=item.min_quantity,
+        max_quantity=item.max_quantity,
+        unit_cost=item.unit_cost,
+        status=item.status.value if hasattr(item.status, "value") else item.status,
     )
 
 

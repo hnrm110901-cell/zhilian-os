@@ -2,16 +2,18 @@
 AI建议准确率回溯 API
 AI Recommendation Accuracy Retrospective
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import Optional, List, Dict, Any
+
 from datetime import date, datetime, timedelta
+from typing import Any, Dict, List, Optional
+
 import structlog
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import and_, case, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.dependencies import get_current_active_user, get_db
+from ..models.decision_log import DecisionLog, DecisionOutcome, DecisionType
 from ..models.user import User
-from ..models.decision_log import DecisionLog, DecisionType, DecisionOutcome
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, case
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -41,9 +43,7 @@ async def get_accuracy_retrospective(
         if store_id:
             conditions.append(DecisionLog.store_id == store_id)
 
-        result = await db.execute(
-            select(DecisionLog).where(and_(*conditions))
-        )
+        result = await db.execute(select(DecisionLog).where(and_(*conditions)))
         logs = result.scalars().all()
 
         if not logs:
@@ -67,7 +67,14 @@ async def get_accuracy_retrospective(
         for log in logs:
             t = log.decision_type.value if log.decision_type else "unknown"
             if t not in type_stats:
-                type_stats[t] = {"total": 0, "success": 0, "partial": 0, "failure": 0, "avg_confidence": 0.0, "confidences": []}
+                type_stats[t] = {
+                    "total": 0,
+                    "success": 0,
+                    "partial": 0,
+                    "failure": 0,
+                    "avg_confidence": 0.0,
+                    "confidences": [],
+                }
             type_stats[t]["total"] += 1
             if log.outcome == DecisionOutcome.SUCCESS:
                 type_stats[t]["success"] += 1
@@ -82,15 +89,17 @@ async def get_accuracy_retrospective(
         for t, s in type_stats.items():
             acc = round((s["success"] + s["partial"] * 0.5) / s["total"] * 100, 1) if s["total"] > 0 else 0
             avg_conf = round(sum(s["confidences"]) / len(s["confidences"]) * 100, 1) if s["confidences"] else 0
-            by_type.append({
-                "decision_type": t,
-                "total": s["total"],
-                "success": s["success"],
-                "partial": s["partial"],
-                "failure": s["failure"],
-                "accuracy": acc,
-                "avg_confidence": avg_conf,
-            })
+            by_type.append(
+                {
+                    "decision_type": t,
+                    "total": s["total"],
+                    "success": s["success"],
+                    "partial": s["partial"],
+                    "failure": s["failure"],
+                    "accuracy": acc,
+                    "avg_confidence": avg_conf,
+                }
+            )
         by_type.sort(key=lambda x: x["total"], reverse=True)
 
         # 每7天一个趋势点
@@ -104,12 +113,14 @@ async def get_accuracy_retrospective(
             w_success = sum(1 for l in week_logs if l.outcome == DecisionOutcome.SUCCESS)
             w_partial = sum(1 for l in week_logs if l.outcome == DecisionOutcome.PARTIAL)
             w_acc = round((w_success + w_partial * 0.5) / len(week_logs) * 100, 1)
-            weekly_trend.append({
-                "week_start": week_start.strftime("%Y-%m-%d"),
-                "week_end": week_end.strftime("%Y-%m-%d"),
-                "total": len(week_logs),
-                "accuracy": w_acc,
-            })
+            weekly_trend.append(
+                {
+                    "week_start": week_start.strftime("%Y-%m-%d"),
+                    "week_end": week_end.strftime("%Y-%m-%d"),
+                    "total": len(week_logs),
+                    "accuracy": w_acc,
+                }
+            )
         weekly_trend.reverse()
 
         # 置信度分桶（0-20%, 20-40%, 40-60%, 60-80%, 80-100%）
@@ -128,11 +139,13 @@ async def get_accuracy_retrospective(
             b_success = sum(1 for l in bucket_logs if l.outcome == DecisionOutcome.SUCCESS)
             b_partial = sum(1 for l in bucket_logs if l.outcome == DecisionOutcome.PARTIAL)
             b_acc = round((b_success + b_partial * 0.5) / len(bucket_logs) * 100, 1)
-            confidence_buckets.append({
-                "confidence_range": b["label"],
-                "total": len(bucket_logs),
-                "accuracy": b_acc,
-            })
+            confidence_buckets.append(
+                {
+                    "confidence_range": b["label"],
+                    "total": len(bucket_logs),
+                    "accuracy": b_acc,
+                }
+            )
 
         return {
             "period_days": days,

@@ -2,18 +2,19 @@
 客户自助预订公开API — 无需登录
 H5页面通过手机号+验证码认证后，使用 X-Phone-Token 访问
 """
-from fastapi import APIRouter, Depends, HTTPException, Header, Query
-from pydantic import BaseModel, Field
-from typing import Optional, List
-from datetime import date, time, datetime
+
+from datetime import date, datetime, time
+from typing import List, Optional
 
 import structlog
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
-from ..services.sms_service import sms_service
-from ..services.public_reservation_service import public_reservation_service
 from ..middleware.public_rate_limiter import check_ip_rate_limit, check_sms_rate_limit
+from ..services.public_reservation_service import public_reservation_service
+from ..services.sms_service import sms_service
 
 logger = structlog.get_logger()
 
@@ -22,12 +23,15 @@ router = APIRouter(prefix="/api/v1/public", tags=["public_reservation"])
 
 # ── Pydantic Models ──
 
+
 class SendCodeRequest(BaseModel):
     phone: str = Field(..., min_length=11, max_length=11, description="手机号")
+
 
 class VerifyCodeRequest(BaseModel):
     phone: str = Field(..., min_length=11, max_length=11)
     code: str = Field(..., min_length=6, max_length=6)
+
 
 class CreateBookingRequest(BaseModel):
     store_id: str
@@ -39,6 +43,7 @@ class CreateBookingRequest(BaseModel):
     table_type: Optional[str] = None
     special_requests: Optional[str] = Field(None, max_length=500)
     dietary_restrictions: Optional[str] = Field(None, max_length=255)
+
 
 class BookingResponse(BaseModel):
     id: str
@@ -74,6 +79,7 @@ def _to_booking_response(r) -> BookingResponse:
 
 # ── Helper: get DB without tenant isolation ──
 
+
 def _get_public_db():
     return get_db(enable_tenant_isolation=False)
 
@@ -87,6 +93,7 @@ async def _get_phone_from_token(x_phone_token: str = Header(..., alias="X-Phone-
 
 
 # ── SMS 验证 ──
+
 
 @router.post("/sms/send-code")
 async def send_code(
@@ -118,6 +125,7 @@ async def verify_code(
 
 # ── 门店信息 ──
 
+
 @router.get("/stores")
 async def list_stores(
     session: AsyncSession = Depends(_get_public_db),
@@ -139,6 +147,7 @@ async def get_availability(
 
 
 # ── 预订操作（需 X-Phone-Token） ──
+
 
 @router.post("/reservations", response_model=BookingResponse, status_code=201)
 async def create_reservation(

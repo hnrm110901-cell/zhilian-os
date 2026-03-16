@@ -2,11 +2,13 @@
 POS Service
 品智收银系统服务层
 """
-from typing import Dict, Any, Optional, List
-from datetime import datetime
-import structlog
-import sys
+
 import os
+import sys
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+import structlog
 
 # 添加packages路径到sys.path
 packages_path = os.path.join(os.path.dirname(__file__), "../../../../packages")
@@ -14,6 +16,7 @@ sys.path.insert(0, os.path.abspath(packages_path))
 
 try:
     from api_adapters.pinzhi.src.adapter import PinzhiAdapter
+
     PINZHI_AVAILABLE = True
 except ImportError:
     logger = structlog.get_logger()
@@ -155,9 +158,7 @@ class POSService:
             "total": len(orders),
         }
 
-    async def query_order_summary(
-        self, ognid: str, business_date: str
-    ) -> Dict[str, Any]:
+    async def query_order_summary(self, ognid: str, business_date: str) -> Dict[str, Any]:
         """
         查询门店收入汇总
 

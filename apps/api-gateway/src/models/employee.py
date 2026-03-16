@@ -1,9 +1,11 @@
 """
 Employee Model
 """
-from sqlalchemy import Column, String, Boolean, JSON, ForeignKey, Date
-from sqlalchemy.dialects.postgresql import UUID, ARRAY
+
 import uuid
+
+from sqlalchemy import JSON, Boolean, Column, Date, ForeignKey, String
+from sqlalchemy.dialects.postgresql import ARRAY, UUID
 
 from .base import Base, TimestampMixin
 

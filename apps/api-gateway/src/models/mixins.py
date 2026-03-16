@@ -3,4 +3,3 @@
 from .base import TimestampMixin
 
 __all__ = ["TimestampMixin"]
-

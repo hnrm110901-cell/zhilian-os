@@ -2,11 +2,13 @@
 Celery异步任务
 用于Neural System的事件处理和向量数据库索引
 """
-from typing import Dict, Any
+
 import asyncio
 import inspect
 import os
 import re
+from typing import Any, Dict
+
 import structlog
 
 # 表名只允许小写字母/数字/下划线，防止通过 backup_jobs.tables 字段注入任意 SQL
@@ -90,11 +92,13 @@ def process_neural_event(
     Returns:
         处理结果
     """
+
     async def _run():
         from datetime import datetime
-        from ..services.vector_db_service import vector_db_service
+
         from ..core.database import AsyncSessionLocal
-        from ..models.neural_event_log import NeuralEventLog, EventProcessingStatus
+        from ..models.neural_event_log import EventProcessingStatus, NeuralEventLog
+        from ..services.vector_db_service import vector_db_service
 
         # 1. 写入 DB — 标记为 processing
         async with AsyncSessionLocal() as session:
@@ -138,12 +142,14 @@ def process_neural_event(
             }
             await vector_db_service.index_event(event_payload)
             from ..services.domain_vector_service import domain_vector_service
+
             await domain_vector_service.index_neural_event(store_id, event_payload)
             vector_indexed = True
             actions_taken.append("vector_indexed")
 
             # 3. 触发企微推送
             from ..services.wechat_trigger_service import wechat_trigger_service
+
             try:
                 await wechat_trigger_service.trigger_push(
                     event_type=event_type,
@@ -196,8 +202,7 @@ def process_neural_event(
                     db_log = await session.get(NeuralEventLog, event_id)
                     if db_log:
                         db_log.processing_status = (
-                            EventProcessingStatus.FAILED if is_last_retry
-                            else EventProcessingStatus.RETRYING
+                            EventProcessingStatus.FAILED if is_last_retry else EventProcessingStatus.RETRYING
                         )
                         db_log.error_message = str(e)
                         db_log.retry_count = self.request.retries + 1
@@ -230,6 +235,7 @@ def index_to_vector_db(
     Returns:
         索引结果
     """
+
     async def _run():
         try:
             from ..services.vector_db_service import vector_db_service
@@ -292,15 +298,18 @@ def index_order_to_vector_db(
     Returns:
         索引结果
     """
+
     async def _run():
-        from ..services.vector_db_service import vector_db_service
         from ..services.domain_vector_service import domain_vector_service
+        from ..services.vector_db_service import vector_db_service
+
         store_id = order_data.get("store_id", "")
         logger.info("开始索引到向量数据库", collection="orders", data_id=order_data.get("id"))
         await vector_db_service.index_order(order_data)
         await domain_vector_service.index_revenue_event(store_id, order_data)
         logger.info("向量数据库索引完成", collection="orders/revenue", data_id=order_data.get("id"))
         return {"success": True, "collection": "orders", "data_id": order_data.get("id")}
+
     try:
         return asyncio.run(_run())
     except Exception as e:
@@ -325,15 +334,18 @@ def index_dish_to_vector_db(
     Returns:
         索引结果
     """
+
     async def _run():
-        from ..services.vector_db_service import vector_db_service
         from ..services.domain_vector_service import domain_vector_service
+        from ..services.vector_db_service import vector_db_service
+
         store_id = dish_data.get("store_id", "")
         logger.info("开始索引到向量数据库", collection="dishes", data_id=dish_data.get("id"))
         await vector_db_service.index_dish(dish_data)
         await domain_vector_service.index_menu_item(store_id, dish_data)
         logger.info("向量数据库索引完成", collection="dishes/menu", data_id=dish_data.get("id"))
         return {"success": True, "collection": "dishes", "data_id": dish_data.get("id")}
+
     try:
         return asyncio.run(_run())
     except Exception as e:
@@ -361,10 +373,7 @@ def batch_index_orders(
         logger.info("开始批量索引订单", count=len(orders))
 
         # 为每个订单创建异步任务
-        tasks = [
-            index_order_to_vector_db.delay(order)
-            for order in orders
-        ]
+        tasks = [index_order_to_vector_db.delay(order) for order in orders]
 
         # 等待所有任务完成
         results = [task.get(timeout=int(os.getenv("CELERY_TASK_GET_TIMEOUT", "300"))) for task in tasks]
@@ -411,10 +420,7 @@ def batch_index_dishes(
         logger.info("开始批量索引菜品", count=len(dishes))
 
         # 为每个菜品创建异步任务
-        tasks = [
-            index_dish_to_vector_db.delay(dish)
-            for dish in dishes
-        ]
+        tasks = [index_dish_to_vector_db.delay(dish) for dish in dishes]
 
         # 等待所有任务完成
         results = [task.get(timeout=int(os.getenv("CELERY_TASK_GET_TIMEOUT", "300"))) for task in tasks]
@@ -461,49 +467,39 @@ def generate_and_send_daily_report(
     Returns:
         生成和发送结果
     """
+
     async def _run():
         try:
             from datetime import date, datetime, timedelta
-            from ..services.daily_report_service import daily_report_service
-            from ..services.wechat_work_message_service import wechat_work_message_service
+
+            from sqlalchemy import select
+
+            from ..core.database import get_db_session
             from ..models.store import Store
             from ..models.user import User, UserRole
-            from ..core.database import get_db_session
-            from sqlalchemy import select
+            from ..services.daily_report_service import daily_report_service
+            from ..services.wechat_work_message_service import wechat_work_message_service
 
             # 解析日期
             target_date = (
-                datetime.strptime(report_date, "%Y-%m-%d").date()
-                if report_date
-                else date.today() - timedelta(days=1)
+                datetime.strptime(report_date, "%Y-%m-%d").date() if report_date else date.today() - timedelta(days=1)
             )
 
-            logger.info(
-                "开始生成营业日报",
-                store_id=store_id,
-                report_date=str(target_date)
-            )
+            logger.info("开始生成营业日报", store_id=store_id, report_date=str(target_date))
 
             # 获取要生成报告的门店列表
             async with get_db_session() as session:
                 if store_id:
-                    result = await session.execute(
-                        select(Store).where(Store.id == store_id, Store.is_active == True)
-                    )
+                    result = await session.execute(select(Store).where(Store.id == store_id, Store.is_active == True))
                 else:
-                    result = await session.execute(
-                        select(Store).where(Store.is_active == True)
-                    )
+                    result = await session.execute(select(Store).where(Store.is_active == True))
                 stores = result.scalars().all()
 
             total_sent = 0
             for store in stores:
                 try:
                     # 1. 生成日报
-                    report = await daily_report_service.generate_daily_report(
-                        store_id=str(store.id),
-                        report_date=target_date
-                    )
+                    report = await daily_report_service.generate_daily_report(store_id=str(store.id), report_date=target_date)
 
                     # 2. 构建推送消息
                     message = f"""【营业日报】{target_date.strftime('%Y年%m月%d日')}
@@ -538,7 +534,7 @@ def generate_and_send_daily_report(
                                 User.store_id == store.id,
                                 User.is_active == True,
                                 User.role.in_([UserRole.STORE_MANAGER, UserRole.ADMIN]),
-                                User.wechat_user_id.isnot(None)
+                                User.wechat_user_id.isnot(None),
                             )
                         )
                         managers = mgr_result.scalars().all()
@@ -547,43 +543,28 @@ def generate_and_send_daily_report(
                     for manager in managers:
                         try:
                             send_result = await wechat_work_message_service.send_text_message(
-                                user_id=manager.wechat_user_id,
-                                content=message
+                                user_id=manager.wechat_user_id, content=message
                             )
                             if send_result.get("success"):
                                 sent_count += 1
                         except Exception as send_err:
-                            logger.error(
-                                "发送日报失败",
-                                user_id=str(manager.id),
-                                error=str(send_err)
-                            )
+                            logger.error("发送日报失败", user_id=str(manager.id), error=str(send_err))
 
                     # 4. 标记为已发送
                     if sent_count > 0:
                         await daily_report_service.mark_as_sent(report.id)
 
                     logger.info(
-                        "营业日报生成并发送完成",
-                        store_id=str(store.id),
-                        report_date=str(target_date),
-                        sent_count=sent_count
+                        "营业日报生成并发送完成", store_id=str(store.id), report_date=str(target_date), sent_count=sent_count
                     )
                     total_sent += sent_count
 
                 except Exception as store_err:
-                    logger.error(
-                        "门店日报生成失败",
-                        store_id=str(store.id),
-                        error=str(store_err)
-                    )
+                    logger.error("门店日报生成失败", store_id=str(store.id), error=str(store_err))
                     continue
 
             logger.info(
-                "所有门店营业日报生成完成",
-                stores_processed=len(stores),
-                total_sent=total_sent,
-                report_date=str(target_date)
+                "所有门店营业日报生成完成", stores_processed=len(stores), total_sent=total_sent, report_date=str(target_date)
             )
 
             return {
@@ -594,12 +575,7 @@ def generate_and_send_daily_report(
             }
 
         except Exception as e:
-            logger.error(
-                "生成营业日报失败",
-                store_id=store_id,
-                error=str(e),
-                exc_info=e
-            )
+            logger.error("生成营业日报失败", store_id=store_id, error=str(e), exc_info=e)
             raise self.retry(exc=e)
 
     return asyncio.run(_run())
@@ -626,36 +602,32 @@ def perform_daily_reconciliation(
     Returns:
         对账结果
     """
+
     async def _run():
         try:
             from datetime import date, datetime
+
             from ..services.reconcile_service import reconcile_service
 
-            logger.info(
-                "开始执行每日对账",
-                store_id=store_id,
-                reconciliation_date=reconciliation_date
-            )
+            logger.info("开始执行每日对账", store_id=store_id, reconciliation_date=reconciliation_date)
 
             # 解析日期
             if reconciliation_date:
                 target_date = datetime.strptime(reconciliation_date, "%Y-%m-%d").date()
             else:
                 from datetime import timedelta
+
                 target_date = date.today() - timedelta(days=1)
 
             # 执行对账
-            record = await reconcile_service.perform_reconciliation(
-                store_id=store_id,
-                reconciliation_date=target_date
-            )
+            record = await reconcile_service.perform_reconciliation(store_id=store_id, reconciliation_date=target_date)
 
             logger.info(
                 "每日对账完成",
                 store_id=store_id,
                 reconciliation_date=str(target_date),
                 status=record.status.value,
-                diff_ratio=record.diff_ratio
+                diff_ratio=record.diff_ratio,
             )
 
             return {
@@ -665,16 +637,11 @@ def perform_daily_reconciliation(
                 "record_id": str(record.id),
                 "status": record.status.value,
                 "diff_ratio": record.diff_ratio,
-                "alert_sent": record.alert_sent
+                "alert_sent": record.alert_sent,
             }
 
         except Exception as e:
-            logger.error(
-                "执行每日对账失败",
-                store_id=store_id,
-                error=str(e),
-                exc_info=e
-            )
+            logger.error("执行每日对账失败", store_id=store_id, error=str(e), exc_info=e)
             raise self.retry(exc=e)
 
     return asyncio.run(_run())
@@ -699,21 +666,21 @@ def detect_revenue_anomaly(
     Returns:
         检测结果
     """
+
     async def _run():
         try:
-            from datetime import datetime, timedelta, date
+            from datetime import date, datetime, timedelta
+
+            from sqlalchemy import func, select
+
             from ..agents.decision_agent import DecisionAgent
-            from ..services.wechat_alert_service import wechat_alert_service
+            from ..core.database import get_db_session
+            from ..models.order import Order, OrderStatus
             from ..models.store import Store
             from ..models.user import User, UserRole
-            from ..models.order import Order, OrderStatus
-            from ..core.database import get_db_session
-            from sqlalchemy import select, func
+            from ..services.wechat_alert_service import wechat_alert_service
 
-            logger.info(
-                "开始检测营收异常",
-                store_id=store_id
-            )
+            logger.info("开始检测营收异常", store_id=store_id)
 
             decision_agent = DecisionAgent()
             alerts_sent = 0
@@ -721,14 +688,10 @@ def detect_revenue_anomaly(
             # 获取要检测的门店列表
             async with get_db_session() as session:
                 if store_id:
-                    result = await session.execute(
-                        select(Store).where(Store.id == store_id, Store.is_active == True)
-                    )
+                    result = await session.execute(select(Store).where(Store.id == store_id, Store.is_active == True))
                     stores = result.scalars().all()
                 else:
-                    result = await session.execute(
-                        select(Store).where(Store.is_active == True)
-                    )
+                    result = await session.execute(select(Store).where(Store.is_active == True))
                     stores = result.scalars().all()
 
                 for store in stores:
@@ -742,7 +705,7 @@ def detect_revenue_anomaly(
                                 Order.store_id == store.id,
                                 Order.order_time >= today_start,
                                 Order.order_time <= now,
-                                Order.status.in_([OrderStatus.COMPLETED, OrderStatus.SERVED])
+                                Order.status.in_([OrderStatus.COMPLETED, OrderStatus.SERVED]),
                             )
                         )
                         current_revenue = float(rev_result.scalar() or 0) / 100
@@ -759,7 +722,7 @@ def detect_revenue_anomaly(
                                     Order.store_id == store.id,
                                     Order.order_time >= past_start,
                                     Order.order_time <= past_end,
-                                    Order.status.in_([OrderStatus.COMPLETED, OrderStatus.SERVED])
+                                    Order.status.in_([OrderStatus.COMPLETED, OrderStatus.SERVED]),
                                 )
                             )
                             val = float(past_rev.scalar() or 0) / 100
@@ -783,7 +746,7 @@ def detect_revenue_anomaly(
                                 store_id=str(store.id),
                                 current_revenue=current_revenue,
                                 expected_revenue=expected_revenue,
-                                time_period="today"
+                                time_period="today",
                             )
 
                             if analysis["success"]:
@@ -793,7 +756,7 @@ def detect_revenue_anomaly(
                                         User.store_id == store.id,
                                         User.is_active == True,
                                         User.role.in_([UserRole.STORE_MANAGER, UserRole.ADMIN]),
-                                        User.wechat_user_id.isnot(None)
+                                        User.wechat_user_id.isnot(None),
                                     )
                                 )
                                 managers = user_result.scalars().all()
@@ -807,8 +770,8 @@ def detect_revenue_anomaly(
                                         current_revenue=current_revenue,
                                         expected_revenue=expected_revenue,
                                         deviation=deviation,
-                                        analysis=analysis['data']['analysis'],
-                                        recipient_ids=recipient_ids
+                                        analysis=analysis["data"]["analysis"],
+                                        recipient_ids=recipient_ids,
                                     )
 
                                     if alert_result.get("success"):
@@ -817,41 +780,26 @@ def detect_revenue_anomaly(
                                             "营收异常告警已发送",
                                             store_id=str(store.id),
                                             deviation=deviation,
-                                            sent_count=alert_result.get("sent_count")
+                                            sent_count=alert_result.get("sent_count"),
                                         )
                                 else:
-                                    logger.warning(
-                                        "无可用接收人",
-                                        store_id=str(store.id)
-                                    )
+                                    logger.warning("无可用接收人", store_id=str(store.id))
 
                     except Exception as e:
-                        logger.error(
-                            "门店营收异常检测失败",
-                            store_id=str(store.id),
-                            error=str(e)
-                        )
+                        logger.error("门店营收异常检测失败", store_id=str(store.id), error=str(e))
                         continue
 
-            logger.info(
-                "营收异常检测完成",
-                stores_checked=len(stores),
-                alerts_sent=alerts_sent
-            )
+            logger.info("营收异常检测完成", stores_checked=len(stores), alerts_sent=alerts_sent)
 
             return {
                 "success": True,
                 "stores_checked": len(stores),
                 "alerts_sent": alerts_sent,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
         except Exception as e:
-            logger.error(
-                "营收异常检测失败",
-                error=str(e),
-                exc_info=e
-            )
+            logger.error("营收异常检测失败", error=str(e), exc_info=e)
             raise self.retry(exc=e)
 
     return asyncio.run(_run())
@@ -876,19 +824,19 @@ def generate_daily_report_with_rag(
     Returns:
         生成结果
     """
+
     async def _run():
         try:
-            from datetime import datetime, date, timedelta
-            from ..agents.decision_agent import DecisionAgent
-            from ..services.wechat_work_message_service import wechat_work_message_service
-            from ..models.store import Store
-            from ..core.database import get_db_session
+            from datetime import date, datetime, timedelta
+
             from sqlalchemy import select
 
-            logger.info(
-                "开始生成昨日简报(RAG增强)",
-                store_id=store_id
-            )
+            from ..agents.decision_agent import DecisionAgent
+            from ..core.database import get_db_session
+            from ..models.store import Store
+            from ..services.wechat_work_message_service import wechat_work_message_service
+
+            logger.info("开始生成昨日简报(RAG增强)", store_id=store_id)
 
             decision_agent = DecisionAgent()
             reports_sent = 0
@@ -897,22 +845,17 @@ def generate_daily_report_with_rag(
             # 获取要生成报告的门店列表
             async with get_db_session() as session:
                 if store_id:
-                    result = await session.execute(
-                        select(Store).where(Store.id == store_id, Store.is_active == True)
-                    )
+                    result = await session.execute(select(Store).where(Store.id == store_id, Store.is_active == True))
                     stores = result.scalars().all()
                 else:
-                    result = await session.execute(
-                        select(Store).where(Store.is_active == True)
-                    )
+                    result = await session.execute(select(Store).where(Store.is_active == True))
                     stores = result.scalars().all()
 
                 for store in stores:
                     try:
                         # 使用DecisionAgent生成经营建议
                         recommendations = await decision_agent.generate_business_recommendations(
-                            store_id=str(store.id),
-                            focus_area=None  # 全面分析
+                            store_id=str(store.id), focus_area=None  # 全面分析
                         )
 
                         if recommendations["success"]:
@@ -931,12 +874,13 @@ def generate_daily_report_with_rag(
 
                             # 查询店长和管理员的企微ID并发送
                             from ..models.user import User, UserRole
+
                             user_result = await session.execute(
                                 select(User).where(
                                     User.store_id == store.id,
                                     User.is_active == True,
                                     User.role.in_([UserRole.STORE_MANAGER, UserRole.ADMIN]),
-                                    User.wechat_user_id.isnot(None)
+                                    User.wechat_user_id.isnot(None),
                                 )
                             )
                             managers = user_result.scalars().all()
@@ -944,53 +888,32 @@ def generate_daily_report_with_rag(
                             for manager in managers:
                                 try:
                                     send_result = await wechat_work_message_service.send_text_message(
-                                        user_id=manager.wechat_user_id,
-                                        content=message
+                                        user_id=manager.wechat_user_id, content=message
                                     )
                                     if send_result.get("success"):
                                         sent_count += 1
                                 except Exception as send_err:
-                                    logger.error(
-                                        "发送简报失败",
-                                        user_id=str(manager.id),
-                                        error=str(send_err)
-                                    )
+                                    logger.error("发送简报失败", user_id=str(manager.id), error=str(send_err))
 
-                            logger.info(
-                                "昨日简报已生成并发送",
-                                store_id=str(store.id),
-                                sent_count=sent_count
-                            )
+                            logger.info("昨日简报已生成并发送", store_id=str(store.id), sent_count=sent_count)
                             reports_sent += sent_count
 
                     except Exception as e:
-                        logger.error(
-                            "门店简报生成失败",
-                            store_id=str(store.id),
-                            error=str(e)
-                        )
+                        logger.error("门店简报生成失败", store_id=str(store.id), error=str(e))
                         continue
 
-            logger.info(
-                "昨日简报生成完成",
-                stores_processed=len(stores),
-                reports_sent=reports_sent
-            )
+            logger.info("昨日简报生成完成", stores_processed=len(stores), reports_sent=reports_sent)
 
             return {
                 "success": True,
                 "stores_processed": len(stores),
                 "reports_sent": reports_sent,
                 "report_date": str(yesterday),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
         except Exception as e:
-            logger.error(
-                "昨日简报生成失败",
-                error=str(e),
-                exc_info=e
-            )
+            logger.error("昨日简报生成失败", error=str(e), exc_info=e)
             raise self.retry(exc=e)
 
     return asyncio.run(_run())
@@ -1015,21 +938,21 @@ def check_inventory_alert(
     Returns:
         检查结果
     """
+
     async def _run():
         try:
             from datetime import datetime
-            from ..agents.inventory_agent import InventoryAgent
-            from ..services.wechat_alert_service import wechat_alert_service
-            from ..models.store import Store
-            from ..models.user import User, UserRole
-            from ..models.inventory import InventoryItem, InventoryStatus
-            from ..core.database import get_db_session
+
             from sqlalchemy import select
 
-            logger.info(
-                "开始检查库存预警",
-                store_id=store_id
-            )
+            from ..agents.inventory_agent import InventoryAgent
+            from ..core.database import get_db_session
+            from ..models.inventory import InventoryItem, InventoryStatus
+            from ..models.store import Store
+            from ..models.user import User, UserRole
+            from ..services.wechat_alert_service import wechat_alert_service
+
+            logger.info("开始检查库存预警", store_id=store_id)
 
             inventory_agent = InventoryAgent()
             alerts_sent = 0
@@ -1037,14 +960,10 @@ def check_inventory_alert(
             # 获取要检查的门店列表
             async with get_db_session() as session:
                 if store_id:
-                    result = await session.execute(
-                        select(Store).where(Store.id == store_id, Store.is_active == True)
-                    )
+                    result = await session.execute(select(Store).where(Store.id == store_id, Store.is_active == True))
                     stores = result.scalars().all()
                 else:
-                    result = await session.execute(
-                        select(Store).where(Store.is_active == True)
-                    )
+                    result = await session.execute(select(Store).where(Store.is_active == True))
                     stores = result.scalars().all()
 
                 for store in stores:
@@ -1053,11 +972,13 @@ def check_inventory_alert(
                         inv_result = await session.execute(
                             select(InventoryItem).where(
                                 InventoryItem.store_id == store.id,
-                                InventoryItem.status.in_([
-                                    InventoryStatus.LOW,
-                                    InventoryStatus.CRITICAL,
-                                    InventoryStatus.OUT_OF_STOCK,
-                                ])
+                                InventoryItem.status.in_(
+                                    [
+                                        InventoryStatus.LOW,
+                                        InventoryStatus.CRITICAL,
+                                        InventoryStatus.OUT_OF_STOCK,
+                                    ]
+                                ),
                             )
                         )
                         low_stock_items = inv_result.scalars().all()
@@ -1067,15 +988,13 @@ def check_inventory_alert(
                             continue
 
                         # 构建 InventoryAgent 所需的 current_inventory 字典
-                        current_inventory = {
-                            item.id: item.current_quantity for item in low_stock_items
-                        }
+                        current_inventory = {item.id: item.current_quantity for item in low_stock_items}
 
                         # 使用InventoryAgent检查低库存
                         alert_result = await inventory_agent.check_low_stock_alert(
                             store_id=str(store.id),
                             current_inventory=current_inventory,
-                            threshold_hours=int(os.getenv("INVENTORY_ALERT_THRESHOLD_HOURS", "4"))  # 午高峰前N小时预警
+                            threshold_hours=int(os.getenv("INVENTORY_ALERT_THRESHOLD_HOURS", "4")),  # 午高峰前N小时预警
                         )
 
                         if alert_result["success"]:
@@ -1086,9 +1005,11 @@ def check_inventory_alert(
                                     "quantity": item.current_quantity,
                                     "unit": item.unit or "",
                                     "min_quantity": item.min_quantity,
-                                    "risk": "high" if item.status in (
-                                        InventoryStatus.CRITICAL, InventoryStatus.OUT_OF_STOCK
-                                    ) else "medium",
+                                    "risk": (
+                                        "high"
+                                        if item.status in (InventoryStatus.CRITICAL, InventoryStatus.OUT_OF_STOCK)
+                                        else "medium"
+                                    ),
                                 }
                                 for item in low_stock_items
                             ]
@@ -1099,7 +1020,7 @@ def check_inventory_alert(
                                     User.store_id == store.id,
                                     User.is_active == True,
                                     User.role.in_([UserRole.STORE_MANAGER, UserRole.ADMIN]),
-                                    User.wechat_user_id.isnot(None)
+                                    User.wechat_user_id.isnot(None),
                                 )
                             )
                             managers = user_result.scalars().all()
@@ -1111,50 +1032,33 @@ def check_inventory_alert(
                                     store_id=str(store.id),
                                     store_name=store.name,
                                     alert_items=alert_items,
-                                    analysis=alert_result['data']['alert'],
-                                    recipient_ids=recipient_ids
+                                    analysis=alert_result["data"]["alert"],
+                                    recipient_ids=recipient_ids,
                                 )
 
                                 if send_result.get("success"):
                                     alerts_sent += send_result.get("sent_count", 0)
                                     logger.info(
-                                        "库存预警已发送",
-                                        store_id=str(store.id),
-                                        sent_count=send_result.get("sent_count")
+                                        "库存预警已发送", store_id=str(store.id), sent_count=send_result.get("sent_count")
                                     )
                             else:
-                                logger.warning(
-                                    "无可用接收人",
-                                    store_id=str(store.id)
-                                )
+                                logger.warning("无可用接收人", store_id=str(store.id))
 
                     except Exception as e:
-                        logger.error(
-                            "门店库存检查失败",
-                            store_id=str(store.id),
-                            error=str(e)
-                        )
+                        logger.error("门店库存检查失败", store_id=str(store.id), error=str(e))
                         continue
 
-            logger.info(
-                "库存预警检查完成",
-                stores_checked=len(stores),
-                alerts_sent=alerts_sent
-            )
+            logger.info("库存预警检查完成", stores_checked=len(stores), alerts_sent=alerts_sent)
 
             return {
                 "success": True,
                 "stores_checked": len(stores),
                 "alerts_sent": alerts_sent,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
         except Exception as e:
-            logger.error(
-                "库存预警检查失败",
-                error=str(e),
-                exc_info=e
-            )
+            logger.error("库存预警检查失败", error=str(e), exc_info=e)
             raise self.retry(exc=e)
 
     return asyncio.run(_run())
@@ -1163,6 +1067,7 @@ def check_inventory_alert(
 # ------------------------------------------------------------------ #
 # 大数据异步导出任务                                                    #
 # ------------------------------------------------------------------ #
+
 
 @celery_app.task(
     base=CallbackTask,
@@ -1180,12 +1085,12 @@ def async_export_data(self, job_id: str) -> Dict[str, Any]:
     """
     import csv
     import tempfile
-    from datetime import datetime, date
+    from datetime import date, datetime
 
     async def _run():
+        from sqlalchemy import and_, select
         from src.core.database import AsyncSessionLocal
         from src.models.export_job import ExportJob, ExportStatus
-        from sqlalchemy import select, and_
 
         BATCH_SIZE = int(os.getenv("EXPORT_BATCH_SIZE", "1000"))
 
@@ -1243,12 +1148,14 @@ def async_export_data(self, job_id: str) -> Dict[str, Any]:
             raise self.retry(exc=e)
 
     async def _fetch_export_data(job_type: str, params: Dict):
+        from datetime import date, datetime
+
+        from sqlalchemy import and_, select
         from src.core.database import AsyncSessionLocal
-        from sqlalchemy import select, and_
-        from datetime import datetime, date
 
         if job_type == "transactions":
             from src.models.finance import FinancialTransaction
+
             headers = ["日期", "类型", "分类", "子分类", "金额(元)", "描述", "支付方式", "门店ID"]
             async with AsyncSessionLocal() as session:
                 conditions = []
@@ -1266,16 +1173,23 @@ def async_export_data(self, job_id: str) -> Dict[str, Any]:
                 stmt = stmt.order_by(FinancialTransaction.transaction_date.desc())
                 result = await session.execute(stmt)
                 rows = [
-                    [t.transaction_date.isoformat() if t.transaction_date else "",
-                     t.transaction_type or "", t.category or "", t.subcategory or "",
-                     round((t.amount or 0) / 100, 2), t.description or "",
-                     t.payment_method or "", t.store_id or ""]
+                    [
+                        t.transaction_date.isoformat() if t.transaction_date else "",
+                        t.transaction_type or "",
+                        t.category or "",
+                        t.subcategory or "",
+                        round((t.amount or 0) / 100, 2),
+                        t.description or "",
+                        t.payment_method or "",
+                        t.store_id or "",
+                    ]
                     for t in result.scalars().all()
                 ]
             return rows, headers
 
         elif job_type == "audit_logs":
             from src.models.audit_log import AuditLog
+
             headers = ["时间", "用户ID", "用户名", "角色", "操作", "资源类型", "资源ID", "描述", "IP", "状态", "门店ID"]
             async with AsyncSessionLocal() as session:
                 conditions = []
@@ -1295,18 +1209,26 @@ def async_export_data(self, job_id: str) -> Dict[str, Any]:
                 stmt = stmt.order_by(AuditLog.created_at.desc())
                 result = await session.execute(stmt)
                 rows = [
-                    [log.created_at.isoformat() if log.created_at else "",
-                     str(log.user_id) if log.user_id else "", log.username or "",
-                     log.user_role or "", log.action or "", log.resource_type or "",
-                     str(log.resource_id) if log.resource_id else "", log.description or "",
-                     log.ip_address or "", log.status or "",
-                     str(log.store_id) if log.store_id else ""]
+                    [
+                        log.created_at.isoformat() if log.created_at else "",
+                        str(log.user_id) if log.user_id else "",
+                        log.username or "",
+                        log.user_role or "",
+                        log.action or "",
+                        log.resource_type or "",
+                        str(log.resource_id) if log.resource_id else "",
+                        log.description or "",
+                        log.ip_address or "",
+                        log.status or "",
+                        str(log.store_id) if log.store_id else "",
+                    ]
                     for log in result.scalars().all()
                 ]
             return rows, headers
 
         elif job_type == "orders":
             from src.models.order import Order
+
             headers = ["订单号", "状态", "总金额(元)", "桌号", "门店ID", "下单时间"]
             async with AsyncSessionLocal() as session:
                 conditions = []
@@ -1324,11 +1246,14 @@ def async_export_data(self, job_id: str) -> Dict[str, Any]:
                 stmt = stmt.order_by(Order.created_at.desc())
                 result = await session.execute(stmt)
                 rows = [
-                    [o.order_number or str(o.id),
-                     o.status.value if hasattr(o.status, "value") else str(o.status or ""),
-                     round((o.total_amount or 0) / 100, 2),
-                     o.table_number or "", o.store_id or "",
-                     o.created_at.isoformat() if o.created_at else ""]
+                    [
+                        o.order_number or str(o.id),
+                        o.status.value if hasattr(o.status, "value") else str(o.status or ""),
+                        round((o.total_amount or 0) / 100, 2),
+                        o.table_number or "",
+                        o.store_id or "",
+                        o.created_at.isoformat() if o.created_at else "",
+                    ]
                     for o in result.scalars().all()
                 ]
             return rows, headers
@@ -1372,6 +1297,7 @@ def async_export_data(self, job_id: str) -> Dict[str, Any]:
 # 增量备份任务
 # ---------------------------------------------------------------------------
 
+
 @celery_app.task(
     base=CallbackTask,
     bind=True,
@@ -1392,9 +1318,9 @@ def run_backup(self, job_id: str) -> Dict[str, Any]:
     from datetime import datetime, timezone
 
     async def _run():
-        from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-        from sqlalchemy.orm import sessionmaker
         from sqlalchemy import text
+        from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+        from sqlalchemy.orm import sessionmaker
 
         db_url = os.environ["DATABASE_URL"]
         backup_dir = os.getenv("BACKUP_TMP_DIR", "/tmp/backups")
@@ -1406,6 +1332,7 @@ def run_backup(self, job_id: str) -> Dict[str, Any]:
         async with async_session() as session:
             # 读取 BackupJob
             from src.models.backup_job import BackupJob, BackupStatus
+
             result = await session.execute(
                 text("SELECT * FROM backup_jobs WHERE id = :id"),
                 {"id": job_id},
@@ -1427,9 +1354,7 @@ def run_backup(self, job_id: str) -> Dict[str, Any]:
 
         # 获取所有用户表
         async with async_session() as session:
-            res = await session.execute(
-                text("SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename")
-            )
+            res = await session.execute(text("SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename"))
             all_tables = [r[0] for r in res.fetchall()]
 
         target_tables = [t for t in all_tables if not tables_filter or t in tables_filter]
@@ -1539,6 +1464,7 @@ def run_backup(self, job_id: str) -> Dict[str, Any]:
 
         finally:
             import shutil
+
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
     return asyncio.run(_run())
@@ -1563,32 +1489,29 @@ def generate_daily_hub(
     Returns:
         生成结果
     """
+
     async def _run():
         from datetime import date, timedelta
-        from ..services.daily_hub_service import daily_hub_service
-        from ..models.store import Store
-        from ..core.database import get_db_session
+
         from sqlalchemy import select
+
+        from ..core.database import get_db_session
+        from ..models.store import Store
+        from ..services.daily_hub_service import daily_hub_service
 
         target_date = date.today() + timedelta(days=1)
 
         async with get_db_session() as session:
             if store_id:
-                result = await session.execute(
-                    select(Store).where(Store.id == store_id, Store.is_active == True)
-                )
+                result = await session.execute(select(Store).where(Store.id == store_id, Store.is_active == True))
             else:
-                result = await session.execute(
-                    select(Store).where(Store.is_active == True)
-                )
+                result = await session.execute(select(Store).where(Store.is_active == True))
             stores = result.scalars().all()
 
         generated = 0
         for store in stores:
             try:
-                await daily_hub_service.generate_battle_board(
-                    store_id=str(store.id), target_date=target_date
-                )
+                await daily_hub_service.generate_battle_board(store_id=str(store.id), target_date=target_date)
                 generated += 1
                 logger.info("备战板生成成功", store_id=str(store.id), target_date=str(target_date))
             except Exception as e:
@@ -1605,6 +1528,7 @@ def generate_daily_hub(
 # ═══════════════════════════════════════════════════════════════════════════════
 # Phase 3 — 损耗推理 / 规则评估 / 本体日同步
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 @celery_app.task(
     base=CallbackTask,
@@ -1636,6 +1560,7 @@ def process_waste_event(
     Returns:
         {"success": True, "event_id": ..., "root_cause": ..., "confidence": ...}
     """
+
     async def _run():
         from ..core.database import get_db_session
         from ..services.waste_event_service import WasteEventService
@@ -1645,17 +1570,18 @@ def process_waste_event(
 
             # 标记推理中
             from sqlalchemy import update as _update
+
             from ..models.waste_event import WasteEvent, WasteEventStatus
+
             await session.execute(
-                _update(WasteEvent)
-                .where(WasteEvent.event_id == event_id)
-                .values(status=WasteEventStatus.ANALYZING)
+                _update(WasteEvent).where(WasteEvent.event_id == event_id).values(status=WasteEventStatus.ANALYZING)
             )
             await session.commit()
 
         # 调用推理引擎（同步驱动，独立 session）
         try:
             from ..ontology.reasoning import WasteReasoningEngine
+
             engine = WasteReasoningEngine()
             result = engine.infer_root_cause(event_id)
         except Exception as e:
@@ -1704,6 +1630,7 @@ def process_waste_event(
 # L3 — 跨店知识聚合夜间物化（凌晨 2:30 触发）
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @celery_app.task(
     base=CallbackTask,
     bind=True,
@@ -1740,6 +1667,7 @@ def nightly_cross_store_sync(
           "errors":            [...]
         }
     """
+
     async def _run():
         from ..core.database import get_db_session
         from ..services.cross_store_knowledge_service import CrossStoreKnowledgeService
@@ -1800,12 +1728,12 @@ def nightly_cross_store_sync(
             errors=len(errors),
         )
         return {
-            "success":          len(errors) == 0,
+            "success": len(errors) == 0,
             "similarity_pairs": similarity_pairs,
-            "peer_groups":      peer_groups,
+            "peer_groups": peer_groups,
             "metrics_upserted": metrics_upserted,
-            "graph_synced":     graph_synced,
-            "errors":           errors,
+            "graph_synced": graph_synced,
+            "errors": errors,
         }
 
     try:
@@ -1850,6 +1778,7 @@ def evaluate_store_rules(
     Returns:
         {"matched": [...], "actions_created": N, "store_id": ...}
     """
+
     async def _run():
         from ..core.database import get_db_session
         from ..services.knowledge_rule_service import KnowledgeRuleService
@@ -1881,31 +1810,18 @@ def evaluate_store_rules(
                 # 置信度 ≥ 0.70 → 推送企微告警
                 if hit["confidence"] >= 0.70:
                     try:
-                        from ..services.wechat_action_fsm import (
-                            ActionCategory,
-                            ActionPriority,
-                            get_wechat_fsm,
-                        )
+                        from ..services.wechat_action_fsm import ActionCategory, ActionPriority, get_wechat_fsm
+
                         fsm = get_wechat_fsm()
-                        priority = (
-                            ActionPriority.P1 if hit["confidence"] >= 0.80
-                            else ActionPriority.P2
-                        )
+                        priority = ActionPriority.P1 if hit["confidence"] >= 0.80 else ActionPriority.P2
                         conclusion = hit.get("conclusion", {})
-                        action_text = (
-                            conclusion.get("action") or
-                            conclusion.get("conclusion", "请检查相关指标")
-                        )
+                        action_text = conclusion.get("action") or conclusion.get("conclusion", "请检查相关指标")
                         await fsm.create_action(
                             store_id=store_id,
                             category=ActionCategory.KPI_ALERT,
                             priority=priority,
                             title=f"规则告警：{hit['rule_code']}",
-                            content=(
-                                f"**{hit['name']}**\n"
-                                f"置信度：{hit['confidence']:.0%}\n"
-                                f"建议：{action_text}"
-                            ),
+                            content=(f"**{hit['name']}**\n" f"置信度：{hit['confidence']:.0%}\n" f"建议：{action_text}"),
                             receiver_user_id="store_manager",
                             source_event_id=f"RULE-{hit['rule_code']}-{store_id}",
                             evidence={"kpi_context": kpi_context, "rule_code": hit["rule_code"]},
@@ -1922,9 +1838,7 @@ def evaluate_store_rules(
             # 行业基准对比（非 general 时）
             benchmark_summary = []
             if industry_type != "general":
-                benchmark_results = await rule_svc.compare_to_benchmark(
-                    industry_type, kpi_context
-                )
+                benchmark_results = await rule_svc.compare_to_benchmark(industry_type, kpi_context)
                 for br in benchmark_results:
                     if br["percentile_band"] == "bottom_25":
                         benchmark_summary.append(br)
@@ -1979,13 +1893,16 @@ def daily_ontology_sync(
     Returns:
         {"synced_stores": N, "nodes_upserted": N, "errors": [...]}
     """
+
     async def _run():
-        from ..core.database import get_db_session
-        from ..models.store import Store
-        from ..models.bom import BOMTemplate
-        from ..models.waste_event import WasteEvent
-        from sqlalchemy import select, and_
         from datetime import datetime, timedelta
+
+        from sqlalchemy import and_, select
+
+        from ..core.database import get_db_session
+        from ..models.bom import BOMTemplate
+        from ..models.store import Store
+        from ..models.waste_event import WasteEvent
 
         synced_stores = 0
         nodes_upserted = 0
@@ -2004,17 +1921,13 @@ def daily_ontology_sync(
                 sid = str(store.id)
                 try:
                     # 1. 同步活跃 BOM
-                    bom_stmt = (
-                        select(BOMTemplate)
-                        .where(
-                            and_(BOMTemplate.store_id == sid, BOMTemplate.is_active.is_(True))
-                        )
-                    )
+                    bom_stmt = select(BOMTemplate).where(and_(BOMTemplate.store_id == sid, BOMTemplate.is_active.is_(True)))
                     bom_result = await session.execute(bom_stmt)
                     active_boms = bom_result.scalars().all()
 
                     try:
                         from ..ontology.data_sync import OntologyDataSync
+
                         with OntologyDataSync() as sync:
                             for bom in active_boms:
                                 dish_id_str = f"DISH-{bom.dish_id}"
@@ -2042,6 +1955,7 @@ def daily_ontology_sync(
                     events = we_result.scalars().all()
 
                     from ..services.waste_event_service import WasteEventService
+
                     svc = WasteEventService(session)
                     for ev in events:
                         try:
@@ -2089,6 +2003,7 @@ def daily_ontology_sync(
 # L4 — 全平台推理扫描夜间任务（凌晨 3:30 触发）
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @celery_app.task(
     base=CallbackTask,
     bind=True,
@@ -2126,13 +2041,15 @@ def nightly_reasoning_scan(
           "errors":          [...]
         }
     """
+
     async def _run():
+        from sqlalchemy import and_, func, select
+
         from ..core.database import get_db_session
+        from ..models.reasoning import ReasoningReport
         from ..models.store import Store
         from ..services.diagnosis_service import DiagnosisService
         from ..services.reasoning_engine import ALL_DIMENSIONS
-        from ..models.reasoning import ReasoningReport
-        from sqlalchemy import select, and_, func
 
         errors = []
         stores_scanned = 0
@@ -2143,9 +2060,7 @@ def nightly_reasoning_scan(
         async with get_db_session() as session:
             # 拉取活跃门店列表
             if store_ids:
-                stmt = select(Store).where(
-                    and_(Store.id.in_(store_ids), Store.is_active.is_(True))
-                )
+                stmt = select(Store).where(and_(Store.id.in_(store_ids), Store.is_active.is_(True)))
             else:
                 stmt = select(Store).where(Store.is_active.is_(True))
             stores = (await session.execute(stmt)).scalars().all()
@@ -2180,18 +2095,24 @@ def nightly_reasoning_scan(
                         if c.severity in ("P1", "P2") and c.confidence >= 0.70:
                             # Neo4j 同步
                             try:
-                                from ..ontology.data_sync import OntologyDataSync
                                 import uuid as _uuid
+                                from datetime import date
+
                                 # 查找刚写入的 reasoning_report id
                                 from ..models.reasoning import ReasoningReport as RR
-                                from datetime import date
-                                rr_stmt = select(RR).where(
-                                    and_(
-                                        RR.store_id    == sid,
-                                        RR.report_date == date.today(),
-                                        RR.dimension   == dim,
+                                from ..ontology.data_sync import OntologyDataSync
+
+                                rr_stmt = (
+                                    select(RR)
+                                    .where(
+                                        and_(
+                                            RR.store_id == sid,
+                                            RR.report_date == date.today(),
+                                            RR.dimension == dim,
+                                        )
                                     )
-                                ).limit(1)
+                                    .limit(1)
+                                )
                                 rr = (await session.execute(rr_stmt)).scalar_one_or_none()
                                 if rr:
                                     with OntologyDataSync() as sync:
@@ -2214,22 +2135,11 @@ def nightly_reasoning_scan(
 
                             # 企微推送
                             try:
-                                from ..services.wechat_action_fsm import (
-                                    ActionCategory,
-                                    ActionPriority,
-                                    get_wechat_fsm,
-                                )
-                                fsm      = get_wechat_fsm()
-                                priority = (
-                                    ActionPriority.P1
-                                    if c.severity == "P1"
-                                    else ActionPriority.P2
-                                )
-                                action_text = (
-                                    c.recommended_actions[0]
-                                    if c.recommended_actions
-                                    else "请查看推理报告并采取行动"
-                                )
+                                from ..services.wechat_action_fsm import ActionCategory, ActionPriority, get_wechat_fsm
+
+                                fsm = get_wechat_fsm()
+                                priority = ActionPriority.P1 if c.severity == "P1" else ActionPriority.P2
+                                action_text = c.recommended_actions[0] if c.recommended_actions else "请查看推理报告并采取行动"
                                 await fsm.create_action(
                                     store_id=sid,
                                     category=ActionCategory.KPI_ALERT,
@@ -2269,19 +2179,21 @@ def nightly_reasoning_scan(
             errors=len(errors),
         )
         return {
-            "success":       len(errors) == 0,
+            "success": len(errors) == 0,
             "stores_scanned": stores_scanned,
-            "p1_alerts":     p1_count,
-            "p2_alerts":     p2_count,
-            "wechat_sent":   wechat_sent,
-            "errors":        errors,
+            "p1_alerts": p1_count,
+            "p2_alerts": p2_count,
+            "wechat_sent": wechat_sent,
+            "errors": errors,
         }
 
     async def _build_kpi_context(session, store_id: str) -> Dict[str, Any]:
         """从 cross_store_metrics 物化表拉取近期 KPI 值"""
-        from ..models.cross_store import CrossStoreMetric
         from datetime import date, timedelta
-        from sqlalchemy import select, and_
+
+        from sqlalchemy import and_, select
+
+        from ..models.cross_store import CrossStoreMetric
 
         yesterday = date.today() - timedelta(days=1)
         stmt = select(
@@ -2289,7 +2201,7 @@ def nightly_reasoning_scan(
             CrossStoreMetric.value,
         ).where(
             and_(
-                CrossStoreMetric.store_id    == store_id,
+                CrossStoreMetric.store_id == store_id,
                 CrossStoreMetric.metric_date == yesterday,
             )
         )
@@ -2304,17 +2216,22 @@ def nightly_reasoning_scan(
 
 # ── L5 夜间行动派发任务 ───────────────────────────────────────────────────────
 
+
 @celery_app.task(
-    base=CallbackTask, bind=True,
+    base=CallbackTask,
+    bind=True,
     name="tasks.nightly_action_dispatch",
-    max_retries=2, default_retry_delay=300,
-    autoretry_for=(Exception,), retry_backoff=True,
-    retry_backoff_max=1800, retry_jitter=False,
+    max_retries=2,
+    default_retry_delay=300,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=1800,
+    retry_jitter=False,
 )
 def nightly_action_dispatch(
     self,
     store_ids: list = None,
-    days_back: int  = 1,
+    days_back: int = 1,
 ) -> Dict[str, Any]:
     """
     L5 夜间行动批量派发任务（建议调度时间: 04:30，L4 nightly_reasoning_scan 完成后执行）
@@ -2332,19 +2249,23 @@ def nightly_action_dispatch(
         {success, stores_covered, plans_created, dispatched, partial, skipped, errors}
     """
     import asyncio
-    from typing import Dict, Any
+    from typing import Any, Dict
 
     async def _run():
-        from src.core.database import async_session_factory
-        from src.services.action_dispatch_service import ActionDispatchService
-        from src.models.reasoning import ReasoningReport
-        from src.models.action_plan import ActionPlan
         from datetime import date, timedelta
-        from sqlalchemy import select, and_
+
+        from sqlalchemy import and_, select
+        from src.core.database import async_session_factory
+        from src.models.action_plan import ActionPlan
+        from src.models.reasoning import ReasoningReport
+        from src.services.action_dispatch_service import ActionDispatchService
 
         total_stats = {
-            "plans_created": 0, "dispatched": 0,
-            "partial": 0, "skipped": 0, "errors": 0,
+            "plans_created": 0,
+            "dispatched": 0,
+            "partial": 0,
+            "skipped": 0,
+            "errors": 0,
         }
         stores_covered: set = set()
 
@@ -2354,17 +2275,14 @@ def nightly_action_dispatch(
                 target_stores = store_ids
             else:
                 from src.models.store import Store
-                rows  = (await session.execute(
-                    select(Store.id).where(Store.is_active == True)  # noqa: E712
-                )).all()
+
+                rows = (await session.execute(select(Store.id).where(Store.is_active == True))).all()  # noqa: E712
                 target_stores = [r[0] for r in rows]
 
             svc = ActionDispatchService(session)
             for sid in target_stores:
                 try:
-                    stats = await svc.dispatch_pending_alerts(
-                        store_id=sid, days_back=days_back
-                    )
+                    stats = await svc.dispatch_pending_alerts(store_id=sid, days_back=days_back)
                     if stats["plans_created"] > 0 or stats["dispatched"] > 0:
                         stores_covered.add(sid)
                     for k in ("plans_created", "dispatched", "partial", "skipped", "errors"):
@@ -2381,8 +2299,8 @@ def nightly_action_dispatch(
             **total_stats,
         )
         return {
-            "success":         total_stats["errors"] == 0,
-            "stores_covered":  len(stores_covered),
+            "success": total_stats["errors"] == 0,
+            "stores_covered": len(stores_covered),
             **total_stats,
         }
 
@@ -2394,12 +2312,17 @@ def nightly_action_dispatch(
 
 # ── 多阶段工作流 Celery 任务 ──────────────────────────────────────────────────
 
+
 @celery_app.task(
-    base=CallbackTask, bind=True,
+    base=CallbackTask,
+    bind=True,
     name="tasks.start_evening_planning_all_stores",
-    max_retries=2, default_retry_delay=120,
-    autoretry_for=(Exception,), retry_backoff=True,
-    retry_backoff_max=600, retry_jitter=True,
+    max_retries=2,
+    default_retry_delay=120,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
 )
 def start_evening_planning_all_stores(
     self,
@@ -2417,31 +2340,32 @@ def start_evening_planning_all_stores(
     Returns:
         {success, stores_started, fast_plan_ok, fast_plan_failed, errors}
     """
+
     async def _run():
         from datetime import date, timedelta
-        from src.core.database import async_session_factory
-        from src.services.workflow_engine import WorkflowEngine
-        from src.services.fast_planning_service import FastPlanningService
 
-        plan_date      = date.today() + timedelta(days=1)
-        started        = 0
-        fast_plan_ok   = 0
+        from src.core.database import async_session_factory
+        from src.services.fast_planning_service import FastPlanningService
+        from src.services.workflow_engine import WorkflowEngine
+
+        plan_date = date.today() + timedelta(days=1)
+        started = 0
+        fast_plan_ok = 0
         fast_plan_fail = 0
-        errors         = 0
+        errors = 0
 
         async with async_session_factory() as session:
             # 确定目标门店
             if store_ids:
                 target_stores = store_ids
             else:
-                from src.models.store import Store
                 from sqlalchemy import select
-                rows = (await session.execute(
-                    select(Store.id).where(Store.is_active == True)  # noqa: E712
-                )).all()
+                from src.models.store import Store
+
+                rows = (await session.execute(select(Store.id).where(Store.is_active == True))).all()  # noqa: E712
                 target_stores = [str(r[0]) for r in rows]
 
-            engine   = WorkflowEngine(session)
+            engine = WorkflowEngine(session)
             fast_svc = FastPlanningService(session)
 
             for sid in target_stores:
@@ -2491,12 +2415,12 @@ def start_evening_planning_all_stores(
             errors=errors,
         )
         return {
-            "success":          errors == 0,
-            "plan_date":        str(plan_date),
-            "stores_started":   started,
-            "fast_plan_ok":     fast_plan_ok,
+            "success": errors == 0,
+            "plan_date": str(plan_date),
+            "stores_started": started,
+            "fast_plan_ok": fast_plan_ok,
             "fast_plan_failed": fast_plan_fail,
-            "errors":           errors,
+            "errors": errors,
         }
 
     try:
@@ -2506,9 +2430,11 @@ def start_evening_planning_all_stores(
 
 
 @celery_app.task(
-    base=CallbackTask, bind=True,
+    base=CallbackTask,
+    bind=True,
     name="tasks.check_workflow_deadlines",
-    max_retries=1, default_retry_delay=30,
+    max_retries=1,
+    default_retry_delay=30,
 )
 def check_workflow_deadlines(self) -> Dict[str, Any]:
     """
@@ -2521,6 +2447,7 @@ def check_workflow_deadlines(self) -> Dict[str, Any]:
     Returns:
         {success, auto_locked, locked_phases}
     """
+
     async def _run():
         from src.core.database import async_session_factory
         from src.services.timing_service import TimingService
@@ -2531,8 +2458,8 @@ def check_workflow_deadlines(self) -> Dict[str, Any]:
             await session.commit()
 
         return {
-            "success":       True,
-            "auto_locked":   len(locked),
+            "success": True,
+            "auto_locked": len(locked),
             "locked_phases": locked,
         }
 
@@ -2543,10 +2470,13 @@ def check_workflow_deadlines(self) -> Dict[str, Any]:
 
 
 @celery_app.task(
-    base=CallbackTask, bind=True,
+    base=CallbackTask,
+    bind=True,
     name="tasks.release_expired_room_locks",
-    max_retries=2, default_retry_delay=60,
-    autoretry_for=(Exception,), retry_backoff=True,
+    max_retries=2,
+    default_retry_delay=60,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
 )
 def release_expired_room_locks(self) -> Dict[str, Any]:
     """
@@ -2560,19 +2490,20 @@ def release_expired_room_locks(self) -> Dict[str, Any]:
     Returns:
         {success, released_count, released_ids}
     """
+
     async def _run():
         from src.core.database import async_session_factory
         from src.services.banquet_lifecycle_service import BanquetLifecycleService
 
         async with async_session_factory() as session:
-            svc      = BanquetLifecycleService(session)
+            svc = BanquetLifecycleService(session)
             released = await svc.release_expired_locks()
             await session.commit()
 
         return {
-            "success":        True,
+            "success": True,
             "released_count": len(released),
-            "released_ids":   released,
+            "released_ids": released,
         }
 
     try:
@@ -2604,17 +2535,17 @@ def monthly_save_fct_tax(self, year: int = 0, month: int = 0) -> Dict[str, Any]:
     from datetime import date, timedelta
 
     async def _run():
+        from sqlalchemy import select
         from src.core.database import async_session_factory
         from src.models.store import Store
         from src.services.fct_service import FCTService
-        from sqlalchemy import select
 
         # 自动推断上个月
         today = date.today()
         if year == 0 or month == 0:
             first_of_this_month = today.replace(day=1)
             last_month_end = first_of_this_month - timedelta(days=1)
-            _year  = last_month_end.year
+            _year = last_month_end.year
             _month = last_month_end.month
         else:
             _year, _month = year, month
@@ -2649,8 +2580,10 @@ def monthly_save_fct_tax(self, year: int = 0, month: int = 0) -> Dict[str, Any]:
 
         logger.info(
             "月度税务批量保存完成",
-            year=_year, month=_month,
-            saved=saved, failed=failed,
+            year=_year,
+            month=_month,
+            saved=saved,
+            failed=failed,
         )
         return {"year": _year, "month": _month, "saved": saved, "failed": failed}
 
@@ -2663,6 +2596,7 @@ def monthly_save_fct_tax(self, year: int = 0, month: int = 0) -> Dict[str, Any]:
 # ============================================================
 # ARCH-003: 门店记忆层更新任务
 # ============================================================
+
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=300)
 def update_store_memory(self, store_id: str = None, brand_id: str = None):
@@ -2681,6 +2615,7 @@ def update_store_memory(self, store_id: str = None, brand_id: str = None):
                 # 全量刷新：从 DB 获取所有门店
                 from sqlalchemy import select
                 from src.models.store import Store
+
                 result = await db.execute(select(Store.id, Store.brand_id))
                 stores = result.all()
                 for row in stores:
@@ -2725,6 +2660,7 @@ def realtime_anomaly_check(self, store_id: str, event: dict):
 # FEAT-002: 预测性备料推送任务
 # ============================================================
 
+
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=300)
 def push_daily_forecast(self, store_id: str = None):
     """每日9AM推送预测性备料建议，confidence=low 时附\"数据积累中\"提示"""
@@ -2747,6 +2683,7 @@ def push_daily_forecast(self, store_id: str = None):
             else:
                 from sqlalchemy import select
                 from src.models.store import Store
+
                 result = await db.execute(select(Store.id))
                 stores_to_forecast = [str(row.id) for row in result.all()]
 
@@ -2783,6 +2720,7 @@ def push_daily_forecast(self, store_id: str = None):
 # ============================================================
 # L8: 07:00 今日人力建议推送任务
 # ============================================================
+
 
 @celery_app.task(
     bind=True,
@@ -2842,6 +2780,7 @@ def push_daily_workforce_advice(self, store_id: str = None):
 # ============================================================
 # L8: 自动排班（预算硬约束 + 异常提醒）
 # ============================================================
+
 
 @celery_app.task(
     bind=True,
@@ -2905,6 +2844,7 @@ def auto_generate_workforce_schedule(self, store_id: str = None):
 # INFRA-002: 企微消息重试任务
 # ============================================================
 
+
 @celery_app.task(bind=True, max_retries=1)
 def retry_failed_wechat_messages(self):
     """每5分钟从失败队列取出企微消息重试（最多3次）"""
@@ -2912,6 +2852,7 @@ def retry_failed_wechat_messages(self):
 
     async def _run():
         from src.services.wechat_service import wechat_service
+
         await wechat_service.retry_failed_messages(max_retries=3, batch_size=10)
 
     try:
@@ -2924,6 +2865,7 @@ def retry_failed_wechat_messages(self):
 # v2.0 决策效果反馈（48h 后检查）
 # ============================================================
 
+
 @celery_app.task(bind=True, max_retries=2, default_retry_delay=300)
 def check_decision_impact(self, decision_id: str):
     """
@@ -2935,16 +2877,14 @@ def check_decision_impact(self, decision_id: str):
     import asyncio
 
     async def _run():
-        from src.core.database import get_db_session
-        from src.models.decision_log import DecisionLog, DecisionStatus, DecisionOutcome
-        from src.services.wechat_service import wechat_service
-        from src.services.decision_push_service import _APPROVAL_BASE_URL
         from sqlalchemy import select
+        from src.core.database import get_db_session
+        from src.models.decision_log import DecisionLog, DecisionOutcome, DecisionStatus
+        from src.services.decision_push_service import _APPROVAL_BASE_URL
+        from src.services.wechat_service import wechat_service
 
         async with get_db_session() as db:
-            result = await db.execute(
-                select(DecisionLog).where(DecisionLog.id == decision_id)
-            )
+            result = await db.execute(select(DecisionLog).where(DecisionLog.id == decision_id))
             dl = result.scalar_one_or_none()
             if not dl:
                 logger.warning("check_decision_impact.not_found", decision_id=decision_id)
@@ -2952,8 +2892,7 @@ def check_decision_impact(self, decision_id: str):
 
             # 仅处理已批准且尚无结果的决策
             if dl.decision_status not in (DecisionStatus.APPROVED, DecisionStatus.EXECUTED):
-                logger.info("check_decision_impact.skip_status",
-                            decision_id=decision_id, status=str(dl.decision_status))
+                logger.info("check_decision_impact.skip_status", decision_id=decision_id, status=str(dl.decision_status))
                 return
             if dl.outcome is None:
                 dl.outcome = DecisionOutcome.PENDING
@@ -2961,7 +2900,7 @@ def check_decision_impact(self, decision_id: str):
 
             # 向审批人发送 48h 效果反馈提醒
             try:
-                title       = f"【48h效果反馈】{dl.decision_type}"
+                title = f"【48h效果反馈】{dl.decision_type}"
                 description = (
                     f"您于48小时前批准的决策\n"
                     f"来源：{dl.agent_type} / {dl.agent_method}\n"
@@ -2969,7 +2908,7 @@ def check_decision_impact(self, decision_id: str):
                     f"请核实执行效果并在系统中记录结果"
                 )
                 action_url = f"{_APPROVAL_BASE_URL}/{decision_id}/outcome"
-                recipient  = dl.manager_id or f"store_{dl.store_id}"
+                recipient = dl.manager_id or f"store_{dl.store_id}"
                 await wechat_service.send_decision_card(
                     title=title,
                     description=description,
@@ -2977,11 +2916,9 @@ def check_decision_impact(self, decision_id: str):
                     btntxt="记录结果",
                     to_user_id=recipient,
                 )
-                logger.info("check_decision_impact.feedback_sent",
-                            decision_id=decision_id, recipient=recipient)
+                logger.info("check_decision_impact.feedback_sent", decision_id=decision_id, recipient=recipient)
             except Exception as exc:
-                logger.warning("check_decision_impact.feedback_failed",
-                               decision_id=decision_id, error=str(exc))
+                logger.warning("check_decision_impact.feedback_failed", decision_id=decision_id, error=str(exc))
 
     try:
         asyncio.run(_run())
@@ -2992,6 +2929,7 @@ def check_decision_impact(self, decision_id: str):
 # ============================================================
 # v2.0 决策型企微推送（4时间点）
 # ============================================================
+
 
 def _get_store_recipient(store_id: str) -> str:
     """获取门店负责人的企微 user_id（优先从环境变量读，兜底返回 store_{id}）。"""
@@ -3004,9 +2942,9 @@ def push_morning_decisions(self, store_id: str = None):
     import asyncio
 
     async def _run():
+        from sqlalchemy import select
         from src.core.database import get_db_session
         from src.models.store import Store
-        from sqlalchemy import select
         from src.services.decision_push_service import DecisionPushService
 
         async with get_db_session() as db:
@@ -3026,8 +2964,7 @@ def push_morning_decisions(self, store_id: str = None):
                         store_name=sname,
                     )
                 except Exception as exc:
-                    logger.warning("push_morning_decisions.store_failed",
-                                   store_id=sid, error=str(exc))
+                    logger.warning("push_morning_decisions.store_failed", store_id=sid, error=str(exc))
 
     try:
         asyncio.run(_run())
@@ -3041,9 +2978,9 @@ def push_noon_anomaly(self, store_id: str = None):
     import asyncio
 
     async def _run():
+        from sqlalchemy import select
         from src.core.database import get_db_session
         from src.models.store import Store
-        from sqlalchemy import select
         from src.services.decision_push_service import DecisionPushService
 
         async with get_db_session() as db:
@@ -3063,8 +3000,7 @@ def push_noon_anomaly(self, store_id: str = None):
                         store_name=sname,
                     )
                 except Exception as exc:
-                    logger.warning("push_noon_anomaly.store_failed",
-                                   store_id=sid, error=str(exc))
+                    logger.warning("push_noon_anomaly.store_failed", store_id=sid, error=str(exc))
 
     try:
         asyncio.run(_run())
@@ -3078,9 +3014,9 @@ def push_prebattle_decisions(self, store_id: str = None):
     import asyncio
 
     async def _run():
+        from sqlalchemy import select
         from src.core.database import get_db_session
         from src.models.store import Store
-        from sqlalchemy import select
         from src.services.decision_push_service import DecisionPushService
 
         async with get_db_session() as db:
@@ -3100,8 +3036,7 @@ def push_prebattle_decisions(self, store_id: str = None):
                         store_name=sname,
                     )
                 except Exception as exc:
-                    logger.warning("push_prebattle_decisions.store_failed",
-                                   store_id=sid, error=str(exc))
+                    logger.warning("push_prebattle_decisions.store_failed", store_id=sid, error=str(exc))
 
     try:
         asyncio.run(_run())
@@ -3115,9 +3050,9 @@ def push_evening_recap(self, store_id: str = None):
     import asyncio
 
     async def _run():
+        from sqlalchemy import select
         from src.core.database import get_db_session
         from src.models.store import Store
-        from sqlalchemy import select
         from src.services.decision_push_service import DecisionPushService
 
         async with get_db_session() as db:
@@ -3137,8 +3072,7 @@ def push_evening_recap(self, store_id: str = None):
                         store_name=sname,
                     )
                 except Exception as exc:
-                    logger.warning("push_evening_recap.store_failed",
-                                   store_id=sid, error=str(exc))
+                    logger.warning("push_evening_recap.store_failed", store_id=sid, error=str(exc))
 
     try:
         asyncio.run(_run())
@@ -3149,6 +3083,7 @@ def push_evening_recap(self, store_id: str = None):
 # ============================================================
 # v2.0 KPI 食材成本率告警（09:30 日检）
 # ============================================================
+
 
 @celery_app.task(bind=True, max_retries=2, default_retry_delay=300)
 def check_food_cost_kpi_alert(self):
@@ -3171,6 +3106,7 @@ def check_food_cost_kpi_alert(self):
                 sent=result["sent_count"],
                 failed=result["failed_count"],
             )
+
     try:
         asyncio.run(_run())
     except Exception as exc:
@@ -3180,6 +3116,7 @@ def check_food_cost_kpi_alert(self):
 # ============================================================
 # v2.0 食材成本率趋势预测告警（09:45 日检）
 # ============================================================
+
 
 @celery_app.task(bind=True, max_retries=2, default_retry_delay=300)
 def check_food_cost_trend_alert(self):
@@ -3202,6 +3139,7 @@ def check_food_cost_trend_alert(self):
                 sent=result["sent_count"],
                 failed=result["failed_count"],
             )
+
     try:
         asyncio.run(_run())
     except Exception as exc:
@@ -3221,15 +3159,15 @@ def check_food_cost_trend_alert(self):
     async def _run():
         from sqlalchemy import text as _text
         from src.core.database import get_db_session
-        from src.services.lifecycle_state_machine import LifecycleStateMachine
-        from src.services.journey_orchestrator import JourneyOrchestrator
         from src.models.member_lifecycle import StateTransitionTrigger
-        from src.services.member_context_store import get_context_store, MemberContextStore
+        from src.services.journey_orchestrator import JourneyOrchestrator
+        from src.services.lifecycle_state_machine import LifecycleStateMachine
+        from src.services.member_context_store import MemberContextStore, get_context_store
 
-        sm        = LifecycleStateMachine()
-        orch      = JourneyOrchestrator()
+        sm = LifecycleStateMachine()
+        orch = JourneyOrchestrator()
         ctx_store = await get_context_store() or MemberContextStore(None)  # None = no-op
-        stats     = {"scanned": 0, "transitioned": 0, "journeys_triggered": 0}
+        stats = {"scanned": 0, "transitioned": 0, "journeys_triggered": 0}
 
         async with get_db_session() as db:
             # 获取近30天有交易的活跃门店
@@ -3238,7 +3176,7 @@ def check_food_cost_trend_alert(self):
                 WHERE created_at >= NOW() - (30 * INTERVAL '1 day')
             """)
             store_rows = (await db.execute(stores_sql)).fetchall()
-            store_ids  = [r[0] for r in store_rows]
+            store_ids = [r[0] for r in store_rows]
 
             for store_id in store_ids:
                 # ── 批次1：churn_warning 候选（recency > 45，非终态）──────────
@@ -3257,15 +3195,20 @@ def check_food_cost_trend_alert(self):
                 for row in churn_rows:
                     stats["scanned"] += 1
                     result = await sm.apply_trigger(
-                        row[0], store_id,
+                        row[0],
+                        store_id,
                         StateTransitionTrigger.CHURN_WARNING,
-                        db, changed_by="scan_lifecycle",
+                        db,
+                        changed_by="scan_lifecycle",
                     )
                     if result.get("transitioned"):
                         stats["transitioned"] += 1
                         await ctx_store.invalidate(store_id, row[0])
                         jr = await orch.trigger(
-                            row[0], store_id, "dormant_wakeup", db,
+                            row[0],
+                            store_id,
+                            "dormant_wakeup",
+                            db,
                             wechat_user_id=row[1],
                         )
                         if "error" not in jr:
@@ -3285,15 +3228,20 @@ def check_food_cost_trend_alert(self):
                 for row in dormant_rows:
                     stats["scanned"] += 1
                     result = await sm.apply_trigger(
-                        row[0], store_id,
+                        row[0],
+                        store_id,
                         StateTransitionTrigger.INACTIVITY_LONG,
-                        db, changed_by="scan_lifecycle",
+                        db,
+                        changed_by="scan_lifecycle",
                     )
                     if result.get("transitioned"):
                         stats["transitioned"] += 1
                         await ctx_store.invalidate(store_id, row[0])
                         jr = await orch.trigger(
-                            row[0], store_id, "dormant_wakeup", db,
+                            row[0],
+                            store_id,
+                            "dormant_wakeup",
+                            db,
                             wechat_user_id=row[1],
                         )
                         if "error" not in jr:
@@ -3332,13 +3280,14 @@ def execute_journey_step(
 
     async def _run():
         from src.core.database import get_db_session
-        from src.services.journey_orchestrator import JourneyOrchestrator
         from src.services.journey_narrator import JourneyNarrator
+        from src.services.journey_orchestrator import JourneyOrchestrator
 
         # 懒初始化企微服务（WECHAT_CORP_ID 未配置时降级为 None）
         wechat_svc = None
         try:
             from src.services.wechat_service import wechat_service as _ws
+
             if _ws.corp_id and _ws.corp_secret:
                 wechat_svc = _ws
         except Exception:
@@ -3351,10 +3300,9 @@ def execute_journey_step(
         try:
             import redis.asyncio as aioredis
             from src.services.frequency_cap_engine import FrequencyCapEngine
+
             _redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
-            _redis_client = await aioredis.from_url(
-                _redis_url, encoding="utf-8", decode_responses=True
-            )
+            _redis_client = await aioredis.from_url(_redis_url, encoding="utf-8", decode_responses=True)
             freq_cap = FrequencyCapEngine(_redis_client)
         except Exception:
             pass  # Redis 未配置，频控静默禁用
@@ -3407,7 +3355,7 @@ def refresh_private_domain_rfm(self):
     async def _run():
         from sqlalchemy import text as _text
         from src.core.database import get_db_session
-        from src.services.member_context_store import get_context_store, MemberContextStore
+        from src.services.member_context_store import MemberContextStore, get_context_store
 
         sql = _text("""
             UPDATE private_domain_members AS m
@@ -3505,7 +3453,10 @@ def trigger_new_member_journeys(self):
                 customer_id, store_id, wechat_openid = row[0], row[1], row[2]
                 stats["scanned"] += 1
                 result = await orch.trigger(
-                    customer_id, store_id, "member_activation", db,
+                    customer_id,
+                    store_id,
+                    "member_activation",
+                    db,
                     wechat_user_id=wechat_openid,
                 )
                 if "error" in result:
@@ -3551,8 +3502,7 @@ def trigger_demand_predictions(self):
 
         # 取所有有会员的门店
         store_sql = _text(
-            "SELECT DISTINCT store_id FROM private_domain_members "
-            "WHERE lifecycle_state NOT IN ('lost', 'lead') LIMIT 200"
+            "SELECT DISTINCT store_id FROM private_domain_members " "WHERE lifecycle_state NOT IN ('lost', 'lead') LIMIT 200"
         )
 
         async with get_db_session() as db:
@@ -3562,9 +3512,7 @@ def trigger_demand_predictions(self):
 
             for (store_id,) in stores:
                 try:
-                    candidates = await predictor.scan_upcoming_visitors(
-                        store_id, db, horizon_days=3
-                    )
+                    candidates = await predictor.scan_upcoming_visitors(store_id, db, horizon_days=3)
                     for c in candidates:
                         stats["candidates"] += 1
                         result = await orch.trigger(
@@ -3625,13 +3573,10 @@ def trigger_birthday_reminders(self):
             "skipped": 0,
         }
 
-        store_sql = _text(
-            "SELECT DISTINCT store_id FROM private_domain_members "
-            "WHERE is_active = true LIMIT 200"
-        )
+        store_sql = _text("SELECT DISTINCT store_id FROM private_domain_members " "WHERE is_active = true LIMIT 200")
 
         _EVENT_TO_JOURNEY = {
-            "birthday":    "birthday_greeting",
+            "birthday": "birthday_greeting",
             "anniversary": "anniversary_greeting",
         }
 
@@ -3641,9 +3586,7 @@ def trigger_birthday_reminders(self):
 
             for (store_id,) in stores:
                 try:
-                    events = await svc.scan_upcoming_events(
-                        store_id, db, horizon_days=3
-                    )
+                    events = await svc.scan_upcoming_events(store_id, db, horizon_days=3)
                     for ev in events:
                         journey_id = _EVENT_TO_JOURNEY[ev.event_type]
                         result = await orch.trigger(
@@ -3675,6 +3618,7 @@ def trigger_birthday_reminders(self):
 
 # ── 天财商龙 POS 日单拉取（凌晨 02:00）──────────────────────────────────────
 
+
 @celery_app.task(
     base=CallbackTask,
     bind=True,
@@ -3698,9 +3642,13 @@ def pull_tiancai_daily_orders(self) -> Dict[str, Any]:
     Returns:
         {success, date, stores_processed, orders_upserted, errors}
     """
+
     async def _run():
         from datetime import date, timedelta
-        from sqlalchemy import text as _text, select
+
+        from sqlalchemy import select
+        from sqlalchemy import text as _text
+
         from ..core.database import get_db_session
         from ..models.store import Store
 
@@ -3757,15 +3705,17 @@ def pull_tiancai_daily_orders(self) -> Dict[str, Any]:
                 )
 
                 try:
-                    adapter = TiancaiShanglongAdapter({
-                        "base_url": base_url,
-                        "appid": appid,
-                        "accessid": accessid,
-                        "center_id": center_id,
-                        "shop_id": shop_id,
-                        "timeout": 30,
-                        "retry_times": 2,
-                    })
+                    adapter = TiancaiShanglongAdapter(
+                        {
+                            "base_url": base_url,
+                            "appid": appid,
+                            "accessid": accessid,
+                            "center_id": center_id,
+                            "shop_id": shop_id,
+                            "timeout": 30,
+                            "retry_times": 2,
+                        }
+                    )
                     order_list = await adapter.pull_daily_orders(yesterday, brand_id)
 
                     for schema in order_list:
@@ -3809,7 +3759,9 @@ def pull_tiancai_daily_orders(self) -> Dict[str, Any]:
                     stores_processed += 1
                     logger.info(
                         "tiancai_pull.store_done",
-                        store_id=sid, date=yesterday, orders=len(order_list),
+                        store_id=sid,
+                        date=yesterday,
+                        orders=len(order_list),
                     )
 
                 except Exception as e:
@@ -3841,6 +3793,7 @@ def pull_tiancai_daily_orders(self) -> Dict[str, Any]:
 
 # ── 品智日营业数据同步（每日 01:30 执行，早于天财 02:00 及对账 03:00）────────────
 
+
 @celery_app.task(
     bind=True,
     max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
@@ -3858,9 +3811,13 @@ def pull_pinzhi_daily_data(self) -> Dict[str, Any]:
     Returns:
         {success, date, stores_processed, orders_upserted, summaries_saved, errors}
     """
+
     async def _run():
         from datetime import date, timedelta
-        from sqlalchemy import text as _text, select
+
+        from sqlalchemy import select
+        from sqlalchemy import text as _text
+
         from ..core.database import get_db_session
         from ..models.integration import ExternalSystem, IntegrationType
         from ..models.store import Store
@@ -3880,9 +3837,7 @@ def pull_pinzhi_daily_data(self) -> Dict[str, Any]:
         try:
             async with get_db_session() as session:
                 # 获取所有活跃门店
-                result = await session.execute(
-                    select(Store).where(Store.is_active.is_(True))
-                )
+                result = await session.execute(select(Store).where(Store.is_active.is_(True)))
                 stores = result.scalars().all()
 
                 # 预加载品智 ExternalSystem 凭证（store_id → ExternalSystem）
@@ -3892,9 +3847,7 @@ def pull_pinzhi_daily_data(self) -> Dict[str, Any]:
                         ExternalSystem.type == IntegrationType.POS,
                     )
                 )
-                ext_by_store: dict = {
-                    str(e.store_id): e for e in ext_result.scalars().all() if e.store_id
-                }
+                ext_by_store: dict = {str(e.store_id): e for e in ext_result.scalars().all() if e.store_id}
 
                 # 若全局凭证和 ExternalSystem 均无配置，跳过整个任务
                 if not global_base_url and not global_token and not ext_by_store:
@@ -3946,12 +3899,14 @@ def pull_pinzhi_daily_data(self) -> Dict[str, Any]:
                         logger.debug("pinzhi_pull.store_skipped", store_id=sid, reason="无凭证")
                         continue
 
-                    adapter = PinzhiAdapter({
-                        "base_url": base_url,
-                        "token": token,
-                        "timeout": int(os.getenv("PINZHI_TIMEOUT", "30")),
-                        "retry_times": int(os.getenv("PINZHI_RETRY_TIMES", "3")),
-                    })
+                    adapter = PinzhiAdapter(
+                        {
+                            "base_url": base_url,
+                            "token": token,
+                            "timeout": int(os.getenv("PINZHI_TIMEOUT", "30")),
+                            "retry_times": int(os.getenv("PINZHI_RETRY_TIMES", "3")),
+                        }
+                    )
 
                     try:
                         # 1) 拉取订单明细
@@ -4058,7 +4013,8 @@ def pull_pinzhi_daily_data(self) -> Dict[str, Any]:
                         stores_processed += 1
                         logger.info(
                             "pinzhi_pull.store_done",
-                            store_id=sid, date=yesterday,
+                            store_id=sid,
+                            date=yesterday,
                             orders=store_orders,
                         )
 
@@ -4099,6 +4055,7 @@ def pull_pinzhi_daily_data(self) -> Dict[str, Any]:
 
 # ── Onboarding Pipeline Task ───────────────────────────────────────────────────
 
+
 @celery_app.task(bind=True, max_retries=1, default_retry_delay=60)
 def run_onboarding_pipeline(self, store_id: str, task_id: str = "") -> Dict[str, Any]:
     """
@@ -4106,9 +4063,11 @@ def run_onboarding_pipeline(self, store_id: str, task_id: str = "") -> Dict[str,
       1. data_cleaning → 2. kpi_calculation → 3. baseline_compare
       4. vector_embedding → 5. knowledge_summary
     """
+
     async def _run():
         from ..core.database import get_db_session
         from ..services.onboarding_pipeline_service import OnboardingPipelineService
+
         async with get_db_session() as session:
             return await OnboardingPipelineService.run(store_id=store_id, db=session)
 
@@ -4120,6 +4079,7 @@ def run_onboarding_pipeline(self, store_id: str, task_id: str = "") -> Dict[str,
 
 
 # ── Onboarding Historical Backfill Task ───────────────────────────────────────
+
 
 @celery_app.task(bind=True, max_retries=2, default_retry_delay=120)
 def pull_historical_backfill(
@@ -4141,8 +4101,11 @@ def pull_historical_backfill(
     Returns:
         {success, store_id, adapter, records_imported, skipped, errors}
     """
+
     async def _run() -> Dict[str, Any]:
-        from sqlalchemy import select, text as _text
+        from sqlalchemy import select
+        from sqlalchemy import text as _text
+
         from ..core.database import get_db_session
         from ..models.onboarding import OnboardingTask
 
@@ -4172,9 +4135,8 @@ def pull_historical_backfill(
         # ── 天财商龙适配器 ─────────────────────────────────────────────────────
         if adapter == "tiancai":
             from datetime import date, timedelta
-            from packages.api_adapters.tiancai_shanglong.src.adapter import (
-                TiancaiShanglongAdapter,
-            )
+
+            from packages.api_adapters.tiancai_shanglong.src.adapter import TiancaiShanglongAdapter
 
             base_url = credentials.get("base_url") or os.getenv("TIANCAI_BASE_URL", "")
             if not base_url:
@@ -4184,16 +4146,17 @@ def pull_historical_backfill(
                     reason="TIANCAI_BASE_URL not configured",
                 )
                 async with get_db_session() as session:
-                    await _update_progress(session, 0, 0, 0, "skipped",
-                                           {"reason": "TIANCAI_BASE_URL 未配置"})
-                return {"success": True, "store_id": store_id, "adapter": adapter,
-                        "records_imported": 0, "skipped": True, "errors": []}
+                    await _update_progress(session, 0, 0, 0, "skipped", {"reason": "TIANCAI_BASE_URL 未配置"})
+                return {
+                    "success": True,
+                    "store_id": store_id,
+                    "adapter": adapter,
+                    "records_imported": 0,
+                    "skipped": True,
+                    "errors": [],
+                }
 
-            app_id = (
-                credentials.get("app_id")
-                or os.getenv(f"TIANCAI_APP_ID_{store_id}")
-                or os.getenv("TIANCAI_APP_ID", "")
-            )
+            app_id = credentials.get("app_id") or os.getenv(f"TIANCAI_APP_ID_{store_id}") or os.getenv("TIANCAI_APP_ID", "")
             app_secret = (
                 credentials.get("app_secret")
                 or os.getenv(f"TIANCAI_APP_SECRET_{store_id}")
@@ -4215,8 +4178,7 @@ def pull_historical_backfill(
             errors: list = []
 
             async with get_db_session() as session:
-                await _update_progress(session, backfill_days, 0, 0, "in_progress",
-                                       {"adapter": adapter, "phase": "pulling"})
+                await _update_progress(session, backfill_days, 0, 0, "in_progress", {"adapter": adapter, "phase": "pulling"})
 
             for i in range(backfill_days):
                 target_date = (today - timedelta(days=i + 1)).strftime("%Y-%m-%d")
@@ -4296,6 +4258,7 @@ def pull_historical_backfill(
         # ── 客如云适配器 ───────────────────────────────────────────────────────
         elif adapter == "keruyun":
             from datetime import date, timedelta
+
             from packages.api_adapters.keruyun.src.adapter import KeruyunAdapter
 
             client_id = (
@@ -4309,20 +4272,26 @@ def pull_historical_backfill(
                 or os.getenv("KERUYUN_CLIENT_SECRET", "")
             )
             if not client_id or not client_secret:
-                logger.warning("backfill.keruyun.skipped", store_id=store_id,
-                               reason="KERUYUN credentials not configured")
+                logger.warning("backfill.keruyun.skipped", store_id=store_id, reason="KERUYUN credentials not configured")
                 async with get_db_session() as session:
-                    await _update_progress(session, 0, 0, 0, "skipped",
-                                           {"reason": "KERUYUN_CLIENT_ID/SECRET 未配置"})
-                return {"success": True, "store_id": store_id, "adapter": adapter,
-                        "records_imported": 0, "skipped": True, "errors": []}
+                    await _update_progress(session, 0, 0, 0, "skipped", {"reason": "KERUYUN_CLIENT_ID/SECRET 未配置"})
+                return {
+                    "success": True,
+                    "store_id": store_id,
+                    "adapter": adapter,
+                    "records_imported": 0,
+                    "skipped": True,
+                    "errors": [],
+                }
 
-            adapter_instance = KeruyunAdapter(config={
-                "base_url": credentials.get("base_url") or os.getenv("KERUYUN_BASE_URL", "https://api.keruyun.com"),
-                "client_id": client_id,
-                "client_secret": client_secret,
-                "store_id": store_id,
-            })
+            adapter_instance = KeruyunAdapter(
+                config={
+                    "base_url": credentials.get("base_url") or os.getenv("KERUYUN_BASE_URL", "https://api.keruyun.com"),
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "store_id": store_id,
+                }
+            )
 
             backfill_days = int(os.getenv("ONBOARDING_BACKFILL_DAYS", "30"))
             today = date.today()
@@ -4330,29 +4299,19 @@ def pull_historical_backfill(
             errors: list = []
 
             async with get_db_session() as session:
-                await _update_progress(session, backfill_days, 0, 0, "in_progress",
-                                       {"adapter": adapter, "phase": "pulling"})
+                await _update_progress(session, backfill_days, 0, 0, "in_progress", {"adapter": adapter, "phase": "pulling"})
 
             for i in range(backfill_days):
                 target_date = today - timedelta(days=i + 1)
                 start_time = target_date.strftime("%Y-%m-%d 00:00:00")
                 end_time = target_date.strftime("%Y-%m-%d 23:59:59")
                 try:
-                    result = await adapter_instance.query_order(
-                        start_time=start_time, end_time=end_time
-                    )
-                    orders = (
-                        result if isinstance(result, list)
-                        else result.get("orders", result.get("list", []))
-                    )
+                    result = await adapter_instance.query_order(start_time=start_time, end_time=end_time)
+                    orders = result if isinstance(result, list) else result.get("orders", result.get("list", []))
                     if orders and isinstance(orders, list):
                         async with get_db_session() as session:
                             for order in orders:
-                                oid = (
-                                    order.get("order_id")
-                                    or order.get("orderId")
-                                    or order.get("id")
-                                )
+                                oid = order.get("order_id") or order.get("orderId") or order.get("id")
                                 if not oid:
                                     continue
                                 await session.execute(
@@ -4373,56 +4332,78 @@ def pull_historical_backfill(
                                         "store_id": store_id,
                                         "table_number": order.get("tableId") or order.get("table_id") or "",
                                         "status": str(order.get("status") or "completed"),
-                                        "total_amount": int(float(order.get("totalAmount") or order.get("total_amount") or 0) * 100),
-                                        "discount_amount": int(float(order.get("discountAmount") or order.get("discount_amount") or 0) * 100),
-                                        "final_amount": int(float(order.get("paidAmount") or order.get("paid_amount") or order.get("finalAmount") or 0) * 100),
+                                        "total_amount": int(
+                                            float(order.get("totalAmount") or order.get("total_amount") or 0) * 100
+                                        ),
+                                        "discount_amount": int(
+                                            float(order.get("discountAmount") or order.get("discount_amount") or 0) * 100
+                                        ),
+                                        "final_amount": int(
+                                            float(
+                                                order.get("paidAmount")
+                                                or order.get("paid_amount")
+                                                or order.get("finalAmount")
+                                                or 0
+                                            )
+                                            * 100
+                                        ),
                                         "order_time": order.get("orderTime") or order.get("order_time") or start_time,
                                     },
                                 )
                                 records_imported += 1
                             await session.commit()
                 except Exception as e:
-                    logger.warning("backfill.keruyun.day_failed", store_id=store_id,
-                                   date=target_date.isoformat(), error=str(e))
+                    logger.warning(
+                        "backfill.keruyun.day_failed", store_id=store_id, date=target_date.isoformat(), error=str(e)
+                    )
                     errors.append({"date": target_date.isoformat(), "error": str(e)})
 
             async with get_db_session() as session:
                 await _update_progress(
-                    session, total=backfill_days, imported=records_imported,
-                    failed=len(errors), status="completed",
-                    extra={"adapter": adapter, "days_pulled": backfill_days,
-                           "records_imported": records_imported, "errors": errors[:10]},
+                    session,
+                    total=backfill_days,
+                    imported=records_imported,
+                    failed=len(errors),
+                    status="completed",
+                    extra={
+                        "adapter": adapter,
+                        "days_pulled": backfill_days,
+                        "records_imported": records_imported,
+                        "errors": errors[:10],
+                    },
                 )
-            logger.info("backfill.keruyun.done", store_id=store_id,
-                        records_imported=records_imported, errors=len(errors))
-            return {"success": True, "store_id": store_id, "adapter": adapter,
-                    "records_imported": records_imported, "skipped": False, "errors": errors[:10]}
+            logger.info("backfill.keruyun.done", store_id=store_id, records_imported=records_imported, errors=len(errors))
+            return {
+                "success": True,
+                "store_id": store_id,
+                "adapter": adapter,
+                "records_imported": records_imported,
+                "skipped": False,
+                "errors": errors[:10],
+            }
 
         # ── 品智适配器 ─────────────────────────────────────────────────────────
         elif adapter == "pinzhi":
             from datetime import date, timedelta
+
             from packages.api_adapters.pinzhi.src.adapter import PinzhiAdapter
 
             base_url = credentials.get("base_url") or os.getenv("PINZHI_BASE_URL", "")
-            token = (
-                credentials.get("token")
-                or os.getenv(f"PINZHI_TOKEN_{store_id}")
-                or os.getenv("PINZHI_TOKEN", "")
-            )
+            token = credentials.get("token") or os.getenv(f"PINZHI_TOKEN_{store_id}") or os.getenv("PINZHI_TOKEN", "")
             if not base_url or not token:
-                logger.warning("backfill.pinzhi.skipped", store_id=store_id,
-                               reason="PINZHI_BASE_URL/TOKEN not configured")
+                logger.warning("backfill.pinzhi.skipped", store_id=store_id, reason="PINZHI_BASE_URL/TOKEN not configured")
                 async with get_db_session() as session:
-                    await _update_progress(session, 0, 0, 0, "skipped",
-                                           {"reason": "PINZHI_BASE_URL/TOKEN 未配置"})
-                return {"success": True, "store_id": store_id, "adapter": adapter,
-                        "records_imported": 0, "skipped": True, "errors": []}
+                    await _update_progress(session, 0, 0, 0, "skipped", {"reason": "PINZHI_BASE_URL/TOKEN 未配置"})
+                return {
+                    "success": True,
+                    "store_id": store_id,
+                    "adapter": adapter,
+                    "records_imported": 0,
+                    "skipped": True,
+                    "errors": [],
+                }
 
-            ognid = (
-                credentials.get("ognid")
-                or os.getenv(f"PINZHI_OGNID_{store_id}")
-                or os.getenv("PINZHI_OGNID", store_id)
-            )
+            ognid = credentials.get("ognid") or os.getenv(f"PINZHI_OGNID_{store_id}") or os.getenv("PINZHI_OGNID", store_id)
             adapter_instance = PinzhiAdapter(config={"base_url": base_url, "token": token})
 
             backfill_days = int(os.getenv("ONBOARDING_BACKFILL_DAYS", "30"))
@@ -4432,8 +4413,7 @@ def pull_historical_backfill(
             page_size = 50
 
             async with get_db_session() as session:
-                await _update_progress(session, backfill_days, 0, 0, "in_progress",
-                                       {"adapter": adapter, "phase": "pulling"})
+                await _update_progress(session, backfill_days, 0, 0, "in_progress", {"adapter": adapter, "phase": "pulling"})
 
             for i in range(backfill_days):
                 target_date = today - timedelta(days=i + 1)
@@ -4452,11 +4432,7 @@ def pull_historical_backfill(
                             break
                         async with get_db_session() as session:
                             for order in orders:
-                                oid = (
-                                    order.get("orderId")
-                                    or order.get("order_id")
-                                    or order.get("id")
-                                )
+                                oid = order.get("orderId") or order.get("order_id") or order.get("id")
                                 if not oid:
                                     continue
                                 await session.execute(
@@ -4477,9 +4453,21 @@ def pull_historical_backfill(
                                         "store_id": store_id,
                                         "table_number": order.get("tableId") or order.get("table_id") or "",
                                         "status": str(order.get("orderStatus") or order.get("status") or "completed"),
-                                        "total_amount": int(float(order.get("totalAmount") or order.get("total_amount") or 0) * 100),
-                                        "discount_amount": int(float(order.get("discountAmount") or order.get("discount_amount") or 0) * 100),
-                                        "final_amount": int(float(order.get("actualAmount") or order.get("paidAmount") or order.get("final_amount") or 0) * 100),
+                                        "total_amount": int(
+                                            float(order.get("totalAmount") or order.get("total_amount") or 0) * 100
+                                        ),
+                                        "discount_amount": int(
+                                            float(order.get("discountAmount") or order.get("discount_amount") or 0) * 100
+                                        ),
+                                        "final_amount": int(
+                                            float(
+                                                order.get("actualAmount")
+                                                or order.get("paidAmount")
+                                                or order.get("final_amount")
+                                                or 0
+                                            )
+                                            * 100
+                                        ),
                                         "order_time": order.get("orderTime") or order.get("order_time") or date_str,
                                     },
                                 )
@@ -4489,56 +4477,90 @@ def pull_historical_backfill(
                             break
                         page += 1
                 except Exception as e:
-                    logger.warning("backfill.pinzhi.day_failed", store_id=store_id,
-                                   date=date_str, error=str(e))
+                    logger.warning("backfill.pinzhi.day_failed", store_id=store_id, date=date_str, error=str(e))
                     errors.append({"date": date_str, "error": str(e)})
 
             async with get_db_session() as session:
                 await _update_progress(
-                    session, total=backfill_days, imported=records_imported,
-                    failed=len(errors), status="completed",
-                    extra={"adapter": adapter, "days_pulled": backfill_days,
-                           "records_imported": records_imported, "errors": errors[:10]},
+                    session,
+                    total=backfill_days,
+                    imported=records_imported,
+                    failed=len(errors),
+                    status="completed",
+                    extra={
+                        "adapter": adapter,
+                        "days_pulled": backfill_days,
+                        "records_imported": records_imported,
+                        "errors": errors[:10],
+                    },
                 )
-            logger.info("backfill.pinzhi.done", store_id=store_id,
-                        records_imported=records_imported, errors=len(errors))
-            return {"success": True, "store_id": store_id, "adapter": adapter,
-                    "records_imported": records_imported, "skipped": False, "errors": errors[:10]}
+            logger.info("backfill.pinzhi.done", store_id=store_id, records_imported=records_imported, errors=len(errors))
+            return {
+                "success": True,
+                "store_id": store_id,
+                "adapter": adapter,
+                "records_imported": records_imported,
+                "skipped": False,
+                "errors": errors[:10],
+            }
 
         # ── 美团SAAS / 奥琦玮 / 一订 — 不支持历史批量回灌 ──────────────────────
         elif adapter in ("meituan", "meituan-saas"):
             # 美团SAAS只提供单单查询接口（query_order by order_id/day_seq），
             # 无法按日期批量拉取历史订单，标记 skipped。
-            logger.warning("backfill.meituan.skipped", store_id=store_id,
-                           reason="meituan-saas adapter has no batch historical pull API")
+            logger.warning(
+                "backfill.meituan.skipped", store_id=store_id, reason="meituan-saas adapter has no batch historical pull API"
+            )
             async with get_db_session() as session:
-                await _update_progress(session, 0, 0, 0, "skipped",
-                                       {"adapter": adapter,
-                                        "reason": "美团SAAS仅支持单单查询，不支持历史批量回灌"})
-            return {"success": True, "store_id": store_id, "adapter": adapter,
-                    "records_imported": 0, "skipped": True, "errors": []}
+                await _update_progress(
+                    session, 0, 0, 0, "skipped", {"adapter": adapter, "reason": "美团SAAS仅支持单单查询，不支持历史批量回灌"}
+                )
+            return {
+                "success": True,
+                "store_id": store_id,
+                "adapter": adapter,
+                "records_imported": 0,
+                "skipped": True,
+                "errors": [],
+            }
 
         elif adapter == "aoqiwei":
             # 奥琦玮为上传推送模型（POS→奥琦玮），无历史订单拉取接口，标记 skipped。
-            logger.warning("backfill.aoqiwei.skipped", store_id=store_id,
-                           reason="aoqiwei is an upload-push model with no historical pull API")
+            logger.warning(
+                "backfill.aoqiwei.skipped",
+                store_id=store_id,
+                reason="aoqiwei is an upload-push model with no historical pull API",
+            )
             async with get_db_session() as session:
-                await _update_progress(session, 0, 0, 0, "skipped",
-                                       {"adapter": adapter,
-                                        "reason": "奥琦玮为上传推送模型，无历史数据拉取接口"})
-            return {"success": True, "store_id": store_id, "adapter": adapter,
-                    "records_imported": 0, "skipped": True, "errors": []}
+                await _update_progress(
+                    session, 0, 0, 0, "skipped", {"adapter": adapter, "reason": "奥琦玮为上传推送模型，无历史数据拉取接口"}
+                )
+            return {
+                "success": True,
+                "store_id": store_id,
+                "adapter": adapter,
+                "records_imported": 0,
+                "skipped": True,
+                "errors": [],
+            }
 
         elif adapter == "yiding":
             # 一订为预订管理系统，非POS订单系统，orders表回灌不适用，标记 skipped。
-            logger.warning("backfill.yiding.skipped", store_id=store_id,
-                           reason="yiding is a reservation system, not a POS order system")
+            logger.warning(
+                "backfill.yiding.skipped", store_id=store_id, reason="yiding is a reservation system, not a POS order system"
+            )
             async with get_db_session() as session:
-                await _update_progress(session, 0, 0, 0, "skipped",
-                                       {"adapter": adapter,
-                                        "reason": "一订为预订系统，不适用于orders表历史回灌"})
-            return {"success": True, "store_id": store_id, "adapter": adapter,
-                    "records_imported": 0, "skipped": True, "errors": []}
+                await _update_progress(
+                    session, 0, 0, 0, "skipped", {"adapter": adapter, "reason": "一订为预订系统，不适用于orders表历史回灌"}
+                )
+            return {
+                "success": True,
+                "store_id": store_id,
+                "adapter": adapter,
+                "records_imported": 0,
+                "skipped": True,
+                "errors": [],
+            }
 
         # ── 未知适配器 ─────────────────────────────────────────────────────────
         logger.warning(
@@ -4548,7 +4570,11 @@ def pull_historical_backfill(
         )
         async with get_db_session() as session:
             await _update_progress(
-                session, 0, 0, 0, "skipped",
+                session,
+                0,
+                0,
+                0,
+                "skipped",
                 {"adapter": adapter, "reason": f"{adapter} 历史回灌尚未集成"},
             )
         return {
@@ -4571,6 +4597,7 @@ def pull_historical_backfill(
 # P3: OpsAgent 定时巡检 + 企微 P0 告警推送
 # ============================================================
 
+
 def _build_ops_alert_markdown(store_id: str, store_name: str, dashboard: Dict[str, Any]) -> str:
     """将 get_store_dashboard 结果格式化为企微 Markdown 告警消息。"""
     score = dashboard.get("overall_score", 0)
@@ -4591,11 +4618,9 @@ def _build_ops_alert_markdown(store_id: str, store_name: str, dashboard: Dict[st
         f"> 健康分：**{score}/100** | 活跃告警：{active} 条",
         "",
         f"**L1 设备层**：{l1.get('score', '-')} 分，告警 {l1.get('alert_count', 0)} 条",
-        f"**L2 网络层**：{l2.get('score', '-')} 分，"
-        f"可用率 {l2.get('availability_pct', 100):.1f}%",
+        f"**L2 网络层**：{l2.get('score', '-')} 分，" f"可用率 {l2.get('availability_pct', 100):.1f}%",
         f"**L3 系统层**：{l3.get('score', '-')} 分，"
-        f"宕机系统 {l3.get('down_systems', 0)} 个"
-        + (f"（其中 P0 = {l3['p0_down']} 个）" if l3.get("p0_down") else ""),
+        f"宕机系统 {l3.get('down_systems', 0)} 个" + (f"（其中 P0 = {l3['p0_down']} 个）" if l3.get("p0_down") else ""),
     ]
 
     down_list = l3.get("down_list") or []
@@ -4621,10 +4646,11 @@ def ops_patrol(self, store_id: str = None):
     立即通过企微 Markdown 推送 P0 告警给门店负责人。
     warning 状态仅记录日志，不推送（避免告警风暴）。
     """
+
     async def _run():
+        from sqlalchemy import select
         from src.core.database import get_db_session
         from src.models.store import Store
-        from sqlalchemy import select
         from src.services.ops_monitor_service import OpsMonitorService
         from src.services.wechat_service import wechat_service
 
@@ -4681,6 +4707,7 @@ def ops_patrol(self, store_id: str = None):
 # P5: Agent 间通信协议 — 异步分发任务
 # ============================================================
 
+
 @celery_app.task(bind=True, max_retries=2, default_retry_delay=30)
 def dispatch_agent_message(
     self,
@@ -4699,8 +4726,9 @@ def dispatch_agent_message(
     收到消息后实例化目标 Agent 并执行 action，
     结果写入日志（不推送，调用方不等待回复）。
     """
+
     async def _run():
-        from ..core.agent_bus import AgentMessage, AgentBus
+        from ..core.agent_bus import AgentBus, AgentMessage
 
         msg = AgentMessage(
             from_agent=from_agent,
@@ -4737,12 +4765,12 @@ def dispatch_agent_message(
     try:
         return asyncio.run(_run())
     except Exception as exc:
-        logger.error("dispatch_agent_message.failed",
-                     to_agent=to_agent, action=action, error=str(exc))
+        logger.error("dispatch_agent_message.failed", to_agent=to_agent, action=action, error=str(exc))
         raise self.retry(exc=exc)
 
 
 # ── Marketing: 每日批量挽回流失客户 ──────────────────────────────────────────────
+
 
 @celery_app.task(
     base=CallbackTask,
@@ -4756,11 +4784,13 @@ def marketing_auto_outreach(self, store_id: str = None) -> Dict[str, Any]:
     遍历所有活跃门店（或指定门店），对 at_risk/lost 客户发送个性化挽回消息。
     通过 FrequencyCapEngine 控制发送频次，避免骚扰。
     """
+
     async def _run():
-        from ..services.marketing_agent_service import MarketingAgentService
-        from ..models.store import Store
-        from ..core.database import get_db_session
         from datetime import datetime
+
+        from ..core.database import get_db_session
+        from ..models.store import Store
+        from ..services.marketing_agent_service import MarketingAgentService
 
         results = []
         async with get_db_session() as session:
@@ -4768,13 +4798,14 @@ def marketing_auto_outreach(self, store_id: str = None) -> Dict[str, Any]:
                 store_ids = [store_id]
             else:
                 # 取最近30天有订单的门店
-                from ..models.order import Order
-                from sqlalchemy import select, distinct, func
                 from datetime import timedelta
+
+                from sqlalchemy import distinct, func, select
+
+                from ..models.order import Order
+
                 cutoff = datetime.utcnow() - timedelta(days=30)
-                rows = (await session.execute(
-                    select(distinct(Order.store_id)).where(Order.created_at >= cutoff)
-                )).all()
+                rows = (await session.execute(select(distinct(Order.store_id)).where(Order.created_at >= cutoff))).all()
                 store_ids = [r[0] for r in rows if r[0]]
 
         svc = MarketingAgentService(db=None)
@@ -4827,64 +4858,78 @@ def check_edge_hub_heartbeats(self) -> Dict[str, Any]:
     OFFLINE_THRESHOLD_MINUTES = int(os.getenv("EDGE_HUB_OFFLINE_THRESHOLD_MIN", "5"))
 
     async def _run():
+        from sqlalchemy import and_, select, update
         from src.core.database import AsyncSessionLocal
-        from src.models.edge_hub import EdgeHub, EdgeAlert, AlertStatus, AlertLevel, HubStatus
+        from src.models.edge_hub import AlertLevel, AlertStatus, EdgeAlert, EdgeHub, HubStatus
         from src.models.user import User, UserRole
         from src.services.wechat_alert_service import wechat_alert_service
-        from sqlalchemy import select, and_, update
 
-        offline_marked   = 0
-        recovered        = 0
-        alerts_created   = 0
-        alerts_resolved  = 0
-        now              = __import__("datetime").datetime.utcnow()
-        stale_cutoff     = now - timedelta(minutes=OFFLINE_THRESHOLD_MINUTES)
+        offline_marked = 0
+        recovered = 0
+        alerts_created = 0
+        alerts_resolved = 0
+        now = __import__("datetime").datetime.utcnow()
+        stale_cutoff = now - timedelta(minutes=OFFLINE_THRESHOLD_MINUTES)
 
         async with AsyncSessionLocal() as db:
             hubs = (await db.execute(select(EdgeHub))).scalars().all()
 
             for hub in hubs:
-                heartbeat_stale = (hub.last_heartbeat is None or hub.last_heartbeat < stale_cutoff)
+                heartbeat_stale = hub.last_heartbeat is None or hub.last_heartbeat < stale_cutoff
 
                 if heartbeat_stale and hub.status != HubStatus.OFFLINE:
                     # ── 心跳超时 → 标记离线 + 创建 P1 告警 ─────────────────
                     hub.status = HubStatus.OFFLINE
                     offline_marked += 1
 
-                    existing = (await db.execute(
-                        select(EdgeAlert).where(and_(
-                            EdgeAlert.hub_id   == hub.id,
-                            EdgeAlert.alert_type == "hub_offline",
-                            EdgeAlert.status   == AlertStatus.OPEN,
-                        ))
-                    )).scalar_one_or_none()
+                    existing = (
+                        await db.execute(
+                            select(EdgeAlert).where(
+                                and_(
+                                    EdgeAlert.hub_id == hub.id,
+                                    EdgeAlert.alert_type == "hub_offline",
+                                    EdgeAlert.status == AlertStatus.OPEN,
+                                )
+                            )
+                        )
+                    ).scalar_one_or_none()
 
                     if not existing:
-                        db.add(EdgeAlert(
-                            id         = str(_uuid.uuid4()),
-                            hub_id     = hub.id,
-                            store_id   = hub.store_id,
-                            level      = AlertLevel.P1,
-                            alert_type = "hub_offline",
-                            message    = f"边缘主机 {hub.hub_code} 心跳超时（>{OFFLINE_THRESHOLD_MINUTES}min）",
-                            status     = AlertStatus.OPEN,
-                        ))
+                        db.add(
+                            EdgeAlert(
+                                id=str(_uuid.uuid4()),
+                                hub_id=hub.id,
+                                store_id=hub.store_id,
+                                level=AlertLevel.P1,
+                                alert_type="hub_offline",
+                                message=f"边缘主机 {hub.hub_code} 心跳超时（>{OFFLINE_THRESHOLD_MINUTES}min）",
+                                status=AlertStatus.OPEN,
+                            )
+                        )
                         alerts_created += 1
                         logger.warning(
                             "edge_hub.heartbeat_lost",
-                            hub_id=hub.id, hub_code=hub.hub_code, store_id=hub.store_id,
+                            hub_id=hub.id,
+                            hub_code=hub.hub_code,
+                            store_id=hub.store_id,
                         )
 
                         # ── 推送企微通知给对应门店店长 ───────────────────────
                         try:
-                            managers = (await db.execute(
-                                select(User).where(
-                                    User.store_id == hub.store_id,
-                                    User.is_active == True,
-                                    User.role.in_([UserRole.STORE_MANAGER, UserRole.ADMIN]),
-                                    User.wechat_user_id.isnot(None),
+                            managers = (
+                                (
+                                    await db.execute(
+                                        select(User).where(
+                                            User.store_id == hub.store_id,
+                                            User.is_active == True,
+                                            User.role.in_([UserRole.STORE_MANAGER, UserRole.ADMIN]),
+                                            User.wechat_user_id.isnot(None),
+                                        )
+                                    )
                                 )
-                            )).scalars().all()
+                                .scalars()
+                                .all()
+                            )
                             recipient_ids = [m.wechat_user_id for m in managers]
                             if recipient_ids:
                                 await wechat_alert_service.send_hardware_alert(
@@ -4907,33 +4952,43 @@ def check_edge_hub_heartbeats(self) -> Dict[str, Any]:
                     hub.status = HubStatus.ONLINE
                     recovered += 1
 
-                    open_alerts = (await db.execute(
-                        select(EdgeAlert).where(and_(
-                            EdgeAlert.hub_id     == hub.id,
-                            EdgeAlert.alert_type == "hub_offline",
-                            EdgeAlert.status     == AlertStatus.OPEN,
-                        ))
-                    )).scalars().all()
+                    open_alerts = (
+                        (
+                            await db.execute(
+                                select(EdgeAlert).where(
+                                    and_(
+                                        EdgeAlert.hub_id == hub.id,
+                                        EdgeAlert.alert_type == "hub_offline",
+                                        EdgeAlert.status == AlertStatus.OPEN,
+                                    )
+                                )
+                            )
+                        )
+                        .scalars()
+                        .all()
+                    )
 
                     for alert in open_alerts:
-                        alert.status      = AlertStatus.RESOLVED
+                        alert.status = AlertStatus.RESOLVED
                         alert.resolved_at = now
                         alert.resolved_by = "system"
-                        alerts_resolved  += 1
+                        alerts_resolved += 1
 
                     if recovered:
                         logger.info(
                             "edge_hub.heartbeat_recovered",
-                            hub_id=hub.id, hub_code=hub.hub_code, store_id=hub.store_id,
+                            hub_id=hub.id,
+                            hub_code=hub.hub_code,
+                            store_id=hub.store_id,
                         )
 
             await db.commit()
 
         return {
-            "success":         True,
-            "offline_marked":  offline_marked,
-            "recovered":       recovered,
-            "alerts_created":  alerts_created,
+            "success": True,
+            "offline_marked": offline_marked,
+            "recovered": recovered,
+            "alerts_created": alerts_created,
             "alerts_resolved": alerts_resolved,
         }
 
@@ -4945,6 +5000,7 @@ def check_edge_hub_heartbeats(self) -> Dict[str, Any]:
 
 
 # ── SignalBus 周期扫描任务 ─────────────────────────────────────────────────────
+
 
 @celery_app.task(
     bind=True,
@@ -4958,17 +5014,17 @@ def run_signal_bus_scan(self) -> Dict[str, Any]:
       ② 临期/低库存 → 废料预警推送
       ③ 大桌预订(≥6人) → 裂变场景识别
     """
+
     async def _run():
+        from sqlalchemy import text
+
         from ..core.database import AsyncSessionLocal
         from ..services.signal_bus import run_periodic_scan
-        from sqlalchemy import text
 
         results = []
         async with AsyncSessionLocal() as db:
             try:
-                rows = (await db.execute(
-                    text("SELECT id FROM stores WHERE is_active = true")
-                )).fetchall()
+                rows = (await db.execute(text("SELECT id FROM stores WHERE is_active = true"))).fetchall()
                 store_ids = [r[0] for r in rows]
             except Exception:
                 store_ids = ["store_001"]  # 降级到默认门店
@@ -4978,12 +5034,10 @@ def run_signal_bus_scan(self) -> Dict[str, Any]:
                     r = await run_periodic_scan(sid, db)
                     results.append(r)
                 except Exception as exc:
-                    logger.warning("signal_bus.task.store_failed",
-                                   store_id=sid, error=str(exc))
+                    logger.warning("signal_bus.task.store_failed", store_id=sid, error=str(exc))
 
         total = sum(r.get("total_routed", 0) for r in results)
-        logger.info("signal_bus.task.done",
-                    stores=len(results), total_routed=total)
+        logger.info("signal_bus.task.done", stores=len(results), total_routed=total)
         return {"stores": len(results), "total_routed": total, "details": results}
 
     try:
@@ -4994,6 +5048,7 @@ def run_signal_bus_scan(self) -> Dict[str, Any]:
 
 
 # ── 店长版每日简报任务 ────────────────────────────────────────────────────────
+
 
 @celery_app.task(
     bind=True,
@@ -5009,17 +5064,17 @@ def push_sm_daily_briefing(self) -> Dict[str, Any]:
       - 流失预警（高风险会员数）
       - 今日1条核心行动建议
     """
+
     async def _run():
+        from sqlalchemy import text
+
         from ..core.database import AsyncSessionLocal
         from ..services.store_manager_briefing_service import push_briefing
-        from sqlalchemy import text
 
         results = []
         async with AsyncSessionLocal() as db:
             try:
-                rows = (await db.execute(
-                    text("SELECT id FROM stores WHERE is_active = true")
-                )).fetchall()
+                rows = (await db.execute(text("SELECT id FROM stores WHERE is_active = true"))).fetchall()
                 store_ids = [r[0] for r in rows]
             except Exception:
                 store_ids = ["store_001"]
@@ -5027,18 +5082,18 @@ def push_sm_daily_briefing(self) -> Dict[str, Any]:
             for sid in store_ids:
                 try:
                     r = await push_briefing(sid, db)
-                    results.append({
-                        "store_id": sid,
-                        "pushed": r["pushed"],
-                        "score":  r["briefing"]["health"]["total_score"],
-                    })
+                    results.append(
+                        {
+                            "store_id": sid,
+                            "pushed": r["pushed"],
+                            "score": r["briefing"]["health"]["total_score"],
+                        }
+                    )
                 except Exception as exc:
-                    logger.warning("push_sm_briefing.store_failed",
-                                   store_id=sid, error=str(exc))
+                    logger.warning("push_sm_briefing.store_failed", store_id=sid, error=str(exc))
 
         total_pushed = sum(1 for r in results if r.get("pushed"))
-        logger.info("push_sm_briefing.done",
-                    stores=len(results), pushed=total_pushed)
+        logger.info("push_sm_briefing.done", stores=len(results), pushed=total_pushed)
         return {"stores": len(results), "pushed": total_pushed, "details": results}
 
     try:
@@ -5049,6 +5104,7 @@ def push_sm_daily_briefing(self) -> Dict[str, Any]:
 
 
 # ── 老板多店版简报任务 ────────────────────────────────────────────────────────
+
 
 @celery_app.task(
     bind=True,
@@ -5063,6 +5119,7 @@ def push_hq_daily_briefing(self) -> Dict[str, Any]:
       - 全局 Top3 决策
       - 昨日全店合并营收/均成本率
     """
+
     async def _run():
         from ..core.database import AsyncSessionLocal
         from ..services.hq_briefing_service import push_hq_briefing
@@ -5078,7 +5135,7 @@ def push_hq_daily_briefing(self) -> Dict[str, Any]:
         )
         return {
             "store_count": result["briefing"].get("store_count", 0),
-            "pushed":      result["pushed"],
+            "pushed": result["pushed"],
         }
 
     try:
@@ -5099,6 +5156,7 @@ def cdp_sync_consumer_ids(self) -> Dict[str, Any]:
 
     Sprint 1 KPI: consumer_id 填充率 ≥ 80%
     """
+
     async def _run():
         from src.core.database import get_db_session
         from src.services.cdp_sync_service import cdp_sync_service
@@ -5133,6 +5191,7 @@ def cdp_rfm_recalculate(self) -> Dict[str, Any]:
 
     Sprint 2 KPI: RFM 偏差 < 5%
     """
+
     async def _run():
         from src.core.database import get_db_session
         from src.services.cdp_rfm_service import cdp_rfm_service
@@ -5177,11 +5236,12 @@ def member_agent_dormant_sweep(self) -> Dict[str, Any]:
 
     每店每天限 10 条，避免集中骚扰；7天累计 ≥50 达标。
     """
+
     async def _run():
+        from sqlalchemy import func, select
         from src.core.database import get_db_session
-        from src.services.member_agent_service import member_agent_service
         from src.models.private_domain import PrivateDomainMember
-        from sqlalchemy import select, func
+        from src.services.member_agent_service import member_agent_service
 
         async with get_db_session() as session:
             # Step 1: 找到有沉睡会员的门店
@@ -5202,7 +5262,8 @@ def member_agent_dormant_sweep(self) -> Dict[str, Any]:
             for sid in store_ids:
                 try:
                     r = await member_agent_service.batch_trigger_wakeup(
-                        session, sid,
+                        session,
+                        sid,
                         min_recency_days=30,
                         max_count=10,
                         dry_run=False,
@@ -5214,7 +5275,8 @@ def member_agent_dormant_sweep(self) -> Dict[str, Any]:
                 except Exception as e:
                     logger.warning(
                         "member_agent_dormant_sweep.store_failed",
-                        store_id=sid, error=str(e),
+                        store_id=sid,
+                        error=str(e),
                     )
 
             await session.commit()
@@ -5239,18 +5301,16 @@ def revenue_growth_monthly_report(self) -> Dict[str, Any]:
 
     遍历所有门店，生成各 Agent ¥贡献汇总。
     """
+
     async def _run():
+        from sqlalchemy import func, select
         from src.core.database import get_db_session
-        from src.services.revenue_growth_service import revenue_growth_service
         from src.models.order import Order
-        from sqlalchemy import select, func
+        from src.services.revenue_growth_service import revenue_growth_service
 
         async with get_db_session() as session:
             # 查询所有有订单的门店
-            stmt = (
-                select(Order.store_id)
-                .group_by(Order.store_id)
-            )
+            stmt = select(Order.store_id).group_by(Order.store_id)
             result = await session.execute(stmt)
             store_ids = [row[0] for row in result.all()]
 
@@ -5258,7 +5318,9 @@ def revenue_growth_monthly_report(self) -> Dict[str, Any]:
             for sid in store_ids:
                 try:
                     report = await revenue_growth_service.generate_monthly_report(
-                        session, sid, month_offset=-1,
+                        session,
+                        sid,
+                        month_offset=-1,
                     )
                     reports.append(report)
                     logger.info(
@@ -5270,15 +5332,14 @@ def revenue_growth_monthly_report(self) -> Dict[str, Any]:
                 except Exception as e:
                     logger.warning(
                         "revenue_growth_report.store_failed",
-                        store_id=sid, error=str(e),
+                        store_id=sid,
+                        error=str(e),
                     )
 
         total = {
             "stores": len(reports),
             "total_delta_yuan": sum(r["revenue"]["delta_yuan"] for r in reports),
-            "total_agent_contribution_yuan": sum(
-                r["agent_contribution"]["agent_total_yuan"] for r in reports
-            ),
+            "total_agent_contribution_yuan": sum(r["agent_contribution"]["agent_total_yuan"] for r in reports),
         }
         logger.info("revenue_growth_monthly_report.done", **total)
         return total
@@ -5292,6 +5353,7 @@ def revenue_growth_monthly_report(self) -> Dict[str, Any]:
 
 # ── CDP 全量回填管道 ────────────────────────────────────────────
 
+
 @celery_app.task(bind=True, max_retries=1, default_retry_delay=300)
 def cdp_full_backfill(self, store_id=None, batch_size=500) -> Dict[str, Any]:
     """
@@ -5299,13 +5361,16 @@ def cdp_full_backfill(self, store_id=None, batch_size=500) -> Dict[str, Any]:
 
     步骤：订单回填 → 会员回填 → RFM重算 → 偏差校验
     """
+
     async def _run():
         from src.core.database import get_db_session
         from src.services.cdp_monitor_service import cdp_monitor_service
 
         async with get_db_session() as db:
             result = await cdp_monitor_service.run_full_backfill(
-                db, store_id=store_id, batch_size=batch_size,
+                db,
+                store_id=store_id,
+                batch_size=batch_size,
             )
             logger.info(
                 "cdp_full_backfill.done",
@@ -5323,6 +5388,7 @@ def cdp_full_backfill(self, store_id=None, batch_size=500) -> Dict[str, Any]:
 
 # ── P2: 决策效果闭环评估 ──────────────────────────────────────────────────
 
+
 @celery_app.task(
     base=CallbackTask,
     bind=True,
@@ -5337,6 +5403,7 @@ def evaluate_decision_effects(self) -> Dict[str, Any]:
     每日 03:30 扫描已执行但未评估的 DecisionLog，
     根据 decision_type 匹配评估策略，计算偏差，更新 outcome/trust_score。
     """
+
     async def _run():
         from src.core.database import get_db_session
         from src.services.effect_evaluator import EffectEvaluator
@@ -5351,6 +5418,7 @@ def evaluate_decision_effects(self) -> Dict[str, Any]:
             if evaluated > 0:
                 try:
                     from src.services.wechat_service import wechat_service
+
                     if wechat_service:
                         success = result.get("success", 0)
                         failure = result.get("failure", 0)
@@ -5375,6 +5443,7 @@ def evaluate_decision_effects(self) -> Dict[str, Any]:
 
 # ── 奥琦玮供应链：每日库存 + 采购单拉取 ──────────────────────────────────────
 
+
 @celery_app.task(
     bind=True,
     max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
@@ -5397,9 +5466,12 @@ def pull_aoqiwei_daily_supply(self) -> Dict[str, Any]:
     Returns:
         {success, date, stores_processed, purchase_orders_saved, stock_snapshots, errors}
     """
+
     async def _run():
         from datetime import date, timedelta
+
         from sqlalchemy import select
+
         from ..core.database import get_db_session
         from ..models.store import Store
 
@@ -5407,8 +5479,7 @@ def pull_aoqiwei_daily_supply(self) -> Dict[str, Any]:
         app_secret = os.getenv("AOQIWEI_APP_SECRET", "")
 
         if not app_key or not app_secret:
-            logger.warning("aoqiwei_supply_pull.skipped",
-                           reason="AOQIWEI_APP_KEY or AOQIWEI_APP_SECRET not configured")
+            logger.warning("aoqiwei_supply_pull.skipped", reason="AOQIWEI_APP_KEY or AOQIWEI_APP_SECRET not configured")
             return {
                 "success": True,
                 "skipped": True,
@@ -5423,13 +5494,15 @@ def pull_aoqiwei_daily_supply(self) -> Dict[str, Any]:
 
         from packages.api_adapters.aoqiwei.src.adapter import AoqiweiAdapter
 
-        adapter = AoqiweiAdapter({
-            "base_url": base_url,
-            "app_key": app_key,
-            "app_secret": app_secret,
-            "timeout": int(os.getenv("AOQIWEI_TIMEOUT", "30")),
-            "retry_times": int(os.getenv("AOQIWEI_RETRY_TIMES", "3")),
-        })
+        adapter = AoqiweiAdapter(
+            {
+                "base_url": base_url,
+                "app_key": app_key,
+                "app_secret": app_secret,
+                "timeout": int(os.getenv("AOQIWEI_TIMEOUT", "30")),
+                "retry_times": int(os.getenv("AOQIWEI_RETRY_TIMES", "3")),
+            }
+        )
 
         stores_processed = 0
         purchase_orders_saved = 0
@@ -5438,9 +5511,7 @@ def pull_aoqiwei_daily_supply(self) -> Dict[str, Any]:
 
         try:
             async with get_db_session() as session:
-                result = await session.execute(
-                    select(Store).where(Store.is_active.is_(True))
-                )
+                result = await session.execute(select(Store).where(Store.is_active.is_(True)))
                 stores = result.scalars().all()
 
                 for store in stores:
@@ -5475,6 +5546,7 @@ def pull_aoqiwei_daily_supply(self) -> Dict[str, Any]:
                                 raw_json = __import__("json").dumps(po, ensure_ascii=False)
                                 # 写入 inventory_transactions 或专用采购表（降级：只记录摘要到 daily_summaries source='aoqiwei_supply'）
                                 from sqlalchemy import text as _text
+
                                 await session.execute(
                                     _text("""
                                         INSERT INTO daily_summaries
@@ -5512,6 +5584,7 @@ def pull_aoqiwei_daily_supply(self) -> Dict[str, Any]:
                             stock_snapshots += len(stock_list)
                             # 库存数据写入 inventory_items（仅记录有 good_code 的行）
                             from sqlalchemy import text as _text2
+
                             for item in stock_list:
                                 good_code = item.get("goodCode") or item.get("good_code") or ""
                                 good_name = item.get("goodName") or item.get("good_name") or ""
@@ -5541,9 +5614,12 @@ def pull_aoqiwei_daily_supply(self) -> Dict[str, Any]:
                                 )
 
                         stores_processed += 1
-                        logger.info("aoqiwei_supply_pull.store_done",
-                                    store_id=sid, purchase_orders=store_po_count,
-                                    stock_items=len(stock_list) if stock_list else 0)
+                        logger.info(
+                            "aoqiwei_supply_pull.store_done",
+                            store_id=sid,
+                            purchase_orders=store_po_count,
+                            stock_items=len(stock_list) if stock_list else 0,
+                        )
 
                     except Exception as store_exc:
                         err_msg = f"store {sid}: {store_exc}"
@@ -5574,6 +5650,7 @@ def pull_aoqiwei_daily_supply(self) -> Dict[str, Any]:
 
 # ── 奥琦玮微生活会员：基于 POS 订单手机号增强会员数据 ──────────────────────────
 
+
 @celery_app.task(
     bind=True,
     max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
@@ -5597,10 +5674,14 @@ def enrich_members_from_aoqiwei_crm(self) -> Dict[str, Any]:
       AOQIWEI_CRM_APPKEY   — CRM AppKey（签名密钥）
       AOQIWEI_CRM_BASE_URL — 默认 https://welcrm.com
     """
+
     async def _run():
         import json as _json
         from datetime import date, timedelta
-        from sqlalchemy import select, text as _text
+
+        from sqlalchemy import select
+        from sqlalchemy import text as _text
+
         from ..core.database import get_db_session
         from ..models.integration import ExternalSystem, IntegrationStatus
 
@@ -5614,16 +5695,14 @@ def enrich_members_from_aoqiwei_crm(self) -> Dict[str, Any]:
 
         async with get_db_session() as session:
             # 优先用 DB 中配置的凭证（如有），fallback 到环境变量
-            sys_result = await session.execute(
-                _text("""
+            sys_result = await session.execute(_text("""
                     SELECT api_key, api_secret, api_endpoint
                     FROM external_systems
                     WHERE provider = 'aoqiwei_crm'
                       AND status != 'inactive'
                     ORDER BY created_at ASC
                     LIMIT 1
-                """)
-            )
+                """))
             sys_row = sys_result.fetchone()
             if sys_row:
                 appid = sys_row[0] or appid
@@ -5659,8 +5738,7 @@ def enrich_members_from_aoqiwei_crm(self) -> Dict[str, Any]:
             phones = [row[0] for row in phones_result.fetchall() if row[0]]
 
             if not phones:
-                logger.info("aoqiwei_crm_enrich.no_phones",
-                            reason="近30天无含手机号的订单，跳过本次同步")
+                logger.info("aoqiwei_crm_enrich.no_phones", reason="近30天无含手机号的订单，跳过本次同步")
                 return {
                     "success": True,
                     "skipped": True,
@@ -5673,13 +5751,15 @@ def enrich_members_from_aoqiwei_crm(self) -> Dict[str, Any]:
 
             from packages.api_adapters.aoqiwei.src.crm_adapter import AoqiweiCrmAdapter
 
-            adapter = AoqiweiCrmAdapter({
-                "base_url": base_url,
-                "appid": appid,
-                "appkey": appkey,
-                "timeout": int(os.getenv("AOQIWEI_CRM_TIMEOUT", "15")),
-                "retry_times": 2,
-            })
+            adapter = AoqiweiCrmAdapter(
+                {
+                    "base_url": base_url,
+                    "appid": appid,
+                    "appkey": appkey,
+                    "timeout": int(os.getenv("AOQIWEI_CRM_TIMEOUT", "15")),
+                    "retry_times": 2,
+                }
+            )
 
             for phone in phones:
                 try:
@@ -5742,14 +5822,12 @@ def enrich_members_from_aoqiwei_crm(self) -> Dict[str, Any]:
                 except Exception as phone_exc:
                     err_str = str(phone_exc)
                     # "会员不存在" 不算错误
-                    not_found_keywords = ["会员不存在", "用户不存在", "member not found",
-                                          "status=0", "status=2", "无效用户"]
+                    not_found_keywords = ["会员不存在", "用户不存在", "member not found", "status=0", "status=2", "无效用户"]
                     if any(kw.lower() in err_str.lower() for kw in not_found_keywords):
                         members_not_found += 1
                     else:
                         errors.append(f"{phone}: {err_str}")
-                        logger.warning("aoqiwei_crm_enrich.phone_error",
-                                       phone=phone, error=err_str)
+                        logger.warning("aoqiwei_crm_enrich.phone_error", phone=phone, error=err_str)
 
             await adapter.aclose()
             await session.commit()
@@ -5776,6 +5854,7 @@ def enrich_members_from_aoqiwei_crm(self) -> Dict[str, Any]:
 
 # ── IM 通讯录定时同步 ─────────────────────────────────────────────────────
 
+
 @celery_app.task(
     base=CallbackTask,
     bind=True,
@@ -5790,11 +5869,12 @@ def scheduled_im_roster_sync(self) -> Dict[str, Any]:
     定时同步所有已启用 sync_enabled 的品牌 IM 通讯录。
     默认每日 02:00 执行（通过 beat_schedule 配置）。
     """
+
     async def _run():
+        from sqlalchemy import and_, select
         from src.core.database import get_db_session
         from src.models.brand_im_config import BrandIMConfig
         from src.services.im_sync_service import IMSyncService
-        from sqlalchemy import select, and_
 
         results = []
         async with get_db_session() as db:
@@ -5815,24 +5895,28 @@ def scheduled_im_roster_sync(self) -> Dict[str, Any]:
                         brand_id=config.brand_id,
                         trigger="scheduled",
                     )
-                    results.append({
-                        "brand_id": config.brand_id,
-                        "status": "success",
-                        "added": result.get("added", 0),
-                        "updated": result.get("updated", 0),
-                        "disabled": result.get("disabled", 0),
-                    })
+                    results.append(
+                        {
+                            "brand_id": config.brand_id,
+                            "status": "success",
+                            "added": result.get("added", 0),
+                            "updated": result.get("updated", 0),
+                            "disabled": result.get("disabled", 0),
+                        }
+                    )
                     logger.info(
                         "scheduled_im_sync.brand_done",
                         brand_id=config.brand_id,
                         added=result.get("added", 0),
                     )
                 except Exception as exc:
-                    results.append({
-                        "brand_id": config.brand_id,
-                        "status": "failed",
-                        "error": str(exc),
-                    })
+                    results.append(
+                        {
+                            "brand_id": config.brand_id,
+                            "status": "failed",
+                            "error": str(exc),
+                        }
+                    )
                     logger.error(
                         "scheduled_im_sync.brand_failed",
                         brand_id=config.brand_id,
@@ -5856,6 +5940,7 @@ def scheduled_im_roster_sync(self) -> Dict[str, Any]:
 
 # ── 钉钉消息重试 ──────────────────────────────────────────────────────────
 
+
 @celery_app.task(bind=True, max_retries=1)
 def retry_failed_dingtalk_messages(self):
     """每5分钟从失败队列取出钉钉消息重试（最多3次）"""
@@ -5863,6 +5948,7 @@ def retry_failed_dingtalk_messages(self):
 
     async def _run():
         from src.services.dingtalk_service import dingtalk_service
+
         await dingtalk_service.retry_failed_messages(max_retries=3, batch_size=10)
 
     try:
@@ -5872,6 +5958,7 @@ def retry_failed_dingtalk_messages(self):
 
 
 # ── IM 考勤数据定时同步 ───────────────────────────────────────────────────
+
 
 @celery_app.task(
     base=CallbackTask,
@@ -5886,10 +5973,10 @@ def scheduled_im_attendance_sync(self) -> Dict[str, Any]:
     from datetime import date, timedelta
 
     async def _run():
+        from sqlalchemy import and_, select
         from src.core.database import get_db_session
         from src.models.brand_im_config import BrandIMConfig
         from src.services.im_attendance_sync import IMAttendanceSyncService
-        from sqlalchemy import select, and_
 
         yesterday = date.today() - timedelta(days=1)
         results = []
@@ -5907,13 +5994,14 @@ def scheduled_im_attendance_sync(self) -> Dict[str, Any]:
                 try:
                     service = IMAttendanceSyncService(db)
                     result = await service.sync_attendance(
-                        config.brand_id, yesterday, yesterday,
+                        config.brand_id,
+                        yesterday,
+                        yesterday,
                     )
                     results.append({"brand_id": config.brand_id, **result})
                 except Exception as exc:
                     results.append({"brand_id": config.brand_id, "error": str(exc)})
-                    logger.warning("scheduled_attendance_sync.brand_failed",
-                                   brand_id=config.brand_id, error=str(exc))
+                    logger.warning("scheduled_attendance_sync.brand_failed", brand_id=config.brand_id, error=str(exc))
 
         summary = {
             "total_brands": len(results),
@@ -5931,11 +6019,13 @@ def scheduled_im_attendance_sync(self) -> Dict[str, Any]:
 
 # ── Phase 4: 入职引导提醒 ────────────────────────────────────────────────
 
+
 @celery_app.task(bind=True, max_retries=1)
 def remind_incomplete_onboarding(self) -> Dict[str, Any]:
     """
     每日 09:00 提醒入职超过7天但任务未完成的新员工。
     """
+
     async def _run():
         from src.core.database import get_db_session
         from src.services.im_onboarding_robot import IMOnboardingRobot
@@ -5953,11 +6043,13 @@ def remind_incomplete_onboarding(self) -> Dict[str, Any]:
 
 # ── Phase 4: 里程碑通知扫描 ──────────────────────────────────────────────
 
+
 @celery_app.task(bind=True, max_retries=1)
 def sweep_milestone_notifications(self) -> Dict[str, Any]:
     """
     每日 10:00 扫描未推送的里程碑，批量发送 IM 庆祝通知。
     """
+
     async def _run():
         from src.core.database import get_db_session
         from src.services.im_milestone_notifier import IMMilestoneNotifier
@@ -5977,17 +6069,16 @@ def sweep_milestone_notifications(self) -> Dict[str, Any]:
 def check_compliance_alerts():
     """每日合规扫描：健康证/合同/身份证到期告警"""
     import asyncio
-    from src.core.database import AsyncSessionLocal
-    from src.services.compliance_alert_service import ComplianceAlertService
-    from src.models.store import Store
+
     from sqlalchemy import select
+    from src.core.database import AsyncSessionLocal
+    from src.models.store import Store
+    from src.services.compliance_alert_service import ComplianceAlertService
 
     async def _run():
         async with AsyncSessionLocal() as db:
             # 扫描所有活跃门店
-            result = await db.execute(
-                select(Store.id).where(Store.is_active.is_(True))
-            )
+            result = await db.execute(select(Store.id).where(Store.is_active.is_(True)))
             store_ids = [r[0] for r in result.all()]
 
             total_alerts = 0
@@ -6006,6 +6097,7 @@ def check_compliance_alerts():
 
 
 # ── W2-1: 审批超期检查 ────────────────────────────────────────────────
+
 
 @celery_app.task(name="src.core.celery_tasks.run_decision_effect_reviews", bind=True, max_retries=1)
 def run_decision_effect_reviews(self) -> Dict[str, Any]:

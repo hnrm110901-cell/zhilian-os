@@ -2,6 +2,7 @@
 Blindbox API (compatibility shim)
 历史上 main.py 已挂载 blindbox 路由；该模块用于保持导入兼容，避免应用启动失败。
 """
+
 from fastapi import APIRouter
 
 router = APIRouter(prefix="/blindbox", tags=["blindbox"])

@@ -1,16 +1,19 @@
 """
 User Model
 """
-from sqlalchemy import Column, String, Boolean, Enum
-from sqlalchemy.dialects.postgresql import UUID
-import uuid
+
 import enum
+import uuid
+
+from sqlalchemy import Boolean, Column, Enum, String
+from sqlalchemy.dialects.postgresql import UUID
 
 from .base import Base, TimestampMixin
 
 
 class UserRole(str, enum.Enum):
     """User roles - 基于实际餐饮岗位"""
+
     # 系统管理员
     ADMIN = "admin"
 

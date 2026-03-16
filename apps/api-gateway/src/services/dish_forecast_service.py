@@ -9,26 +9,27 @@ from __future__ import annotations
 
 from collections import defaultdict
 from typing import Optional
-from sqlalchemy.ext.asyncio import AsyncSession
+
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 # ── 常量 ───────────────────────────────────────────────────────────────────────
 HISTORY_PERIODS = 6  # 最多使用近 6 期历史
 
 # 生命周期阶段对预测的修正量
 LIFECYCLE_ADJUSTMENT: dict[str, float] = {
-    'launch':  0.15,   # 新品 +15%
-    'growth':  0.10,   # 成长期 +10%
-    'peak':    0.00,   # 成熟期不修正
-    'decline': -0.08,  # 衰退期 -8%
-    'exit':    -0.20,  # 退出期 -20%
+    "launch": 0.15,  # 新品 +15%
+    "growth": 0.10,  # 成长期 +10%
+    "peak": 0.00,  # 成熟期不修正
+    "decline": -0.08,  # 衰退期 -8%
+    "exit": -0.20,  # 退出期 -20%
 }
 
 
 # ── 纯函数 ─────────────────────────────────────────────────────────────────────
 
-def compute_weighted_avg(values: list[float],
-                          weights: list[float] | None = None) -> float:
+
+def compute_weighted_avg(values: list[float], weights: list[float] | None = None) -> float:
     """
     加权平均。默认权重 [1, 2, …, n]（越近越重）。
     空列表返回 0.0。
@@ -70,23 +71,28 @@ def apply_lifecycle_adjustment(base: float, lifecycle_phase: str) -> float:
     return round(base * (1 + adj), 2)
 
 
-def compute_confidence_interval(point: float,
-                                  periods_used: int) -> tuple[float, float]:
+def compute_confidence_interval(point: float, periods_used: int) -> tuple[float, float]:
     """
     对称置信区间 [low, high]。
     不确定度随历史期数增加而收窄：max(10%, 30% - periods_used × 4%)。
     low 最小为 0。
     """
     uncertainty = max(0.10, 0.30 - periods_used * 0.04)
-    low  = round(max(0.0, point * (1 - uncertainty)), 1)
+    low = round(max(0.0, point * (1 - uncertainty)), 1)
     high = round(point * (1 + uncertainty), 1)
     return low, high
 
 
-def build_forecast_record(store_id: str, forecast_period: str, base_period: str,
-                           dish_id: str, dish_name: str, category: Optional[str],
-                           history: list[dict],
-                           lifecycle_phase: str = 'peak') -> Optional[dict]:
+def build_forecast_record(
+    store_id: str,
+    forecast_period: str,
+    base_period: str,
+    dish_id: str,
+    dish_name: str,
+    category: Optional[str],
+    history: list[dict],
+    lifecycle_phase: str = "peak",
+) -> Optional[dict]:
     """
     基于历史数据列表（按期间升序）构建单道菜的预测记录。
     history 每项需含: order_count, revenue_yuan, food_cost_rate, gross_profit_margin。
@@ -98,82 +104,86 @@ def build_forecast_record(store_id: str, forecast_period: str, base_period: str,
     n = len(history)
     weights = list(range(1, n + 1))
 
-    orders_list  = [float(h['order_count'])         for h in history]
-    revenue_list = [float(h['revenue_yuan'])         for h in history]
-    fcr_list     = [float(h['food_cost_rate'])       for h in history]
-    gpm_list     = [float(h['gross_profit_margin'])  for h in history]
+    orders_list = [float(h["order_count"]) for h in history]
+    revenue_list = [float(h["revenue_yuan"]) for h in history]
+    fcr_list = [float(h["food_cost_rate"]) for h in history]
+    gpm_list = [float(h["gross_profit_margin"]) for h in history]
 
-    base_orders  = compute_weighted_avg(orders_list,  weights)
+    base_orders = compute_weighted_avg(orders_list, weights)
     base_revenue = compute_weighted_avg(revenue_list, weights)
-    avg_fcr      = compute_weighted_avg(fcr_list,     weights)
-    avg_gpm      = compute_weighted_avg(gpm_list,     weights)
+    avg_fcr = compute_weighted_avg(fcr_list, weights)
+    avg_gpm = compute_weighted_avg(gpm_list, weights)
 
-    trend_orders  = compute_trend_factor(orders_list)
+    trend_orders = compute_trend_factor(orders_list)
     trend_revenue = compute_trend_factor(revenue_list)
 
     # 趋势外推一期
-    trended_orders  = base_orders  * (1 + trend_orders  / 100.0)
+    trended_orders = base_orders * (1 + trend_orders / 100.0)
     trended_revenue = base_revenue * (1 + trend_revenue / 100.0)
 
     # 生命周期修正
-    pred_orders  = apply_lifecycle_adjustment(trended_orders,  lifecycle_phase)
+    pred_orders = apply_lifecycle_adjustment(trended_orders, lifecycle_phase)
     pred_revenue = apply_lifecycle_adjustment(trended_revenue, lifecycle_phase)
 
-    pred_orders  = max(0.0, pred_orders)
+    pred_orders = max(0.0, pred_orders)
     pred_revenue = max(0.0, pred_revenue)
 
-    o_low, o_high = compute_confidence_interval(pred_orders,  n)
+    o_low, o_high = compute_confidence_interval(pred_orders, n)
     r_low, r_high = compute_confidence_interval(pred_revenue, n)
 
     lc_adj_pct = round(LIFECYCLE_ADJUSTMENT.get(lifecycle_phase, 0.0) * 100.0, 1)
 
     return {
-        'store_id':        store_id,
-        'forecast_period': forecast_period,
-        'base_period':     base_period,
-        'dish_id':         dish_id,
-        'dish_name':       dish_name,
-        'category':        category,
-        'lifecycle_phase': lifecycle_phase,
-        'periods_used':    n,
-        'hist_avg_orders':  round(base_orders,  1),
-        'hist_avg_revenue': round(base_revenue, 2),
-        'trend_orders_pct':  trend_orders,
-        'trend_revenue_pct': trend_revenue,
-        'lifecycle_adj_pct': lc_adj_pct,
-        'predicted_order_count':  round(pred_orders,  1),
-        'predicted_order_low':    o_low,
-        'predicted_order_high':   o_high,
-        'predicted_revenue_yuan': round(pred_revenue, 2),
-        'predicted_revenue_low':  r_low,
-        'predicted_revenue_high': r_high,
-        'predicted_fcr':  round(avg_fcr, 2),
-        'predicted_gpm':  round(avg_gpm, 2),
+        "store_id": store_id,
+        "forecast_period": forecast_period,
+        "base_period": base_period,
+        "dish_id": dish_id,
+        "dish_name": dish_name,
+        "category": category,
+        "lifecycle_phase": lifecycle_phase,
+        "periods_used": n,
+        "hist_avg_orders": round(base_orders, 1),
+        "hist_avg_revenue": round(base_revenue, 2),
+        "trend_orders_pct": trend_orders,
+        "trend_revenue_pct": trend_revenue,
+        "lifecycle_adj_pct": lc_adj_pct,
+        "predicted_order_count": round(pred_orders, 1),
+        "predicted_order_low": o_low,
+        "predicted_order_high": o_high,
+        "predicted_revenue_yuan": round(pred_revenue, 2),
+        "predicted_revenue_low": r_low,
+        "predicted_revenue_high": r_high,
+        "predicted_fcr": round(avg_fcr, 2),
+        "predicted_gpm": round(avg_gpm, 2),
     }
 
 
 # ── 期间辅助 ───────────────────────────────────────────────────────────────────
 
+
 def _next_period(period: str) -> str:
     """返回下一个 YYYY-MM。"""
     year, month = int(period[:4]), int(period[5:7])
     if month == 12:
-        return f'{year + 1:04d}-01'
-    return f'{year:04d}-{month + 1:02d}'
+        return f"{year + 1:04d}-01"
+    return f"{year:04d}-{month + 1:02d}"
 
 
 def _start_period(period: str, n: int) -> str:
     year, month = int(period[:4]), int(period[5:7])
     total = year * 12 + (month - 1) - (n - 1)
-    return f'{total // 12:04d}-{total % 12 + 1:02d}'
+    return f"{total // 12:04d}-{total % 12 + 1:02d}"
 
 
 # ── 数据库函数 ──────────────────────────────────────────────────────────────────
 
-async def _fetch_all_dish_history(db: AsyncSession, store_id: str,
-                                   up_to_period: str,
-                                   n_periods: int = HISTORY_PERIODS,
-                                   ) -> tuple[dict[str, list[dict]], dict[str, tuple]]:
+
+async def _fetch_all_dish_history(
+    db: AsyncSession,
+    store_id: str,
+    up_to_period: str,
+    n_periods: int = HISTORY_PERIODS,
+) -> tuple[dict[str, list[dict]], dict[str, tuple]]:
     """
     批量拉取所有菜品近 n_periods 期的历史数据。
     返回 (by_dish_id, dish_meta)
@@ -189,34 +199,33 @@ async def _fetch_all_dish_history(db: AsyncSession, store_id: str,
           AND period >= :start AND period <= :up_to_period
         ORDER BY dish_id, period ASC
     """)
-    rows = (await db.execute(sql, {'store_id': store_id,
-                                    'start': start,
-                                    'up_to_period': up_to_period})).fetchall()
+    rows = (await db.execute(sql, {"store_id": store_id, "start": start, "up_to_period": up_to_period})).fetchall()
 
     by_dish: dict[str, list[dict]] = defaultdict(list)
     dish_meta: dict[str, tuple] = {}
     for r in rows:
         dish_id = r[0]
-        dish_meta[dish_id] = (r[1], r[2])   # (dish_name, category)
-        by_dish[dish_id].append({
-            'period':              r[3],
-            'order_count':         int(r[4] or 0),
-            'revenue_yuan':        float(r[5] or 0),
-            'food_cost_rate':      float(r[6] or 0),
-            'gross_profit_margin': float(r[7] or 0),
-        })
+        dish_meta[dish_id] = (r[1], r[2])  # (dish_name, category)
+        by_dish[dish_id].append(
+            {
+                "period": r[3],
+                "order_count": int(r[4] or 0),
+                "revenue_yuan": float(r[5] or 0),
+                "food_cost_rate": float(r[6] or 0),
+                "gross_profit_margin": float(r[7] or 0),
+            }
+        )
     return dict(by_dish), dish_meta
 
 
-async def _fetch_lifecycle_phases(db: AsyncSession, store_id: str,
-                                   period: str) -> dict[str, str]:
+async def _fetch_lifecycle_phases(db: AsyncSession, store_id: str, period: str) -> dict[str, str]:
     """拉取该期所有菜品的生命周期阶段。"""
     sql = text("""
         SELECT dish_id, phase
         FROM dish_lifecycle_records
         WHERE store_id = :store_id AND period = :period
     """)
-    rows = (await db.execute(sql, {'store_id': store_id, 'period': period})).fetchall()
+    rows = (await db.execute(sql, {"store_id": store_id, "period": period})).fetchall()
     return {r[0]: r[1] for r in rows}
 
 
@@ -266,9 +275,9 @@ async def _upsert_forecast_record(db: AsyncSession, rec: dict) -> None:
     await db.execute(sql, rec)
 
 
-async def generate_dish_forecasts(db: AsyncSession, store_id: str,
-                                   base_period: str,
-                                   forecast_period: Optional[str] = None) -> dict:
+async def generate_dish_forecasts(
+    db: AsyncSession, store_id: str, base_period: str, forecast_period: Optional[str] = None
+) -> dict:
     """
     生成门店所有菜品的下期预测。幂等。
     forecast_period 默认为 base_period 的下一期。
@@ -281,9 +290,12 @@ async def generate_dish_forecasts(db: AsyncSession, store_id: str,
     if not by_dish:
         await db.commit()
         return {
-            'store_id': store_id, 'base_period': base_period,
-            'forecast_period': forecast_period, 'dish_count': 0,
-            'total_predicted_revenue': 0.0, 'phase_counts': {},
+            "store_id": store_id,
+            "base_period": base_period,
+            "forecast_period": forecast_period,
+            "dish_count": 0,
+            "total_predicted_revenue": 0.0,
+            "phase_counts": {},
         }
 
     lifecycle_phases = await _fetch_lifecycle_phases(db, store_id, base_period)
@@ -293,33 +305,29 @@ async def generate_dish_forecasts(db: AsyncSession, store_id: str,
 
     for dish_id, history in by_dish.items():
         dish_name, category = dish_meta[dish_id]
-        phase = lifecycle_phases.get(dish_id, 'peak')  # default peak if no lifecycle data
+        phase = lifecycle_phases.get(dish_id, "peak")  # default peak if no lifecycle data
 
-        rec = build_forecast_record(
-            store_id, forecast_period, base_period,
-            dish_id, dish_name, category, history, phase
-        )
+        rec = build_forecast_record(store_id, forecast_period, base_period, dish_id, dish_name, category, history, phase)
         if rec is None:
             continue
         await _upsert_forecast_record(db, rec)
-        total_rev += rec['predicted_revenue_yuan']
+        total_rev += rec["predicted_revenue_yuan"]
         phase_counts[phase] = phase_counts.get(phase, 0) + 1
 
     await db.commit()
     return {
-        'store_id':                store_id,
-        'base_period':             base_period,
-        'forecast_period':         forecast_period,
-        'dish_count':              len(by_dish),
-        'total_predicted_revenue': round(total_rev, 2),
-        'phase_counts':            phase_counts,
+        "store_id": store_id,
+        "base_period": base_period,
+        "forecast_period": forecast_period,
+        "dish_count": len(by_dish),
+        "total_predicted_revenue": round(total_rev, 2),
+        "phase_counts": phase_counts,
     }
 
 
-async def get_dish_forecasts(db: AsyncSession, store_id: str,
-                              forecast_period: str,
-                              lifecycle_phase: Optional[str] = None,
-                              limit: int = 100) -> list[dict]:
+async def get_dish_forecasts(
+    db: AsyncSession, store_id: str, forecast_period: str, lifecycle_phase: Optional[str] = None, limit: int = 100
+) -> list[dict]:
     """
     查询门店某预测期的菜品预测列表。
     L011合规：两路 text() 分支。
@@ -338,8 +346,7 @@ async def get_dish_forecasts(db: AsyncSession, store_id: str,
             ORDER BY predicted_revenue_yuan DESC
             LIMIT :limit
         """)
-        params = {'store_id': store_id, 'forecast_period': forecast_period,
-                  'lifecycle_phase': lifecycle_phase, 'limit': limit}
+        params = {"store_id": store_id, "forecast_period": forecast_period, "lifecycle_phase": lifecycle_phase, "limit": limit}
     else:
         sql = text("""
             SELECT id, dish_id, dish_name, category, lifecycle_phase,
@@ -353,23 +360,35 @@ async def get_dish_forecasts(db: AsyncSession, store_id: str,
             ORDER BY predicted_revenue_yuan DESC
             LIMIT :limit
         """)
-        params = {'store_id': store_id, 'forecast_period': forecast_period,
-                  'limit': limit}
+        params = {"store_id": store_id, "forecast_period": forecast_period, "limit": limit}
 
     rows = (await db.execute(sql, params)).fetchall()
     cols = [
-        'id', 'dish_id', 'dish_name', 'category', 'lifecycle_phase',
-        'periods_used', 'hist_avg_orders', 'hist_avg_revenue',
-        'trend_orders_pct', 'trend_revenue_pct', 'lifecycle_adj_pct',
-        'predicted_order_count', 'predicted_order_low', 'predicted_order_high',
-        'predicted_revenue_yuan', 'predicted_revenue_low', 'predicted_revenue_high',
-        'predicted_fcr', 'predicted_gpm', 'base_period',
+        "id",
+        "dish_id",
+        "dish_name",
+        "category",
+        "lifecycle_phase",
+        "periods_used",
+        "hist_avg_orders",
+        "hist_avg_revenue",
+        "trend_orders_pct",
+        "trend_revenue_pct",
+        "lifecycle_adj_pct",
+        "predicted_order_count",
+        "predicted_order_low",
+        "predicted_order_high",
+        "predicted_revenue_yuan",
+        "predicted_revenue_low",
+        "predicted_revenue_high",
+        "predicted_fcr",
+        "predicted_gpm",
+        "base_period",
     ]
     return [dict(zip(cols, r)) for r in rows]
 
 
-async def get_forecast_summary(db: AsyncSession, store_id: str,
-                                forecast_period: str) -> dict:
+async def get_forecast_summary(db: AsyncSession, store_id: str, forecast_period: str) -> dict:
     """按生命周期阶段聚合预测统计。"""
     sql = text("""
         SELECT
@@ -385,39 +404,36 @@ async def get_forecast_summary(db: AsyncSession, store_id: str,
         GROUP BY lifecycle_phase
         ORDER BY lifecycle_phase
     """)
-    rows = (await db.execute(sql, {'store_id': store_id,
-                                    'forecast_period': forecast_period})).fetchall()
+    rows = (await db.execute(sql, {"store_id": store_id, "forecast_period": forecast_period})).fetchall()
 
     by_phase = []
-    total_dishes  = 0
+    total_dishes = 0
     total_revenue = 0.0
 
     for r in rows:
         item = {
-            'lifecycle_phase':  r[0],
-            'dish_count':       int(r[1]),
-            'total_orders':     float(r[2] or 0),
-            'total_revenue':    float(r[3] or 0),
-            'avg_trend':        float(r[4] or 0),
-            'avg_lc_adj':       float(r[5] or 0),
-            'avg_periods_used': float(r[6] or 0),
+            "lifecycle_phase": r[0],
+            "dish_count": int(r[1]),
+            "total_orders": float(r[2] or 0),
+            "total_revenue": float(r[3] or 0),
+            "avg_trend": float(r[4] or 0),
+            "avg_lc_adj": float(r[5] or 0),
+            "avg_periods_used": float(r[6] or 0),
         }
         by_phase.append(item)
-        total_dishes  += item['dish_count']
-        total_revenue += item['total_revenue']
+        total_dishes += item["dish_count"]
+        total_revenue += item["total_revenue"]
 
     return {
-        'store_id':        store_id,
-        'forecast_period': forecast_period,
-        'total_dishes':    total_dishes,
-        'total_revenue':   round(total_revenue, 2),
-        'by_phase':        by_phase,
+        "store_id": store_id,
+        "forecast_period": forecast_period,
+        "total_dishes": total_dishes,
+        "total_revenue": round(total_revenue, 2),
+        "by_phase": by_phase,
     }
 
 
-async def get_forecast_accuracy(db: AsyncSession, store_id: str,
-                                 forecast_period: str,
-                                 limit: int = 50) -> list[dict]:
+async def get_forecast_accuracy(db: AsyncSession, store_id: str, forecast_period: str, limit: int = 50) -> list[dict]:
     """
     将预测值与实际值（dish_profitability_records）JOIN 对比，
     计算订单/营收预测误差百分比。
@@ -450,20 +466,23 @@ async def get_forecast_accuracy(db: AsyncSession, store_id: str,
         ORDER BY ABS(a.revenue_yuan - f.predicted_revenue_yuan) DESC
         LIMIT :limit
     """)
-    rows = (await db.execute(sql, {'store_id': store_id,
-                                    'forecast_period': forecast_period,
-                                    'limit': limit})).fetchall()
+    rows = (await db.execute(sql, {"store_id": store_id, "forecast_period": forecast_period, "limit": limit})).fetchall()
     cols = [
-        'dish_id', 'dish_name', 'category', 'lifecycle_phase',
-        'predicted_order_count', 'predicted_revenue_yuan',
-        'actual_orders', 'actual_revenue',
-        'order_error_pct', 'revenue_error_pct',
+        "dish_id",
+        "dish_name",
+        "category",
+        "lifecycle_phase",
+        "predicted_order_count",
+        "predicted_revenue_yuan",
+        "actual_orders",
+        "actual_revenue",
+        "order_error_pct",
+        "revenue_error_pct",
     ]
     return [dict(zip(cols, r)) for r in rows]
 
 
-async def get_dish_forecast_history(db: AsyncSession, store_id: str,
-                                     dish_id: str, periods: int = 6) -> list[dict]:
+async def get_dish_forecast_history(db: AsyncSession, store_id: str, dish_id: str, periods: int = 6) -> list[dict]:
     """某道菜近 N 期预测记录（可与实际对比追踪预测精度演进）。"""
     sql = text("""
         SELECT
@@ -490,13 +509,21 @@ async def get_dish_forecast_history(db: AsyncSession, store_id: str,
         ORDER BY f.forecast_period DESC
         LIMIT :periods
     """)
-    rows = (await db.execute(sql, {'store_id': store_id, 'dish_id': dish_id,
-                                    'periods': periods})).fetchall()
+    rows = (await db.execute(sql, {"store_id": store_id, "dish_id": dish_id, "periods": periods})).fetchall()
     cols = [
-        'forecast_period', 'base_period', 'lifecycle_phase',
-        'predicted_order_count', 'predicted_order_low', 'predicted_order_high',
-        'predicted_revenue_yuan', 'predicted_revenue_low', 'predicted_revenue_high',
-        'trend_revenue_pct', 'lifecycle_adj_pct', 'periods_used',
-        'actual_orders', 'actual_revenue',
+        "forecast_period",
+        "base_period",
+        "lifecycle_phase",
+        "predicted_order_count",
+        "predicted_order_low",
+        "predicted_order_high",
+        "predicted_revenue_yuan",
+        "predicted_revenue_low",
+        "predicted_revenue_high",
+        "trend_revenue_pct",
+        "lifecycle_adj_pct",
+        "periods_used",
+        "actual_orders",
+        "actual_revenue",
     ]
     return [dict(zip(cols, r)) for r in rows]

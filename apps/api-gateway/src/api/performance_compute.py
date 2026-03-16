@@ -11,6 +11,7 @@ P2 绩效计算 API
   GET /api/v1/performance/{store_id}/summary
       → 查询门店月度绩效汇总（各指标的达成率分布）
 """
+
 from datetime import date
 from typing import List, Optional
 
@@ -18,7 +19,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.core.dependencies import get_current_active_user, require_role
 from src.models.employee import Employee
@@ -30,6 +30,7 @@ router = APIRouter(prefix="/api/v1/performance", tags=["performance"])
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
+
 
 class ComputeRequest(BaseModel):
     store_id: str
@@ -67,6 +68,7 @@ class MetricSummaryItem(BaseModel):
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
+
 
 @router.post("/compute", response_model=ComputeResponse)
 async def trigger_compute(

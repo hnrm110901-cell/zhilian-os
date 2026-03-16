@@ -2,13 +2,15 @@
 排队管理API
 Queue Management API
 """
-from fastapi import APIRouter, Depends, HTTPException, Query, Body
-from typing import Optional
-import structlog
 
-from ..services.queue_service import queue_service, QueueStatus
+from typing import Optional
+
+import structlog
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
+
 from ..core.dependencies import get_current_user
 from ..models.user import User
+from ..services.queue_service import QueueStatus, queue_service
 
 router = APIRouter(prefix="/api/v1/queue", tags=["Queue"])
 logger = structlog.get_logger()
@@ -231,14 +233,13 @@ async def get_queue_detail(
         queue_id: 排队ID
     """
     try:
-        from ..models.queue import Queue
-        from ..core.database import get_session
         from sqlalchemy import select
 
+        from ..core.database import get_session
+        from ..models.queue import Queue
+
         async with get_session() as session:
-            result = await session.execute(
-                select(Queue).where(Queue.queue_id == queue_id)
-            )
+            result = await session.execute(select(Queue).where(Queue.queue_id == queue_id))
             queue = result.scalar_one_or_none()
 
             if not queue:

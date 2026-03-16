@@ -5,12 +5,13 @@ Payment Reconciliation API
 路由前缀: /payment-reconciliation
 所有端点要求 ADMIN 角色
 """
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
-from pydantic import BaseModel, Field
-from typing import Optional
-from datetime import date
-import structlog
 
+from datetime import date
+from typing import Optional
+
+import structlog
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from pydantic import BaseModel, Field
 from src.core.dependencies import get_current_active_user
 from src.models.user import User
 from src.services.payment_reconcile_service import payment_reconcile_service
@@ -25,12 +26,14 @@ router = APIRouter(prefix="/payment-reconciliation", tags=["支付对账"])
 
 class RunReconciliationRequest(BaseModel):
     """执行对账请求"""
+
     channel: str = Field(..., description="支付渠道: wechat/alipay/meituan/eleme/douyin 等")
     reconcile_date: date = Field(..., description="对账日期")
 
 
 class ResolveDiffRequest(BaseModel):
     """标记差异已处理"""
+
     pass  # resolved_by 从 current_user 获取
 
 

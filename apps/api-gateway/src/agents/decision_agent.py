@@ -1,13 +1,15 @@
 """
 DecisionAgent - 决策分析Agent (Claude Tool Use 增强)
 """
-from typing import Dict, Any, Optional
+
 from decimal import Decimal
+from typing import Any, Dict, Optional
+
 import structlog
 
-from .llm_agent import LLMEnhancedAgent, AgentResult
+from ..core.monitoring import ErrorCategory, ErrorSeverity, error_monitor
 from ..services.decision_validator import DecisionValidator, ValidationResult
-from ..core.monitoring import error_monitor, ErrorSeverity, ErrorCategory
+from .llm_agent import AgentResult, LLMEnhancedAgent
 
 logger = structlog.get_logger()
 
@@ -33,11 +35,7 @@ class DecisionAgent(LLMEnhancedAgent):
         self.validator = DecisionValidator()
 
     async def analyze_revenue_anomaly(
-        self,
-        store_id: str,
-        current_revenue: Decimal,
-        expected_revenue: Decimal,
-        time_period: str = "today"
+        self, store_id: str, current_revenue: Decimal, expected_revenue: Decimal, time_period: str = "today"
     ) -> AgentResult:
         """
         分析营收异常
@@ -67,7 +65,7 @@ class DecisionAgent(LLMEnhancedAgent):
                 store_id=store_id,
                 current_revenue=str(current_revenue),
                 expected_revenue=str(expected_revenue),
-                deviation=deviation
+                deviation=deviation,
             )
 
             result = await self.execute_with_tools(
@@ -78,7 +76,7 @@ class DecisionAgent(LLMEnhancedAgent):
                     "expected_revenue": str(expected_revenue),
                     "deviation_pct": deviation,
                     "time_period": time_period,
-                }
+                },
             )
 
             if not result.success:
@@ -95,9 +93,8 @@ class DecisionAgent(LLMEnhancedAgent):
                     "iterations": result.iterations,
                 },
                 message="营收异常分析完成",
-                reasoning=result.reasoning or (
-                    f"当前营收 ¥{current_revenue}，预期 ¥{expected_revenue}，偏差 {deviation:.1f}%"
-                ),
+                reasoning=result.reasoning
+                or (f"当前营收 ¥{current_revenue}，预期 ¥{expected_revenue}，偏差 {deviation:.1f}%"),
                 confidence=result.confidence,
                 source_data={
                     "store_id": store_id,
@@ -120,12 +117,7 @@ class DecisionAgent(LLMEnhancedAgent):
             return formatted
 
         except Exception as e:
-            logger.error(
-                "Revenue anomaly analysis failed",
-                store_id=store_id,
-                error=str(e),
-                exc_info=e
-            )
+            logger.error("Revenue anomaly analysis failed", store_id=store_id, error=str(e), exc_info=e)
             return self.format_response(
                 success=False,
                 data=None,
@@ -135,11 +127,7 @@ class DecisionAgent(LLMEnhancedAgent):
                 source_data={"store_id": store_id},
             )
 
-    async def analyze_order_trend(
-        self,
-        store_id: str,
-        time_range: str = "7d"
-    ) -> AgentResult:
+    async def analyze_order_trend(self, store_id: str, time_range: str = "7d") -> AgentResult:
         """
         分析订单趋势
 
@@ -157,16 +145,10 @@ class DecisionAgent(LLMEnhancedAgent):
                 f"给出趋势判断和经营建议。"
             )
 
-            logger.info(
-                "Analyzing order trend with Tool Use",
-                store_id=store_id,
-                time_range=time_range
-            )
+            logger.info("Analyzing order trend with Tool Use", store_id=store_id, time_range=time_range)
 
             result = await self.execute_with_tools(
-                user_message=user_message,
-                store_id=store_id,
-                context={"time_range": time_range}
+                user_message=user_message, store_id=store_id, context={"time_range": time_range}
             )
 
             if not result.success:
@@ -187,12 +169,7 @@ class DecisionAgent(LLMEnhancedAgent):
             )
 
         except Exception as e:
-            logger.error(
-                "Order trend analysis failed",
-                store_id=store_id,
-                error=str(e),
-                exc_info=e
-            )
+            logger.error("Order trend analysis failed", store_id=store_id, error=str(e), exc_info=e)
             return self.format_response(
                 success=False,
                 data=None,
@@ -203,10 +180,7 @@ class DecisionAgent(LLMEnhancedAgent):
             )
 
     async def generate_business_recommendations(
-        self,
-        store_id: str,
-        focus_area: Optional[str] = None,
-        validation_context: Optional[Dict] = None
+        self, store_id: str, focus_area: Optional[str] = None, validation_context: Optional[Dict] = None
     ) -> AgentResult:
         """
         生成经营建议
@@ -227,16 +201,10 @@ class DecisionAgent(LLMEnhancedAgent):
                 f"给出具体的、可操作的经营改进方案。"
             )
 
-            logger.info(
-                "Generating business recommendations with Tool Use",
-                store_id=store_id,
-                focus_area=focus_area
-            )
+            logger.info("Generating business recommendations with Tool Use", store_id=store_id, focus_area=focus_area)
 
             result = await self.execute_with_tools(
-                user_message=user_message,
-                store_id=store_id,
-                context={"focus_area": focus_area}
+                user_message=user_message, store_id=store_id, context={"focus_area": focus_area}
             )
 
             if not result.success:
@@ -247,9 +215,7 @@ class DecisionAgent(LLMEnhancedAgent):
             if validation_context:
                 decision = {"action": "recommendation", **validation_context.get("decision_overrides", {})}
                 validation = await self.validator.validate_decision(
-                    decision=decision,
-                    context=validation_context,
-                    rules_to_apply=["budget_check"]
+                    decision=decision, context=validation_context, rules_to_apply=["budget_check"]
                 )
                 if validation["result"] == ValidationResult.REJECTED.value:
                     return self.format_response(
@@ -282,12 +248,7 @@ class DecisionAgent(LLMEnhancedAgent):
             )
 
         except Exception as e:
-            logger.error(
-                "Business recommendations generation failed",
-                store_id=store_id,
-                error=str(e),
-                exc_info=e
-            )
+            logger.error("Business recommendations generation failed", store_id=store_id, error=str(e), exc_info=e)
             return self.format_response(
                 success=False,
                 data=None,

@@ -2,7 +2,8 @@
 Agent提示词模板
 为不同Agent定义专业的系统提示词
 """
-from typing import Dict, Any
+
+from typing import Any, Dict
 
 
 class AgentPrompts:
@@ -115,12 +116,7 @@ class AgentPrompts:
         return prompts.get(agent_type, "你是一个专业的餐厅运营助手。")
 
     @classmethod
-    def format_user_prompt(
-        cls,
-        action: str,
-        params: Dict[str, Any],
-        context: Dict[str, Any] = None
-    ) -> str:
+    def format_user_prompt(cls, action: str, params: Dict[str, Any], context: Dict[str, Any] = None) -> str:
         """
         格式化用户提示词
 

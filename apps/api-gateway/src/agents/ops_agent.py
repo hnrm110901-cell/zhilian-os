@@ -8,14 +8,16 @@ OpsAgent - 连锁餐饮IT运维智能体 (屯象OS 运维方案)
 - 协调层：自然语言运维问答
 - V2.0 新增：store_dashboard / alert_convergence / food_safety_status
 """
+
 import time
-from typing import Dict, Any, Optional, List
 from types import SimpleNamespace
+from typing import Any, Dict, List, Optional
+
 import structlog
 
-from .llm_agent import LLMEnhancedAgent
 from ..core.base_agent import AgentResponse
-from ..core.monitoring import error_monitor, ErrorSeverity, ErrorCategory
+from ..core.monitoring import ErrorCategory, ErrorSeverity, error_monitor
+from .llm_agent import LLMEnhancedAgent
 
 logger = structlog.get_logger()
 
@@ -36,17 +38,17 @@ class OpsAgent(LLMEnhancedAgent):
 
     def get_supported_actions(self) -> List[str]:
         return [
-            "health_check",        # 单店/全域健康检查建议
-            "diagnose_fault",      # 故障根因分析
+            "health_check",  # 单店/全域健康检查建议
+            "diagnose_fault",  # 故障根因分析
             "runbook_suggestion",  # 修复步骤/Runbook 建议
-            "predict_maintenance", # 预测性维护建议（硬件/网络）
-            "security_advice",     # 安全加固建议（弱密码/漏洞/VPN/白名单）
+            "predict_maintenance",  # 预测性维护建议（硬件/网络）
+            "security_advice",  # 安全加固建议（弱密码/漏洞/VPN/白名单）
             "link_switch_advice",  # 主备链路切换建议
-            "asset_overview",      # 资产概览与台账建议
-            "nl_query",            # 自然语言运维问答
+            "asset_overview",  # 资产概览与台账建议
+            "nl_query",  # 自然语言运维问答
             # V2.0 新增 ──────────────────────────────────────────────────────
-            "store_dashboard",     # 门店健康总览（L1+L2+L3实时数据汇总）
-            "alert_convergence",   # 告警收敛（多信号→根因事件）
+            "store_dashboard",  # 门店健康总览（L1+L2+L3实时数据汇总）
+            "alert_convergence",  # 告警收敛（多信号→根因事件）
             "food_safety_status",  # 食安合规状态查询
         ]
 
@@ -153,14 +155,17 @@ class OpsAgent(LLMEnhancedAgent):
             f"网络域(带宽/链路/VPN)，列出各域检查项状态与结论建议。"
         )
         result = await self._safe_execute_with_tools(
-            user_message=user_message,
-            store_id=store_id or "",
-            context={"scope": scope}
+            user_message=user_message, store_id=store_id or "", context={"scope": scope}
         )
         return {
             "success": result.success,
-            "data": {"check_advice": result.data, "scope": scope, "store_id": store_id,
-                     "tool_calls": len(result.tool_calls), "iterations": result.iterations},
+            "data": {
+                "check_advice": result.data,
+                "scope": scope,
+                "store_id": store_id,
+                "tool_calls": len(result.tool_calls),
+                "iterations": result.iterations,
+            },
             "error": result.message if not result.success else None,
             "metadata": {"source": "tool_use"},
         }
@@ -174,14 +179,16 @@ class OpsAgent(LLMEnhancedAgent):
             f"请做根因分析（网络/数据库/应用），给出可能原因（按概率排序）与排查顺序。"
         )
         result = await self._safe_execute_with_tools(
-            user_message=user_message,
-            store_id=store_id or "",
-            context={"symptom": symptom}
+            user_message=user_message, store_id=store_id or "", context={"symptom": symptom}
         )
         return {
             "success": result.success,
-            "data": {"diagnosis": result.data, "symptom": symptom,
-                     "tool_calls": len(result.tool_calls), "iterations": result.iterations},
+            "data": {
+                "diagnosis": result.data,
+                "symptom": symptom,
+                "tool_calls": len(result.tool_calls),
+                "iterations": result.iterations,
+            },
             "error": result.message if not result.success else None,
             "metadata": {"source": "tool_use"},
         }
@@ -190,19 +197,18 @@ class OpsAgent(LLMEnhancedAgent):
         """Runbook/修复步骤建议（对应方案中的自动修复 Runbook 库）。"""
         fault_type = params.get("fault_type", "")
         store_id = params.get("store_id")
-        user_message = (
-            f"故障类型「{fault_type}」的标准修复步骤（Runbook）："
-            f"请给出分步操作指南、注意事项与回滚建议。"
-        )
+        user_message = f"故障类型「{fault_type}」的标准修复步骤（Runbook）：" f"请给出分步操作指南、注意事项与回滚建议。"
         result = await self._safe_execute_with_tools(
-            user_message=user_message,
-            store_id=store_id or "",
-            context={"fault_type": fault_type}
+            user_message=user_message, store_id=store_id or "", context={"fault_type": fault_type}
         )
         return {
             "success": result.success,
-            "data": {"runbook": result.data, "fault_type": fault_type,
-                     "tool_calls": len(result.tool_calls), "iterations": result.iterations},
+            "data": {
+                "runbook": result.data,
+                "fault_type": fault_type,
+                "tool_calls": len(result.tool_calls),
+                "iterations": result.iterations,
+            },
             "error": result.message if not result.success else None,
             "metadata": {"source": "tool_use"},
         }
@@ -216,14 +222,16 @@ class OpsAgent(LLMEnhancedAgent):
             f"请根据使用频率与历史故障数据，给出维护时间窗口、备件建议和巡检计划。"
         )
         result = await self._safe_execute_with_tools(
-            user_message=user_message,
-            store_id=store_id or "",
-            context={"device_type": device_type}
+            user_message=user_message, store_id=store_id or "", context={"device_type": device_type}
         )
         return {
             "success": result.success,
-            "data": {"maintenance_advice": result.data, "device_type": device_type,
-                     "tool_calls": len(result.tool_calls), "iterations": result.iterations},
+            "data": {
+                "maintenance_advice": result.data,
+                "device_type": device_type,
+                "tool_calls": len(result.tool_calls),
+                "iterations": result.iterations,
+            },
             "error": result.message if not result.success else None,
             "metadata": {"source": "tool_use"},
         }
@@ -237,14 +245,16 @@ class OpsAgent(LLMEnhancedAgent):
             f"请分析弱密码风险、非授权设备、固件漏洞、VPN 隧道健康，给出优先级排序的加固措施。"
         )
         result = await self._safe_execute_with_tools(
-            user_message=user_message,
-            store_id=store_id or "",
-            context={"focus": focus}
+            user_message=user_message, store_id=store_id or "", context={"focus": focus}
         )
         return {
             "success": result.success,
-            "data": {"security_advice": result.data, "focus": focus,
-                     "tool_calls": len(result.tool_calls), "iterations": result.iterations},
+            "data": {
+                "security_advice": result.data,
+                "focus": focus,
+                "tool_calls": len(result.tool_calls),
+                "iterations": result.iterations,
+            },
             "error": result.message if not result.success else None,
             "metadata": {"source": "tool_use"},
         }
@@ -258,14 +268,16 @@ class OpsAgent(LLMEnhancedAgent):
             f"请判断是否建议切换、切换时机、回切条件与注意事项。"
         )
         result = await self._safe_execute_with_tools(
-            user_message=user_message,
-            store_id=store_id or "",
-            context={"quality_score": quality_score}
+            user_message=user_message, store_id=store_id or "", context={"quality_score": quality_score}
         )
         return {
             "success": result.success,
-            "data": {"link_advice": result.data, "quality_score": quality_score,
-                     "tool_calls": len(result.tool_calls), "iterations": result.iterations},
+            "data": {
+                "link_advice": result.data,
+                "quality_score": quality_score,
+                "tool_calls": len(result.tool_calls),
+                "iterations": result.iterations,
+            },
             "error": result.message if not result.success else None,
             "metadata": {"source": "tool_use"},
         }
@@ -279,15 +291,15 @@ class OpsAgent(LLMEnhancedAgent):
             f"硬件域(POS/打印机/显示屏/KDS/门禁/监控/服务器)、"
             f"网络域(局域网/广域网/WiFi/4G5G/VPN)的建议采集项与分类。"
         )
-        result = await self._safe_execute_with_tools(
-            user_message=user_message,
-            store_id=store_id or "",
-            context={}
-        )
+        result = await self._safe_execute_with_tools(user_message=user_message, store_id=store_id or "", context={})
         return {
             "success": result.success,
-            "data": {"asset_advice": result.data, "store_id": store_id,
-                     "tool_calls": len(result.tool_calls), "iterations": result.iterations},
+            "data": {
+                "asset_advice": result.data,
+                "store_id": store_id,
+                "tool_calls": len(result.tool_calls),
+                "iterations": result.iterations,
+            },
             "error": result.message if not result.success else None,
             "metadata": {"source": "tool_use"},
         }
@@ -296,19 +308,18 @@ class OpsAgent(LLMEnhancedAgent):
         """自然语言运维问答，如「3号店今天网络为什么慢」（方案 3.2.3 LLM 运维助手）。"""
         question = params.get("question", "")
         store_id = params.get("store_id")
-        user_message = (
-            f"运维问答 门店 {store_id or '不限'}：{question}。"
-            f"请结合运维知识给出人类可读的分析与操作建议。"
-        )
+        user_message = f"运维问答 门店 {store_id or '不限'}：{question}。" f"请结合运维知识给出人类可读的分析与操作建议。"
         result = await self._safe_execute_with_tools(
-            user_message=user_message,
-            store_id=store_id or "",
-            context={"question": question}
+            user_message=user_message, store_id=store_id or "", context={"question": question}
         )
         return {
             "success": result.success,
-            "data": {"answer": result.data, "question": question,
-                     "tool_calls": len(result.tool_calls), "iterations": result.iterations},
+            "data": {
+                "answer": result.data,
+                "question": question,
+                "tool_calls": len(result.tool_calls),
+                "iterations": result.iterations,
+            },
             "error": result.message if not result.success else None,
             "metadata": {"source": "tool_use"},
         }
@@ -322,6 +333,7 @@ class OpsAgent(LLMEnhancedAgent):
         再用 Claude 对结果生成自然语言摘要和处置建议。
         """
         from ..services.ops_monitor_service import OpsMonitorService
+
         store_id = params.get("store_id", "")
         session = params.get("session")
         window_minutes = params.get("window_minutes", 30)
@@ -331,18 +343,16 @@ class OpsAgent(LLMEnhancedAgent):
         if session:
             svc = OpsMonitorService()
             try:
-                dashboard_data = await svc.get_store_dashboard(
-                    session, store_id, window_minutes=window_minutes
-                )
+                dashboard_data = await svc.get_store_dashboard(session, store_id, window_minutes=window_minutes)
             except Exception as exc:
                 logger.warning("get_store_dashboard DB error", error=str(exc))
 
-        summary_text = (
-            f"门店 {store_id} 运维健康总览（最近 {window_minutes} 分钟）：\n"
-            + (f"整体状态: {dashboard_data.get('overall_status', '未知')}，"
-               f"健康分: {dashboard_data.get('overall_score', 'N/A')}，"
-               f"活跃告警: {dashboard_data.get('active_alerts', 'N/A')} 条"
-               if dashboard_data else "暂无实时数据，请基于运维知识给出巡检建议")
+        summary_text = f"门店 {store_id} 运维健康总览（最近 {window_minutes} 分钟）：\n" + (
+            f"整体状态: {dashboard_data.get('overall_status', '未知')}，"
+            f"健康分: {dashboard_data.get('overall_score', 'N/A')}，"
+            f"活跃告警: {dashboard_data.get('active_alerts', 'N/A')} 条"
+            if dashboard_data
+            else "暂无实时数据，请基于运维知识给出巡检建议"
         )
         result = await self._safe_execute_with_tools(
             user_message=summary_text + "。请给出摘要解读和优先处置建议。",
@@ -367,6 +377,7 @@ class OpsAgent(LLMEnhancedAgent):
         对应方案 5.2 故障关联分析。
         """
         from ..services.ops_monitor_service import OpsMonitorService
+
         store_id = params.get("store_id", "")
         session = params.get("session")
         window_minutes = params.get("window_minutes", 5)
@@ -375,9 +386,7 @@ class OpsAgent(LLMEnhancedAgent):
         if session:
             svc = OpsMonitorService()
             try:
-                convergence_data = await svc.converge_alerts(
-                    session, store_id, window_minutes=window_minutes
-                )
+                convergence_data = await svc.converge_alerts(session, store_id, window_minutes=window_minutes)
             except Exception as exc:
                 logger.warning("converge_alerts DB error", error=str(exc))
 
@@ -407,6 +416,7 @@ class OpsAgent(LLMEnhancedAgent):
     async def _food_safety_status(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """食安合规状态查询（对应方案 3.2 食安设备监控SOP）。"""
         from ..services.ops_monitor_service import OpsMonitorService
+
         store_id = params.get("store_id", "")
         session = params.get("session")
         days = params.get("days", 7)

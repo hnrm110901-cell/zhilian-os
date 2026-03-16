@@ -30,11 +30,12 @@ EventType = Literal["birthday", "anniversary"]
 @dataclass
 class UpcomingEvent:
     """单条生日/周年事件。"""
+
     customer_id: str
     store_id: str
     wechat_openid: str | None
     event_type: EventType
-    days_until: int   # 0 = 今天, 1 = 明天, ...
+    days_until: int  # 0 = 今天, 1 = 明天, ...
 
 
 # ── SQL ──────────────────────────────────────────────────────────────────────
@@ -107,6 +108,7 @@ _ANNIVERSARY_SQL = text("""
 
 # ── 核心服务 ──────────────────────────────────────────────────────────────────
 
+
 class BirthdayReminderService:
     """
     扫描即将到来的生日/周年事件并返回待触发列表。
@@ -138,8 +140,8 @@ class BirthdayReminderService:
         results: List[UpcomingEvent] = []
 
         for sql, event_type in (
-            (_BIRTHDAY_SQL,     "birthday"),
-            (_ANNIVERSARY_SQL,  "anniversary"),
+            (_BIRTHDAY_SQL, "birthday"),
+            (_ANNIVERSARY_SQL, "anniversary"),
         ):
             try:
                 rows = (await db.execute(sql, params)).fetchall()
@@ -148,7 +150,7 @@ class BirthdayReminderService:
                         customer_id=row[0],
                         store_id=row[1],
                         wechat_openid=row[2],
-                        event_type=event_type,    # type: ignore[arg-type]
+                        event_type=event_type,  # type: ignore[arg-type]
                         days_until=int(row[4]),
                     )
                     for row in rows

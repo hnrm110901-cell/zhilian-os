@@ -2,11 +2,11 @@
 日清日结 — DailyClosingReport 模型
 每日自动对账汇总：营收、成本、毛利、支付/银行/发票对账状态、异常检测
 """
+
 import uuid
 from datetime import datetime
-from sqlalchemy import (
-    Column, String, Integer, DateTime, Date, Index, Numeric, JSON,
-)
+
+from sqlalchemy import JSON, Column, Date, DateTime, Index, Integer, Numeric, String
 from sqlalchemy.dialects.postgresql import UUID
 
 from .base import Base, TimestampMixin
@@ -29,8 +29,8 @@ class DailyClosingReport(Base, TimestampMixin):
 
     # ── 营收（单位：分）──────────────────────────────────────────────
     total_revenue_fen = Column(Integer, nullable=False, default=0)  # POS + 外卖 + 团购
-    total_cost_fen = Column(Integer, nullable=False, default=0)     # 采购 + 损耗 + 人力
-    gross_profit_fen = Column(Integer, nullable=False, default=0)   # 营收 - 成本
+    total_cost_fen = Column(Integer, nullable=False, default=0)  # 采购 + 损耗 + 人力
+    gross_profit_fen = Column(Integer, nullable=False, default=0)  # 营收 - 成本
 
     # ── 对账状态 ──────────────────────────────────────────────────────
     payment_recon_status = Column(String(20), nullable=False, default="pending")  # matched / has_diff / pending
@@ -62,7 +62,4 @@ class DailyClosingReport(Base, TimestampMixin):
     )
 
     def __repr__(self):
-        return (
-            f"<DailyClosingReport(brand='{self.brand_id}', "
-            f"date='{self.closing_date}', status='{self.status}')>"
-        )
+        return f"<DailyClosingReport(brand='{self.brand_id}', " f"date='{self.closing_date}', status='{self.status}')>"

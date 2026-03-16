@@ -4,18 +4,20 @@ WeChat Push Trigger Service
 
 基于Neural System事件自动触发企业微信推送
 """
-from typing import Dict, Any, Optional
+
 import asyncio
-import uuid
-import structlog
 import os
+import uuid
 from datetime import datetime
+from typing import Any, Dict, Optional
+
+import structlog
 from sqlalchemy import select
 
-from ..services.wechat_service import WeChatService
 from ..core.celery_tasks import celery_app
 from ..core.database import get_db_session
 from ..models.user import User, UserRole
+from ..services.wechat_service import WeChatService
 
 logger = structlog.get_logger()
 
@@ -56,7 +58,6 @@ class WeChatTriggerService:
                 "target": "manager",
                 "message_template": "【订单取消】\n订单号：{order_number}\n原因：{cancel_reason}\n时间：{cancelled_at}",
             },
-
             # 预订相关触发
             "reservation.confirmed": {
                 "enabled": True,
@@ -79,7 +80,6 @@ class WeChatTriggerService:
                 "target": "service_staff",  # 服务员
                 "message_template": "【客人到店】\n客户：{customer_name}\n预订人数：{party_size}人\n桌号：{table_number}",
             },
-
             # 会员相关触发
             "member.points_changed": {
                 "enabled": True,
@@ -95,7 +95,6 @@ class WeChatTriggerService:
                 "target": "member_manager",
                 "message_template": "【会员升级】\n会员：{member_name}\n新等级：{new_level}\n恭喜升级！",
             },
-
             # 支付相关触发
             "payment.completed": {
                 "enabled": True,
@@ -111,7 +110,6 @@ class WeChatTriggerService:
                 "target": "cashier",
                 "message_template": "【支付失败】\n订单号：{order_number}\n金额：¥{amount}\n失败原因：{failure_reason}",
             },
-
             # 库存相关触发
             "inventory.low_stock": {
                 "enabled": True,
@@ -127,7 +125,6 @@ class WeChatTriggerService:
                 "target": "manager",
                 "message_template": "【库存告警】\n商品：{item_name}\n当前库存：0\n已无法继续销售，请立即处理！",
             },
-
             # 异常事件触发
             "system.error": {
                 "enabled": True,
@@ -143,7 +140,6 @@ class WeChatTriggerService:
                 "target": "manager",
                 "message_template": "【服务质量】\n问题类型：{issue_type}\n描述：{description}\n客户：{customer_name}\n请及时处理！",
             },
-
             # 任务相关触发
             "task.created": {
                 "enabled": True,
@@ -159,7 +155,6 @@ class WeChatTriggerService:
                 "target": "creator",  # 推送给创建人
                 "message_template": "【任务完成】\n任务：{title}\n完成人：{assignee_name}\n完成时间：{completed_at}",
             },
-
             # 对账相关触发
             "reconcile.anomaly": {
                 "enabled": True,
@@ -244,9 +239,7 @@ class WeChatTriggerService:
 
             # 获取推送目标
             target_users = await self._get_target_users(
-                rule["target"],
-                store_id,
-                event_data  # 传递事件数据，用于处理特殊目标（如assignee、creator）
+                rule["target"], store_id, event_data  # 传递事件数据，用于处理特殊目标（如assignee、creator）
             )
 
             # 发送企微消息
@@ -340,9 +333,7 @@ class WeChatTriggerService:
                     async with get_db_session() as session:
                         result = await session.execute(
                             select(User).where(
-                                User.id == uuid.UUID(user_id),
-                                User.is_active == True,
-                                User.wechat_user_id.isnot(None)
+                                User.id == uuid.UUID(user_id), User.is_active == True, User.wechat_user_id.isnot(None)
                             )
                         )
                         user = result.scalar_one_or_none()
@@ -351,11 +342,7 @@ class WeChatTriggerService:
                             return user.wechat_user_id
 
                 except Exception as e:
-                    logger.error(
-                        "查询特定用户企微ID失败",
-                        user_id=user_id,
-                        error=str(e)
-                    )
+                    logger.error("查询特定用户企微ID失败", user_id=user_id, error=str(e))
 
         # 映射触发规则中的角色名称到UserRole枚举
         role_mapping = {
@@ -373,20 +360,13 @@ class WeChatTriggerService:
         user_roles = role_mapping.get(target_role, [])
 
         if not user_roles:
-            logger.warning(
-                "未找到对应的用户角色映射",
-                target_role=target_role
-            )
+            logger.warning("未找到对应的用户角色映射", target_role=target_role)
             return "@all"
 
         try:
             async with get_db_session() as session:
                 # 构建查询条件
-                query = select(User).where(
-                    User.is_active == True,
-                    User.role.in_(user_roles),
-                    User.wechat_user_id.isnot(None)
-                )
+                query = select(User).where(User.is_active == True, User.role.in_(user_roles), User.wechat_user_id.isnot(None))
 
                 # 如果指定了门店，添加门店过滤
                 if store_id:
@@ -397,18 +377,14 @@ class WeChatTriggerService:
                 users = result.scalars().all()
 
                 # 提取企微用户ID
-                wechat_user_ids = [
-                    user.wechat_user_id
-                    for user in users
-                    if user.wechat_user_id
-                ]
+                wechat_user_ids = [user.wechat_user_id for user in users if user.wechat_user_id]
 
                 if not wechat_user_ids:
                     logger.warning(
                         "未找到符合条件的用户",
                         target_role=target_role,
                         store_id=store_id,
-                        user_roles=[role.value for role in user_roles]
+                        user_roles=[role.value for role in user_roles],
                     )
                     return "@all"
 
@@ -416,22 +392,13 @@ class WeChatTriggerService:
                 user_id_str = "|".join(wechat_user_ids)
 
                 logger.info(
-                    "成功获取推送目标用户",
-                    target_role=target_role,
-                    store_id=store_id,
-                    user_count=len(wechat_user_ids)
+                    "成功获取推送目标用户", target_role=target_role, store_id=store_id, user_count=len(wechat_user_ids)
                 )
 
                 return user_id_str
 
         except Exception as e:
-            logger.error(
-                "查询推送目标用户失败",
-                target_role=target_role,
-                store_id=store_id,
-                error=str(e),
-                exc_info=e
-            )
+            logger.error("查询推送目标用户失败", target_role=target_role, store_id=store_id, error=str(e), exc_info=e)
             # 出错时返回@all，确保消息能发送
             return "@all"
 
@@ -456,6 +423,7 @@ def send_wechat_push_task(
         event_data: 事件数据
         store_id: 门店ID
     """
+
     async def _run():
         try:
             trigger_service = WeChatTriggerService()

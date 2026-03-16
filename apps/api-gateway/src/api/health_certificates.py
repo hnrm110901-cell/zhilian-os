@@ -1,10 +1,11 @@
 """健康证管理 API — 录入/查询/到期预警/批量状态更新"""
-from typing import Optional
+
 from datetime import date
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.core.dependencies import require_role
 from src.models.user import User, UserRole
@@ -67,8 +68,12 @@ async def list_certificates(
 ):
     """健康证列表（分页+筛选）"""
     return await HealthCertService.list_certificates(
-        session, brand_id=brand_id, store_id=store_id,
-        page=page, page_size=page_size, status=status,
+        session,
+        brand_id=brand_id,
+        store_id=store_id,
+        page=page,
+        page_size=page_size,
+        status=status,
         employee_name=employee_name,
     )
 

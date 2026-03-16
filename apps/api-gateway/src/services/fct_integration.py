@@ -4,11 +4,11 @@
 供屯象OS 其他模块在业务节点（如对账完成、日结）向 FCT 推送业财事件。
 合并部署时直接调用 fct_service，避免 HTTP 自调用。
 """
+
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
 import structlog
-
 from src.core.config import settings
 from src.core.database import get_db_session
 
@@ -67,6 +67,7 @@ async def push_store_daily_settlement_event(
     }
     try:
         from src.services.fct_service import fct_service
+
         async with get_db_session(enable_tenant_isolation=False) as session:
             result = await fct_service.ingest_event(session, body)
         logger.info("FCT 日结事件已推送", entity_id=entity_id, biz_date=biz_date.isoformat(), event_id=result.get("event_id"))
@@ -113,6 +114,7 @@ async def push_purchase_receipt_event(
     }
     try:
         from src.services.fct_service import fct_service
+
         async with get_db_session(enable_tenant_isolation=False) as session:
             result = await fct_service.ingest_event(session, body)
         logger.info("FCT 采购入库事件已推送", entity_id=entity_id, supplier_id=supplier_id, event_id=result.get("event_id"))

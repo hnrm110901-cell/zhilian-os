@@ -1,12 +1,14 @@
 """
 OrderAgent - 订单分析Agent (Claude Tool Use 增强)
 """
-from typing import Dict, Any, List, Optional
+
+from typing import Any, Dict, List, Optional
+
 import structlog
 
-from .llm_agent import LLMEnhancedAgent, AgentResult
+from ..core.monitoring import ErrorCategory, ErrorSeverity, error_monitor
 from ..services.decision_validator import DecisionValidator, ValidationResult
-from ..core.monitoring import error_monitor, ErrorSeverity, ErrorCategory
+from .llm_agent import AgentResult, LLMEnhancedAgent
 
 logger = structlog.get_logger()
 
@@ -34,10 +36,7 @@ class OrderAgent(LLMEnhancedAgent):
         self.validator = DecisionValidator()
 
     async def analyze_order_anomaly(
-        self,
-        store_id: str,
-        order_id: Optional[str] = None,
-        time_period: str = "today"
+        self, store_id: str, order_id: Optional[str] = None, time_period: str = "today"
     ) -> AgentResult:
         """
         分析订单异常
@@ -64,17 +63,10 @@ class OrderAgent(LLMEnhancedAgent):
                     f"分析异常原因，给出改进建议和预期效果。"
                 )
 
-            logger.info(
-                "Analyzing order anomaly with Tool Use",
-                store_id=store_id,
-                order_id=order_id,
-                time_period=time_period
-            )
+            logger.info("Analyzing order anomaly with Tool Use", store_id=store_id, order_id=order_id, time_period=time_period)
 
             result = await self.execute_with_tools(
-                user_message=user_message,
-                store_id=store_id,
-                context={"order_id": order_id, "time_period": time_period}
+                user_message=user_message, store_id=store_id, context={"order_id": order_id, "time_period": time_period}
             )
 
             if not result.success:
@@ -97,27 +89,24 @@ class OrderAgent(LLMEnhancedAgent):
             )
 
         except Exception as e:
-            logger.error("Order anomaly analysis failed", store_id=store_id,
-                         order_id=order_id, error=str(e), exc_info=e)
+            logger.error("Order anomaly analysis failed", store_id=store_id, order_id=order_id, error=str(e), exc_info=e)
             error_monitor.log_error(
                 message=f"Order anomaly analysis failed for {store_id}",
                 severity=ErrorSeverity.ERROR,
                 category=ErrorCategory.AGENT,
                 exception=e,
-                context={"store_id": store_id, "order_id": order_id}
+                context={"store_id": store_id, "order_id": order_id},
             )
             return self.format_response(
-                success=False, data=None, message=f"分析失败: {str(e)}",
-                reasoning=f"分析过程中发生异常: {str(e)}", confidence=0.0,
+                success=False,
+                data=None,
+                message=f"分析失败: {str(e)}",
+                reasoning=f"分析过程中发生异常: {str(e)}",
+                confidence=0.0,
                 source_data={"store_id": store_id},
             )
 
-    async def predict_order_volume(
-        self,
-        store_id: str,
-        time_range: str = "7d",
-        granularity: str = "day"
-    ) -> AgentResult:
+    async def predict_order_volume(self, store_id: str, time_range: str = "7d", granularity: str = "day") -> AgentResult:
         """预测订单量"""
         try:
             user_message = (
@@ -126,13 +115,10 @@ class OrderAgent(LLMEnhancedAgent):
                 f"给出预测订单量、置信区间、影响因素分析和风险提示。"
             )
 
-            logger.info("Predicting order volume with Tool Use",
-                        store_id=store_id, time_range=time_range)
+            logger.info("Predicting order volume with Tool Use", store_id=store_id, time_range=time_range)
 
             result = await self.execute_with_tools(
-                user_message=user_message,
-                store_id=store_id,
-                context={"time_range": time_range, "granularity": granularity}
+                user_message=user_message, store_id=store_id, context={"time_range": time_range, "granularity": granularity}
             )
 
             if not result.success:
@@ -156,16 +142,16 @@ class OrderAgent(LLMEnhancedAgent):
         except Exception as e:
             logger.error("Order volume prediction failed", store_id=store_id, error=str(e), exc_info=e)
             return self.format_response(
-                success=False, data=None, message=f"预测失败: {str(e)}",
-                reasoning=f"预测过程中发生异常: {str(e)}", confidence=0.0,
+                success=False,
+                data=None,
+                message=f"预测失败: {str(e)}",
+                reasoning=f"预测过程中发生异常: {str(e)}",
+                confidence=0.0,
                 source_data={"store_id": store_id},
             )
 
     async def analyze_customer_behavior(
-        self,
-        store_id: str,
-        customer_id: Optional[str] = None,
-        segment: Optional[str] = None
+        self, store_id: str, customer_id: Optional[str] = None, segment: Optional[str] = None
     ) -> AgentResult:
         """分析客户行为"""
         try:
@@ -183,13 +169,12 @@ class OrderAgent(LLMEnhancedAgent):
                     f"给出群体特征、行为洞察、营销策略和增长机会。"
                 )
 
-            logger.info("Analyzing customer behavior with Tool Use",
-                        store_id=store_id, customer_id=customer_id, segment=segment)
+            logger.info(
+                "Analyzing customer behavior with Tool Use", store_id=store_id, customer_id=customer_id, segment=segment
+            )
 
             result = await self.execute_with_tools(
-                user_message=user_message,
-                store_id=store_id,
-                context={"customer_id": customer_id, "segment": segment}
+                user_message=user_message, store_id=store_id, context={"customer_id": customer_id, "segment": segment}
             )
 
             if not result.success:
@@ -212,19 +197,20 @@ class OrderAgent(LLMEnhancedAgent):
             )
 
         except Exception as e:
-            logger.error("Customer behavior analysis failed", store_id=store_id,
-                         customer_id=customer_id, error=str(e), exc_info=e)
+            logger.error(
+                "Customer behavior analysis failed", store_id=store_id, customer_id=customer_id, error=str(e), exc_info=e
+            )
             return self.format_response(
-                success=False, data=None, message=f"分析失败: {str(e)}",
-                reasoning=f"分析过程中发生异常: {str(e)}", confidence=0.0,
+                success=False,
+                data=None,
+                message=f"分析失败: {str(e)}",
+                reasoning=f"分析过程中发生异常: {str(e)}",
+                confidence=0.0,
                 source_data={"store_id": store_id},
             )
 
     async def optimize_menu_pricing(
-        self,
-        store_id: str,
-        dish_ids: List[str],
-        validation_context: Optional[Dict] = None
+        self, store_id: str, dish_ids: List[str], validation_context: Optional[Dict] = None
     ) -> AgentResult:
         """优化菜品定价"""
         try:
@@ -235,13 +221,10 @@ class OrderAgent(LLMEnhancedAgent):
                 f"给出提升营收和利润率的定价优化建议。"
             )
 
-            logger.info("Optimizing menu pricing with Tool Use",
-                        store_id=store_id, dish_count=len(dish_ids))
+            logger.info("Optimizing menu pricing with Tool Use", store_id=store_id, dish_count=len(dish_ids))
 
             result = await self.execute_with_tools(
-                user_message=user_message,
-                store_id=store_id,
-                context={"dish_ids": dish_ids}
+                user_message=user_message, store_id=store_id, context={"dish_ids": dish_ids}
             )
 
             if not result.success:
@@ -249,14 +232,9 @@ class OrderAgent(LLMEnhancedAgent):
 
             # 合规性校验（利润率）
             if validation_context:
-                decision = {
-                    "action": "pricing",
-                    **validation_context.get("decision_overrides", {})
-                }
+                decision = {"action": "pricing", **validation_context.get("decision_overrides", {})}
                 validation = await self.validator.validate_decision(
-                    decision=decision,
-                    context=validation_context,
-                    rules_to_apply=["profit_margin"]
+                    decision=decision, context=validation_context, rules_to_apply=["profit_margin"]
                 )
 
                 if validation["result"] == ValidationResult.REJECTED.value:
@@ -266,8 +244,7 @@ class OrderAgent(LLMEnhancedAgent):
                         message=f"定价方案被合规校验拒绝: {validation['message']}",
                         reasoning=f"LLM 生成了定价建议，但利润率校验拒绝: {validation['message']}",
                         confidence=0.0,
-                        source_data={"store_id": store_id, "dish_count": len(dish_ids),
-                                     "validation": validation},
+                        source_data={"store_id": store_id, "dish_count": len(dish_ids), "validation": validation},
                     )
 
                 has_warning = validation["result"] == ValidationResult.WARNING.value
@@ -283,8 +260,7 @@ class OrderAgent(LLMEnhancedAgent):
                     message="定价优化完成" + ("（含合规警告）" if has_warning else ""),
                     reasoning=result.reasoning,
                     confidence=result.confidence,
-                    source_data={"store_id": store_id, "dish_count": len(dish_ids),
-                                 "validation": validation},
+                    source_data={"store_id": store_id, "dish_count": len(dish_ids), "validation": validation},
                 )
 
             return self.format_response(
@@ -304,7 +280,10 @@ class OrderAgent(LLMEnhancedAgent):
         except Exception as e:
             logger.error("Menu pricing optimization failed", store_id=store_id, error=str(e), exc_info=e)
             return self.format_response(
-                success=False, data=None, message=f"优化失败: {str(e)}",
-                reasoning=f"优化过程中发生异常: {str(e)}", confidence=0.0,
+                success=False,
+                data=None,
+                message=f"优化失败: {str(e)}",
+                reasoning=f"优化过程中发生异常: {str(e)}",
+                confidence=0.0,
                 source_data={"store_id": store_id},
             )

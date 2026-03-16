@@ -2,22 +2,22 @@
 日清日结服务 — FinancialClosingService
 自动化每日对账：聚合营收、校验支付/银行/发票对账、检测异常
 """
+
 import uuid
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Optional
 
 import structlog
-from sqlalchemy import select, func, case, and_, extract
+from sqlalchemy import and_, case, extract, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from src.models.bank_reconciliation import BankReconciliationBatch
+from src.models.e_invoice import EInvoice
 from src.models.financial_closing import DailyClosingReport
 from src.models.order import Order
 from src.models.payment_reconciliation import ReconciliationBatch
-from src.models.bank_reconciliation import BankReconciliationBatch
-from src.models.tri_reconciliation import TriReconciliationRecord
-from src.models.e_invoice import EInvoice
 from src.models.supplier_b2b import B2BPurchaseOrder
+from src.models.tri_reconciliation import TriReconciliationRecord
 
 logger = structlog.get_logger()
 
@@ -52,9 +52,7 @@ class FinancialClosingService:
         else:
             filters.append(DailyClosingReport.store_id.is_(None))
 
-        result = await db.execute(
-            select(DailyClosingReport).where(and_(*filters))
-        )
+        result = await db.execute(select(DailyClosingReport).where(and_(*filters)))
         report = result.scalar_one_or_none()
 
         if not report:
@@ -107,8 +105,14 @@ class FinancialClosingService:
 
             # 8) 异常检测
             anomalies = await self._detect_anomalies(
-                db, brand_id, closing_date, store_id,
-                total_revenue_fen, total_cost_fen, payment_status, bank_status,
+                db,
+                brand_id,
+                closing_date,
+                store_id,
+                total_revenue_fen,
+                total_cost_fen,
+                payment_status,
+                bank_status,
             )
             report.anomalies = anomalies if anomalies else None
             report.status = "warning" if anomalies else "completed"
@@ -130,7 +134,11 @@ class FinancialClosingService:
     # ── 子步骤：聚合营收 ──────────────────────────────────────────────
 
     async def _aggregate_revenue(
-        self, db: AsyncSession, brand_id: str, closing_date: date, store_id: Optional[str],
+        self,
+        db: AsyncSession,
+        brand_id: str,
+        closing_date: date,
+        store_id: Optional[str],
     ) -> dict:
         """按渠道聚合当日订单营收"""
         day_start = datetime.combine(closing_date, datetime.min.time())
@@ -144,13 +152,17 @@ class FinancialClosingService:
         if store_id:
             filters.append(Order.store_id == store_id)
 
-        rows = (await db.execute(
-            select(
-                func.coalesce(Order.sales_channel, "dine_in").label("channel"),
-                func.count(Order.id).label("cnt"),
-                func.coalesce(func.sum(Order.final_amount), 0).label("revenue"),
-            ).where(and_(*filters)).group_by("channel")
-        )).all()
+        rows = (
+            await db.execute(
+                select(
+                    func.coalesce(Order.sales_channel, "dine_in").label("channel"),
+                    func.count(Order.id).label("cnt"),
+                    func.coalesce(func.sum(Order.final_amount), 0).label("revenue"),
+                )
+                .where(and_(*filters))
+                .group_by("channel")
+            )
+        ).all()
 
         channel_breakdown: dict = {}
         total_revenue_fen = 0
@@ -173,14 +185,16 @@ class FinancialClosingService:
     # ── 子步骤：支付对账 ──────────────────────────────────────────────
 
     async def _check_payment_recon(self, db: AsyncSession, brand_id: str, closing_date: date) -> str:
-        rows = (await db.execute(
-            select(ReconciliationBatch.status, ReconciliationBatch.diff_fen).where(
-                and_(
-                    ReconciliationBatch.brand_id == brand_id,
-                    ReconciliationBatch.reconcile_date == closing_date,
+        rows = (
+            await db.execute(
+                select(ReconciliationBatch.status, ReconciliationBatch.diff_fen).where(
+                    and_(
+                        ReconciliationBatch.brand_id == brand_id,
+                        ReconciliationBatch.reconcile_date == closing_date,
+                    )
                 )
             )
-        )).all()
+        ).all()
 
         if not rows:
             return "pending"
@@ -191,15 +205,17 @@ class FinancialClosingService:
     # ── 子步骤：银行对账 ──────────────────────────────────────────────
 
     async def _check_bank_recon(self, db: AsyncSession, brand_id: str, closing_date: date) -> str:
-        rows = (await db.execute(
-            select(BankReconciliationBatch.status, BankReconciliationBatch.diff_fen).where(
-                and_(
-                    BankReconciliationBatch.brand_id == brand_id,
-                    BankReconciliationBatch.period_start <= closing_date,
-                    BankReconciliationBatch.period_end >= closing_date,
+        rows = (
+            await db.execute(
+                select(BankReconciliationBatch.status, BankReconciliationBatch.diff_fen).where(
+                    and_(
+                        BankReconciliationBatch.brand_id == brand_id,
+                        BankReconciliationBatch.period_start <= closing_date,
+                        BankReconciliationBatch.period_end >= closing_date,
+                    )
                 )
             )
-        )).all()
+        ).all()
 
         if not rows:
             return "pending"
@@ -210,20 +226,24 @@ class FinancialClosingService:
     # ── 子步骤：三角对账 ──────────────────────────────────────────────
 
     async def _check_tri_recon(self, db: AsyncSession, brand_id: str, closing_date: date) -> Optional[Decimal]:
-        row = (await db.execute(
-            select(
-                func.count(TriReconciliationRecord.id).label("total"),
-                func.sum(case(
-                    (TriReconciliationRecord.match_level.in_(["full_match", "triple_match"]), 1),
-                    else_=0,
-                )).label("matched"),
-            ).where(
-                and_(
-                    TriReconciliationRecord.brand_id == brand_id,
-                    TriReconciliationRecord.match_date == closing_date,
+        row = (
+            await db.execute(
+                select(
+                    func.count(TriReconciliationRecord.id).label("total"),
+                    func.sum(
+                        case(
+                            (TriReconciliationRecord.match_level.in_(["full_match", "triple_match"]), 1),
+                            else_=0,
+                        )
+                    ).label("matched"),
+                ).where(
+                    and_(
+                        TriReconciliationRecord.brand_id == brand_id,
+                        TriReconciliationRecord.match_date == closing_date,
+                    )
                 )
             )
-        )).one()
+        ).one()
 
         if not row.total or row.total == 0:
             return None
@@ -234,7 +254,11 @@ class FinancialClosingService:
     # ── 子步骤：发票状态 ──────────────────────────────────────────────
 
     async def _check_invoices(
-        self, db: AsyncSession, brand_id: str, closing_date: date, store_id: Optional[str],
+        self,
+        db: AsyncSession,
+        brand_id: str,
+        closing_date: date,
+        store_id: Optional[str],
     ) -> str:
         day_start = datetime.combine(closing_date, datetime.min.time())
         day_end = datetime.combine(closing_date + timedelta(days=1), datetime.min.time())
@@ -248,9 +272,7 @@ class FinancialClosingService:
         if store_id:
             order_filters.append(Order.store_id == store_id)
 
-        order_count = (await db.execute(
-            select(func.count(Order.id)).where(and_(*order_filters))
-        )).scalar() or 0
+        order_count = (await db.execute(select(func.count(Order.id)).where(and_(*order_filters)))).scalar() or 0
 
         if order_count == 0:
             return "none"
@@ -265,9 +287,7 @@ class FinancialClosingService:
         if store_id:
             inv_filters.append(EInvoice.store_id == store_id)
 
-        invoice_count = (await db.execute(
-            select(func.count(EInvoice.id)).where(and_(*inv_filters))
-        )).scalar() or 0
+        invoice_count = (await db.execute(select(func.count(EInvoice.id)).where(and_(*inv_filters)))).scalar() or 0
 
         if invoice_count == 0:
             return "none"
@@ -278,7 +298,11 @@ class FinancialClosingService:
     # ── 子步骤：计算成本 ──────────────────────────────────────────────
 
     async def _calculate_costs(
-        self, db: AsyncSession, brand_id: str, closing_date: date, store_id: Optional[str],
+        self,
+        db: AsyncSession,
+        brand_id: str,
+        closing_date: date,
+        store_id: Optional[str],
     ) -> int:
         """采购已收货金额作为当日成本"""
         filters = [
@@ -289,17 +313,24 @@ class FinancialClosingService:
         if store_id:
             filters.append(B2BPurchaseOrder.store_id == store_id)
 
-        total = (await db.execute(
-            select(func.coalesce(func.sum(B2BPurchaseOrder.total_amount_fen), 0)).where(and_(*filters))
-        )).scalar() or 0
+        total = (
+            await db.execute(select(func.coalesce(func.sum(B2BPurchaseOrder.total_amount_fen), 0)).where(and_(*filters)))
+        ).scalar() or 0
 
         return int(total)
 
     # ── 子步骤：异常检测 ──────────────────────────────────────────────
 
     async def _detect_anomalies(
-        self, db: AsyncSession, brand_id: str, closing_date: date, store_id: Optional[str],
-        revenue_fen: int, cost_fen: int, payment_status: str, bank_status: str,
+        self,
+        db: AsyncSession,
+        brand_id: str,
+        closing_date: date,
+        store_id: Optional[str],
+        revenue_fen: int,
+        cost_fen: int,
+        payment_status: str,
+        bank_status: str,
     ) -> list:
         anomalies = []
 
@@ -314,66 +345,76 @@ class FinancialClosingService:
         else:
             prev_filters.append(DailyClosingReport.store_id.is_(None))
 
-        prev = (await db.execute(
-            select(DailyClosingReport.total_revenue_fen).where(and_(*prev_filters))
-        )).scalar()
+        prev = (await db.execute(select(DailyClosingReport.total_revenue_fen).where(and_(*prev_filters)))).scalar()
 
         if prev and prev > 0:
             drop_pct = (prev - revenue_fen) / prev * 100
             if drop_pct > 20:
-                anomalies.append({
-                    "type": "revenue_drop",
-                    "description": f"营收较前日下降{drop_pct:.1f}%",
-                    "amount_fen": prev - revenue_fen,
-                    "severity": "high",
-                })
+                anomalies.append(
+                    {
+                        "type": "revenue_drop",
+                        "description": f"营收较前日下降{drop_pct:.1f}%",
+                        "amount_fen": prev - revenue_fen,
+                        "severity": "high",
+                    }
+                )
 
         # 2) 支付/银行对账有差异
         if payment_status == "has_diff":
-            anomalies.append({
-                "type": "payment_mismatch",
-                "description": "支付对账存在差异，请检查支付流水",
-                "amount_fen": 0,
-                "severity": "medium",
-            })
+            anomalies.append(
+                {
+                    "type": "payment_mismatch",
+                    "description": "支付对账存在差异，请检查支付流水",
+                    "amount_fen": 0,
+                    "severity": "medium",
+                }
+            )
 
         if bank_status == "has_diff":
-            anomalies.append({
-                "type": "bank_mismatch",
-                "description": "银行对账存在差异，请核实银行流水",
-                "amount_fen": 0,
-                "severity": "medium",
-            })
+            anomalies.append(
+                {
+                    "type": "bank_mismatch",
+                    "description": "银行对账存在差异，请核实银行流水",
+                    "amount_fen": 0,
+                    "severity": "medium",
+                }
+            )
 
         # 3) 三角对账未匹配金额 > ¥1000 (100000分)
-        unmatched_sum = (await db.execute(
-            select(func.coalesce(func.sum(TriReconciliationRecord.discrepancy_fen), 0)).where(
-                and_(
-                    TriReconciliationRecord.brand_id == brand_id,
-                    TriReconciliationRecord.match_date == closing_date,
-                    TriReconciliationRecord.match_level.in_(["single", "double_match"]),
+        unmatched_sum = (
+            await db.execute(
+                select(func.coalesce(func.sum(TriReconciliationRecord.discrepancy_fen), 0)).where(
+                    and_(
+                        TriReconciliationRecord.brand_id == brand_id,
+                        TriReconciliationRecord.match_date == closing_date,
+                        TriReconciliationRecord.match_level.in_(["single", "double_match"]),
+                    )
                 )
             )
-        )).scalar() or 0
+        ).scalar() or 0
 
         if int(unmatched_sum) > 100000:
-            anomalies.append({
-                "type": "unreconciled_amount",
-                "description": f"未对账金额¥{int(unmatched_sum) / 100:.2f}，超过¥1000阈值",
-                "amount_fen": int(unmatched_sum),
-                "severity": "high",
-            })
+            anomalies.append(
+                {
+                    "type": "unreconciled_amount",
+                    "description": f"未对账金额¥{int(unmatched_sum) / 100:.2f}，超过¥1000阈值",
+                    "amount_fen": int(unmatched_sum),
+                    "severity": "high",
+                }
+            )
 
         # 4) 成本异常（成本率 > 70%）
         if revenue_fen > 0:
             cost_ratio = cost_fen / revenue_fen * 100
             if cost_ratio > 70:
-                anomalies.append({
-                    "type": "cost_spike",
-                    "description": f"成本率{cost_ratio:.1f}%，超过70%警戒线",
-                    "amount_fen": cost_fen,
-                    "severity": "high",
-                })
+                anomalies.append(
+                    {
+                        "type": "cost_spike",
+                        "description": f"成本率{cost_ratio:.1f}%，超过70%警戒线",
+                        "amount_fen": cost_fen,
+                        "severity": "high",
+                    }
+                )
 
         return anomalies
 
@@ -397,17 +438,21 @@ class FinancialClosingService:
         if end_date:
             filters.append(DailyClosingReport.closing_date <= end_date)
 
-        total = (await db.execute(
-            select(func.count(DailyClosingReport.id)).where(and_(*filters))
-        )).scalar() or 0
+        total = (await db.execute(select(func.count(DailyClosingReport.id)).where(and_(*filters)))).scalar() or 0
 
-        rows = (await db.execute(
-            select(DailyClosingReport)
-            .where(and_(*filters))
-            .order_by(DailyClosingReport.closing_date.desc())
-            .offset((page - 1) * page_size)
-            .limit(page_size)
-        )).scalars().all()
+        rows = (
+            (
+                await db.execute(
+                    select(DailyClosingReport)
+                    .where(and_(*filters))
+                    .order_by(DailyClosingReport.closing_date.desc())
+                    .offset((page - 1) * page_size)
+                    .limit(page_size)
+                )
+            )
+            .scalars()
+            .all()
+        )
 
         return {
             "total": total,
@@ -419,9 +464,9 @@ class FinancialClosingService:
     # ── 报告详情 ──────────────────────────────────────────────────────
 
     async def get_report_detail(self, db: AsyncSession, report_id: str) -> Optional[dict]:
-        report = (await db.execute(
-            select(DailyClosingReport).where(DailyClosingReport.id == uuid.UUID(report_id))
-        )).scalar_one_or_none()
+        report = (
+            await db.execute(select(DailyClosingReport).where(DailyClosingReport.id == uuid.UUID(report_id)))
+        ).scalar_one_or_none()
 
         if not report:
             return None
@@ -430,7 +475,11 @@ class FinancialClosingService:
     # ── 月度汇总 ──────────────────────────────────────────────────────
 
     async def get_monthly_summary(
-        self, db: AsyncSession, brand_id: str, year: int, month: int,
+        self,
+        db: AsyncSession,
+        brand_id: str,
+        year: int,
+        month: int,
     ) -> dict:
         filters = [
             DailyClosingReport.brand_id == brand_id,
@@ -439,15 +488,17 @@ class FinancialClosingService:
             DailyClosingReport.status.in_(["completed", "warning"]),
         ]
 
-        row = (await db.execute(
-            select(
-                func.coalesce(func.sum(DailyClosingReport.total_revenue_fen), 0).label("revenue"),
-                func.coalesce(func.sum(DailyClosingReport.total_cost_fen), 0).label("cost"),
-                func.coalesce(func.sum(DailyClosingReport.gross_profit_fen), 0).label("profit"),
-                func.coalesce(func.sum(DailyClosingReport.order_count), 0).label("orders"),
-                func.count(DailyClosingReport.id).label("days"),
-            ).where(and_(*filters))
-        )).one()
+        row = (
+            await db.execute(
+                select(
+                    func.coalesce(func.sum(DailyClosingReport.total_revenue_fen), 0).label("revenue"),
+                    func.coalesce(func.sum(DailyClosingReport.total_cost_fen), 0).label("cost"),
+                    func.coalesce(func.sum(DailyClosingReport.gross_profit_fen), 0).label("profit"),
+                    func.coalesce(func.sum(DailyClosingReport.order_count), 0).label("orders"),
+                    func.count(DailyClosingReport.id).label("days"),
+                ).where(and_(*filters))
+            )
+        ).one()
 
         revenue = int(row.revenue)
         cost = int(row.cost)
@@ -455,11 +506,15 @@ class FinancialClosingService:
         margin_pct = round(profit / revenue * 100, 2) if revenue > 0 else 0
 
         # 每日明细
-        daily_rows = (await db.execute(
-            select(DailyClosingReport)
-            .where(and_(*filters))
-            .order_by(DailyClosingReport.closing_date.asc())
-        )).scalars().all()
+        daily_rows = (
+            (
+                await db.execute(
+                    select(DailyClosingReport).where(and_(*filters)).order_by(DailyClosingReport.closing_date.asc())
+                )
+            )
+            .scalars()
+            .all()
+        )
 
         daily_data = [
             {
@@ -507,7 +562,11 @@ class FinancialClosingService:
     # ── 日历视图 ──────────────────────────────────────────────────────
 
     async def get_closing_calendar(
-        self, db: AsyncSession, brand_id: str, year: int, month: int,
+        self,
+        db: AsyncSession,
+        brand_id: str,
+        year: int,
+        month: int,
     ) -> list:
         filters = [
             DailyClosingReport.brand_id == brand_id,
@@ -515,16 +574,20 @@ class FinancialClosingService:
             extract("month", DailyClosingReport.closing_date) == month,
         ]
 
-        rows = (await db.execute(
-            select(
-                DailyClosingReport.closing_date,
-                DailyClosingReport.status,
-                DailyClosingReport.total_revenue_fen,
-                DailyClosingReport.gross_profit_fen,
-                DailyClosingReport.order_count,
-                DailyClosingReport.id,
-            ).where(and_(*filters)).order_by(DailyClosingReport.closing_date.asc())
-        )).all()
+        rows = (
+            await db.execute(
+                select(
+                    DailyClosingReport.closing_date,
+                    DailyClosingReport.status,
+                    DailyClosingReport.total_revenue_fen,
+                    DailyClosingReport.gross_profit_fen,
+                    DailyClosingReport.order_count,
+                    DailyClosingReport.id,
+                )
+                .where(and_(*filters))
+                .order_by(DailyClosingReport.closing_date.asc())
+            )
+        ).all()
 
         return [
             {
@@ -541,41 +604,52 @@ class FinancialClosingService:
     # ── 异常告警 ──────────────────────────────────────────────────────
 
     async def get_anomaly_alerts(self, db: AsyncSession, brand_id: str, limit: int = 50) -> list:
-        rows = (await db.execute(
-            select(DailyClosingReport)
-            .where(
-                and_(
-                    DailyClosingReport.brand_id == brand_id,
-                    DailyClosingReport.anomalies.isnot(None),
+        rows = (
+            (
+                await db.execute(
+                    select(DailyClosingReport)
+                    .where(
+                        and_(
+                            DailyClosingReport.brand_id == brand_id,
+                            DailyClosingReport.anomalies.isnot(None),
+                        )
+                    )
+                    .order_by(DailyClosingReport.closing_date.desc())
+                    .limit(limit)
                 )
             )
-            .order_by(DailyClosingReport.closing_date.desc())
-            .limit(limit)
-        )).scalars().all()
+            .scalars()
+            .all()
+        )
 
         alerts = []
         for r in rows:
-            for a in (r.anomalies or []):
-                alerts.append({
-                    **a,
-                    "closing_date": r.closing_date.isoformat(),
-                    "report_id": str(r.id),
-                    "store_id": r.store_id,
-                })
+            for a in r.anomalies or []:
+                alerts.append(
+                    {
+                        **a,
+                        "closing_date": r.closing_date.isoformat(),
+                        "report_id": str(r.id),
+                        "store_id": r.store_id,
+                    }
+                )
         return alerts
 
     # ── 重新执行 ──────────────────────────────────────────────────────
 
     async def rerun_closing(self, db: AsyncSession, report_id: str) -> dict:
-        report = (await db.execute(
-            select(DailyClosingReport).where(DailyClosingReport.id == uuid.UUID(report_id))
-        )).scalar_one_or_none()
+        report = (
+            await db.execute(select(DailyClosingReport).where(DailyClosingReport.id == uuid.UUID(report_id)))
+        ).scalar_one_or_none()
 
         if not report:
             raise ValueError("报告不存在")
 
         return await self.run_daily_closing(
-            db, report.brand_id, report.closing_date, report.store_id,
+            db,
+            report.brand_id,
+            report.closing_date,
+            report.store_id,
         )
 
     # ── 序列化 ────────────────────────────────────────────────────────

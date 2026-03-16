@@ -30,14 +30,15 @@ logger = structlog.get_logger()
 
 # ── 主函数 ────────────────────────────────────────────────────────────────────
 
+
 async def submit_execution_feedback(
-    decision_id:         str,
-    store_id:            str,
-    outcome:             str,          # "success" | "failure" | "partial"
-    actual_impact_yuan:  float,
-    executor_id:         str,
-    note:                Optional[str],
-    db:                  AsyncSession,
+    decision_id: str,
+    store_id: str,
+    outcome: str,  # "success" | "failure" | "partial"
+    actual_impact_yuan: float,
+    executor_id: str,
+    note: Optional[str],
+    db: AsyncSession,
 ) -> Dict[str, Any]:
     """
     提交决策执行反馈，更新 decision_log，触发健康分重算。
@@ -67,14 +68,10 @@ async def submit_execution_feedback(
 
     # ② 更新 decision_log
     actual_impact_fen = int(actual_impact_yuan * 100)
-    await _update_decision_log(
-        decision_id, outcome, actual_impact_fen, executor_id, note, db
-    )
+    await _update_decision_log(decision_id, outcome, actual_impact_fen, executor_id, note, db)
 
     # ③ 写入正向/负向信号（影响健康分的信号响应维度）
-    signal_id = await _write_outcome_signal(
-        store_id, decision_id, outcome, actual_impact_yuan, db
-    )
+    signal_id = await _write_outcome_signal(store_id, decision_id, outcome, actual_impact_yuan, db)
 
     # ④ 重算健康分
     health_after = await _get_current_score(store_id, db)
@@ -82,27 +79,33 @@ async def submit_execution_feedback(
 
     logger.info(
         "feedback.submitted",
-        decision_id=decision_id, store_id=store_id, outcome=outcome,
+        decision_id=decision_id,
+        store_id=store_id,
+        outcome=outcome,
         actual_yuan=actual_impact_yuan,
-        health_before=health_before, health_after=health_after, delta=delta,
+        health_before=health_before,
+        health_after=health_after,
+        delta=delta,
     )
 
     return {
-        "decision_id":          decision_id,
-        "outcome":              outcome,
-        "actual_impact_yuan":   actual_impact_yuan,
-        "health_before":        health_before,
-        "health_after":         health_after,
-        "health_delta":         delta,
-        "signal_id":            signal_id,
+        "decision_id": decision_id,
+        "outcome": outcome,
+        "actual_impact_yuan": actual_impact_yuan,
+        "health_before": health_before,
+        "health_after": health_after,
+        "health_delta": delta,
+        "signal_id": signal_id,
     }
 
 
 # ── 内部 helpers ──────────────────────────────────────────────────────────────
 
+
 async def _get_current_score(store_id: str, db: AsyncSession) -> float:
     try:
         from .private_domain_health_service import calculate_health_score
+
         result = await calculate_health_score(store_id, db)
         return float(result.get("total_score", 0))
     except Exception as exc:
@@ -111,20 +114,22 @@ async def _get_current_score(store_id: str, db: AsyncSession) -> float:
 
 
 async def _update_decision_log(
-    decision_id:      str,
-    outcome:          str,
+    decision_id: str,
+    outcome: str,
     actual_impact_fen: int,
-    executor_id:      str,
-    note:             Optional[str],
-    db:               AsyncSession,
+    executor_id: str,
+    note: Optional[str],
+    db: AsyncSession,
 ) -> None:
     now = datetime.datetime.utcnow()
     try:
         # 读取当前 trust_score 用于贝叶斯更新
-        current_row = (await db.execute(
-            text("SELECT trust_score, expected_result FROM decision_logs WHERE id = :did"),
-            {"did": decision_id},
-        )).fetchone()
+        current_row = (
+            await db.execute(
+                text("SELECT trust_score, expected_result FROM decision_logs WHERE id = :did"),
+                {"did": decision_id},
+            )
+        ).fetchone()
 
         current_trust = float(current_row[0]) if current_row and current_row[0] else 50.0
         expected_result = current_row[1] if current_row else None
@@ -138,6 +143,7 @@ async def _update_decision_log(
 
         # 贝叶斯信任分更新
         from src.services.effect_evaluator import _compute_trust_delta
+
         trust_delta = _compute_trust_delta(outcome, deviation, current_trust)
         new_trust = max(0.0, min(100.0, current_trust + trust_delta))
 
@@ -154,36 +160,35 @@ async def _update_decision_log(
                 WHERE id = :did
             """),
             {
-                "outcome":   outcome,
-                "actual":    {"impact_fen": actual_impact_fen},
+                "outcome": outcome,
+                "actual": {"impact_fen": actual_impact_fen},
                 "deviation": round(deviation, 2),
-                "trust":     round(new_trust, 2),
-                "now":       now,
-                "executor":  executor_id,
-                "note":      note or "",
-                "did":       decision_id,
+                "trust": round(new_trust, 2),
+                "now": now,
+                "executor": executor_id,
+                "note": note or "",
+                "did": decision_id,
             },
         )
         await db.commit()
     except Exception as exc:
-        logger.warning("feedback.update_log_failed",
-                       decision_id=decision_id, error=str(exc))
+        logger.warning("feedback.update_log_failed", decision_id=decision_id, error=str(exc))
         await db.rollback()
 
 
 async def _write_outcome_signal(
-    store_id:           str,
-    decision_id:        str,
-    outcome:            str,
+    store_id: str,
+    decision_id: str,
+    outcome: str,
     actual_impact_yuan: float,
-    db:                 AsyncSession,
+    db: AsyncSession,
 ) -> Optional[str]:
     """
     正向结果 → 写入 consumption 类型信号（提升信号响应维度分）
     负向结果 → 写入 churn_risk 类型信号（供后续改善参考）
     """
     signal_type = "consumption" if outcome == "success" else "churn_risk"
-    severity    = "low"         if outcome == "success" else "medium"
+    severity = "low" if outcome == "success" else "medium"
     description = (
         f"决策执行{'成功' if outcome == 'success' else '失败'}：{decision_id}"
         f" | 实际影响 ¥{actual_impact_yuan:,.2f}"
@@ -204,15 +209,15 @@ async def _write_outcome_signal(
                 ON CONFLICT (signal_id) DO NOTHING
             """),
             {
-                "sid":         sid,
-                "store_id":    store_id,
+                "sid": sid,
+                "store_id": store_id,
                 "signal_type": signal_type,
                 "description": description,
-                "severity":    severity,
-                "now":         datetime.datetime.utcnow(),
+                "severity": severity,
+                "now": datetime.datetime.utcnow(),
                 # 成功结果信号立即标为已解决（不拉低信号响应分）
                 "resolved_at": datetime.datetime.utcnow() if outcome == "success" else None,
-                "action":      f"execution_feedback:{outcome}",
+                "action": f"execution_feedback:{outcome}",
             },
         )
         await db.commit()
@@ -225,19 +230,21 @@ async def _write_outcome_signal(
 
 # ── 历史反馈查询 ──────────────────────────────────────────────────────────────
 
+
 async def get_feedback_history(
     store_id: str,
-    db:       AsyncSession,
-    days:     int = 30,
-    limit:    int = 20,
+    db: AsyncSession,
+    days: int = 30,
+    limit: int = 20,
 ) -> Dict[str, Any]:
     """
     查询门店近 N 天的决策执行反馈历史，含¥实际影响统计。
     """
     since = (datetime.date.today() - datetime.timedelta(days=days)).isoformat()
     try:
-        rows = (await db.execute(
-            text("""
+        rows = (
+            await db.execute(
+                text("""
                 SELECT
                     id,
                     decision_type,
@@ -252,8 +259,9 @@ async def get_feedback_history(
                 ORDER BY executed_at DESC
                 LIMIT :limit
             """),
-            {"s": store_id, "since": since, "limit": limit},
-        )).fetchall()
+                {"s": store_id, "since": since, "limit": limit},
+            )
+        ).fetchall()
     except Exception as exc:
         logger.warning("feedback.history_failed", store_id=store_id, error=str(exc))
         rows = []
@@ -265,24 +273,26 @@ async def get_feedback_history(
         impact_yuan = round((actual.get("impact_fen", 0)) / 100, 2)
         if r[2] == "success":
             total_success_yuan += impact_yuan
-        items.append({
-            "decision_id":      str(r[0]),
-            "decision_type":    r[1],
-            "outcome":          r[2],
-            "actual_impact_yuan": impact_yuan,
-            "executed_at":      str(r[4]) if r[4] else None,
-            "note":             r[5],
-        })
+        items.append(
+            {
+                "decision_id": str(r[0]),
+                "decision_type": r[1],
+                "outcome": r[2],
+                "actual_impact_yuan": impact_yuan,
+                "executed_at": str(r[4]) if r[4] else None,
+                "note": r[5],
+            }
+        )
 
     success_count = sum(1 for i in items if i["outcome"] == "success")
     adoption_rate = round(success_count / len(items), 3) if items else 0.0
 
     return {
-        "store_id":            store_id,
-        "days":                days,
-        "total_decisions":     len(items),
-        "success_count":       success_count,
-        "adoption_rate":       adoption_rate,
-        "total_success_yuan":  round(total_success_yuan, 2),
-        "items":               items,
+        "store_id": store_id,
+        "days": days,
+        "total_decisions": len(items),
+        "success_count": success_count,
+        "adoption_rate": adoption_rate,
+        "total_success_yuan": round(total_success_yuan, 2),
+        "items": items,
     }

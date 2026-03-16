@@ -7,32 +7,35 @@
 - 查看预订的菜品清单和预估消费
 - 厨房视图：查看当日需要备料的预排菜汇总
 """
+
+import uuid
+from datetime import date
+from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
-from datetime import date
-import uuid
+from sqlalchemy import and_, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
-from ..models.reservation_pre_order import ReservationPreOrder, PreOrderStatus
-from ..models.reservation import Reservation, ReservationStatus
 from ..models.dish import Dish
+from ..models.reservation import Reservation, ReservationStatus
+from ..models.reservation_pre_order import PreOrderStatus, ReservationPreOrder
 from ..models.user import User
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, func
 
 router = APIRouter()
 
 
 # ── Request / Response Models ─────────────────────────────────────
 
+
 class AddPreOrderItem(BaseModel):
-    dish_id: Optional[str] = None       # 可选，若无则手写菜名
+    dish_id: Optional[str] = None  # 可选，若无则手写菜名
     dish_name: str
-    unit_price: int                     # 单价（分）
+    unit_price: int  # 单价（分）
     quantity: int = 1
-    taste_note: Optional[str] = None    # 口味：少盐/加辣
+    taste_note: Optional[str] = None  # 口味：少盐/加辣
     serving_size: Optional[str] = None  # 规格：大份/小份
 
 
@@ -60,13 +63,14 @@ def _to_dict(item: ReservationPreOrder) -> Dict[str, Any]:
         "subtotal": item.subtotal,
         "taste_note": item.taste_note,
         "serving_size": item.serving_size,
-        "status": item.status.value if hasattr(item.status, 'value') else str(item.status),
+        "status": item.status.value if hasattr(item.status, "value") else str(item.status),
         "is_locked": item.is_locked,
         "sort_order": item.sort_order,
     }
 
 
 # ── 查看预排菜 ───────────────────────────────────────────────────
+
 
 @router.get("/api/v1/pre-orders/{reservation_id}")
 async def get_pre_orders(
@@ -76,12 +80,14 @@ async def get_pre_orders(
 ):
     """查看预订的预排菜列表"""
     result = await session.execute(
-        select(ReservationPreOrder).where(
+        select(ReservationPreOrder)
+        .where(
             and_(
                 ReservationPreOrder.reservation_id == reservation_id,
                 ReservationPreOrder.status != PreOrderStatus.CANCELLED,
             )
-        ).order_by(ReservationPreOrder.sort_order)
+        )
+        .order_by(ReservationPreOrder.sort_order)
     )
     items = result.scalars().all()
 
@@ -97,6 +103,7 @@ async def get_pre_orders(
 
 # ── 添加预排菜 ───────────────────────────────────────────────────
 
+
 @router.post("/api/v1/pre-orders", status_code=201)
 async def add_pre_orders(
     req: BatchAddPreOrderRequest,
@@ -105,9 +112,7 @@ async def add_pre_orders(
 ):
     """批量添加预排菜"""
     # 验证预订存在
-    res_result = await session.execute(
-        select(Reservation).where(Reservation.id == req.reservation_id)
-    )
+    res_result = await session.execute(select(Reservation).where(Reservation.id == req.reservation_id))
     reservation = res_result.scalar_one_or_none()
     if not reservation:
         raise HTTPException(status_code=404, detail="预订不存在")
@@ -130,9 +135,7 @@ async def add_pre_orders(
 
     # 获取现有最大排序号
     max_sort_result = await session.execute(
-        select(func.max(ReservationPreOrder.sort_order)).where(
-            ReservationPreOrder.reservation_id == req.reservation_id
-        )
+        select(func.max(ReservationPreOrder.sort_order)).where(ReservationPreOrder.reservation_id == req.reservation_id)
     )
     max_sort = max_sort_result.scalar() or 0
 
@@ -141,9 +144,7 @@ async def add_pre_orders(
         # 如有dish_id，补充菜品编码
         dish_code = None
         if item.dish_id:
-            dish_result = await session.execute(
-                select(Dish).where(Dish.id == item.dish_id)
-            )
+            dish_result = await session.execute(select(Dish).where(Dish.id == item.dish_id))
             dish = dish_result.scalar_one_or_none()
             if dish:
                 dish_code = dish.code
@@ -179,6 +180,7 @@ async def add_pre_orders(
 
 # ── 修改预排菜 ───────────────────────────────────────────────────
 
+
 @router.patch("/api/v1/pre-orders/items/{item_id}")
 async def update_pre_order_item(
     item_id: str,
@@ -187,9 +189,7 @@ async def update_pre_order_item(
     current_user: User = Depends(get_current_active_user),
 ):
     """修改预排菜项（数量/口味/规格）"""
-    result = await session.execute(
-        select(ReservationPreOrder).where(ReservationPreOrder.id == item_id)
-    )
+    result = await session.execute(select(ReservationPreOrder).where(ReservationPreOrder.id == item_id))
     item = result.scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="预排菜项不存在")
@@ -212,6 +212,7 @@ async def update_pre_order_item(
 
 # ── 删除预排菜 ───────────────────────────────────────────────────
 
+
 @router.delete("/api/v1/pre-orders/items/{item_id}")
 async def delete_pre_order_item(
     item_id: str,
@@ -219,9 +220,7 @@ async def delete_pre_order_item(
     current_user: User = Depends(get_current_active_user),
 ):
     """删除预排菜项"""
-    result = await session.execute(
-        select(ReservationPreOrder).where(ReservationPreOrder.id == item_id)
-    )
+    result = await session.execute(select(ReservationPreOrder).where(ReservationPreOrder.id == item_id))
     item = result.scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="预排菜项不存在")
@@ -235,6 +234,7 @@ async def delete_pre_order_item(
 
 
 # ── 确认/锁定预排菜 ──────────────────────────────────────────────
+
 
 @router.post("/api/v1/pre-orders/{reservation_id}/confirm")
 async def confirm_pre_orders(
@@ -274,6 +274,7 @@ async def confirm_pre_orders(
 
 # ── 厨房备料视图 ─────────────────────────────────────────────────
 
+
 @router.get("/api/v1/pre-orders/kitchen-prep/{store_id}")
 async def get_kitchen_prep_summary(
     store_id: str,
@@ -292,24 +293,28 @@ async def get_kitchen_prep_summary(
             ReservationPreOrder.dish_name,
             ReservationPreOrder.dish_code,
             ReservationPreOrder.serving_size,
-            func.sum(ReservationPreOrder.quantity).label('total_qty'),
-            func.count(ReservationPreOrder.reservation_id.distinct()).label('order_count'),
+            func.sum(ReservationPreOrder.quantity).label("total_qty"),
+            func.count(ReservationPreOrder.reservation_id.distinct()).label("order_count"),
         )
         .join(Reservation, Reservation.id == ReservationPreOrder.reservation_id)
         .where(
             and_(
                 ReservationPreOrder.store_id == store_id,
                 Reservation.reservation_date == prep_date,
-                ReservationPreOrder.status.in_([
-                    PreOrderStatus.CONFIRMED,
-                    PreOrderStatus.PREPARING,
-                ]),
-                Reservation.status.in_([
-                    ReservationStatus.PENDING,
-                    ReservationStatus.CONFIRMED,
-                    ReservationStatus.ARRIVED,
-                    ReservationStatus.SEATED,
-                ]),
+                ReservationPreOrder.status.in_(
+                    [
+                        PreOrderStatus.CONFIRMED,
+                        PreOrderStatus.PREPARING,
+                    ]
+                ),
+                Reservation.status.in_(
+                    [
+                        ReservationStatus.PENDING,
+                        ReservationStatus.CONFIRMED,
+                        ReservationStatus.ARRIVED,
+                        ReservationStatus.SEATED,
+                    ]
+                ),
             )
         )
         .group_by(
@@ -325,13 +330,15 @@ async def get_kitchen_prep_summary(
 
     dishes = []
     for r in rows:
-        dishes.append({
-            "dish_name": r.dish_name,
-            "dish_code": r.dish_code,
-            "serving_size": r.serving_size,
-            "total_quantity": int(r.total_qty),
-            "order_count": int(r.order_count),
-        })
+        dishes.append(
+            {
+                "dish_name": r.dish_name,
+                "dish_code": r.dish_code,
+                "serving_size": r.serving_size,
+                "total_quantity": int(r.total_qty),
+                "order_count": int(r.order_count),
+            }
+        )
 
     return {
         "store_id": store_id,

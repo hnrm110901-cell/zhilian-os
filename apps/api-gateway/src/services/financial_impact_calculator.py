@@ -102,9 +102,7 @@ class FinancialImpactCalculator:
         """
         total = sum(item.get("waste_cost_yuan", 0.0) for item in waste_items)
         saving = round(total * reduction_rate_pct / 100, 2)
-        sorted_items = sorted(
-            waste_items, key=lambda x: x.get("waste_cost_yuan", 0.0), reverse=True
-        )
+        sorted_items = sorted(waste_items, key=lambda x: x.get("waste_cost_yuan", 0.0), reverse=True)
         return {
             "total_waste_yuan": round(total, 2),
             "potential_saving_yuan": saving,
