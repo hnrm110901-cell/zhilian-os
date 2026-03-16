@@ -2,30 +2,39 @@
 Integration Hub Status Model
 集成中心状态模型 — 跟踪所有外部集成的健康状况和同步状态
 """
-from datetime import datetime
-from sqlalchemy import Column, String, DateTime, Text, Boolean, Integer, JSON
-from sqlalchemy.dialects.postgresql import UUID
+
 import uuid
+from datetime import datetime
+
+from sqlalchemy import JSON, Boolean, Column, DateTime, Integer, String, Text
+from sqlalchemy.dialects.postgresql import UUID
 
 from .base import Base, TimestampMixin
 
 
 class IntegrationHubStatus(Base, TimestampMixin):
     """集成状态追踪 — 每个外部集成对应一行"""
+
     __tablename__ = "integration_hub_statuses"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     integration_key = Column(
-        String(30), unique=True, nullable=False, index=True,
+        String(30),
+        unique=True,
+        nullable=False,
+        index=True,
         comment="集成标识，如 eleme / pinzhi / wechat_work",
     )
     display_name = Column(String(50), nullable=False, comment="显示名称")
     category = Column(
-        String(30), nullable=False,
+        String(30),
+        nullable=False,
         comment="分类: pos / channel / financial / compliance / review / procurement / im",
     )
     status = Column(
-        String(20), nullable=False, default="not_configured",
+        String(20),
+        nullable=False,
+        default="not_configured",
         comment="健康状态: healthy / degraded / error / disconnected / not_configured",
     )
     last_sync_at = Column(DateTime, nullable=True, comment="最后成功同步时间")

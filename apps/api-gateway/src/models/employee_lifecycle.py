@@ -2,29 +2,31 @@
 Employee Lifecycle — 员工生命周期
 入职、转正、调岗、离职等变动记录
 """
+
 import enum
 import uuid
-from sqlalchemy import (
-    Column, String, Integer, Date, DateTime,
-    Text, ForeignKey, Enum as SAEnum,
-)
-from sqlalchemy.dialects.postgresql import UUID, JSON
+
+from sqlalchemy import Column, Date, DateTime
+from sqlalchemy import Enum as SAEnum
+from sqlalchemy import ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSON, UUID
 
 from .base import Base, TimestampMixin
 
 
 class ChangeType(str, enum.Enum):
     """变动类型"""
-    TRIAL = "trial"                 # 试岗
-    ONBOARD = "onboard"             # 正式入职
-    PROBATION_PASS = "probation"    # 转正
-    TRANSFER = "transfer"           # 调岗/调店
-    PROMOTION = "promotion"         # 晋升
-    DEMOTION = "demotion"           # 降级
-    SALARY_ADJUST = "salary_adj"    # 薪资调整
-    RESIGN = "resign"               # 主动离职
-    DISMISS = "dismiss"             # 辞退
-    RETIRE = "retire"               # 退休
+
+    TRIAL = "trial"  # 试岗
+    ONBOARD = "onboard"  # 正式入职
+    PROBATION_PASS = "probation"  # 转正
+    TRANSFER = "transfer"  # 调岗/调店
+    PROMOTION = "promotion"  # 晋升
+    DEMOTION = "demotion"  # 降级
+    SALARY_ADJUST = "salary_adj"  # 薪资调整
+    RESIGN = "resign"  # 主动离职
+    DISMISS = "dismiss"  # 辞退
+    RETIRE = "retire"  # 退休
 
 
 class EmployeeChange(Base, TimestampMixin):
@@ -32,6 +34,7 @@ class EmployeeChange(Base, TimestampMixin):
     员工变动记录：每次入/离/转/调/升/降创建一条。
     构成员工完整的职业时间线。
     """
+
     __tablename__ = "employee_changes"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -67,7 +70,4 @@ class EmployeeChange(Base, TimestampMixin):
     attachments = Column(JSON, nullable=True)
 
     def __repr__(self):
-        return (
-            f"<EmployeeChange(employee='{self.employee_id}', "
-            f"type='{self.change_type}', date='{self.effective_date}')>"
-        )
+        return f"<EmployeeChange(employee='{self.employee_id}', " f"type='{self.change_type}', date='{self.effective_date}')>"

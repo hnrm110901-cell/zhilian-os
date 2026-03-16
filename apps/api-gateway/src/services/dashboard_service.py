@@ -2,19 +2,21 @@
 Dashboard Service
 数据可视化大屏服务层
 """
-from typing import Dict, Any, List
-from datetime import datetime, timedelta, date
-import os
-import structlog
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
 
-from ..services.pos_service import pos_service
-from ..services.member_service import member_service
-from ..services.agent_service import agent_service
+import os
+from datetime import date, datetime, timedelta
+from typing import Any, Dict, List
+
+import structlog
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from ..core.database import get_db_session
-from ..models.order import Order, OrderItem, OrderStatus
 from ..models.dish import Dish, DishCategory
+from ..models.order import Order, OrderItem, OrderStatus
+from ..services.agent_service import agent_service
+from ..services.member_service import member_service
+from ..services.pos_service import pos_service
 
 logger = structlog.get_logger()
 
@@ -91,27 +93,18 @@ class DashboardService:
 
                 if stats["orders"]["yesterday"] > 0:
                     stats["orders"]["growth_rate"] = (
-                        (stats["orders"]["today"] - stats["orders"]["yesterday"])
-                        / stats["orders"]["yesterday"]
-                        * 100
+                        (stats["orders"]["today"] - stats["orders"]["yesterday"]) / stats["orders"]["yesterday"] * 100
                     )
 
                 # 计算营收
-                today_revenue = sum(
-                    order.get("realPrice", 0) for order in today_orders.get("orders", [])
-                )
-                yesterday_revenue = sum(
-                    order.get("realPrice", 0)
-                    for order in yesterday_orders.get("orders", [])
-                )
+                today_revenue = sum(order.get("realPrice", 0) for order in today_orders.get("orders", []))
+                yesterday_revenue = sum(order.get("realPrice", 0) for order in yesterday_orders.get("orders", []))
 
                 stats["revenue"]["today"] = today_revenue
                 stats["revenue"]["yesterday"] = yesterday_revenue
 
                 if yesterday_revenue > 0:
-                    stats["revenue"]["growth_rate"] = (
-                        (today_revenue - yesterday_revenue) / yesterday_revenue * 100
-                    )
+                    stats["revenue"]["growth_rate"] = (today_revenue - yesterday_revenue) / yesterday_revenue * 100
 
             except Exception as e:
                 logger.warning("获取订单数据失败", error=str(e))
@@ -199,21 +192,13 @@ class DashboardService:
                 logger.warning("dashboard_category_sales_db_failed", error=str(e))
 
             if rows:
-                category_sales = [
-                    {"name": row.category_name, "value": int(row.total_sales or 0)}
-                    for row in rows
-                ]
+                category_sales = [{"name": row.category_name, "value": int(row.total_sales or 0)} for row in rows]
                 return {"categories": category_sales}
 
             # fallback：从POS获取分类列表，销售额为0
             try:
                 categories = await pos_service.get_dish_categories()
-                return {
-                    "categories": [
-                        {"name": c.get("rcNAME", "未知"), "value": 0}
-                        for c in categories[:5]
-                    ]
-                }
+                return {"categories": [{"name": c.get("rcNAME", "未知"), "value": 0} for c in categories[:5]]}
             except Exception as e:
                 logger.warning("dashboard_pos_categories_fallback_failed", error=str(e))
                 return {"categories": []}
@@ -253,16 +238,13 @@ class DashboardService:
 
             if payment_counts:
                 payment_distribution = [
-                    {"name": name, "value": count}
-                    for name, count in sorted(payment_counts.items(), key=lambda x: -x[1])
+                    {"name": name, "value": count} for name, count in sorted(payment_counts.items(), key=lambda x: -x[1])
                 ]
             else:
                 # fallback：从 POS 获取分类列表，value 为 0
                 try:
                     pay_types = await pos_service.get_pay_types()
-                    payment_distribution = [
-                        {"name": p.get("name", "未知"), "value": 0} for p in pay_types
-                    ]
+                    payment_distribution = [{"name": p.get("name", "未知"), "value": 0} for p in pay_types]
                 except Exception as e:
                     logger.warning("dashboard_pos_pay_types_failed", error=str(e))
                     payment_distribution = []
@@ -361,9 +343,9 @@ class DashboardService:
                     select(
                         DecisionLog.agent_type,
                         func.count(DecisionLog.id).label("total"),
-                        func.count(DecisionLog.id).filter(
-                            DecisionLog.decision_status == DecisionStatus.EXECUTED
-                        ).label("executed"),
+                        func.count(DecisionLog.id)
+                        .filter(DecisionLog.decision_status == DecisionStatus.EXECUTED)
+                        .label("executed"),
                     ).group_by(DecisionLog.agent_type)
                 )
                 rows = result.all()
@@ -405,22 +387,20 @@ class DashboardService:
             from ..models.queue import Queue, QueueStatus
 
             active_statuses = [
-                OrderStatus.PENDING, OrderStatus.CONFIRMED,
-                OrderStatus.PREPARING, OrderStatus.READY,
+                OrderStatus.PENDING,
+                OrderStatus.CONFIRMED,
+                OrderStatus.PREPARING,
+                OrderStatus.READY,
             ]
 
             async with get_db_session() as session:
                 # 当前进行中订单
-                orders_result = await session.execute(
-                    select(func.count(Order.id)).where(Order.status.in_(active_statuses))
-                )
+                orders_result = await session.execute(select(func.count(Order.id)).where(Order.status.in_(active_statuses)))
                 current_orders = orders_result.scalar() or 0
 
                 # 厨房待制作
                 kitchen_result = await session.execute(
-                    select(func.count(Order.id)).where(
-                        Order.status.in_([OrderStatus.CONFIRMED, OrderStatus.PREPARING])
-                    )
+                    select(func.count(Order.id)).where(Order.status.in_([OrderStatus.CONFIRMED, OrderStatus.PREPARING]))
                 )
                 kitchen_queue = kitchen_result.scalar() or 0
 

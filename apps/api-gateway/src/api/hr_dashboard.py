@@ -1,26 +1,28 @@
 """
 HR Dashboard API — HR报表 + 业人一体化仪表盘
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import Optional
+
 from datetime import date, timedelta
 from decimal import Decimal
+from typing import Optional
+
 import structlog
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import and_, case, extract, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
-from ..models.user import User
-from ..models.employee import Employee
-from ..models.payroll import PayrollRecord
-from ..models.leave import LeaveRequest, LeaveRequestStatus
 from ..models.attendance import AttendanceLog
-from ..models.employee_contract import EmployeeContract, ContractStatus
-from ..models.employee_lifecycle import EmployeeChange, ChangeType
-from ..models.recruitment import JobPosting, Candidate, JobStatus, CandidateStage
+from ..models.employee import Employee
+from ..models.employee_contract import ContractStatus, EmployeeContract
+from ..models.employee_lifecycle import ChangeType, EmployeeChange
+from ..models.leave import LeaveRequest, LeaveRequestStatus
+from ..models.payroll import PayrollRecord
 from ..models.performance_review import PerformanceReview
+from ..models.recruitment import Candidate, CandidateStage, JobPosting, JobStatus
+from ..models.user import User
 from ..models.workforce import LaborCostSnapshot
-from sqlalchemy import select, and_, func, case, extract
-from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -40,9 +42,7 @@ async def get_hr_overview(
 
     # 1. 在职人数
     active_count = await db.execute(
-        select(func.count(Employee.id)).where(
-            and_(Employee.store_id == store_id, Employee.is_active.is_(True))
-        )
+        select(func.count(Employee.id)).where(and_(Employee.store_id == store_id, Employee.is_active.is_(True)))
     )
     total_active = active_count.scalar() or 0
 
@@ -142,12 +142,14 @@ async def get_labor_cost_trend(
     """人力成本趋势（日维度）"""
     start = date.today() - timedelta(days=days)
     result = await db.execute(
-        select(LaborCostSnapshot).where(
+        select(LaborCostSnapshot)
+        .where(
             and_(
                 LaborCostSnapshot.store_id == store_id,
                 LaborCostSnapshot.snapshot_date >= start,
             )
-        ).order_by(LaborCostSnapshot.snapshot_date.asc())
+        )
+        .order_by(LaborCostSnapshot.snapshot_date.asc())
     )
     snapshots = result.scalars().all()
     return {
@@ -211,12 +213,14 @@ async def get_turnover_trend(
         resigned = resign_count.scalar() or 0
         rate = round(resigned / max(active, 1) * 100, 1)
 
-        trends.append({
-            "month": f"{y}-{m:02d}",
-            "active_employees": active,
-            "resignations": resigned,
-            "turnover_rate_pct": rate,
-        })
+        trends.append(
+            {
+                "month": f"{y}-{m:02d}",
+                "active_employees": active,
+                "resignations": resigned,
+                "turnover_rate_pct": rate,
+            }
+        )
 
     return {"items": trends}
 
@@ -292,19 +296,18 @@ async def get_position_distribution(
         select(
             Employee.position,
             func.count(Employee.id).label("count"),
-        ).where(
+        )
+        .where(
             and_(
                 Employee.store_id == store_id,
                 Employee.is_active.is_(True),
             )
-        ).group_by(Employee.position)
+        )
+        .group_by(Employee.position)
     )
     rows = result.all()
     return {
-        "items": [
-            {"position": r.position or "未分配", "count": r.count}
-            for r in rows
-        ],
+        "items": [{"position": r.position or "未分配", "count": r.count} for r in rows],
     }
 
 
@@ -321,4 +324,5 @@ async def get_agent_insights(
     - 招聘策略推荐 + 渠道效果
     """
     from ..services.hr_agent_service import get_hr_agent_insights
+
     return await get_hr_agent_insights(store_id, db)

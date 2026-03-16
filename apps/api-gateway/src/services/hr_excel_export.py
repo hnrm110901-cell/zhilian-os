@@ -3,26 +3,25 @@ HR Excel 导出服务 — 生成月度人事报表 Excel 文件
 支持7张月报表 + 工资明细 + 考勤报表 + 花名册
 所有金额：数据库存分（fen），Excel 展示元（÷100）
 """
+
+import calendar
+from datetime import date, timedelta
 from io import BytesIO
 from typing import Any, Dict, List, Optional
-from datetime import date, timedelta
-import calendar
+
 import structlog
-
 from openpyxl import Workbook
-from openpyxl.styles import Font, Alignment, Border, Side, PatternFill, numbers
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side, numbers
 from openpyxl.utils import get_column_letter
-
-from sqlalchemy import select, and_, func, Integer
+from sqlalchemy import Integer, and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from src.models.attendance import AttendanceLog
 from src.models.employee import Employee
-from src.models.payroll import PayrollRecord, SalaryStructure
-from src.models.employee_lifecycle import EmployeeChange, ChangeType
+from src.models.employee_lifecycle import ChangeType, EmployeeChange
 from src.models.exit_interview import ExitInterview
 from src.models.mentorship import Mentorship
+from src.models.payroll import PayrollRecord, SalaryStructure
 from src.models.social_insurance import EmployeeSocialInsurance
-from src.models.attendance import AttendanceLog
 from src.models.store import Store
 
 logger = structlog.get_logger()
@@ -32,9 +31,9 @@ HEADER_FONT = Font(name="微软雅黑", bold=True, size=11, color="FFFFFF")
 HEADER_FILL = PatternFill(start_color="0AAF9A", end_color="0AAF9A", fill_type="solid")
 TITLE_FONT = Font(name="微软雅黑", bold=True, size=14)
 NORMAL_FONT = Font(name="微软雅黑", size=10)
-MONEY_FORMAT = '#,##0.00'
-PCT_FORMAT = '0.0%'
-DATE_FORMAT = 'YYYY-MM-DD'
+MONEY_FORMAT = "#,##0.00"
+PCT_FORMAT = "0.0%"
+DATE_FORMAT = "YYYY-MM-DD"
 THIN_BORDER = Border(
     left=Side(style="thin", color="D0D0D0"),
     right=Side(style="thin", color="D0D0D0"),
@@ -92,9 +91,7 @@ def _write_title_row(ws, title: str, col_count: int):
 
 async def _get_store_name(db: AsyncSession, store_id: str) -> str:
     """获取门店名称"""
-    result = await db.execute(
-        select(Store.name).where(Store.id == store_id)
-    )
+    result = await db.execute(select(Store.name).where(Store.id == store_id))
     name = result.scalar()
     return name or store_id
 
@@ -102,9 +99,7 @@ async def _get_store_name(db: AsyncSession, store_id: str) -> str:
 class HRExcelExporter:
     """生成 HR 月度报表 Excel 文件"""
 
-    async def export_monthly_report(
-        self, db: AsyncSession, store_id: str, month: str, brand_id: str
-    ) -> bytes:
+    async def export_monthly_report(self, db: AsyncSession, store_id: str, month: str, brand_id: str) -> bytes:
         """
         生成完整月度报表 Excel（7张 Sheet）
         month 格式: YYYY-MM
@@ -121,39 +116,23 @@ class HRExcelExporter:
         wb.remove(wb.active)
 
         # Sheet 1: 工资异动表
-        await self._sheet_salary_changes(
-            wb, db, store_id, month, month_start, month_end, title_prefix
-        )
+        await self._sheet_salary_changes(wb, db, store_id, month, month_start, month_end, title_prefix)
         # Sheet 2: 月末编制盘存
-        await self._sheet_headcount_inventory(
-            wb, db, store_id, month_end, title_prefix
-        )
+        await self._sheet_headcount_inventory(wb, db, store_id, month_end, title_prefix)
         # Sheet 3: 核心岗位培养统计
-        await self._sheet_mentorship(
-            wb, db, store_id, month_start, month_end, title_prefix
-        )
+        await self._sheet_mentorship(wb, db, store_id, month_start, month_end, title_prefix)
         # Sheet 4: 小时工/灵活用工考勤
-        await self._sheet_hourly_attendance(
-            wb, db, store_id, month_start, month_end, title_prefix
-        )
+        await self._sheet_hourly_attendance(wb, db, store_id, month_start, month_end, title_prefix)
         # Sheet 5: 离职回访汇总
-        await self._sheet_exit_interview(
-            wb, db, store_id, month_start, month_end, title_prefix
-        )
+        await self._sheet_exit_interview(wb, db, store_id, month_start, month_end, title_prefix)
         # Sheet 6: 人事工作总结与计划
-        await self._sheet_hr_summary(
-            wb, db, store_id, brand_id, month, title_prefix
-        )
+        await self._sheet_hr_summary(wb, db, store_id, brand_id, month, title_prefix)
         # Sheet 7: 社保/保险变动
-        await self._sheet_insurance_changes(
-            wb, db, store_id, year, month_start, month_end, title_prefix
-        )
+        await self._sheet_insurance_changes(wb, db, store_id, year, month_start, month_end, title_prefix)
 
         return self._save_to_bytes(wb)
 
-    async def export_payroll_detail(
-        self, db: AsyncSession, store_id: str, month: str
-    ) -> bytes:
+    async def export_payroll_detail(self, db: AsyncSession, store_id: str, month: str) -> bytes:
         """导出工资明细表"""
         store_name = await _get_store_name(db, store_id)
         wb = Workbook()
@@ -161,10 +140,24 @@ class HRExcelExporter:
         ws.title = "工资明细"
 
         headers = [
-            "姓名", "工号", "岗位", "基本工资", "岗位津贴", "餐补",
-            "交通补贴", "绩效奖金", "加班费", "提成", "奖励",
-            "迟到扣款", "缺勤扣款", "社保个人", "公积金个人", "个税",
-            "应发合计", "实发合计",
+            "姓名",
+            "工号",
+            "岗位",
+            "基本工资",
+            "岗位津贴",
+            "餐补",
+            "交通补贴",
+            "绩效奖金",
+            "加班费",
+            "提成",
+            "奖励",
+            "迟到扣款",
+            "缺勤扣款",
+            "社保个人",
+            "公积金个人",
+            "个税",
+            "应发合计",
+            "实发合计",
         ]
         money_cols = set(range(4, 19))  # 列4~18是金额列（1-based）
 
@@ -177,14 +170,15 @@ class HRExcelExporter:
 
         # 数据
         result = await db.execute(
-            select(PayrollRecord, Employee.name, Employee.position).join(
-                Employee, PayrollRecord.employee_id == Employee.id
-            ).where(
+            select(PayrollRecord, Employee.name, Employee.position)
+            .join(Employee, PayrollRecord.employee_id == Employee.id)
+            .where(
                 and_(
                     PayrollRecord.store_id == store_id,
                     PayrollRecord.pay_month == month,
                 )
-            ).order_by(Employee.name)
+            )
+            .order_by(Employee.name)
         )
         rows = result.all()
 
@@ -231,26 +225,29 @@ class HRExcelExporter:
         _auto_width(ws)
         return self._save_to_bytes(wb)
 
-    async def export_attendance_report(
-        self, db: AsyncSession, store_id: str, month: str
-    ) -> bytes:
+    async def export_attendance_report(self, db: AsyncSession, store_id: str, month: str) -> bytes:
         """导出月度考勤报表"""
         store_name = await _get_store_name(db, store_id)
         year, mon = int(month[:4]), int(month[5:7])
         month_start = date(year, mon, 1)
         month_end = date(year, mon, calendar.monthrange(year, mon)[1])
-        workdays = sum(
-            1 for d in range(calendar.monthrange(year, mon)[1])
-            if date(year, mon, d + 1).weekday() < 5
-        )
+        workdays = sum(1 for d in range(calendar.monthrange(year, mon)[1]) if date(year, mon, d + 1).weekday() < 5)
 
         wb = Workbook()
         ws = wb.active
         ws.title = "考勤报表"
 
         headers = [
-            "姓名", "工号", "应出勤天数", "实际出勤", "迟到次数",
-            "早退次数", "请假天数", "缺勤天数", "加班时数", "出勤率",
+            "姓名",
+            "工号",
+            "应出勤天数",
+            "实际出勤",
+            "迟到次数",
+            "早退次数",
+            "请假天数",
+            "缺勤天数",
+            "加班时数",
+            "出勤率",
         ]
 
         _write_title_row(ws, f"{store_name} {month} 考勤报表", len(headers))
@@ -261,12 +258,14 @@ class HRExcelExporter:
 
         # 查询在职员工
         emp_result = await db.execute(
-            select(Employee).where(
+            select(Employee)
+            .where(
                 and_(
                     Employee.store_id == store_id,
                     Employee.is_active.is_(True),
                 )
-            ).order_by(Employee.name)
+            )
+            .order_by(Employee.name)
         )
         employees = emp_result.scalars().all()
 
@@ -277,11 +276,8 @@ class HRExcelExporter:
                 select(
                     func.count(AttendanceLog.id).label("total"),
                     func.sum(
-                        func.cast(
-                            AttendanceLog.status == "normal", Integer
-                        ) + func.cast(
-                            AttendanceLog.status == "late", Integer
-                        )
+                        func.cast(AttendanceLog.status == "normal", Integer)
+                        + func.cast(AttendanceLog.status == "late", Integer)
                     ).label("attended"),
                     func.sum(func.cast(AttendanceLog.status == "late", Integer)).label("late_count"),
                     func.sum(func.cast(AttendanceLog.status == "early_leave", Integer)).label("early_count"),
@@ -330,9 +326,7 @@ class HRExcelExporter:
         _auto_width(ws)
         return self._save_to_bytes(wb)
 
-    async def export_roster(
-        self, db: AsyncSession, store_id: str
-    ) -> bytes:
+    async def export_roster(self, db: AsyncSession, store_id: str) -> bytes:
         """导出员工花名册"""
         store_name = await _get_store_name(db, store_id)
 
@@ -341,14 +335,38 @@ class HRExcelExporter:
         ws.title = "花名册"
 
         headers = [
-            "工号", "姓名", "性别", "岗位", "职级", "用工类型", "员工状态",
-            "入职日期", "转正日期", "司龄(月)", "手机号", "邮箱",
-            "出生日期", "民族", "学历", "毕业院校", "专业",
-            "户籍类型", "户籍地", "政治面貌",
-            "紧急联系人", "紧急联系电话", "紧急联系关系",
-            "开户行", "银行支行",
-            "健康证到期", "身份证到期", "背调状态",
-            "工时制度", "宿舍", "工会会员", "专业证书",
+            "工号",
+            "姓名",
+            "性别",
+            "岗位",
+            "职级",
+            "用工类型",
+            "员工状态",
+            "入职日期",
+            "转正日期",
+            "司龄(月)",
+            "手机号",
+            "邮箱",
+            "出生日期",
+            "民族",
+            "学历",
+            "毕业院校",
+            "专业",
+            "户籍类型",
+            "户籍地",
+            "政治面貌",
+            "紧急联系人",
+            "紧急联系电话",
+            "紧急联系关系",
+            "开户行",
+            "银行支行",
+            "健康证到期",
+            "身份证到期",
+            "背调状态",
+            "工时制度",
+            "宿舍",
+            "工会会员",
+            "专业证书",
         ]
 
         _write_title_row(ws, f"{store_name} 员工花名册", len(headers))
@@ -358,19 +376,29 @@ class HRExcelExporter:
         _apply_header_style(ws, 2, len(headers))
 
         result = await db.execute(
-            select(Employee).where(
+            select(Employee)
+            .where(
                 Employee.store_id == store_id,
-            ).order_by(Employee.is_active.desc(), Employee.name)
+            )
+            .order_by(Employee.is_active.desc(), Employee.name)
         )
         employees = result.scalars().all()
 
         emp_type_map = {
-            "regular": "正式", "part_time": "兼职", "intern": "实习",
-            "trainee": "培训", "rehire": "返聘", "temp": "临时",
-            "outsource": "外包", "outsource_flex": "灵活用工",
+            "regular": "正式",
+            "part_time": "兼职",
+            "intern": "实习",
+            "trainee": "培训",
+            "rehire": "返聘",
+            "temp": "临时",
+            "outsource": "外包",
+            "outsource_flex": "灵活用工",
         }
         status_map = {
-            "trial": "试岗", "probation": "试用", "regular": "正式", "resigned": "离职",
+            "trial": "试岗",
+            "probation": "试用",
+            "regular": "正式",
+            "resigned": "离职",
         }
 
         for i, emp in enumerate(employees, start=3):
@@ -419,8 +447,14 @@ class HRExcelExporter:
     # ── 内部方法：7 张月报 Sheet ────────────────────────────────
 
     async def _sheet_salary_changes(
-        self, wb: Workbook, db: AsyncSession, store_id: str,
-        month: str, month_start: date, month_end: date, title_prefix: str,
+        self,
+        wb: Workbook,
+        db: AsyncSession,
+        store_id: str,
+        month: str,
+        month_start: date,
+        month_end: date,
+        title_prefix: str,
     ):
         """Sheet 1: 工资异动表"""
         ws = wb.create_sheet("工资异动表")
@@ -439,9 +473,9 @@ class HRExcelExporter:
 
         # 离职
         resign_result = await db.execute(
-            select(EmployeeChange, Employee.name, Employee.position).join(
-                Employee, EmployeeChange.employee_id == Employee.id
-            ).where(
+            select(EmployeeChange, Employee.name, Employee.position)
+            .join(Employee, EmployeeChange.employee_id == Employee.id)
+            .where(
                 and_(
                     EmployeeChange.store_id == store_id,
                     EmployeeChange.change_type == ChangeType.RESIGN,
@@ -454,9 +488,9 @@ class HRExcelExporter:
 
         # 调薪
         adj_result = await db.execute(
-            select(SalaryStructure, Employee.name, Employee.position).join(
-                Employee, SalaryStructure.employee_id == Employee.id
-            ).where(
+            select(SalaryStructure, Employee.name, Employee.position)
+            .join(Employee, SalaryStructure.employee_id == Employee.id)
+            .where(
                 and_(
                     SalaryStructure.store_id == store_id,
                     SalaryStructure.effective_date >= month_start,
@@ -522,8 +556,11 @@ class HRExcelExporter:
         row += 1
         for ss, name, position in adjustments:
             data = [
-                name, ss.employee_id, position or "",
-                _fen_to_yuan(ss.base_salary_fen), str(ss.effective_date),
+                name,
+                ss.employee_id,
+                position or "",
+                _fen_to_yuan(ss.base_salary_fen),
+                str(ss.effective_date),
             ]
             for col, val in enumerate(data, 1):
                 cell = ws.cell(row=row, column=col, value=val)
@@ -547,8 +584,12 @@ class HRExcelExporter:
         _auto_width(ws)
 
     async def _sheet_headcount_inventory(
-        self, wb: Workbook, db: AsyncSession, store_id: str,
-        month_end: date, title_prefix: str,
+        self,
+        wb: Workbook,
+        db: AsyncSession,
+        store_id: str,
+        month_end: date,
+        title_prefix: str,
     ):
         """Sheet 2: 月末编制盘存"""
         ws = wb.create_sheet("月末编制盘存")
@@ -558,12 +599,14 @@ class HRExcelExporter:
                 Employee.position,
                 Employee.employment_type,
                 func.count(Employee.id).label("count"),
-            ).where(
+            )
+            .where(
                 and_(
                     Employee.store_id == store_id,
                     Employee.is_active.is_(True),
                 )
-            ).group_by(Employee.position, Employee.employment_type)
+            )
+            .group_by(Employee.position, Employee.employment_type)
         )
         rows = result.all()
 
@@ -575,8 +618,11 @@ class HRExcelExporter:
         _apply_header_style(ws, 2, len(headers))
 
         emp_type_map = {
-            "regular": "正式", "part_time": "兼职", "intern": "实习",
-            "temp": "临时", "outsource_flex": "灵活用工",
+            "regular": "正式",
+            "part_time": "兼职",
+            "intern": "实习",
+            "temp": "临时",
+            "outsource_flex": "灵活用工",
         }
 
         total = 0
@@ -603,8 +649,13 @@ class HRExcelExporter:
         _auto_width(ws)
 
     async def _sheet_mentorship(
-        self, wb: Workbook, db: AsyncSession, store_id: str,
-        month_start: date, month_end: date, title_prefix: str,
+        self,
+        wb: Workbook,
+        db: AsyncSession,
+        store_id: str,
+        month_start: date,
+        month_end: date,
+        title_prefix: str,
     ):
         """Sheet 3: 核心岗位培养统计"""
         ws = wb.create_sheet("核心岗位培养统计")
@@ -621,9 +672,9 @@ class HRExcelExporter:
 
         active = [m for m in mentorships if m.status == "active"]
         completed = [
-            m for m in mentorships
-            if m.status == "completed" and m.actual_review_date
-            and month_start <= m.actual_review_date <= month_end
+            m
+            for m in mentorships
+            if m.status == "completed" and m.actual_review_date and month_start <= m.actual_review_date <= month_end
         ]
 
         _write_title_row(ws, f"{title_prefix} 核心岗位培养统计", 6)
@@ -640,7 +691,9 @@ class HRExcelExporter:
         row += 1
         for m in active:
             data = [
-                m.mentor_name, m.apprentice_name, m.target_position or "",
+                m.mentor_name,
+                m.apprentice_name,
+                m.target_position or "",
                 str(m.expected_review_date) if m.expected_review_date else "",
                 "进行中",
             ]
@@ -664,7 +717,9 @@ class HRExcelExporter:
         row += 1
         for m in completed:
             data = [
-                m.mentor_name, m.apprentice_name, m.target_position or "",
+                m.mentor_name,
+                m.apprentice_name,
+                m.target_position or "",
                 str(m.actual_review_date),
                 _fen_to_yuan(m.reward_fen),
             ]
@@ -688,8 +743,13 @@ class HRExcelExporter:
         _auto_width(ws)
 
     async def _sheet_hourly_attendance(
-        self, wb: Workbook, db: AsyncSession, store_id: str,
-        month_start: date, month_end: date, title_prefix: str,
+        self,
+        wb: Workbook,
+        db: AsyncSession,
+        store_id: str,
+        month_start: date,
+        month_end: date,
+        title_prefix: str,
     ):
         """Sheet 4: 小时工/灵活用工考勤"""
         ws = wb.create_sheet("灵活用工考勤")
@@ -713,7 +773,9 @@ class HRExcelExporter:
         _apply_header_style(ws, 2, len(headers))
 
         emp_type_map = {
-            "part_time": "兼职", "temp": "临时", "outsource_flex": "灵活用工",
+            "part_time": "兼职",
+            "temp": "临时",
+            "outsource_flex": "灵活用工",
         }
 
         row = 3
@@ -735,8 +797,12 @@ class HRExcelExporter:
             pay = days * daily_wage
 
             data = [
-                w.name, w.id, emp_type_map.get(w.employment_type, w.employment_type or ""),
-                days, daily_wage, pay,
+                w.name,
+                w.id,
+                emp_type_map.get(w.employment_type, w.employment_type or ""),
+                days,
+                daily_wage,
+                pay,
             ]
             for col, val in enumerate(data, 1):
                 cell = ws.cell(row=row, column=col, value=val)
@@ -763,8 +829,13 @@ class HRExcelExporter:
         _auto_width(ws)
 
     async def _sheet_exit_interview(
-        self, wb: Workbook, db: AsyncSession, store_id: str,
-        month_start: date, month_end: date, title_prefix: str,
+        self,
+        wb: Workbook,
+        db: AsyncSession,
+        store_id: str,
+        month_start: date,
+        month_end: date,
+        title_prefix: str,
     ):
         """Sheet 5: 离职回访汇总"""
         ws = wb.create_sheet("离职回访汇总")
@@ -788,8 +859,12 @@ class HRExcelExporter:
         _apply_header_style(ws, 2, len(headers))
 
         reason_map = {
-            "personal": "个人原因", "salary": "薪资原因", "development": "发展原因",
-            "management": "管理原因", "relocation": "搬迁", "other": "其他",
+            "personal": "个人原因",
+            "salary": "薪资原因",
+            "development": "发展原因",
+            "management": "管理原因",
+            "relocation": "搬迁",
+            "other": "其他",
         }
         return_map = {"yes": "愿意", "no": "不愿意", "maybe": "考虑中"}
 
@@ -827,8 +902,13 @@ class HRExcelExporter:
         _auto_width(ws)
 
     async def _sheet_hr_summary(
-        self, wb: Workbook, db: AsyncSession, store_id: str,
-        brand_id: str, month: str, title_prefix: str,
+        self,
+        wb: Workbook,
+        db: AsyncSession,
+        store_id: str,
+        brand_id: str,
+        month: str,
+        title_prefix: str,
     ):
         """Sheet 6: 人事工作总结与计划"""
         from src.services.hr_report_engine import HRReportEngine
@@ -883,17 +963,23 @@ class HRExcelExporter:
         _auto_width(ws, min_width=15)
 
     async def _sheet_insurance_changes(
-        self, wb: Workbook, db: AsyncSession, store_id: str,
-        year: int, month_start: date, month_end: date, title_prefix: str,
+        self,
+        wb: Workbook,
+        db: AsyncSession,
+        store_id: str,
+        year: int,
+        month_start: date,
+        month_end: date,
+        title_prefix: str,
     ):
         """Sheet 7: 社保/保险变动"""
         ws = wb.create_sheet("社保保险变动")
 
         # 本月新增参保
         new_result = await db.execute(
-            select(EmployeeSocialInsurance, Employee.name, Employee.position).join(
-                Employee, EmployeeSocialInsurance.employee_id == Employee.id
-            ).where(
+            select(EmployeeSocialInsurance, Employee.name, Employee.position)
+            .join(Employee, EmployeeSocialInsurance.employee_id == Employee.id)
+            .where(
                 and_(
                     EmployeeSocialInsurance.effective_year == year,
                     EmployeeSocialInsurance.created_at >= month_start,

@@ -3,16 +3,18 @@
 实现Human-in-the-loop决策流程
 支持企微卡片式交互和决策数据记录
 """
+
+import os
 import uuid
 from datetime import datetime
-from typing import Dict, List, Optional, Any
-import os
+from typing import Any, Dict, List, Optional
+
 import structlog
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.clock import now_utc, utcnow_naive
-from ..models.decision_log import DecisionLog, DecisionType, DecisionStatus, DecisionOutcome
+from ..models.decision_log import DecisionLog, DecisionOutcome, DecisionStatus, DecisionType
 from ..models.store import Store
 from ..models.user import User
 from .wechat_alert_service import WeChatAlertService
@@ -38,7 +40,7 @@ class ApprovalService:
         ai_alternatives: Optional[List[Dict[str, Any]]] = None,
         context_data: Optional[Dict[str, Any]] = None,
         rag_context: Optional[Dict[str, Any]] = None,
-        db: AsyncSession = None
+        db: AsyncSession = None,
     ) -> DecisionLog:
         """
         创建审批请求
@@ -74,7 +76,7 @@ class ApprovalService:
                 decision_status=DecisionStatus.PENDING,
                 context_data=context_data,
                 rag_context=rag_context,
-                created_at=utcnow_naive()
+                created_at=utcnow_naive(),
             )
 
             # 保存到数据库
@@ -88,7 +90,7 @@ class ApprovalService:
                 decision_id=decision_log.id,
                 decision_type=decision_type.value,
                 agent_type=agent_type,
-                store_id=store_id
+                store_id=store_id,
             )
 
             # 发送企微审批通知
@@ -115,8 +117,7 @@ class ApprovalService:
             # 获取店长信息
             result = await db.execute(
                 select(User).where(
-                    User.store_id == decision_log.store_id,
-                    User.role.in_(["store_manager", "assistant_manager"])
+                    User.store_id == decision_log.store_id, User.role.in_(["store_manager", "assistant_manager"])
                 )
             )
             managers = result.scalars().all()
@@ -131,16 +132,10 @@ class ApprovalService:
             # 发送给所有店长
             for manager in managers:
                 await self.wechat_service.send_approval_card(
-                    user_id=manager.wechat_user_id,
-                    message=message,
-                    decision_id=decision_log.id
+                    user_id=manager.wechat_user_id, message=message, decision_id=decision_log.id
                 )
 
-            logger.info(
-                "approval_notification_sent",
-                decision_id=decision_log.id,
-                recipients=len(managers)
-            )
+            logger.info("approval_notification_sent", decision_id=decision_log.id, recipients=len(managers))
 
         except Exception as e:
             logger.error("send_approval_notification_failed", error=str(e))
@@ -156,7 +151,7 @@ class ApprovalService:
             DecisionType.MENU_PRICING: "菜品定价调整",
             DecisionType.ORDER_ANOMALY: "订单异常处理",
             DecisionType.KPI_IMPROVEMENT: "KPI改进计划",
-            DecisionType.COST_OPTIMIZATION: "成本优化"
+            DecisionType.COST_OPTIMIZATION: "成本优化",
         }
 
         type_name = type_names.get(decision_log.decision_type, "AI决策建议")
@@ -174,18 +169,14 @@ class ApprovalService:
             "actions": [
                 {"label": "✅ 批准", "action": "approve"},
                 {"label": "❌ 拒绝", "action": "reject"},
-                {"label": "✏️ 修改", "action": "modify"}
-            ]
+                {"label": "✏️ 修改", "action": "modify"},
+            ],
         }
 
         return card
 
     async def approve_decision(
-        self,
-        decision_id: str,
-        manager_id: str,
-        manager_feedback: Optional[str] = None,
-        db: AsyncSession = None
+        self, decision_id: str, manager_id: str, manager_feedback: Optional[str] = None, db: AsyncSession = None
     ) -> DecisionLog:
         """
         批准决策
@@ -214,22 +205,20 @@ class ApprovalService:
 
             # 更新审批链
             approval_chain = decision_log.approval_chain or []
-            approval_chain.append({
-                "action": "approved",
-                "manager_id": manager_id,
-                "timestamp": now_utc().isoformat(),
-                "feedback": manager_feedback
-            })
+            approval_chain.append(
+                {
+                    "action": "approved",
+                    "manager_id": manager_id,
+                    "timestamp": now_utc().isoformat(),
+                    "feedback": manager_feedback,
+                }
+            )
             decision_log.approval_chain = approval_chain
 
             await db.commit()
             await db.refresh(decision_log)
 
-            logger.info(
-                "decision_approved",
-                decision_id=decision_id,
-                manager_id=manager_id
-            )
+            logger.info("decision_approved", decision_id=decision_id, manager_id=manager_id)
 
             # 执行决策
             await self._execute_decision(decision_log, db)
@@ -243,11 +232,7 @@ class ApprovalService:
             raise
 
     async def reject_decision(
-        self,
-        decision_id: str,
-        manager_id: str,
-        manager_feedback: str,
-        db: AsyncSession = None
+        self, decision_id: str, manager_id: str, manager_feedback: str, db: AsyncSession = None
     ) -> DecisionLog:
         """
         拒绝决策
@@ -275,12 +260,14 @@ class ApprovalService:
 
             # 更新审批链
             approval_chain = decision_log.approval_chain or []
-            approval_chain.append({
-                "action": "rejected",
-                "manager_id": manager_id,
-                "timestamp": now_utc().isoformat(),
-                "feedback": manager_feedback
-            })
+            approval_chain.append(
+                {
+                    "action": "rejected",
+                    "manager_id": manager_id,
+                    "timestamp": now_utc().isoformat(),
+                    "feedback": manager_feedback,
+                }
+            )
             decision_log.approval_chain = approval_chain
 
             # 标记为训练数据（拒绝的决策对学习很有价值）
@@ -289,12 +276,7 @@ class ApprovalService:
             await db.commit()
             await db.refresh(decision_log)
 
-            logger.info(
-                "decision_rejected",
-                decision_id=decision_id,
-                manager_id=manager_id,
-                reason=manager_feedback
-            )
+            logger.info("decision_rejected", decision_id=decision_id, manager_id=manager_id, reason=manager_feedback)
 
             return decision_log
 
@@ -310,7 +292,7 @@ class ApprovalService:
         manager_id: str,
         modified_decision: Dict[str, Any],
         manager_feedback: Optional[str] = None,
-        db: AsyncSession = None
+        db: AsyncSession = None,
     ) -> DecisionLog:
         """
         修改决策
@@ -340,14 +322,16 @@ class ApprovalService:
 
             # 更新审批链
             approval_chain = decision_log.approval_chain or []
-            approval_chain.append({
-                "action": "modified",
-                "manager_id": manager_id,
-                "timestamp": now_utc().isoformat(),
-                "original": decision_log.ai_suggestion,
-                "modified": modified_decision,
-                "feedback": manager_feedback
-            })
+            approval_chain.append(
+                {
+                    "action": "modified",
+                    "manager_id": manager_id,
+                    "timestamp": now_utc().isoformat(),
+                    "original": decision_log.ai_suggestion,
+                    "modified": modified_decision,
+                    "feedback": manager_feedback,
+                }
+            )
             decision_log.approval_chain = approval_chain
 
             # 标记为训练数据（修改的决策对学习很有价值）
@@ -356,11 +340,7 @@ class ApprovalService:
             await db.commit()
             await db.refresh(decision_log)
 
-            logger.info(
-                "decision_modified",
-                decision_id=decision_id,
-                manager_id=manager_id
-            )
+            logger.info("decision_modified", decision_id=decision_id, manager_id=manager_id)
 
             # 执行修改后的决策
             await self._execute_decision(decision_log, db)
@@ -381,7 +361,8 @@ class ApprovalService:
 
             if decision_log.decision_type == DecisionType.PURCHASE_SUGGESTION:
                 # 采购建议：创建采购通知
-                from ..models.notification import Notification, NotificationType, NotificationPriority
+                from ..models.notification import Notification, NotificationPriority, NotificationType
+
                 notif = Notification(
                     title="AI采购建议已批准",
                     message=f"采购建议已批准执行：{decision_log.ai_reasoning or ''}",
@@ -394,7 +375,8 @@ class ApprovalService:
 
             elif decision_log.decision_type == DecisionType.INVENTORY_ALERT:
                 # 库存预警：记录处理通知
-                from ..models.notification import Notification, NotificationType, NotificationPriority
+                from ..models.notification import Notification, NotificationPriority, NotificationType
+
                 notif = Notification(
                     title="库存预警已处理",
                     message=f"库存预警决策已执行：{decision_log.ai_reasoning or ''}",
@@ -406,7 +388,8 @@ class ApprovalService:
 
             elif decision_log.decision_type == DecisionType.SCHEDULE_OPTIMIZATION:
                 # 排班优化：记录排班通知
-                from ..models.notification import Notification, NotificationType, NotificationPriority
+                from ..models.notification import Notification, NotificationPriority, NotificationType
+
                 notif = Notification(
                     title="排班优化已执行",
                     message=f"AI排班优化方案已批准：{decision_log.ai_reasoning or ''}",
@@ -420,11 +403,7 @@ class ApprovalService:
             decision_log.executed_at = utcnow_naive()
             await db.commit()
 
-            logger.info(
-                "decision_executed",
-                decision_id=decision_log.id,
-                decision_type=decision_log.decision_type.value
-            )
+            logger.info("decision_executed", decision_id=decision_log.id, decision_type=decision_log.decision_type.value)
 
         except Exception as e:
             logger.error("execute_decision_failed", error=str(e))
@@ -437,7 +416,7 @@ class ApprovalService:
         actual_result: Dict[str, Any],
         expected_result: Dict[str, Any],
         business_impact: Optional[Dict[str, Any]] = None,
-        db: AsyncSession = None
+        db: AsyncSession = None,
     ) -> DecisionLog:
         """
         记录决策结果
@@ -483,12 +462,7 @@ class ApprovalService:
             await db.commit()
             await db.refresh(decision_log)
 
-            logger.info(
-                "decision_outcome_recorded",
-                decision_id=decision_id,
-                outcome=outcome.value,
-                trust_score=trust_score
-            )
+            logger.info("decision_outcome_recorded", decision_id=decision_id, outcome=outcome.value, trust_score=trust_score)
 
             return decision_log
 
@@ -515,30 +489,27 @@ class ApprovalService:
 
         # 决策采纳情况得分
         if decision_log.decision_status == DecisionStatus.APPROVED:
-            score += float(os.getenv("APPROVAL_SCORE_ADOPTED", "40"))    # 完全采纳
+            score += float(os.getenv("APPROVAL_SCORE_ADOPTED", "40"))  # 完全采纳
         elif decision_log.decision_status == DecisionStatus.MODIFIED:
-            score += float(os.getenv("APPROVAL_SCORE_MODIFIED", "20"))   # 部分采纳
+            score += float(os.getenv("APPROVAL_SCORE_MODIFIED", "20"))  # 部分采纳
         elif decision_log.decision_status == DecisionStatus.REJECTED:
             score += 0  # 未采纳
 
         # 结果偏差得分
         if decision_log.result_deviation is not None:
             if decision_log.result_deviation < float(os.getenv("APPROVAL_DEVIATION_LOW", "10")):
-                score += float(os.getenv("APPROVAL_SCORE_DEV_LOW", "30"))    # 偏差<10%
+                score += float(os.getenv("APPROVAL_SCORE_DEV_LOW", "30"))  # 偏差<10%
             elif decision_log.result_deviation < float(os.getenv("APPROVAL_DEVIATION_MID", "20")):
-                score += float(os.getenv("APPROVAL_SCORE_DEV_MID", "20"))    # 偏差<20%
+                score += float(os.getenv("APPROVAL_SCORE_DEV_MID", "20"))  # 偏差<20%
             elif decision_log.result_deviation < float(os.getenv("APPROVAL_DEVIATION_HIGH", "30")):
-                score += float(os.getenv("APPROVAL_SCORE_DEV_HIGH", "10"))   # 偏差<30%
+                score += float(os.getenv("APPROVAL_SCORE_DEV_HIGH", "10"))  # 偏差<30%
             else:
                 score += 0  # 偏差≥30%
 
         return min(score, 100.0)
 
     async def get_pending_approvals(
-        self,
-        store_id: Optional[str] = None,
-        manager_id: Optional[str] = None,
-        db: AsyncSession = None
+        self, store_id: Optional[str] = None, manager_id: Optional[str] = None, db: AsyncSession = None
     ) -> List[DecisionLog]:
         """
         获取待审批决策列表
@@ -552,18 +523,14 @@ class ApprovalService:
             List[DecisionLog]: 待审批决策列表
         """
         try:
-            stmt = select(DecisionLog).where(
-                DecisionLog.decision_status == DecisionStatus.PENDING
-            )
+            stmt = select(DecisionLog).where(DecisionLog.decision_status == DecisionStatus.PENDING)
 
             if store_id:
                 stmt = stmt.where(DecisionLog.store_id == store_id)
 
             if manager_id:
                 # 获取店长管理的门店
-                stores_result = await db.execute(
-                    select(Store.id).where(Store.manager_id == manager_id)
-                )
+                stores_result = await db.execute(select(Store.id).where(Store.manager_id == manager_id))
                 store_ids = [row[0] for row in stores_result.all()]
                 stmt = stmt.where(DecisionLog.store_id.in_(store_ids))
 
@@ -580,7 +547,7 @@ class ApprovalService:
         store_id: Optional[str] = None,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        db: AsyncSession = None
+        db: AsyncSession = None,
     ) -> Dict[str, Any]:
         """
         获取决策统计数据
@@ -636,7 +603,7 @@ class ApprovalService:
                 "modification_rate": (modified / total * 100) if total > 0 else 0,
                 "rejection_rate": (rejected / total * 100) if total > 0 else 0,
                 "avg_trust_score": avg_trust_score,
-                "by_type": type_stats
+                "by_type": type_stats,
             }
 
         except Exception as e:

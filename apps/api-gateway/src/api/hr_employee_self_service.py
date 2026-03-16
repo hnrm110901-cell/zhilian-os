@@ -2,15 +2,17 @@
 员工自助查询API — 员工H5端使用
 员工可查看自己的工资条、考勤、请假、培训、合同等信息
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import Optional
-from pydantic import BaseModel
+
 from datetime import date, datetime
+from typing import Optional
+
 import structlog
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/hr/self-service", tags=["hr_employee_self_service"])
@@ -18,12 +20,13 @@ router = APIRouter(prefix="/hr/self-service", tags=["hr_employee_self_service"])
 
 # ── 请求模型 ──────────────────────────────────────────
 
+
 class LeaveRequestBody(BaseModel):
     employee_id: str
     store_id: str
     leave_category: str  # annual/sick/personal/compensatory/other
     start_date: str  # YYYY-MM-DD
-    end_date: str    # YYYY-MM-DD
+    end_date: str  # YYYY-MM-DD
     reason: str
     brand_id: Optional[str] = None
 
@@ -33,6 +36,7 @@ class PayslipConfirmBody(BaseModel):
 
 
 # ── 工具函数 ──────────────────────────────────────────
+
 
 def _mask_phone(phone: Optional[str]) -> str:
     """手机号脱敏：138****1234"""
@@ -49,6 +53,7 @@ def _mask_id_card(id_card: Optional[str]) -> str:
 
 
 # ── API 端点 ──────────────────────────────────────────
+
 
 @router.get("/my-profile")
 async def get_my_profile(

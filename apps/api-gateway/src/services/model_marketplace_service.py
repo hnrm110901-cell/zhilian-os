@@ -8,23 +8,26 @@
 - Level 3: 定制模型（¥29,999/年） - 针对特定品类的专属模型
 - Level 4: 数据贡献分成 - 门店贡献数据获得模型销售收益分成
 """
+
 import os
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional
-from enum import Enum
-from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
-import structlog
 import uuid
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Dict, List, Optional
+
+import structlog
+from pydantic import BaseModel
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_db_session
-from src.models.ai_model import AIModel, ModelPurchaseRecord, DataContributionRecord, ModelStatus, PurchaseStatus
+from src.models.ai_model import AIModel, DataContributionRecord, ModelPurchaseRecord, ModelStatus, PurchaseStatus
 
 logger = structlog.get_logger()
 
 
 class ModelType(str, Enum):
     """模型类型"""
+
     SCHEDULING = "scheduling"  # 排班模型
     INVENTORY = "inventory"  # 库存预测模型
     PRICING = "pricing"  # 动态定价模型
@@ -35,6 +38,7 @@ class ModelType(str, Enum):
 
 class ModelLevel(str, Enum):
     """模型级别"""
+
     BASIC = "basic"  # Level 1: 基础服务（免费）
     INDUSTRY = "industry"  # Level 2: 行业模型（¥9,999/年）
     CUSTOM = "custom"  # Level 3: 定制模型（¥29,999/年）
@@ -42,6 +46,7 @@ class ModelLevel(str, Enum):
 
 class IndustryCategory(str, Enum):
     """行业类别"""
+
     HOTPOT = "hotpot"  # 火锅
     BBQ = "bbq"  # 烧烤
     FAST_FOOD = "fast_food"  # 快餐
@@ -52,6 +57,7 @@ class IndustryCategory(str, Enum):
 
 class ModelInfo(BaseModel):
     """模型信息"""
+
     model_id: str
     model_name: str
     model_type: ModelType
@@ -68,6 +74,7 @@ class ModelInfo(BaseModel):
 
 class ModelPurchase(BaseModel):
     """模型购买记录"""
+
     purchase_id: str
     store_id: str
     model_id: str
@@ -79,6 +86,7 @@ class ModelPurchase(BaseModel):
 
 class DataContribution(BaseModel):
     """数据贡献记录"""
+
     contribution_id: str
     store_id: str
     model_id: str
@@ -105,17 +113,12 @@ class ModelMarketplaceService:
         self,
         model_type: Optional[ModelType] = None,
         model_level: Optional[ModelLevel] = None,
-        industry_category: Optional[IndustryCategory] = None
+        industry_category: Optional[IndustryCategory] = None,
     ) -> List[ModelInfo]:
         """
         列出可用的模型
         """
-        logger.info(
-            "列出可用模型",
-            model_type=model_type,
-            model_level=model_level,
-            industry_category=industry_category
-        )
+        logger.info("列出可用模型", model_type=model_type, model_level=model_level, industry_category=industry_category)
 
         async with get_db_session() as session:
             stmt = select(AIModel).where(AIModel.status == ModelStatus.ACTIVE)
@@ -148,20 +151,14 @@ class ModelMarketplaceService:
 
         return models
 
-    async def purchase_model(
-        self,
-        store_id: str,
-        model_id: str
-    ) -> ModelPurchase:
+    async def purchase_model(self, store_id: str, model_id: str) -> ModelPurchase:
         """
         购买模型
         """
         logger.info("购买模型", store_id=store_id, model_id=model_id)
 
         async with get_db_session() as session:
-            model_result = await session.execute(
-                select(AIModel).where(AIModel.id == model_id)
-            )
+            model_result = await session.execute(select(AIModel).where(AIModel.id == model_id))
             model = model_result.scalar_one_or_none()
             if not model:
                 raise ValueError(f"模型不存在: {model_id}")
@@ -193,29 +190,20 @@ class ModelMarketplaceService:
         logger.info("模型购买成功", purchase_id=purchase.purchase_id)
         return purchase
 
-    async def contribute_data(
-        self,
-        store_id: str,
-        model_id: str,
-        data_points: int,
-        quality_score: float
-    ) -> DataContribution:
+    async def contribute_data(self, store_id: str, model_id: str, data_points: int, quality_score: float) -> DataContribution:
         """
         贡献数据参与联邦学习
 
         门店贡献数据后，可以获得模型销售收益的分成
         """
-        logger.info(
-            "贡献数据",
-            store_id=store_id,
-            model_id=model_id,
-            data_points=data_points,
-            quality_score=quality_score
-        )
+        logger.info("贡献数据", store_id=store_id, model_id=model_id, data_points=data_points, quality_score=quality_score)
 
         base_revenue_share = float(os.getenv("MARKETPLACE_BASE_REVENUE_SHARE", "100.0"))
         quality_multiplier = quality_score / 100.0
-        data_volume_multiplier = min(data_points / int(os.getenv("MARKETPLACE_DATA_VOLUME_BASE", "10000")), float(os.getenv("MARKETPLACE_DATA_VOLUME_MAX_MULTIPLIER", "10.0")))
+        data_volume_multiplier = min(
+            data_points / int(os.getenv("MARKETPLACE_DATA_VOLUME_BASE", "10000")),
+            float(os.getenv("MARKETPLACE_DATA_VOLUME_MAX_MULTIPLIER", "10.0")),
+        )
         revenue_share = base_revenue_share * quality_multiplier * data_volume_multiplier
 
         async with get_db_session() as session:
@@ -242,17 +230,10 @@ class ModelMarketplaceService:
             revenue_share=revenue_share,
         )
 
-        logger.info(
-            "数据贡献成功",
-            contribution_id=contribution.contribution_id,
-            revenue_share=revenue_share
-        )
+        logger.info("数据贡献成功", contribution_id=contribution.contribution_id, revenue_share=revenue_share)
         return contribution
 
-    async def get_store_purchased_models(
-        self,
-        store_id: str
-    ) -> List[ModelPurchase]:
+    async def get_store_purchased_models(self, store_id: str) -> List[ModelPurchase]:
         """
         获取门店已购买的模型
         """
@@ -280,10 +261,7 @@ class ModelMarketplaceService:
             for r in rows
         ]
 
-    async def get_data_contributions(
-        self,
-        store_id: str
-    ) -> List[DataContribution]:
+    async def get_data_contributions(self, store_id: str) -> List[DataContribution]:
         """
         获取门店的数据贡献记录
         """
@@ -291,9 +269,9 @@ class ModelMarketplaceService:
 
         async with get_db_session() as session:
             result = await session.execute(
-                select(DataContributionRecord).where(
-                    DataContributionRecord.store_id == store_id
-                ).order_by(DataContributionRecord.contribution_date.desc())
+                select(DataContributionRecord)
+                .where(DataContributionRecord.store_id == store_id)
+                .order_by(DataContributionRecord.contribution_date.desc())
             )
             rows = result.scalars().all()
 
@@ -317,9 +295,7 @@ class ModelMarketplaceService:
         logger.info("计算网络效应指标")
 
         async with get_db_session() as session:
-            total_stores_result = await session.execute(
-                select(func.count(func.distinct(ModelPurchaseRecord.store_id)))
-            )
+            total_stores_result = await session.execute(select(func.count(func.distinct(ModelPurchaseRecord.store_id))))
             total_stores = int(total_stores_result.scalar() or 0)
 
             total_models_result = await session.execute(
@@ -338,7 +314,11 @@ class ModelMarketplaceService:
             avg_accuracy = round(float(avg_accuracy_result.scalar() or 0), 1)
 
         network_value = total_stores * total_stores * float(os.getenv("MARKETPLACE_NETWORK_VALUE_COEF", "0.5"))
-        moat_strength = "high" if total_stores >= int(os.getenv("MARKETPLACE_MOAT_HIGH_STORES", "500")) else ("medium" if total_stores >= int(os.getenv("MARKETPLACE_MOAT_MED_STORES", "100")) else "low")
+        moat_strength = (
+            "high"
+            if total_stores >= int(os.getenv("MARKETPLACE_MOAT_HIGH_STORES", "500"))
+            else ("medium" if total_stores >= int(os.getenv("MARKETPLACE_MOAT_MED_STORES", "100")) else "low")
+        )
 
         network_effect = {
             "total_stores": total_stores,

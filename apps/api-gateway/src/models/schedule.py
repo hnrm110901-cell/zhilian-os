@@ -1,10 +1,12 @@
 """
 Schedule Models
 """
-from sqlalchemy import Column, String, Date, Time, ForeignKey, Boolean
+
+import uuid
+
+from sqlalchemy import Boolean, Column, Date, ForeignKey, String, Time
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-import uuid
 
 from .base import Base, TimestampMixin
 

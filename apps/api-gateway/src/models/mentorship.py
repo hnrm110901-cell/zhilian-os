@@ -2,8 +2,10 @@
 Mentorship Model — 核心岗位师徒培养
 师傅+徒弟+培养周期+验收+奖励
 """
+
 import uuid
-from sqlalchemy import Column, String, Integer, Date, Text, Boolean
+
+from sqlalchemy import Boolean, Column, Date, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 
 from .base import Base, TimestampMixin

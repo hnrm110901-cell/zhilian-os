@@ -2,20 +2,22 @@
 HR Smart Schedule API — 智能排班接口
 提供自动排班生成、手动调整、发布通知、需求配置、AI建议等端点。
 """
-from fastapi import APIRouter, Depends, Query, Body, HTTPException
-from pydantic import BaseModel, Field
-from typing import Any, Dict, List, Optional
-from datetime import date, time, timedelta
+
 import uuid
+from datetime import date, time, timedelta
+from typing import Any, Dict, List, Optional
+
 import structlog
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
+from sqlalchemy import and_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
-from ..models.user import User
 from ..models.schedule_demand import StoreStaffingDemand
+from ..models.user import User
 from ..services.smart_schedule_service import smart_schedule_service
-from sqlalchemy import select, and_
-from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -23,18 +25,19 @@ router = APIRouter()
 
 # ── Pydantic Schemas ──────────────────────────────────────────
 
+
 class AutoGenerateRequest(BaseModel):
     """自动排班请求"""
+
     store_id: str
     brand_id: str
     week_start: str = Field(..., description="周一日期，格式 YYYY-MM-DD")
-    demand_forecast: Optional[Dict[str, Any]] = Field(
-        None, description="外部需求预测覆盖，key=日期字符串，value=岗位需求dict"
-    )
+    demand_forecast: Optional[Dict[str, Any]] = Field(None, description="外部需求预测覆盖，key=日期字符串，value=岗位需求dict")
 
 
 class ScheduleAdjustChange(BaseModel):
     """单个调整操作"""
+
     action: str = Field(..., description="swap / add / remove")
     employee_id: Optional[str] = None
     from_employee_id: Optional[str] = None
@@ -45,6 +48,7 @@ class ScheduleAdjustChange(BaseModel):
 
 class ScheduleAdjustRequest(BaseModel):
     """排班调整请求"""
+
     store_id: str
     schedule_date: str = Field(..., description="YYYY-MM-DD")
     changes: List[ScheduleAdjustChange]
@@ -52,6 +56,7 @@ class ScheduleAdjustRequest(BaseModel):
 
 class PublishRequest(BaseModel):
     """发布排班请求"""
+
     store_id: str
     week_start: str = Field(..., description="周一日期，格式 YYYY-MM-DD")
     published_by: Optional[str] = "system"
@@ -59,6 +64,7 @@ class PublishRequest(BaseModel):
 
 class StaffingDemandCreate(BaseModel):
     """岗位编制需求配置"""
+
     store_id: str
     brand_id: str
     position: str = Field(..., description="waiter/chef/cashier/host/manager/dishwasher")
@@ -70,6 +76,7 @@ class StaffingDemandCreate(BaseModel):
 
 
 # ── 自动排班 ──────────────────────────────────────────────────
+
 
 @router.post("/hr/schedule/auto-generate")
 async def auto_generate_schedule(
@@ -110,6 +117,7 @@ async def auto_generate_schedule(
 
 # ── 查询周排班 ────────────────────────────────────────────────
 
+
 @router.get("/hr/schedule/weekly/{store_id}")
 async def get_weekly_schedule(
     store_id: str,
@@ -122,8 +130,9 @@ async def get_weekly_schedule(
     获取指定门店的一周排班（已持久化的排班数据）。
     如果该周排班尚未生成，返回空结构。
     """
-    from ..models.schedule import Schedule, Shift
     from sqlalchemy.orm import selectinload
+
+    from ..models.schedule import Schedule, Shift
 
     ws = date.fromisoformat(week_start)
     we = ws + timedelta(days=6)
@@ -149,21 +158,25 @@ async def get_weekly_schedule(
     for sched in schedules:
         shifts_data = []
         for shift in sched.shifts:
-            shifts_data.append({
-                "employee_id": shift.employee_id,
-                "position": shift.position,
-                "shift_type": shift.shift_type,
-                "start_time": shift.start_time.strftime("%H:%M") if shift.start_time else None,
-                "end_time": shift.end_time.strftime("%H:%M") if shift.end_time else None,
-                "is_confirmed": shift.is_confirmed,
-            })
+            shifts_data.append(
+                {
+                    "employee_id": shift.employee_id,
+                    "position": shift.position,
+                    "shift_type": shift.shift_type,
+                    "start_time": shift.start_time.strftime("%H:%M") if shift.start_time else None,
+                    "end_time": shift.end_time.strftime("%H:%M") if shift.end_time else None,
+                    "is_confirmed": shift.is_confirmed,
+                }
+            )
 
-        daily_schedules.append({
-            "date": str(sched.schedule_date),
-            "day_of_week": day_names[sched.schedule_date.weekday()],
-            "is_published": sched.is_published,
-            "shifts": shifts_data,
-        })
+        daily_schedules.append(
+            {
+                "date": str(sched.schedule_date),
+                "day_of_week": day_names[sched.schedule_date.weekday()],
+                "is_published": sched.is_published,
+                "shifts": shifts_data,
+            }
+        )
 
     return {
         "store_id": store_id,
@@ -175,6 +188,7 @@ async def get_weekly_schedule(
 
 
 # ── 手动调整 ──────────────────────────────────────────────────
+
 
 @router.put("/hr/schedule/adjust")
 async def adjust_schedule(
@@ -207,6 +221,7 @@ async def adjust_schedule(
 
 # ── 发布排班 ──────────────────────────────────────────────────
 
+
 @router.post("/hr/schedule/publish")
 async def publish_schedule(
     payload: PublishRequest,
@@ -236,6 +251,7 @@ async def publish_schedule(
 
 
 # ── 需求配置 ──────────────────────────────────────────────────
+
 
 @router.get("/hr/schedule/demand/{store_id}")
 async def get_staffing_demand(
@@ -270,17 +286,19 @@ async def get_staffing_demand(
 
     items = []
     for d in demands:
-        items.append({
-            "id": str(d.id),
-            "store_id": d.store_id,
-            "brand_id": d.brand_id,
-            "position": d.position,
-            "day_type": d.day_type,
-            "shift_type": d.shift_type,
-            "min_count": d.min_count,
-            "max_count": d.max_count,
-            "is_active": d.is_active,
-        })
+        items.append(
+            {
+                "id": str(d.id),
+                "store_id": d.store_id,
+                "brand_id": d.brand_id,
+                "position": d.position,
+                "day_type": d.day_type,
+                "shift_type": d.shift_type,
+                "min_count": d.min_count,
+                "max_count": d.max_count,
+                "is_active": d.is_active,
+            }
+        )
 
     return {"items": items, "total": len(items)}
 
@@ -347,6 +365,7 @@ async def set_staffing_demand(
 
 # ── AI 优化建议 ──────────────────────────────────────────────
 
+
 @router.get("/hr/schedule/suggestions/{store_id}")
 async def get_schedule_suggestions(
     store_id: str,
@@ -377,6 +396,7 @@ async def get_schedule_suggestions(
 
 
 # ── AI 排班深度分析 ──────────────────────────────────────────
+
 
 @router.get("/hr/schedule/ai-analysis/{store_id}")
 async def get_ai_schedule_analysis(
@@ -413,8 +433,7 @@ async def get_ai_schedule_analysis(
 
         # 汇总预期节省金额
         total_expected_saving = sum(
-            s.get("expected_saving_yuan", 0) for s in suggestions
-            if isinstance(s.get("expected_saving_yuan"), (int, float))
+            s.get("expected_saving_yuan", 0) for s in suggestions if isinstance(s.get("expected_saving_yuan"), (int, float))
         )
         total_expected_saving += sum(
             s.get("expected_saving_yuan", 0)

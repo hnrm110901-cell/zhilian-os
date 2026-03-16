@@ -2,11 +2,13 @@
 品智POS系统适配器
 Pinzhi POS System Adapter
 """
-from typing import Dict, Any, Optional, List
+
+import hashlib
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 import httpx
 import structlog
-from datetime import datetime
-import hashlib
 
 from ..core.config import settings
 
@@ -17,10 +19,7 @@ def _generate_sign(token: str, params: Dict[str, Any]) -> str:
     """
     生成品智 API 签名（与适配器算法保持一致）。
     """
-    filtered = {
-        k: v for k, v in params.items()
-        if k not in ["sign", "pageIndex", "pageSize"] and v is not None
-    }
+    filtered = {k: v for k, v in params.items() if k not in ["sign", "pageIndex", "pageSize"] and v is not None}
     sorted_items = sorted(filtered.items(), key=lambda item: item[0])
     param_str = "&".join([f"{k}={v}" for k, v in sorted_items]) + f"&token={token}"
     return hashlib.md5(param_str.encode("utf-8")).hexdigest()
@@ -84,9 +83,7 @@ class PinzhiService:
 
                     success = payload.get("success")
                     errcode = payload.get("errcode")
-                    if success in (0, "0") or (
-                        success is None and errcode in (0, "0")
-                    ):
+                    if success in (0, "0") or (success is None and errcode in (0, "0")):
                         return {
                             "status": "healthy",
                             "message": "品智 .do 接口连接正常",
@@ -208,9 +205,7 @@ class PinzhiService:
             logger.error("获取菜品列表异常", error=str(e))
             raise
 
-    async def get_orders(
-        self, store_id: str, start_date: str, end_date: str
-    ) -> List[Dict[str, Any]]:
+    async def get_orders(self, store_id: str, start_date: str, end_date: str) -> List[Dict[str, Any]]:
         """
         获取订单列表
 
@@ -250,9 +245,7 @@ class PinzhiService:
             logger.error("获取订单列表异常", error=str(e))
             raise
 
-    async def get_sales_data(
-        self, store_id: str, start_date: str, end_date: str
-    ) -> Dict[str, Any]:
+    async def get_sales_data(self, store_id: str, start_date: str, end_date: str) -> Dict[str, Any]:
         """
         获取营业数据
 

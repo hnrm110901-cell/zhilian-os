@@ -2,13 +2,15 @@
 领域分割向量索引 API
 提供按领域的语义搜索和索引管理接口
 """
-from fastapi import APIRouter, Query, HTTPException, Depends
-from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
 
-from ..services.domain_vector_service import domain_vector_service, DOMAINS
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+
 from ..core.dependencies import get_current_user
 from ..models.user import User
+from ..services.domain_vector_service import DOMAINS, domain_vector_service
 
 router = APIRouter(prefix="/api/v1/vector", tags=["vector_index"])
 

@@ -16,13 +16,8 @@ from typing import Any, Dict, List, Optional
 
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.services.reasoning_engine import (
-    ALL_DIMENSIONS,
-    StoreHealthReport,
-    UniversalReasoningEngine,
-)
 from src.services.causal_graph_service import CausalGraphService
+from src.services.reasoning_engine import ALL_DIMENSIONS, StoreHealthReport, UniversalReasoningEngine
 
 logger = structlog.get_logger()
 
@@ -50,9 +45,9 @@ class DiagnosisService:
 
     async def run_full_diagnosis(
         self,
-        store_id:    str,
+        store_id: str,
         kpi_context: Dict[str, Any],
-        dimensions:  Optional[List[str]] = None,
+        dimensions: Optional[List[str]] = None,
     ) -> StoreHealthReport:
         """
         全维度门店健康诊断。
@@ -99,26 +94,26 @@ class DiagnosisService:
 
     async def get_diagnosis_history(
         self,
-        store_id:  str,
-        days:      int = 30,
+        store_id: str,
+        days: int = 30,
         dimension: Optional[str] = None,
     ) -> List[Dict]:
         """查询门店推理报告历史（供趋势图表展示）"""
-        engine     = UniversalReasoningEngine(self.db)
+        engine = UniversalReasoningEngine(self.db)
         start_date = date.today() - timedelta(days=days)
-        reports    = await engine.list_reports(
+        reports = await engine.list_reports(
             store_id=store_id,
             start_date=start_date,
             dimension=dimension,
         )
         return [
             {
-                "report_id":   str(r.id),
+                "report_id": str(r.id),
                 "report_date": r.report_date.isoformat(),
-                "dimension":   r.dimension,
-                "severity":    r.severity,
-                "root_cause":  r.root_cause,
-                "confidence":  r.confidence,
+                "dimension": r.dimension,
+                "severity": r.severity,
+                "root_cause": r.root_cause,
+                "confidence": r.confidence,
                 "is_actioned": r.is_actioned,
             }
             for r in reports
@@ -128,7 +123,7 @@ class DiagnosisService:
 
     async def get_cross_store_improvement_plan(
         self,
-        store_id:    str,
+        store_id: str,
         metric_name: str = "waste_rate",
     ) -> Dict:
         """
@@ -149,21 +144,18 @@ class DiagnosisService:
 
         if not hints:
             return {
-                "store_id":    store_id,
-                "metric":      metric_name,
-                "status":      "no_better_peers_found",
+                "store_id": store_id,
+                "metric": metric_name,
+                "status": "no_better_peers_found",
                 "suggestions": [],
             }
 
         return {
-            "store_id":    store_id,
-            "metric":      metric_name,
-            "status":      "improvement_candidates_found",
+            "store_id": store_id,
+            "metric": metric_name,
+            "status": "improvement_candidates_found",
             "suggestions": hints,
-            "next_step": (
-                f"联系以上同类门店深入交流 {metric_name} 优化经验，"
-                f"重点对比操作流程和采购策略差异"
-            ),
+            "next_step": (f"联系以上同类门店深入交流 {metric_name} 优化经验，" f"重点对比操作流程和采购策略差异"),
         }
 
     # ── 内部方法 ──────────────────────────────────────────────────────────────
@@ -171,10 +163,9 @@ class DiagnosisService:
     async def _fetch_peer_context(self, store_id: str) -> Dict[str, float]:
         """从 L3 物化表拉取同伴组百分位上下文"""
         try:
-            from src.services.cross_store_knowledge_service import (
-                CrossStoreKnowledgeService,
-            )
-            l3_svc     = CrossStoreKnowledgeService(self.db)
+            from src.services.cross_store_knowledge_service import CrossStoreKnowledgeService
+
+            l3_svc = CrossStoreKnowledgeService(self.db)
             benchmarks = await l3_svc.get_all_benchmarks(store_id)
             if not benchmarks:
                 return {}

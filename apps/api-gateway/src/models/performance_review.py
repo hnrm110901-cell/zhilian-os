@@ -2,13 +2,14 @@
 Performance Review Models — 绩效考核
 考核模板、考核周期、考核评分
 """
+
 import enum
 import uuid
-from sqlalchemy import (
-    Column, String, Integer, Numeric, Boolean, Date, DateTime,
-    Text, ForeignKey, Enum as SAEnum, UniqueConstraint,
-)
-from sqlalchemy.dialects.postgresql import UUID, JSON
+
+from sqlalchemy import Boolean, Column, Date, DateTime
+from sqlalchemy import Enum as SAEnum
+from sqlalchemy import ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy.dialects.postgresql import JSON, UUID
 
 from .base import Base, TimestampMixin
 
@@ -22,28 +23,31 @@ class ReviewCycle(str, enum.Enum):
 
 class ReviewStatus(str, enum.Enum):
     DRAFT = "draft"
-    SELF_REVIEW = "self_review"     # 自评中
-    MANAGER_REVIEW = "manager"      # 上级评中
+    SELF_REVIEW = "self_review"  # 自评中
+    MANAGER_REVIEW = "manager"  # 上级评中
     COMPLETED = "completed"
-    APPEALED = "appealed"           # 申诉中
+    APPEALED = "appealed"  # 申诉中
 
 
 class ReviewLevel(str, enum.Enum):
     """绩效等级"""
-    S = "S"         # 卓越
-    A = "A"         # 优秀
-    B = "B"         # 良好
-    C = "C"         # 合格
-    D = "D"         # 待改进
+
+    S = "S"  # 卓越
+    A = "A"  # 优秀
+    B = "B"  # 良好
+    C = "C"  # 合格
+    D = "D"  # 待改进
 
 
 # ── 1. 考核模板 ────────────────────────────────────────────
+
 
 class PerformanceTemplate(Base, TimestampMixin):
     """
     考核模板：定义考核维度和权重。
     可按岗位配置不同模板。
     """
+
     __tablename__ = "performance_templates"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -51,7 +55,7 @@ class PerformanceTemplate(Base, TimestampMixin):
     brand_id = Column(String(50), nullable=True, index=True)
 
     name = Column(String(100), nullable=False)
-    position = Column(String(50), nullable=True)       # 适用岗位，NULL=通用
+    position = Column(String(50), nullable=True)  # 适用岗位，NULL=通用
     cycle = Column(
         SAEnum(ReviewCycle, name="review_cycle_enum"),
         nullable=False,
@@ -80,15 +84,15 @@ class PerformanceTemplate(Base, TimestampMixin):
 
 # ── 2. 考核记录 ────────────────────────────────────────────
 
+
 class PerformanceReview(Base, TimestampMixin):
     """
     员工考核记录：每个考核周期一条。
     打通现有KPI监控数据，自动填充业务指标维度。
     """
+
     __tablename__ = "performance_reviews"
-    __table_args__ = (
-        UniqueConstraint("employee_id", "review_period", name="uq_perf_review_period"),
-    )
+    __table_args__ = (UniqueConstraint("employee_id", "review_period", name="uq_perf_review_period"),)
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     store_id = Column(String(50), nullable=False, index=True)
@@ -135,7 +139,4 @@ class PerformanceReview(Base, TimestampMixin):
     completed_at = Column(DateTime, nullable=True)
 
     def __repr__(self):
-        return (
-            f"<PerformanceReview(employee='{self.employee_id}', "
-            f"period='{self.review_period}', level='{self.level}')>"
-        )
+        return f"<PerformanceReview(employee='{self.employee_id}', " f"period='{self.review_period}', level='{self.level}')>"

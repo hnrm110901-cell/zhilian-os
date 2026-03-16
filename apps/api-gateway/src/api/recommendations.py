@@ -5,21 +5,17 @@ Recommendation Engine API Endpoints
 Phase 4: 智能优化期 (Intelligence Optimization Period)
 """
 
-from fastapi import APIRouter, HTTPException, Depends
 import os
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
-from ..services.recommendation_engine import (
-    IntelligentRecommendationEngine,
-    RecommendationType,
-    PricingStrategy
-)
-from ..core.database import get_db
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..core.database import get_db
+from ..services.recommendation_engine import IntelligentRecommendationEngine, PricingStrategy, RecommendationType
 
 router = APIRouter(prefix="/api/v1/recommendations", tags=["recommendations"])
 
@@ -27,6 +23,7 @@ router = APIRouter(prefix="/api/v1/recommendations", tags=["recommendations"])
 # Request/Response Models
 class RecommendDishesRequest(BaseModel):
     """Recommend dishes request"""
+
     customer_id: str
     store_id: str
     context: Optional[Dict[str, Any]] = None
@@ -35,6 +32,7 @@ class RecommendDishesRequest(BaseModel):
 
 class OptimizePricingRequest(BaseModel):
     """Optimize pricing request"""
+
     store_id: str
     dish_id: str
     context: Optional[Dict[str, Any]] = None
@@ -42,6 +40,7 @@ class OptimizePricingRequest(BaseModel):
 
 class GenerateCampaignRequest(BaseModel):
     """Generate marketing campaign request"""
+
     store_id: str
     objective: str
     budget: float
@@ -50,6 +49,7 @@ class GenerateCampaignRequest(BaseModel):
 
 class PerformanceRequest(BaseModel):
     """Get performance request"""
+
     store_id: str
     start_date: datetime
     end_date: datetime
@@ -57,10 +57,7 @@ class PerformanceRequest(BaseModel):
 
 # API Endpoints
 @router.post("/dishes")
-async def recommend_dishes(
-    request: RecommendDishesRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def recommend_dishes(request: RecommendDishesRequest, db: AsyncSession = Depends(get_db)):
     """
     Recommend dishes for customer
     为客户推荐菜品
@@ -75,10 +72,7 @@ async def recommend_dishes(
         engine = IntelligentRecommendationEngine(db)
 
         recommendations = await engine.recommend_dishes(
-            customer_id=request.customer_id,
-            store_id=request.store_id,
-            context=request.context,
-            top_k=request.top_k
+            customer_id=request.customer_id, store_id=request.store_id, context=request.context, top_k=request.top_k
         )
 
         return {
@@ -93,20 +87,17 @@ async def recommend_dishes(
                     "reason": rec.reason,
                     "price": rec.price,
                     "estimated_profit": rec.estimated_profit,
-                    "confidence": rec.confidence
+                    "confidence": rec.confidence,
                 }
                 for rec in recommendations
-            ]
+            ],
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/pricing/optimize")
-async def optimize_pricing(
-    request: OptimizePricingRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def optimize_pricing(request: OptimizePricingRequest, db: AsyncSession = Depends(get_db)):
     """
     Optimize pricing for dish
     优化菜品定价
@@ -121,11 +112,7 @@ async def optimize_pricing(
     try:
         engine = IntelligentRecommendationEngine(db)
 
-        pricing = await engine.optimize_pricing(
-            store_id=request.store_id,
-            dish_id=request.dish_id,
-            context=request.context
-        )
+        pricing = await engine.optimize_pricing(store_id=request.store_id, dish_id=request.dish_id, context=request.context)
 
         return {
             "success": True,
@@ -137,17 +124,14 @@ async def optimize_pricing(
             "strategy": pricing.strategy.value,
             "expected_demand_change": pricing.expected_demand_change,
             "expected_revenue_change": pricing.expected_revenue_change,
-            "reason": pricing.reason
+            "reason": pricing.reason,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/marketing/campaign")
-async def generate_marketing_campaign(
-    request: GenerateCampaignRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def generate_marketing_campaign(request: GenerateCampaignRequest, db: AsyncSession = Depends(get_db)):
     """
     Generate precision marketing campaign
     生成精准营销方案
@@ -165,7 +149,7 @@ async def generate_marketing_campaign(
             store_id=request.store_id,
             objective=request.objective,
             budget=request.budget,
-            target_segment=request.target_segment
+            target_segment=request.target_segment,
         )
 
         return {
@@ -178,18 +162,15 @@ async def generate_marketing_campaign(
                 "expected_conversion": campaign.expected_conversion,
                 "expected_revenue": campaign.expected_revenue,
                 "duration_days": campaign.duration_days,
-                "reason": campaign.reason
-            }
+                "reason": campaign.reason,
+            },
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/performance")
-async def get_recommendation_performance(
-    request: PerformanceRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def get_recommendation_performance(request: PerformanceRequest, db: AsyncSession = Depends(get_db)):
     """
     Get recommendation performance metrics
     获取推荐性能指标
@@ -204,15 +185,10 @@ async def get_recommendation_performance(
         engine = IntelligentRecommendationEngine(db)
 
         performance = await engine.get_recommendation_performance(
-            store_id=request.store_id,
-            start_date=request.start_date,
-            end_date=request.end_date
+            store_id=request.store_id, start_date=request.start_date, end_date=request.end_date
         )
 
-        return {
-            "success": True,
-            **performance
-        }
+        return {"success": True, **performance}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -220,12 +196,13 @@ async def get_recommendation_performance(
 # ==================== P1-3：门店级经营推荐 ====================
 
 import datetime
+
 import structlog
 from sqlalchemy import text
 
-from ..services.recommendation_service import generate_store_recommendations
 from ..core.dependencies import get_current_active_user
 from ..models.user import User
+from ..services.recommendation_service import generate_store_recommendations
 
 _rec_logger = structlog.get_logger()
 
@@ -234,8 +211,9 @@ async def _fetch_sales_data(store_id: str, db: AsyncSession) -> List[dict]:
     """查询近7天门店销售数据（按菜品汇总）。"""
     since = (datetime.date.today() - datetime.timedelta(days=7)).isoformat()
     try:
-        rows = (await db.execute(
-            text("""
+        rows = (
+            await db.execute(
+                text("""
                 SELECT
                     oi.item_name                          AS dish_name,
                     COALESCE(oi.item_id, oi.item_name)   AS dish_id,
@@ -250,18 +228,19 @@ async def _fetch_sales_data(store_id: str, db: AsyncSession) -> List[dict]:
                 ORDER BY revenue_7d DESC
                 LIMIT 20
             """),
-            {"store_id": store_id, "since": since},
-        )).fetchall()
+                {"store_id": store_id, "since": since},
+            )
+        ).fetchall()
     except Exception as exc:
         _rec_logger.warning("recommendations.sales_query_failed", store_id=store_id, error=str(exc))
         return []
 
     return [
         {
-            "dish_id":       str(r[1] or r[0]),
-            "dish_name":     r[0],
-            "qty_sold_7d":   int(r[2] or 0),
-            "revenue_7d":    float(r[3] or 0),
+            "dish_id": str(r[1] or r[0]),
+            "dish_name": r[0],
+            "qty_sold_7d": int(r[2] or 0),
+            "revenue_7d": float(r[3] or 0),
             "avg_daily_qty": float(r[4] or 0),
         }
         for r in rows
@@ -276,8 +255,9 @@ async def _fetch_inventory_data(store_id: str, db: AsyncSession) -> List[dict]:
     """
     since = (datetime.date.today() - datetime.timedelta(days=7)).isoformat()
     try:
-        rows = (await db.execute(
-            text("""
+        rows = (
+            await db.execute(
+                text("""
                 SELECT
                     ii.name                          AS dish_name,
                     ii.name                          AS dish_id,
@@ -305,18 +285,19 @@ async def _fetch_inventory_data(store_id: str, db: AsyncSession) -> List[dict]:
                 ORDER BY days_until_expiry ASC
                 LIMIT 20
             """),
-            {"store_id": store_id, "since": since},
-        )).fetchall()
+                {"store_id": store_id, "since": since},
+            )
+        ).fetchall()
     except Exception as exc:
         _rec_logger.warning("recommendations.inventory_query_failed", store_id=store_id, error=str(exc))
         return []
 
     return [
         {
-            "dish_id":          r[1],
-            "dish_name":        r[0],
-            "stock_qty":        float(r[2]),
-            "cost_per_unit":    float(r[3]),
+            "dish_id": r[1],
+            "dish_name": r[0],
+            "stock_qty": float(r[2]),
+            "cost_per_unit": float(r[3]),
             "days_until_expiry": int(r[4]),
         }
         for r in rows

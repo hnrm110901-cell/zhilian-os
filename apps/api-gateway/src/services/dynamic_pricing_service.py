@@ -16,10 +16,10 @@ DynamicPricingService — Agent-14 私域会员个性化定价策略
 
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
-from datetime import datetime
-from typing import Optional, Dict, Any
 import inspect
+from dataclasses import asdict, dataclass
+from datetime import datetime
+from typing import Any, Dict, Optional
 
 import structlog
 from sqlalchemy import text
@@ -34,39 +34,39 @@ logger = structlog.get_logger()
 
 _OFFER_CONFIG: Dict[int, Dict[str, Any]] = {
     1: {
-        "offer_type":     "quality_story",
-        "title":          "品质首选",
-        "description":    "精选当季食材，主厨匠心之作，欢迎您放心体验",
-        "discount_pct":   0.0,
-        "strategy_note":  "L1首次接触：强调品质口碑与安全感，不发折扣",
+        "offer_type": "quality_story",
+        "title": "品质首选",
+        "description": "精选当季食材，主厨匠心之作，欢迎您放心体验",
+        "discount_pct": 0.0,
+        "strategy_note": "L1首次接触：强调品质口碑与安全感，不发折扣",
     },
     2: {
-        "offer_type":     "discount_coupon",
-        "title":          "回头客专属优惠",
-        "description":    "感谢再次光临，享 88折 回头客专属优惠",
-        "discount_pct":   8.8,
-        "strategy_note":  "L2初步信任：性价比 + 小额折扣，降低再次到店门槛",
+        "offer_type": "discount_coupon",
+        "title": "回头客专属优惠",
+        "description": "感谢再次光临，享 88折 回头客专属优惠",
+        "discount_pct": 8.8,
+        "strategy_note": "L2初步信任：性价比 + 小额折扣，降低再次到店门槛",
     },
     3: {
-        "offer_type":     "group_bundle",
-        "title":          "聚餐特惠套餐",
-        "description":    "带朋友来更划算，3人及以上享 78折 聚餐特惠",
-        "discount_pct":   7.8,
-        "strategy_note":  "L3社交习惯：组合套餐「请客有面子」，场合适配",
+        "offer_type": "group_bundle",
+        "title": "聚餐特惠套餐",
+        "description": "带朋友来更划算，3人及以上享 78折 聚餐特惠",
+        "discount_pct": 7.8,
+        "strategy_note": "L3社交习惯：组合套餐「请客有面子」，场合适配",
     },
     4: {
-        "offer_type":     "exclusive_access",
-        "title":          "专属会员礼遇",
-        "description":    "您是我们最熟悉的老朋友，优先预约包厢，店长专程接待",
-        "discount_pct":   0.0,
-        "strategy_note":  "L4尊重需求：专属感 > 折扣，不发通用优惠",
+        "offer_type": "exclusive_access",
+        "title": "专属会员礼遇",
+        "description": "您是我们最熟悉的老朋友，优先预约包厢，店长专程接待",
+        "discount_pct": 0.0,
+        "strategy_note": "L4尊重需求：专属感 > 折扣，不发通用优惠",
     },
     5: {
-        "offer_type":     "experience",
-        "title":          "主厨特别体验",
-        "description":    "本周主厨新作邀您首品，附食材溯源故事——专为您保留",
-        "discount_pct":   0.0,
-        "strategy_note":  "L5自我实现：探索体验 + 主厨故事，意义 > 价格",
+        "offer_type": "experience",
+        "title": "主厨特别体验",
+        "description": "本周主厨新作邀您首品，附食材溯源故事——专为您保留",
+        "discount_pct": 0.0,
+        "strategy_note": "L5自我实现：探索体验 + 主厨故事，意义 > 价格",
     },
 }
 
@@ -76,20 +76,23 @@ _PEAK_WINDOWS = [(11, 13), (17, 20)]
 
 # ── 数据模型 ───────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class PricingOffer:
     """个性化定价推荐（单条）。"""
-    offer_type:     str
-    title:          str
-    description:    str
-    discount_pct:   float    # 0 = 无折扣；8.8 = 88折；7.8 = 78折
-    maslow_level:   int
-    strategy_note:  str
-    is_peak_hour:   bool
-    confidence:     float    # [0.3, 1.0]
+
+    offer_type: str
+    title: str
+    description: str
+    discount_pct: float  # 0 = 无折扣；8.8 = 88折；7.8 = 78折
+    maslow_level: int
+    strategy_note: str
+    is_peak_hour: bool
+    confidence: float  # [0.3, 1.0]
 
 
 # ── 核心服务 ───────────────────────────────────────────────────────────────────
+
 
 class DynamicPricingService:
     """

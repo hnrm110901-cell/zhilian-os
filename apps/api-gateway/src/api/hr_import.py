@@ -1,16 +1,18 @@
 """
 花名册导入API — Excel上传/预览/确认
 """
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
-from pydantic import BaseModel
-from typing import Optional, Dict
+
+from typing import Dict, Optional
+
 import structlog
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
 from ..models.user import User
 from ..services.hr_roster_import import HRRosterImportService
-from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -24,7 +26,7 @@ async def preview_roster_import(
     current_user: User = Depends(get_current_active_user),
 ):
     """上传花名册Excel，预览列映射"""
-    if not file.filename or not file.filename.endswith(('.xlsx', '.xls')):
+    if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
         raise HTTPException(status_code=400, detail="仅支持 .xlsx/.xls 文件")
 
     content = await file.read()
@@ -62,6 +64,7 @@ async def get_import_templates(
 ):
     """获取导入模板说明"""
     from ..services.hr_roster_import import LECAI_COLUMN_MAP
+
     return {
         "supported_formats": ["乐才HR", "钉钉", "企业微信"],
         "lecai_columns": list(LECAI_COLUMN_MAP.keys()),
@@ -72,8 +75,9 @@ async def get_import_templates(
 
 # ── 组织架构API ──
 
-from ..models.organization import Organization
 from sqlalchemy import select
+
+from ..models.organization import Organization
 
 
 @router.get("/hr/organizations")
@@ -84,26 +88,30 @@ async def get_organizations(
 ):
     """获取组织架构树"""
     result = await db.execute(
-        select(Organization).where(
+        select(Organization)
+        .where(
             Organization.brand_id == brand_id,
             Organization.is_active.is_(True),
-        ).order_by(Organization.level, Organization.sort_order)
+        )
+        .order_by(Organization.level, Organization.sort_order)
     )
     orgs = result.scalars().all()
 
     items = []
     for org in orgs:
-        items.append({
-            "id": str(org.id),
-            "name": org.name,
-            "code": org.code,
-            "parent_id": str(org.parent_id) if org.parent_id else None,
-            "level": org.level,
-            "org_type": org.org_type,
-            "store_id": org.store_id,
-            "manager_id": org.manager_id,
-            "sort_order": org.sort_order,
-        })
+        items.append(
+            {
+                "id": str(org.id),
+                "name": org.name,
+                "code": org.code,
+                "parent_id": str(org.parent_id) if org.parent_id else None,
+                "level": org.level,
+                "org_type": org.org_type,
+                "store_id": org.store_id,
+                "manager_id": org.manager_id,
+                "sort_order": org.sort_order,
+            }
+        )
     return {"items": items, "total": len(items)}
 
 

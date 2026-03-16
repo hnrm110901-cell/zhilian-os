@@ -10,21 +10,22 @@ FloorAgent Service — 楼面经营智能（Sprint 4）
 
 定位：楼面经理的经营仪表盘
 """
+
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, List
+from typing import List, Optional
 
-from sqlalchemy import select, func, and_, case, extract
+from sqlalchemy import and_, case, extract, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.models.order import Order
-from src.models.reservation import Reservation
 from src.models.queue import Queue, QueueStatus
+from src.models.reservation import Reservation
 
 logger = logging.getLogger(__name__)
 
 
 # ── 纯函数 ──────────────────────────────────────────────────────
+
 
 def compute_turnover_rate(
     total_orders: int,
@@ -128,12 +129,16 @@ class FloorAgentService:
         wait_stats = await db.execute(
             select(
                 func.count(Queue.queue_id),
-                func.count(case(
-                    (Queue.status == QueueStatus.SEATED.value, 1),
-                )),
-                func.count(case(
-                    (Queue.status.in_([QueueStatus.CANCELLED.value, QueueStatus.NO_SHOW.value]), 1),
-                )),
+                func.count(
+                    case(
+                        (Queue.status == QueueStatus.SEATED.value, 1),
+                    )
+                ),
+                func.count(
+                    case(
+                        (Queue.status.in_([QueueStatus.CANCELLED.value, QueueStatus.NO_SHOW.value]), 1),
+                    )
+                ),
                 func.avg(Queue.actual_wait_time),
             ).where(
                 Queue.store_id == store_id,
@@ -152,12 +157,16 @@ class FloorAgentService:
         reservation_stats = await db.execute(
             select(
                 func.count(Reservation.id),
-                func.count(case(
-                    (Reservation.status.in_(["arrived", "seated", "completed"]), 1),
-                )),
-                func.count(case(
-                    (Reservation.status == "no_show", 1),
-                )),
+                func.count(
+                    case(
+                        (Reservation.status.in_(["arrived", "seated", "completed"]), 1),
+                    )
+                ),
+                func.count(
+                    case(
+                        (Reservation.status == "no_show", 1),
+                    )
+                ),
             ).where(
                 Reservation.store_id == store_id,
                 Reservation.created_at >= cutoff,
@@ -233,12 +242,14 @@ class FloorAgentService:
         for h in range(24):
             d = hour_data[h]
             avg_ticket = round(d["revenue_yuan"] / d["orders"], 2) if d["orders"] > 0 else 0.0
-            heatmap.append({
-                "hour": h,
-                "orders": d["orders"],
-                "revenue_yuan": d["revenue_yuan"],
-                "avg_ticket_yuan": avg_ticket,
-            })
+            heatmap.append(
+                {
+                    "hour": h,
+                    "orders": d["orders"],
+                    "revenue_yuan": d["revenue_yuan"],
+                    "avg_ticket_yuan": avg_ticket,
+                }
+            )
         return heatmap
 
     async def get_table_efficiency(
@@ -260,9 +271,7 @@ class FloorAgentService:
                 Order.table_number,
                 func.count(Order.id).label("order_count"),
                 func.coalesce(func.sum(Order.total_amount), 0).label("revenue"),
-                func.avg(
-                    extract("epoch", Order.completed_at - Order.order_time) / 60
-                ).label("avg_duration_min"),
+                func.avg(extract("epoch", Order.completed_at - Order.order_time) / 60).label("avg_duration_min"),
             )
             .where(
                 Order.store_id == store_id,
@@ -282,14 +291,16 @@ class FloorAgentService:
             turnover = round((row[1] or 0) / max(days, 1), 2)
             duration = float(row[3] or 60)
             efficiency = classify_table_efficiency(turnover, duration)
-            tables.append({
-                "table_number": row[0],
-                "order_count": row[1],
-                "revenue_yuan": round(float(row[2] or 0), 2),
-                "turnover_rate": turnover,
-                "avg_duration_min": round(duration, 1),
-                "efficiency": efficiency,
-            })
+            tables.append(
+                {
+                    "table_number": row[0],
+                    "order_count": row[1],
+                    "revenue_yuan": round(float(row[2] or 0), 2),
+                    "turnover_rate": turnover,
+                    "avg_duration_min": round(duration, 1),
+                    "efficiency": efficiency,
+                }
+            )
         return tables
 
 

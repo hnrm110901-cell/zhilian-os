@@ -11,38 +11,40 @@
   GET /api/v1/channel-profit/{store_id}/labels?label=亏钱|勉强|赚钱
       → 按标注过滤菜品渠道毛利
 """
+
 from decimal import Decimal
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.core.dependencies import get_current_user
 from src.models.user import User
-from src.services.menu_profit_engine import MenuProfitEngine, DishChannelProfit
+from src.services.menu_profit_engine import DishChannelProfit, MenuProfitEngine
 
 router = APIRouter(prefix="/api/v1/channel-profit", tags=["channel_profit"])
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
 
+
 class DishChannelProfitResponse(BaseModel):
     """渠道毛利响应（分 → 元转换）"""
+
     dish_id: str
     dish_name: str
     channel: str
     store_id: str
     price_yuan: float
-    revenue_yuan: float         # 扣佣后到手金额（元）
-    bom_cost_yuan: float        # BOM 食材成本（元）
+    revenue_yuan: float  # 扣佣后到手金额（元）
+    bom_cost_yuan: float  # BOM 食材成本（元）
     packaging_cost_yuan: float  # 包材费（元）
-    delivery_cost_yuan: float   # 配送费（元）
-    total_cost_yuan: float      # 总成本（元）
-    gross_profit_yuan: float    # 毛利（元）
-    gross_margin_pct: float     # 毛利率（0~1 float）
-    label: str                  # 赚钱 / 勉强 / 亏钱
+    delivery_cost_yuan: float  # 配送费（元）
+    total_cost_yuan: float  # 总成本（元）
+    gross_profit_yuan: float  # 毛利（元）
+    gross_margin_pct: float  # 毛利率（0~1 float）
+    label: str  # 赚钱 / 勉强 / 亏钱
     bom_source_ids: List[str]
 
     @classmethod
@@ -69,6 +71,7 @@ class DishChannelProfitResponse(BaseModel):
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
+
 
 @router.get("/{store_id}", response_model=List[DishChannelProfitResponse])
 async def get_store_channel_report(

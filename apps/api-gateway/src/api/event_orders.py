@@ -2,12 +2,14 @@
 EO执行引擎 API — Phase P3 (宴小猪能力)
 EO单管理 · 演职人员 · 履约追踪 · 宴会厅展示
 """
+
+from datetime import date, datetime
+from typing import List, Optional
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional, List
-from datetime import date, datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-import structlog
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
@@ -19,6 +21,7 @@ router = APIRouter()
 
 
 # ── Request Models ──
+
 
 class GenerateEORequest(BaseModel):
     store_id: str
@@ -105,6 +108,7 @@ class UpdateHallRequest(BaseModel):
 
 # ── EO 单 Routes ──
 
+
 @router.get("/event-orders")
 async def list_event_orders(
     store_id: str = Query(...),
@@ -115,9 +119,7 @@ async def list_event_orders(
     current_user: User = Depends(get_current_active_user),
 ):
     """获取 EO 单列表"""
-    return await event_order_service.list_event_orders(
-        session, store_id, status, start_date, end_date
-    )
+    return await event_order_service.list_event_orders(session, store_id, status, start_date, end_date)
 
 
 @router.get("/event-orders/{eo_id}")
@@ -140,9 +142,7 @@ async def generate_event_order(
     current_user: User = Depends(get_current_active_user),
 ):
     """AI 自动生成 EO 单"""
-    result = await event_order_service.generate_eo(
-        session=session, **req.model_dump()
-    )
+    result = await event_order_service.generate_eo(session=session, **req.model_dump())
     await session.commit()
     return result
 
@@ -188,9 +188,7 @@ async def update_fulfillment(
 ):
     """更新履约节点打卡"""
     try:
-        result = await event_order_service.update_fulfillment(
-            session, eo_id, req.node, req.actual_time, req.notes
-        )
+        result = await event_order_service.update_fulfillment(session, eo_id, req.node, req.actual_time, req.notes)
         await session.commit()
         return result
     except ValueError as e:
@@ -198,6 +196,7 @@ async def update_fulfillment(
 
 
 # ── 演职人员 Routes ──
+
 
 @router.get("/event-orders/{eo_id}/staff")
 async def list_staff(
@@ -238,6 +237,7 @@ async def update_staff_status(
 
 
 # ── 宴会厅展示 Routes ──
+
 
 @router.get("/hall-showcase")
 async def list_halls(

@@ -2,13 +2,14 @@
 Reservation Service with Database Integration
 Provides reservation management using real database data
 """
-import os
-from datetime import datetime, date, time, timedelta
-from typing import List, Dict, Any, Optional
-from sqlalchemy import select, and_, or_, desc
-from sqlalchemy.ext.asyncio import AsyncSession
-import uuid
 
+import os
+import uuid
+from datetime import date, datetime, time, timedelta
+from typing import Any, Dict, List, Optional
+
+from sqlalchemy import and_, desc, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_db_session
 from src.models import Reservation, Store
 from src.models.reservation import ReservationStatus, ReservationType
@@ -29,7 +30,7 @@ class ReservationService:
         reservation_time: str,
         party_size: int,
         reservation_type: str = "regular",
-        **kwargs
+        **kwargs,
     ) -> Dict[str, Any]:
         """
         Create a new reservation in database
@@ -92,10 +93,7 @@ class ReservationService:
             }
 
     async def get_reservations(
-        self,
-        reservation_date: Optional[str] = None,
-        status: Optional[str] = None,
-        limit: int = 100
+        self, reservation_date: Optional[str] = None, status: Optional[str] = None, limit: int = 100
     ) -> List[Dict[str, Any]]:
         """
         Get reservations from database
@@ -118,37 +116,24 @@ class ReservationService:
             if status:
                 query = query.where(Reservation.status == status)
 
-            query = query.order_by(
-                Reservation.reservation_date,
-                Reservation.reservation_time
-            ).limit(limit)
+            query = query.order_by(Reservation.reservation_date, Reservation.reservation_time).limit(limit)
 
             result = await session.execute(query)
             reservations = result.scalars().all()
 
             return [self._reservation_to_dict(r) for r in reservations]
 
-    async def get_reservation_by_id(
-        self,
-        reservation_id: str
-    ) -> Optional[Dict[str, Any]]:
+    async def get_reservation_by_id(self, reservation_id: str) -> Optional[Dict[str, Any]]:
         """Get reservation by ID"""
         async with get_db_session() as session:
-            result = await session.execute(
-                select(Reservation).where(Reservation.id == reservation_id)
-            )
+            result = await session.execute(select(Reservation).where(Reservation.id == reservation_id))
             reservation = result.scalar_one_or_none()
 
             if reservation:
                 return self._reservation_to_dict(reservation)
             return None
 
-    async def update_reservation_status(
-        self,
-        reservation_id: str,
-        status: str,
-        notes: Optional[str] = None
-    ) -> Dict[str, Any]:
+    async def update_reservation_status(self, reservation_id: str, status: str, notes: Optional[str] = None) -> Dict[str, Any]:
         """
         Update reservation status
 
@@ -161,9 +146,7 @@ class ReservationService:
             Updated reservation data
         """
         async with get_db_session() as session:
-            result = await session.execute(
-                select(Reservation).where(Reservation.id == reservation_id)
-            )
+            result = await session.execute(select(Reservation).where(Reservation.id == reservation_id))
             reservation = result.scalar_one_or_none()
 
             if not reservation:
@@ -177,11 +160,7 @@ class ReservationService:
 
             return self._reservation_to_dict(reservation)
 
-    async def assign_table(
-        self,
-        reservation_id: str,
-        table_number: str
-    ) -> Dict[str, Any]:
+    async def assign_table(self, reservation_id: str, table_number: str) -> Dict[str, Any]:
         """
         Assign table to reservation
 
@@ -193,9 +172,7 @@ class ReservationService:
             Updated reservation data
         """
         async with get_db_session() as session:
-            result = await session.execute(
-                select(Reservation).where(Reservation.id == reservation_id)
-            )
+            result = await session.execute(select(Reservation).where(Reservation.id == reservation_id))
             reservation = result.scalar_one_or_none()
 
             if not reservation:
@@ -207,10 +184,7 @@ class ReservationService:
 
             return self._reservation_to_dict(reservation)
 
-    async def get_upcoming_reservations(
-        self,
-        days: int = 7
-    ) -> List[Dict[str, Any]]:
+    async def get_upcoming_reservations(self, days: int = 7) -> List[Dict[str, Any]]:
         """
         Get upcoming reservations
 
@@ -225,30 +199,22 @@ class ReservationService:
             end_date = today + timedelta(days=days)
 
             result = await session.execute(
-                select(Reservation).where(
+                select(Reservation)
+                .where(
                     and_(
                         Reservation.store_id == self.store_id,
                         Reservation.reservation_date >= today,
                         Reservation.reservation_date <= end_date,
-                        Reservation.status.in_([
-                            ReservationStatus.PENDING,
-                            ReservationStatus.CONFIRMED
-                        ])
+                        Reservation.status.in_([ReservationStatus.PENDING, ReservationStatus.CONFIRMED]),
                     )
-                ).order_by(
-                    Reservation.reservation_date,
-                    Reservation.reservation_time
                 )
+                .order_by(Reservation.reservation_date, Reservation.reservation_time)
             )
             reservations = result.scalars().all()
 
             return [self._reservation_to_dict(r) for r in reservations]
 
-    async def cancel_reservation(
-        self,
-        reservation_id: str,
-        reason: Optional[str] = None
-    ) -> Dict[str, Any]:
+    async def cancel_reservation(self, reservation_id: str, reason: Optional[str] = None) -> Dict[str, Any]:
         """
         Cancel a reservation
 
@@ -260,9 +226,7 @@ class ReservationService:
             Updated reservation data
         """
         async with get_db_session() as session:
-            result = await session.execute(
-                select(Reservation).where(Reservation.id == reservation_id)
-            )
+            result = await session.execute(select(Reservation).where(Reservation.id == reservation_id))
             reservation = result.scalar_one_or_none()
 
             if not reservation:
@@ -277,9 +241,7 @@ class ReservationService:
             return self._reservation_to_dict(reservation)
 
     async def get_reservation_statistics(
-        self,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None
+        self, start_date: Optional[str] = None, end_date: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Get reservation statistics
@@ -309,7 +271,7 @@ class ReservationService:
                     and_(
                         Reservation.store_id == self.store_id,
                         Reservation.reservation_date >= start_dt,
-                        Reservation.reservation_date <= end_dt
+                        Reservation.reservation_date <= end_dt,
                     )
                 )
             )

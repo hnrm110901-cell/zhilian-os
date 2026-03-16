@@ -14,13 +14,13 @@ Level 3: 营销能力
 Level 4: 高级能力
 """
 
-from typing import Dict, List, Optional, Any
-from datetime import datetime
-from pydantic import BaseModel, Field
-from enum import Enum
 import logging
 import os
+from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List, Optional
 
+from pydantic import BaseModel, Field
 from src.core.money import yuan_to_fen
 
 logger = logging.getLogger(__name__)
@@ -28,8 +28,10 @@ logger = logging.getLogger(__name__)
 
 # ==================== 标准数据模型 ====================
 
+
 class StandardOrder(BaseModel):
     """标准订单模型"""
+
     order_id: str = Field(..., description="订单ID")
     store_id: str = Field(..., description="门店ID")
     table_number: Optional[str] = Field(None, description="桌号")
@@ -47,6 +49,7 @@ class StandardOrder(BaseModel):
 
 class StandardDish(BaseModel):
     """标准菜品模型"""
+
     dish_id: str = Field(..., description="菜品ID")
     name: str = Field(..., description="菜品名称")
     category: str = Field(..., description="菜品分类")
@@ -62,6 +65,7 @@ class StandardDish(BaseModel):
 
 class StandardInventory(BaseModel):
     """标准库存模型"""
+
     inventory_id: str = Field(..., description="库存ID")
     store_id: str = Field(..., description="门店ID")
     item_id: str = Field(..., description="物料ID")
@@ -76,6 +80,7 @@ class StandardInventory(BaseModel):
 
 class StandardMember(BaseModel):
     """标准会员模型"""
+
     member_id: str = Field(..., description="会员ID")
     name: str = Field(..., description="姓名")
     phone: str = Field(..., description="手机号")
@@ -90,6 +95,7 @@ class StandardMember(BaseModel):
 
 class StandardEmployee(BaseModel):
     """标准员工模型"""
+
     employee_id: str = Field(..., description="员工ID")
     name: str = Field(..., description="姓名")
     phone: str = Field(..., description="手机号")
@@ -101,8 +107,10 @@ class StandardEmployee(BaseModel):
 
 # ==================== API响应模型 ====================
 
+
 class APIResponse(BaseModel):
     """API响应"""
+
     code: int = Field(..., description="状态码（200成功，其他失败）")
     message: str = Field(..., description="消息")
     data: Optional[Any] = Field(None, description="数据")
@@ -110,6 +118,7 @@ class APIResponse(BaseModel):
 
 
 # ==================== 屯象OpenAPI ====================
+
 
 class ZhilianOpenAPI:
     """屯象OpenAPI规范"""
@@ -121,10 +130,7 @@ class ZhilianOpenAPI:
 
     # ==================== Level 1: 数据同步能力 ====================
 
-    async def sync_orders(
-        self,
-        orders: List[StandardOrder]
-    ) -> APIResponse:
+    async def sync_orders(self, orders: List[StandardOrder]) -> APIResponse:
         """
         同步订单数据
 
@@ -136,9 +142,9 @@ class ZhilianOpenAPI:
         """
         logger.info(f"Syncing {len(orders)} orders")
 
+        from sqlalchemy import select
         from src.core.database import get_db_session
         from src.models.order import Order, OrderStatus
-        from sqlalchemy import select
 
         valid_statuses = {s.value for s in OrderStatus}
         synced, errors = 0, []
@@ -146,9 +152,7 @@ class ZhilianOpenAPI:
         async with get_db_session() as session:
             for order in orders:
                 try:
-                    result = await session.execute(
-                        select(Order).where(Order.id == order.order_id)
-                    )
+                    result = await session.execute(select(Order).where(Order.id == order.order_id))
                     existing = result.scalar_one_or_none()
                     status = OrderStatus(order.status) if order.status in valid_statuses else OrderStatus.COMPLETED
 
@@ -158,37 +162,32 @@ class ZhilianOpenAPI:
                         existing.discount_amount = yuan_to_fen(order.discount_amount)
                         existing.final_amount = yuan_to_fen(order.actual_amount)
                     else:
-                        session.add(Order(
-                            id=order.order_id,
-                            store_id=order.store_id,
-                            table_number=order.table_number,
-                            status=status,
-                            total_amount=yuan_to_fen(order.total_amount),
-                            discount_amount=yuan_to_fen(order.discount_amount),
-                            final_amount=yuan_to_fen(order.actual_amount),
-                            order_time=order.order_time,
-                            order_metadata={
-                                "payment_method": order.payment_method,
-                                "customer_id": order.customer_id,
-                                "order_type": order.order_type,
-                                "items": order.items,
-                            },
-                        ))
+                        session.add(
+                            Order(
+                                id=order.order_id,
+                                store_id=order.store_id,
+                                table_number=order.table_number,
+                                status=status,
+                                total_amount=yuan_to_fen(order.total_amount),
+                                discount_amount=yuan_to_fen(order.discount_amount),
+                                final_amount=yuan_to_fen(order.actual_amount),
+                                order_time=order.order_time,
+                                order_metadata={
+                                    "payment_method": order.payment_method,
+                                    "customer_id": order.customer_id,
+                                    "order_type": order.order_type,
+                                    "items": order.items,
+                                },
+                            )
+                        )
                     synced += 1
                 except Exception as e:
                     errors.append({"order_id": order.order_id, "error": str(e)})
             await session.commit()
 
-        return APIResponse(
-            code=200,
-            message="订单同步成功",
-            data={"synced_count": synced, "errors": errors}
-        )
+        return APIResponse(code=200, message="订单同步成功", data={"synced_count": synced, "errors": errors})
 
-    async def sync_dishes(
-        self,
-        dishes: List[StandardDish]
-    ) -> APIResponse:
+    async def sync_dishes(self, dishes: List[StandardDish]) -> APIResponse:
         """
         同步菜品数据
 
@@ -200,16 +199,9 @@ class ZhilianOpenAPI:
         """
         logger.info(f"Syncing {len(dishes)} dishes")
 
-        return APIResponse(
-            code=200,
-            message="菜品同步成功",
-            data={"synced_count": len(dishes)}
-        )
+        return APIResponse(code=200, message="菜品同步成功", data={"synced_count": len(dishes)})
 
-    async def sync_inventory(
-        self,
-        inventory: List[StandardInventory]
-    ) -> APIResponse:
+    async def sync_inventory(self, inventory: List[StandardInventory]) -> APIResponse:
         """
         同步库存数据
 
@@ -221,16 +213,9 @@ class ZhilianOpenAPI:
         """
         logger.info(f"Syncing {len(inventory)} inventory items")
 
-        return APIResponse(
-            code=200,
-            message="库存同步成功",
-            data={"synced_count": len(inventory)}
-        )
+        return APIResponse(code=200, message="库存同步成功", data={"synced_count": len(inventory)})
 
-    async def sync_members(
-        self,
-        members: List[StandardMember]
-    ) -> APIResponse:
+    async def sync_members(self, members: List[StandardMember]) -> APIResponse:
         """
         同步会员数据
 
@@ -242,20 +227,11 @@ class ZhilianOpenAPI:
         """
         logger.info(f"Syncing {len(members)} members")
 
-        return APIResponse(
-            code=200,
-            message="会员同步成功",
-            data={"synced_count": len(members)}
-        )
+        return APIResponse(code=200, message="会员同步成功", data={"synced_count": len(members)})
 
     # ==================== Level 2: 智能决策能力 ====================
 
-    async def predict_sales(
-        self,
-        store_id: str,
-        date: datetime,
-        dish_ids: Optional[List[str]] = None
-    ) -> APIResponse:
+    async def predict_sales(self, store_id: str, date: datetime, dish_ids: Optional[List[str]] = None) -> APIResponse:
         """
         销量预测API
 
@@ -269,11 +245,12 @@ class ZhilianOpenAPI:
         """
         logger.info(f"Predicting sales for store {store_id} on {date}")
 
+        from datetime import timedelta
+
+        from sqlalchemy import func, select
         from src.core.database import get_db_session
         from src.models.daily_report import DailyReport
         from src.models.dish import Dish
-        from sqlalchemy import select, func
-        from datetime import timedelta
 
         target_date = date if isinstance(date, datetime) else date
         weekday = target_date.weekday()
@@ -300,21 +277,17 @@ class ZhilianOpenAPI:
         if dish_ids:
             predictions = {
                 str(d.id): {"dish_name": d.name, "predicted_sales": max(1, avg_orders // max(len(dishes), 1))}
-                for d in dishes if str(d.id) in dish_ids
+                for d in dishes
+                if str(d.id) in dish_ids
             }
         else:
             predictions = {
-                str(d.id): {"dish_name": d.name, "predicted_sales": max(1, avg_orders // max(len(dishes), 1))}
-                for d in dishes
+                str(d.id): {"dish_name": d.name, "predicted_sales": max(1, avg_orders // max(len(dishes), 1))} for d in dishes
             }
 
         return APIResponse(code=200, message="销量预测成功", data=predictions)
 
-    async def suggest_schedule(
-        self,
-        store_id: str,
-        date: datetime
-    ) -> APIResponse:
+    async def suggest_schedule(self, store_id: str, date: datetime) -> APIResponse:
         """
         排班建议API
 
@@ -327,30 +300,26 @@ class ZhilianOpenAPI:
         """
         logger.info(f"Suggesting schedule for store {store_id} on {date}")
 
+        from sqlalchemy import func, select
         from src.core.database import get_db_session
         from src.models.employee import Employee
-        from sqlalchemy import select, func
 
         async with get_db_session() as session:
             result = await session.execute(
-                select(Employee.position, func.count(Employee.id).label("cnt")).where(
+                select(Employee.position, func.count(Employee.id).label("cnt"))
+                .where(
                     Employee.store_id == store_id,
                     Employee.is_active == True,
-                ).group_by(Employee.position)
+                )
+                .group_by(Employee.position)
             )
             rows = result.all()
 
-        schedule = {row.position: row.cnt for row in rows} if rows else {
-            "服务员": 12, "厨师": 8, "配菜员": 4, "收银员": 2
-        }
+        schedule = {row.position: row.cnt for row in rows} if rows else {"服务员": 12, "厨师": 8, "配菜员": 4, "收银员": 2}
 
         return APIResponse(code=200, message="排班建议生成成功", data=schedule)
 
-    async def suggest_purchase(
-        self,
-        store_id: str,
-        date: datetime
-    ) -> APIResponse:
+    async def suggest_purchase(self, store_id: str, date: datetime) -> APIResponse:
         """
         采购建议API
 
@@ -363,16 +332,18 @@ class ZhilianOpenAPI:
         """
         logger.info(f"Suggesting purchase for store {store_id} on {date}")
 
+        from sqlalchemy import select
         from src.core.database import get_db_session
         from src.models.inventory import InventoryItem
-        from sqlalchemy import select
 
         async with get_db_session() as session:
             result = await session.execute(
-                select(InventoryItem).where(
+                select(InventoryItem)
+                .where(
                     InventoryItem.store_id == store_id,
                     InventoryItem.current_quantity <= InventoryItem.min_quantity,
-                ).limit(20)
+                )
+                .limit(20)
             )
             low_items = result.scalars().all()
 
@@ -387,11 +358,7 @@ class ZhilianOpenAPI:
 
         return APIResponse(code=200, message="采购建议生成成功", data=purchase_list)
 
-    async def suggest_pricing(
-        self,
-        dish_id: str,
-        context: Optional[Dict] = None
-    ) -> APIResponse:
+    async def suggest_pricing(self, dish_id: str, context: Optional[Dict] = None) -> APIResponse:
         """
         定价建议API
 
@@ -404,9 +371,9 @@ class ZhilianOpenAPI:
         """
         logger.info(f"Suggesting pricing for dish {dish_id}")
 
+        from sqlalchemy import select
         from src.core.database import get_db_session
         from src.models.dish import Dish
-        from sqlalchemy import select
 
         async with get_db_session() as session:
             result = await session.execute(select(Dish).where(Dish.id == dish_id))
@@ -430,10 +397,7 @@ class ZhilianOpenAPI:
 
     # ==================== Level 3: 营销能力 ====================
 
-    async def get_customer_profile(
-        self,
-        customer_id: str
-    ) -> APIResponse:
+    async def get_customer_profile(self, customer_id: str) -> APIResponse:
         """
         客户画像API
 
@@ -445,9 +409,9 @@ class ZhilianOpenAPI:
         """
         logger.info(f"Getting customer profile for {customer_id}")
 
+        from sqlalchemy import func, select
         from src.core.database import get_db_session
         from src.models.order import Order, OrderItem, OrderStatus
-        from sqlalchemy import select, func
 
         async with get_db_session() as session:
             result = await session.execute(
@@ -485,17 +449,15 @@ class ZhilianOpenAPI:
             "last_visit": row.last_visit.isoformat() if row.last_visit else None,
             "value_score": round(value_score, 1),
             "churn_risk": churn_risk,
-            "segment": "high_value" if value_score > float(os.getenv("OPENAPI_HIGH_VALUE_SCORE_THRESHOLD", "60")) else "regular",
+            "segment": (
+                "high_value" if value_score > float(os.getenv("OPENAPI_HIGH_VALUE_SCORE_THRESHOLD", "60")) else "regular"
+            ),
             "favorite_dishes": top_items,
         }
 
         return APIResponse(code=200, message="客户画像获取成功", data=profile)
 
-    async def recommend_dishes_for_customer(
-        self,
-        customer_id: str,
-        top_k: int = 5
-    ) -> APIResponse:
+    async def recommend_dishes_for_customer(self, customer_id: str, top_k: int = 5) -> APIResponse:
         """
         个性化推荐API
 
@@ -508,10 +470,10 @@ class ZhilianOpenAPI:
         """
         logger.info(f"Recommending dishes for customer {customer_id}")
 
+        from sqlalchemy import func, select
         from src.core.database import get_db_session
         from src.models.dish import Dish
         from src.models.order import Order, OrderItem, OrderStatus
-        from sqlalchemy import select, func
 
         async with get_db_session() as session:
             # 顾客历史点过的菜
@@ -525,7 +487,8 @@ class ZhilianOpenAPI:
 
             # 推荐高评分且顾客未点过的菜
             dishes_result = await session.execute(
-                select(Dish).where(Dish.is_available == True)
+                select(Dish)
+                .where(Dish.is_available == True)
                 .order_by(Dish.rating.desc().nullslast(), Dish.total_sales.desc().nullslast())
                 .limit(top_k + len(ordered_names))
             )
@@ -535,21 +498,19 @@ class ZhilianOpenAPI:
         for d in all_dishes:
             if len(recommendations) >= top_k:
                 break
-            recommendations.append({
-                "dish_id": str(d.id),
-                "dish_name": d.name,
-                "price": float(d.price),
-                "score": float(d.rating or 4.0),
-                "is_new": d.name not in ordered_names,
-            })
+            recommendations.append(
+                {
+                    "dish_id": str(d.id),
+                    "dish_name": d.name,
+                    "price": float(d.price),
+                    "score": float(d.rating or 4.0),
+                    "is_new": d.name not in ordered_names,
+                }
+            )
 
         return APIResponse(code=200, message="推荐生成成功", data=recommendations)
 
-    async def generate_coupon_strategy(
-        self,
-        scenario: str,
-        target_segment: str
-    ) -> APIResponse:
+    async def generate_coupon_strategy(self, scenario: str, target_segment: str) -> APIResponse:
         """
         优惠券策略API
 
@@ -562,9 +523,9 @@ class ZhilianOpenAPI:
         """
         logger.info(f"Generating coupon strategy for {scenario}")
 
+        from sqlalchemy import func, select
         from src.core.database import get_db_session
         from src.models.order import Order, OrderStatus
-        from sqlalchemy import select, func
 
         # 根据目标客群查询历史消费均值，生成合适的优惠券策略
         async with get_db_session() as session:
@@ -595,10 +556,7 @@ class ZhilianOpenAPI:
 
         return APIResponse(code=200, message="优惠券策略生成成功", data=strategy)
 
-    async def trigger_marketing_campaign(
-        self,
-        campaign_config: Dict
-    ) -> APIResponse:
+    async def trigger_marketing_campaign(self, campaign_config: Dict) -> APIResponse:
         """
         触发营销活动API
 
@@ -610,10 +568,11 @@ class ZhilianOpenAPI:
         """
         logger.info("Triggering marketing campaign")
 
-        from src.core.database import get_db_session
-        from src.models.marketing_campaign import MarketingCampaign
         import uuid as _uuid
         from datetime import date
+
+        from src.core.database import get_db_session
+        from src.models.marketing_campaign import MarketingCampaign
 
         campaign_id = f"CAMP_{datetime.now().strftime('%Y%m%d%H%M%S')}"
         async with get_db_session() as session:
@@ -636,11 +595,7 @@ class ZhilianOpenAPI:
 
     # ==================== Level 4: 高级能力 ====================
 
-    async def query_sop(
-        self,
-        scenario: str,
-        context: Optional[Dict] = None
-    ) -> APIResponse:
+    async def query_sop(self, scenario: str, context: Optional[Dict] = None) -> APIResponse:
         """
         SOP知识库API
 
@@ -653,7 +608,7 @@ class ZhilianOpenAPI:
         """
         logger.info(f"Querying SOP for scenario: {scenario}")
 
-        from src.services.sop_knowledge_base_service import sop_knowledge_base, QueryContext
+        from src.services.sop_knowledge_base_service import QueryContext, sop_knowledge_base
 
         ctx = QueryContext(
             user_role=context.get("user_role", "store_manager") if context else "store_manager",
@@ -680,10 +635,7 @@ class ZhilianOpenAPI:
 
         return APIResponse(code=200, message="SOP查询成功", data=sop)
 
-    async def get_federated_model(
-        self,
-        model_type: str
-    ) -> APIResponse:
+    async def get_federated_model(self, model_type: str) -> APIResponse:
         """
         联邦学习模型API
 
@@ -695,16 +647,19 @@ class ZhilianOpenAPI:
         """
         logger.info(f"Getting federated model: {model_type}")
 
+        from sqlalchemy import select
         from src.core.database import get_db_session
         from src.models.federated_learning import FLTrainingRound
-        from sqlalchemy import select
 
         async with get_db_session() as session:
             result = await session.execute(
-                select(FLTrainingRound).where(
+                select(FLTrainingRound)
+                .where(
                     FLTrainingRound.model_type == model_type,
                     FLTrainingRound.status == "completed",
-                ).order_by(FLTrainingRound.completed_at.desc()).limit(1)
+                )
+                .order_by(FLTrainingRound.completed_at.desc())
+                .limit(1)
             )
             fl_round = result.scalar_one_or_none()
 
@@ -738,9 +693,10 @@ class ZhilianOpenAPI:
     def _rate_limit_check(self) -> bool:
         """限流检查 - 每个 api_key 每分钟最多 60 次"""
         import time
+
         now = time.time()
-        window = int(os.getenv("OPEN_API_RATE_LIMIT_WINDOW", "60"))    # 秒
-        limit = int(os.getenv("OPEN_API_RATE_LIMIT_REQUESTS", "60"))   # 次
+        window = int(os.getenv("OPEN_API_RATE_LIMIT_WINDOW", "60"))  # 秒
+        limit = int(os.getenv("OPEN_API_RATE_LIMIT_REQUESTS", "60"))  # 次
 
         if not hasattr(self, "_rate_counters"):
             self._rate_counters: dict = {}
@@ -762,6 +718,7 @@ class ZhilianOpenAPI:
 
 # ==================== SDK示例 ====================
 
+
 class ZhilianSDK:
     """屯象SDK（Python版本）"""
 
@@ -774,16 +731,9 @@ class ZhilianSDK:
         response = await self.api.sync_orders([order])
         return response.model_dump()
 
-    async def get_sales_prediction(
-        self,
-        store_id: str,
-        date: str
-    ) -> Dict:
+    async def get_sales_prediction(self, store_id: str, date: str) -> Dict:
         """获取销量预测（便捷方法）"""
-        response = await self.api.predict_sales(
-            store_id,
-            datetime.fromisoformat(date)
-        )
+        response = await self.api.predict_sales(store_id, datetime.fromisoformat(date))
         return response.model_dump()
 
 

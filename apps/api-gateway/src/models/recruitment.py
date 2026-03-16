@@ -2,13 +2,14 @@
 Recruitment Models — 招聘管理
 职位发布、候选人、面试、Offer
 """
+
 import enum
 import uuid
-from sqlalchemy import (
-    Column, String, Integer, Numeric, Boolean, Date, DateTime,
-    Text, ForeignKey, Enum as SAEnum,
-)
-from sqlalchemy.dialects.postgresql import UUID, JSON
+
+from sqlalchemy import Boolean, Column, Date, DateTime
+from sqlalchemy import Enum as SAEnum
+from sqlalchemy import ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy.dialects.postgresql import JSON, UUID
 
 from .base import Base, TimestampMixin
 
@@ -47,8 +48,10 @@ class OfferStatus(str, enum.Enum):
 
 # ── 1. 职位发布 ────────────────────────────────────────────
 
+
 class JobPosting(Base, TimestampMixin):
     """招聘职位"""
+
     __tablename__ = "job_postings"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -56,7 +59,7 @@ class JobPosting(Base, TimestampMixin):
     brand_id = Column(String(50), nullable=True, index=True)
 
     title = Column(String(100), nullable=False)
-    position = Column(String(50), nullable=False)       # waiter, chef, etc.
+    position = Column(String(50), nullable=False)  # waiter, chef, etc.
     department = Column(String(50), nullable=True)
     headcount = Column(Integer, nullable=False, default=1)
     hired_count = Column(Integer, nullable=False, default=0)
@@ -91,8 +94,10 @@ class JobPosting(Base, TimestampMixin):
 
 # ── 2. 候选人 ──────────────────────────────────────────────
 
+
 class Candidate(Base, TimestampMixin):
     """候选人档案"""
+
     __tablename__ = "candidates"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -119,12 +124,12 @@ class Candidate(Base, TimestampMixin):
     skills = Column(JSON, nullable=True)
 
     # 来源
-    source = Column(String(50), nullable=True)          # boss/58/referral/walk_in
-    referrer_id = Column(String(50), nullable=True)     # 推荐人员工ID
+    source = Column(String(50), nullable=True)  # boss/58/referral/walk_in
+    referrer_id = Column(String(50), nullable=True)  # 推荐人员工ID
 
     # 评分
-    screening_score = Column(Integer, nullable=True)     # 简历筛选分 0-100
-    interview_score = Column(Integer, nullable=True)     # 面试综合分 0-100
+    screening_score = Column(Integer, nullable=True)  # 简历筛选分 0-100
+    interview_score = Column(Integer, nullable=True)  # 面试综合分 0-100
 
     rejection_reason = Column(Text, nullable=True)
     notes = Column(Text, nullable=True)
@@ -135,15 +140,17 @@ class Candidate(Base, TimestampMixin):
 
 # ── 3. 面试记录 ────────────────────────────────────────────
 
+
 class Interview(Base, TimestampMixin):
     """面试记录"""
+
     __tablename__ = "interviews"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     candidate_id = Column(UUID(as_uuid=True), ForeignKey("candidates.id"), nullable=False, index=True)
     store_id = Column(String(50), nullable=False, index=True)
 
-    round = Column(Integer, nullable=False, default=1)   # 面试轮次
+    round = Column(Integer, nullable=False, default=1)  # 面试轮次
     interview_date = Column(DateTime, nullable=False)
     interviewer_id = Column(String(50), nullable=True)
     interviewer_name = Column(String(100), nullable=True)
@@ -155,10 +162,10 @@ class Interview(Base, TimestampMixin):
     )
 
     # 评估维度
-    skill_score = Column(Integer, nullable=True)          # 技能分 0-100
-    attitude_score = Column(Integer, nullable=True)       # 态度分 0-100
-    experience_score = Column(Integer, nullable=True)     # 经验分 0-100
-    overall_score = Column(Integer, nullable=True)        # 综合分 0-100
+    skill_score = Column(Integer, nullable=True)  # 技能分 0-100
+    attitude_score = Column(Integer, nullable=True)  # 态度分 0-100
+    experience_score = Column(Integer, nullable=True)  # 经验分 0-100
+    overall_score = Column(Integer, nullable=True)  # 综合分 0-100
 
     feedback = Column(Text, nullable=True)
     notes = Column(Text, nullable=True)
@@ -169,8 +176,10 @@ class Interview(Base, TimestampMixin):
 
 # ── 4. Offer ───────────────────────────────────────────────
 
+
 class Offer(Base, TimestampMixin):
     """录用通知"""
+
     __tablename__ = "offers"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

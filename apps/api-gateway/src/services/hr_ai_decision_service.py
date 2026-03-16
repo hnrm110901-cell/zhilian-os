@@ -7,18 +7,18 @@ HR AI 决策服务 — 真正的 Claude 驱动人力智能
 2. 每个AI建议必须包含：建议动作 + 预期¥影响 + 置信度
 3. 所有LLM输入/输出通过 structlog 记录（可审计）
 """
+
 from __future__ import annotations
 
 import json
-import structlog
 from datetime import date, timedelta
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional
 
+import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.core.llm import get_llm_client
 from src.core.config import settings
+from src.core.llm import get_llm_client
 
 logger = structlog.get_logger()
 
@@ -78,9 +78,7 @@ class HRAIDecisionService:
 
     # ─── 1. 单员工离职风险预测 ──────────────────────────────
 
-    async def predict_turnover_risk(
-        self, db: AsyncSession, employee_id: str, store_id: str
-    ) -> Dict[str, Any]:
+    async def predict_turnover_risk(self, db: AsyncSession, employee_id: str, store_id: str) -> Dict[str, Any]:
         """
         多信号融合离职风险预测。
 
@@ -135,9 +133,7 @@ class HRAIDecisionService:
                 "risk_level": self._score_to_level(rule_score),
                 "signals": profile["signals"],
                 "ai_analysis": None,
-                "recommendations": self._rule_based_recommendations(
-                    rule_score, profile, replacement_cost
-                ),
+                "recommendations": self._rule_based_recommendations(rule_score, profile, replacement_cost),
                 "replacement_cost_yuan": replacement_cost,
                 "data_source": "rules_only",
             }
@@ -149,16 +145,17 @@ class HRAIDecisionService:
 
     # ─── 2. 全店离职风险扫描 ───────────────────────────────
 
-    async def scan_store_turnover_risk(
-        self, db: AsyncSession, store_id: str
-    ) -> Dict[str, Any]:
+    async def scan_store_turnover_risk(self, db: AsyncSession, store_id: str) -> Dict[str, Any]:
         """扫描全店离职风险，返回风险排名 + 门店级AI分析"""
         # 查询所有活跃员工
-        emp_result = await db.execute(text("""
+        emp_result = await db.execute(
+            text("""
             SELECT id, name, position, hire_date, seniority_months
             FROM employees
             WHERE store_id = :store_id AND is_active = true
-        """), {"store_id": store_id})
+        """),
+            {"store_id": store_id},
+        )
         employees = [dict(r) for r in emp_result.mappings()]
 
         if not employees:
@@ -173,22 +170,22 @@ class HRAIDecisionService:
         # 为每位员工快速计算规则风险分（不调LLM，批量效率优先）
         risk_list = []
         for emp in employees:
-            profile = await self._build_employee_profile(
-                db, emp["id"], store_id
-            )
+            profile = await self._build_employee_profile(db, emp["id"], store_id)
             if profile.get("error"):
                 continue
             score = self._calculate_rule_based_score(profile)
             replacement_cost = self._estimate_replacement_cost(profile)
-            risk_list.append({
-                "employee_id": emp["id"],
-                "employee_name": emp["name"],
-                "position": emp["position"],
-                "risk_score": score,
-                "risk_level": self._score_to_level(score),
-                "signals": profile["signals"],
-                "replacement_cost_yuan": replacement_cost,
-            })
+            risk_list.append(
+                {
+                    "employee_id": emp["id"],
+                    "employee_name": emp["name"],
+                    "position": emp["position"],
+                    "risk_score": score,
+                    "risk_level": self._score_to_level(score),
+                    "signals": profile["signals"],
+                    "replacement_cost_yuan": replacement_cost,
+                }
+            )
 
         # 按风险分降序排列
         risk_list.sort(key=lambda x: -x["risk_score"])
@@ -211,25 +208,24 @@ class HRAIDecisionService:
             "total_replacement_cost_yuan": total_replacement,
             "store_analysis": store_ai.get("store_analysis") if store_ai else None,
             "top_risk_pattern": store_ai.get("top_risk_pattern") if store_ai else None,
-            "store_recommendations": (
-                store_ai.get("store_recommendations", []) if store_ai else []
-            ),
+            "store_recommendations": (store_ai.get("store_recommendations", []) if store_ai else []),
             "data_source": "ai+rules" if store_ai else "rules_only",
         }
 
     # ─── 数据收集 ─────────────────────────────────────────
 
-    async def _build_employee_profile(
-        self, db: AsyncSession, employee_id: str, store_id: str
-    ) -> Dict[str, Any]:
+    async def _build_employee_profile(self, db: AsyncSession, employee_id: str, store_id: str) -> Dict[str, Any]:
         """构建员工360°画像"""
         # 基本信息
-        emp_result = await db.execute(text("""
+        emp_result = await db.execute(
+            text("""
             SELECT id, name, position, hire_date, employment_type,
                    seniority_months, grade_level, daily_wage_standard_fen
             FROM employees
             WHERE id = :emp_id AND store_id = :store_id AND is_active = true
-        """), {"emp_id": employee_id, "store_id": store_id})
+        """),
+            {"emp_id": employee_id, "store_id": store_id},
+        )
         emp = emp_result.mappings().first()
         if not emp:
             return {"error": "employee_not_found"}
@@ -248,16 +244,21 @@ class HRAIDecisionService:
             month_start = month_start.replace(day=1)
             month_end = (month_start.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
 
-            att_result = await db.execute(text("""
+            att_result = await db.execute(
+                text("""
                 SELECT COUNT(*) AS total,
                        COUNT(*) FILTER (WHERE status IN ('normal', 'late')) AS present
                 FROM attendance_logs
                 WHERE employee_id = :emp_id AND store_id = :store_id
                   AND work_date >= :start AND work_date <= :end
-            """), {
-                "emp_id": employee_id, "store_id": store_id,
-                "start": month_start, "end": month_end,
-            })
+            """),
+                {
+                    "emp_id": employee_id,
+                    "store_id": store_id,
+                    "start": month_start,
+                    "end": month_end,
+                },
+            )
             row = att_result.mappings().first()
             total = row["total"] if row else 0
             present = row["present"] if row else 0
@@ -267,66 +268,80 @@ class HRAIDecisionService:
         # 出勤率下降信号
         if len(attendance_trend) >= 2 and attendance_trend[-1] < attendance_trend[0] - 5:
             drop = round(attendance_trend[0] - attendance_trend[-1], 1)
-            signals.append({
-                "signal": "考勤下降",
-                "detail": f"近3月出勤率: {attendance_trend[0]}% → {attendance_trend[1]}% → {attendance_trend[2]}%",
-                "weight": 0.3,
-            })
+            signals.append(
+                {
+                    "signal": "考勤下降",
+                    "detail": f"近3月出勤率: {attendance_trend[0]}% → {attendance_trend[1]}% → {attendance_trend[2]}%",
+                    "weight": 0.3,
+                }
+            )
 
         # ── 信号2: 绩效变化（最近两次） ──
-        perf_result = await db.execute(text("""
+        perf_result = await db.execute(
+            text("""
             SELECT total_score, level, review_period
             FROM performance_reviews
             WHERE employee_id = :emp_id AND store_id = :store_id
               AND status = 'completed'
             ORDER BY review_period DESC
             LIMIT 3
-        """), {"emp_id": employee_id, "store_id": store_id})
+        """),
+            {"emp_id": employee_id, "store_id": store_id},
+        )
         perf_rows = [dict(r) for r in perf_result.mappings()]
-        performance_trend = [
-            float(r["total_score"]) for r in perf_rows if r.get("total_score")
-        ]
+        performance_trend = [float(r["total_score"]) for r in perf_rows if r.get("total_score")]
 
         if len(performance_trend) >= 2 and performance_trend[0] < performance_trend[1]:
             last_level = perf_rows[0].get("level", "")
             prev_level = perf_rows[1].get("level", "")
-            signals.append({
-                "signal": "绩效下滑",
-                "detail": f"{prev_level} → {last_level}（{performance_trend[1]} → {performance_trend[0]}）",
-                "weight": 0.25,
-            })
+            signals.append(
+                {
+                    "signal": "绩效下滑",
+                    "detail": f"{prev_level} → {last_level}（{performance_trend[1]} → {performance_trend[0]}）",
+                    "weight": 0.25,
+                }
+            )
 
         # 绩效等级C/D
         if perf_rows and perf_rows[0].get("level") in ("C", "D"):
-            signals.append({
-                "signal": "绩效评级低",
-                "detail": f"最近绩效等级: {perf_rows[0]['level']}",
-                "weight": 0.2,
-            })
+            signals.append(
+                {
+                    "signal": "绩效评级低",
+                    "detail": f"最近绩效等级: {perf_rows[0]['level']}",
+                    "weight": 0.2,
+                }
+            )
 
         # ── 信号3: 加班时长（近30天） ──
-        ot_result = await db.execute(text("""
+        ot_result = await db.execute(
+            text("""
             SELECT COALESCE(SUM(overtime_hours), 0) AS total_ot,
                    COUNT(*) AS work_days
             FROM attendance_logs
             WHERE employee_id = :emp_id AND store_id = :store_id
               AND work_date >= :since
-        """), {
-            "emp_id": employee_id, "store_id": store_id,
-            "since": today - timedelta(days=30),
-        })
+        """),
+            {
+                "emp_id": employee_id,
+                "store_id": store_id,
+                "since": today - timedelta(days=30),
+            },
+        )
         ot_row = ot_result.mappings().first()
         total_ot = float(ot_row["total_ot"]) if ot_row else 0
         if total_ot > 40:  # 月加班超40小时
-            signals.append({
-                "signal": "加班过多",
-                "detail": f"近30天加班{total_ot:.0f}小时",
-                "weight": 0.15,
-            })
+            signals.append(
+                {
+                    "signal": "加班过多",
+                    "detail": f"近30天加班{total_ot:.0f}小时",
+                    "weight": 0.15,
+                }
+            )
 
         # ── 信号4: 同岗位离职率（近6个月） ──
         position = emp.get("position", "")
-        peer_result = await db.execute(text("""
+        peer_result = await db.execute(
+            text("""
             SELECT
                 COUNT(*) FILTER (
                     WHERE ec.change_type IN ('resign', 'dismiss')
@@ -337,39 +352,49 @@ class HRAIDecisionService:
                 AND ec.change_type IN ('resign', 'dismiss')
                 AND ec.effective_date >= :since
             WHERE e.store_id = :store_id AND e.position = :position
-        """), {
-            "store_id": store_id, "position": position,
-            "since": today - timedelta(days=180),
-        })
+        """),
+            {
+                "store_id": store_id,
+                "position": position,
+                "since": today - timedelta(days=180),
+            },
+        )
         peer_row = peer_result.mappings().first()
         total_peers = peer_row["total_peers"] if peer_row else 1
         resigned_peers = peer_row["resigned"] if peer_row else 0
         peer_turnover_rate = round(resigned_peers / max(total_peers, 1), 2)
 
         if peer_turnover_rate > 0.2:
-            signals.append({
-                "signal": "同岗离职率高",
-                "detail": f"{position}岗位近6月离职率{peer_turnover_rate*100:.0f}%",
-                "weight": 0.15,
-            })
+            signals.append(
+                {
+                    "signal": "同岗离职率高",
+                    "detail": f"{position}岗位近6月离职率{peer_turnover_rate*100:.0f}%",
+                    "weight": 0.15,
+                }
+            )
 
         # ── 信号5: 工龄（1年内离职风险最高） ──
         if tenure_days < 365:
             months = tenure_days // 30
-            signals.append({
-                "signal": "新员工高风险期",
-                "detail": f"入职仅{months}个月",
-                "weight": 0.2,
-            })
+            signals.append(
+                {
+                    "signal": "新员工高风险期",
+                    "detail": f"入职仅{months}个月",
+                    "weight": 0.2,
+                }
+            )
 
         # ── 信号6: 最近调薪 ──
-        salary_result = await db.execute(text("""
+        salary_result = await db.execute(
+            text("""
             SELECT effective_date, from_salary_fen, to_salary_fen
             FROM employee_changes
             WHERE employee_id = :emp_id AND change_type = 'salary_adj'
             ORDER BY effective_date DESC
             LIMIT 1
-        """), {"emp_id": employee_id})
+        """),
+            {"emp_id": employee_id},
+        )
         salary_row = salary_result.mappings().first()
         days_since_raise = 9999
         if salary_row:
@@ -378,11 +403,13 @@ class HRAIDecisionService:
             days_since_raise = tenure_days
 
         if days_since_raise > 365:
-            signals.append({
-                "signal": "长期未调薪",
-                "detail": f"距上次调薪{days_since_raise}天",
-                "weight": 0.15,
-            })
+            signals.append(
+                {
+                    "signal": "长期未调薪",
+                    "detail": f"距上次调薪{days_since_raise}天",
+                    "weight": 0.15,
+                }
+            )
 
         return {
             "employee": {
@@ -405,19 +432,14 @@ class HRAIDecisionService:
 
     # ─── LLM 调用 ────────────────────────────────────────
 
-    async def _llm_turnover_analysis(
-        self, profile: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+    async def _llm_turnover_analysis(self, profile: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """调用Claude分析单员工离职风险"""
         if not getattr(settings, "LLM_ENABLED", False):
             logger.info("turnover_risk_llm_skipped", reason="LLM_ENABLED=false")
             return None
 
         try:
-            prompt = (
-                "请分析以下餐饮连锁门店员工的离职风险：\n"
-                f"{json.dumps(profile, ensure_ascii=False, default=str)}"
-            )
+            prompt = "请分析以下餐饮连锁门店员工的离职风险：\n" f"{json.dumps(profile, ensure_ascii=False, default=str)}"
 
             response = await get_llm_client().generate(
                 prompt=prompt,
@@ -445,9 +467,7 @@ class HRAIDecisionService:
             )
             return None
 
-    async def _llm_store_scan_analysis(
-        self, top_risks: List[Dict], store_id: str
-    ) -> Optional[Dict[str, Any]]:
+    async def _llm_store_scan_analysis(self, top_risks: List[Dict], store_id: str) -> Optional[Dict[str, Any]]:
         """调用Claude做门店级风险分析"""
         if not getattr(settings, "LLM_ENABLED", False):
             return None
@@ -546,48 +566,60 @@ class HRAIDecisionService:
         signal_names = [s.get("signal", "") for s in signals]
 
         if score >= 60:
-            recs.append({
-                "action": "建议立即安排1对1谈话，了解员工真实诉求",
-                "expected_impact_yuan": -200,
-                "confidence": 0.8,
-            })
+            recs.append(
+                {
+                    "action": "建议立即安排1对1谈话，了解员工真实诉求",
+                    "expected_impact_yuan": -200,
+                    "confidence": 0.8,
+                }
+            )
 
         if "长期未调薪" in signal_names:
-            recs.append({
-                "action": "考虑调薪¥300-500/月以提升稳定性",
-                "expected_impact_yuan": -4800,
-                "vs_replacement_yuan": replacement_cost,
-                "confidence": 0.65,
-            })
+            recs.append(
+                {
+                    "action": "考虑调薪¥300-500/月以提升稳定性",
+                    "expected_impact_yuan": -4800,
+                    "vs_replacement_yuan": replacement_cost,
+                    "confidence": 0.65,
+                }
+            )
 
         if "考勤下降" in signal_names:
-            recs.append({
-                "action": "关注出勤情况，排查是否有个人或工作环境问题",
-                "expected_impact_yuan": -100,
-                "confidence": 0.7,
-            })
+            recs.append(
+                {
+                    "action": "关注出勤情况，排查是否有个人或工作环境问题",
+                    "expected_impact_yuan": -100,
+                    "confidence": 0.7,
+                }
+            )
 
         if "绩效下滑" in signal_names or "绩效评级低" in signal_names:
-            recs.append({
-                "action": "制定绩效改进计划(PIP)，提供培训支持",
-                "expected_impact_yuan": -800,
-                "confidence": 0.6,
-            })
+            recs.append(
+                {
+                    "action": "制定绩效改进计划(PIP)，提供培训支持",
+                    "expected_impact_yuan": -800,
+                    "confidence": 0.6,
+                }
+            )
 
         if "新员工高风险期" in signal_names:
-            recs.append({
-                "action": "安排导师/师傅带教，加强新员工关怀",
-                "expected_impact_yuan": -300,
-                "confidence": 0.75,
-            })
+            recs.append(
+                {
+                    "action": "安排导师/师傅带教，加强新员工关怀",
+                    "expected_impact_yuan": -300,
+                    "confidence": 0.75,
+                }
+            )
 
         # 至少返回一条建议
         if not recs:
-            recs.append({
-                "action": "建议定期沟通，关注员工状态变化",
-                "expected_impact_yuan": 0,
-                "confidence": 0.5,
-            })
+            recs.append(
+                {
+                    "action": "建议定期沟通，关注员工状态变化",
+                    "expected_impact_yuan": 0,
+                    "confidence": 0.5,
+                }
+            )
 
         return recs
 
@@ -677,9 +709,7 @@ class HRAIDecisionService:
 4. net_impact_yuan = saved_recruitment_yuan + annual_impact_yuan
 5. 综合考虑离职数据给出务实建议"""
 
-    async def analyze_salary_competitiveness(
-        self, db: AsyncSession, store_id: str, brand_id: str = ""
-    ) -> Dict[str, Any]:
+    async def analyze_salary_competitiveness(self, db: AsyncSession, store_id: str, brand_id: str = "") -> Dict[str, Any]:
         """
         薪资竞争力分析 -- Claude驱动
 
@@ -699,7 +729,8 @@ class HRAIDecisionService:
         last_month_date = today.replace(day=1) - timedelta(days=1)
         last_month = f"{last_month_date.year}-{last_month_date.month:02d}"
 
-        salary_result = await db.execute(text("""
+        salary_result = await db.execute(
+            text("""
             SELECT e.position,
                    COUNT(DISTINCT e.id) AS headcount,
                    AVG(p.net_pay_fen) AS avg_pay_fen,
@@ -711,12 +742,15 @@ class HRAIDecisionService:
               AND e.is_active = true
               AND p.pay_month IN (:m1, :m2)
             GROUP BY e.position
-        """), {"store_id": store_id, "m1": recent_month, "m2": last_month})
+        """),
+            {"store_id": store_id, "m1": recent_month, "m2": last_month},
+        )
         position_rows = [dict(r) for r in salary_result.mappings()]
 
         # 2. 收集近6个月离职数据
         six_months_ago = today - timedelta(days=180)
-        turnover_result = await db.execute(text("""
+        turnover_result = await db.execute(
+            text("""
             SELECT COUNT(*) AS total_exits,
                    COUNT(*) FILTER (
                        WHERE remark ILIKE '%薪%'
@@ -728,13 +762,13 @@ class HRAIDecisionService:
             WHERE store_id = :store_id
               AND change_type = 'resign'
               AND effective_date >= :since
-        """), {"store_id": store_id, "since": six_months_ago})
+        """),
+            {"store_id": store_id, "since": six_months_ago},
+        )
         turnover = turnover_result.mappings().first()
         total_exits = int(turnover["total_exits"]) if turnover else 0
         salary_exits = int(turnover["salary_exits"]) if turnover else 0
-        salary_exit_ratio = round(
-            salary_exits / max(total_exits, 1) * 100, 1
-        )
+        salary_exit_ratio = round(salary_exits / max(total_exits, 1) * 100, 1)
 
         # 3. 构建岗位数据
         position_data = []
@@ -742,13 +776,15 @@ class HRAIDecisionService:
             if not row.get("position") or not row.get("avg_pay_fen"):
                 continue
             avg_yuan = round(float(row["avg_pay_fen"]) / 100, 2)
-            position_data.append({
-                "position": row["position"],
-                "headcount": row["headcount"],
-                "avg_salary_yuan": avg_yuan,
-                "min_salary_yuan": round(float(row.get("min_pay_fen") or 0) / 100, 2),
-                "max_salary_yuan": round(float(row.get("max_pay_fen") or 0) / 100, 2),
-            })
+            position_data.append(
+                {
+                    "position": row["position"],
+                    "headcount": row["headcount"],
+                    "avg_salary_yuan": avg_yuan,
+                    "min_salary_yuan": round(float(row.get("min_pay_fen") or 0) / 100, 2),
+                    "max_salary_yuan": round(float(row.get("max_pay_fen") or 0) / 100, 2),
+                }
+            )
 
         # 4. 尝试使用 LLM 生成分析
         try:
@@ -771,9 +807,7 @@ class HRAIDecisionService:
                 )
 
                 response = await get_llm_client().generate(
-                    prompt=json.dumps(
-                        analysis_context, ensure_ascii=False, default=str
-                    ),
+                    prompt=json.dumps(analysis_context, ensure_ascii=False, default=str),
                     system_prompt=self.SALARY_SYSTEM_PROMPT,
                     max_tokens=1500,
                     temperature=0.3,
@@ -789,9 +823,7 @@ class HRAIDecisionService:
 
                 return {
                     "store_id": store_id,
-                    "overall_competitiveness": parsed.get(
-                        "overall_competitiveness", "average"
-                    ),
+                    "overall_competitiveness": parsed.get("overall_competitiveness", "average"),
                     "positions": parsed.get("positions", []),
                     "turnover_stats": {
                         "total_exits_6m": total_exits,
@@ -810,9 +842,7 @@ class HRAIDecisionService:
             )
 
         # 5. 规则引擎回退
-        return self._rule_based_salary_analysis(
-            store_id, position_data, total_exits, salary_exits, salary_exit_ratio
-        )
+        return self._rule_based_salary_analysis(store_id, position_data, total_exits, salary_exits, salary_exit_ratio)
 
     def _rule_based_salary_analysis(
         self,
@@ -831,9 +861,7 @@ class HRAIDecisionService:
         for pd in position_data:
             pos = pd["position"]
             avg = pd["avg_salary_yuan"]
-            ref = self.MARKET_SALARY_REFERENCE.get(
-                pos, {"p25": avg, "p50": avg, "p75": avg}
-            )
+            ref = self.MARKET_SALARY_REFERENCE.get(pos, {"p25": avg, "p50": avg, "p75": avg})
             market_p50 = ref["p50"]
 
             # 百分位估算
@@ -866,17 +894,13 @@ class HRAIDecisionService:
                 gap = recommended - avg
                 annual_impact = round(-gap * headcount * 12, 2)
                 saved_recruitment = round(headcount * 0.2 * 3000, 2)
-                recommendation = (
-                    f"建议调至¥{recommended:,.0f}，预计降低离职率20%"
-                )
+                recommendation = f"建议调至¥{recommended:,.0f}，预计降低离职率20%"
             elif risk == "medium":
                 recommended = round(market_p50)
                 gap = max(recommended - avg, 0)
                 annual_impact = round(-gap * headcount * 12, 2)
                 saved_recruitment = round(headcount * 0.1 * 3000, 2)
-                recommendation = (
-                    f"薪资接近市场水平，建议小幅调整至¥{recommended:,.0f}"
-                )
+                recommendation = f"薪资接近市场水平，建议小幅调整至¥{recommended:,.0f}"
             else:
                 recommendation = "薪资具有竞争力，建议保持当前水平"
 
@@ -884,18 +908,20 @@ class HRAIDecisionService:
             total_annual_impact += annual_impact
             total_saved_recruitment += saved_recruitment
 
-            positions_result.append({
-                "position": pos,
-                "headcount": headcount,
-                "avg_salary_yuan": avg,
-                "market_estimate_yuan": market_p50,
-                "percentile": percentile,
-                "risk_level": risk,
-                "recommendation": recommendation,
-                "annual_impact_yuan": annual_impact,
-                "saved_recruitment_yuan": saved_recruitment,
-                "net_impact_yuan": net_impact,
-            })
+            positions_result.append(
+                {
+                    "position": pos,
+                    "headcount": headcount,
+                    "avg_salary_yuan": avg,
+                    "market_estimate_yuan": market_p50,
+                    "percentile": percentile,
+                    "risk_level": risk,
+                    "recommendation": recommendation,
+                    "annual_impact_yuan": annual_impact,
+                    "saved_recruitment_yuan": saved_recruitment,
+                    "net_impact_yuan": net_impact,
+                }
+            )
 
         # 整体竞争力判定
         if not positions_result:
@@ -1004,16 +1030,14 @@ class HRAIDecisionService:
             recommendation_text = ""
             if recs:
                 first = recs[0]
-                predicted_fen = int(
-                    first.get("expected_impact_yuan", 0) * 100
-                )
+                predicted_fen = int(first.get("expected_impact_yuan", 0) * 100)
                 confidence = first.get("confidence", 0.5)
                 recommendation_text = first.get("action", "")
 
             # 查品牌ID
-            brand_result = await db.execute(text(
-                "SELECT brand_id FROM stores WHERE store_id = :sid LIMIT 1"
-            ), {"sid": store_id})
+            brand_result = await db.execute(
+                text("SELECT brand_id FROM stores WHERE store_id = :sid LIMIT 1"), {"sid": store_id}
+            )
             brand_row = brand_result.mappings().first()
             brand_id = brand_row["brand_id"] if brand_row else "unknown"
 

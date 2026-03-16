@@ -2,32 +2,28 @@
 多渠道通知服务
 支持邮件、短信、微信、App推送等多种通知方式
 """
-from typing import Dict, List, Optional, Any
-from datetime import datetime
-from enum import Enum
+
 import asyncio
 import os
-import structlog
-from abc import ABC, abstractmethod
 import smtplib
-from email.mime.text import MIMEText
+from abc import ABC, abstractmethod
+from datetime import datetime
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from email.utils import formataddr
+from enum import Enum
+from typing import Any, Dict, List, Optional
 
-from ..core.notification_config import (
-    email_config,
-    sms_config,
-    wechat_config,
-    feishu_config,
-    push_config,
-    notification_config,
-)
+import structlog
+
+from ..core.notification_config import email_config, feishu_config, notification_config, push_config, sms_config, wechat_config
 
 logger = structlog.get_logger()
 
 
 class NotificationChannel(str, Enum):
     """通知渠道"""
+
     EMAIL = "email"
     SMS = "sms"
     WECHAT = "wechat"
@@ -114,13 +110,7 @@ class NotificationChannelHandler(ABC):
     """通知渠道处理器基类"""
 
     @abstractmethod
-    async def send(
-        self,
-        recipient: str,
-        title: str,
-        content: str,
-        extra_data: Optional[Dict[str, Any]] = None
-    ) -> bool:
+    async def send(self, recipient: str, title: str, content: str, extra_data: Optional[Dict[str, Any]] = None) -> bool:
         """发送通知"""
         pass
 
@@ -128,13 +118,7 @@ class NotificationChannelHandler(ABC):
 class EmailNotificationHandler(NotificationChannelHandler):
     """邮件通知处理器"""
 
-    async def send(
-        self,
-        recipient: str,
-        title: str,
-        content: str,
-        extra_data: Optional[Dict[str, Any]] = None
-    ) -> bool:
+    async def send(self, recipient: str, title: str, content: str, extra_data: Optional[Dict[str, Any]] = None) -> bool:
         """
         发送邮件通知
 
@@ -150,39 +134,30 @@ class EmailNotificationHandler(NotificationChannelHandler):
         try:
             # 检查配置
             if not email_config.SMTP_PASSWORD:
-                logger.warning("邮件服务未配置,通知跳过", recipient=recipient, channel="email",
-                               hint="请设置 SMTP_PASSWORD 环境变量")
+                logger.warning(
+                    "邮件服务未配置,通知跳过", recipient=recipient, channel="email", hint="请设置 SMTP_PASSWORD 环境变量"
+                )
                 return False
 
             # 创建邮件
-            msg = MIMEMultipart('alternative')
-            msg['Subject'] = title
-            msg['From'] = formataddr((email_config.SMTP_FROM_NAME, email_config.SMTP_USER))
-            msg['To'] = recipient
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = title
+            msg["From"] = formataddr((email_config.SMTP_FROM_NAME, email_config.SMTP_USER))
+            msg["To"] = recipient
 
             # 添加文本内容
-            text_part = MIMEText(content, 'plain', 'utf-8')
+            text_part = MIMEText(content, "plain", "utf-8")
             msg.attach(text_part)
 
             # 如果提供了HTML内容,添加HTML部分
-            if extra_data and 'html_content' in extra_data:
-                html_part = MIMEText(extra_data['html_content'], 'html', 'utf-8')
+            if extra_data and "html_content" in extra_data:
+                html_part = MIMEText(extra_data["html_content"], "html", "utf-8")
                 msg.attach(html_part)
 
             # 发送邮件
-            await asyncio.get_event_loop().run_in_executor(
-                None,
-                self._send_email_sync,
-                msg,
-                recipient
-            )
+            await asyncio.get_event_loop().run_in_executor(None, self._send_email_sync, msg, recipient)
 
-            logger.info(
-                "邮件发送成功",
-                recipient=recipient,
-                title=title,
-                channel="email"
-            )
+            logger.info("邮件发送成功", recipient=recipient, title=title, channel="email")
             return True
 
         except Exception as e:
@@ -193,18 +168,10 @@ class EmailNotificationHandler(NotificationChannelHandler):
         """同步发送邮件"""
         try:
             if email_config.SMTP_USE_TLS:
-                server = smtplib.SMTP(
-                    email_config.SMTP_HOST,
-                    email_config.SMTP_PORT,
-                    timeout=email_config.SMTP_TIMEOUT
-                )
+                server = smtplib.SMTP(email_config.SMTP_HOST, email_config.SMTP_PORT, timeout=email_config.SMTP_TIMEOUT)
                 server.starttls()
             else:
-                server = smtplib.SMTP_SSL(
-                    email_config.SMTP_HOST,
-                    email_config.SMTP_PORT,
-                    timeout=email_config.SMTP_TIMEOUT
-                )
+                server = smtplib.SMTP_SSL(email_config.SMTP_HOST, email_config.SMTP_PORT, timeout=email_config.SMTP_TIMEOUT)
 
             server.login(email_config.SMTP_USER, email_config.SMTP_PASSWORD)
             server.send_message(msg)
@@ -218,13 +185,7 @@ class EmailNotificationHandler(NotificationChannelHandler):
 class SMSNotificationHandler(NotificationChannelHandler):
     """短信通知处理器"""
 
-    async def send(
-        self,
-        recipient: str,
-        title: str,
-        content: str,
-        extra_data: Optional[Dict[str, Any]] = None
-    ) -> bool:
+    async def send(self, recipient: str, title: str, content: str, extra_data: Optional[Dict[str, Any]] = None) -> bool:
         """
         发送短信通知
 
@@ -240,8 +201,12 @@ class SMSNotificationHandler(NotificationChannelHandler):
         try:
             # 检查配置
             if not sms_config.ALIYUN_ACCESS_KEY_ID and not sms_config.TENCENT_SECRET_ID:
-                logger.warning("短信服务未配置,通知跳过", recipient=recipient, channel="sms",
-                               hint="请设置 ALIYUN_ACCESS_KEY_ID 或 TENCENT_SECRET_ID 环境变量")
+                logger.warning(
+                    "短信服务未配置,通知跳过",
+                    recipient=recipient,
+                    channel="sms",
+                    hint="请设置 ALIYUN_ACCESS_KEY_ID 或 TENCENT_SECRET_ID 环境变量",
+                )
                 return False
 
             # 根据配置选择SMS提供商
@@ -254,54 +219,47 @@ class SMSNotificationHandler(NotificationChannelHandler):
                 return False
 
             if result:
-                logger.info(
-                    "短信发送成功",
-                    recipient=recipient,
-                    provider=sms_config.SMS_PROVIDER,
-                    channel="sms"
-                )
+                logger.info("短信发送成功", recipient=recipient, provider=sms_config.SMS_PROVIDER, channel="sms")
             return result
 
         except Exception as e:
             logger.error("短信发送失败", recipient=recipient, error=str(e))
             return False
 
-    async def _send_aliyun_sms(
-        self,
-        phone: str,
-        content: str,
-        extra_data: Optional[Dict[str, Any]] = None
-    ) -> bool:
+    async def _send_aliyun_sms(self, phone: str, content: str, extra_data: Optional[Dict[str, Any]] = None) -> bool:
         """发送阿里云短信"""
         try:
-            import json
-            import httpx
-            import hmac
-            import hashlib
             import base64
-            from urllib.parse import quote
-            from datetime import datetime, timezone
+            import hashlib
+            import hmac
+            import json
             import uuid as uuid_lib
+            from datetime import datetime, timezone
+            from urllib.parse import quote
+
+            import httpx
 
             # 构建请求参数
             params = {
-                'PhoneNumbers': phone,
-                'SignName': sms_config.ALIYUN_SMS_SIGN_NAME,
-                'TemplateCode': extra_data.get('template_code') if extra_data else sms_config.ALIYUN_SMS_TEMPLATE_CODE,
-                'TemplateParam': json.dumps(extra_data.get('template_params', {'content': content}) if extra_data else {'content': content}),
+                "PhoneNumbers": phone,
+                "SignName": sms_config.ALIYUN_SMS_SIGN_NAME,
+                "TemplateCode": extra_data.get("template_code") if extra_data else sms_config.ALIYUN_SMS_TEMPLATE_CODE,
+                "TemplateParam": json.dumps(
+                    extra_data.get("template_params", {"content": content}) if extra_data else {"content": content}
+                ),
             }
 
             # 公共参数
             common_params = {
-                'AccessKeyId': sms_config.ALIYUN_ACCESS_KEY_ID,
-                'Action': 'SendSms',
-                'Format': 'JSON',
-                'RegionId': sms_config.ALIYUN_SMS_REGION or 'cn-hangzhou',
-                'SignatureMethod': 'HMAC-SHA1',
-                'SignatureNonce': str(uuid_lib.uuid4()),
-                'SignatureVersion': '1.0',
-                'Timestamp': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
-                'Version': '2017-05-25',
+                "AccessKeyId": sms_config.ALIYUN_ACCESS_KEY_ID,
+                "Action": "SendSms",
+                "Format": "JSON",
+                "RegionId": sms_config.ALIYUN_SMS_REGION or "cn-hangzhou",
+                "SignatureMethod": "HMAC-SHA1",
+                "SignatureNonce": str(uuid_lib.uuid4()),
+                "SignatureVersion": "1.0",
+                "Timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "Version": "2017-05-25",
             }
 
             # 合并参数
@@ -309,52 +267,46 @@ class SMSNotificationHandler(NotificationChannelHandler):
 
             # 构建签名字符串
             sorted_params = sorted(all_params.items())
-            canonicalized_query_string = '&'.join([f"{quote(k, safe='')}={quote(str(v), safe='')}" for k, v in sorted_params])
+            canonicalized_query_string = "&".join([f"{quote(k, safe='')}={quote(str(v), safe='')}" for k, v in sorted_params])
             string_to_sign = f"GET&%2F&{quote(canonicalized_query_string, safe='')}"
 
             # 计算签名
             h = hmac.new(
-                (sms_config.ALIYUN_ACCESS_KEY_SECRET + '&').encode('utf-8'),
-                string_to_sign.encode('utf-8'),
-                hashlib.sha1
+                (sms_config.ALIYUN_ACCESS_KEY_SECRET + "&").encode("utf-8"), string_to_sign.encode("utf-8"), hashlib.sha1
             )
-            signature = base64.b64encode(h.digest()).decode('utf-8')
-            all_params['Signature'] = signature
+            signature = base64.b64encode(h.digest()).decode("utf-8")
+            all_params["Signature"] = signature
 
             # 发送请求
             async with httpx.AsyncClient() as client:
                 response = await client.get(
                     f"https://dysmsapi.aliyuncs.com/",
                     params=all_params,
-                    timeout=float(os.getenv("NOTIFICATION_HTTP_TIMEOUT", "30.0"))
+                    timeout=float(os.getenv("NOTIFICATION_HTTP_TIMEOUT", "30.0")),
                 )
                 result = response.json()
 
-                if result.get('Code') == 'OK':
-                    logger.info("阿里云短信发送成功", phone=phone, biz_id=result.get('BizId'))
+                if result.get("Code") == "OK":
+                    logger.info("阿里云短信发送成功", phone=phone, biz_id=result.get("BizId"))
                     return True
                 else:
-                    logger.error("阿里云短信发送失败", phone=phone, code=result.get('Code'), message=result.get('Message'))
+                    logger.error("阿里云短信发送失败", phone=phone, code=result.get("Code"), message=result.get("Message"))
                     return False
 
         except Exception as e:
             logger.error("阿里云短信发送失败", error=str(e))
             return False
 
-    async def _send_tencent_sms(
-        self,
-        phone: str,
-        content: str,
-        extra_data: Optional[Dict[str, Any]] = None
-    ) -> bool:
+    async def _send_tencent_sms(self, phone: str, content: str, extra_data: Optional[Dict[str, Any]] = None) -> bool:
         """发送腾讯云短信"""
         try:
-            import json
-            import httpx
-            import hmac
             import hashlib
-            from datetime import datetime
+            import hmac
+            import json
             import time
+            from datetime import datetime
+
+            import httpx
 
             # 腾讯云API参数
             service = "sms"
@@ -368,11 +320,11 @@ class SMSNotificationHandler(NotificationChannelHandler):
 
             # 请求体
             payload = {
-                "PhoneNumberSet": [phone if phone.startswith('+') else f"+86{phone}"],
+                "PhoneNumberSet": [phone if phone.startswith("+") else f"+86{phone}"],
                 "SmsSdkAppId": sms_config.TENCENT_SMS_APP_ID,
                 "SignName": sms_config.TENCENT_SMS_SIGN,
-                "TemplateId": extra_data.get('template_id') if extra_data else sms_config.TENCENT_SMS_TEMPLATE_ID,
-                "TemplateParamSet": extra_data.get('template_params', [content]) if extra_data else [content],
+                "TemplateId": extra_data.get("template_id") if extra_data else sms_config.TENCENT_SMS_TEMPLATE_ID,
+                "TemplateParamSet": extra_data.get("template_params", [content]) if extra_data else [content],
             }
             payload_str = json.dumps(payload)
 
@@ -416,19 +368,20 @@ class SMSNotificationHandler(NotificationChannelHandler):
 
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    endpoint,
-                    headers=headers,
-                    data=payload_str,
-                    timeout=float(os.getenv("NOTIFICATION_HTTP_TIMEOUT", "30.0"))
+                    endpoint, headers=headers, data=payload_str, timeout=float(os.getenv("NOTIFICATION_HTTP_TIMEOUT", "30.0"))
                 )
                 result = response.json()
 
-                if result.get('Response', {}).get('SendStatusSet', [{}])[0].get('Code') == 'Ok':
-                    logger.info("腾讯云短信发送成功", phone=phone, serial_no=result.get('Response', {}).get('SendStatusSet', [{}])[0].get('SerialNo'))
+                if result.get("Response", {}).get("SendStatusSet", [{}])[0].get("Code") == "Ok":
+                    logger.info(
+                        "腾讯云短信发送成功",
+                        phone=phone,
+                        serial_no=result.get("Response", {}).get("SendStatusSet", [{}])[0].get("SerialNo"),
+                    )
                     return True
                 else:
-                    error = result.get('Response', {}).get('Error', {})
-                    logger.error("腾讯云短信发送失败", phone=phone, code=error.get('Code'), message=error.get('Message'))
+                    error = result.get("Response", {}).get("Error", {})
+                    logger.error("腾讯云短信发送失败", phone=phone, code=error.get("Code"), message=error.get("Message"))
                     return False
 
         except Exception as e:
@@ -439,13 +392,7 @@ class SMSNotificationHandler(NotificationChannelHandler):
 class WeChatNotificationHandler(NotificationChannelHandler):
     """微信通知处理器"""
 
-    async def send(
-        self,
-        recipient: str,
-        title: str,
-        content: str,
-        extra_data: Optional[Dict[str, Any]] = None
-    ) -> bool:
+    async def send(self, recipient: str, title: str, content: str, extra_data: Optional[Dict[str, Any]] = None) -> bool:
         """
         发送微信通知
 
@@ -461,8 +408,12 @@ class WeChatNotificationHandler(NotificationChannelHandler):
         try:
             # 检查配置
             if not wechat_config.WECHAT_CORP_ID and not wechat_config.WECHAT_APP_ID:
-                logger.warning("微信服务未配置,通知跳过", recipient=recipient, channel="wechat",
-                               hint="请设置 WECHAT_CORP_ID 或 WECHAT_APP_ID 环境变量")
+                logger.warning(
+                    "微信服务未配置,通知跳过",
+                    recipient=recipient,
+                    channel="wechat",
+                    hint="请设置 WECHAT_CORP_ID 或 WECHAT_APP_ID 环境变量",
+                )
                 return False
 
             # 根据配置选择微信类型
@@ -475,12 +426,7 @@ class WeChatNotificationHandler(NotificationChannelHandler):
                 return False
 
             if result:
-                logger.info(
-                    "微信通知发送成功",
-                    recipient=recipient,
-                    type=wechat_config.WECHAT_TYPE,
-                    channel="wechat"
-                )
+                logger.info("微信通知发送成功", recipient=recipient, type=wechat_config.WECHAT_TYPE, channel="wechat")
             return result
 
         except Exception as e:
@@ -488,11 +434,7 @@ class WeChatNotificationHandler(NotificationChannelHandler):
             return False
 
     async def _send_corp_wechat(
-        self,
-        user_id: str,
-        title: str,
-        content: str,
-        extra_data: Optional[Dict[str, Any]] = None
+        self, user_id: str, title: str, content: str, extra_data: Optional[Dict[str, Any]] = None
     ) -> bool:
         """发送企业微信消息"""
         try:
@@ -508,10 +450,7 @@ class WeChatNotificationHandler(NotificationChannelHandler):
             if extra_data:
                 message_content += f"\n\n{extra_data}"
 
-            result = await wechat_work_message_service.send_text_message(
-                user_id=user_id,
-                content=message_content
-            )
+            result = await wechat_work_message_service.send_text_message(user_id=user_id, content=message_content)
 
             return result.get("success", False)
 
@@ -520,11 +459,7 @@ class WeChatNotificationHandler(NotificationChannelHandler):
             return False
 
     async def _send_official_wechat(
-        self,
-        openid: str,
-        title: str,
-        content: str,
-        extra_data: Optional[Dict[str, Any]] = None
+        self, openid: str, title: str, content: str, extra_data: Optional[Dict[str, Any]] = None
     ) -> bool:
         """发送微信公众号模板消息"""
         try:
@@ -533,11 +468,14 @@ class WeChatNotificationHandler(NotificationChannelHandler):
             # 获取 access_token
             token_url = "https://api.weixin.qq.com/cgi-bin/token"
             async with httpx.AsyncClient(timeout=float(os.getenv("NOTIFICATION_HTTP_TIMEOUT_SHORT", "10.0"))) as client:
-                token_resp = await client.get(token_url, params={
-                    "grant_type": "client_credential",
-                    "appid": wechat_config.WECHAT_APP_ID,
-                    "secret": wechat_config.WECHAT_APP_SECRET,
-                })
+                token_resp = await client.get(
+                    token_url,
+                    params={
+                        "grant_type": "client_credential",
+                        "appid": wechat_config.WECHAT_APP_ID,
+                        "secret": wechat_config.WECHAT_APP_SECRET,
+                    },
+                )
                 token_data = token_resp.json()
                 access_token = token_data.get("access_token")
                 if not access_token:
@@ -574,13 +512,7 @@ class WeChatNotificationHandler(NotificationChannelHandler):
 class AppPushNotificationHandler(NotificationChannelHandler):
     """App推送通知处理器"""
 
-    async def send(
-        self,
-        recipient: str,
-        title: str,
-        content: str,
-        extra_data: Optional[Dict[str, Any]] = None
-    ) -> bool:
+    async def send(self, recipient: str, title: str, content: str, extra_data: Optional[Dict[str, Any]] = None) -> bool:
         """
         发送App推送通知
 
@@ -597,10 +529,10 @@ class AppPushNotificationHandler(NotificationChannelHandler):
             # 若已配置 JPush，调用极光推送
             if push_config.JPUSH_APP_KEY and push_config.JPUSH_MASTER_SECRET:
                 import base64
+
                 import httpx
-                auth = base64.b64encode(
-                    f"{push_config.JPUSH_APP_KEY}:{push_config.JPUSH_MASTER_SECRET}".encode()
-                ).decode()
+
+                auth = base64.b64encode(f"{push_config.JPUSH_APP_KEY}:{push_config.JPUSH_MASTER_SECRET}".encode()).decode()
                 payload = {
                     "platform": "all",
                     "audience": {"registration_id": [recipient]},
@@ -620,6 +552,7 @@ class AppPushNotificationHandler(NotificationChannelHandler):
             # 若已配置 Firebase FCM，调用 FCM HTTP v1
             if push_config.FIREBASE_SERVER_KEY:
                 import httpx
+
                 payload = {
                     "message": {
                         "token": recipient,
@@ -640,10 +573,9 @@ class AppPushNotificationHandler(NotificationChannelHandler):
             # 降级：通过企业微信转发推送内容（recipient 视为企业微信 user_id）
             try:
                 from .wechat_work_message_service import wechat_work_message_service
+
                 message = f"【App通知】{title}\n\n{content}"
-                result = await wechat_work_message_service.send_text_message(
-                    user_id=recipient, content=message
-                )
+                result = await wechat_work_message_service.send_text_message(user_id=recipient, content=message)
                 ok = result.get("success", False)
                 if ok:
                     logger.info(
@@ -684,7 +616,7 @@ class MultiChannelNotificationService:
         recipient: str,
         title: str,
         content: str,
-        extra_data: Optional[Dict[str, Any]] = None
+        extra_data: Optional[Dict[str, Any]] = None,
     ) -> Dict[NotificationChannel, bool]:
         """
         通过多个渠道发送通知
@@ -726,7 +658,7 @@ class MultiChannelNotificationService:
         recipient: str,
         title: str,
         content: str,
-        extra_data: Optional[Dict[str, Any]]
+        extra_data: Optional[Dict[str, Any]],
     ) -> bool:
         """通过指定渠道发送(带重试机制)"""
         max_retries = notification_config.MAX_RETRY_ATTEMPTS
@@ -741,40 +673,26 @@ class MultiChannelNotificationService:
                 # 如果发送失败且还有重试次数,等待后重试
                 if attempt < max_retries - 1:
                     logger.warning(
-                        "通知发送失败,准备重试",
-                        channel=channel.value,
-                        attempt=attempt + 1,
-                        max_retries=max_retries
+                        "通知发送失败,准备重试", channel=channel.value, attempt=attempt + 1, max_retries=max_retries
                     )
                     await asyncio.sleep(retry_delay)
 
             except Exception as e:
-                logger.error(
-                    "通知发送异常",
-                    channel=channel.value,
-                    attempt=attempt + 1,
-                    error=str(e)
-                )
+                logger.error("通知发送异常", channel=channel.value, attempt=attempt + 1, error=str(e))
                 if attempt < max_retries - 1:
                     await asyncio.sleep(retry_delay)
 
         # 所有重试都失败,尝试故障转移
         if notification_config.ENABLE_FALLBACK and channel.value != notification_config.FALLBACK_CHANNEL:
             logger.warning(
-                "启用故障转移",
-                original_channel=channel.value,
-                fallback_channel=notification_config.FALLBACK_CHANNEL
+                "启用故障转移", original_channel=channel.value, fallback_channel=notification_config.FALLBACK_CHANNEL
             )
             return await self._send_with_fallback(recipient, title, content, extra_data)
 
         return False
 
     async def _send_with_fallback(
-        self,
-        recipient: str,
-        title: str,
-        content: str,
-        extra_data: Optional[Dict[str, Any]]
+        self, recipient: str, title: str, content: str, extra_data: Optional[Dict[str, Any]]
     ) -> bool:
         """使用故障转移渠道发送"""
         try:
@@ -788,10 +706,7 @@ class MultiChannelNotificationService:
         return False
 
     async def send_template_notification(
-        self,
-        template_name: str,
-        recipient: str,
-        **template_vars
+        self, template_name: str, recipient: str, **template_vars
     ) -> Dict[NotificationChannel, bool]:
         """
         使用模板发送通知

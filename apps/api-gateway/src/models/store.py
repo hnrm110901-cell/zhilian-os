@@ -1,17 +1,20 @@
 """
 Store Model
 """
-from sqlalchemy import Column, String, Boolean, JSON, Integer, Float, Numeric
+
+import enum
+import uuid
+
+from sqlalchemy import JSON, Boolean, Column, Float, Integer, Numeric, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-import uuid
-import enum
 
 from .base import Base, TimestampMixin
 
 
 class StoreStatus(str, enum.Enum):
     """门店状态"""
+
     ACTIVE = "active"  # 营业中
     INACTIVE = "inactive"  # 暂停营业
     RENOVATING = "renovating"  # 装修中

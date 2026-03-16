@@ -2,12 +2,13 @@
 客户意向预测 — Phase P4 (屯象独有)
 基于客户行为特征预测成交概率，排序跟进优先级
 """
-from datetime import datetime, date
-from typing import Optional, List, Dict, Any
 
-from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import date, datetime
+from typing import Any, Dict, List, Optional
+
 import structlog
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
 
@@ -75,8 +76,13 @@ class IntentPredictor:
     def _extract_features(self, **kwargs) -> Dict[str, float]:
         """提取预测特征"""
         stage_scores = {
-            "lead": 0.1, "intent": 0.3, "room_lock": 0.6,
-            "negotiation": 0.7, "signed": 0.95, "completed": 1.0, "lost": 0.05,
+            "lead": 0.1,
+            "intent": 0.3,
+            "room_lock": 0.6,
+            "negotiation": 0.7,
+            "signed": 0.95,
+            "completed": 1.0,
+            "lost": 0.05,
         }
 
         features = {
@@ -127,7 +133,10 @@ class IntentPredictor:
         return max(0.01, min(0.99, score))
 
     def _calculate_priority(
-        self, probability: float, value_yuan: float, target_date: Optional[str],
+        self,
+        probability: float,
+        value_yuan: float,
+        target_date: Optional[str],
     ) -> float:
         """计算跟进优先级（0-100）"""
         # 期望价值 = 概率 × 金额
@@ -171,7 +180,10 @@ class IntentPredictor:
         return signals
 
     def _recommend_action(
-        self, stage: str, probability: float, features: Dict[str, float],
+        self,
+        stage: str,
+        probability: float,
+        features: Dict[str, float],
     ) -> str:
         """推荐下一步行动"""
         if probability >= 0.7:

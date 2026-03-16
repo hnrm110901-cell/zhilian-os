@@ -13,9 +13,9 @@
 
 import os
 import time
-import structlog
 from typing import Optional
 
+import structlog
 from neo4j import GraphDatabase
 
 logger = structlog.get_logger()

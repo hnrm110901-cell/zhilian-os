@@ -2,8 +2,10 @@
 Exit Interview Model — 离职回访记录
 结构化回访：原因→目前状况→是否愿意回来
 """
+
 import uuid
-from sqlalchemy import Column, String, Text, Date, Boolean
+
+from sqlalchemy import Boolean, Column, Date, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 
 from .base import Base, TimestampMixin

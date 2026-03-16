@@ -57,7 +57,6 @@ SKILL_BUSINESS_METADATA = {
         "effect_metric": "labor_cost_ratio",
         "evaluation_delay_hours": 72,
     },
-
     # ═══════════════════════════════════════════════════════════════
     # OrderAgent（订单）
     # ═══════════════════════════════════════════════════════════════
@@ -100,7 +99,6 @@ SKILL_BUSINESS_METADATA = {
         "provides": ["bill_data"],
         "evaluation_delay_hours": 24,
     },
-
     # ═══════════════════════════════════════════════════════════════
     # InventoryAgent（库存）
     # ═══════════════════════════════════════════════════════════════
@@ -140,7 +138,6 @@ SKILL_BUSINESS_METADATA = {
         "effect_metric": "waste_rate",
         "evaluation_delay_hours": 48,
     },
-
     # ═══════════════════════════════════════════════════════════════
     # ServiceAgent（服务质量）
     # ═══════════════════════════════════════════════════════════════
@@ -168,7 +165,6 @@ SKILL_BUSINESS_METADATA = {
         "effect_metric": "queue_conversion_rate",
         "evaluation_delay_hours": 168,
     },
-
     # ═══════════════════════════════════════════════════════════════
     # TrainingAgent（培训）
     # ═══════════════════════════════════════════════════════════════
@@ -197,7 +193,6 @@ SKILL_BUSINESS_METADATA = {
         "provides": ["training_progress_data"],
         "evaluation_delay_hours": 168,
     },
-
     # ═══════════════════════════════════════════════════════════════
     # DecisionAgent（决策）
     # ═══════════════════════════════════════════════════════════════
@@ -223,7 +218,6 @@ SKILL_BUSINESS_METADATA = {
         "provides": ["decision_history_data"],
         "evaluation_delay_hours": 72,
     },
-
     # ═══════════════════════════════════════════════════════════════
     # ReservationAgent（预订）
     # ═══════════════════════════════════════════════════════════════
@@ -259,7 +253,6 @@ SKILL_BUSINESS_METADATA = {
         "provides": ["reservation_status_updated"],
         "evaluation_delay_hours": 24,
     },
-
     # ═══════════════════════════════════════════════════════════════
     # OpsAgent（运营）
     # ═══════════════════════════════════════════════════════════════
@@ -286,7 +279,6 @@ SKILL_BUSINESS_METADATA = {
         "provides": ["daily_report_data"],
         "evaluation_delay_hours": 24,
     },
-
     # ═══════════════════════════════════════════════════════════════
     # PerformanceAgent（绩效）
     # ═══════════════════════════════════════════════════════════════

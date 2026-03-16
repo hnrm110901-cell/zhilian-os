@@ -44,6 +44,7 @@ _FEEDBACK_OUTCOMES = {"success", "failure", "partial"}
 # 纯函数（无 DB 依赖，便于单元测试）
 # ════════════════════════════════════════════════════════════════════════════════
 
+
 def compute_adoption_rate(decisions: List[Dict[str, Any]]) -> float:
     """
     计算 AI 建议采纳率（0.0–1.0）。
@@ -59,10 +60,7 @@ def compute_adoption_rate(decisions: List[Dict[str, Any]]) -> float:
     total = len(decisions)
     if total == 0:
         return 0.0
-    adopted = sum(
-        1 for d in decisions
-        if (d.get("decision_status") or "").lower() in _ADOPTED_STATUSES
-    )
+    adopted = sum(1 for d in decisions if (d.get("decision_status") or "").lower() in _ADOPTED_STATUSES)
     return round(adopted / total, 4)
 
 
@@ -79,16 +77,10 @@ def compute_execution_accuracy(decisions: List[Dict[str, Any]]) -> float:
     Returns:
         float 0.0–1.0；无采纳记录时返回 0.0
     """
-    adopted = [
-        d for d in decisions
-        if (d.get("decision_status") or "").lower() in _ADOPTED_STATUSES
-    ]
+    adopted = [d for d in decisions if (d.get("decision_status") or "").lower() in _ADOPTED_STATUSES]
     if not adopted:
         return 0.0
-    with_feedback = sum(
-        1 for d in adopted
-        if (d.get("outcome") or "").lower() in _FEEDBACK_OUTCOMES
-    )
+    with_feedback = sum(1 for d in adopted if (d.get("outcome") or "").lower() in _FEEDBACK_OUTCOMES)
     return round(with_feedback / len(adopted), 4)
 
 
@@ -107,11 +99,7 @@ def compute_total_saving(decisions: List[Dict[str, Any]]) -> float:
         if (d.get("decision_status") or "").lower() not in _ADOPTED_STATUSES:
             continue
         suggestion = d.get("ai_suggestion") or {}
-        saving = (
-            suggestion.get("expected_saving_yuan")
-            or d.get("expected_saving_yuan")
-            or 0.0
-        )
+        saving = suggestion.get("expected_saving_yuan") or d.get("expected_saving_yuan") or 0.0
         total += float(saving)
     return round(total, 2)
 
@@ -130,6 +118,7 @@ def _classify_adoption(rate_pct: float) -> str:
 # ════════════════════════════════════════════════════════════════════════════════
 # BehaviorScoreEngine（含 DB 查询的完整入口）
 # ════════════════════════════════════════════════════════════════════════════════
+
 
 class BehaviorScoreEngine:
     """
@@ -157,10 +146,10 @@ class BehaviorScoreEngine:
 
     @staticmethod
     async def get_store_report(
-        store_id:   str,
+        store_id: str,
         start_date: date,
-        end_date:   date,
-        db:         AsyncSession,
+        end_date: date,
+        db: AsyncSession,
     ) -> Dict[str, Any]:
         """
         门店维度 AI 建议采纳报告。
@@ -188,9 +177,9 @@ class BehaviorScoreEngine:
         result = await db.execute(
             select(DecisionLog).where(
                 and_(
-                    DecisionLog.store_id  == store_id,
+                    DecisionLog.store_id == store_id,
                     DecisionLog.created_at >= datetime.combine(start_date, datetime.min.time()),
-                    DecisionLog.created_at  < datetime.combine(end_date, datetime.max.time()),
+                    DecisionLog.created_at < datetime.combine(end_date, datetime.max.time()),
                 )
             )
         )
@@ -199,20 +188,15 @@ class BehaviorScoreEngine:
         # 转为 dict 便于纯函数处理
         decisions = [_record_to_dict(r) for r in records]
 
-        adoption_rate  = compute_adoption_rate(decisions)
-        exec_accuracy  = compute_execution_accuracy(decisions)
-        total_saving   = compute_total_saving(decisions)
+        adoption_rate = compute_adoption_rate(decisions)
+        exec_accuracy = compute_execution_accuracy(decisions)
+        total_saving = compute_total_saving(decisions)
 
-        adopted_count   = sum(
-            1 for d in decisions
-            if (d.get("decision_status") or "").lower() in _ADOPTED_STATUSES
-        )
-        rejected_count  = sum(
-            1 for d in decisions
-            if (d.get("decision_status") or "").lower() == "rejected"
-        )
-        feedback_count  = sum(
-            1 for d in decisions
+        adopted_count = sum(1 for d in decisions if (d.get("decision_status") or "").lower() in _ADOPTED_STATUSES)
+        rejected_count = sum(1 for d in decisions if (d.get("decision_status") or "").lower() == "rejected")
+        feedback_count = sum(
+            1
+            for d in decisions
             if (d.get("decision_status") or "").lower() in _ADOPTED_STATUSES
             and (d.get("outcome") or "").lower() in _FEEDBACK_OUTCOMES
         )
@@ -228,25 +212,25 @@ class BehaviorScoreEngine:
         )
 
         return {
-            "store_id":                store_id,
-            "period_start":            start_date.isoformat(),
-            "period_end":              end_date.isoformat(),
-            "total_sent":              len(decisions),
-            "total_adopted":           adopted_count,
-            "total_rejected":          rejected_count,
-            "adoption_rate_pct":       adoption_rate_pct,
-            "adoption_level":          _classify_adoption(adoption_rate_pct),
-            "feedback_count":          feedback_count,
-            "execution_accuracy_pct":  round(exec_accuracy * 100, 1),
-            "total_saving_yuan":       total_saving,
-            "generated_at":            datetime.utcnow().isoformat(),
+            "store_id": store_id,
+            "period_start": start_date.isoformat(),
+            "period_end": end_date.isoformat(),
+            "total_sent": len(decisions),
+            "total_adopted": adopted_count,
+            "total_rejected": rejected_count,
+            "adoption_rate_pct": adoption_rate_pct,
+            "adoption_level": _classify_adoption(adoption_rate_pct),
+            "feedback_count": feedback_count,
+            "execution_accuracy_pct": round(exec_accuracy * 100, 1),
+            "total_saving_yuan": total_saving,
+            "generated_at": datetime.utcnow().isoformat(),
         }
 
     @staticmethod
     async def get_system_roi_summary(
         brand_id: str,
-        month:    date,
-        db:       AsyncSession,
+        month: date,
+        db: AsyncSession,
     ) -> Dict[str, Any]:
         """
         品牌级 ROI 汇总（供老板续费决策参考）。
@@ -278,23 +262,21 @@ class BehaviorScoreEngine:
         from src.models.store import Store
 
         # 获取所有活跃门店
-        stores_result = await db.execute(
-            select(Store).where(Store.is_active == True)
-        )
+        stores_result = await db.execute(select(Store).where(Store.is_active == True))
         stores = stores_result.scalars().all()
 
         # 月份区间
-        year  = month.year
-        mo    = month.month
-        days  = monthrange(year, mo)[1]
+        year = month.year
+        mo = month.month
+        days = monthrange(year, mo)[1]
         start = date(year, mo, 1)
-        end   = date(year, mo, days)
+        end = date(year, mo, days)
 
         # 逐店聚合（单店失败静默跳过）
-        total_sent    = 0
+        total_sent = 0
         total_adopted = 0
-        total_saving  = 0.0
-        store_count   = 0
+        total_saving = 0.0
+        store_count = 0
 
         for store in stores:
             try:
@@ -304,10 +286,10 @@ class BehaviorScoreEngine:
                     end_date=end,
                     db=db,
                 )
-                total_sent    += report["total_sent"]
+                total_sent += report["total_sent"]
                 total_adopted += report["total_adopted"]
-                total_saving  += report["total_saving_yuan"]
-                store_count   += 1
+                total_saving += report["total_saving_yuan"]
+                store_count += 1
             except Exception as exc:
                 logger.warning(
                     "behavior_score.roi_store_failed",
@@ -315,12 +297,10 @@ class BehaviorScoreEngine:
                     error=str(exc),
                 )
 
-        avg_adoption = round(
-            (total_adopted / total_sent * 100) if total_sent > 0 else 0.0, 1
-        )
-        monthly_cost  = _MONTHLY_SYSTEM_COST_YUAN * store_count
-        roi_multiple  = round(total_saving / monthly_cost, 2) if monthly_cost > 0 else 0.0
-        roi_label     = _roi_label(roi_multiple)
+        avg_adoption = round((total_adopted / total_sent * 100) if total_sent > 0 else 0.0, 1)
+        monthly_cost = _MONTHLY_SYSTEM_COST_YUAN * store_count
+        roi_multiple = round(total_saving / monthly_cost, 2) if monthly_cost > 0 else 0.0
+        roi_label = _roi_label(roi_multiple)
 
         logger.info(
             "behavior_score.roi_summary",
@@ -331,39 +311,38 @@ class BehaviorScoreEngine:
         )
 
         return {
-            "brand_id":              brand_id,
-            "year_month":            f"{year:04d}-{mo:02d}",
-            "store_count":           store_count,
-            "total_sent":            total_sent,
-            "total_adopted":         total_adopted,
+            "brand_id": brand_id,
+            "year_month": f"{year:04d}-{mo:02d}",
+            "store_count": store_count,
+            "total_sent": total_sent,
+            "total_adopted": total_adopted,
             "avg_adoption_rate_pct": avg_adoption,
-            "total_saving_yuan":     round(total_saving, 2),
-            "monthly_cost_yuan":     round(monthly_cost, 2),
-            "roi_multiple":          roi_multiple,
-            "roi_label":             roi_label,
-            "generated_at":          datetime.utcnow().isoformat(),
+            "total_saving_yuan": round(total_saving, 2),
+            "monthly_cost_yuan": round(monthly_cost, 2),
+            "roi_multiple": roi_multiple,
+            "roi_label": roi_label,
+            "generated_at": datetime.utcnow().isoformat(),
         }
 
 
 # ── 内部工具 ────────────────────────────────────────────────────────────────────
 
+
 def _record_to_dict(record: Any) -> Dict[str, Any]:
     """将 DecisionLog ORM 对象转为计算用 dict"""
     suggestion = record.ai_suggestion or {}
     return {
-        "id":                  record.id,
-        "store_id":            record.store_id,
-        "decision_type":       record.decision_type,
-        "decision_status":     record.decision_status.value
-                               if hasattr(record.decision_status, "value")
-                               else str(record.decision_status or ""),
-        "outcome":             record.outcome.value
-                               if hasattr(record.outcome, "value")
-                               else str(record.outcome or ""),
-        "ai_suggestion":       suggestion,
+        "id": record.id,
+        "store_id": record.store_id,
+        "decision_type": record.decision_type,
+        "decision_status": (
+            record.decision_status.value if hasattr(record.decision_status, "value") else str(record.decision_status or "")
+        ),
+        "outcome": record.outcome.value if hasattr(record.outcome, "value") else str(record.outcome or ""),
+        "ai_suggestion": suggestion,
         "expected_saving_yuan": suggestion.get("expected_saving_yuan", 0.0),
-        "approved_at":         record.approved_at,
-        "created_at":          record.created_at,
+        "approved_at": record.approved_at,
+        "created_at": record.created_at,
     }
 
 

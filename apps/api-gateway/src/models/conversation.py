@@ -4,12 +4,14 @@ FEAT-001: 语音会话上下文模型
 ConversationTurn + ConversationContext 使语音交互具有状态（记忆最近3轮对话）。
 存储在 Redis，TTL 30分钟（会话超时自动清除）。
 """
+
 import json
 import uuid
 from datetime import datetime
 from typing import Any, ClassVar, Dict, List, Optional
-from pydantic import BaseModel, Field
+
 import structlog
+from pydantic import BaseModel, Field
 
 logger = structlog.get_logger()
 
@@ -18,6 +20,7 @@ CONVERSATION_TTL = 30 * 60  # 30分钟
 
 class ConversationTurn(BaseModel):
     """单轮对话记录"""
+
     turn_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     user_input: str
     intent: Optional[str] = None
@@ -28,6 +31,7 @@ class ConversationTurn(BaseModel):
 
 class ConversationContext(BaseModel):
     """会话上下文（有状态，最近3轮）"""
+
     session_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     store_id: str
     user_id: str
@@ -36,9 +40,9 @@ class ConversationContext(BaseModel):
     turns: List[ConversationTurn] = Field(default_factory=list)
 
     # 会话元数据（跨轮次记忆）
-    current_table: Optional[str] = None     # 当前操作桌号
+    current_table: Optional[str] = None  # 当前操作桌号
     current_order_id: Optional[str] = None  # 当前订单ID
-    pending_intent: Optional[str] = None    # 待确认意图（多步操作用）
+    pending_intent: Optional[str] = None  # 待确认意图（多步操作用）
 
     MAX_TURNS: ClassVar[int] = 3  # 保留最近3轮
 
@@ -46,7 +50,7 @@ class ConversationContext(BaseModel):
         """添加对话轮次，超过 MAX_TURNS 时移除最旧的"""
         self.turns.append(turn)
         if len(self.turns) > self.MAX_TURNS:
-            self.turns = self.turns[-self.MAX_TURNS:]
+            self.turns = self.turns[-self.MAX_TURNS :]
         self.last_active = datetime.utcnow()
 
     def get_recent_turns(self, n: int = 3) -> List[ConversationTurn]:

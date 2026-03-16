@@ -16,19 +16,20 @@ Rule 7 合规：所有决策输出均含 expected_saving_yuan + confidence_pct +
 
 from __future__ import annotations
 
+from datetime import date, timedelta
+from typing import Any, Dict, List, Optional
+
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from typing import Any, Dict, List, Optional
-from datetime import date, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from ..core.dependencies import get_current_active_user, get_db
-from ..models.user import User
+from src.services.behavior_score_engine import BehaviorScoreEngine
 from src.services.decision_priority_engine import DecisionPriorityEngine
 from src.services.decision_push_service import DecisionPushService
 from src.services.scenario_matcher import ScenarioMatcher
-from src.services.behavior_score_engine import BehaviorScoreEngine
+
+from ..core.dependencies import get_current_active_user, get_db
+from ..models.user import User
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/api/v1/decisions", tags=["decision_hub"])
@@ -36,65 +37,67 @@ router = APIRouter(prefix="/api/v1/decisions", tags=["decision_hub"])
 
 # ── 响应模型 ──────────────────────────────────────────────────────────────────
 
+
 class DecisionItem(BaseModel):
-    rank:                  int
-    title:                 str
-    action:                str
-    source:                str
-    expected_saving_yuan:  float
-    expected_cost_yuan:    float
-    net_benefit_yuan:      float
-    confidence_pct:        float
-    urgency_hours:         float
-    execution_difficulty:  str
+    rank: int
+    title: str
+    action: str
+    source: str
+    expected_saving_yuan: float
+    expected_cost_yuan: float
+    net_benefit_yuan: float
+    confidence_pct: float
+    urgency_hours: float
+    execution_difficulty: str
     decision_window_label: str
-    priority_score:        float
+    priority_score: float
 
 
 class Top3Response(BaseModel):
-    store_id:       str
-    decisions:      List[DecisionItem]
-    count:          int
-    generated_at:   str
+    store_id: str
+    decisions: List[DecisionItem]
+    count: int
+    generated_at: str
 
 
 class TriggerPushRequest(BaseModel):
-    store_id:            str
-    push_type:           str = "morning"   # morning | noon | prebattle | evening
-    recipient_user_id:   Optional[str] = None
+    store_id: str
+    push_type: str = "morning"  # morning | noon | prebattle | evening
+    recipient_user_id: Optional[str] = None
     monthly_revenue_yuan: float = 0.0
 
 
 class FlowWindowState(BaseModel):
-    window:      str
-    slug:        str
-    state:       Optional[Dict[str, Any]] = None   # DecisionFlowState.summary() or null
+    window: str
+    slug: str
+    state: Optional[Dict[str, Any]] = None  # DecisionFlowState.summary() or null
 
 
 class FlowHistoryResponse(BaseModel):
-    store_id:     str
-    date:         str
-    windows:      List[FlowWindowState]
-    pushed_count: int   # 今日实际成功推送次数
+    store_id: str
+    date: str
+    windows: List[FlowWindowState]
+    pushed_count: int  # 今日实际成功推送次数
 
 
 class ScenarioResponse(BaseModel):
-    store_id:       str
-    scenario_type:  str
+    store_id: str
+    scenario_type: str
     scenario_label: str
-    metrics:        Dict[str, Any]
-    similar_cases:  List[Dict[str, Any]]
-    as_of:          str
+    metrics: Dict[str, Any]
+    similar_cases: List[Dict[str, Any]]
+    as_of: str
 
 
 # ── GET /api/v1/decisions/top3 ────────────────────────────────────────────────
 
+
 @router.get("/top3", response_model=Top3Response)
 async def get_top3_decisions(
-    store_id:             str,
+    store_id: str,
     monthly_revenue_yuan: float = Query(default=0.0, description="月营收（元），用于财务影响评分"),
-    current_user: User    = Depends(get_current_active_user),
-    db: AsyncSession      = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     查询门店当前 Top3 决策（含 ¥ 预期收益 + 置信度）。
@@ -109,14 +112,14 @@ async def get_top3_decisions(
     from datetime import datetime
 
     try:
-        engine    = DecisionPriorityEngine(store_id=store_id)
+        engine = DecisionPriorityEngine(store_id=store_id)
         decisions = await engine.get_top3(db=db, monthly_revenue_yuan=monthly_revenue_yuan)
 
         logger.info("top3_decisions_queried", store_id=store_id, count=len(decisions))
         return {
-            "store_id":     store_id,
-            "decisions":    decisions,
-            "count":        len(decisions),
+            "store_id": store_id,
+            "decisions": decisions,
+            "count": len(decisions),
             "generated_at": datetime.utcnow().isoformat(),
         }
     except Exception as exc:
@@ -126,11 +129,12 @@ async def get_top3_decisions(
 
 # ── POST /api/v1/decisions/trigger-push ──────────────────────────────────────
 
+
 @router.post("/trigger-push")
 async def trigger_decision_push(
     req: TriggerPushRequest,
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession   = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     手动触发决策推送（无需等待定时任务）。
@@ -144,15 +148,13 @@ async def trigger_decision_push(
     import os
 
     push_type = req.push_type.lower()
-    recipient = req.recipient_user_id or os.getenv(
-        f"WECHAT_RECIPIENT_{req.store_id.upper()}", f"store_{req.store_id}"
-    )
+    recipient = req.recipient_user_id or os.getenv(f"WECHAT_RECIPIENT_{req.store_id.upper()}", f"store_{req.store_id}")
 
     push_map = {
-        "morning":   DecisionPushService.push_morning_decisions,
-        "noon":      DecisionPushService.push_noon_anomaly,
+        "morning": DecisionPushService.push_morning_decisions,
+        "noon": DecisionPushService.push_noon_anomaly,
         "prebattle": DecisionPushService.push_prebattle_decisions,
-        "evening":   DecisionPushService.push_evening_recap,
+        "evening": DecisionPushService.push_evening_recap,
     }
 
     if push_type not in push_map:
@@ -185,7 +187,7 @@ _PUSH_WINDOWS = [
 
 @router.get("/flow-history", response_model=FlowHistoryResponse)
 async def get_flow_history(
-    store_id:    str,
+    store_id: str,
     target_date: Optional[date] = Query(None, alias="date", description="查询日期 YYYY-MM-DD，默认今天"),
     current_user: User = Depends(get_current_active_user),
 ):
@@ -208,16 +210,15 @@ async def get_flow_history(
             push_window=window_name,
             target_date=query_date,
         )
-        windows.append(FlowWindowState(
-            window=window_name,
-            slug=slug,
-            state=state.summary() if state else None,
-        ))
+        windows.append(
+            FlowWindowState(
+                window=window_name,
+                slug=slug,
+                state=state.summary() if state else None,
+            )
+        )
 
-    pushed_count = sum(
-        1 for w in windows
-        if w.state and w.state.get("push_sent")
-    )
+    pushed_count = sum(1 for w in windows if w.state and w.state.get("push_sent"))
 
     logger.info(
         "flow_history_queried",
@@ -235,12 +236,13 @@ async def get_flow_history(
 
 # ── GET /api/v1/decisions/pending ────────────────────────────────────────────
 
+
 @router.get("/pending")
 async def list_pending_decisions(
-    store_id:      Optional[str] = None,
-    limit:         int           = Query(default=20, le=100),
-    current_user:  User          = Depends(get_current_active_user),
-    db: AsyncSession             = Depends(get_db),
+    store_id: Optional[str] = None,
+    limit: int = Query(default=20, le=100),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     获取待审批决策列表（给前端审批页面使用）。
@@ -257,33 +259,36 @@ async def list_pending_decisions(
     if store_id:
         stmt = stmt.where(DecisionLog.store_id == store_id)
 
-    result  = await db.execute(stmt)
+    result = await db.execute(stmt)
     records = result.scalars().all()
 
     items = []
     for r in records:
         suggestion = r.ai_suggestion or {}
-        items.append({
-            "id":                    r.id,
-            "store_id":              r.store_id,
-            "decision_type":         r.decision_type,
-            "action":                suggestion.get("action", ""),
-            "expected_saving_yuan":  suggestion.get("expected_saving_yuan", 0.0),
-            "confidence_pct":        round(float(r.ai_confidence or 0) * 100, 1),
-            "created_at":            r.created_at.isoformat() if r.created_at else None,
-        })
+        items.append(
+            {
+                "id": r.id,
+                "store_id": r.store_id,
+                "decision_type": r.decision_type,
+                "action": suggestion.get("action", ""),
+                "expected_saving_yuan": suggestion.get("expected_saving_yuan", 0.0),
+                "confidence_pct": round(float(r.ai_confidence or 0) * 100, 1),
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+        )
 
     return {"total": len(items), "items": items}
 
 
 # ── GET /api/v1/decisions/scenario ───────────────────────────────────────────
 
+
 @router.get("/scenario", response_model=ScenarioResponse)
 async def get_store_scenario(
-    store_id:      str,
-    as_of:         Optional[date] = None,
-    current_user:  User           = Depends(get_current_active_user),
-    db: AsyncSession              = Depends(get_db),
+    store_id: str,
+    as_of: Optional[date] = None,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     识别门店当前经营场景，并返回最相似的历史案例（含执行结果）。
@@ -292,9 +297,7 @@ async def get_store_scenario(
               营收下行期 / 周末经营期 / 新品上市期 / 工作日正常期
     """
     try:
-        scenario_info = await ScenarioMatcher.identify_current_scenario(
-            store_id=store_id, db=db, as_of=as_of
-        )
+        scenario_info = await ScenarioMatcher.identify_current_scenario(store_id=store_id, db=db, as_of=as_of)
         similar_cases = await ScenarioMatcher.find_similar_cases(
             store_id=store_id,
             scenario_type=scenario_info["scenario_type"],
@@ -313,13 +316,14 @@ async def get_store_scenario(
 
 # ── GET /api/v1/decisions/behavior-report ────────────────────────────────────
 
+
 @router.get("/behavior-report")
 async def get_behavior_report(
-    store_id:   str,
+    store_id: str,
     start_date: Optional[date] = None,
-    end_date:   Optional[date] = None,
-    current_user: User         = Depends(get_current_active_user),
-    db: AsyncSession           = Depends(get_db),
+    end_date: Optional[date] = None,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     门店 AI 建议采纳率报告（BehaviorScoreEngine）。
@@ -351,14 +355,15 @@ async def get_behavior_report(
 
 # ── P3-1 A/B 测试：推送时间点效果分析 ─────────────────────────────────────────
 
+
 @router.get("/stores/{store_id}/push-ab-test", summary="决策推送时间点 A/B 测试分析")
 async def get_push_ab_test(
-    store_id:      str,
-    start_date:    Optional[date] = None,
-    end_date:      Optional[date] = None,
-    lookback_days: int            = Query(30, ge=7, le=180, description="回望天数"),
-    current_user:  User           = Depends(get_current_active_user),
-    db: AsyncSession              = Depends(get_db),
+    store_id: str,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    lookback_days: int = Query(30, ge=7, le=180, description="回望天数"),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     分析门店 4 个决策推送时间点（晨推/午推/战前/晚推）的采纳效果。
@@ -372,6 +377,7 @@ async def get_push_ab_test(
       - recommendation: 文字建议
     """
     from src.services.decision_ab_test_service import DecisionPushABTestService
+
     try:
         return await DecisionPushABTestService.analyze(
             session=db,
@@ -387,15 +393,16 @@ async def get_push_ab_test(
 
 @router.get("/push-ab-test/multi-store", summary="多门店推送时间点横向对比")
 async def get_push_ab_test_multi_store(
-    store_ids:     str            = Query(..., description="逗号分隔的门店 ID 列表"),
-    lookback_days: int            = Query(30, ge=7, le=180, description="回望天数"),
-    current_user:  User           = Depends(get_current_active_user),
-    db: AsyncSession              = Depends(get_db),
+    store_ids: str = Query(..., description="逗号分隔的门店 ID 列表"),
+    lookback_days: int = Query(30, ge=7, le=180, description="回望天数"),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     多门店横向对比各推送时间点效果，找出全局最优推送时间点。
     """
     from src.services.decision_ab_test_service import DecisionPushABTestService
+
     ids = [s.strip() for s in store_ids.split(",") if s.strip()]
     if not ids:
         raise HTTPException(status_code=400, detail="store_ids 不能为空")

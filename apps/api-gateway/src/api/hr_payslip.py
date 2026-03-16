@@ -1,23 +1,26 @@
 """
 HR Payslip API — 工资条生成、PDF下载、IM推送、员工确认
 """
+
+from typing import Optional
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
-from typing import Optional
 from pydantic import BaseModel
-import structlog
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
 from ..models.user import User
 from ..services.payslip_service import PayslipService
-from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
 router = APIRouter()
 
 
 # ── 请求模型 ──────────────────────────────────────────
+
 
 class BatchPushRequest(BaseModel):
     store_id: str
@@ -32,11 +35,13 @@ class ConfirmRequest(BaseModel):
 
 # ── 工具函数 ──────────────────────────────────────────
 
+
 def _get_service(store_id: str, brand_id: Optional[str] = None) -> PayslipService:
     return PayslipService(store_id=store_id, brand_id=brand_id or "")
 
 
 # ── API 端点 ──────────────────────────────────────────
+
 
 @router.get("/hr/payslip/{employee_id}/{pay_month}")
 async def get_payslip_data(

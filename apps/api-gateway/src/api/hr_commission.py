@@ -1,22 +1,21 @@
 """
 HR Commission API -- 提成规则管理 + 提成记录
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import Optional, List
-from datetime import date
-from pydantic import BaseModel
+
 import uuid as uuid_mod
+from datetime import date
+from typing import List, Optional
+
 import structlog
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+from sqlalchemy import and_, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
+from ..models.commission import CommissionCalcMethod, CommissionRecord, CommissionRule, CommissionType
 from ..models.user import User
-from ..models.commission import (
-    CommissionRule, CommissionRecord,
-    CommissionType, CommissionCalcMethod,
-)
-from sqlalchemy import select, and_, func
-from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -24,11 +23,12 @@ router = APIRouter()
 
 # ── 请求模型 ──────────────────────────────────────────
 
+
 class CommissionRuleRequest(BaseModel):
     store_id: str
     name: str
-    commission_type: str                    # sales_amount|dish_count|service_fee|membership|custom
-    calc_method: str                        # fixed_per_unit|percentage|tiered
+    commission_type: str  # sales_amount|dish_count|service_fee|membership|custom
+    calc_method: str  # fixed_per_unit|percentage|tiered
     applicable_positions: Optional[List[str]] = None
     applicable_employee_ids: Optional[List[str]] = None
     fixed_amount_fen: int = 0
@@ -54,6 +54,7 @@ class CommissionRecordRequest(BaseModel):
 
 
 # ── 提成规则 ──────────────────────────────────────────
+
 
 @router.get("/hr/commission/rules")
 async def list_commission_rules(
@@ -126,9 +127,7 @@ async def toggle_commission_rule(
     current_user: User = Depends(get_current_active_user),
 ):
     """启用/停用提成规则"""
-    result = await db.execute(
-        select(CommissionRule).where(CommissionRule.id == rule_id)
-    )
+    result = await db.execute(select(CommissionRule).where(CommissionRule.id == rule_id))
     rule = result.scalar_one_or_none()
     if not rule:
         raise HTTPException(status_code=404, detail="规则不存在")
@@ -138,6 +137,7 @@ async def toggle_commission_rule(
 
 
 # ── 提成记录 ──────────────────────────────────────────
+
 
 @router.get("/hr/commission/records")
 async def list_commission_records(

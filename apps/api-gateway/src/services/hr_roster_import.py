@@ -1,14 +1,14 @@
 """
 花名册Excel导入服务 — 支持从乐才/钉钉/企微等HR系统导入员工数据
 """
-from typing import Any, Dict, List, Optional, Tuple
-from datetime import date, datetime
-import structlog
+
 import io
+from datetime import date, datetime
+from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import select, and_
+import structlog
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.models.employee import Employee
 from src.models.organization import Organization
 
@@ -64,8 +64,12 @@ LECAI_COLUMN_MAP = {
 
 # 日期类字段
 DATE_FIELDS = {
-    "health_cert_expiry", "id_card_expiry", "birth_date",
-    "first_work_date", "regular_date", "hire_date",
+    "health_cert_expiry",
+    "id_card_expiry",
+    "birth_date",
+    "first_work_date",
+    "regular_date",
+    "hire_date",
 }
 
 # 布尔类字段
@@ -186,9 +190,7 @@ class HRRosterImportService:
                 data["store_id"] = data.get("store_id") or store_id
 
                 # upsert
-                existing = await db.execute(
-                    select(Employee).where(Employee.id == emp_id)
-                )
+                existing = await db.execute(select(Employee).where(Employee.id == emp_id))
                 emp = existing.scalar_one_or_none()
 
                 if emp:
@@ -261,9 +263,7 @@ class HRRosterImportService:
 
         return str(val).strip() if val else None
 
-    async def _ensure_org_node(
-        self, db: AsyncSession, dept_name: str, store_id: Optional[str]
-    ) -> None:
+    async def _ensure_org_node(self, db: AsyncSession, dept_name: str, store_id: Optional[str]) -> None:
         """确保组织节点存在，不存在则创建"""
         existing = await db.execute(
             select(Organization).where(

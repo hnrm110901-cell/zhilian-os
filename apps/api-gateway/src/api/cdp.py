@@ -4,13 +4,13 @@ CDP API — Consumer Data Platform 统一消费者身份管理
 Sprint 1: 身份解析 + 回填 + 统计
 Sprint 2: RFM 重算 + 企微通道 + 偏差校验
 """
+
 import logging
-from typing import Optional, List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.core.dependencies import get_current_user
 from src.services.identity_resolution_service import identity_resolution_service
@@ -21,6 +21,7 @@ router = APIRouter(prefix="/api/v1/cdp", tags=["CDP"])
 
 
 # ── Request / Response Schemas ──────────────────────────────────────
+
 
 class ResolveRequest(BaseModel):
     phone: str
@@ -43,6 +44,7 @@ class BackfillRequest(BaseModel):
 
 
 # ── Endpoints ───────────────────────────────────────────────────────
+
 
 @router.post("/resolve")
 async def resolve_consumer(
@@ -76,6 +78,7 @@ async def get_consumer(
 ):
     """获取消费者详情"""
     import uuid
+
     try:
         cid = uuid.UUID(consumer_id)
     except ValueError:
@@ -130,6 +133,7 @@ async def merge_consumers(
 ):
     """合并两个消费者身份（loser → winner）"""
     import uuid
+
     try:
         winner = uuid.UUID(req.winner_id)
         loser = uuid.UUID(req.loser_id)
@@ -152,7 +156,9 @@ async def backfill_orders(
 ):
     """回填指定门店存量订单的 consumer_id"""
     result = await identity_resolution_service.backfill_orders(
-        db, req.store_id, batch_size=req.batch_size,
+        db,
+        req.store_id,
+        batch_size=req.batch_size,
     )
     await db.commit()
     return result
@@ -166,7 +172,9 @@ async def backfill_reservations(
 ):
     """回填指定门店存量预订的 consumer_id"""
     result = await identity_resolution_service.backfill_reservations(
-        db, req.store_id, batch_size=req.batch_size,
+        db,
+        req.store_id,
+        batch_size=req.batch_size,
     )
     await db.commit()
     return result
@@ -180,6 +188,7 @@ async def refresh_profile(
 ):
     """刷新消费者聚合统计"""
     import uuid
+
     try:
         cid = uuid.UUID(consumer_id)
     except ValueError:
@@ -211,10 +220,12 @@ async def get_fill_rate(
     返回 orders/reservations/queues 各表的填充率
     """
     from src.services.cdp_sync_service import cdp_sync_service
+
     return await cdp_sync_service.get_fill_rate(db, store_id=store_id)
 
 
 # ── Sprint 2: RFM 重算 + 企微通道 ──────────────────────────────────
+
 
 class RFMRecalcRequest(BaseModel):
     store_id: Optional[str] = None
@@ -251,6 +262,7 @@ async def rfm_recalculate(
 ):
     """基于 consumer_id 重算全量 RFM（Sprint 2）"""
     from src.services.cdp_rfm_service import cdp_rfm_service
+
     result = await cdp_rfm_service.recalculate_all(db, store_id=req.store_id)
     await db.commit()
     return result
@@ -264,6 +276,7 @@ async def rfm_deviation(
 ):
     """RFM 偏差率（Sprint 2 KPI: < 5%）"""
     from src.services.cdp_rfm_service import cdp_rfm_service
+
     return await cdp_rfm_service.compute_deviation(db, store_id=store_id)
 
 
@@ -275,8 +288,11 @@ async def backfill_members(
 ):
     """将 PrivateDomainMember 链接到 ConsumerIdentity（按 customer_id=phone 匹配）"""
     from src.services.cdp_rfm_service import cdp_rfm_service
+
     result = await cdp_rfm_service.backfill_members(
-        db, store_id=req.store_id, batch_size=req.batch_size,
+        db,
+        store_id=req.store_id,
+        batch_size=req.batch_size,
     )
     await db.commit()
     return result
@@ -290,10 +306,15 @@ async def wechat_batch_send(
 ):
     """按 RFM 等级批量发送企微消息（默认 dry_run=True 仅预估）"""
     from src.services.cdp_wechat_channel import cdp_wechat_channel
+
     result = await cdp_wechat_channel.batch_send_by_rfm(
-        db, req.store_id, req.rfm_levels,
-        req.message_type, req.content,
-        limit=req.limit, dry_run=req.dry_run,
+        db,
+        req.store_id,
+        req.rfm_levels,
+        req.message_type,
+        req.content,
+        limit=req.limit,
+        dry_run=req.dry_run,
     )
     if not req.dry_run:
         await db.commit()
@@ -308,10 +329,15 @@ async def wechat_tag_send(
 ):
     """按标签定向推送企微消息"""
     from src.services.cdp_wechat_channel import cdp_wechat_channel
+
     result = await cdp_wechat_channel.batch_send_by_tags(
-        db, req.store_id, req.tags,
-        req.message_type, req.content,
-        limit=req.limit, dry_run=req.dry_run,
+        db,
+        req.store_id,
+        req.tags,
+        req.message_type,
+        req.content,
+        limit=req.limit,
+        dry_run=req.dry_run,
     )
     if not req.dry_run:
         await db.commit()
@@ -326,4 +352,5 @@ async def wechat_channel_stats(
 ):
     """企微通道统计：openid覆盖率 + CDP链接率"""
     from src.services.cdp_wechat_channel import cdp_wechat_channel
+
     return await cdp_wechat_channel.get_channel_stats(db, store_id=store_id)

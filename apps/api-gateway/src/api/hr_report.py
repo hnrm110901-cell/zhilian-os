@@ -1,18 +1,20 @@
 """
 月度人事报表API — 生成/查看/导出
 """
+
+from io import BytesIO
+from typing import Optional
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from typing import Optional
-from io import BytesIO
-import structlog
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
 from ..models.user import User
-from ..services.hr_report_engine import HRReportEngine
 from ..services.hr_excel_export import HRExcelExporter
-from sqlalchemy.ext.asyncio import AsyncSession
+from ..services.hr_report_engine import HRReportEngine
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -46,8 +48,9 @@ async def cross_store_report(
     current_user: User = Depends(get_current_active_user),
 ):
     """跨门店人事汇总"""
-    from ..models.store import Store
     from sqlalchemy import select
+
+    from ..models.store import Store
 
     # 获取品牌下所有门店
     result = await db.execute(
@@ -69,14 +72,16 @@ async def cross_store_report(
             report = await engine.generate_monthly_report(db, pay_month)
             sc = report.get("salary_changes", {})
             hc = report.get("headcount_inventory", {})
-            store_reports.append({
-                "store_id": store.id,
-                "store_name": store.name,
-                "headcount": hc.get("total_headcount", 0),
-                "new_count": sc.get("new_count", 0),
-                "resign_count": sc.get("resignation_count", 0),
-                "turnover_rate_pct": report.get("hr_summary", {}).get("turnover_rate_pct", 0),
-            })
+            store_reports.append(
+                {
+                    "store_id": store.id,
+                    "store_name": store.name,
+                    "headcount": hc.get("total_headcount", 0),
+                    "new_count": sc.get("new_count", 0),
+                    "resign_count": sc.get("resignation_count", 0),
+                    "turnover_rate_pct": report.get("hr_summary", {}).get("turnover_rate_pct", 0),
+                }
+            )
             total_headcount += hc.get("total_headcount", 0)
             total_new += sc.get("new_count", 0)
             total_resign += sc.get("resignation_count", 0)

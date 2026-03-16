@@ -29,7 +29,6 @@ from typing import Dict, List, Optional, Tuple
 import structlog
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.models.customer_key import CustomerKey, EncryptedField, KeyAlgorithm, KeyStatus
 
 logger = structlog.get_logger()
@@ -163,11 +162,8 @@ class DataEncryptionService:
         if purpose:
             conditions.append(CustomerKey.purpose == purpose)
         from sqlalchemy import and_
-        stmt = (
-            select(CustomerKey)
-            .where(and_(*conditions))
-            .order_by(CustomerKey.key_version.desc())
-        )
+
+        stmt = select(CustomerKey).where(and_(*conditions)).order_by(CustomerKey.key_version.desc())
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
@@ -272,6 +268,7 @@ class DataEncryptionService:
     def _wrap_key(self, raw_dek: bytes) -> str:
         """使用 KEK (AES-256-GCM) 包裹 DEK，返回 Base64 字符串"""
         from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
         iv = os.urandom(12)
         aesgcm = AESGCM(KEK)
         wrapped = aesgcm.encrypt(iv, raw_dek, None)
@@ -280,6 +277,7 @@ class DataEncryptionService:
     def _unwrap_key(self, encrypted_dek: str) -> bytes:
         """解包 KEK 保护的 DEK"""
         from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
         raw = base64.b64decode(encrypted_dek)
         iv = raw[:12]
         wrapped_key = raw[12:]
@@ -294,6 +292,7 @@ class DataEncryptionService:
         purpose: str,
     ) -> Optional[CustomerKey]:
         from sqlalchemy import and_
+
         stmt = select(CustomerKey).where(
             and_(
                 CustomerKey.store_id == store_id,
@@ -305,7 +304,8 @@ class DataEncryptionService:
         return result.scalar_one_or_none()
 
     async def _get_max_version(self, store_id: str, purpose: str) -> int:
-        from sqlalchemy import func, and_
+        from sqlalchemy import and_, func
+
         stmt = select(func.max(CustomerKey.key_version)).where(
             and_(CustomerKey.store_id == store_id, CustomerKey.purpose == purpose)
         )

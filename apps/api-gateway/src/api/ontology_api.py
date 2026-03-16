@@ -1,14 +1,15 @@
 """
 本体层 API（Palantir L2）：图谱初始化、BOM 本体化、同步入口、感知层导入
 """
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
-from fastapi.responses import PlainTextResponse
-import structlog
-from pydantic import BaseModel, Field
+
 from typing import Any, Dict, List, Optional
 
-from src.core.dependencies import get_current_active_user
+import structlog
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi.responses import PlainTextResponse
+from pydantic import BaseModel, Field
 from src.core.database import get_db_session
+from src.core.dependencies import get_current_active_user
 from src.models import User
 from src.ontology import get_ontology_repository
 from src.services.ontology_sync_service import sync_bom_version_to_pg
@@ -110,9 +111,7 @@ async def bom_upsert(
         )
     # BOM 双向同步：回写 PG Dish.bom_version / effective_date
     async with get_db_session() as session:
-        await sync_bom_version_to_pg(
-            session, body.dish_id, body.version, body.effective_date
-        )
+        await sync_bom_version_to_pg(session, body.dish_id, body.version, body.effective_date)
     return {"ok": True, "bom_id": bom_id}
 
 
@@ -137,12 +136,14 @@ async def get_dish_bom(
 
 # ---------- 感知层半自动导入（L1）----------
 
+
 @router.get("/perception/template/inventory_snapshot", response_class=PlainTextResponse)
 async def get_perception_template_inventory_snapshot(
     _: User = Depends(get_current_active_user),
 ):
     """下载库存快照标准化 CSV 模板（列：store_id, ing_id, qty, unit, ts, source）。"""
     from src.services.perception_import_service import get_inventory_snapshot_template_csv
+
     return PlainTextResponse(
         get_inventory_snapshot_template_csv(),
         media_type="text/csv",
@@ -162,11 +163,10 @@ async def perception_import(
     列名支持：store_id/门店ID, ing_id/食材ID/物料ID, qty/数量, unit/单位, ts/时间, source/来源。
     """
     from src.services.perception_import_service import import_inventory_snapshots
+
     raw = await file.read()
     try:
-        ok, fail, errors = import_inventory_snapshots(
-            raw, file.filename or "upload", tenant_id, default_store_id
-        )
+        ok, fail, errors = import_inventory_snapshots(raw, file.filename or "upload", tenant_id, default_store_id)
     except ValueError as e:
         raise HTTPException(400, detail=str(e))
     except RuntimeError as e:
@@ -175,6 +175,7 @@ async def perception_import(
 
 
 # ---------- P2：IoT 网关 / 边缘节点 → 标准化写入本体 ----------
+
 
 class EdgeInventorySnapshotItem(BaseModel):
     ing_id: str
@@ -193,6 +194,7 @@ class EdgeEquipmentItem(BaseModel):
 
 class EdgePushRequest(BaseModel):
     """边缘节点（如树莓派 5）标准化上报：写入图谱 InventorySnapshot / Equipment。"""
+
     store_id: str
     tenant_id: Optional[str] = None
     inventory_snapshots: List[EdgeInventorySnapshotItem] = Field(default_factory=list)
@@ -247,6 +249,7 @@ async def perception_edge_push(
 
 # ---------- L4 Action 状态机 ----------
 
+
 @router.post("/actions")
 async def action_create(
     body: ActionCreateRequest,
@@ -255,6 +258,7 @@ async def action_create(
     """创建 L4 Action 任务（可关联推理报告）。"""
     from src.core.database import get_db_session
     from src.services.ontology_action_service import create_action
+
     async with get_db_session() as session:
         action = await create_action(
             session,
@@ -270,7 +274,12 @@ async def action_create(
         )
         await session.commit()
         aid = str(action.id)
-    return {"ok": True, "action_id": aid, "status": action.status, "deadline_at": action.deadline_at.isoformat() if action.deadline_at else None}
+    return {
+        "ok": True,
+        "action_id": aid,
+        "status": action.status,
+        "deadline_at": action.deadline_at.isoformat() if action.deadline_at else None,
+    }
 
 
 @router.get("/actions")
@@ -286,6 +295,7 @@ async def action_list(
     """L4 Action 列表。"""
     from src.core.database import get_db_session
     from src.services.ontology_action_service import list_actions
+
     async with get_db_session() as session:
         actions = await list_actions(session, tenant_id, store_id, status, assignee_staff_id, limit, offset)
     return {
@@ -317,6 +327,7 @@ async def action_update_status(
     """更新 Action 状态（如回执 acked、完成 done）。"""
     from src.core.database import get_db_session
     from src.services.ontology_action_service import update_status
+
     async with get_db_session() as session:
         action = await update_status(session, action_id, body.status)
         await session.commit()
@@ -333,6 +344,7 @@ async def action_send_to_wechat(
     """将 L4 Action 推送到企微并标记为 SENT（需配置企微应用）。"""
     from src.core.database import get_db_session
     from src.services.ontology_action_service import push_action_to_wechat
+
     async with get_db_session() as session:
         action = await push_action_to_wechat(session, action_id)
         await session.commit()
@@ -348,6 +360,7 @@ async def ontology_nl_query(
 ):
     """自然语言查询图谱：意图识别 → 图谱/推理 → 结构化答案 + 溯源。"""
     from src.services.ontology_nl_query_service import query_ontology_natural_language
+
     result = await query_ontology_natural_language(
         question=body.question,
         tenant_id=body.tenant_id,
@@ -364,6 +377,7 @@ async def reasoning_waste(
     """损耗五步推理：库存差异→BOM偏差→时间窗口员工→供应商批次→根因评分 TOP3。"""
     from src.core.database import get_db_session
     from src.services.waste_reasoning_service import run_waste_reasoning
+
     async with get_db_session() as session:
         report = await run_waste_reasoning(
             session,
@@ -383,10 +397,9 @@ async def sync_from_pg(
     """从 PostgreSQL 主数据同步 Store、Dish、Ingredient、Staff、Order 到图谱（L2）。"""
     from src.core.database import get_db_session
     from src.services.ontology_sync_service import sync_ontology_from_pg
+
     async with get_db_session() as session:
-        result = await sync_ontology_from_pg(
-            session, tenant_id=body.tenant_id, store_id=body.store_id
-        )
+        result = await sync_ontology_from_pg(session, tenant_id=body.tenant_id, store_id=body.store_id)
     return {"ok": True, "synced": result}
 
 
@@ -403,6 +416,7 @@ async def get_replenish(
     target_date 格式 YYYY-MM-DD。
     """
     from datetime import date
+
     from src.core.database import get_db_session
     from src.services.ontology_replenish_service import get_replenish_suggestion
 
@@ -422,6 +436,7 @@ async def get_replenish(
 
 
 # ---------- P2：Equipment 节点 ----------
+
 
 class EquipmentUpsertRequest(BaseModel):
     equip_id: str
@@ -452,6 +467,7 @@ async def upsert_equipment(
 
 # ---------- P2：本体模板复制 ----------
 
+
 class CloneTemplateRequest(BaseModel):
     source_store_id: str
     target_store_id: str
@@ -476,6 +492,7 @@ async def clone_template(
 
 # ---------- P2：知识库雏形（损耗规则/BOM基准/异常模式）----------
 
+
 class KnowledgeAddRequest(BaseModel):
     tenant_id: str
     type: str = Field(..., description="waste_rule | bom_baseline | anomaly_pattern")
@@ -490,7 +507,8 @@ async def knowledge_add(
     _: User = Depends(get_current_active_user),
 ):
     """新增知识库条目（损耗规则库、BOM 基准库、异常模式库）。"""
-    from src.services.ontology_knowledge_service import add_knowledge, KNOWLEDGE_TYPES
+    from src.services.ontology_knowledge_service import KNOWLEDGE_TYPES, add_knowledge
+
     if body.type not in KNOWLEDGE_TYPES:
         raise HTTPException(status_code=400, detail=f"type 须为 {list(KNOWLEDGE_TYPES)} 之一")
     record = add_knowledge(
@@ -513,6 +531,7 @@ async def knowledge_list(
 ):
     """列表查询知识库。"""
     from src.services.ontology_knowledge_service import list_knowledge
+
     items = list_knowledge(tenant_id=tenant_id, knowledge_type=type, store_id=store_id, limit=limit)
     return {"items": items}
 
@@ -524,6 +543,7 @@ async def knowledge_get(
 ):
     """按 id 查询知识库条目。"""
     from src.services.ontology_knowledge_service import get_knowledge
+
     record = get_knowledge(knowledge_id)
     if not record:
         raise HTTPException(status_code=404, detail="未找到")
@@ -544,6 +564,7 @@ async def knowledge_update(
 ):
     """更新知识库条目（仅更新传入的字段）。"""
     from src.services.ontology_knowledge_service import update_knowledge
+
     record = update_knowledge(
         knowledge_id,
         name=body.name,
@@ -562,6 +583,7 @@ async def knowledge_delete(
 ):
     """删除知识库条目。"""
     from src.services.ontology_knowledge_service import delete_knowledge
+
     if not delete_knowledge(knowledge_id):
         raise HTTPException(status_code=404, detail="未找到")
     return {"ok": True, "id": knowledge_id}
@@ -569,7 +591,9 @@ async def knowledge_delete(
 
 class KnowledgeDistributeRequest(BaseModel):
     tenant_id: str
-    target_store_ids: List[str] = Field(default_factory=list, description="目标门店 ID 列表；空表示下发到连锁级（一条 store_id 为空的记录）")
+    target_store_ids: List[str] = Field(
+        default_factory=list, description="目标门店 ID 列表；空表示下发到连锁级（一条 store_id 为空的记录）"
+    )
 
 
 @router.post("/knowledge/{knowledge_id}/distribute")
@@ -580,6 +604,7 @@ async def knowledge_distribute(
 ):
     """连锁下发：将知识库条目复制到指定门店或连锁级。"""
     from src.services.ontology_knowledge_service import distribute_knowledge
+
     result = distribute_knowledge(
         knowledge_id=knowledge_id,
         tenant_id=body.tenant_id,
@@ -593,6 +618,7 @@ async def knowledge_distribute(
 # ---------- Phase 3：导出与跨店 ----------
 
 # ---------- 徐记 POC 扩展 ----------
+
 
 class LiveSeafoodUpsertRequest(BaseModel):
     live_seafood_id: str
@@ -725,6 +751,7 @@ async def ontology_context_for_agent(
 ):
     """为 Agent 拉取图谱上下文（bom, inventory_snapshot, waste_summary）。types 逗号分隔，不传则全部。"""
     from src.services.ontology_context_service import get_ontology_context_for_agent
+
     want = [x.strip() for x in (types or "").split(",") if x.strip()] or None
     result = await get_ontology_context_for_agent(store_id=store_id, tenant_id=tenant_id, types=want)
     return result
@@ -738,6 +765,7 @@ async def ontology_export(
 ):
     """导出图谱快照（JSON）：门店、菜品、食材、BOM、库存快照。支持按 store_id 过滤。"""
     from src.services.ontology_export_service import export_graph_snapshot
+
     return export_graph_snapshot(tenant_id=tenant_id, store_id=store_id)
 
 
@@ -753,6 +781,7 @@ async def ontology_graph_full(
     用于 OntologyGraphPage 全图可视化。
     """
     from src.services.ontology_export_service import export_full_graph
+
     return export_full_graph(tenant_id=tenant_id, store_id=store_id)
 
 
@@ -773,11 +802,8 @@ async def list_waste_events(
     where = " WHERE n.store_id = $store_id" if store_id else ""
     params: Dict[str, Any] = {"store_id": store_id} if store_id else {}
     query = (
-        "MATCH (n:WasteEvent)"
-        + where
-        + " RETURN n.event_id AS event_id, n.store_id AS store_id,"
-          " n.event_type AS event_type, n.root_cause AS root_cause, n.amount AS amount"
-        + " LIMIT $limit"
+        "MATCH (n:WasteEvent)" + where + " RETURN n.event_id AS event_id, n.store_id AS store_id,"
+        " n.event_type AS event_type, n.root_cause AS root_cause, n.amount AS amount" + " LIMIT $limit"
     )
     params["limit"] = limit
     rows = repo.run_read_only_query(query, params)
@@ -795,27 +821,30 @@ async def ontology_graph_stats(
     if not repo:
         return {"error": "Neo4j 未启用", "stats": {}}
 
-    labels = ["Store", "Dish", "BOM", "Ingredient", "InventorySnapshot",
-              "Staff", "WasteEvent", "TrainingModule"]
+    labels = ["Store", "Dish", "BOM", "Ingredient", "InventorySnapshot", "Staff", "WasteEvent", "TrainingModule"]
     stats: Dict[str, int] = {}
     for label in labels:
         try:
-            rows = repo.run_read_only_query(
-                f"MATCH (n:{label}) RETURN count(n) AS cnt"
-            )
+            rows = repo.run_read_only_query(f"MATCH (n:{label}) RETURN count(n) AS cnt")
             stats[label] = rows[0]["cnt"] if rows else 0
         except Exception:
             stats[label] = -1
 
     # 关系数量
-    rel_types = ["HAS_DISH", "HAS_BOM", "REQUIRES", "BELONGS_TO",
-                 "SIMILAR_TO", "TRIGGERED_BY", "NEEDS_TRAINING", "COMPLETED_TRAINING"]
+    rel_types = [
+        "HAS_DISH",
+        "HAS_BOM",
+        "REQUIRES",
+        "BELONGS_TO",
+        "SIMILAR_TO",
+        "TRIGGERED_BY",
+        "NEEDS_TRAINING",
+        "COMPLETED_TRAINING",
+    ]
     rel_counts: Dict[str, int] = {}
     for rel in rel_types:
         try:
-            rows = repo.run_read_only_query(
-                f"MATCH ()-[r:{rel}]->() RETURN count(r) AS cnt"
-            )
+            rows = repo.run_read_only_query(f"MATCH ()-[r:{rel}]->() RETURN count(r) AS cnt")
             rel_counts[rel] = rows[0]["cnt"] if rows else 0
         except Exception:
             rel_counts[rel] = -1
@@ -829,6 +858,7 @@ async def ontology_graph_stats(
 
 
 # ---------- 数据主权：加密导出与断开权 ----------
+
 
 class ExportEncryptedRequest(BaseModel):
     tenant_id: str = ""
@@ -849,9 +879,9 @@ async def data_sovereignty_export_encrypted(
     current_user: User = Depends(get_current_active_user),
 ):
     """导出图谱快照并用客户密钥 AES-256 加密；客户自持密钥则屯象无法解密。需配置 DATA_SOVEREIGNTY_ENABLED。"""
-    from src.services.data_sovereignty_service import export_encrypted
-    from src.services.audit_log_service import audit_log_service
     from src.models.audit_log import AuditAction, ResourceType
+    from src.services.audit_log_service import audit_log_service
+    from src.services.data_sovereignty_service import export_encrypted
 
     result = export_encrypted(
         tenant_id=body.tenant_id,
@@ -859,6 +889,7 @@ async def data_sovereignty_export_encrypted(
         customer_key=body.customer_key,
     )
     from src.core.config import settings
+
     if settings.DATA_SOVEREIGNTY_ENABLED:
         await audit_log_service.log_action(
             action=AuditAction.DATA_SOVEREIGNTY_EXPORT,
@@ -880,9 +911,9 @@ async def data_sovereignty_disconnect(
     current_user: User = Depends(get_current_active_user),
 ):
     """断开权：先导出（可选加密），再删除图谱中该租户/门店数据。需 DATA_SOVEREIGNTY_ENABLED。调用方负责留存导出文件。"""
-    from src.services.data_sovereignty_service import disconnect_tenant
-    from src.services.audit_log_service import audit_log_service
     from src.models.audit_log import AuditAction, ResourceType
+    from src.services.audit_log_service import audit_log_service
+    from src.services.data_sovereignty_service import disconnect_tenant
 
     result = disconnect_tenant(
         tenant_id=body.tenant_id,
@@ -891,6 +922,7 @@ async def data_sovereignty_disconnect(
         customer_key=body.customer_key,
     )
     from src.core.config import settings
+
     if settings.DATA_SOVEREIGNTY_ENABLED:
         await audit_log_service.log_action(
             action=AuditAction.DATA_SOVEREIGNTY_DISCONNECT,
@@ -899,7 +931,11 @@ async def data_sovereignty_disconnect(
             username=getattr(current_user, "username", None) or getattr(current_user, "email", None),
             resource_id=body.tenant_id,
             description=f"断开权 tenant={body.tenant_id} store_ids={body.store_ids} deleted={result.get('deleted_counts', {})}",
-            new_value={"tenant_id": body.tenant_id, "store_ids": body.store_ids, "deleted_counts": result.get("deleted_counts")},
+            new_value={
+                "tenant_id": body.tenant_id,
+                "store_ids": body.store_ids,
+                "deleted_counts": result.get("deleted_counts"),
+            },
             status="success" if result.get("disconnected") else "failed",
             error_message=result.get("error"),
         )
@@ -912,6 +948,7 @@ async def data_sovereignty_config(
 ):
     """数据主权配置状态：是否启用、是否已配置客户密钥（不暴露密钥本身）。"""
     from src.core.config import settings
+
     enabled = getattr(settings, "DATA_SOVEREIGNTY_ENABLED", False)
     key_configured = bool(getattr(settings, "CUSTOMER_ENCRYPTION_KEY", "") or "")
     return {"enabled": enabled, "key_configured": key_configured}
@@ -924,8 +961,8 @@ async def data_sovereignty_audit_logs(
     _: User = Depends(get_current_active_user),
 ):
     """数据主权相关审计日志（导出、断开权等）分页查询。"""
-    from src.services.audit_log_service import audit_log_service
     from src.models.audit_log import ResourceType
+    from src.services.audit_log_service import audit_log_service
 
     logs, total = await audit_log_service.get_logs(
         resource_type=ResourceType.DATA_SOVEREIGNTY,
@@ -946,6 +983,7 @@ async def cross_store_waste(
     """跨店损耗对比：多门店执行损耗推理并返回对比结果。store_ids 逗号分隔，不传则从图谱/PG 取全部门店。"""
     from src.core.database import get_db_session
     from src.services.ontology_cross_store_service import cross_store_waste_comparison
+
     ids = [x.strip() for x in store_ids.split(",") if x.strip()] if store_ids else None
     async with get_db_session() as session:
         result = await cross_store_waste_comparison(
@@ -965,6 +1003,7 @@ async def ontology_health():
 
 
 # ---------- Phase 3: 门店相似度 ----------
+
 
 class StoreSimilarityRequest(BaseModel):
     store_id_a: str
@@ -1012,6 +1051,7 @@ async def get_similar_stores(
 
 # ---------- 员工培训图谱状态 ----------
 
+
 @router.get("/staff/{staff_id}/training-status")
 async def staff_training_status(
     staff_id: str,
@@ -1031,6 +1071,7 @@ async def staff_training_status(
 
 # ---------- 手动触发图谱同步 ----------
 
+
 @router.post("/admin/sync-graph")
 async def admin_sync_graph(
     tenant_id: str = "",
@@ -1038,5 +1079,6 @@ async def admin_sync_graph(
 ):
     """手动触发 PG → Neo4j 全量同步（生产环境由 Celery Beat 每日自动执行）。"""
     from src.core.celery_tasks import sync_ontology_graph
+
     task = sync_ontology_graph.delay(tenant_id=tenant_id)
     return {"ok": True, "task_id": task.id, "message": "图谱同步任务已提交"}

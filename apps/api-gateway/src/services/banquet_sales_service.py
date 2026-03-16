@@ -2,18 +2,22 @@
 宴会销控 Service — Phase P2 (宴荟佳能力)
 档期管理 · 销售漏斗 · 竞对分析 · 动态定价建议
 """
-from datetime import datetime, date, timedelta
-from typing import List, Dict, Any, Optional
-from sqlalchemy import select, func, and_, case, update
-from sqlalchemy.ext.asyncio import AsyncSession
-import uuid
-import structlog
 
+import uuid
+from datetime import date, datetime, timedelta
+from typing import Any, Dict, List, Optional
+
+import structlog
+from sqlalchemy import and_, case, func, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_db_session
 from src.models.banquet_sales import (
-    BanquetDateConfig, AuspiciousLevel, DateBookingStatus,
-    SalesFunnelRecord, FunnelStage,
+    AuspiciousLevel,
     BanquetCompetitor,
+    BanquetDateConfig,
+    DateBookingStatus,
+    FunnelStage,
+    SalesFunnelRecord,
 )
 
 logger = structlog.get_logger()
@@ -38,11 +42,13 @@ class BanquetSalesService:
         """配置档期（吉日等级+定价系数）"""
         # 查找已有配置
         existing = await session.execute(
-            select(BanquetDateConfig).where(and_(
-                BanquetDateConfig.store_id == store_id,
-                BanquetDateConfig.target_date == target_date,
-                BanquetDateConfig.hall_id == hall_id,
-            ))
+            select(BanquetDateConfig).where(
+                and_(
+                    BanquetDateConfig.store_id == store_id,
+                    BanquetDateConfig.target_date == target_date,
+                    BanquetDateConfig.hall_id == hall_id,
+                )
+            )
         )
         config = existing.scalar_one_or_none()
 
@@ -79,11 +85,13 @@ class BanquetSalesService:
         """获取档期日历（销控看板核心数据）"""
         query = (
             select(BanquetDateConfig)
-            .where(and_(
-                BanquetDateConfig.store_id == store_id,
-                BanquetDateConfig.target_date >= start_date,
-                BanquetDateConfig.target_date <= end_date,
-            ))
+            .where(
+                and_(
+                    BanquetDateConfig.store_id == store_id,
+                    BanquetDateConfig.target_date >= start_date,
+                    BanquetDateConfig.target_date <= end_date,
+                )
+            )
             .order_by(BanquetDateConfig.target_date)
         )
         result = await session.execute(query)
@@ -99,10 +107,12 @@ class BanquetSalesService:
     ) -> Dict[str, Any]:
         """锁定档期（客户意向中）"""
         result = await session.execute(
-            select(BanquetDateConfig).where(and_(
-                BanquetDateConfig.store_id == store_id,
-                BanquetDateConfig.target_date == target_date,
-            ))
+            select(BanquetDateConfig).where(
+                and_(
+                    BanquetDateConfig.store_id == store_id,
+                    BanquetDateConfig.target_date == target_date,
+                )
+            )
         )
         config = result.scalar_one_or_none()
         if not config:
@@ -130,10 +140,12 @@ class BanquetSalesService:
     ) -> Dict[str, Any]:
         """AI动态定价建议"""
         result = await session.execute(
-            select(BanquetDateConfig).where(and_(
-                BanquetDateConfig.store_id == store_id,
-                BanquetDateConfig.target_date == target_date,
-            ))
+            select(BanquetDateConfig).where(
+                and_(
+                    BanquetDateConfig.store_id == store_id,
+                    BanquetDateConfig.target_date == target_date,
+                )
+            )
         )
         config = result.scalar_one_or_none()
 
@@ -212,9 +224,7 @@ class BanquetSalesService:
         note: Optional[str] = None,
     ) -> Dict[str, Any]:
         """推进漏斗阶段"""
-        result = await session.execute(
-            select(SalesFunnelRecord).where(SalesFunnelRecord.id == record_id)
-        )
+        result = await session.execute(select(SalesFunnelRecord).where(SalesFunnelRecord.id == record_id))
         record = result.scalar_one_or_none()
         if not record:
             raise ValueError(f"线索不存在: {record_id}")
@@ -239,9 +249,14 @@ class BanquetSalesService:
 
         # 更新AI转化概率
         stage_probs = {
-            "lead": 0.15, "intent": 0.35, "room_lock": 0.55,
-            "negotiation": 0.70, "signed": 0.95, "preparation": 0.98,
-            "completed": 1.0, "lost": 0.0,
+            "lead": 0.15,
+            "intent": 0.35,
+            "room_lock": 0.55,
+            "negotiation": 0.70,
+            "signed": 0.95,
+            "preparation": 0.98,
+            "completed": 1.0,
+            "lost": 0.0,
         }
         record.conversion_probability = stage_probs.get(new_stage, 0.5)
 
@@ -258,9 +273,9 @@ class BanquetSalesService:
         query = (
             select(
                 SalesFunnelRecord.current_stage,
-                func.count().label('count'),
-                func.sum(SalesFunnelRecord.estimated_value).label('total_value'),
-                func.avg(SalesFunnelRecord.conversion_probability).label('avg_prob'),
+                func.count().label("count"),
+                func.sum(SalesFunnelRecord.estimated_value).label("total_value"),
+                func.avg(SalesFunnelRecord.conversion_probability).label("avg_prob"),
             )
             .where(SalesFunnelRecord.store_id == store_id)
             .group_by(SalesFunnelRecord.current_stage)
@@ -268,12 +283,14 @@ class BanquetSalesService:
         result = await session.execute(query)
         stages = []
         for r in result.all():
-            stages.append({
-                "stage": r.current_stage.value if hasattr(r.current_stage, 'value') else str(r.current_stage),
-                "count": r.count,
-                "total_value_yuan": round(float(r.total_value or 0) / 100, 2),
-                "avg_probability": round(float(r.avg_prob or 0) * 100, 1),
-            })
+            stages.append(
+                {
+                    "stage": r.current_stage.value if hasattr(r.current_stage, "value") else str(r.current_stage),
+                    "count": r.count,
+                    "total_value_yuan": round(float(r.total_value or 0) / 100, 2),
+                    "avg_probability": round(float(r.avg_prob or 0) * 100, 1),
+                }
+            )
         return {"store_id": store_id, "stages": stages}
 
     async def list_funnel(
@@ -302,9 +319,7 @@ class BanquetSalesService:
         lost_to_competitor: Optional[str] = None,
     ) -> Dict[str, Any]:
         """标记输单"""
-        result = await session.execute(
-            select(SalesFunnelRecord).where(SalesFunnelRecord.id == record_id)
-        )
+        result = await session.execute(select(SalesFunnelRecord).where(SalesFunnelRecord.id == record_id))
         record = result.scalar_one_or_none()
         if not record:
             raise ValueError(f"线索不存在: {record_id}")
@@ -317,10 +332,12 @@ class BanquetSalesService:
         # 更新竞对数据
         if lost_to_competitor:
             comp_result = await session.execute(
-                select(BanquetCompetitor).where(and_(
-                    BanquetCompetitor.store_id == record.store_id,
-                    BanquetCompetitor.competitor_name == lost_to_competitor,
-                ))
+                select(BanquetCompetitor).where(
+                    and_(
+                        BanquetCompetitor.store_id == record.store_id,
+                        BanquetCompetitor.competitor_name == lost_to_competitor,
+                    )
+                )
             )
             competitor = comp_result.scalar_one_or_none()
             if competitor:
@@ -364,9 +381,9 @@ class BanquetSalesService:
             "id": str(c.id),
             "store_id": c.store_id,
             "target_date": str(c.target_date),
-            "auspicious_level": c.auspicious_level.value if hasattr(c.auspicious_level, 'value') else str(c.auspicious_level),
+            "auspicious_level": c.auspicious_level.value if hasattr(c.auspicious_level, "value") else str(c.auspicious_level),
             "price_multiplier": float(c.price_multiplier) if c.price_multiplier else 1.0,
-            "booking_status": c.booking_status.value if hasattr(c.booking_status, 'value') else str(c.booking_status),
+            "booking_status": c.booking_status.value if hasattr(c.booking_status, "value") else str(c.booking_status),
             "max_tables": c.max_tables,
             "booked_tables": c.booked_tables,
             "notes": c.notes,
@@ -379,7 +396,7 @@ class BanquetSalesService:
             "customer_name": r.customer_name,
             "customer_phone": r.customer_phone,
             "event_type": r.event_type,
-            "current_stage": r.current_stage.value if hasattr(r.current_stage, 'value') else str(r.current_stage),
+            "current_stage": r.current_stage.value if hasattr(r.current_stage, "value") else str(r.current_stage),
             "owner_employee_id": r.owner_employee_id,
             "follow_up_count": r.follow_up_count,
             "conversion_probability": r.conversion_probability,

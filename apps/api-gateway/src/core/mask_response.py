@@ -11,10 +11,10 @@
 
 装饰器会根据请求头 X-User-Role 或查询参数 mask_level 自动确定脱敏级别。
 """
+
 from functools import wraps
 
 from fastapi import Request
-
 from src.services.data_masking_service import DataMaskingService
 
 
@@ -25,6 +25,7 @@ def mask_sensitive_fields(sensitive_fields: set[str] | None = None):
         sensitive_fields: 可选，指定需要脱敏的字段名集合。
                          为 None 时使用 DataMaskingService 默认的全部敏感字段。
     """
+
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
@@ -62,4 +63,5 @@ def mask_sensitive_fields(sensitive_fields: set[str] | None = None):
             return result
 
         return wrapper
+
     return decorator

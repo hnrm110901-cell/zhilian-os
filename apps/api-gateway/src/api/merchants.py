@@ -2,25 +2,27 @@
 商户管理 API — 商户开通 / 列表 / 详情 / 更新 / 启停 / 门店 / 用户 / 配置聚合 / 渠道
 所有端点仅 ADMIN 可用
 """
-from typing import Optional, List
-from decimal import Decimal
+
 import uuid
+from decimal import Decimal
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import select, delete as sa_delete
+from sqlalchemy import delete as sa_delete
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.core.dependencies import require_role
-from src.models.user import User, UserRole
 from src.models.channel_config import SalesChannelConfig
+from src.models.user import User, UserRole
 from src.services import merchant_service
 
 router = APIRouter(prefix="/merchants", tags=["merchants"])
 
 
 # ── Pydantic Schemas ─────────────────────────────────────────────────────────
+
 
 class GroupInfo(BaseModel):
     group_name: str
@@ -96,6 +98,7 @@ class AddUserRequest(BaseModel):
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
+
 @router.get("/stats")
 async def get_stats(
     session: AsyncSession = Depends(get_db),
@@ -151,7 +154,10 @@ async def list_merchants(
 ):
     """商户列表（支持搜索 + 状态/菜系筛选）"""
     return await merchant_service.list_merchants(
-        session, keyword=keyword, status=status, cuisine_type=cuisine_type,
+        session,
+        keyword=keyword,
+        status=status,
+        cuisine_type=cuisine_type,
     )
 
 
@@ -176,9 +182,7 @@ async def update_merchant(
     _admin: User = Depends(require_role(UserRole.ADMIN)),
 ):
     """更新品牌设置"""
-    result = await merchant_service.update_merchant(
-        session, brand_id, **req.model_dump(exclude_none=True)
-    )
+    result = await merchant_service.update_merchant(session, brand_id, **req.model_dump(exclude_none=True))
     if not result:
         raise HTTPException(status_code=404, detail="商户不存在")
     await session.commit()
@@ -197,9 +201,7 @@ async def update_group(
     if not detail:
         raise HTTPException(status_code=404, detail="商户不存在")
     group_id = detail["group"]["group_id"]
-    result = await merchant_service.update_group(
-        session, group_id, **req.model_dump(exclude_none=True)
-    )
+    result = await merchant_service.update_group(session, group_id, **req.model_dump(exclude_none=True))
     if not result:
         raise HTTPException(status_code=404, detail="集团不存在")
     await session.commit()
@@ -230,7 +232,8 @@ async def add_store(
     """为商户添加门店"""
     try:
         result = await merchant_service.add_store_to_merchant(
-            session, brand_id,
+            session,
+            brand_id,
             store_name=req.store_name,
             store_code=req.store_code,
             city=req.city,
@@ -270,7 +273,8 @@ async def add_user(
     """为商户添加用户"""
     try:
         result = await merchant_service.add_user_to_merchant(
-            session, brand_id,
+            session,
+            brand_id,
             username=req.username,
             email=req.email,
             password=req.password,
@@ -317,6 +321,7 @@ async def remove_user(
 
 # ── 配置聚合 ─────────────────────────────────────────────────────────────────
 
+
 @router.get("/{brand_id}/config-summary")
 async def get_config_summary(
     brand_id: str,
@@ -324,17 +329,15 @@ async def get_config_summary(
     _admin: User = Depends(require_role(UserRole.ADMIN)),
 ):
     """聚合返回 IM/Agent/渠道/门店/用户 配置状态"""
-    from src.models.brand_im_config import BrandIMConfig
     from src.models.agent_config import AgentConfig
+    from src.models.brand_im_config import BrandIMConfig
 
     detail = await merchant_service.get_merchant_detail(session, brand_id)
     if not detail:
         raise HTTPException(status_code=404, detail="商户不存在")
 
     # IM config
-    im_result = await session.execute(
-        select(BrandIMConfig).where(BrandIMConfig.brand_id == brand_id)
-    )
+    im_result = await session.execute(select(BrandIMConfig).where(BrandIMConfig.brand_id == brand_id))
     im_config = im_result.scalar_one_or_none()
     im_summary = {
         "configured": im_config is not None,
@@ -344,9 +347,7 @@ async def get_config_summary(
     }
 
     # Agent configs
-    agent_result = await session.execute(
-        select(AgentConfig).where(AgentConfig.brand_id == brand_id)
-    )
+    agent_result = await session.execute(select(AgentConfig).where(AgentConfig.brand_id == brand_id))
     agents = agent_result.scalars().all()
     agent_summary = {
         "total": len(agents),
@@ -354,9 +355,7 @@ async def get_config_summary(
     }
 
     # Channels
-    ch_result = await session.execute(
-        select(SalesChannelConfig).where(SalesChannelConfig.brand_id == brand_id)
-    )
+    ch_result = await session.execute(select(SalesChannelConfig).where(SalesChannelConfig.brand_id == brand_id))
     channels = ch_result.scalars().all()
 
     return {
@@ -369,6 +368,7 @@ async def get_config_summary(
 
 
 # ── 渠道配置 CRUD ────────────────────────────────────────────────────────────
+
 
 class ChannelConfigRequest(BaseModel):
     channel: str
@@ -385,9 +385,7 @@ async def list_channels(
     _admin: User = Depends(require_role(UserRole.ADMIN)),
 ):
     """品牌下 SalesChannelConfig 列表"""
-    result = await session.execute(
-        select(SalesChannelConfig).where(SalesChannelConfig.brand_id == brand_id)
-    )
+    result = await session.execute(select(SalesChannelConfig).where(SalesChannelConfig.brand_id == brand_id))
     rows = result.scalars().all()
     return [
         {

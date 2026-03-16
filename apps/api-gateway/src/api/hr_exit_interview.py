@@ -1,19 +1,21 @@
 """
 离职回访API — CRUD + AI分析
 """
+
+from datetime import date
+from typing import List, Optional
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional, List
-from datetime import date
-import structlog
+from sqlalchemy import and_, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
-from ..models.user import User
 from ..models.exit_interview import ExitInterview
+from ..models.user import User
 from ..services.compliance_alert_service import ComplianceAlertService
-from sqlalchemy import select, and_, func
-from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -43,6 +45,7 @@ async def create_exit_interview(
 ):
     """提交离职回访记录"""
     from datetime import datetime
+
     interview = ExitInterview(
         store_id=req.store_id,
         brand_id=req.brand_id,
@@ -112,6 +115,7 @@ async def exit_interview_insights(
 ):
     """AI分析离职原因分布+趋势"""
     from datetime import timedelta
+
     since = date.today() - timedelta(days=months * 30)
 
     query = select(ExitInterview).where(
@@ -132,8 +136,12 @@ async def exit_interview_insights(
     monthly_trend = {}
 
     reason_labels = {
-        "personal": "个人原因", "salary": "薪资待遇", "development": "发展空间",
-        "management": "管理问题", "relocation": "搬迁", "other": "其他",
+        "personal": "个人原因",
+        "salary": "薪资待遇",
+        "development": "发展空间",
+        "management": "管理问题",
+        "relocation": "搬迁",
+        "other": "其他",
     }
 
     for i in interviews:
@@ -172,6 +180,7 @@ async def exit_interview_insights(
 
 
 # ── 合规看板API ──
+
 
 @router.get("/hr/compliance/dashboard")
 async def compliance_dashboard(

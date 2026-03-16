@@ -3,18 +3,20 @@
 记录每个AI决策建议的完整生命周期：
 建议 → 用户响应 → 执行 → 效果追踪 → 模型校准
 """
+
 from __future__ import annotations
 
 import uuid
-from sqlalchemy import Column, String, Integer, Float, Boolean, Text, DateTime, Date, Index
-from sqlalchemy.dialects.postgresql import UUID, JSON
-from sqlalchemy.sql import func
 
+from sqlalchemy import Boolean, Column, Date, DateTime, Float, Index, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSON, UUID
+from sqlalchemy.sql import func
 from src.models.base import Base, TimestampMixin
 
 
 class DecisionRecord(Base, TimestampMixin):
     """AI决策记录 — 飞轮核心数据表"""
+
     __tablename__ = "decision_records"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

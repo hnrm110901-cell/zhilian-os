@@ -2,12 +2,11 @@
 供应商智能评分卡模型
 SupplierScorecard — 跨系统供应商综合评分（B2B采购 + 食品安全溯源 + 价格趋势）
 """
-import uuid
-from sqlalchemy import (
-    Column, String, Integer, Text, Index,
-)
-from sqlalchemy.dialects.postgresql import UUID, JSON
 
+import uuid
+
+from sqlalchemy import Column, Index, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSON, UUID
 from src.models.base import Base
 from src.models.mixins import TimestampMixin
 
@@ -30,10 +29,10 @@ class SupplierScorecard(Base, TimestampMixin):
     score_period = Column(String(10), nullable=False)
 
     # 四维度评分（0-100）
-    delivery_score = Column(Integer, nullable=False, default=0)   # 准时交付率
-    quality_score = Column(Integer, nullable=False, default=0)    # 食安合格率 + 温控达标
-    price_score = Column(Integer, nullable=False, default=0)      # 价格稳定性 + 竞争力
-    service_score = Column(Integer, nullable=False, default=0)    # 响应速度 + 问题解决
+    delivery_score = Column(Integer, nullable=False, default=0)  # 准时交付率
+    quality_score = Column(Integer, nullable=False, default=0)  # 食安合格率 + 温控达标
+    price_score = Column(Integer, nullable=False, default=0)  # 价格稳定性 + 竞争力
+    service_score = Column(Integer, nullable=False, default=0)  # 响应速度 + 问题解决
 
     # 综合评分（加权平均）
     overall_score = Column(Integer, nullable=False, default=0)

@@ -16,6 +16,7 @@ Claude Tool Use 工具注册表
         system_prompt=system_prompt,
     )
 """
+
 from __future__ import annotations
 
 import json
@@ -615,8 +616,21 @@ OPS_TOOLS: List[Dict[str, Any]] = [
                 "store_id": {"type": "string", "description": "门店ID"},
                 "asset_type": {
                     "type": "string",
-                    "enum": ["pos", "erp", "member", "printer", "kds", "door_access", "camera",
-                             "server", "router", "switch", "ap", "vpn", "all"],
+                    "enum": [
+                        "pos",
+                        "erp",
+                        "member",
+                        "printer",
+                        "kds",
+                        "door_access",
+                        "camera",
+                        "server",
+                        "router",
+                        "switch",
+                        "ap",
+                        "vpn",
+                        "all",
+                    ],
                     "default": "all",
                 },
                 "status": {
@@ -755,6 +769,7 @@ def get_skill_for_tool(agent_type: str, tool_name: str):
     """
     try:
         from src.core.skill_registry import SkillRegistry
+
         return SkillRegistry.get().get_skill(f"{agent_type}.{tool_name}")
     except Exception:
         return None
@@ -763,6 +778,7 @@ def get_skill_for_tool(agent_type: str, tool_name: str):
 # ─────────────────────────────────────────────────────────────────────────────
 # 工具执行路由器
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class ToolExecutor:
     """
@@ -892,187 +908,252 @@ class ToolExecutor:
 
     # ScheduleAgent handlers
     async def _query_staff_availability(self, p: Dict) -> Any:
-        return await self._call_service("schedule", "get_staff_availability",
-                                        store_id=p["store_id"], date=p["date"],
-                                        shift_type=p.get("shift_type", "all"))
+        return await self._call_service(
+            "schedule", "get_staff_availability", store_id=p["store_id"], date=p["date"], shift_type=p.get("shift_type", "all")
+        )
 
     async def _get_customer_flow_forecast(self, p: Dict) -> Any:
-        return await self._call_service("analytics", "get_flow_forecast",
-                                        store_id=p["store_id"], date=p["date"])
+        return await self._call_service("analytics", "get_flow_forecast", store_id=p["store_id"], date=p["date"])
 
     async def _get_historical_schedule(self, p: Dict) -> Any:
-        return await self._call_service("schedule", "get_history",
-                                        store_id=p["store_id"], days_back=p.get("days_back", 30))
+        return await self._call_service("schedule", "get_history", store_id=p["store_id"], days_back=p.get("days_back", 30))
 
     async def _create_schedule_recommendation(self, p: Dict) -> Any:
-        return await self._call_service("schedule", "save_recommendation",
-                                        store_id=p["store_id"], date=p["date"],
-                                        recommended_staff=p["recommended_staff"],
-                                        shift_breakdown=p.get("shift_breakdown"),
-                                        reasoning=p.get("reasoning", ""))
+        return await self._call_service(
+            "schedule",
+            "save_recommendation",
+            store_id=p["store_id"],
+            date=p["date"],
+            recommended_staff=p["recommended_staff"],
+            shift_breakdown=p.get("shift_breakdown"),
+            reasoning=p.get("reasoning", ""),
+        )
 
     # OrderAgent handlers
     async def _get_order_details(self, p: Dict) -> Any:
         return await self._call_service("order", "get_by_id", order_id=p["order_id"])
 
     async def _query_orders_by_condition(self, p: Dict) -> Any:
-        return await self._call_service("order", "query",
-                                        store_id=p["store_id"], status=p.get("status"),
-                                        date=p.get("date"), table_number=p.get("table_number"),
-                                        limit=p.get("limit", 20))
+        return await self._call_service(
+            "order",
+            "query",
+            store_id=p["store_id"],
+            status=p.get("status"),
+            date=p.get("date"),
+            table_number=p.get("table_number"),
+            limit=p.get("limit", 20),
+        )
 
     async def _get_menu_recommendations(self, p: Dict) -> Any:
-        return await self._call_service("recommendation", "get_menu_recs",
-                                        store_id=p["store_id"], customer_id=p.get("customer_id"),
-                                        party_size=p.get("party_size"), budget=p.get("budget_per_person"))
+        return await self._call_service(
+            "recommendation",
+            "get_menu_recs",
+            store_id=p["store_id"],
+            customer_id=p.get("customer_id"),
+            party_size=p.get("party_size"),
+            budget=p.get("budget_per_person"),
+        )
 
     async def _update_order_status(self, p: Dict) -> Any:
-        return await self._call_service("order", "update_status",
-                                        order_id=p["order_id"], new_status=p["new_status"],
-                                        reason=p.get("reason", ""))
+        return await self._call_service(
+            "order", "update_status", order_id=p["order_id"], new_status=p["new_status"], reason=p.get("reason", "")
+        )
 
     async def _calculate_bill(self, p: Dict) -> Any:
-        return await self._call_service("order", "calculate_bill",
-                                        order_id=p["order_id"], coupon_code=p.get("coupon_code"),
-                                        member_id=p.get("member_id"))
+        return await self._call_service(
+            "order", "calculate_bill", order_id=p["order_id"], coupon_code=p.get("coupon_code"), member_id=p.get("member_id")
+        )
 
     # InventoryAgent handlers
     async def _get_inventory_status(self, p: Dict) -> Any:
-        return await self._call_service("inventory", "get_status",
-                                        store_id=p["store_id"], category=p.get("category"),
-                                        alert_only=p.get("alert_only", False))
+        return await self._call_service(
+            "inventory",
+            "get_status",
+            store_id=p["store_id"],
+            category=p.get("category"),
+            alert_only=p.get("alert_only", False),
+        )
 
     async def _get_consumption_trend(self, p: Dict) -> Any:
-        return await self._call_service("inventory", "get_consumption_trend",
-                                        store_id=p["store_id"], ingredient_id=p.get("ingredient_id"),
-                                        days=p.get("days", 30))
+        return await self._call_service(
+            "inventory",
+            "get_consumption_trend",
+            store_id=p["store_id"],
+            ingredient_id=p.get("ingredient_id"),
+            days=p.get("days", 30),
+        )
 
     async def _create_purchase_order(self, p: Dict) -> Any:
-        return await self._call_service("inventory", "create_purchase_order",
-                                        store_id=p["store_id"], items=p["items"],
-                                        urgency=p.get("urgency", "normal"))
+        return await self._call_service(
+            "inventory", "create_purchase_order", store_id=p["store_id"], items=p["items"], urgency=p.get("urgency", "normal")
+        )
 
     async def _check_expiry_alerts(self, p: Dict) -> Any:
-        return await self._call_service("inventory", "check_expiry",
-                                        store_id=p["store_id"], days_ahead=p.get("days_ahead", 3))
+        return await self._call_service("inventory", "check_expiry", store_id=p["store_id"], days_ahead=p.get("days_ahead", 3))
 
     # ServiceAgent handlers
     async def _get_customer_feedback(self, p: Dict) -> Any:
-        return await self._call_service("service", "get_feedback",
-                                        store_id=p["store_id"], days=p.get("days", 7),
-                                        sentiment=p.get("sentiment", "all"), limit=p.get("limit", 20))
+        return await self._call_service(
+            "service",
+            "get_feedback",
+            store_id=p["store_id"],
+            days=p.get("days", 7),
+            sentiment=p.get("sentiment", "all"),
+            limit=p.get("limit", 20),
+        )
 
     async def _get_service_quality_metrics(self, p: Dict) -> Any:
-        return await self._call_service("service", "get_quality_metrics",
-                                        store_id=p["store_id"], period=p.get("period", "week"))
+        return await self._call_service(
+            "service", "get_quality_metrics", store_id=p["store_id"], period=p.get("period", "week")
+        )
 
     async def _create_improvement_task(self, p: Dict) -> Any:
-        return await self._call_service("service", "create_task",
-                                        store_id=p["store_id"], issue_type=p["issue_type"],
-                                        description=p["description"], priority=p["priority"],
-                                        assignee_role=p.get("assignee_role"))
+        return await self._call_service(
+            "service",
+            "create_task",
+            store_id=p["store_id"],
+            issue_type=p["issue_type"],
+            description=p["description"],
+            priority=p["priority"],
+            assignee_role=p.get("assignee_role"),
+        )
 
     # TrainingAgent handlers
     async def _get_employee_training_status(self, p: Dict) -> Any:
-        return await self._call_service("training", "get_status",
-                                        store_id=p["store_id"], employee_id=p.get("employee_id"),
-                                        include_scores=p.get("include_scores", True))
+        return await self._call_service(
+            "training",
+            "get_status",
+            store_id=p["store_id"],
+            employee_id=p.get("employee_id"),
+            include_scores=p.get("include_scores", True),
+        )
 
     async def _search_knowledge_base(self, p: Dict) -> Any:
-        return await self._call_service("rag", "search",
-                                        query=p["query"], category=p.get("category", "all"),
-                                        top_k=p.get("top_k", 5))
+        return await self._call_service(
+            "rag", "search", query=p["query"], category=p.get("category", "all"), top_k=p.get("top_k", 5)
+        )
 
     async def _assign_training_plan(self, p: Dict) -> Any:
-        return await self._call_service("training", "assign_plan",
-                                        employee_id=p["employee_id"],
-                                        modules=p["training_modules"],
-                                        deadline=p.get("deadline"),
-                                        priority=p.get("priority", "normal"))
+        return await self._call_service(
+            "training",
+            "assign_plan",
+            employee_id=p["employee_id"],
+            modules=p["training_modules"],
+            deadline=p.get("deadline"),
+            priority=p.get("priority", "normal"),
+        )
 
     # DecisionAgent handlers
     async def _get_store_kpi_summary(self, p: Dict) -> Any:
-        return await self._call_service("decision", "get_kpi_summary",
-                                        store_id=p["store_id"], period=p.get("period", "month"),
-                                        compare_with_last=p.get("compare_with_last", True))
+        return await self._call_service(
+            "decision",
+            "get_kpi_summary",
+            store_id=p["store_id"],
+            period=p.get("period", "month"),
+            compare_with_last=p.get("compare_with_last", True),
+        )
 
     async def _get_cross_store_benchmark(self, p: Dict) -> Any:
-        return await self._call_service("benchmark", "get_cross_store",
-                                        store_id=p["store_id"], metric=p["metric"],
-                                        top_n=p.get("top_n", 5))
+        return await self._call_service(
+            "benchmark", "get_cross_store", store_id=p["store_id"], metric=p["metric"], top_n=p.get("top_n", 5)
+        )
 
     async def _run_revenue_forecast(self, p: Dict) -> Any:
-        return await self._call_service("analytics", "run_forecast",
-                                        store_id=p["store_id"],
-                                        forecast_days=p.get("forecast_days", 30),
-                                        include_scenarios=p.get("include_scenarios", True))
+        return await self._call_service(
+            "analytics",
+            "run_forecast",
+            store_id=p["store_id"],
+            forecast_days=p.get("forecast_days", 30),
+            include_scenarios=p.get("include_scenarios", True),
+        )
 
     async def _get_anomaly_alerts(self, p: Dict) -> Any:
-        return await self._call_service("analytics", "get_anomalies",
-                                        store_id=p.get("store_id"),
-                                        severity=p.get("severity", "all"))
+        return await self._call_service(
+            "analytics", "get_anomalies", store_id=p.get("store_id"), severity=p.get("severity", "all")
+        )
 
     # ReservationAgent handlers
     async def _check_table_availability(self, p: Dict) -> Any:
-        return await self._call_service("reservation", "check_availability",
-                                        store_id=p["store_id"], date=p["date"],
-                                        time=p["time"], party_size=p["party_size"],
-                                        duration_minutes=p.get("duration_minutes", 90))
+        return await self._call_service(
+            "reservation",
+            "check_availability",
+            store_id=p["store_id"],
+            date=p["date"],
+            time=p["time"],
+            party_size=p["party_size"],
+            duration_minutes=p.get("duration_minutes", 90),
+        )
 
     async def _create_reservation(self, p: Dict) -> Any:
-        return await self._call_service("reservation", "create",
-                                        store_id=p["store_id"], customer_name=p["customer_name"],
-                                        customer_phone=p["customer_phone"], date=p["date"],
-                                        time=p["time"], party_size=p["party_size"],
-                                        special_requests=p.get("special_requests"),
-                                        table_preference=p.get("table_preference"))
+        return await self._call_service(
+            "reservation",
+            "create",
+            store_id=p["store_id"],
+            customer_name=p["customer_name"],
+            customer_phone=p["customer_phone"],
+            date=p["date"],
+            time=p["time"],
+            party_size=p["party_size"],
+            special_requests=p.get("special_requests"),
+            table_preference=p.get("table_preference"),
+        )
 
     async def _get_reservation_list(self, p: Dict) -> Any:
-        return await self._call_service("reservation", "list_by_date",
-                                        store_id=p["store_id"], date=p["date"],
-                                        status=p.get("status", "all"))
+        return await self._call_service(
+            "reservation", "list_by_date", store_id=p["store_id"], date=p["date"], status=p.get("status", "all")
+        )
 
     async def _update_reservation(self, p: Dict) -> Any:
-        return await self._call_service("reservation", "update",
-                                        reservation_id=p["reservation_id"],
-                                        action=p["action"],
-                                        new_date=p.get("new_date"),
-                                        new_time=p.get("new_time"),
-                                        new_party_size=p.get("new_party_size"),
-                                        reason=p.get("reason", ""))
+        return await self._call_service(
+            "reservation",
+            "update",
+            reservation_id=p["reservation_id"],
+            action=p["action"],
+            new_date=p.get("new_date"),
+            new_time=p.get("new_time"),
+            new_party_size=p.get("new_party_size"),
+            reason=p.get("reason", ""),
+        )
 
     # OpsAgent handlers
     async def _get_system_health(self, p: Dict) -> Any:
-        return await self._call_service("ops", "get_health",
-                                        store_id=p["store_id"], component=p.get("component", "all"))
+        return await self._call_service("ops", "get_health", store_id=p["store_id"], component=p.get("component", "all"))
 
     async def _get_error_logs(self, p: Dict) -> Any:
-        return await self._call_service("ops", "get_logs",
-                                        store_id=p["store_id"],
-                                        hours_back=p.get("hours_back", 24),
-                                        severity=p.get("severity", "error"),
-                                        limit=p.get("limit", 50))
+        return await self._call_service(
+            "ops",
+            "get_logs",
+            store_id=p["store_id"],
+            hours_back=p.get("hours_back", 24),
+            severity=p.get("severity", "error"),
+            limit=p.get("limit", 50),
+        )
 
     async def _create_maintenance_ticket(self, p: Dict) -> Any:
-        return await self._call_service("ops", "create_ticket",
-                                        store_id=p["store_id"], device_type=p["device_type"],
-                                        issue_description=p["issue_description"],
-                                        priority=p["priority"],
-                                        suggested_action=p.get("suggested_action", ""))
+        return await self._call_service(
+            "ops",
+            "create_ticket",
+            store_id=p["store_id"],
+            device_type=p["device_type"],
+            issue_description=p["issue_description"],
+            priority=p["priority"],
+            suggested_action=p.get("suggested_action", ""),
+        )
 
     async def _query_device_readings(self, p: Dict) -> Any:
         """查询IoT设备读数历史，直接查 ops_device_readings 表。"""
         session = self.services.get("db_session")
         if not session:
             return {"status": "service_unavailable", "service": "ops", "method": "query_device_readings"}
-        from sqlalchemy import select, and_
         from datetime import datetime, timedelta, timezone
+
+        from sqlalchemy import and_, select
+
         from ..models.ops import OpsDeviceReading
+
         since = datetime.now(timezone.utc) - timedelta(minutes=p.get("minutes_back", 60))
-        stmt = (
-            select(OpsDeviceReading)
-            .where(OpsDeviceReading.store_id == p["store_id"],
-                   OpsDeviceReading.recorded_at >= since)
+        stmt = select(OpsDeviceReading).where(
+            OpsDeviceReading.store_id == p["store_id"], OpsDeviceReading.recorded_at >= since
         )
         if p.get("device_name"):
             stmt = stmt.where(OpsDeviceReading.device_name == p["device_name"])
@@ -1083,11 +1164,16 @@ class ToolExecutor:
         return {
             "total": len(rows),
             "readings": [
-                {"device_name": r.device_name, "metric_type": r.metric_type,
-                 "value_float": r.value_float, "value_bool": r.value_bool,
-                 "unit": r.unit, "is_alert": r.is_alert,
-                 "alert_message": r.alert_message,
-                 "recorded_at": r.recorded_at.isoformat()}
+                {
+                    "device_name": r.device_name,
+                    "metric_type": r.metric_type,
+                    "value_float": r.value_float,
+                    "value_bool": r.value_bool,
+                    "unit": r.unit,
+                    "is_alert": r.is_alert,
+                    "alert_message": r.alert_message,
+                    "recorded_at": r.recorded_at.isoformat(),
+                }
                 for r in rows
             ],
         }
@@ -1097,14 +1183,15 @@ class ToolExecutor:
         session = self.services.get("db_session")
         if not session:
             return {"status": "service_unavailable", "service": "ops", "method": "query_network_health"}
-        from sqlalchemy import select
         from datetime import datetime, timedelta, timezone
+
+        from sqlalchemy import select
+
         from ..models.ops import OpsNetworkHealth
+
         since = datetime.now(timezone.utc) - timedelta(minutes=p.get("minutes_back", 30))
-        stmt = (
-            select(OpsNetworkHealth)
-            .where(OpsNetworkHealth.store_id == p["store_id"],
-                   OpsNetworkHealth.recorded_at >= since)
+        stmt = select(OpsNetworkHealth).where(
+            OpsNetworkHealth.store_id == p["store_id"], OpsNetworkHealth.recorded_at >= since
         )
         if p.get("probe_type") and p["probe_type"] != "all":
             stmt = stmt.where(OpsNetworkHealth.probe_type == p["probe_type"])
@@ -1117,11 +1204,18 @@ class ToolExecutor:
         return {
             "total": len(rows),
             "probes": [
-                {"probe_type": r.probe_type, "target": r.target, "vlan": r.vlan,
-                 "is_available": r.is_available, "latency_ms": r.latency_ms,
-                 "packet_loss_pct": r.packet_loss_pct, "bandwidth_mbps": r.bandwidth_mbps,
-                 "is_alert": r.is_alert, "alert_message": r.alert_message,
-                 "recorded_at": r.recorded_at.isoformat()}
+                {
+                    "probe_type": r.probe_type,
+                    "target": r.target,
+                    "vlan": r.vlan,
+                    "is_available": r.is_available,
+                    "latency_ms": r.latency_ms,
+                    "packet_loss_pct": r.packet_loss_pct,
+                    "bandwidth_mbps": r.bandwidth_mbps,
+                    "is_alert": r.is_alert,
+                    "alert_message": r.alert_message,
+                    "recorded_at": r.recorded_at.isoformat(),
+                }
                 for r in rows
             ],
         }
@@ -1131,14 +1225,15 @@ class ToolExecutor:
         session = self.services.get("db_session")
         if not session:
             return {"status": "service_unavailable", "service": "ops", "method": "query_food_safety"}
-        from sqlalchemy import select
         from datetime import datetime, timedelta, timezone
+
+        from sqlalchemy import select
+
         from ..models.ops import OpsFoodSafetyRecord
+
         since = datetime.now(timezone.utc) - timedelta(days=p.get("days_back", 7))
-        stmt = (
-            select(OpsFoodSafetyRecord)
-            .where(OpsFoodSafetyRecord.store_id == p["store_id"],
-                   OpsFoodSafetyRecord.recorded_at >= since)
+        stmt = select(OpsFoodSafetyRecord).where(
+            OpsFoodSafetyRecord.store_id == p["store_id"], OpsFoodSafetyRecord.recorded_at >= since
         )
         if p.get("record_type") and p["record_type"] != "all":
             stmt = stmt.where(OpsFoodSafetyRecord.record_type == p["record_type"])
@@ -1150,11 +1245,16 @@ class ToolExecutor:
             "total": len(rows),
             "violations": sum(1 for r in rows if not r.is_compliant),
             "records": [
-                {"record_type": r.record_type, "device_name": r.device_name,
-                 "is_compliant": r.is_compliant, "value_float": r.value_float,
-                 "unit": r.unit, "notes": r.notes,
-                 "requires_action": r.requires_action,
-                 "recorded_at": r.recorded_at.isoformat()}
+                {
+                    "record_type": r.record_type,
+                    "device_name": r.device_name,
+                    "is_compliant": r.is_compliant,
+                    "value_float": r.value_float,
+                    "unit": r.unit,
+                    "notes": r.notes,
+                    "requires_action": r.requires_action,
+                    "recorded_at": r.recorded_at.isoformat(),
+                }
                 for r in rows
             ],
         }
@@ -1165,7 +1265,9 @@ class ToolExecutor:
         if not session:
             return {"status": "service_unavailable", "service": "ops", "method": "get_asset_inventory"}
         from sqlalchemy import select
+
         from ..models.ops import OpsAsset
+
         stmt = select(OpsAsset).where(OpsAsset.store_id == p["store_id"])
         if p.get("asset_type") and p["asset_type"] != "all":
             stmt = stmt.where(OpsAsset.asset_type == p["asset_type"])
@@ -1178,10 +1280,15 @@ class ToolExecutor:
             "online": sum(1 for r in rows if r.status == "online"),
             "offline": sum(1 for r in rows if r.status == "offline"),
             "assets": [
-                {"id": str(r.id), "asset_type": r.asset_type, "name": r.name,
-                 "ip_address": r.ip_address, "status": r.status,
-                 "last_seen": r.last_seen.isoformat() if r.last_seen else None,
-                 "firmware_version": r.firmware_version}
+                {
+                    "id": str(r.id),
+                    "asset_type": r.asset_type,
+                    "name": r.name,
+                    "ip_address": r.ip_address,
+                    "status": r.status,
+                    "last_seen": r.last_seen.isoformat() if r.last_seen else None,
+                    "firmware_version": r.firmware_version,
+                }
                 for r in rows
             ],
         }
@@ -1191,15 +1298,14 @@ class ToolExecutor:
         session = self.services.get("db_session")
         if not session:
             return {"status": "service_unavailable", "service": "ops", "method": "get_alert_history"}
-        from sqlalchemy import select
         from datetime import datetime, timedelta, timezone
+
+        from sqlalchemy import select
+
         from ..models.ops import OpsEvent
+
         since = datetime.now(timezone.utc) - timedelta(hours=p.get("hours_back", 24))
-        stmt = (
-            select(OpsEvent)
-            .where(OpsEvent.store_id == p["store_id"],
-                   OpsEvent.created_at >= since)
-        )
+        stmt = select(OpsEvent).where(OpsEvent.store_id == p["store_id"], OpsEvent.created_at >= since)
         if p.get("severity") and p["severity"] != "all":
             stmt = stmt.where(OpsEvent.severity == p["severity"])
         if p.get("status") and p["status"] != "all":
@@ -1209,28 +1315,45 @@ class ToolExecutor:
         return {
             "total": len(rows),
             "alerts": [
-                {"id": str(r.id), "event_type": r.event_type, "severity": r.severity,
-                 "component": r.component, "description": r.description,
-                 "status": r.status, "created_at": r.created_at.isoformat(),
-                 "resolved_at": r.resolved_at.isoformat() if r.resolved_at else None}
+                {
+                    "id": str(r.id),
+                    "event_type": r.event_type,
+                    "severity": r.severity,
+                    "component": r.component,
+                    "description": r.description,
+                    "status": r.status,
+                    "created_at": r.created_at.isoformat(),
+                    "resolved_at": r.resolved_at.isoformat() if r.resolved_at else None,
+                }
                 for r in rows
             ],
         }
 
     # PerformanceAgent handlers
     async def _get_employee_performance(self, p: Dict) -> Any:
-        return await self._call_service("performance", "get_employee_kpi",
-                                        store_id=p["store_id"],
-                                        employee_id=p.get("employee_id"),
-                                        period=p.get("period", "month"))
+        return await self._call_service(
+            "performance",
+            "get_employee_kpi",
+            store_id=p["store_id"],
+            employee_id=p.get("employee_id"),
+            period=p.get("period", "month"),
+        )
 
     async def _calculate_commission(self, p: Dict) -> Any:
-        return await self._call_service("performance", "calc_commission",
-                                        store_id=p["store_id"], employee_id=p["employee_id"],
-                                        period_start=p["period_start"], period_end=p["period_end"])
+        return await self._call_service(
+            "performance",
+            "calc_commission",
+            store_id=p["store_id"],
+            employee_id=p["employee_id"],
+            period_start=p["period_start"],
+            period_end=p["period_end"],
+        )
 
     async def _get_store_ranking(self, p: Dict) -> Any:
-        return await self._call_service("performance", "get_ranking",
-                                        metric=p.get("metric", "composite"),
-                                        period=p.get("period", "month"),
-                                        top_n=p.get("top_n", 10))
+        return await self._call_service(
+            "performance",
+            "get_ranking",
+            metric=p.get("metric", "composite"),
+            period=p.get("period", "month"),
+            top_n=p.get("top_n", 10),
+        )

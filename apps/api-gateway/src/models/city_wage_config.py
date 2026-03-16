@@ -2,8 +2,10 @@
 City Wage Config — 城市最低工资与社保基数配置
 支持多城市差异化薪酬计算
 """
+
 import uuid
-from sqlalchemy import Column, String, Integer, UniqueConstraint
+
+from sqlalchemy import Column, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 
 from .base import Base, TimestampMixin
@@ -11,10 +13,9 @@ from .base import Base, TimestampMixin
 
 class CityWageConfig(Base, TimestampMixin):
     """城市最低工资与社保基数标准"""
+
     __tablename__ = "city_wage_configs"
-    __table_args__ = (
-        UniqueConstraint("city", "year", name="uq_city_wage_year"),
-    )
+    __table_args__ = (UniqueConstraint("city", "year", name="uq_city_wage_year"),)
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     city = Column(String(50), nullable=False, index=True)  # 长沙/西安/武汉/深圳/上海

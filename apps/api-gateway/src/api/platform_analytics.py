@@ -2,6 +2,7 @@
 
 商业化收尾：API 用量追踪、插件评分、平台生态总览与月度趋势。
 """
+
 import uuid
 from datetime import date
 from typing import Optional
@@ -11,7 +12,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 
 logger = structlog.get_logger()
@@ -53,7 +53,7 @@ class LogUsageRequest(BaseModel):
 
 class RatePluginRequest(BaseModel):
     store_id: str
-    rating: int          # 1-5
+    rating: int  # 1-5
     comment: Optional[str] = None
 
 
@@ -122,23 +122,23 @@ async def get_platform_overview(db: AsyncSession = Depends(get_db)):
         "total_developers": devs.get("total_developers") or 0,
         "active_developers": devs.get("active_developers") or 0,
         "by_tier": {
-            "free":       devs.get("free_count") or 0,
-            "basic":      devs.get("basic_count") or 0,
-            "pro":        devs.get("pro_count") or 0,
+            "free": devs.get("free_count") or 0,
+            "basic": devs.get("basic_count") or 0,
+            "pro": devs.get("pro_count") or 0,
             "enterprise": devs.get("enterprise_count") or 0,
         },
         "published_plugins": plugins.get("published_plugins") or 0,
-        "pending_plugins":   plugins.get("pending_plugins") or 0,
-        "total_installs":    plugins.get("total_installs") or 0,
+        "pending_plugins": plugins.get("pending_plugins") or 0,
+        "total_installs": plugins.get("total_installs") or 0,
         "avg_plugin_rating": round(float(plugins.get("avg_rating") or 0), 2),
-        "total_gross_revenue_fen":  total_gross,
+        "total_gross_revenue_fen": total_gross,
         "total_gross_revenue_yuan": total_gross / 100,
-        "total_net_payout_fen":     total_net,
-        "total_net_payout_yuan":    total_net / 100,
-        "platform_profit_yuan":     (total_gross - total_net) / 100,
-        "current_month":            current_period,
+        "total_net_payout_fen": total_net,
+        "total_net_payout_yuan": total_net / 100,
+        "platform_profit_yuan": (total_gross - total_net) / 100,
+        "current_month": current_period,
         "current_month_gross_yuan": curr_gross / 100,
-        "current_month_net_yuan":   curr_net / 100,
+        "current_month_net_yuan": curr_net / 100,
     }
 
 
@@ -172,13 +172,15 @@ async def get_revenue_trends(
         data = by_period.get(period, {})
         gross = data.get("gross_fen") or 0
         net = data.get("net_fen") or 0
-        trends.append({
-            "period": period,
-            "gross_yuan": gross / 100,
-            "net_yuan": net / 100,
-            "platform_profit_yuan": (gross - net) / 100,
-            "developer_count": data.get("developer_count") or 0,
-        })
+        trends.append(
+            {
+                "period": period,
+                "gross_yuan": gross / 100,
+                "net_yuan": net / 100,
+                "platform_profit_yuan": (gross - net) / 100,
+                "developer_count": data.get("developer_count") or 0,
+            }
+        )
 
     return {"periods": periods, "trends": trends}
 
@@ -280,11 +282,11 @@ async def get_usage_stats(
     top_endpoints = [_row_to_dict(r) for r in top_rows.fetchall()]
 
     return {
-        "total_calls":       stats.get("total_calls") or 0,
-        "billable_calls":    stats.get("billable_calls") or 0,
-        "avg_response_ms":   round(float(stats.get("avg_response_ms") or 0), 1),
+        "total_calls": stats.get("total_calls") or 0,
+        "billable_calls": stats.get("billable_calls") or 0,
+        "avg_response_ms": round(float(stats.get("avg_response_ms") or 0), 1),
         "unique_developers": stats.get("unique_developers") or 0,
-        "top_endpoints":     top_endpoints,
+        "top_endpoints": top_endpoints,
     }
 
 
@@ -322,8 +324,7 @@ async def rate_plugin(
             ON CONFLICT (plugin_id, store_id) DO UPDATE
             SET rating = EXCLUDED.rating, comment = EXCLUDED.comment
         """),
-        {"id": rating_id, "pid": plugin_id, "sid": body.store_id,
-         "rating": body.rating, "comment": body.comment},
+        {"id": rating_id, "pid": plugin_id, "sid": body.store_id, "rating": body.rating, "comment": body.comment},
     )
 
     # Sync avg rating back to the plugin card
@@ -367,10 +368,10 @@ async def get_plugin_ratings(plugin_id: str, db: AsyncSession = Depends(get_db))
         {"id": plugin_id},
     )
     return {
-        "plugin_id":      plugin_id,
-        "avg_rating":     round(float(summary.get("avg_rating") or 0), 2),
-        "total_ratings":  summary.get("total_ratings") or 0,
+        "plugin_id": plugin_id,
+        "avg_rating": round(float(summary.get("avg_rating") or 0), 2),
+        "total_ratings": summary.get("total_ratings") or 0,
         "five_star_count": summary.get("five_star_count") or 0,
         "four_plus_count": summary.get("four_plus_count") or 0,
-        "ratings":        [_row_to_dict(r) for r in rows.fetchall()],
+        "ratings": [_row_to_dict(r) for r in rows.fetchall()],
     }

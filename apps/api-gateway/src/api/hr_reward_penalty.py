@@ -1,23 +1,22 @@
 """
 HR Reward & Penalty API -- 奖惩管理
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import Optional
-from datetime import date
-from pydantic import BaseModel
+
 import uuid as uuid_mod
+from datetime import date
+from typing import Optional
+
 import structlog
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+from sqlalchemy import and_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
-from ..models.user import User
 from ..models.employee import Employee
-from ..models.reward_penalty import (
-    RewardPenaltyRecord, RewardPenaltyType,
-    RewardPenaltyStatus,
-)
-from sqlalchemy import select, and_
-from sqlalchemy.ext.asyncio import AsyncSession
+from ..models.reward_penalty import RewardPenaltyRecord, RewardPenaltyStatus, RewardPenaltyType
+from ..models.user import User
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -26,11 +25,11 @@ router = APIRouter()
 class RewardPenaltyRequest(BaseModel):
     store_id: str
     employee_id: str
-    rp_type: str                    # reward|penalty
-    category: str                   # RewardPenaltyCategory value
+    rp_type: str  # reward|penalty
+    category: str  # RewardPenaltyCategory value
     amount_fen: int
-    pay_month: Optional[str] = None # 计入哪个月（默认当月）
-    incident_date: str              # YYYY-MM-DD
+    pay_month: Optional[str] = None  # 计入哪个月（默认当月）
+    incident_date: str  # YYYY-MM-DD
     description: str
     evidence: Optional[list] = None
     remark: Optional[str] = None
@@ -64,9 +63,7 @@ async def list_reward_penalties(
         query = query.where(RewardPenaltyRecord.employee_id == employee_id)
 
     result = await db.execute(
-        query.order_by(RewardPenaltyRecord.created_at.desc())
-        .offset((page - 1) * page_size)
-        .limit(page_size)
+        query.order_by(RewardPenaltyRecord.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
     )
     rows = result.all()
 
@@ -135,9 +132,7 @@ async def approve_reward_penalty(
     current_user: User = Depends(get_current_active_user),
 ):
     """审批通过奖惩记录"""
-    result = await db.execute(
-        select(RewardPenaltyRecord).where(RewardPenaltyRecord.id == record_id)
-    )
+    result = await db.execute(select(RewardPenaltyRecord).where(RewardPenaltyRecord.id == record_id))
     record = result.scalar_one_or_none()
     if not record:
         raise HTTPException(status_code=404, detail="记录不存在")
@@ -160,9 +155,7 @@ async def reject_reward_penalty(
     current_user: User = Depends(get_current_active_user),
 ):
     """驳回奖惩记录"""
-    result = await db.execute(
-        select(RewardPenaltyRecord).where(RewardPenaltyRecord.id == record_id)
-    )
+    result = await db.execute(select(RewardPenaltyRecord).where(RewardPenaltyRecord.id == record_id))
     record = result.scalar_one_or_none()
     if not record:
         raise HTTPException(status_code=404, detail="记录不存在")

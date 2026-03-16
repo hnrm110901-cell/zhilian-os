@@ -10,6 +10,7 @@ Voice Command Whitelist
 - 未匹配指令保守降级为 CONFIRM（需语音二次确认）
 - 所有函数为纯函数，无 I/O、无 DB 依赖
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -18,44 +19,78 @@ from typing import Tuple
 
 
 class RiskLevel(str, Enum):
-    SAFE = "safe"          # 查询/通知类，直接执行，无需确认
-    CONFIRM = "confirm"    # 普通写操作，需语音二次确认
+    SAFE = "safe"  # 查询/通知类，直接执行，无需确认
+    CONFIRM = "confirm"  # 普通写操作，需语音二次确认
     HIGH_RISK = "high_risk"  # 财务/批量删除/权限，必须手机端确认后才执行
 
 
 @dataclass(frozen=True)
 class VoiceValidationResult:
-    allowed: bool                  # 是否允许发起（高危也 True，但需确认）
+    allowed: bool  # 是否允许发起（高危也 True，但需确认）
     risk_level: RiskLevel
-    category: str                  # 指令类别，如 "query" / "financial"
-    require_mobile_confirm: bool   # True → 推送到手机端等待点按确认
-    reason: str                    # 人类可读的说明
+    category: str  # 指令类别，如 "query" / "financial"
+    require_mobile_confirm: bool  # True → 推送到手机端等待点按确认
+    reason: str  # 人类可读的说明
 
 
 # ── 关键词字典（中文关键词匹配）────────────────────────────────────────────────
 
 _SAFE_PATTERNS: dict[str, list[str]] = {
     "query": [
-        "查询", "查看", "今天", "昨天", "营收", "库存", "订单", "多少",
-        "报告", "状态", "营业额", "收入", "库存量", "剩余",
+        "查询",
+        "查看",
+        "今天",
+        "昨天",
+        "营收",
+        "库存",
+        "订单",
+        "多少",
+        "报告",
+        "状态",
+        "营业额",
+        "收入",
+        "库存量",
+        "剩余",
     ],
     "notify": [
-        "催菜", "呼叫服务员", "通知后厨", "提醒备料", "叫一下", "通知",
+        "催菜",
+        "呼叫服务员",
+        "通知后厨",
+        "提醒备料",
+        "叫一下",
+        "通知",
     ],
     "simple_confirm": [
-        "确认收货", "标记完成", "确认入库", "签收",
+        "确认收货",
+        "标记完成",
+        "确认入库",
+        "签收",
     ],
 }
 
 _HIGH_RISK_PATTERNS: dict[str, list[str]] = {
     "financial": [
-        "退款", "打款", "转账", "提现", "划账", "付款", "汇款",
+        "退款",
+        "打款",
+        "转账",
+        "提现",
+        "划账",
+        "付款",
+        "汇款",
     ],
     "bulk_inventory": [
-        "调拨大宗", "批量删除", "清空库存", "全部清除", "批量清除",
+        "调拨大宗",
+        "批量删除",
+        "清空库存",
+        "全部清除",
+        "批量清除",
     ],
     "system": [
-        "修改权限", "删除数据", "重置系统", "删除账号", "撤销权限",
+        "修改权限",
+        "删除数据",
+        "重置系统",
+        "删除账号",
+        "撤销权限",
     ],
 }
 
@@ -67,6 +102,7 @@ _CONFIRM_PATTERNS: dict[str, list[str]] = {
 
 
 # ── 纯函数 ────────────────────────────────────────────────────────────────────
+
 
 def classify_risk_level(command: str) -> Tuple[RiskLevel, str]:
     """
@@ -122,6 +158,7 @@ def get_confirmation_type(command: str) -> str:
 
 # ── 类接口 ────────────────────────────────────────────────────────────────────
 
+
 class VoiceCommandWhitelist:
     """语音指令白名单验证器（无状态，可共享实例）。"""
 
@@ -148,7 +185,7 @@ class VoiceCommandWhitelist:
 
         if level == RiskLevel.HIGH_RISK:
             return VoiceValidationResult(
-                allowed=True,           # 允许发起流程，但必须经手机端确认后才执行
+                allowed=True,  # 允许发起流程，但必须经手机端确认后才执行
                 risk_level=level,
                 category=category,
                 require_mobile_confirm=True,

@@ -1,24 +1,27 @@
 """
 Payroll API — 薪酬管理接口
 """
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
-from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
+
 from datetime import date
+from typing import Any, Dict, List, Optional
+
 import structlog
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from pydantic import BaseModel
+from sqlalchemy import and_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
 from ..models.user import User
 from ..services.payroll_service import PayrollService
-from sqlalchemy import select, and_
-from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
 router = APIRouter()
 
 
 # ── Request / Response ─────────────────────────────────────
+
 
 class SalaryStructureRequest(BaseModel):
     employee_id: str
@@ -54,6 +57,7 @@ class MarkPaidRequest(BaseModel):
 
 
 # ── 薪资方案 ───────────────────────────────────────────────
+
 
 @router.get("/payroll/salary-structure/{employee_id}")
 async def get_salary_structure(
@@ -102,6 +106,7 @@ async def upsert_salary_structure(
 
 # ── 算薪 ───────────────────────────────────────────────────
 
+
 @router.post("/payroll/calculate/{employee_id}")
 async def calculate_single(
     employee_id: str,
@@ -139,6 +144,7 @@ async def batch_calculate(
 
 # ── 工资表查询 ─────────────────────────────────────────────
 
+
 @router.get("/payroll/list")
 async def get_payroll_list(
     store_id: str = Query(...),
@@ -165,6 +171,7 @@ async def get_payroll_summary(
 
 
 # ── 确认 & 发放 ───────────────────────────────────────────
+
 
 @router.post("/payroll/confirm")
 async def confirm_payroll(
@@ -197,6 +204,7 @@ async def mark_paid(
 
 # ── 新引擎薪酬计算 ─────────────────────────────────────────
 
+
 @router.get("/payroll/detail/{employee_id}/{pay_month}")
 async def get_payroll_detail(
     employee_id: str,
@@ -206,24 +214,29 @@ async def get_payroll_detail(
 ):
     """获取员工薪酬明细（106项）"""
     from ..models.salary_item import SalaryItemRecord
+
     result = await db.execute(
-        select(SalaryItemRecord).where(
+        select(SalaryItemRecord)
+        .where(
             and_(
                 SalaryItemRecord.employee_id == employee_id,
                 SalaryItemRecord.pay_month == pay_month,
             )
-        ).order_by(SalaryItemRecord.item_category)
+        )
+        .order_by(SalaryItemRecord.item_category)
     )
     records = result.scalars().all()
     items = []
     for r in records:
-        items.append({
-            "item_name": r.item_name,
-            "item_category": r.item_category,
-            "amount_yuan": r.amount_fen / 100,
-            "amount_fen": r.amount_fen,
-            "formula": r.formula_snapshot,
-        })
+        items.append(
+            {
+                "item_name": r.item_name,
+                "item_category": r.item_category,
+                "amount_yuan": r.amount_fen / 100,
+                "amount_fen": r.amount_fen,
+                "formula": r.formula_snapshot,
+            }
+        )
 
     income = sum(r.amount_fen for r in records if r.item_category in ("income", "subsidy"))
     deduction = sum(r.amount_fen for r in records if r.item_category in ("deduction", "tax"))
@@ -248,6 +261,7 @@ async def formula_calculate(
 ):
     """使用公式引擎计算员工薪酬"""
     from ..services.salary_formula_engine import SalaryFormulaEngine
+
     engine = SalaryFormulaEngine(brand_id=brand_id)
     try:
         result = await engine.calculate_employee_salary(db, employee_id, pay_month, store_id)
@@ -268,6 +282,7 @@ async def simulate_payroll(
 ):
     """模拟薪酬计算（不写DB，调试用）"""
     from ..services.salary_formula_engine import SalaryFormulaEngine
+
     engine = SalaryFormulaEngine(brand_id=brand_id)
     try:
         return await engine.simulate_calculation(db, employee_id, pay_month, store_id)
@@ -276,6 +291,7 @@ async def simulate_payroll(
 
 
 # ── 工资套导入 ──
+
 
 @router.post("/payroll/salary-items/import")
 async def import_salary_items(
@@ -287,6 +303,7 @@ async def import_salary_items(
 ):
     """导入工资套（薪酬项定义）"""
     from ..services.salary_formula_engine import SalaryFormulaEngine
+
     content = await file.read()
     engine = SalaryFormulaEngine(brand_id=brand_id)
     result = await engine.import_salary_items(db, content, brand_id, store_id)
@@ -297,6 +314,7 @@ async def import_salary_items(
 
 
 # ── 公式校验 & 测试 ──
+
 
 class FormulaValidateRequest(BaseModel):
     formula: str
@@ -316,6 +334,7 @@ async def validate_formula(
 ):
     """校验公式语法和变量引用"""
     from ..services.salary_formula_engine import SalaryFormulaEngine
+
     engine = SalaryFormulaEngine(brand_id=brand_id)
     return engine.validate_formula(req.formula, req.available_variables)
 
@@ -328,11 +347,13 @@ async def test_formula(
 ):
     """用模拟数据测试公式（不写DB）"""
     from ..services.salary_formula_engine import SalaryFormulaEngine
+
     engine = SalaryFormulaEngine(brand_id=brand_id)
     return engine.test_formula(req.formula, req.test_variables)
 
 
 # ── 城市最低工资 ──
+
 
 @router.get("/payroll/city-wage-configs")
 async def list_city_wage_configs(
@@ -342,6 +363,7 @@ async def list_city_wage_configs(
 ):
     """查询城市最低工资配置"""
     from ..models.city_wage_config import CityWageConfig
+
     query = select(CityWageConfig)
     if year:
         query = query.where(CityWageConfig.year == year)
@@ -370,6 +392,7 @@ async def create_city_wage_config(
 ):
     """创建/更新城市最低工资"""
     from ..models.city_wage_config import CityWageConfig
+
     config = CityWageConfig(
         city=data["city"],
         province=data.get("province"),

@@ -13,6 +13,7 @@
   commission_risk: 抽佣率 > 行业均值(22%) + 5% → high
   overdue_risk:   结算周期结束后 >7天未到账 → medium, >15天 → high
 """
+
 from __future__ import annotations
 
 import json
@@ -30,30 +31,30 @@ logger = structlog.get_logger()
 # ── 风控阈值 ──────────────────────────────────────────────────────────────────
 DEVIATION_THRESHOLDS = {"critical": 0.20, "high": 0.10, "medium": 0.05}
 REFUND_RATE_THRESHOLDS = {"high": 0.15, "medium": 0.08}
-COMMISSION_RATE_BENCHMARK = 0.22          # 外卖平台行业均值抽佣率
+COMMISSION_RATE_BENCHMARK = 0.22  # 外卖平台行业均值抽佣率
 COMMISSION_RATE_WARN = COMMISSION_RATE_BENCHMARK + 0.05  # 超过 27% 告警
-OVERDUE_DAYS_HIGH   = 15
+OVERDUE_DAYS_HIGH = 15
 OVERDUE_DAYS_MEDIUM = 7
 
 PLATFORM_LABELS = {
-    "meituan":    "美团外卖",
-    "eleme":      "饿了么",
+    "meituan": "美团外卖",
+    "eleme": "饿了么",
     "wechat_pay": "微信支付",
-    "alipay":     "支付宝",
-    "unionpay":   "银联",
-    "cash":       "现金",
-    "other":      "其他",
+    "alipay": "支付宝",
+    "unionpay": "银联",
+    "cash": "现金",
+    "other": "其他",
 }
 
 ITEM_TYPE_LABELS = {
-    "sale_income":         "销售收入",
-    "commission":          "平台佣金",
-    "refund_deduction":    "退款扣款",
-    "marketing_subsidy":   "营销补贴",
-    "packaging_fee":       "包装费",
-    "tech_fee":            "技术服务费",
-    "adjustment":          "调账",
-    "other":               "其他",
+    "sale_income": "销售收入",
+    "commission": "平台佣金",
+    "refund_deduction": "退款扣款",
+    "marketing_subsidy": "营销补贴",
+    "packaging_fee": "包装费",
+    "tech_fee": "技术服务费",
+    "adjustment": "调账",
+    "other": "其他",
 }
 
 
@@ -77,13 +78,13 @@ def _assess_deviation_risk(deviation_pct: float) -> str:
 
 
 def assess_settlement_risk(
-    gross_yuan:      float,
+    gross_yuan: float,
     commission_yuan: float,
-    refund_yuan:     float,
-    net_yuan:        float,
-    expected_yuan:   Optional[float],
-    settle_date:     date,
-    cycle_end:       Optional[date],
+    refund_yuan: float,
+    net_yuan: float,
+    expected_yuan: Optional[float],
+    settle_date: date,
+    cycle_end: Optional[date],
 ) -> Dict[str, Any]:
     """
     综合评估单条结算记录的风险等级。
@@ -95,16 +96,14 @@ def assess_settlement_risk(
 
     # 1. 偏差风险
     deviation_yuan = 0.0
-    deviation_pct  = 0.0
+    deviation_pct = 0.0
     if expected_yuan is not None and expected_yuan > 0:
         deviation_yuan = net_yuan - expected_yuan
-        deviation_pct  = deviation_yuan / expected_yuan * 100
+        deviation_pct = deviation_yuan / expected_yuan * 100
         dev_risk = _assess_deviation_risk(deviation_pct / 100)
         if dev_risk != "low":
             risk_levels.append(dev_risk)
-            findings.append(
-                f"结算偏差 {deviation_pct:.1f}%（预期¥{expected_yuan:.2f} 实到¥{net_yuan:.2f}）"
-            )
+            findings.append(f"结算偏差 {deviation_pct:.1f}%（预期¥{expected_yuan:.2f} 实到¥{net_yuan:.2f}）")
 
     # 2. 退款率风险
     if gross_yuan > 0:
@@ -122,8 +121,7 @@ def assess_settlement_risk(
         if commission_rate >= COMMISSION_RATE_WARN:
             risk_levels.append("high")
             findings.append(
-                f"平台抽佣率 {commission_rate*100:.1f}% 超出行业均值"
-                f"（{COMMISSION_RATE_BENCHMARK*100:.0f}%+5%）"
+                f"平台抽佣率 {commission_rate*100:.1f}% 超出行业均值" f"（{COMMISSION_RATE_BENCHMARK*100:.0f}%+5%）"
             )
 
     # 4. 逾期风险（结算周期结束后N天仍未到账）
@@ -141,10 +139,10 @@ def assess_settlement_risk(
     final_risk = max(risk_levels, key=lambda r: priority.get(r, 0))
 
     return {
-        "risk_level":    final_risk,
+        "risk_level": final_risk,
         "deviation_yuan": round(deviation_yuan, 2),
-        "deviation_pct":  round(deviation_pct, 2),
-        "findings":       findings,
+        "deviation_pct": round(deviation_pct, 2),
+        "findings": findings,
     }
 
 
@@ -169,13 +167,18 @@ async def create_settlement_record(
     net_yuan = gross_yuan - commission_yuan - refund_yuan + adjustment_yuan
 
     # 查预期收款（来自当期 collection/sale 类事件）
-    expected_row = (await db.execute(text("""
+    expected_row = (
+        await db.execute(
+            text("""
         SELECT COALESCE(SUM(amount_yuan), 0) AS expected
         FROM business_events
         WHERE store_id = :sid AND period = :period
           AND event_type IN ('sale', 'collection')
           AND source_system = :platform
-    """), {"sid": store_id, "period": period, "platform": platform})).fetchone()
+    """),
+            {"sid": store_id, "period": period, "platform": platform},
+        )
+    ).fetchone()
     expected_yuan = _safe_float(expected_row.expected) if expected_row else None
     if expected_yuan == 0.0:
         expected_yuan = None  # 无历史数据时不评估偏差
@@ -194,7 +197,8 @@ async def create_settlement_record(
     )
 
     rid = str(uuid.uuid4())
-    await db.execute(text("""
+    await db.execute(
+        text("""
         INSERT INTO settlement_records
           (id, store_id, brand_id, platform, period, settlement_no,
            settle_date, cycle_start, cycle_end,
@@ -207,22 +211,36 @@ async def create_settlement_record(
            :gross, :comm, :ref, :adj, :net,
            :exp, :dev, :devpct,
            :risk, 'pending', NOW(), NOW())
-    """), {
-        "id":      rid,        "sid":  store_id,   "bid": brand_id,
-        "plat":    platform,   "period": period,   "sno": settlement_no,
-        "sd":      settle_date,"cs":   cycle_start,"ce":  cycle_end,
-        "gross":   gross_yuan, "comm": commission_yuan,
-        "ref":     refund_yuan,"adj":  adjustment_yuan, "net": net_yuan,
-        "exp":     expected_yuan,
-        "dev":     risk_result["deviation_yuan"],
-        "devpct":  risk_result["deviation_pct"],
-        "risk":    risk_result["risk_level"],
-    })
+    """),
+        {
+            "id": rid,
+            "sid": store_id,
+            "bid": brand_id,
+            "plat": platform,
+            "period": period,
+            "sno": settlement_no,
+            "sd": settle_date,
+            "cs": cycle_start,
+            "ce": cycle_end,
+            "gross": gross_yuan,
+            "comm": commission_yuan,
+            "ref": refund_yuan,
+            "adj": adjustment_yuan,
+            "net": net_yuan,
+            "exp": expected_yuan,
+            "dev": risk_result["deviation_yuan"],
+            "devpct": risk_result["deviation_pct"],
+            "risk": risk_result["risk_level"],
+        },
+    )
 
     # 高风险 → 生成 risk_task
     if risk_result["risk_level"] in ("high", "critical"):
         await _create_risk_task(
-            db, store_id, brand_id, rid,
+            db,
+            store_id,
+            brand_id,
+            rid,
             risk_type="invoice_mismatch" if risk_result["deviation_yuan"] != 0 else "unusual_refund",
             severity=risk_result["risk_level"],
             title=f"{PLATFORM_LABELS.get(platform, platform)} 结算风险 ({period})",
@@ -230,7 +248,9 @@ async def create_settlement_record(
             amount_yuan=abs(risk_result["deviation_yuan"]) or net_yuan,
         )
         await _log_agent_action(
-            db, store_id, period,
+            db,
+            store_id,
+            period,
             level="L2" if risk_result["risk_level"] == "critical" else "L1",
             agent="SettlementAgent",
             trigger="settlement_risk",
@@ -241,19 +261,18 @@ async def create_settlement_record(
         )
 
     await db.commit()
-    logger.info("settlement_created", store_id=store_id, platform=platform,
-                risk=risk_result["risk_level"], net=net_yuan)
+    logger.info("settlement_created", store_id=store_id, platform=platform, risk=risk_result["risk_level"], net=net_yuan)
 
     return {
-        "id":            rid,
-        "store_id":      store_id,
-        "platform":      platform,
-        "period":        period,
-        "net_yuan":      round(net_yuan, 2),
-        "risk_level":    risk_result["risk_level"],
+        "id": rid,
+        "store_id": store_id,
+        "platform": platform,
+        "period": period,
+        "net_yuan": round(net_yuan, 2),
+        "risk_level": risk_result["risk_level"],
         "deviation_yuan": risk_result["deviation_yuan"],
-        "deviation_pct":  risk_result["deviation_pct"],
-        "findings":      risk_result["findings"],
+        "deviation_pct": risk_result["deviation_pct"],
+        "findings": risk_result["findings"],
     }
 
 
@@ -268,44 +287,62 @@ async def run_overdue_scan(
     today = date.today().isoformat()
 
     # 逾期高风险（>15天）
-    high_rows = (await db.execute(text("""
+    high_rows = (
+        await db.execute(
+            text("""
         SELECT id, platform, period, cycle_end, net_yuan
         FROM settlement_records
         WHERE store_id = :sid AND status = 'pending'
           AND cycle_end IS NOT NULL
           AND cycle_end < (:today::date - :days * INTERVAL '1 day')
-    """), {"sid": store_id, "today": today, "days": OVERDUE_DAYS_HIGH})).fetchall()
+    """),
+            {"sid": store_id, "today": today, "days": OVERDUE_DAYS_HIGH},
+        )
+    ).fetchall()
 
     # 逾期中风险（>7天，未在高风险列表内）
-    medium_rows = (await db.execute(text("""
+    medium_rows = (
+        await db.execute(
+            text("""
         SELECT id, platform, period, cycle_end, net_yuan
         FROM settlement_records
         WHERE store_id = :sid AND status = 'pending'
           AND cycle_end IS NOT NULL
           AND cycle_end < (:today::date - :days * INTERVAL '1 day')
           AND risk_level NOT IN ('high', 'critical')
-    """), {"sid": store_id, "today": today, "days": OVERDUE_DAYS_MEDIUM})).fetchall()
+    """),
+            {"sid": store_id, "today": today, "days": OVERDUE_DAYS_MEDIUM},
+        )
+    ).fetchall()
 
-    updated_high   = 0
+    updated_high = 0
     updated_medium = 0
 
     for r in high_rows:
-        await db.execute(text("""
+        await db.execute(
+            text("""
             UPDATE settlement_records SET risk_level = 'high', updated_at = NOW()
             WHERE id = :id AND risk_level NOT IN ('critical')
-        """), {"id": r.id})
+        """),
+            {"id": r.id},
+        )
         updated_high += 1
 
     for r in medium_rows:
-        await db.execute(text("""
+        await db.execute(
+            text("""
             UPDATE settlement_records SET risk_level = 'medium', updated_at = NOW()
             WHERE id = :id AND risk_level = 'low'
-        """), {"id": r.id})
+        """),
+            {"id": r.id},
+        )
         updated_medium += 1
 
     if updated_high > 0:
         await _log_agent_action(
-            db, store_id, period=date.today().strftime("%Y-%m"),
+            db,
+            store_id,
+            period=date.today().strftime("%Y-%m"),
             level="L2",
             agent="SettlementAgent",
             trigger="overdue_payment",
@@ -316,8 +353,8 @@ async def run_overdue_scan(
 
     await db.commit()
     return {
-        "store_id":     store_id,
-        "scanned_at":   today,
+        "store_id": store_id,
+        "scanned_at": today,
         "high_updated": updated_high,
         "medium_updated": updated_medium,
     }
@@ -335,18 +372,27 @@ async def _create_risk_task(
     amount_yuan: float,
 ) -> None:
     tid = str(uuid.uuid4())
-    await db.execute(text("""
+    await db.execute(
+        text("""
         INSERT INTO risk_tasks
           (id, store_id, brand_id, risk_type, severity, title, description,
            related_event_ids, amount_yuan, status, created_at, updated_at)
         VALUES
           (:id, :sid, :bid, :rtype, :sev, :title, :desc,
            :refs, :amt, 'open', NOW(), NOW())
-    """), {
-        "id": tid, "sid": store_id, "bid": brand_id,
-        "rtype": risk_type, "sev": severity, "title": title, "desc": description,
-        "refs": json.dumps([settlement_id]), "amt": round(amount_yuan, 2),
-    })
+    """),
+        {
+            "id": tid,
+            "sid": store_id,
+            "bid": brand_id,
+            "rtype": risk_type,
+            "sev": severity,
+            "title": title,
+            "desc": description,
+            "refs": json.dumps([settlement_id]),
+            "amt": round(amount_yuan, 2),
+        },
+    )
 
 
 async def _log_agent_action(
@@ -362,7 +408,8 @@ async def _log_agent_action(
     ref_id: Optional[str] = None,
 ) -> None:
     aid = str(uuid.uuid4())
-    await db.execute(text("""
+    await db.execute(
+        text("""
         INSERT INTO agent_action_log
           (id, store_id, action_level, agent_name, trigger_type, title, description,
            expected_impact_yuan, confidence, ref_type, ref_id,
@@ -371,8 +418,17 @@ async def _log_agent_action(
           (:id, :sid, :level, :agent, :trigger, :title, :desc,
            :impact, 0.82, 'settlement_record', :ref_id,
            'pending', :period, NOW())
-    """), {
-        "id": aid, "sid": store_id, "level": level, "agent": agent,
-        "trigger": trigger, "title": title, "desc": description,
-        "impact": round(impact, 2), "ref_id": ref_id, "period": period,
-    })
+    """),
+        {
+            "id": aid,
+            "sid": store_id,
+            "level": level,
+            "agent": agent,
+            "trigger": trigger,
+            "title": title,
+            "desc": description,
+            "impact": round(impact, 2),
+            "ref_id": ref_id,
+            "period": period,
+        },
+    )

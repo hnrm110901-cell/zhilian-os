@@ -2,6 +2,7 @@
 知识库雏形（P2）：损耗规则库、BOM 基准库、异常模式库。
 当前为文件存储，便于后续迁入 PG/图谱。
 """
+
 from __future__ import annotations
 
 import json
@@ -49,8 +50,10 @@ def add_knowledge(
         raise ValueError(f"knowledge_type 须为 {KNOWLEDGE_TYPES} 之一")
     items = _load_all(base_path)
     import uuid
+
     kid = str(uuid.uuid4())
     from datetime import datetime
+
     now = datetime.utcnow().isoformat() + "Z"
     record = {
         "id": kid,

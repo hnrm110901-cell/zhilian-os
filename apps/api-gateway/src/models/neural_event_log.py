@@ -2,23 +2,30 @@
 神经事件日志模型
 记录每个Neural System事件的完整处理链路，支持事件溯源审计
 """
-from sqlalchemy import Column, String, Integer, Float, DateTime, Text, JSON, Boolean, Enum as SQLEnum
-from datetime import datetime
+
 import enum
+from datetime import datetime
+
+from sqlalchemy import JSON, Boolean, Column, DateTime
+from sqlalchemy import Enum as SQLEnum
+from sqlalchemy import Float, Integer, String, Text
+
 from .base import Base
 
 
 class EventProcessingStatus(str, enum.Enum):
     """事件处理状态"""
-    QUEUED = "queued"          # 已入队，等待处理
+
+    QUEUED = "queued"  # 已入队，等待处理
     PROCESSING = "processing"  # 处理中
-    COMPLETED = "completed"    # 处理完成
-    FAILED = "failed"          # 处理失败
-    RETRYING = "retrying"      # 重试中
+    COMPLETED = "completed"  # 处理完成
+    FAILED = "failed"  # 处理失败
+    RETRYING = "retrying"  # 重试中
 
 
 class NeuralEventLog(Base):
     """神经事件日志表 — 事件溯源核心表"""
+
     __tablename__ = "neural_event_logs"
 
     # 主键 / 事件标识

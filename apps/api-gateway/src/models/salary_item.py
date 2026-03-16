@@ -2,11 +2,11 @@
 Salary Item Models — 薪酬项定义与明细
 支持106项薪酬公式的定义、计算和记录
 """
+
 import uuid
-from sqlalchemy import (
-    Column, String, Integer, Boolean, Text, UniqueConstraint,
-)
-from sqlalchemy.dialects.postgresql import UUID, JSON
+
+from sqlalchemy import Boolean, Column, Integer, String, Text, UniqueConstraint
+from sqlalchemy.dialects.postgresql import JSON, UUID
 
 from .base import Base, TimestampMixin
 
@@ -16,6 +16,7 @@ class SalaryItemDefinition(Base, TimestampMixin):
     薪酬项定义（品牌/门店级）
     每个薪酬项定义一个计算公式，按 calc_order 顺序执行
     """
+
     __tablename__ = "salary_item_definitions"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -43,10 +44,9 @@ class SalaryItemRecord(Base, TimestampMixin):
     员工月度薪酬项明细
     每个员工每月每个薪酬项一条记录
     """
+
     __tablename__ = "salary_item_records"
-    __table_args__ = (
-        UniqueConstraint("employee_id", "pay_month", "item_id", name="uq_salary_item_month"),
-    )
+    __table_args__ = (UniqueConstraint("employee_id", "pay_month", "item_id", name="uq_salary_item_month"),)
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     store_id = Column(String(50), nullable=False, index=True)

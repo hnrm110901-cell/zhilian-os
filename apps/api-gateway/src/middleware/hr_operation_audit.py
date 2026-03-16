@@ -7,6 +7,7 @@ HR操作审计中间件 — 自动记录所有HR写操作（POST/PUT/DELETE）
   - 脱敏敏感字段（身份证号、银行卡号、手机号等）
   - 通过 BackgroundTask 异步写入数据库，不阻塞响应
 """
+
 import copy
 import json
 import re
@@ -34,10 +35,21 @@ EXCLUDE_PATHS = [
 
 # 敏感字段名集合（递归脱敏）
 SENSITIVE_FIELDS = {
-    "password", "id_card_no", "id_card_number", "id_number",
-    "bank_account", "bank_card_no", "bank_card_number",
-    "phone", "mobile", "telephone", "contact_phone",
-    "token", "secret", "access_token", "refresh_token",
+    "password",
+    "id_card_no",
+    "id_card_number",
+    "id_number",
+    "bank_account",
+    "bank_card_no",
+    "bank_card_number",
+    "phone",
+    "mobile",
+    "telephone",
+    "contact_phone",
+    "token",
+    "secret",
+    "access_token",
+    "refresh_token",
 }
 
 # 路径到模块的映射规则
@@ -174,6 +186,7 @@ class HROperationAuditMiddleware(BaseHTTPMiddleware):
 
 # ── 辅助函数 ───────────────────────────────────────────────
 
+
 def _schedule_audit_write(**kwargs):
     """调度后台审计日志写入（异步，不阻塞主请求）"""
     import asyncio
@@ -223,10 +236,7 @@ def _mask_sensitive(data: dict) -> dict:
         elif isinstance(value, dict):
             masked[key] = _mask_sensitive(value)
         elif isinstance(value, list):
-            masked[key] = [
-                _mask_sensitive(item) if isinstance(item, dict) else item
-                for item in value
-            ]
+            masked[key] = [_mask_sensitive(item) if isinstance(item, dict) else item for item in value]
         else:
             masked[key] = value
     return masked
@@ -308,6 +318,7 @@ def _extract_operator_id(request: Request) -> str:
     if auth_header.startswith("Bearer "):
         try:
             from src.core.security import decode_access_token
+
             payload = decode_access_token(auth_header.split(" ")[1])
             return payload.get("sub", "system")
         except Exception:

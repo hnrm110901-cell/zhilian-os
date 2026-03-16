@@ -32,29 +32,28 @@ from typing import Dict, List, Optional, Tuple
 import structlog
 from sqlalchemy import and_, delete, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from src.models.bom import BOMItem, BOMTemplate
 from src.models.cross_store import CrossStoreMetric, StorePeerGroup, StoreSimilarityCache
-from src.models.store import Store
 from src.models.dish import Dish
-from src.models.bom import BOMTemplate, BOMItem
+from src.models.store import Store
 
 logger = structlog.get_logger()
 
 # ── 常量 ──────────────────────────────────────────────────────────────────────
 
-SIMILARITY_THRESHOLD = 0.55   # 写入 Neo4j SIMILAR_TO 的最低阈值
-MIN_PEER_GROUP_SIZE  = 2      # 同伴组最少门店数（低于此则归入"全国"组）
+SIMILARITY_THRESHOLD = 0.55  # 写入 Neo4j SIMILAR_TO 的最低阈值
+MIN_PEER_GROUP_SIZE = 2  # 同伴组最少门店数（低于此则归入"全国"组）
 
 TIER_THRESHOLDS = {
-    "premium":  {"min_seats": 201, "min_monthly_revenue": 500_000},
-    "standard": {"min_seats": 80,  "min_monthly_revenue": 200_000},
+    "premium": {"min_seats": 201, "min_monthly_revenue": 500_000},
+    "standard": {"min_seats": 80, "min_monthly_revenue": 200_000},
     # fastfood: 其余
 }
 
 # 相似度各维度权重
-W_MENU     = 0.40
-W_REGION   = 0.20
-W_TIER     = 0.20
+W_MENU = 0.40
+W_REGION = 0.20
+W_TIER = 0.20
 W_CAPACITY = 0.20
 
 # 物化指标名单
@@ -70,16 +69,15 @@ MATERIALIZE_METRICS = [
 
 # ── 纯函数工具（无 IO，可单元测试）──────────────────────────────────────────
 
+
 def classify_store_tier(store: Store) -> str:
     """根据座位数和月营收目标划分门店层级"""
-    seats   = store.seats or 0
+    seats = store.seats or 0
     revenue = float(store.monthly_revenue_target or 0)
 
-    if seats > TIER_THRESHOLDS["premium"]["min_seats"] or \
-       revenue > TIER_THRESHOLDS["premium"]["min_monthly_revenue"]:
+    if seats > TIER_THRESHOLDS["premium"]["min_seats"] or revenue > TIER_THRESHOLDS["premium"]["min_monthly_revenue"]:
         return "premium"
-    elif seats >= TIER_THRESHOLDS["standard"]["min_seats"] or \
-         revenue >= TIER_THRESHOLDS["standard"]["min_monthly_revenue"]:
+    elif seats >= TIER_THRESHOLDS["standard"]["min_seats"] or revenue >= TIER_THRESHOLDS["standard"]["min_monthly_revenue"]:
         return "standard"
     else:
         return "fastfood"
@@ -90,10 +88,10 @@ def _dish_name_set(dishes: List[Dish]) -> frozenset:
 
 
 def compute_similarity(
-    store_a:   Store,
-    store_b:   Store,
-    dishes_a:  List[Dish],
-    dishes_b:  List[Dish],
+    store_a: Store,
+    store_b: Store,
+    dishes_a: List[Dish],
+    dishes_b: List[Dish],
 ) -> Dict:
     """
     计算两家门店的相似度（返回分量明细，方便可解释性）
@@ -104,14 +102,14 @@ def compute_similarity(
     # 1. 菜单 Jaccard
     names_a = _dish_name_set(dishes_a)
     names_b = _dish_name_set(dishes_b)
-    union   = names_a | names_b
+    union = names_a | names_b
     menu_jaccard = len(names_a & names_b) / len(union) if union else 0.0
 
     # 2. 区域相似度
     region_a = store_a.region or ""
     region_b = store_b.region or ""
-    city_a   = store_a.city   or ""
-    city_b   = store_b.city   or ""
+    city_a = store_a.city or ""
+    city_b = store_b.city or ""
     if region_a and region_a == region_b:
         region_score = 1.0
     elif city_a and city_a == city_b:
@@ -129,18 +127,13 @@ def compute_similarity(
     seats_b = store_b.seats or 100
     capacity_ratio = min(seats_a, seats_b) / max(seats_a, seats_b)
 
-    score = (
-        W_MENU     * menu_jaccard
-        + W_REGION   * region_score
-        + W_TIER     * tier_score
-        + W_CAPACITY * capacity_ratio
-    )
+    score = W_MENU * menu_jaccard + W_REGION * region_score + W_TIER * tier_score + W_CAPACITY * capacity_ratio
     return {
-        "similarity_score": round(score,           4),
-        "menu_overlap":     round(menu_jaccard,    4),
-        "region_match":     region_a == region_b,
-        "tier_match":       tier_a == tier_b,
-        "capacity_ratio":   round(capacity_ratio,  4),
+        "similarity_score": round(score, 4),
+        "menu_overlap": round(menu_jaccard, 4),
+        "region_match": region_a == region_b,
+        "tier_match": tier_a == tier_b,
+        "capacity_ratio": round(capacity_ratio, 4),
     }
 
 
@@ -160,8 +153,8 @@ def compute_percentiles(values: List[float]) -> Dict[str, float]:
 
     def _percentile(pct: float) -> float:
         idx = (n - 1) * pct
-        lo  = int(idx)
-        hi  = min(lo + 1, n - 1)
+        lo = int(idx)
+        hi = min(lo + 1, n - 1)
         return sv[lo] + (sv[hi] - sv[lo]) * (idx - lo)
 
     return {
@@ -181,6 +174,7 @@ def compute_percentile_rank(value: float, peer_values: List[float]) -> float:
 
 
 # ── 主服务 ────────────────────────────────────────────────────────────────────
+
 
 class CrossStoreKnowledgeService:
     """
@@ -211,9 +205,7 @@ class CrossStoreKnowledgeService:
             return []
 
         # 批量加载菜品（减少 N+1 查询）
-        all_dishes = await self._load_dishes_by_store(
-            [s.id for s in stores]
-        )
+        all_dishes = await self._load_dishes_by_store([s.id for s in stores])
 
         written: List[StoreSimilarityCache] = []
         for i in range(len(stores)):
@@ -225,7 +217,8 @@ class CrossStoreKnowledgeService:
                     sa, sb = sb, sa
 
                 sim = compute_similarity(
-                    sa, sb,
+                    sa,
+                    sb,
                     all_dishes.get(sa.id, []),
                     all_dishes.get(sb.id, []),
                 )
@@ -254,14 +247,14 @@ class CrossStoreKnowledgeService:
         groups: Dict[str, List[str]] = {}
 
         for store in stores:
-            tier   = store.tier or classify_store_tier(store)
+            tier = store.tier or classify_store_tier(store)
             region = store.region or "全国"
-            key    = f"{tier}_{region}"
+            key = f"{tier}_{region}"
             groups.setdefault(key, []).append(store.id)
 
         # 小组归并到全国兜底组
         national_merge: Dict[str, List[str]] = {}
-        final_groups: Dict[str, List[str]]   = {}
+        final_groups: Dict[str, List[str]] = {}
 
         for key, ids in groups.items():
             tier = key.split("_")[0]
@@ -277,8 +270,8 @@ class CrossStoreKnowledgeService:
 
         saved: List[StorePeerGroup] = []
         for key, ids in final_groups.items():
-            parts  = key.split("_", 1)
-            tier   = parts[0] if len(parts) > 0 else ""
+            parts = key.split("_", 1)
+            tier = parts[0] if len(parts) > 0 else ""
             region = parts[1] if len(parts) > 1 else "全国"
             saved.append(await self._upsert_peer_group(key, tier, region, ids))
 
@@ -290,7 +283,7 @@ class CrossStoreKnowledgeService:
 
     async def get_peer_benchmarks(
         self,
-        store_id:    str,
+        store_id: str,
         metric_name: str,
         metric_date: Optional[date] = None,
     ) -> Optional[Dict]:
@@ -316,7 +309,7 @@ class CrossStoreKnowledgeService:
             select(CrossStoreMetric)
             .where(
                 and_(
-                    CrossStoreMetric.store_id    == store_id,
+                    CrossStoreMetric.store_id == store_id,
                     CrossStoreMetric.metric_name == metric_name,
                     CrossStoreMetric.metric_date == d,
                 )
@@ -329,30 +322,33 @@ class CrossStoreKnowledgeService:
 
         gap = row.value - (row.peer_p50 or 0)
         verdict = (
-            "top_quartile"  if (row.percentile_in_peer or 0) >= 75 else
-            "above_median"  if (row.percentile_in_peer or 0) >= 50 else
-            "below_median"  if (row.percentile_in_peer or 0) >= 25 else
-            "bottom_quartile"
+            "top_quartile"
+            if (row.percentile_in_peer or 0) >= 75
+            else (
+                "above_median"
+                if (row.percentile_in_peer or 0) >= 50
+                else "below_median" if (row.percentile_in_peer or 0) >= 25 else "bottom_quartile"
+            )
         )
         return {
-            "store_id":          store_id,
-            "metric_name":       metric_name,
-            "metric_date":       d.isoformat(),
-            "value":             row.value,
-            "peer_group":        row.peer_group,
-            "peer_count":        row.peer_count,
+            "store_id": store_id,
+            "metric_name": metric_name,
+            "metric_date": d.isoformat(),
+            "value": row.value,
+            "peer_group": row.peer_group,
+            "peer_count": row.peer_count,
             "percentile_in_peer": row.percentile_in_peer,
-            "peer_p25":          row.peer_p25,
-            "peer_p50":          row.peer_p50,
-            "peer_p75":          row.peer_p75,
-            "peer_p90":          row.peer_p90,
-            "gap_to_median":     round(gap, 4),
-            "verdict":           verdict,
+            "peer_p25": row.peer_p25,
+            "peer_p50": row.peer_p50,
+            "peer_p75": row.peer_p75,
+            "peer_p90": row.peer_p90,
+            "gap_to_median": round(gap, 4),
+            "verdict": verdict,
         }
 
     async def get_all_benchmarks(
         self,
-        store_id:    str,
+        store_id: str,
         metric_date: Optional[date] = None,
     ) -> List[Dict]:
         """获取某门店所有指标的 Benchmark 快照"""
@@ -367,8 +363,8 @@ class CrossStoreKnowledgeService:
 
     async def materialize_metrics(
         self,
-        target_date:  Optional[date] = None,
-        store_ids:    Optional[List[str]] = None,
+        target_date: Optional[date] = None,
+        store_ids: Optional[List[str]] = None,
         lookback_days: int = 30,
     ) -> Dict[str, int]:
         """
@@ -387,19 +383,19 @@ class CrossStoreKnowledgeService:
 
         # 确保同伴组已建立
         await self.build_peer_groups([s.id for s in stores])
-        peer_group_map = await self._load_peer_group_map()   # store_id → group_key
+        peer_group_map = await self._load_peer_group_map()  # store_id → group_key
 
         # 计算各门店指标
-        waste_rates     = await self._compute_waste_rates(stores, lookback_days)
-        menu_coverages  = await self._compute_menu_coverages(stores)
-        rev_per_seats   = await self._compute_revenue_per_seat(stores, d)
-        labor_ratios    = await self._compute_labor_ratio(stores, d)
+        waste_rates = await self._compute_waste_rates(stores, lookback_days)
+        menu_coverages = await self._compute_menu_coverages(stores)
+        rev_per_seats = await self._compute_revenue_per_seat(stores, d)
+        labor_ratios = await self._compute_labor_ratio(stores, d)
 
         metric_values: Dict[str, Dict[str, float]] = {
-            "waste_rate":      waste_rates,
-            "menu_coverage":   menu_coverages,
+            "waste_rate": waste_rates,
+            "menu_coverage": menu_coverages,
             "revenue_per_seat": rev_per_seats,
-            "labor_ratio":     labor_ratios,
+            "labor_ratio": labor_ratios,
         }
 
         written = 0
@@ -413,8 +409,8 @@ class CrossStoreKnowledgeService:
                 groups.setdefault(gk, []).append((sid, val))
 
             for group_key, entries in groups.items():
-                vals  = [v for _, v in entries]
-                pcts  = compute_percentiles(vals)
+                vals = [v for _, v in entries]
+                pcts = compute_percentiles(vals)
                 for sid, val in entries:
                     prank = compute_percentile_rank(val, vals)
                     await self._upsert_metric(
@@ -440,7 +436,7 @@ class CrossStoreKnowledgeService:
 
     async def get_bom_variance_across_stores(
         self,
-        dish_name:  Optional[str] = None,
+        dish_name: Optional[str] = None,
         min_stores: int = 2,
     ) -> List[Dict]:
         """
@@ -477,9 +473,7 @@ class CrossStoreKnowledgeService:
         agg: Dict[Tuple, List] = {}
         for row in rows:
             key = (str(row.dish_id), row.ingredient_id)
-            agg.setdefault(key, []).append(
-                {"store_id": row.store_id, "qty": float(row.standard_qty or 0)}
-            )
+            agg.setdefault(key, []).append({"store_id": row.store_id, "qty": float(row.standard_qty or 0)})
 
         results = []
         for (dish_id, ing_id), entries in agg.items():
@@ -490,16 +484,18 @@ class CrossStoreKnowledgeService:
             if mean == 0:
                 continue
             variance_pct = (max(qtys) - min(qtys)) / mean
-            results.append({
-                "dish_id":      dish_id,
-                "ingredient_id": ing_id,
-                "store_count":  len(entries),
-                "mean_qty":     round(mean,         4),
-                "max_qty":      round(max(qtys),    4),
-                "min_qty":      round(min(qtys),    4),
-                "variance_pct": round(variance_pct, 4),
-                "stores":       entries,
-            })
+            results.append(
+                {
+                    "dish_id": dish_id,
+                    "ingredient_id": ing_id,
+                    "store_count": len(entries),
+                    "mean_qty": round(mean, 4),
+                    "max_qty": round(max(qtys), 4),
+                    "min_qty": round(min(qtys), 4),
+                    "variance_pct": round(variance_pct, 4),
+                    "stores": entries,
+                }
+            )
 
         # 按 variance_pct 降序
         results.sort(key=lambda x: x["variance_pct"], reverse=True)
@@ -509,11 +505,11 @@ class CrossStoreKnowledgeService:
 
     async def get_best_practice_stores(
         self,
-        metric_name:    str,
-        top_n:          int  = 5,
-        direction:      str  = "lower_better",
+        metric_name: str,
+        top_n: int = 5,
+        direction: str = "lower_better",
         peer_group_key: Optional[str] = None,
-        metric_date:    Optional[date] = None,
+        metric_date: Optional[date] = None,
     ) -> List[Dict]:
         """
         返回同组内某指标表现最佳的 Top N 门店。
@@ -542,10 +538,10 @@ class CrossStoreKnowledgeService:
         )
         return [
             {
-                "rank":              i + 1,
-                "store_id":          r.store_id,
-                "value":             r.value,
-                "peer_group":        r.peer_group,
+                "rank": i + 1,
+                "store_id": r.store_id,
+                "value": r.value,
+                "peer_group": r.peer_group,
                 "percentile_in_peer": r.percentile_in_peer,
             }
             for i, r in enumerate(sorted_rows[:top_n])
@@ -555,7 +551,7 @@ class CrossStoreKnowledgeService:
 
     async def sync_store_graph(
         self,
-        store_ids:   Optional[List[str]] = None,
+        store_ids: Optional[List[str]] = None,
         metric_date: Optional[date] = None,
     ) -> Dict:
         """
@@ -563,19 +559,20 @@ class CrossStoreKnowledgeService:
         """
         try:
             from src.ontology.data_sync import OntologyDataSync
+
             sync = OntologyDataSync()
         except Exception as e:
             logger.warning("Neo4j 连接失败，跳过图同步", error=str(e))
             return {"skipped": True}
 
         stores = await self._load_stores(store_ids)
-        d      = metric_date or (date.today() - timedelta(days=1))
+        d = metric_date or (date.today() - timedelta(days=1))
         peer_group_map = await self._load_peer_group_map()
 
         # 1. 写 Store 节点（含物化 KPI）
         for store in stores:
-            tier       = store.tier or classify_store_tier(store)
-            waste_bm   = await self.get_peer_benchmarks(store.id, "waste_rate",   d)
+            tier = store.tier or classify_store_tier(store)
+            waste_bm = await self.get_peer_benchmarks(store.id, "waste_rate", d)
             coverage_bm = await self.get_peer_benchmarks(store.id, "menu_coverage", d)
             sync.upsert_store(
                 store_id=store.id,
@@ -593,11 +590,15 @@ class CrossStoreKnowledgeService:
             )
 
         # 2. 写 SIMILAR_TO 边
-        sims = (await self.db.execute(
-            select(StoreSimilarityCache).where(
-                StoreSimilarityCache.similarity_score >= SIMILARITY_THRESHOLD
+        sims = (
+            (
+                await self.db.execute(
+                    select(StoreSimilarityCache).where(StoreSimilarityCache.similarity_score >= SIMILARITY_THRESHOLD)
+                )
             )
-        )).scalars().all()
+            .scalars()
+            .all()
+        )
         for sim in sims:
             sync.create_similar_to_edge(
                 store_a_id=sim.store_a_id,
@@ -626,13 +627,10 @@ class CrossStoreKnowledgeService:
                     )
 
         # 4. 写 WasteEvent OCCURRED_IN Store（最近 100 条）
-        from src.models.waste_event import WasteEvent
         from sqlalchemy import desc
-        waste_stmt = (
-            select(WasteEvent.event_id, WasteEvent.store_id)
-            .order_by(desc(WasteEvent.created_at))
-            .limit(100)
-        )
+        from src.models.waste_event import WasteEvent
+
+        waste_stmt = select(WasteEvent.event_id, WasteEvent.store_id).order_by(desc(WasteEvent.created_at)).limit(100)
         waste_rows = (await self.db.execute(waste_stmt)).all()
         for row in waste_rows:
             sync.link_waste_to_store(
@@ -648,28 +646,25 @@ class CrossStoreKnowledgeService:
             recipe_variances=len([v for v in variances if v["variance_pct"] >= 0.10]),
         )
         return {
-            "stores_synced":     len(stores),
-            "similar_to_edges":  len(sims),
-            "shares_recipe_edges": len(
-                [v for v in variances if v["variance_pct"] >= 0.10]
-            ),
+            "stores_synced": len(stores),
+            "similar_to_edges": len(sims),
+            "shares_recipe_edges": len([v for v in variances if v["variance_pct"] >= 0.10]),
         }
 
     # ── 相似门店查询 ──────────────────────────────────────────────────────────
 
     async def get_similar_stores(
         self,
-        store_id:   str,
-        top_n:      int   = 5,
-        min_score:  float = SIMILARITY_THRESHOLD,
+        store_id: str,
+        top_n: int = 5,
+        min_score: float = SIMILARITY_THRESHOLD,
     ) -> List[Dict]:
         """获取与目标门店最相似的 Top N 门店"""
         stmt = (
             select(StoreSimilarityCache)
             .where(
                 and_(
-                    (StoreSimilarityCache.store_a_id == store_id)
-                    | (StoreSimilarityCache.store_b_id == store_id),
+                    (StoreSimilarityCache.store_a_id == store_id) | (StoreSimilarityCache.store_b_id == store_id),
                     StoreSimilarityCache.similarity_score >= min_score,
                 )
             )
@@ -680,14 +675,16 @@ class CrossStoreKnowledgeService:
         results = []
         for r in rows:
             peer_id = r.store_b_id if r.store_a_id == store_id else r.store_a_id
-            results.append({
-                "peer_store_id":  peer_id,
-                "similarity_score": r.similarity_score,
-                "menu_overlap":   r.menu_overlap,
-                "region_match":   r.region_match,
-                "tier_match":     r.tier_match,
-                "capacity_ratio": r.capacity_ratio,
-            })
+            results.append(
+                {
+                    "peer_store_id": peer_id,
+                    "similarity_score": r.similarity_score,
+                    "menu_overlap": r.menu_overlap,
+                    "region_match": r.region_match,
+                    "tier_match": r.tier_match,
+                    "capacity_ratio": r.capacity_ratio,
+                }
+            )
         return results
 
     # ── 内部方法 ──────────────────────────────────────────────────────────────
@@ -698,9 +695,7 @@ class CrossStoreKnowledgeService:
             stmt = stmt.where(Store.id.in_(store_ids))
         return list((await self.db.execute(stmt)).scalars().all())
 
-    async def _load_dishes_by_store(
-        self, store_ids: List[str]
-    ) -> Dict[str, List[Dish]]:
+    async def _load_dishes_by_store(self, store_ids: List[str]) -> Dict[str, List[Dish]]:
         stmt = select(Dish).where(Dish.store_id.in_(store_ids))
         rows = (await self.db.execute(stmt)).scalars().all()
         result: Dict[str, List[Dish]] = {}
@@ -714,18 +709,17 @@ class CrossStoreKnowledgeService:
         groups = (await self.db.execute(stmt)).scalars().all()
         mapping: Dict[str, str] = {}
         for g in groups:
-            for sid in (g.store_ids or []):
+            for sid in g.store_ids or []:
                 mapping[sid] = g.group_key
         return mapping
 
-    async def _compute_waste_rates(
-        self, stores: List[Store], lookback_days: int
-    ) -> Dict[str, float]:
+    async def _compute_waste_rates(self, stores: List[Store], lookback_days: int) -> Dict[str, float]:
         """
         用 WasteEvent.variance_pct 平均值作为 waste_rate 代理指标。
         （真实实现应接入 InventoryTransaction 数据）
         """
         from src.models.waste_event import WasteEvent
+
         since = datetime.utcnow() - timedelta(days=lookback_days)
         result: Dict[str, float] = {}
 
@@ -747,29 +741,21 @@ class CrossStoreKnowledgeService:
 
         return result
 
-    async def _compute_menu_coverages(
-        self, stores: List[Store]
-    ) -> Dict[str, float]:
+    async def _compute_menu_coverages(self, stores: List[Store]) -> Dict[str, float]:
         """菜品覆盖率 = 本店菜品数 / 全品牌菜品名集合大小"""
         all_stmt = select(Dish.name).where(Dish.name.isnot(None))
-        all_names = set(
-            (await self.db.execute(all_stmt)).scalars().all()
-        )
+        all_names = set((await self.db.execute(all_stmt)).scalars().all())
         total = len(all_names) or 1
         result: Dict[str, float] = {}
 
         for store in stores:
-            stmt = select(Dish.name).where(
-                and_(Dish.store_id == store.id, Dish.name.isnot(None))
-            )
+            stmt = select(Dish.name).where(and_(Dish.store_id == store.id, Dish.name.isnot(None)))
             names = set((await self.db.execute(stmt)).scalars().all())
             result[store.id] = round(len(names) / total, 4)
 
         return result
 
-    async def _compute_revenue_per_seat(
-        self, stores: List[Store], target_date: date
-    ) -> Dict[str, float]:
+    async def _compute_revenue_per_seat(self, stores: List[Store], target_date: date) -> Dict[str, float]:
         """
         每座位日营收 = SUM(Order.final_amount WHERE status=completed AND date=target_date) / store.seats
 
@@ -795,17 +781,15 @@ class CrossStoreKnowledgeService:
 
         return result
 
-    async def _compute_labor_ratio(
-        self, stores: List[Store], target_date: date
-    ) -> Dict[str, float]:
+    async def _compute_labor_ratio(self, stores: List[Store], target_date: date) -> Dict[str, float]:
         """
         人力成本占比 = SUM(FinancialTransaction.amount WHERE category='labor_cost' AND date=target_date)
                        / SUM(Order.final_amount WHERE status=completed AND date=target_date)
 
         revenue 为 0 时返回 0.0（避免除零）。
         """
-        from src.models.order import Order
         from src.models.finance import FinancialTransaction
+        from src.models.order import Order
 
         result: Dict[str, float] = {}
         for store in stores:
@@ -835,9 +819,7 @@ class CrossStoreKnowledgeService:
 
         return result
 
-    async def _upsert_similarity(
-        self, store_a: str, store_b: str, sim: Dict
-    ) -> StoreSimilarityCache:
+    async def _upsert_similarity(self, store_a: str, store_b: str, sim: Dict) -> StoreSimilarityCache:
         stmt = select(StoreSimilarityCache).where(
             and_(
                 StoreSimilarityCache.store_a_id == store_a,
@@ -847,70 +829,83 @@ class CrossStoreKnowledgeService:
         existing = (await self.db.execute(stmt)).scalar_one_or_none()
         if existing:
             existing.similarity_score = sim["similarity_score"]
-            existing.menu_overlap     = sim["menu_overlap"]
-            existing.region_match     = sim["region_match"]
-            existing.tier_match       = sim["tier_match"]
-            existing.capacity_ratio   = sim["capacity_ratio"]
-            existing.computed_at      = datetime.utcnow()
+            existing.menu_overlap = sim["menu_overlap"]
+            existing.region_match = sim["region_match"]
+            existing.tier_match = sim["tier_match"]
+            existing.capacity_ratio = sim["capacity_ratio"]
+            existing.computed_at = datetime.utcnow()
             return existing
         rec = StoreSimilarityCache(
-            store_a_id=store_a, store_b_id=store_b, **sim,
+            store_a_id=store_a,
+            store_b_id=store_b,
+            **sim,
             computed_at=datetime.utcnow(),
         )
         self.db.add(rec)
         return rec
 
-    async def _upsert_peer_group(
-        self, key: str, tier: str, region: str, store_ids: List[str]
-    ) -> StorePeerGroup:
+    async def _upsert_peer_group(self, key: str, tier: str, region: str, store_ids: List[str]) -> StorePeerGroup:
         stmt = select(StorePeerGroup).where(StorePeerGroup.group_key == key)
         existing = (await self.db.execute(stmt)).scalar_one_or_none()
         if existing:
-            existing.store_ids   = store_ids
+            existing.store_ids = store_ids
             existing.store_count = len(store_ids)
-            existing.updated_at  = datetime.utcnow()
+            existing.updated_at = datetime.utcnow()
             return existing
         g = StorePeerGroup(
-            group_key=key, tier=tier, region=region,
-            store_ids=store_ids, store_count=len(store_ids),
+            group_key=key,
+            tier=tier,
+            region=region,
+            store_ids=store_ids,
+            store_count=len(store_ids),
         )
         self.db.add(g)
         return g
 
     async def _upsert_metric(
-        self, store_id: str, metric_date: date, metric_name: str,
-        value: float, peer_group: str, peer_count: int,
-        peer_p25: float, peer_p50: float, peer_p75: float, peer_p90: float,
+        self,
+        store_id: str,
+        metric_date: date,
+        metric_name: str,
+        value: float,
+        peer_group: str,
+        peer_count: int,
+        peer_p25: float,
+        peer_p50: float,
+        peer_p75: float,
+        peer_p90: float,
         percentile_in_peer: float,
     ) -> None:
         stmt = select(CrossStoreMetric).where(
             and_(
-                CrossStoreMetric.store_id    == store_id,
+                CrossStoreMetric.store_id == store_id,
                 CrossStoreMetric.metric_date == metric_date,
                 CrossStoreMetric.metric_name == metric_name,
             )
         )
         existing = (await self.db.execute(stmt)).scalar_one_or_none()
         if existing:
-            existing.value             = value
-            existing.peer_group        = peer_group
-            existing.peer_count        = peer_count
-            existing.peer_p25          = peer_p25
-            existing.peer_p50          = peer_p50
-            existing.peer_p75          = peer_p75
-            existing.peer_p90          = peer_p90
+            existing.value = value
+            existing.peer_group = peer_group
+            existing.peer_count = peer_count
+            existing.peer_p25 = peer_p25
+            existing.peer_p50 = peer_p50
+            existing.peer_p75 = peer_p75
+            existing.peer_p90 = peer_p90
             existing.percentile_in_peer = percentile_in_peer
         else:
-            self.db.add(CrossStoreMetric(
-                store_id=store_id,
-                metric_date=metric_date,
-                metric_name=metric_name,
-                value=value,
-                peer_group=peer_group,
-                peer_count=peer_count,
-                peer_p25=peer_p25,
-                peer_p50=peer_p50,
-                peer_p75=peer_p75,
-                peer_p90=peer_p90,
-                percentile_in_peer=percentile_in_peer,
-            ))
+            self.db.add(
+                CrossStoreMetric(
+                    store_id=store_id,
+                    metric_date=metric_date,
+                    metric_name=metric_name,
+                    value=value,
+                    peer_group=peer_group,
+                    peer_count=peer_count,
+                    peer_p25=peer_p25,
+                    peer_p50=peer_p50,
+                    peer_p75=peer_p75,
+                    peer_p90=peer_p90,
+                    percentile_in_peer=percentile_in_peer,
+                )
+            )

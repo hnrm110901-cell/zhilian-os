@@ -1,15 +1,17 @@
 """
 LLM配置管理API
 """
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+
 from typing import Optional
 
-from ..core.dependencies import require_permission
-from ..core.permissions import Permission
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+
 from ..core.config import settings
-from ..core.llm import get_llm_client, set_llm_client, LLMFactory, LLMProvider
-from ..core.prompt_injection_guard import prompt_injection_guard, InputSource, SanitizationLevel, PromptInjectionException
+from ..core.dependencies import require_permission
+from ..core.llm import LLMFactory, LLMProvider, get_llm_client, set_llm_client
+from ..core.permissions import Permission
+from ..core.prompt_injection_guard import InputSource, PromptInjectionException, SanitizationLevel, prompt_injection_guard
 from ..models.user import User
 
 router = APIRouter()
@@ -17,6 +19,7 @@ router = APIRouter()
 
 class LLMConfigResponse(BaseModel):
     """LLM配置响应"""
+
     enabled: bool
     provider: str
     model: str
@@ -26,6 +29,7 @@ class LLMConfigResponse(BaseModel):
 
 class LLMConfigUpdate(BaseModel):
     """LLM配置更新"""
+
     enabled: Optional[bool] = None
     provider: Optional[str] = None
     model: Optional[str] = None
@@ -36,6 +40,7 @@ class LLMConfigUpdate(BaseModel):
 
 class LLMTestRequest(BaseModel):
     """LLM测试请求"""
+
     prompt: str
     system_prompt: Optional[str] = None
 
@@ -123,10 +128,7 @@ async def update_llm_config(
             )
             set_llm_client(new_client)
         except Exception as e:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Failed to initialize LLM client: {str(e)}"
-            )
+            raise HTTPException(status_code=400, detail=f"Failed to initialize LLM client: {str(e)}")
 
     return {
         "message": "LLM配置已更新",
@@ -136,7 +138,7 @@ async def update_llm_config(
             "model": settings.LLM_MODEL,
             "temperature": settings.LLM_TEMPERATURE,
             "max_tokens": settings.LLM_MAX_TOKENS,
-        }
+        },
     }
 
 
@@ -171,10 +173,7 @@ async def test_llm(
     ```
     """
     if not settings.LLM_ENABLED:
-        raise HTTPException(
-            status_code=400,
-            detail="LLM未启用，请先在配置中启用LLM"
-        )
+        raise HTTPException(status_code=400, detail="LLM未启用，请先在配置中启用LLM")
 
     # Prompt注入防护
     try:

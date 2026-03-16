@@ -1,21 +1,23 @@
 """
 HR Attendance Report API — 考勤报表 + 排班关联考勤 + 班次模板 + 考勤规则 + 打卡
 """
-from fastapi import APIRouter, Depends, Query, Body, HTTPException
-from pydantic import BaseModel, Field
-from typing import Any, Dict, List, Optional
-from datetime import date, time, timedelta
+
 import uuid
+from datetime import date, time, timedelta
+from typing import Any, Dict, List, Optional
+
 import structlog
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
+from sqlalchemy import and_, case, func, select, text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
-from ..models.user import User
-from ..models.attendance import AttendanceLog, ShiftTemplate, AttendanceRule
+from ..models.attendance import AttendanceLog, AttendanceRule, ShiftTemplate
 from ..models.employee import Employee
+from ..models.user import User
 from ..services.attendance_engine import AttendanceEngine
-from sqlalchemy import select, and_, func, case, text
-from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -44,7 +46,8 @@ async def get_attendance_report(
         else:
             end = date.fromisoformat(end_date)
 
-        result = await db.execute(text("""
+        result = await db.execute(
+            text("""
             SELECT
                 a.employee_id,
                 e.name AS employee_name,
@@ -65,7 +68,9 @@ async def get_attendance_report(
               AND a.work_date <= :end_date
             GROUP BY a.employee_id, e.name, e.position
             ORDER BY e.name
-        """), {"store_id": store_id, "start_date": start, "end_date": end})
+        """),
+            {"store_id": store_id, "start_date": start, "end_date": end},
+        )
 
         items = []
         for r in result.mappings():
@@ -74,22 +79,24 @@ async def get_attendance_report(
             attendance_rate = round(normal / max(total, 1) * 100, 1)
             avg_hours = round(float(r["total_actual_hours"]) / max(total, 1), 1)
 
-            items.append({
-                "employee_id": r["employee_id"],
-                "employee_name": r["employee_name"],
-                "position": r["position"],
-                "total_records": r["total_records"],
-                "normal_days": r["normal_days"],
-                "late_days": r["late_days"],
-                "early_leave_days": r["early_leave_days"],
-                "absent_days": r["absent_days"],
-                "leave_days": r["leave_days"],
-                "total_late_minutes": r["total_late_minutes"],
-                "total_actual_hours": float(r["total_actual_hours"]),
-                "total_overtime_hours": float(r["total_overtime_hours"]),
-                "avg_daily_hours": avg_hours,
-                "attendance_rate_pct": attendance_rate,
-            })
+            items.append(
+                {
+                    "employee_id": r["employee_id"],
+                    "employee_name": r["employee_name"],
+                    "position": r["position"],
+                    "total_records": r["total_records"],
+                    "normal_days": r["normal_days"],
+                    "late_days": r["late_days"],
+                    "early_leave_days": r["early_leave_days"],
+                    "absent_days": r["absent_days"],
+                    "leave_days": r["leave_days"],
+                    "total_late_minutes": r["total_late_minutes"],
+                    "total_actual_hours": float(r["total_actual_hours"]),
+                    "total_overtime_hours": float(r["total_overtime_hours"]),
+                    "avg_daily_hours": avg_hours,
+                    "attendance_rate_pct": attendance_rate,
+                }
+            )
 
         # 汇总统计
         total_employees = len(items)
@@ -130,7 +137,8 @@ async def get_daily_attendance(
     target = date.fromisoformat(work_date) if work_date else date.today()
 
     # 考勤记录
-    result = await db.execute(text("""
+    result = await db.execute(
+        text("""
         SELECT
             a.employee_id,
             e.name AS employee_name,
@@ -147,43 +155,52 @@ async def get_daily_attendance(
         JOIN employees e ON e.id = a.employee_id
         WHERE a.store_id = :store_id AND a.work_date = :work_date
         ORDER BY a.clock_in ASC
-    """), {"store_id": store_id, "work_date": target})
+    """),
+        {"store_id": store_id, "work_date": target},
+    )
 
     items = []
     for r in result.mappings():
-        items.append({
-            "employee_id": r["employee_id"],
-            "employee_name": r["employee_name"],
-            "position": r["position"],
-            "clock_in": str(r["clock_in"]) if r["clock_in"] else None,
-            "clock_out": str(r["clock_out"]) if r["clock_out"] else None,
-            "actual_hours": float(r["actual_hours"]) if r["actual_hours"] else None,
-            "overtime_hours": float(r["overtime_hours"]) if r["overtime_hours"] else None,
-            "status": r["status"],
-            "late_minutes": r["late_minutes"],
-            "leave_type": r["leave_type"],
-            "source": r["source"],
-        })
+        items.append(
+            {
+                "employee_id": r["employee_id"],
+                "employee_name": r["employee_name"],
+                "position": r["position"],
+                "clock_in": str(r["clock_in"]) if r["clock_in"] else None,
+                "clock_out": str(r["clock_out"]) if r["clock_out"] else None,
+                "actual_hours": float(r["actual_hours"]) if r["actual_hours"] else None,
+                "overtime_hours": float(r["overtime_hours"]) if r["overtime_hours"] else None,
+                "status": r["status"],
+                "late_minutes": r["late_minutes"],
+                "leave_type": r["leave_type"],
+                "source": r["source"],
+            }
+        )
 
     # 排班数据（如果存在 schedules 表）
     schedule_items = []
     try:
-        sched_result = await db.execute(text("""
+        sched_result = await db.execute(
+            text("""
             SELECT s.employee_id, e.name AS employee_name,
                    s.shift_start, s.shift_end, s.shift_type
             FROM schedules s
             JOIN employees e ON e.id = s.employee_id
             WHERE s.store_id = :store_id AND s.schedule_date = :work_date
             ORDER BY s.shift_start ASC
-        """), {"store_id": store_id, "work_date": target})
+        """),
+            {"store_id": store_id, "work_date": target},
+        )
         for r in sched_result.mappings():
-            schedule_items.append({
-                "employee_id": r["employee_id"],
-                "employee_name": r["employee_name"],
-                "shift_start": str(r["shift_start"]) if r["shift_start"] else None,
-                "shift_end": str(r["shift_end"]) if r["shift_end"] else None,
-                "shift_type": r["shift_type"],
-            })
+            schedule_items.append(
+                {
+                    "employee_id": r["employee_id"],
+                    "employee_name": r["employee_name"],
+                    "shift_start": str(r["shift_start"]) if r["shift_start"] else None,
+                    "shift_end": str(r["shift_end"]) if r["shift_end"] else None,
+                    "shift_type": r["shift_type"],
+                }
+            )
     except Exception:
         pass  # schedules表可能不存在
 
@@ -200,6 +217,7 @@ async def get_daily_attendance(
 
 
 # ── Pydantic Schemas ──────────────────────────────────────────
+
 
 class ShiftTemplateCreate(BaseModel):
     brand_id: str
@@ -256,6 +274,7 @@ class BatchImportRequest(BaseModel):
 
 # ── 班次模板 ──────────────────────────────────────────────────
 
+
 @router.get("/hr/attendance/shift-templates")
 async def list_shift_templates(
     brand_id: str = Query(...),
@@ -266,38 +285,36 @@ async def list_shift_templates(
     """班次模板列表（品牌级 + 门店级）"""
     conditions = [ShiftTemplate.brand_id == brand_id]
     if store_id:
-        conditions.append(
-            (ShiftTemplate.store_id == store_id) | ShiftTemplate.store_id.is_(None)
-        )
+        conditions.append((ShiftTemplate.store_id == store_id) | ShiftTemplate.store_id.is_(None))
     else:
         conditions.append(ShiftTemplate.store_id.is_(None))
 
     result = await db.execute(
-        select(ShiftTemplate)
-        .where(and_(*conditions))
-        .order_by(ShiftTemplate.sort_order, ShiftTemplate.start_time)
+        select(ShiftTemplate).where(and_(*conditions)).order_by(ShiftTemplate.sort_order, ShiftTemplate.start_time)
     )
     templates = result.scalars().all()
 
     items = []
     for t in templates:
-        items.append({
-            "id": str(t.id),
-            "brand_id": t.brand_id,
-            "store_id": t.store_id,
-            "name": t.name,
-            "code": t.code,
-            "start_time": t.start_time.strftime("%H:%M") if t.start_time else None,
-            "end_time": t.end_time.strftime("%H:%M") if t.end_time else None,
-            "is_cross_day": t.is_cross_day,
-            "break_minutes": t.break_minutes,
-            "min_work_hours": float(t.min_work_hours) if t.min_work_hours else None,
-            "late_threshold_minutes": t.late_threshold_minutes,
-            "early_leave_threshold_minutes": t.early_leave_threshold_minutes,
-            "applicable_positions": t.applicable_positions or [],
-            "is_active": t.is_active,
-            "sort_order": t.sort_order,
-        })
+        items.append(
+            {
+                "id": str(t.id),
+                "brand_id": t.brand_id,
+                "store_id": t.store_id,
+                "name": t.name,
+                "code": t.code,
+                "start_time": t.start_time.strftime("%H:%M") if t.start_time else None,
+                "end_time": t.end_time.strftime("%H:%M") if t.end_time else None,
+                "is_cross_day": t.is_cross_day,
+                "break_minutes": t.break_minutes,
+                "min_work_hours": float(t.min_work_hours) if t.min_work_hours else None,
+                "late_threshold_minutes": t.late_threshold_minutes,
+                "early_leave_threshold_minutes": t.early_leave_threshold_minutes,
+                "applicable_positions": t.applicable_positions or [],
+                "is_active": t.is_active,
+                "sort_order": t.sort_order,
+            }
+        )
 
     return {"items": items, "total": len(items)}
 
@@ -345,6 +362,7 @@ async def create_shift_template(
 
 # ── 考勤规则 ──────────────────────────────────────────────────
 
+
 @router.get("/hr/attendance/rules")
 async def list_attendance_rules(
     brand_id: str = Query(...),
@@ -355,40 +373,38 @@ async def list_attendance_rules(
     """考勤规则列表"""
     conditions = [AttendanceRule.brand_id == brand_id, AttendanceRule.is_active.is_(True)]
     if store_id:
-        conditions.append(
-            (AttendanceRule.store_id == store_id) | AttendanceRule.store_id.is_(None)
-        )
+        conditions.append((AttendanceRule.store_id == store_id) | AttendanceRule.store_id.is_(None))
 
-    result = await db.execute(
-        select(AttendanceRule).where(and_(*conditions))
-    )
+    result = await db.execute(select(AttendanceRule).where(and_(*conditions)))
     rules = result.scalars().all()
 
     items = []
     for r in rules:
-        items.append({
-            "id": str(r.id),
-            "brand_id": r.brand_id,
-            "store_id": r.store_id,
-            "employment_type": r.employment_type,
-            "clock_methods": r.clock_methods or ["wechat"],
-            "gps_fence_enabled": r.gps_fence_enabled,
-            "gps_latitude": float(r.gps_latitude) if r.gps_latitude else None,
-            "gps_longitude": float(r.gps_longitude) if r.gps_longitude else None,
-            "gps_radius_meters": r.gps_radius_meters,
-            "late_deduction_fen": r.late_deduction_fen,
-            "late_deduction_yuan": round((r.late_deduction_fen or 0) / 100, 2),
-            "absent_deduction_fen": r.absent_deduction_fen,
-            "absent_deduction_yuan": round((r.absent_deduction_fen or 0) / 100, 2),
-            "early_leave_deduction_fen": r.early_leave_deduction_fen,
-            "early_leave_deduction_yuan": round((r.early_leave_deduction_fen or 0) / 100, 2),
-            "weekday_overtime_rate": float(r.weekday_overtime_rate) if r.weekday_overtime_rate else 1.5,
-            "weekend_overtime_rate": float(r.weekend_overtime_rate) if r.weekend_overtime_rate else 2.0,
-            "holiday_overtime_rate": float(r.holiday_overtime_rate) if r.holiday_overtime_rate else 3.0,
-            "work_hour_type": r.work_hour_type,
-            "monthly_standard_hours": float(r.monthly_standard_hours) if r.monthly_standard_hours else 174,
-            "is_active": r.is_active,
-        })
+        items.append(
+            {
+                "id": str(r.id),
+                "brand_id": r.brand_id,
+                "store_id": r.store_id,
+                "employment_type": r.employment_type,
+                "clock_methods": r.clock_methods or ["wechat"],
+                "gps_fence_enabled": r.gps_fence_enabled,
+                "gps_latitude": float(r.gps_latitude) if r.gps_latitude else None,
+                "gps_longitude": float(r.gps_longitude) if r.gps_longitude else None,
+                "gps_radius_meters": r.gps_radius_meters,
+                "late_deduction_fen": r.late_deduction_fen,
+                "late_deduction_yuan": round((r.late_deduction_fen or 0) / 100, 2),
+                "absent_deduction_fen": r.absent_deduction_fen,
+                "absent_deduction_yuan": round((r.absent_deduction_fen or 0) / 100, 2),
+                "early_leave_deduction_fen": r.early_leave_deduction_fen,
+                "early_leave_deduction_yuan": round((r.early_leave_deduction_fen or 0) / 100, 2),
+                "weekday_overtime_rate": float(r.weekday_overtime_rate) if r.weekday_overtime_rate else 1.5,
+                "weekend_overtime_rate": float(r.weekend_overtime_rate) if r.weekend_overtime_rate else 2.0,
+                "holiday_overtime_rate": float(r.holiday_overtime_rate) if r.holiday_overtime_rate else 3.0,
+                "work_hour_type": r.work_hour_type,
+                "monthly_standard_hours": float(r.monthly_standard_hours) if r.monthly_standard_hours else 174,
+                "is_active": r.is_active,
+            }
+        )
 
     return {"items": items, "total": len(items)}
 
@@ -413,9 +429,7 @@ async def create_or_update_attendance_rule(
     else:
         conditions.append(AttendanceRule.employment_type.is_(None))
 
-    result = await db.execute(
-        select(AttendanceRule).where(and_(*conditions)).limit(1)
-    )
+    result = await db.execute(select(AttendanceRule).where(and_(*conditions)).limit(1))
     existing = result.scalar_one_or_none()
 
     if existing:
@@ -467,6 +481,7 @@ async def create_or_update_attendance_rule(
 
 # ── 打卡 ──────────────────────────────────────────────────────
 
+
 @router.post("/hr/attendance/clock")
 async def clock_event(
     payload: ClockEventRequest,
@@ -504,6 +519,7 @@ async def clock_event(
 
 # ── 批量导入 ──────────────────────────────────────────────────
 
+
 @router.post("/hr/attendance/batch-import")
 async def batch_import_clock_data(
     payload: BatchImportRequest,
@@ -526,6 +542,7 @@ async def batch_import_clock_data(
 
 
 # ── 月度汇总 ─────────────────────────────────────────────────
+
 
 @router.get("/hr/attendance/monthly-summary/{employee_id}/{pay_month}")
 async def get_monthly_summary(

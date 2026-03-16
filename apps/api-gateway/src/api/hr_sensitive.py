@@ -8,13 +8,14 @@
   GET  /hr/sensitive/{employee_id}/{field_name}   — 解密读取（需审计）
   PUT  /hr/sensitive/{employee_id}/{field_name}   — 加密写入
 """
+
 from datetime import datetime
 from typing import Optional
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import select, desc
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
@@ -29,17 +30,21 @@ router = APIRouter()
 
 # ── 请求/响应模型 ─────────────────────────────────────
 
+
 class SensitiveFieldWriteRequest(BaseModel):
     """写入敏感字段请求体"""
+
     value: str = Field(..., min_length=1, max_length=200, description="明文值")
 
 
 class BatchEncryptRequest(BaseModel):
     """批量加密请求体"""
+
     store_id: Optional[str] = Field(None, description="门店ID（空=全部）")
 
 
 # ── 审计日志查询（静态路径，必须在 {employee_id} 之前注册） ──
+
 
 @router.get("/hr/sensitive/audit-logs")
 async def get_audit_logs(
@@ -55,9 +60,7 @@ async def get_audit_logs(
     current_user: User = Depends(get_current_active_user),
 ):
     """查询敏感数据访问审计日志"""
-    stmt = select(SensitiveDataAuditLog).order_by(
-        desc(SensitiveDataAuditLog.created_at)
-    )
+    stmt = select(SensitiveDataAuditLog).order_by(desc(SensitiveDataAuditLog.created_at))
 
     if employee_id:
         stmt = stmt.where(SensitiveDataAuditLog.employee_id == employee_id)
@@ -68,13 +71,9 @@ async def get_audit_logs(
     if store_id:
         stmt = stmt.where(SensitiveDataAuditLog.store_id == store_id)
     if start_date:
-        stmt = stmt.where(
-            SensitiveDataAuditLog.created_at >= datetime.fromisoformat(start_date)
-        )
+        stmt = stmt.where(SensitiveDataAuditLog.created_at >= datetime.fromisoformat(start_date))
     if end_date:
-        stmt = stmt.where(
-            SensitiveDataAuditLog.created_at <= datetime.fromisoformat(end_date + "T23:59:59")
-        )
+        stmt = stmt.where(SensitiveDataAuditLog.created_at <= datetime.fromisoformat(end_date + "T23:59:59"))
 
     # 分页
     offset = (page - 1) * page_size
@@ -91,6 +90,7 @@ async def get_audit_logs(
 
 
 # ── 批量加密迁移（静态路径） ──────────────────────────
+
 
 @router.post("/hr/sensitive/batch-encrypt")
 async def batch_encrypt(
@@ -114,6 +114,7 @@ async def batch_encrypt(
 
 # ── 脱敏批量读取（/masked 在 /{field_name} 之前注册） ──
 
+
 @router.get("/hr/sensitive/{employee_id}/masked")
 async def get_masked_fields(
     employee_id: str,
@@ -129,6 +130,7 @@ async def get_masked_fields(
 
 
 # ── 解密读取 ──────────────────────────────────────────
+
 
 @router.get("/hr/sensitive/{employee_id}/{field_name}")
 async def get_sensitive_field(
@@ -160,6 +162,7 @@ async def get_sensitive_field(
 
 
 # ── 加密写入 ──────────────────────────────────────────
+
 
 @router.put("/hr/sensitive/{employee_id}/{field_name}")
 async def set_sensitive_field(

@@ -12,18 +12,17 @@ IM 里程碑/技能认证通知服务 — 员工成长高光时刻推送
 - 复用 EmployeeMilestone.notified 字段避免重复推送
 - 决策型推送：包含成就内容 + 奖励信息 + 查看详情入口
 """
-from typing import Any, Dict, List, Optional
+
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 import structlog
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.employee import Employee
+from ..models.employee_growth import EmployeeMilestone, EmployeeSkill, MilestoneType, SkillLevel
 from ..models.store import Store
-from ..models.employee_growth import (
-    EmployeeMilestone, EmployeeSkill, SkillLevel, MilestoneType,
-)
 from ..services.im_message_service import IMMessageService
 
 logger = structlog.get_logger()
@@ -115,16 +114,13 @@ class IMMilestoneNotifier:
         Returns:
             {"notified": True/False, "employee_name": ..., "milestone_type": ...}
         """
-        from sqlalchemy.dialects.postgresql import UUID as PGUUID
         import uuid as uuid_mod
 
-        milestone_uuid = (
-            uuid_mod.UUID(milestone_id) if isinstance(milestone_id, str) else milestone_id
-        )
+        from sqlalchemy.dialects.postgresql import UUID as PGUUID
 
-        result = await self.db.execute(
-            select(EmployeeMilestone).where(EmployeeMilestone.id == milestone_uuid)
-        )
+        milestone_uuid = uuid_mod.UUID(milestone_id) if isinstance(milestone_id, str) else milestone_id
+
+        result = await self.db.execute(select(EmployeeMilestone).where(EmployeeMilestone.id == milestone_uuid))
         milestone = result.scalar_one_or_none()
         if not milestone:
             return {"error": f"里程碑 {milestone_id} 不存在"}
@@ -133,9 +129,7 @@ class IMMilestoneNotifier:
             return {"already_notified": True, "milestone_id": milestone_id}
 
         # 查员工
-        emp_result = await self.db.execute(
-            select(Employee).where(Employee.id == milestone.employee_id)
-        )
+        emp_result = await self.db.execute(select(Employee).where(Employee.id == milestone.employee_id))
         employee = emp_result.scalar_one_or_none()
         if not employee:
             return {"error": f"员工 {milestone.employee_id} 不存在"}
@@ -145,9 +139,7 @@ class IMMilestoneNotifier:
             return {"error": "员工未绑定IM账号", "employee_id": employee.id}
 
         # 获取品牌ID
-        store_result = await self.db.execute(
-            select(Store.brand_id).where(Store.id == employee.store_id)
-        )
+        store_result = await self.db.execute(select(Store.brand_id).where(Store.id == employee.store_id))
         brand_id = store_result.scalar_one_or_none()
 
         # 构建推送内容
@@ -159,13 +151,19 @@ class IMMilestoneNotifier:
         title = f"{emoji} {template['title_prefix']}"
 
         content = self._build_milestone_content(
-            milestone, employee.name, emoji, template["title_prefix"],
+            milestone,
+            employee.name,
+            emoji,
+            template["title_prefix"],
         )
 
         # 发送
         try:
             send_result = await self.msg_service.send_markdown(
-                brand_id, im_userid, title, content,
+                brand_id,
+                im_userid,
+                title,
+                content,
             )
 
             # 标记已通知
@@ -176,8 +174,11 @@ class IMMilestoneNotifier:
             logger.info(
                 "milestone_notifier.sent",
                 employee_id=employee.id,
-                milestone_type=milestone.milestone_type.value
-                if hasattr(milestone.milestone_type, 'value') else str(milestone.milestone_type),
+                milestone_type=(
+                    milestone.milestone_type.value
+                    if hasattr(milestone.milestone_type, "value")
+                    else str(milestone.milestone_type)
+                ),
             )
 
             return {
@@ -187,8 +188,7 @@ class IMMilestoneNotifier:
                 "title": milestone.title,
             }
         except Exception as e:
-            logger.warning("milestone_notifier.send_failed",
-                           milestone_id=str(milestone_id), error=str(e))
+            logger.warning("milestone_notifier.send_failed", milestone_id=str(milestone_id), error=str(e))
             return {"notified": False, "error": str(e)}
 
     async def notify_skill_upgrade(
@@ -202,9 +202,7 @@ class IMMilestoneNotifier:
         技能升级时推送庆祝消息。
         通常由 hr_growth API 在评估技能时调用。
         """
-        emp_result = await self.db.execute(
-            select(Employee).where(Employee.id == employee_id)
-        )
+        emp_result = await self.db.execute(select(Employee).where(Employee.id == employee_id))
         employee = emp_result.scalar_one_or_none()
         if not employee:
             return {"error": f"员工 {employee_id} 不存在"}
@@ -213,9 +211,7 @@ class IMMilestoneNotifier:
         if not im_userid:
             return {"error": "员工未绑定IM账号"}
 
-        store_result = await self.db.execute(
-            select(Store.brand_id).where(Store.id == employee.store_id)
-        )
+        store_result = await self.db.execute(select(Store.brand_id).where(Store.id == employee.store_id))
         brand_id = store_result.scalar_one_or_none()
 
         # 技能等级中文
@@ -234,19 +230,18 @@ class IMMilestoneNotifier:
         if score > 0:
             content += f"- **评估分数**: {score}/100\n"
 
-        content += (
-            f"\n继续加油！下一个目标等着您。\n"
-            f"💡 回复「个人信息」查看技能档案"
-        )
+        content += f"\n继续加油！下一个目标等着您。\n" f"💡 回复「个人信息」查看技能档案"
 
         try:
             result = await self.msg_service.send_markdown(
-                brand_id, im_userid, "技能认证", content,
+                brand_id,
+                im_userid,
+                "技能认证",
+                content,
             )
             return {"notified": True, "skill": skill_name, "level": level_label}
         except Exception as e:
-            logger.warning("skill_upgrade_notify.failed",
-                           employee_id=employee_id, error=str(e))
+            logger.warning("skill_upgrade_notify.failed", employee_id=employee_id, error=str(e))
             return {"notified": False, "error": str(e)}
 
     async def sweep_unnotified_milestones(
@@ -257,9 +252,7 @@ class IMMilestoneNotifier:
         扫描所有未推送的里程碑，批量推送。
         由 Celery Beat 定时调用。
         """
-        query = select(EmployeeMilestone).where(
-            EmployeeMilestone.notified.is_(False)
-        )
+        query = select(EmployeeMilestone).where(EmployeeMilestone.notified.is_(False))
 
         result = await self.db.execute(query)
         milestones = result.scalars().all()
@@ -276,8 +269,7 @@ class IMMilestoneNotifier:
                     errors += 1
             except Exception as e:
                 errors += 1
-                logger.warning("sweep_milestones.item_failed",
-                               milestone_id=str(milestone.id), error=str(e))
+                logger.warning("sweep_milestones.item_failed", milestone_id=str(milestone.id), error=str(e))
 
         logger.info(
             "sweep_milestones.done",

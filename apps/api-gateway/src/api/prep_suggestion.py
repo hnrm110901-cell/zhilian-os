@@ -6,12 +6,13 @@
   POST /api/v1/prep-suggestion/confirm       确认建议 → 生成采购单
   GET  /api/v1/prep-suggestion/history       历史查询
 """
+
 from datetime import date
 from typing import Optional
-from pydantic import BaseModel
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
 
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_db
 from src.core.dependencies import require_role
 from src.models.user import User, UserRole
@@ -21,6 +22,7 @@ router = APIRouter(prefix="/api/v1/prep-suggestion", tags=["prep-suggestion"])
 
 
 # ---------- Schemas ----------
+
 
 class GenerateRequest(BaseModel):
     store_id: str
@@ -39,6 +41,7 @@ class ConfirmRequest(BaseModel):
 
 
 # ---------- Endpoints ----------
+
 
 @router.post("/generate")
 async def generate_suggestion(
@@ -65,7 +68,7 @@ async def confirm_suggestion(
     svc = PrepSuggestionService(db, req.store_id)
     result = await svc.confirm_suggestion(
         suggestion_items=[item.model_dump() for item in req.items],
-        created_by=current_user.username if hasattr(current_user, 'username') else str(current_user.id),
+        created_by=current_user.username if hasattr(current_user, "username") else str(current_user.id),
         notes=req.notes,
     )
     await db.commit()

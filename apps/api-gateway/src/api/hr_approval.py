@@ -1,6 +1,7 @@
 """
 HR 通用审批流 API — 发起/通过/驳回/转交/催办/委托
 """
+
 from datetime import date
 from typing import List, Optional
 from uuid import UUID
@@ -8,16 +9,11 @@ from uuid import UUID
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
-
 from src.core.database import get_db
 from src.core.dependencies import get_current_active_user
-from src.models.approval import (
-    ApprovalDelegation,
-    ApprovalInstance,
-    ApprovalTemplate,
-)
+from src.models.approval import ApprovalDelegation, ApprovalInstance, ApprovalTemplate
 from src.models.user import User
 from src.services.approval_engine import approval_engine
 
@@ -26,6 +22,7 @@ router = APIRouter()
 
 
 # ── Request / Response Models ────────────────────────────────
+
 
 class SubmitApprovalRequest(BaseModel):
     template_code: str = Field(..., description="审批模板编码: leave/salary_adjust/resign/reward/contract_renew")
@@ -73,6 +70,7 @@ class CreateDelegationRequest(BaseModel):
 
 
 # ── 审批流程 API ─────────────────────────────────────────────
+
 
 @router.post("/hr/approval/submit")
 async def submit_approval(
@@ -256,6 +254,7 @@ async def get_approval_history(
 
 # ── 审批模板管理 ─────────────────────────────────────────────
 
+
 @router.get("/hr/approval/templates")
 async def list_templates(
     brand_id: Optional[str] = Query(None),
@@ -267,9 +266,7 @@ async def list_templates(
     if brand_id:
         conditions.append(ApprovalTemplate.brand_id == brand_id)
 
-    result = await db.execute(
-        select(ApprovalTemplate).where(and_(*conditions))
-    )
+    result = await db.execute(select(ApprovalTemplate).where(and_(*conditions)))
     templates = result.scalars().all()
 
     return {
@@ -298,11 +295,7 @@ async def create_template(
 ):
     """创建审批模板"""
     # 检查 template_code 唯一性
-    existing = await db.execute(
-        select(ApprovalTemplate).where(
-            ApprovalTemplate.template_code == req.template_code
-        )
-    )
+    existing = await db.execute(select(ApprovalTemplate).where(ApprovalTemplate.template_code == req.template_code))
     if existing.scalars().first():
         raise HTTPException(status_code=409, detail=f"模板编码 {req.template_code} 已存在")
 
@@ -326,6 +319,7 @@ async def create_template(
 
 
 # ── 审批委托管理 ─────────────────────────────────────────────
+
 
 @router.post("/hr/approval/delegations")
 async def create_delegation(
@@ -371,9 +365,7 @@ async def list_delegations(
     if brand_id:
         conditions.append(ApprovalDelegation.brand_id == brand_id)
 
-    result = await db.execute(
-        select(ApprovalDelegation).where(and_(*conditions))
-    )
+    result = await db.execute(select(ApprovalDelegation).where(and_(*conditions)))
     delegations = result.scalars().all()
 
     return {

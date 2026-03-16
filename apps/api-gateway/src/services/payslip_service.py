@@ -7,13 +7,14 @@
 - push_payslip_to_employee() — 通过IM推送工资条摘要到员工
 - batch_push_payslips() — 批量推送全店工资条
 """
+
 import io
 import os
 from datetime import datetime
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional
 
 import structlog
-from sqlalchemy import select, and_, update
+from sqlalchemy import and_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
@@ -26,9 +27,7 @@ class PayslipService:
         self.store_id = store_id
         self.brand_id = brand_id
 
-    async def generate_payslip_data(
-        self, db: AsyncSession, employee_id: str, pay_month: str
-    ) -> Optional[dict]:
+    async def generate_payslip_data(self, db: AsyncSession, employee_id: str, pay_month: str) -> Optional[dict]:
         """
         从PayrollRecord + SalaryItemRecord组装工资条数据
 
@@ -52,9 +51,7 @@ class PayslipService:
         from src.models.salary_item import SalaryItemRecord
 
         # 查询员工信息
-        emp_result = await db.execute(
-            select(Employee).where(Employee.id == employee_id)
-        )
+        emp_result = await db.execute(select(Employee).where(Employee.id == employee_id))
         employee = emp_result.scalar_one_or_none()
         if not employee:
             logger.warning("payslip.employee_not_found", employee_id=employee_id)
@@ -178,9 +175,7 @@ class PayslipService:
                 items.append({"name": name, "amount_yuan": round(val / 100, 2)})
         return items
 
-    async def generate_payslip_pdf(
-        self, db: AsyncSession, employee_id: str, pay_month: str
-    ) -> bytes:
+    async def generate_payslip_pdf(self, db: AsyncSession, employee_id: str, pay_month: str) -> bytes:
         """
         生成工资条PDF
         使用 reportlab 生成简洁的A4 PDF；reportlab不可用时降级为文本格式。
@@ -193,15 +188,13 @@ class PayslipService:
     def _render_pdf(self, data: dict) -> bytes:
         """使用reportlab生成PDF，不可用时降级为纯文本"""
         try:
-            from reportlab.lib.pagesizes import A4
-            from reportlab.lib.units import mm
             from reportlab.lib import colors
-            from reportlab.platypus import (
-                SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer,
-            )
-            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.pagesizes import A4
+            from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+            from reportlab.lib.units import mm
             from reportlab.pdfbase import pdfmetrics
             from reportlab.pdfbase.ttfonts import TTFont
+            from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
             # 尝试注册中文字体
             font_registered = False
@@ -248,9 +241,7 @@ class PayslipService:
             )
 
             # 标题
-            elements.append(
-                Paragraph(f"工资条 — {data['pay_month']}", title_style)
-            )
+            elements.append(Paragraph(f"工资条 — {data['pay_month']}", title_style))
             elements.append(Spacer(1, 5 * mm))
 
             # 员工信息
@@ -260,13 +251,15 @@ class PayslipService:
             ]
             info_table = Table(info_data, colWidths=[60, 120, 60, 120])
             info_table.setStyle(
-                TableStyle([
-                    ("FONTNAME", (0, 0), (-1, -1), font_name),
-                    ("FONTSIZE", (0, 0), (-1, -1), 10),
-                    ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-                    ("BACKGROUND", (0, 0), (0, -1), colors.Color(0.95, 0.95, 0.95)),
-                    ("BACKGROUND", (2, 0), (2, -1), colors.Color(0.95, 0.95, 0.95)),
-                ])
+                TableStyle(
+                    [
+                        ("FONTNAME", (0, 0), (-1, -1), font_name),
+                        ("FONTSIZE", (0, 0), (-1, -1), 10),
+                        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                        ("BACKGROUND", (0, 0), (0, -1), colors.Color(0.95, 0.95, 0.95)),
+                        ("BACKGROUND", (2, 0), (2, -1), colors.Color(0.95, 0.95, 0.95)),
+                    ]
+                )
             )
             elements.append(info_table)
             elements.append(Spacer(1, 5 * mm))
@@ -280,13 +273,15 @@ class PayslipService:
                     income_data.append([item["name"], f"¥{item['amount_yuan']:,.2f}"])
                 income_table = Table(income_data, colWidths=[250, 100])
                 income_table.setStyle(
-                    TableStyle([
-                        ("FONTNAME", (0, 0), (-1, -1), font_name),
-                        ("FONTSIZE", (0, 0), (-1, -1), 9),
-                        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-                        ("BACKGROUND", (0, 0), (-1, 0), colors.Color(0.9, 0.95, 0.9)),
-                        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
-                    ])
+                    TableStyle(
+                        [
+                            ("FONTNAME", (0, 0), (-1, -1), font_name),
+                            ("FONTSIZE", (0, 0), (-1, -1), 9),
+                            ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                            ("BACKGROUND", (0, 0), (-1, 0), colors.Color(0.9, 0.95, 0.9)),
+                            ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+                        ]
+                    )
                 )
                 elements.append(income_table)
                 elements.append(Spacer(1, 3 * mm))
@@ -300,13 +295,15 @@ class PayslipService:
                     ded_data.append([item["name"], f"-¥{item['amount_yuan']:,.2f}"])
                 ded_table = Table(ded_data, colWidths=[250, 100])
                 ded_table.setStyle(
-                    TableStyle([
-                        ("FONTNAME", (0, 0), (-1, -1), font_name),
-                        ("FONTSIZE", (0, 0), (-1, -1), 9),
-                        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-                        ("BACKGROUND", (0, 0), (-1, 0), colors.Color(0.95, 0.9, 0.9)),
-                        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
-                    ])
+                    TableStyle(
+                        [
+                            ("FONTNAME", (0, 0), (-1, -1), font_name),
+                            ("FONTSIZE", (0, 0), (-1, -1), 9),
+                            ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                            ("BACKGROUND", (0, 0), (-1, 0), colors.Color(0.95, 0.9, 0.9)),
+                            ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+                        ]
+                    )
                 )
                 elements.append(ded_table)
                 elements.append(Spacer(1, 3 * mm))
@@ -321,14 +318,16 @@ class PayslipService:
             ]
             sum_table = Table(summary_data, colWidths=[250, 100])
             sum_table.setStyle(
-                TableStyle([
-                    ("FONTNAME", (0, 0), (-1, -1), font_name),
-                    ("FONTSIZE", (0, 0), (-1, -1), 10),
-                    ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-                    ("BACKGROUND", (-2, -1), (-1, -1), colors.Color(0.85, 0.95, 0.85)),
-                    ("ALIGN", (1, 0), (1, -1), "RIGHT"),
-                    ("FONTSIZE", (0, -1), (-1, -1), 12),
-                ])
+                TableStyle(
+                    [
+                        ("FONTNAME", (0, 0), (-1, -1), font_name),
+                        ("FONTSIZE", (0, 0), (-1, -1), 10),
+                        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                        ("BACKGROUND", (-2, -1), (-1, -1), colors.Color(0.85, 0.95, 0.85)),
+                        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+                        ("FONTSIZE", (0, -1), (-1, -1), 12),
+                    ]
+                )
             )
             elements.append(sum_table)
             elements.append(Spacer(1, 5 * mm))
@@ -338,18 +337,23 @@ class PayslipService:
             if att:
                 att_data = [
                     [
-                        "出勤天数", str(att.get("work_days", 0)),
-                        "加班小时", str(att.get("overtime_hours", 0)),
-                        "迟到次数", str(att.get("late_count", 0)),
+                        "出勤天数",
+                        str(att.get("work_days", 0)),
+                        "加班小时",
+                        str(att.get("overtime_hours", 0)),
+                        "迟到次数",
+                        str(att.get("late_count", 0)),
                     ],
                 ]
                 att_table = Table(att_data, colWidths=[60, 50, 60, 50, 60, 50])
                 att_table.setStyle(
-                    TableStyle([
-                        ("FONTNAME", (0, 0), (-1, -1), font_name),
-                        ("FONTSIZE", (0, 0), (-1, -1), 9),
-                        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-                    ])
+                    TableStyle(
+                        [
+                            ("FONTNAME", (0, 0), (-1, -1), font_name),
+                            ("FONTSIZE", (0, 0), (-1, -1), 9),
+                            ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                        ]
+                    )
                 )
                 elements.append(att_table)
 
@@ -366,8 +370,7 @@ class PayslipService:
             )
             elements.append(
                 Paragraph(
-                    f"本工资条由屯象OS系统自动生成 | 生成时间: "
-                    f"{datetime.now().strftime('%Y-%m-%d %H:%M')}",
+                    f"本工资条由屯象OS系统自动生成 | 生成时间: " f"{datetime.now().strftime('%Y-%m-%d %H:%M')}",
                     footer_style,
                 )
             )
@@ -385,14 +388,8 @@ class PayslipService:
         lines.append(f"{'=' * 50}")
         lines.append(f"工资条 — {data['pay_month']}")
         lines.append(f"{'=' * 50}")
-        lines.append(
-            f"姓名: {data.get('employee_name', '')}  "
-            f"工号: {data.get('employee_id', '')}"
-        )
-        lines.append(
-            f"岗位: {data.get('position', '')}  "
-            f"部门: {data.get('department', '')}"
-        )
+        lines.append(f"姓名: {data.get('employee_name', '')}  " f"工号: {data.get('employee_id', '')}")
+        lines.append(f"岗位: {data.get('position', '')}  " f"部门: {data.get('department', '')}")
         lines.append(f"{'-' * 50}")
 
         lines.append("【收入项】")
@@ -412,16 +409,11 @@ class PayslipService:
         lines.append(f"实发工资:  ¥{summary.get('net_yuan', 0):>10,.2f}")
         lines.append(f"{'=' * 50}")
         lines.append("")
-        lines.append(
-            f"本工资条由屯象OS系统自动生成 | "
-            f"生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
-        )
+        lines.append(f"本工资条由屯象OS系统自动生成 | " f"生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
         return "\n".join(lines).encode("utf-8")
 
-    async def push_payslip_to_employee(
-        self, db: AsyncSession, employee_id: str, pay_month: str
-    ) -> dict:
+    async def push_payslip_to_employee(self, db: AsyncSession, employee_id: str, pay_month: str) -> dict:
         """
         推送工资条到员工IM
         1. 生成Markdown摘要
@@ -429,14 +421,12 @@ class PayslipService:
         3. 记录推送状态到payslip_records
         """
         from src.models.employee import Employee
-        from src.models.store import Store
         from src.models.payslip import PayslipRecord
+        from src.models.store import Store
         from src.services.im_message_service import IMMessageService
 
         # 获取员工信息
-        emp_result = await db.execute(
-            select(Employee).where(Employee.id == employee_id)
-        )
+        emp_result = await db.execute(select(Employee).where(Employee.id == employee_id))
         employee = emp_result.scalar_one_or_none()
         if not employee:
             return {"pushed": False, "error": f"Employee {employee_id} not found"}
@@ -445,7 +435,11 @@ class PayslipService:
         push_channel = "wechat" if employee.wechat_userid else "dingtalk"
         if not im_userid:
             await self._upsert_payslip_record(
-                db, employee_id, pay_month, "failed", push_channel=None,
+                db,
+                employee_id,
+                pay_month,
+                "failed",
+                push_channel=None,
                 error="Employee has no IM binding",
             )
             return {"pushed": False, "error": "Employee has no IM binding"}
@@ -454,7 +448,11 @@ class PayslipService:
         data = await self.generate_payslip_data(db, employee_id, pay_month)
         if not data:
             await self._upsert_payslip_record(
-                db, employee_id, pay_month, "failed", push_channel=push_channel,
+                db,
+                employee_id,
+                pay_month,
+                "failed",
+                push_channel=push_channel,
                 error="No payroll data found",
             )
             return {"pushed": False, "error": "No payroll data found"}
@@ -473,19 +471,19 @@ class PayslipService:
         )
 
         # 获取品牌ID
-        store_result = await db.execute(
-            select(Store.brand_id).where(Store.id == self.store_id)
-        )
+        store_result = await db.execute(select(Store.brand_id).where(Store.id == self.store_id))
         brand_id = store_result.scalar_one_or_none() or self.brand_id
 
         # 通过IM推送
         msg_service = IMMessageService(db)
         try:
-            await msg_service.send_markdown(
-                brand_id, im_userid, f"{pay_month}工资条", content
-            )
+            await msg_service.send_markdown(brand_id, im_userid, f"{pay_month}工资条", content)
             await self._upsert_payslip_record(
-                db, employee_id, pay_month, "sent", push_channel=push_channel,
+                db,
+                employee_id,
+                pay_month,
+                "sent",
+                push_channel=push_channel,
             )
             logger.info(
                 "payslip.pushed",
@@ -501,14 +499,16 @@ class PayslipService:
                 error=str(e),
             )
             await self._upsert_payslip_record(
-                db, employee_id, pay_month, "failed",
-                push_channel=push_channel, error=str(e)[:500],
+                db,
+                employee_id,
+                pay_month,
+                "failed",
+                push_channel=push_channel,
+                error=str(e)[:500],
             )
             return {"pushed": False, "error": str(e)}
 
-    async def batch_push_payslips(
-        self, db: AsyncSession, pay_month: str
-    ) -> dict:
+    async def batch_push_payslips(self, db: AsyncSession, pay_month: str) -> dict:
         """批量推送工资条到全店在职员工"""
         from src.models.employee import Employee
 
@@ -548,9 +548,7 @@ class PayslipService:
             "details": details,
         }
 
-    async def confirm_payslip(
-        self, db: AsyncSession, employee_id: str, pay_month: str
-    ) -> dict:
+    async def confirm_payslip(self, db: AsyncSession, employee_id: str, pay_month: str) -> dict:
         """员工确认工资条"""
         from src.models.payslip import PayslipRecord
 
@@ -581,17 +579,15 @@ class PayslipService:
         )
         return {"confirmed": True, "confirmed_at": str(record.confirmed_at)}
 
-    async def get_push_status(
-        self, db: AsyncSession, pay_month: str
-    ) -> List[dict]:
+    async def get_push_status(self, db: AsyncSession, pay_month: str) -> List[dict]:
         """查询指定月份全店推送状态"""
-        from src.models.payslip import PayslipRecord
         from src.models.employee import Employee
+        from src.models.payslip import PayslipRecord
 
         result = await db.execute(
-            select(PayslipRecord, Employee.name).outerjoin(
-                Employee, PayslipRecord.employee_id == Employee.id
-            ).where(
+            select(PayslipRecord, Employee.name)
+            .outerjoin(Employee, PayslipRecord.employee_id == Employee.id)
+            .where(
                 and_(
                     PayslipRecord.store_id == self.store_id,
                     PayslipRecord.pay_month == pay_month,
@@ -643,6 +639,7 @@ class PayslipService:
                 record.pushed_at = datetime.utcnow()
         else:
             import uuid
+
             record = PayslipRecord(
                 id=uuid.uuid4(),
                 store_id=self.store_id,

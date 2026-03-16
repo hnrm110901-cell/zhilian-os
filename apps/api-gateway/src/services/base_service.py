@@ -2,11 +2,12 @@
 Service基类
 提供统一的租户隔离和数据库访问模式
 """
-from typing import Optional
-import structlog
 
-from src.core.tenant_context import TenantContext
+from typing import Optional
+
+import structlog
 from src.core.database import get_db_session
+from src.core.tenant_context import TenantContext
 
 logger = structlog.get_logger()
 
@@ -37,10 +38,7 @@ class BaseService:
                 "This may cause issues in multi-tenant environment."
             )
 
-        logger.debug(
-            f"{self.__class__.__name__} initialized",
-            store_id=self.store_id
-        )
+        logger.debug(f"{self.__class__.__name__} initialized", store_id=self.store_id)
 
     def get_store_id(self) -> Optional[str]:
         """获取当前Service的store_id"""

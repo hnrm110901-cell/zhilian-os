@@ -13,12 +13,13 @@ IM 员工自助服务 — 通过企微/钉钉消息触发业务操作
 - 调用已有 Service 获取数据
 - 返回格式化消息（Markdown）
 """
+
+from datetime import date, timedelta
 from typing import Any, Dict, Optional, Tuple
 
 import structlog
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import date, timedelta
 
 from ..models.employee import Employee
 from ..models.user import User
@@ -90,31 +91,21 @@ class IMEmployeeSelfService:
             ),
         }
 
-    async def _resolve_employee(
-        self, im_userid: str, platform: str
-    ) -> Tuple[Optional[Employee], Optional[User]]:
+    async def _resolve_employee(self, im_userid: str, platform: str) -> Tuple[Optional[Employee], Optional[User]]:
         """根据 IM userid 查找 Employee + User"""
         if platform == "wechat_work":
-            emp_result = await self.db.execute(
-                select(Employee).where(Employee.wechat_userid == im_userid)
-            )
+            emp_result = await self.db.execute(select(Employee).where(Employee.wechat_userid == im_userid))
         else:
-            emp_result = await self.db.execute(
-                select(Employee).where(Employee.dingtalk_userid == im_userid)
-            )
+            emp_result = await self.db.execute(select(Employee).where(Employee.dingtalk_userid == im_userid))
         employee = emp_result.scalar_one_or_none()
         if not employee:
             return None, None
 
         # 查对应 User
         if platform == "wechat_work":
-            user_result = await self.db.execute(
-                select(User).where(User.wechat_user_id == im_userid)
-            )
+            user_result = await self.db.execute(select(User).where(User.wechat_user_id == im_userid))
         else:
-            user_result = await self.db.execute(
-                select(User).where(User.dingtalk_user_id == im_userid)
-            )
+            user_result = await self.db.execute(select(User).where(User.dingtalk_user_id == im_userid))
         user = user_result.scalar_one_or_none()
         return employee, user
 
@@ -126,14 +117,17 @@ class IMEmployeeSelfService:
 
         try:
             from ..models.schedule import Schedule
+
             result = await self.db.execute(
-                select(Schedule).where(
+                select(Schedule)
+                .where(
                     and_(
                         Schedule.employee_id == employee.id,
                         Schedule.date >= week_start,
                         Schedule.date <= week_end,
                     )
-                ).order_by(Schedule.date)
+                )
+                .order_by(Schedule.date)
             )
             schedules = result.scalars().all()
 
@@ -152,18 +146,14 @@ class IMEmployeeSelfService:
             lines = []
             for s in schedules:
                 day_name = weekday_names[s.date.weekday()]
-                shift_info = getattr(s, 'shift_type', '') or getattr(s, 'shift_name', '') or '排班'
-                start_time = getattr(s, 'start_time', '') or ''
-                end_time = getattr(s, 'end_time', '') or ''
+                shift_info = getattr(s, "shift_type", "") or getattr(s, "shift_name", "") or "排班"
+                start_time = getattr(s, "start_time", "") or ""
+                end_time = getattr(s, "end_time", "") or ""
                 time_str = f"{start_time}-{end_time}" if start_time else ""
                 is_today = "**今日**" if s.date == today else ""
                 lines.append(f"- {s.date} {day_name} {is_today} | {shift_info} {time_str}")
 
-            content = (
-                f"### 本周排班 ({week_start} ~ {week_end})\n\n"
-                + "\n".join(lines) + "\n\n"
-                f"如需调班，请回复「调班」。"
-            )
+            content = f"### 本周排班 ({week_start} ~ {week_end})\n\n" + "\n".join(lines) + "\n\n" f"如需调班，请回复「调班」。"
             return {"type": "markdown", "title": "本周排班", "content": content}
 
         except Exception as e:
@@ -241,6 +231,7 @@ class IMEmployeeSelfService:
 
         try:
             from ..models.hr_attendance import AttendanceRecord
+
             result = await self.db.execute(
                 select(AttendanceRecord).where(
                     and_(
@@ -253,10 +244,10 @@ class IMEmployeeSelfService:
             records = result.scalars().all()
 
             total = len(records)
-            present = sum(1 for r in records if getattr(r, 'status', '') in ('present', 'normal'))
-            late = sum(1 for r in records if getattr(r, 'status', '') == 'late')
-            absent = sum(1 for r in records if getattr(r, 'status', '') == 'absent')
-            leave = sum(1 for r in records if getattr(r, 'status', '') == 'leave')
+            present = sum(1 for r in records if getattr(r, "status", "") in ("present", "normal"))
+            late = sum(1 for r in records if getattr(r, "status", "") == "late")
+            absent = sum(1 for r in records if getattr(r, "status", "") == "absent")
+            leave = sum(1 for r in records if getattr(r, "status", "") == "leave")
 
             content = (
                 f"### {today.strftime('%Y年%m月')} 考勤统计\n\n"

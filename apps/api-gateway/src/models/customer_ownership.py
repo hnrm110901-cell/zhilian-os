@@ -2,30 +2,33 @@
 客户归属与风控模型 — Phase P1 (客必得能力)
 客户归属追踪 + 离职交接 + 流失预警
 """
+
 import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, Enum, ForeignKey, Index, JSON, Text
+from sqlalchemy import JSON, Boolean, Column, DateTime, Enum, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 
 from .base import Base, TimestampMixin
-
 
 # ═══════════════════════════════════════════════════════════════
 #  客户归属
 # ═══════════════════════════════════════════════════════════════
 
+
 class TransferReason(str, enum.Enum):
     """交接原因"""
-    RESIGNATION = "resignation"   # 离职
-    REORG = "reorg"               # 组织调整
-    MANUAL = "manual"             # 手动转移
-    AUTO_BALANCE = "auto_balance" # 自动均衡
+
+    RESIGNATION = "resignation"  # 离职
+    REORG = "reorg"  # 组织调整
+    MANUAL = "manual"  # 手动转移
+    AUTO_BALANCE = "auto_balance"  # 自动均衡
 
 
 class CustomerOwnership(Base, TimestampMixin):
     """客户归属记录（防止人走客走）"""
+
     __tablename__ = "customer_ownerships"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -53,9 +56,9 @@ class CustomerOwnership(Base, TimestampMixin):
     customer_level = Column(String(20), nullable=True)  # VIP/GOLD/SILVER/NORMAL
 
     __table_args__ = (
-        Index('idx_ownership_store_active', 'store_id', 'is_active'),
-        Index('idx_ownership_employee', 'owner_employee_id', 'is_active'),
-        Index('idx_ownership_phone', 'customer_phone', 'store_id'),
+        Index("idx_ownership_store_active", "store_id", "is_active"),
+        Index("idx_ownership_employee", "owner_employee_id", "is_active"),
+        Index("idx_ownership_phone", "customer_phone", "store_id"),
     )
 
 
@@ -63,8 +66,10 @@ class CustomerOwnership(Base, TimestampMixin):
 #  客户流失预警
 # ═══════════════════════════════════════════════════════════════
 
+
 class RiskLevel(str, enum.Enum):
     """风险等级"""
+
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
@@ -72,14 +77,16 @@ class RiskLevel(str, enum.Enum):
 
 class RiskType(str, enum.Enum):
     """风险类型"""
-    DORMANT = "dormant"              # 沉睡(>30天未消费)
-    DECLINING = "declining"          # 消费频次下降
+
+    DORMANT = "dormant"  # 沉睡(>30天未消费)
+    DECLINING = "declining"  # 消费频次下降
     COMPETITOR_LOST = "competitor_lost"  # 疑似流失到竞对
     NEGATIVE_FEEDBACK = "negative_feedback"  # 差评/投诉
 
 
 class CustomerRiskAlert(Base, TimestampMixin):
     """客户流失预警"""
+
     __tablename__ = "customer_risk_alerts"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -104,10 +111,10 @@ class CustomerRiskAlert(Base, TimestampMixin):
     action_taken = Column(Boolean, default=False, nullable=False)
     action_taken_at = Column(DateTime, nullable=True)
     action_by = Column(String(50), nullable=True)  # 执行人
-    action_result = Column(Text, nullable=True)     # 执行结果
+    action_result = Column(Text, nullable=True)  # 执行结果
     is_resolved = Column(Boolean, default=False, nullable=False)
 
     __table_args__ = (
-        Index('idx_risk_store_level', 'store_id', 'risk_level'),
-        Index('idx_risk_unresolved', 'store_id', 'is_resolved'),
+        Index("idx_risk_store_level", "store_id", "risk_level"),
+        Index("idx_risk_unresolved", "store_id", "is_resolved"),
     )

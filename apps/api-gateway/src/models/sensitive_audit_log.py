@@ -6,10 +6,12 @@
   - 《个人信息保护法》第五十四条 — 定期审计
   - PCI-DSS Requirement 10 — 跟踪和监视访问
 """
-from sqlalchemy import Column, String, DateTime, Index
+
+import uuid
+
+from sqlalchemy import Column, DateTime, Index, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
-import uuid
 
 from .base import Base, TimestampMixin
 

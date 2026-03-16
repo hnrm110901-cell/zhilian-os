@@ -1,24 +1,27 @@
 """
 HR Leave & Approval API — 假勤审批接口
 """
+
+from datetime import date, datetime
+from typing import List, Optional
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional, List
-from datetime import date, datetime
-import structlog
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
 from ..models.user import User
-from ..services.leave_service import LeaveService
 from ..services.hr_approval_service import HRApprovalService
-from sqlalchemy.ext.asyncio import AsyncSession
+from ..services.leave_service import LeaveService
 
 logger = structlog.get_logger()
 router = APIRouter()
 
 
 # ── Request Models ─────────────────────────────────────────
+
 
 class LeaveSubmitRequest(BaseModel):
     store_id: str
@@ -54,6 +57,7 @@ class ApprovalActionRequest(BaseModel):
 
 
 # ── 请假 ───────────────────────────────────────────────────
+
 
 @router.post("/hr/leave/submit")
 async def submit_leave(
@@ -138,6 +142,7 @@ async def get_leave_balance(
 
 # ── 加班 ───────────────────────────────────────────────────
 
+
 @router.post("/hr/overtime/submit")
 async def submit_overtime(
     req: OvertimeSubmitRequest,
@@ -160,6 +165,7 @@ async def submit_overtime(
 
 
 # ── 审批中心 ───────────────────────────────────────────────
+
 
 @router.get("/hr/approval/pending")
 async def get_pending_approvals(

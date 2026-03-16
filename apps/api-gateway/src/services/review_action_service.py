@@ -6,6 +6,7 @@ ReviewActionService: 评论自动处理规则引擎
   评论进入 → 遍历规则 → 匹配条件 → 执行行动 → 记录日志
   支持5种行动: auto_reply / alert_manager / create_task / signal_bus / wechat_notify
 """
+
 from __future__ import annotations
 
 import datetime
@@ -13,11 +14,10 @@ import uuid
 from typing import Any, Dict, List, Optional
 
 import structlog
-from sqlalchemy import select, func, update, delete, and_, desc
+from sqlalchemy import and_, delete, desc, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.models.dianping_review import DianpingReview
-from src.models.review_action import ReviewActionRule, ReviewActionLog
+from src.models.review_action import ReviewActionLog, ReviewActionRule
 
 logger = structlog.get_logger()
 
@@ -198,6 +198,7 @@ class ReviewActionService:
         alert_level = config.get("alert_level", "high")
 
         from src.models.notification import Notification
+
         notification = Notification(
             title=f"差评预警: {review.author_name} {review.rating}星",
             message=f"评论内容: {(review.content or '')[:200]}",
@@ -232,13 +233,10 @@ class ReviewActionService:
         assignee_role = config.get("task_assignee", "store_manager")
 
         from src.models.task import Task
+
         task = Task(
             title=f"处理差评: {review.author_name} {review.rating}星评论",
-            content=(
-                f"评论内容：{(review.content or '')[:300]}\n"
-                f"来源：{review.source}\n"
-                f"规则：{rule.rule_name}"
-            ),
+            content=(f"评论内容：{(review.content or '')[:300]}\n" f"来源：{review.source}\n" f"规则：{rule.rule_name}"),
             category="review_handling",
             store_id=review.store_id,
             creator_id=uuid.UUID("00000000-0000-0000-0000-000000000000"),  # 系统创建
@@ -261,7 +259,7 @@ class ReviewActionService:
         review: DianpingReview,
     ) -> Dict[str, Any]:
         """信号总线：发送差评信号到 Signal Bus 触发私域修复旅程"""
-        from src.services.signal_bus import route_bad_review, _write_signal
+        from src.services.signal_bus import _write_signal, route_bad_review
 
         signal_id = await _write_signal(
             store_id=review.store_id,
@@ -381,9 +379,7 @@ class ReviewActionService:
         """分页查询规则列表"""
         base_filter = ReviewActionRule.brand_id == brand_id
 
-        total_result = await db.execute(
-            select(func.count(ReviewActionRule.id)).where(base_filter)
-        )
+        total_result = await db.execute(select(func.count(ReviewActionRule.id)).where(base_filter))
         total = total_result.scalar() or 0
 
         result = await db.execute(
@@ -409,16 +405,18 @@ class ReviewActionService:
         data: Dict[str, Any],
     ) -> Optional[Dict[str, Any]]:
         """更新规则"""
-        result = await db.execute(
-            select(ReviewActionRule).where(ReviewActionRule.id == uuid.UUID(rule_id))
-        )
+        result = await db.execute(select(ReviewActionRule).where(ReviewActionRule.id == uuid.UUID(rule_id)))
         rule = result.scalar_one_or_none()
         if not rule:
             return None
 
         updatable = [
-            "rule_name", "trigger_condition", "action_type",
-            "action_config", "is_enabled", "priority",
+            "rule_name",
+            "trigger_condition",
+            "action_type",
+            "action_config",
+            "is_enabled",
+            "priority",
         ]
         for field in updatable:
             if field in data:
@@ -435,9 +433,7 @@ class ReviewActionService:
         rule_id: str,
     ) -> bool:
         """删除规则"""
-        result = await db.execute(
-            delete(ReviewActionRule).where(ReviewActionRule.id == uuid.UUID(rule_id))
-        )
+        result = await db.execute(delete(ReviewActionRule).where(ReviewActionRule.id == uuid.UUID(rule_id)))
         await db.commit()
         deleted = result.rowcount > 0
         if deleted:
@@ -459,9 +455,7 @@ class ReviewActionService:
         if action_type:
             filters.append(ReviewActionLog.action_type == action_type)
 
-        total_result = await db.execute(
-            select(func.count(ReviewActionLog.id)).where(and_(*filters))
-        )
+        total_result = await db.execute(select(func.count(ReviewActionLog.id)).where(and_(*filters)))
         total = total_result.scalar() or 0
 
         result = await db.execute(
@@ -490,44 +484,45 @@ class ReviewActionService:
         """获取行动引擎统计数据"""
         # 规则总数 & 启用数
         total_rules_result = await db.execute(
-            select(func.count(ReviewActionRule.id))
-            .where(ReviewActionRule.brand_id == brand_id)
+            select(func.count(ReviewActionRule.id)).where(ReviewActionRule.brand_id == brand_id)
         )
         total_rules = total_rules_result.scalar() or 0
 
         active_rules_result = await db.execute(
-            select(func.count(ReviewActionRule.id))
-            .where(and_(
-                ReviewActionRule.brand_id == brand_id,
-                ReviewActionRule.is_enabled.is_(True),
-            ))
+            select(func.count(ReviewActionRule.id)).where(
+                and_(
+                    ReviewActionRule.brand_id == brand_id,
+                    ReviewActionRule.is_enabled.is_(True),
+                )
+            )
         )
         active_rules = active_rules_result.scalar() or 0
 
         # 今日触发数
         today_start = datetime.datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
         triggered_today_result = await db.execute(
-            select(func.count(ReviewActionLog.id))
-            .where(and_(
-                ReviewActionLog.brand_id == brand_id,
-                ReviewActionLog.executed_at >= today_start,
-            ))
+            select(func.count(ReviewActionLog.id)).where(
+                and_(
+                    ReviewActionLog.brand_id == brand_id,
+                    ReviewActionLog.executed_at >= today_start,
+                )
+            )
         )
         triggered_today = triggered_today_result.scalar() or 0
 
         # 成功率
         success_count_result = await db.execute(
-            select(func.count(ReviewActionLog.id))
-            .where(and_(
-                ReviewActionLog.brand_id == brand_id,
-                ReviewActionLog.status == "success",
-            ))
+            select(func.count(ReviewActionLog.id)).where(
+                and_(
+                    ReviewActionLog.brand_id == brand_id,
+                    ReviewActionLog.status == "success",
+                )
+            )
         )
         success_count = success_count_result.scalar() or 0
 
         total_logs_result = await db.execute(
-            select(func.count(ReviewActionLog.id))
-            .where(ReviewActionLog.brand_id == brand_id)
+            select(func.count(ReviewActionLog.id)).where(ReviewActionLog.brand_id == brand_id)
         )
         total_logs = total_logs_result.scalar() or 0
 
@@ -540,10 +535,7 @@ class ReviewActionService:
             .order_by(desc(ReviewActionRule.trigger_count))
             .limit(5)
         )
-        top_rules = [
-            {"rule_name": row[0], "trigger_count": row[1]}
-            for row in top_rules_result.fetchall()
-        ]
+        top_rules = [{"rule_name": row[0], "trigger_count": row[1]} for row in top_rules_result.fetchall()]
 
         return {
             "total_rules": total_rules,
@@ -564,10 +556,12 @@ class ReviewActionService:
         """批量处理该品牌下所有未读评论"""
         result = await db.execute(
             select(DianpingReview)
-            .where(and_(
-                DianpingReview.brand_id == brand_id,
-                DianpingReview.is_read.is_(False),
-            ))
+            .where(
+                and_(
+                    DianpingReview.brand_id == brand_id,
+                    DianpingReview.is_read.is_(False),
+                )
+            )
             .order_by(desc(DianpingReview.review_date))
             .limit(100)
         )
@@ -584,11 +578,7 @@ class ReviewActionService:
                 processed += 1
 
                 # 标记已读
-                await db.execute(
-                    update(DianpingReview)
-                    .where(DianpingReview.id == review.id)
-                    .values(is_read=True)
-                )
+                await db.execute(update(DianpingReview).where(DianpingReview.id == review.id).values(is_read=True))
                 await db.commit()
             except Exception as exc:
                 errors += 1

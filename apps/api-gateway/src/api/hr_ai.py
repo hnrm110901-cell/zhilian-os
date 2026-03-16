@@ -2,12 +2,13 @@
 HR AI决策API — Claude驱动的人力智能
 提供离职风险预测、全店风险扫描、AI成长计划、薪资竞争力分析。
 """
+
 from typing import Optional
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-import structlog
-
 from src.core.database import get_db
 from src.services.hr_ai_decision_service import HRAIDecisionService
 from src.services.hr_growth_agent_service import generate_growth_plan
@@ -91,6 +92,7 @@ async def scan_store_turnover(
 
 # ── AI 成长计划 ─────────────────────────────────────────
 
+
 @router.post("/growth-plan/generate")
 async def ai_generate_growth_plan(
     body: GrowthPlanRequest,
@@ -134,6 +136,7 @@ async def ai_generate_growth_plan(
 
 # ── 薪资竞争力分析 ──────────────────────────────────────
 
+
 @router.get("/salary-competitiveness/{store_id}")
 async def get_salary_competitiveness(
     store_id: str,
@@ -167,9 +170,7 @@ async def get_salary_competitiveness(
     )
 
     try:
-        result = await _service.analyze_salary_competitiveness(
-            db, store_id, brand_id or ""
-        )
+        result = await _service.analyze_salary_competitiveness(db, store_id, brand_id or "")
         return result
     except Exception as e:
         logger.error(

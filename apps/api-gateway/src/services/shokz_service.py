@@ -6,25 +6,29 @@ Shokz Bone Conduction Headset Integration Service
 蓝牙连接：bleak（BLE管理）
 音频流：PulseAudio/BlueZ（系统级A2DP/HFP）
 """
-from typing import Dict, Any, Optional, List
+
 import asyncio
+import os
 import subprocess
 import tempfile
-import os
-import structlog
 from enum import Enum
+from typing import Any, Dict, List, Optional
+
+import structlog
 
 logger = structlog.get_logger()
 
 
 class DeviceType(Enum):
     """设备类型"""
+
     OPENCOMM_2 = "opencomm_2"  # 前厅/收银
     OPENRUN_PRO_2 = "openrun_pro_2"  # 后厨
 
 
 class DeviceRole(Enum):
     """设备角色"""
+
     FRONT_OF_HOUSE = "front_of_house"  # 前厅
     CASHIER = "cashier"  # 收银
     KITCHEN = "kitchen"  # 后厨
@@ -141,6 +145,7 @@ class ShokzService:
             # 音频流由系统 BlueZ/PulseAudio 通过 A2DP/HFP profile 处理
             try:
                 from bleak import BleakClient
+
                 client = BleakClient(device.bluetooth_address)
                 await client.connect()
                 device._ble_client = client
@@ -255,7 +260,8 @@ class ShokzService:
             try:
                 proc = await asyncio.create_subprocess_exec(
                     "paplay",
-                    "--device", sink_name,
+                    "--device",
+                    sink_name,
                     "--format=s16le",
                     f"--rate={sample_rate}",
                     "--channels=1",
@@ -327,7 +333,8 @@ class ShokzService:
             try:
                 proc = await asyncio.create_subprocess_exec(
                     "parec",
-                    "--device", source_name,
+                    "--device",
+                    source_name,
                     "--format=s16le",
                     f"--rate={sample_rate}",
                     f"--channels={channels}",
@@ -349,8 +356,7 @@ class ShokzService:
             finally:
                 os.unlink(tmp_path)
 
-            logger.info("音频接收成功", device_id=device_id, duration=duration_seconds,
-                        bytes_received=len(audio_data))
+            logger.info("音频接收成功", device_id=device_id, duration=duration_seconds, bytes_received=len(audio_data))
 
             return {
                 "success": True,
@@ -421,14 +427,16 @@ class ShokzService:
             if connected_only and not device.is_connected:
                 continue
 
-            devices.append({
-                "device_id": device.device_id,
-                "device_type": device.device_type.value,
-                "role": device.role.value,
-                "user_id": device.user_id,
-                "is_connected": device.is_connected,
-                "battery_level": device.battery_level,
-            })
+            devices.append(
+                {
+                    "device_id": device.device_id,
+                    "device_type": device.device_type.value,
+                    "role": device.role.value,
+                    "user_id": device.user_id,
+                    "is_connected": device.is_connected,
+                    "battery_level": device.battery_level,
+                }
+            )
 
         return devices
 

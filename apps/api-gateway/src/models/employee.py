@@ -1,9 +1,11 @@
 """
 Employee Model
 """
-from sqlalchemy import Column, String, Boolean, JSON, ForeignKey, Date, Integer
-from sqlalchemy.dialects.postgresql import UUID, ARRAY
+
 import uuid
+
+from sqlalchemy import JSON, Boolean, Column, Date, ForeignKey, Integer, String
+from sqlalchemy.dialects.postgresql import ARRAY, UUID
 
 from .base import Base, TimestampMixin
 
@@ -36,7 +38,9 @@ class Employee(Base, TimestampMixin):
     probation_end_date = Column(Date, nullable=True)
 
     # ── 用工类型扩展 ──
-    employment_type = Column(String(30), default="regular")  # regular/part_time/intern/trainee/rehire/temp/outsource/outsource_flex
+    employment_type = Column(
+        String(30), default="regular"
+    )  # regular/part_time/intern/trainee/rehire/temp/outsource/outsource_flex
     grade_level = Column(String(50), nullable=True)  # 职级：门店初级/门店中级/子公司中高级A档...
 
     # ── 合规字段（餐饮强制） ──

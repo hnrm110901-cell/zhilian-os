@@ -8,22 +8,22 @@
 6. 人事工作总结与计划 — AI生成（Claude驱动，规则兜底）
 7. 社保/保险变动 — 本月增减明细
 """
-from typing import Any, Dict, List, Optional
-from datetime import date, datetime, timedelta
+
 import calendar
 import json
+from datetime import date, datetime, timedelta
+from typing import Any, Dict, List, Optional
+
 import structlog
-
-from sqlalchemy import select, and_, func, text
+from sqlalchemy import and_, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from src.core.config import settings
 from src.models.employee import Employee
-from src.models.payroll import PayrollRecord
-from src.models.employee_lifecycle import EmployeeChange, ChangeType
+from src.models.employee_lifecycle import ChangeType, EmployeeChange
 from src.models.exit_interview import ExitInterview
 from src.models.mentorship import Mentorship
+from src.models.payroll import PayrollRecord
 from src.models.social_insurance import EmployeeSocialInsurance
-from src.core.config import settings
 
 logger = structlog.get_logger()
 
@@ -106,9 +106,7 @@ class HRReportEngine:
         self.store_id = store_id
         self.brand_id = brand_id
 
-    async def generate_monthly_report(
-        self, db: AsyncSession, pay_month: str
-    ) -> Dict[str, Any]:
+    async def generate_monthly_report(self, db: AsyncSession, pay_month: str) -> Dict[str, Any]:
         """生成完整月报（7张表）"""
         year, month = int(pay_month[:4]), int(pay_month[5:7])
         month_start = date(year, month, 1)
@@ -144,9 +142,7 @@ class HRReportEngine:
 
         return report
 
-    async def _salary_changes(
-        self, db: AsyncSession, pay_month: str, month_start: date, month_end: date
-    ) -> Dict[str, Any]:
+    async def _salary_changes(self, db: AsyncSession, pay_month: str, month_start: date, month_end: date) -> Dict[str, Any]:
         """工资异动表"""
         # 新进员工
         new_result = await db.execute(
@@ -162,9 +158,9 @@ class HRReportEngine:
 
         # 离职员工
         resign_result = await db.execute(
-            select(EmployeeChange, Employee.name).join(
-                Employee, EmployeeChange.employee_id == Employee.id
-            ).where(
+            select(EmployeeChange, Employee.name)
+            .join(Employee, EmployeeChange.employee_id == Employee.id)
+            .where(
                 and_(
                     EmployeeChange.store_id == self.store_id,
                     EmployeeChange.change_type == ChangeType.RESIGN,
@@ -177,10 +173,11 @@ class HRReportEngine:
 
         # 调薪（本月有生效薪资方案变更的）
         from src.models.payroll import SalaryStructure
+
         adjustment_result = await db.execute(
-            select(SalaryStructure, Employee.name).join(
-                Employee, SalaryStructure.employee_id == Employee.id
-            ).where(
+            select(SalaryStructure, Employee.name)
+            .join(Employee, SalaryStructure.employee_id == Employee.id)
+            .where(
                 and_(
                     SalaryStructure.store_id == self.store_id,
                     SalaryStructure.effective_date >= month_start,
@@ -193,8 +190,7 @@ class HRReportEngine:
 
         return {
             "new_employees": [
-                {"id": e.id, "name": e.name, "position": e.position, "hire_date": str(e.hire_date)}
-                for e in new_employees
+                {"id": e.id, "name": e.name, "position": e.position, "hire_date": str(e.hire_date)} for e in new_employees
             ],
             "new_count": len(new_employees),
             "resignations": [
@@ -214,21 +210,21 @@ class HRReportEngine:
             "adjustment_count": len(adjustments),
         }
 
-    async def _headcount_inventory(
-        self, db: AsyncSession, month_end: date
-    ) -> Dict[str, Any]:
+    async def _headcount_inventory(self, db: AsyncSession, month_end: date) -> Dict[str, Any]:
         """月末编制盘存"""
         result = await db.execute(
             select(
                 Employee.position,
                 Employee.employment_type,
                 func.count(Employee.id).label("count"),
-            ).where(
+            )
+            .where(
                 and_(
                     Employee.store_id == self.store_id,
                     Employee.is_active.is_(True),
                 )
-            ).group_by(Employee.position, Employee.employment_type)
+            )
+            .group_by(Employee.position, Employee.employment_type)
         )
         rows = result.all()
 
@@ -249,9 +245,7 @@ class HRReportEngine:
             "date": str(month_end),
         }
 
-    async def _mentorship_summary(
-        self, db: AsyncSession, month_start: date, month_end: date
-    ) -> Dict[str, Any]:
+    async def _mentorship_summary(self, db: AsyncSession, month_start: date, month_end: date) -> Dict[str, Any]:
         """师徒制进展汇总"""
         result = await db.execute(
             select(Mentorship).where(
@@ -265,9 +259,9 @@ class HRReportEngine:
 
         active = [m for m in mentorships if m.status == "active"]
         completed_this_month = [
-            m for m in mentorships
-            if m.status == "completed" and m.actual_review_date
-            and month_start <= m.actual_review_date <= month_end
+            m
+            for m in mentorships
+            if m.status == "completed" and m.actual_review_date and month_start <= m.actual_review_date <= month_end
         ]
 
         return {
@@ -305,6 +299,7 @@ class HRReportEngine:
         for w in workers:
             # 查找考勤记录
             from src.models.attendance import AttendanceLog
+
             att_result = await db.execute(
                 select(func.count(AttendanceLog.id)).where(
                     and_(
@@ -320,14 +315,16 @@ class HRReportEngine:
             daily_wage = w.daily_wage_standard_fen or 0
             total_pay = days * daily_wage
 
-            items.append({
-                "employee_id": w.id,
-                "name": w.name,
-                "employment_type": w.employment_type,
-                "attendance_days": days,
-                "daily_wage_yuan": daily_wage / 100,
-                "total_pay_yuan": total_pay / 100,
-            })
+            items.append(
+                {
+                    "employee_id": w.id,
+                    "name": w.name,
+                    "employment_type": w.employment_type,
+                    "attendance_days": days,
+                    "daily_wage_yuan": daily_wage / 100,
+                    "total_pay_yuan": total_pay / 100,
+                }
+            )
 
         return {
             "workers": items,
@@ -336,9 +333,7 @@ class HRReportEngine:
             "total_pay_yuan": sum(i["total_pay_yuan"] for i in items),
         }
 
-    async def _exit_interview_summary(
-        self, db: AsyncSession, month_start: date, month_end: date
-    ) -> Dict[str, Any]:
+    async def _exit_interview_summary(self, db: AsyncSession, month_start: date, month_end: date) -> Dict[str, Any]:
         """离职回访汇总"""
         result = await db.execute(
             select(ExitInterview).where(
@@ -363,9 +358,7 @@ class HRReportEngine:
             "interviewed_count": sum(1 for i in interviews if i.interview_date),
             "reason_distribution": reason_dist,
             "willing_to_return_count": willing_count,
-            "interview_rate_pct": round(
-                sum(1 for i in interviews if i.interview_date) / max(len(interviews), 1) * 100, 1
-            ),
+            "interview_rate_pct": round(sum(1 for i in interviews if i.interview_date) / max(len(interviews), 1) * 100, 1),
         }
 
     async def _generate_hr_summary(self, report: Dict, pay_month: str) -> Dict[str, Any]:
@@ -481,7 +474,8 @@ class HRReportEngine:
         except json.JSONDecodeError:
             # LLM可能返回了markdown包裹的JSON，尝试提取
             import re
-            json_match = re.search(r'```(?:json)?\s*(\{[\s\S]*?\})\s*```', response)
+
+            json_match = re.search(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", response)
             if json_match:
                 try:
                     parsed = json.loads(json_match.group(1))
@@ -490,11 +484,11 @@ class HRReportEngine:
                     return None
             else:
                 # 最后尝试：找第一个 { 到最后一个 }
-                start = response.find('{')
-                end = response.rfind('}')
+                start = response.find("{")
+                end = response.rfind("}")
                 if start != -1 and end != -1 and end > start:
                     try:
-                        parsed = json.loads(response[start:end + 1])
+                        parsed = json.loads(response[start : end + 1])
                     except json.JSONDecodeError:
                         logger.warning("hr_summary_llm_json_parse_failed", response_preview=response[:200])
                         return None
@@ -542,37 +536,42 @@ class HRReportEngine:
             risk_warnings.append(f"本月离职率{turnover_rate:.1f}%偏高，建议关注员工满意度和薪资竞争力")
         if turnover.get("exit_interview_rate_pct", 0) < 80:
             risk_warnings.append(
-                f"离职回访率{turnover.get('exit_interview_rate_pct', 0)}%，"
-                f"建议加强回访以获取真实离职原因"
+                f"离职回访率{turnover.get('exit_interview_rate_pct', 0)}%，" f"建议加强回访以获取真实离职原因"
             )
 
         # 行动建议
         action_recommendations = []
         if resign_count > 0:
             avg_replacement_cost = 5000  # 餐饮行业平均招聘+培训成本
-            action_recommendations.append({
-                "action": "启动离职岗位补招，优先内部推荐降低招聘成本",
-                "expected_impact_yuan": -(resign_count * avg_replacement_cost),
-                "confidence": 0.6,
-                "priority": "high",
-            })
+            action_recommendations.append(
+                {
+                    "action": "启动离职岗位补招，优先内部推荐降低招聘成本",
+                    "expected_impact_yuan": -(resign_count * avg_replacement_cost),
+                    "confidence": 0.6,
+                    "priority": "high",
+                }
+            )
         if training.get("active_mentorships", 0) > 0:
-            action_recommendations.append({
-                "action": f"跟进{training['active_mentorships']}对师徒培养进度，确保按期评审",
-                "expected_impact_yuan": -(training["active_mentorships"] * 500),
-                "confidence": 0.5,
-                "priority": "medium",
-            })
+            action_recommendations.append(
+                {
+                    "action": f"跟进{training['active_mentorships']}对师徒培养进度，确保按期评审",
+                    "expected_impact_yuan": -(training["active_mentorships"] * 500),
+                    "confidence": 0.5,
+                    "priority": "medium",
+                }
+            )
 
         # 下月计划
         next_month_plan = []
         if resign_count > 0:
             next_month_plan.append({"task": "补充离职岗位招聘", "priority": "high"})
         if training.get("active_mentorships", 0) > 0:
-            next_month_plan.append({
-                "task": f"跟进{training['active_mentorships']}对师徒培养进度",
-                "priority": "medium",
-            })
+            next_month_plan.append(
+                {
+                    "task": f"跟进{training['active_mentorships']}对师徒培养进度",
+                    "priority": "medium",
+                }
+            )
         next_month_plan.append({"task": "完成下月薪酬核算准备", "priority": "medium"})
 
         return {
@@ -586,9 +585,7 @@ class HRReportEngine:
 
     # ── AI深度洞察 ─────────────────────────────────────────────────
 
-    async def generate_ai_insights(
-        self, db: AsyncSession, pay_month: str
-    ) -> Dict[str, Any]:
+    async def generate_ai_insights(self, db: AsyncSession, pay_month: str) -> Dict[str, Any]:
         """
         独立的AI洞察接口 — 生成深度人力分析
 
@@ -637,31 +634,28 @@ class HRReportEngine:
 
         return result
 
-    async def _query_position_turnover(
-        self, db: AsyncSession, month_start: date, month_end: date
-    ) -> Dict[str, Any]:
+    async def _query_position_turnover(self, db: AsyncSession, month_start: date, month_end: date) -> Dict[str, Any]:
         """按岗位查询离职分布"""
         result = await db.execute(
             select(
                 Employee.position,
                 func.count(EmployeeChange.id).label("resign_count"),
-            ).join(
-                EmployeeChange, EmployeeChange.employee_id == Employee.id
-            ).where(
+            )
+            .join(EmployeeChange, EmployeeChange.employee_id == Employee.id)
+            .where(
                 and_(
                     EmployeeChange.store_id == self.store_id,
                     EmployeeChange.change_type == ChangeType.RESIGN,
                     EmployeeChange.effective_date >= month_start,
                     EmployeeChange.effective_date <= month_end,
                 )
-            ).group_by(Employee.position)
+            )
+            .group_by(Employee.position)
         )
         rows = result.all()
         return {(pos or "未设置"): count for pos, count in rows}
 
-    async def _query_overtime_data(
-        self, db: AsyncSession, month_start: date, month_end: date
-    ) -> Dict[str, Any]:
+    async def _query_overtime_data(self, db: AsyncSession, month_start: date, month_end: date) -> Dict[str, Any]:
         """查询加班相关数据"""
         from src.models.attendance import AttendanceLog
 
@@ -670,13 +664,15 @@ class HRReportEngine:
             select(
                 AttendanceLog.status,
                 func.count(AttendanceLog.id).label("count"),
-            ).where(
+            )
+            .where(
                 and_(
                     AttendanceLog.store_id == self.store_id,
                     AttendanceLog.work_date >= month_start,
                     AttendanceLog.work_date <= month_end,
                 )
-            ).group_by(AttendanceLog.status)
+            )
+            .group_by(AttendanceLog.status)
         )
         rows = result.all()
         status_dist = {status: count for status, count in rows}
@@ -747,9 +743,7 @@ class HRReportEngine:
         turnover_rate = turnover.get("rate_pct", 0)
 
         # 离职分析
-        high_risk_positions = [
-            pos for pos, count in position_turnover.items() if count >= 2
-        ]
+        high_risk_positions = [pos for pos, count in position_turnover.items() if count >= 2]
 
         # 成本分析
         replacement_cost = resign_count * 5000  # 餐饮行业平均招聘+培训成本
@@ -761,26 +755,32 @@ class HRReportEngine:
 
         top_recommendations = []
         if turnover_rate > 5:
-            top_recommendations.append({
-                "action": "开展员工满意度调查，针对高离职岗位制定专项留人方案",
-                "expected_impact_yuan": -replacement_cost,
-                "confidence": 0.6,
-                "priority": "high",
-            })
+            top_recommendations.append(
+                {
+                    "action": "开展员工满意度调查，针对高离职岗位制定专项留人方案",
+                    "expected_impact_yuan": -replacement_cost,
+                    "confidence": 0.6,
+                    "priority": "high",
+                }
+            )
         if late_rate > 10:
-            top_recommendations.append({
-                "action": "优化排班制度，减少迟到率，考虑弹性上班时间",
-                "expected_impact_yuan": -2000,
-                "confidence": 0.5,
-                "priority": "medium",
-            })
+            top_recommendations.append(
+                {
+                    "action": "优化排班制度，减少迟到率，考虑弹性上班时间",
+                    "expected_impact_yuan": -2000,
+                    "confidence": 0.5,
+                    "priority": "medium",
+                }
+            )
         if training.get("active_mentorships", 0) > 0:
-            top_recommendations.append({
-                "action": "加速师徒培养进度，降低新人流失带来的重复培训成本",
-                "expected_impact_yuan": -(training["active_mentorships"] * 800),
-                "confidence": 0.5,
-                "priority": "medium",
-            })
+            top_recommendations.append(
+                {
+                    "action": "加速师徒培养进度，降低新人流失带来的重复培训成本",
+                    "expected_impact_yuan": -(training["active_mentorships"] * 800),
+                    "confidence": 0.5,
+                    "priority": "medium",
+                }
+            )
 
         return {
             "turnover_analysis": {
@@ -811,9 +811,7 @@ class HRReportEngine:
             "top_recommendations": top_recommendations,
         }
 
-    async def _insurance_changes(
-        self, db: AsyncSession, year: int, month_start: date, month_end: date
-    ) -> Dict[str, Any]:
+    async def _insurance_changes(self, db: AsyncSession, year: int, month_start: date, month_end: date) -> Dict[str, Any]:
         """社保/保险变动"""
         # 本月新增参保
         new_result = await db.execute(

@@ -7,13 +7,13 @@
 4. 推送到店长IM（复用 IMMessageService）
 5. 生成合规看板数据
 """
-from typing import Any, Dict, List
+
 from datetime import date, timedelta
+from typing import Any, Dict, List
+
 import structlog
-
-from sqlalchemy import select, and_, func
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.models.employee import Employee
 from src.models.employee_contract import EmployeeContract
 from src.models.store import Store
@@ -32,9 +32,7 @@ class ComplianceAlertService:
     def __init__(self, store_id: str):
         self.store_id = store_id
 
-    async def check_health_cert_expiry(
-        self, db: AsyncSession
-    ) -> Dict[str, Any]:
+    async def check_health_cert_expiry(self, db: AsyncSession) -> Dict[str, Any]:
         """
         扫描健康证到期员工
         返回三级告警列表：expired/critical(7天内)/warning(30天内)
@@ -44,14 +42,16 @@ class ComplianceAlertService:
         threshold_7 = today + timedelta(days=7)
 
         result = await db.execute(
-            select(Employee).where(
+            select(Employee)
+            .where(
                 and_(
                     Employee.store_id == self.store_id,
                     Employee.is_active.is_(True),
                     Employee.health_cert_expiry.isnot(None),
                     Employee.health_cert_expiry <= threshold_30,
                 )
-            ).order_by(Employee.health_cert_expiry)
+            )
+            .order_by(Employee.health_cert_expiry)
         )
         employees = result.scalars().all()
 
@@ -89,41 +89,44 @@ class ComplianceAlertService:
             "warning": warning,
         }
 
-    async def check_contract_expiry(
-        self, db: AsyncSession
-    ) -> Dict[str, Any]:
+    async def check_contract_expiry(self, db: AsyncSession) -> Dict[str, Any]:
         """扫描合同到期员工"""
         today = date.today()
         threshold_60 = today + timedelta(days=60)
 
         result = await db.execute(
-            select(EmployeeContract, Employee.name, Employee.position).join(
-                Employee, EmployeeContract.employee_id == Employee.id
-            ).where(
+            select(EmployeeContract, Employee.name, Employee.position)
+            .join(Employee, EmployeeContract.employee_id == Employee.id)
+            .where(
                 and_(
                     EmployeeContract.store_id == self.store_id,
                     EmployeeContract.status == "active",
                     EmployeeContract.end_date.isnot(None),
                     EmployeeContract.end_date <= threshold_60,
                 )
-            ).order_by(EmployeeContract.end_date)
+            )
+            .order_by(EmployeeContract.end_date)
         )
         rows = result.all()
 
         items = []
         for contract, name, position in rows:
             days_left = (contract.end_date - today).days
-            level = "expired" if days_left <= 0 else "critical" if days_left <= 7 else "warning" if days_left <= 30 else "notice"
-            items.append({
-                "employee_id": contract.employee_id,
-                "employee_name": name,
-                "position": position,
-                "contract_no": contract.contract_no,
-                "end_date": str(contract.end_date),
-                "days_remaining": days_left,
-                "renewal_count": contract.renewal_count,
-                "level": level,
-            })
+            level = (
+                "expired" if days_left <= 0 else "critical" if days_left <= 7 else "warning" if days_left <= 30 else "notice"
+            )
+            items.append(
+                {
+                    "employee_id": contract.employee_id,
+                    "employee_name": name,
+                    "position": position,
+                    "contract_no": contract.contract_no,
+                    "end_date": str(contract.end_date),
+                    "days_remaining": days_left,
+                    "renewal_count": contract.renewal_count,
+                    "level": level,
+                }
+            )
 
         return {
             "store_id": self.store_id,
@@ -131,35 +134,37 @@ class ComplianceAlertService:
             "total": len(items),
         }
 
-    async def check_id_card_expiry(
-        self, db: AsyncSession
-    ) -> Dict[str, Any]:
+    async def check_id_card_expiry(self, db: AsyncSession) -> Dict[str, Any]:
         """扫描身份证到期员工"""
         today = date.today()
         threshold = today + timedelta(days=60)
 
         result = await db.execute(
-            select(Employee).where(
+            select(Employee)
+            .where(
                 and_(
                     Employee.store_id == self.store_id,
                     Employee.is_active.is_(True),
                     Employee.id_card_expiry.isnot(None),
                     Employee.id_card_expiry <= threshold,
                 )
-            ).order_by(Employee.id_card_expiry)
+            )
+            .order_by(Employee.id_card_expiry)
         )
         employees = result.scalars().all()
 
         items = []
         for emp in employees:
             days_left = (emp.id_card_expiry - today).days
-            items.append({
-                "employee_id": emp.id,
-                "employee_name": emp.name,
-                "id_card_expiry": str(emp.id_card_expiry),
-                "days_remaining": days_left,
-                "level": "expired" if days_left <= 0 else "critical" if days_left <= 7 else "warning",
-            })
+            items.append(
+                {
+                    "employee_id": emp.id,
+                    "employee_name": emp.name,
+                    "id_card_expiry": str(emp.id_card_expiry),
+                    "days_remaining": days_left,
+                    "level": "expired" if days_left <= 0 else "critical" if days_left <= 7 else "warning",
+                }
+            )
 
         return {
             "store_id": self.store_id,
@@ -167,9 +172,7 @@ class ComplianceAlertService:
             "total": len(items),
         }
 
-    async def get_compliance_dashboard(
-        self, db: AsyncSession
-    ) -> Dict[str, Any]:
+    async def get_compliance_dashboard(self, db: AsyncSession) -> Dict[str, Any]:
         """合规看板聚合数据"""
         health = await self.check_health_cert_expiry(db)
         contract = await self.check_contract_expiry(db)
@@ -191,14 +194,14 @@ class ComplianceAlertService:
                 "total": id_card["total"],
                 "items": id_card["items"],
             },
-            "overall_risk_level": "high" if (health["expired_count"] > 0 or any(
-                c["days_remaining"] <= 0 for c in contract["items"]
-            )) else "medium" if (health["critical_count"] > 0) else "low",
+            "overall_risk_level": (
+                "high"
+                if (health["expired_count"] > 0 or any(c["days_remaining"] <= 0 for c in contract["items"]))
+                else "medium" if (health["critical_count"] > 0) else "low"
+            ),
         }
 
-    async def send_compliance_alerts(
-        self, db: AsyncSession
-    ) -> Dict[str, Any]:
+    async def send_compliance_alerts(self, db: AsyncSession) -> Dict[str, Any]:
         """
         发送合规告警到店长IM
         调用 IMMessageService 推送
@@ -206,9 +209,7 @@ class ComplianceAlertService:
         dashboard = await self.get_compliance_dashboard(db)
 
         # 查找店长IM账号
-        store_result = await db.execute(
-            select(Store).where(Store.id == self.store_id)
-        )
+        store_result = await db.execute(select(Store).where(Store.id == self.store_id))
         store = store_result.scalar_one_or_none()
         if not store:
             return {"sent": False, "error": "门店不存在"}
@@ -233,6 +234,7 @@ class ComplianceAlertService:
 
         try:
             from src.services.im_message_service import IMMessageService
+
             msg_svc = IMMessageService(db)
             # 查找店长
             manager_result = await db.execute(
@@ -250,8 +252,10 @@ class ComplianceAlertService:
                 im_userid = mgr.wechat_userid or mgr.dingtalk_userid
                 if im_userid:
                     await msg_svc.send_markdown(
-                        store.brand_id if hasattr(store, 'brand_id') else "",
-                        im_userid, "合规告警", content,
+                        store.brand_id if hasattr(store, "brand_id") else "",
+                        im_userid,
+                        "合规告警",
+                        content,
                     )
                     sent_count += 1
 

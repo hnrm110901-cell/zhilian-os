@@ -2,20 +2,20 @@
 竞争分析服务
 提供市场份额分析、竞品对比、价格敏感度分析
 """
+
 import uuid
-from typing import Any, Dict, List, Optional, Tuple
-from datetime import date, timedelta, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
+from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import select, and_, func, desc
-from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
-
+from sqlalchemy import and_, desc, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_db_session
-from src.models.competitor import CompetitorStore, CompetitorPrice
+from src.models.competitor import CompetitorPrice, CompetitorStore
 from src.models.dish import Dish
-from src.models.order import Order
 from src.models.finance import FinancialTransaction
+from src.models.order import Order
 
 logger = structlog.get_logger()
 
@@ -29,9 +29,11 @@ class CompetitiveAnalysisService:
 
     async def list_competitors(self, our_store_id: str) -> List[CompetitorStore]:
         async with get_db_session() as session:
-            stmt = select(CompetitorStore).where(
-                and_(CompetitorStore.our_store_id == our_store_id, CompetitorStore.is_active == True)
-            ).order_by(CompetitorStore.distance_meters)
+            stmt = (
+                select(CompetitorStore)
+                .where(and_(CompetitorStore.our_store_id == our_store_id, CompetitorStore.is_active == True))
+                .order_by(CompetitorStore.distance_meters)
+            )
             result = await session.execute(stmt)
             return list(result.scalars().all())
 
@@ -81,8 +83,18 @@ class CompetitiveAnalysisService:
             competitor = result.scalar_one_or_none()
             if not competitor:
                 return None
-            allowed = {"name", "brand", "cuisine_type", "address", "distance_meters",
-                       "avg_price_per_person", "rating", "monthly_customers", "notes", "is_active"}
+            allowed = {
+                "name",
+                "brand",
+                "cuisine_type",
+                "address",
+                "distance_meters",
+                "avg_price_per_person",
+                "rating",
+                "monthly_customers",
+                "notes",
+                "is_active",
+            }
             for key, value in kwargs.items():
                 if key in allowed and value is not None:
                     setattr(competitor, key, value)
@@ -141,9 +153,7 @@ class CompetitiveAnalysisService:
                 conditions.append(CompetitorPrice.record_date >= start_date)
             if end_date:
                 conditions.append(CompetitorPrice.record_date <= end_date)
-            stmt = select(CompetitorPrice).where(and_(*conditions)).order_by(
-                CompetitorPrice.record_date.desc()
-            )
+            stmt = select(CompetitorPrice).where(and_(*conditions)).order_by(CompetitorPrice.record_date.desc())
             result = await session.execute(stmt)
             return list(result.scalars().all())
 
@@ -185,14 +195,16 @@ class CompetitiveAnalysisService:
             else:
                 estimated_revenue = 0.0
             total_competitor_revenue += estimated_revenue
-            competitor_data.append({
-                "id": str(c.id),
-                "name": c.name,
-                "brand": c.brand,
-                "estimated_revenue": round(estimated_revenue, 2),
-                "distance_meters": c.distance_meters,
-                "rating": float(c.rating) if c.rating else None,
-            })
+            competitor_data.append(
+                {
+                    "id": str(c.id),
+                    "name": c.name,
+                    "brand": c.brand,
+                    "estimated_revenue": round(estimated_revenue, 2),
+                    "distance_meters": c.distance_meters,
+                    "rating": float(c.rating) if c.rating else None,
+                }
+            )
 
         total_market = our_revenue + total_competitor_revenue
         our_share = (our_revenue / total_market * 100) if total_market > 0 else 0.0
@@ -296,22 +308,20 @@ class CompetitiveAnalysisService:
                     None,
                 )
                 if matched:
-                    row["competitors"].append({
-                        "competitor_name": cdata["name"],
-                        "price": matched["price"],
-                        "diff": round(dish["price"] - (matched["price"] or 0), 2),
-                        "diff_pct": round(
-                            (dish["price"] - (matched["price"] or 0)) / (matched["price"] or 1) * 100, 1
-                        ),
-                    })
+                    row["competitors"].append(
+                        {
+                            "competitor_name": cdata["name"],
+                            "price": matched["price"],
+                            "diff": round(dish["price"] - (matched["price"] or 0), 2),
+                            "diff_pct": round((dish["price"] - (matched["price"] or 0)) / (matched["price"] or 1) * 100, 1),
+                        }
+                    )
                     prices_for_avg.append(matched["price"] or 0)
 
             if len(prices_for_avg) > 1:
                 avg_market_price = sum(prices_for_avg) / len(prices_for_avg)
                 row["avg_market_price"] = round(avg_market_price, 2)
-                row["vs_market_avg_pct"] = round(
-                    (dish["price"] - avg_market_price) / avg_market_price * 100, 1
-                )
+                row["vs_market_avg_pct"] = round((dish["price"] - avg_market_price) / avg_market_price * 100, 1)
             comparison.append(row)
 
         return {
@@ -386,30 +396,38 @@ class CompetitiveAnalysisService:
                 competitor_avg_prices.append(float(c.avg_price_per_person))
 
         market_avg = sum(competitor_avg_prices) / len(competitor_avg_prices) if competitor_avg_prices else avg_price
-        price_position = "高于市场均价" if avg_price > market_avg * 1.05 else (
-            "低于市场均价" if avg_price < market_avg * 0.95 else "与市场均价持平"
+        price_position = (
+            "高于市场均价"
+            if avg_price > market_avg * 1.05
+            else ("低于市场均价" if avg_price < market_avg * 0.95 else "与市场均价持平")
         )
 
         # 价格弹性建议
         recommendations = []
         if avg_price > market_avg * 1.1:
-            recommendations.append({
-                "type": "降价机会",
-                "message": f"我方均价（¥{avg_price:.1f}）高于市场均价（¥{market_avg:.1f}）10%以上，可考虑对高价菜品适当调整",
-                "priority": "high",
-            })
+            recommendations.append(
+                {
+                    "type": "降价机会",
+                    "message": f"我方均价（¥{avg_price:.1f}）高于市场均价（¥{market_avg:.1f}）10%以上，可考虑对高价菜品适当调整",
+                    "priority": "high",
+                }
+            )
         elif avg_price < market_avg * 0.9:
-            recommendations.append({
-                "type": "提价空间",
-                "message": f"我方均价（¥{avg_price:.1f}）低于市场均价（¥{market_avg:.1f}）10%以上，存在提价空间",
-                "priority": "medium",
-            })
+            recommendations.append(
+                {
+                    "type": "提价空间",
+                    "message": f"我方均价（¥{avg_price:.1f}）低于市场均价（¥{market_avg:.1f}）10%以上，存在提价空间",
+                    "priority": "medium",
+                }
+            )
         else:
-            recommendations.append({
-                "type": "价格合理",
-                "message": f"我方均价（¥{avg_price:.1f}）与市场均价（¥{market_avg:.1f}）接近，价格竞争力较强",
-                "priority": "low",
-            })
+            recommendations.append(
+                {
+                    "type": "价格合理",
+                    "message": f"我方均价（¥{avg_price:.1f}）与市场均价（¥{market_avg:.1f}）接近，价格竞争力较强",
+                    "priority": "low",
+                }
+            )
 
         # 找出价格偏高的菜品（超过市场均价 20%）
         overpriced = [

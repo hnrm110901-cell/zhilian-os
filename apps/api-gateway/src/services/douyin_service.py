@@ -2,12 +2,13 @@
 抖音生活服务集成 Service
 提供团购券管理、订单同步、结算查询等业务逻辑
 """
+
 import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import structlog
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
@@ -22,12 +23,10 @@ class DouyinService:
 
         从环境变量读取配置：DOUYIN_APP_ID, DOUYIN_APP_SECRET, DOUYIN_SANDBOX
         """
-        import sys
         import os as _os
+        import sys
 
-        adapter_root = _os.path.abspath(
-            _os.path.join(_os.path.dirname(__file__), "../../../../packages/api-adapters")
-        )
+        adapter_root = _os.path.abspath(_os.path.join(_os.path.dirname(__file__), "../../../../packages/api-adapters"))
         douyin_src = _os.path.join(adapter_root, "douyin", "src")
         if douyin_src not in sys.path:
             sys.path.insert(0, douyin_src)
@@ -155,7 +154,10 @@ class DouyinService:
         return {"synced": synced, "skipped": skipped, "errors": errors}
 
     async def verify_coupon(
-        self, brand_id: str, code: str, shop_id: str,
+        self,
+        brand_id: str,
+        code: str,
+        shop_id: str,
     ) -> Dict[str, Any]:
         """
         核销团购券
@@ -180,7 +182,10 @@ class DouyinService:
             await adapter.close()
 
     async def get_coupons(
-        self, brand_id: str, page: int = 1, page_size: int = 20,
+        self,
+        brand_id: str,
+        page: int = 1,
+        page_size: int = 20,
     ) -> Dict[str, Any]:
         """
         获取团购券列表
@@ -196,7 +201,10 @@ class DouyinService:
             await adapter.close()
 
     async def get_settlements(
-        self, brand_id: str, start_date: str, end_date: str,
+        self,
+        brand_id: str,
+        start_date: str,
+        end_date: str,
     ) -> Dict[str, Any]:
         """
         获取结算单列表
@@ -212,14 +220,17 @@ class DouyinService:
         adapter = self.get_adapter(brand_id)
         try:
             result = await adapter.query_settlements(
-                start_date=start_date, end_date=end_date,
+                start_date=start_date,
+                end_date=end_date,
             )
             return result
         finally:
             await adapter.close()
 
     async def get_stats(
-        self, db: AsyncSession, brand_id: str,
+        self,
+        db: AsyncSession,
+        brand_id: str,
     ) -> Dict[str, Any]:
         """
         获取抖音业务统计数据

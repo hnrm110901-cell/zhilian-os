@@ -14,54 +14,57 @@ IM 通讯录同步服务 — 企微/钉钉 → 屯象OS 员工花名册 + 系统
 - 每次同步幂等，可重复执行
 - 向后兼容：无 BrandIMConfig 时使用全局 settings 配置
 """
+
 from __future__ import annotations
 
 import os
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime, date
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
 import httpx
 import structlog
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.config import settings
 from ..core.security import get_password_hash
+from ..models.brand_im_config import BrandIMConfig, IMPlatform, IMSyncLog
 from ..models.employee import Employee
 from ..models.user import User, UserRole
-from ..models.brand_im_config import BrandIMConfig, IMSyncLog, IMPlatform
 
 logger = structlog.get_logger()
 
 
 # ── 统一人员数据结构 ──────────────────────────────────────
 
+
 @dataclass
 class PlatformMember:
     """IM 平台拉取到的人员标准结构"""
-    userid: str                    # 平台内唯一ID
+
+    userid: str  # 平台内唯一ID
     name: str
     mobile: Optional[str] = None
     email: Optional[str] = None
     position: Optional[str] = None
-    department: Optional[str] = None   # 部门名称
+    department: Optional[str] = None  # 部门名称
     department_ids: List[int] = field(default_factory=list)
-    is_active: bool = True         # 平台上是否在职
+    is_active: bool = True  # 平台上是否在职
     avatar_url: Optional[str] = None
     raw: Dict[str, Any] = field(default_factory=dict)
 
 
 # ── 平台适配器抽象 ───────────────────────────────────────
 
+
 class IMPlatformAdapter(ABC):
     """IM 平台通讯录适配器抽象"""
 
     @abstractmethod
-    async def get_access_token(self) -> str:
-        ...
+    async def get_access_token(self) -> str: ...
 
     @abstractmethod
     async def fetch_all_members(self) -> List[PlatformMember]:
@@ -263,6 +266,7 @@ class DingTalkAdapter(IMPlatformAdapter):
 
 # ── 统一同步服务 ──────────────────────────────────────────
 
+
 class IMSyncService:
     """
     IM 通讯录同步服务。
@@ -292,9 +296,7 @@ class IMSyncService:
 
     async def _get_config(self, brand_id: str) -> Optional[BrandIMConfig]:
         result = await self.db.execute(
-            select(BrandIMConfig).where(
-                and_(BrandIMConfig.brand_id == brand_id, BrandIMConfig.is_active.is_(True))
-            )
+            select(BrandIMConfig).where(and_(BrandIMConfig.brand_id == brand_id, BrandIMConfig.is_active.is_(True)))
         )
         return result.scalar_one_or_none()
 
@@ -322,7 +324,7 @@ class IMSyncService:
         sync_log = IMSyncLog(
             id=uuid.uuid4(),
             brand_id=brand_id,
-            im_platform=config.im_platform.value if hasattr(config.im_platform, 'value') else str(config.im_platform),
+            im_platform=config.im_platform.value if hasattr(config.im_platform, "value") else str(config.im_platform),
             trigger=trigger,
             status="running",
             started_at=datetime.utcnow(),
@@ -331,8 +333,12 @@ class IMSyncService:
         await self.db.flush()
 
         stats = {
-            "added": 0, "updated": 0, "disabled": 0,
-            "user_created": 0, "user_disabled": 0, "errors": [],
+            "added": 0,
+            "updated": 0,
+            "disabled": 0,
+            "user_created": 0,
+            "user_disabled": 0,
+            "errors": [],
         }
 
         try:
@@ -345,9 +351,8 @@ class IMSyncService:
 
             # 获取该品牌所有门店
             from ..models.store import Store
-            store_result = await self.db.execute(
-                select(Store.id).where(Store.brand_id == brand_id)
-            )
+
+            store_result = await self.db.execute(select(Store.id).where(Store.brand_id == brand_id))
             brand_store_ids = [r[0] for r in store_result.all()]
             default_store = config.default_store_id or (brand_store_ids[0] if brand_store_ids else None)
 
@@ -357,9 +362,7 @@ class IMSyncService:
             # 获取本地该品牌所有员工（按 im_userid 索引）
             local_employees = {}
             for store_id in brand_store_ids:
-                emp_result = await self.db.execute(
-                    select(Employee).where(Employee.store_id == store_id)
-                )
+                emp_result = await self.db.execute(select(Employee).where(Employee.store_id == store_id))
                 for emp in emp_result.scalars().all():
                     im_uid = getattr(emp, userid_field, None)
                     if im_uid:
@@ -392,19 +395,17 @@ class IMSyncService:
                         stats["updated"] += 1
                 else:
                     # 新增员工 — 按部门映射门店
-                    resolved_store = self._resolve_store_by_dept(
-                        member.department, config, default_store
-                    )
+                    resolved_store = self._resolve_store_by_dept(member.department, config, default_store)
                     try:
-                        await self._create_employee(
-                            member, resolved_store, userid_field, config, stats
-                        )
+                        await self._create_employee(member, resolved_store, userid_field, config, stats)
                     except Exception as e:
-                        stats["errors"].append({
-                            "userid": member.userid,
-                            "name": member.name,
-                            "error": str(e),
-                        })
+                        stats["errors"].append(
+                            {
+                                "userid": member.userid,
+                                "name": member.name,
+                                "error": str(e),
+                            }
+                        )
 
             # 本地有但平台无 → 标记离职
             for im_uid, emp in local_employees.items():
@@ -440,7 +441,7 @@ class IMSyncService:
             logger.info(
                 "im_sync_completed",
                 brand_id=brand_id,
-                platform=config.im_platform.value if hasattr(config.im_platform, 'value') else str(config.im_platform),
+                platform=config.im_platform.value if hasattr(config.im_platform, "value") else str(config.im_platform),
                 added=stats["added"],
                 updated=stats["updated"],
                 disabled=stats["disabled"],
@@ -448,7 +449,7 @@ class IMSyncService:
 
             return {
                 "brand_id": brand_id,
-                "platform": config.im_platform.value if hasattr(config.im_platform, 'value') else str(config.im_platform),
+                "platform": config.im_platform.value if hasattr(config.im_platform, "value") else str(config.im_platform),
                 "total_platform_members": len(platform_members),
                 "added": stats["added"],
                 "updated": stats["updated"],
@@ -499,21 +500,22 @@ class IMSyncService:
 
         # 查本地
         from ..models.store import Store
-        store_result = await self.db.execute(
-            select(Store.id).where(Store.brand_id == brand_id)
-        )
+
+        store_result = await self.db.execute(select(Store.id).where(Store.brand_id == brand_id))
         brand_store_ids = [r[0] for r in store_result.all()]
         default_store = config.default_store_id or (brand_store_ids[0] if brand_store_ids else None)
 
         # 查现有员工
-        emp_result = await self.db.execute(
-            select(Employee).where(getattr(Employee, userid_field) == userid)
-        )
+        emp_result = await self.db.execute(select(Employee).where(getattr(Employee, userid_field) == userid))
         existing_emp = emp_result.scalar_one_or_none()
 
         stats = {
-            "added": 0, "updated": 0, "disabled": 0,
-            "user_created": 0, "user_disabled": 0, "errors": [],
+            "added": 0,
+            "updated": 0,
+            "disabled": 0,
+            "user_created": 0,
+            "user_disabled": 0,
+            "errors": [],
         }
 
         if event_type in ("create_user", "user_add_org"):
@@ -528,9 +530,7 @@ class IMSyncService:
                     adapter = await self._get_adapter(config)
                     member = await self._fetch_member_detail(adapter, userid, is_wechat)
                     if member and default_store:
-                        await self._create_employee(
-                            member, default_store, userid_field, config, stats
-                        )
+                        await self._create_employee(member, default_store, userid_field, config, stats)
                 except Exception as e:
                     stats["errors"].append({"userid": userid, "error": str(e)})
 
@@ -553,7 +553,7 @@ class IMSyncService:
         sync_log = IMSyncLog(
             id=uuid.uuid4(),
             brand_id=brand_id,
-            im_platform=config.im_platform.value if hasattr(config.im_platform, 'value') else str(config.im_platform),
+            im_platform=config.im_platform.value if hasattr(config.im_platform, "value") else str(config.im_platform),
             trigger="callback",
             status="success" if not stats["errors"] else "partial",
             message=f"event={event_type}, userid={userid}",
@@ -581,9 +581,7 @@ class IMSyncService:
 
     # ── 内部方法 ──
 
-    async def _fetch_member_detail(
-        self, adapter: IMPlatformAdapter, userid: str, is_wechat: bool
-    ) -> Optional[PlatformMember]:
+    async def _fetch_member_detail(self, adapter: IMPlatformAdapter, userid: str, is_wechat: bool) -> Optional[PlatformMember]:
         """从平台拉取单个成员详情"""
         token = await adapter.get_access_token()
         async with httpx.AsyncClient() as client:
@@ -655,18 +653,16 @@ class IMSyncService:
 
         # 自动创建系统账号
         if config.auto_create_user:
-            await self._create_user_for_employee(
-                emp, member, config, userid_field, stats
-            )
+            await self._create_user_for_employee(emp, member, config, userid_field, stats)
 
         # 触发入职引导机器人（Phase 4 #10）
         try:
             from ..services.im_onboarding_robot import IMOnboardingRobot
+
             robot = IMOnboardingRobot(self.db)
             await robot.trigger_onboarding(emp.id, brand_id=config.brand_id)
         except Exception as e:
-            logger.warning("im_sync.onboarding_trigger_failed",
-                           employee_id=emp.id, error=str(e))
+            logger.warning("im_sync.onboarding_trigger_failed", employee_id=emp.id, error=str(e))
 
     async def _create_user_for_employee(
         self,
@@ -679,9 +675,7 @@ class IMSyncService:
         """为员工创建系统账号"""
         # 检查是否已有账号（按 username 或 phone 查重）
         username = member.userid
-        existing = await self.db.execute(
-            select(User).where(User.username == username)
-        )
+        existing = await self.db.execute(select(User).where(User.username == username))
         if existing.scalar_one_or_none():
             return
 
@@ -723,13 +717,9 @@ class IMSyncService:
             # 按 wechat_userid / dingtalk_userid 查 User
             is_wechat = config.im_platform == IMPlatform.WECHAT_WORK
             if is_wechat and emp.wechat_userid:
-                user_result = await self.db.execute(
-                    select(User).where(User.wechat_user_id == emp.wechat_userid)
-                )
+                user_result = await self.db.execute(select(User).where(User.wechat_user_id == emp.wechat_userid))
             elif not is_wechat and emp.dingtalk_userid:
-                user_result = await self.db.execute(
-                    select(User).where(User.dingtalk_user_id == emp.dingtalk_userid)
-                )
+                user_result = await self.db.execute(select(User).where(User.dingtalk_user_id == emp.dingtalk_userid))
             else:
                 return
 
@@ -738,9 +728,7 @@ class IMSyncService:
                 user.is_active = False
                 stats["user_disabled"] += 1
 
-    def _update_employee_fields(
-        self, emp: Employee, member: PlatformMember
-    ) -> bool:
+    def _update_employee_fields(self, emp: Employee, member: PlatformMember) -> bool:
         """更新员工字段，返回是否有变更"""
         changed = False
         if member.name and member.name != emp.name:
@@ -784,16 +772,26 @@ class IMSyncService:
             return "waiter"
         pos = platform_position.lower()
         mapping = {
-            "店长": "store_manager", "经理": "store_manager", "manager": "store_manager",
-            "助理": "assistant_manager", "副店长": "assistant_manager",
-            "楼面": "floor_manager", "前厅经理": "floor_manager",
+            "店长": "store_manager",
+            "经理": "store_manager",
+            "manager": "store_manager",
+            "助理": "assistant_manager",
+            "副店长": "assistant_manager",
+            "楼面": "floor_manager",
+            "前厅经理": "floor_manager",
             "领班": "team_leader",
-            "厨师长": "head_chef", "行政总厨": "head_chef",
-            "厨师": "chef", "炒锅": "chef", "切配": "chef",
+            "厨师长": "head_chef",
+            "行政总厨": "head_chef",
+            "厨师": "chef",
+            "炒锅": "chef",
+            "切配": "chef",
             "档口": "station_manager",
             "服务员": "waiter",
-            "库管": "warehouse_manager", "仓管": "warehouse_manager",
-            "财务": "finance", "会计": "finance", "出纳": "finance",
+            "库管": "warehouse_manager",
+            "仓管": "warehouse_manager",
+            "财务": "finance",
+            "会计": "finance",
+            "出纳": "finance",
             "采购": "procurement",
             "客户经理": "customer_manager",
         }

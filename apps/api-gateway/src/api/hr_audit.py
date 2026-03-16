@@ -6,15 +6,15 @@ HR操作审计日志查询API
   GET /hr/audit/logs/{resource_type}/{resource_id}  — 查看特定资源的操作历史
   GET /hr/audit/stats                               — 审计统计（按模块/操作类型分组计数）
 """
+
 from datetime import datetime, timedelta
 from typing import Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import select, func, desc, and_
+from sqlalchemy import and_, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.models.operation_audit_log import OperationAuditLog
 
@@ -24,8 +24,10 @@ router = APIRouter()
 
 # ── 响应模型 ─────────────────────────────────────────────
 
+
 class AuditLogItem(BaseModel):
     """审计日志条目"""
+
     id: str
     operator_id: str
     operator_name: Optional[str] = None
@@ -49,6 +51,7 @@ class AuditLogItem(BaseModel):
 
 class AuditLogListResponse(BaseModel):
     """审计日志列表响应"""
+
     items: list[AuditLogItem]
     total: int
     page: int
@@ -57,12 +60,14 @@ class AuditLogListResponse(BaseModel):
 
 class AuditStatItem(BaseModel):
     """审计统计项"""
+
     key: str
     count: int
 
 
 class AuditStatsResponse(BaseModel):
     """审计统计响应"""
+
     by_module: list[AuditStatItem]
     by_action: list[AuditStatItem]
     by_operator: list[AuditStatItem]
@@ -72,6 +77,7 @@ class AuditStatsResponse(BaseModel):
 
 
 # ── 端点 ─────────────────────────────────────────────────
+
 
 @router.get("/hr/audit/logs", response_model=AuditLogListResponse, summary="查询HR操作审计日志")
 async def list_audit_logs(
@@ -206,9 +212,7 @@ async def get_audit_stats(
     base_where = and_(*base_conditions)
 
     # 总数
-    total = (await db.execute(
-        select(func.count(OperationAuditLog.id)).where(base_where)
-    )).scalar() or 0
+    total = (await db.execute(select(func.count(OperationAuditLog.id)).where(base_where))).scalar() or 0
 
     # 按模块分组
     by_module_stmt = (
@@ -218,10 +222,7 @@ async def get_audit_stats(
         .order_by(desc("cnt"))
         .limit(20)
     )
-    by_module = [
-        AuditStatItem(key=row[0], count=row[1])
-        for row in (await db.execute(by_module_stmt)).all()
-    ]
+    by_module = [AuditStatItem(key=row[0], count=row[1]) for row in (await db.execute(by_module_stmt)).all()]
 
     # 按操作类型分组
     by_action_stmt = (
@@ -231,10 +232,7 @@ async def get_audit_stats(
         .order_by(desc("cnt"))
         .limit(20)
     )
-    by_action = [
-        AuditStatItem(key=row[0], count=row[1])
-        for row in (await db.execute(by_action_stmt)).all()
-    ]
+    by_action = [AuditStatItem(key=row[0], count=row[1]) for row in (await db.execute(by_action_stmt)).all()]
 
     # 按操作人分组（Top 10）
     by_operator_stmt = (
@@ -244,10 +242,7 @@ async def get_audit_stats(
         .order_by(desc("cnt"))
         .limit(10)
     )
-    by_operator = [
-        AuditStatItem(key=row[0], count=row[1])
-        for row in (await db.execute(by_operator_stmt)).all()
-    ]
+    by_operator = [AuditStatItem(key=row[0], count=row[1]) for row in (await db.execute(by_operator_stmt)).all()]
 
     return AuditStatsResponse(
         by_module=by_module,

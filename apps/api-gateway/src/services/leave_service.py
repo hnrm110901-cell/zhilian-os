@@ -2,21 +2,27 @@
 Leave Service — 假勤管理服务
 请假、加班申请及假期余额管理
 """
-from typing import Optional, Dict, Any, List
+
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Any, Dict, List, Optional
+
 import structlog
-
-from sqlalchemy import select, and_, func
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from src.models.employee import Employee
+from src.models.leave import (
+    LeaveBalance,
+    LeaveCategory,
+    LeaveRequest,
+    LeaveRequestStatus,
+    LeaveTypeConfig,
+    OvertimeRequest,
+    OvertimeRequestStatus,
+    OvertimeType,
+)
 from src.services.base_service import BaseService
 from src.services.hr_approval_service import HRApprovalService
-from src.models.leave import (
-    LeaveTypeConfig, LeaveBalance, LeaveRequest, OvertimeRequest,
-    LeaveCategory, LeaveRequestStatus, OvertimeRequestStatus, OvertimeType,
-)
-from src.models.employee import Employee
 
 logger = structlog.get_logger()
 
@@ -24,9 +30,7 @@ logger = structlog.get_logger()
 class LeaveService(BaseService):
     """假勤管理服务"""
 
-    async def submit_leave(
-        self, db: AsyncSession, data: Dict[str, Any]
-    ) -> LeaveRequest:
+    async def submit_leave(self, db: AsyncSession, data: Dict[str, Any]) -> LeaveRequest:
         """提交请假申请"""
         store_id = data.get("store_id") or self.store_id
         employee_id = data["employee_id"]
@@ -37,9 +41,7 @@ class LeaveService(BaseService):
         year = int(data["start_date"][:4]) if isinstance(data["start_date"], str) else data["start_date"].year
         balance = await self._get_balance(db, employee_id, year, category)
         if balance and balance.remaining_days < float(leave_days):
-            raise ValueError(
-                f"假期余额不足: 剩余 {balance.remaining_days} 天, 申请 {leave_days} 天"
-            )
+            raise ValueError(f"假期余额不足: 剩余 {balance.remaining_days} 天, 申请 {leave_days} 天")
 
         start_date = data["start_date"] if isinstance(data["start_date"], date) else date.fromisoformat(data["start_date"])
         end_date = data["end_date"] if isinstance(data["end_date"], date) else date.fromisoformat(data["end_date"])
@@ -91,8 +93,7 @@ class LeaveService(BaseService):
         return request
 
     async def approve_leave(
-        self, db: AsyncSession, request_id: str,
-        approver_id: str, approver_name: str = ""
+        self, db: AsyncSession, request_id: str, approver_id: str, approver_name: str = ""
     ) -> LeaveRequest:
         """审批通过请假"""
         request = await db.get(LeaveRequest, request_id)
@@ -105,31 +106,20 @@ class LeaveService(BaseService):
 
         # 更新余额：pending → used
         year = request.start_date.year
-        balance = await self._get_balance(
-            db, request.employee_id, year, request.leave_category.value
-        )
+        balance = await self._get_balance(db, request.employee_id, year, request.leave_category.value)
         if balance:
-            balance.pending_days = max(
-                Decimal("0"),
-                Decimal(str(float(balance.pending_days) - float(request.leave_days)))
-            )
+            balance.pending_days = max(Decimal("0"), Decimal(str(float(balance.pending_days) - float(request.leave_days))))
             balance.used_days = Decimal(str(float(balance.used_days) + float(request.leave_days)))
 
         # 审批通过
         if request.approval_instance_id:
             approval_svc = HRApprovalService(store_id=request.store_id)
-            await approval_svc.approve(
-                db, str(request.approval_instance_id),
-                approver_id, approver_name
-            )
+            await approval_svc.approve(db, str(request.approval_instance_id), approver_id, approver_name)
 
         await db.flush()
         return request
 
-    async def reject_leave(
-        self, db: AsyncSession, request_id: str,
-        approver_id: str, reason: str = ""
-    ) -> LeaveRequest:
+    async def reject_leave(self, db: AsyncSession, request_id: str, approver_id: str, reason: str = "") -> LeaveRequest:
         """驳回请假"""
         request = await db.get(LeaveRequest, request_id)
         if not request:
@@ -140,28 +130,18 @@ class LeaveService(BaseService):
 
         # 释放pending余额
         year = request.start_date.year
-        balance = await self._get_balance(
-            db, request.employee_id, year, request.leave_category.value
-        )
+        balance = await self._get_balance(db, request.employee_id, year, request.leave_category.value)
         if balance:
-            balance.pending_days = max(
-                Decimal("0"),
-                Decimal(str(float(balance.pending_days) - float(request.leave_days)))
-            )
+            balance.pending_days = max(Decimal("0"), Decimal(str(float(balance.pending_days) - float(request.leave_days))))
 
         if request.approval_instance_id:
             approval_svc = HRApprovalService(store_id=request.store_id)
-            await approval_svc.reject(
-                db, str(request.approval_instance_id),
-                approver_id, reason=reason
-            )
+            await approval_svc.reject(db, str(request.approval_instance_id), approver_id, reason=reason)
 
         await db.flush()
         return request
 
-    async def submit_overtime(
-        self, db: AsyncSession, data: Dict[str, Any]
-    ) -> OvertimeRequest:
+    async def submit_overtime(self, db: AsyncSession, data: Dict[str, Any]) -> OvertimeRequest:
         """提交加班申请"""
         store_id = data.get("store_id") or self.store_id
         overtime_type = data.get("overtime_type", "weekday")
@@ -192,8 +172,7 @@ class LeaveService(BaseService):
         return request
 
     async def get_leave_list(
-        self, db: AsyncSession, store_id: str,
-        status: str = None, month: str = None
+        self, db: AsyncSession, store_id: str, status: str = None, month: str = None
     ) -> List[Dict[str, Any]]:
         """获取请假列表"""
         conditions = [LeaveRequest.store_id == store_id]
@@ -204,9 +183,9 @@ class LeaveService(BaseService):
             conditions.append(LeaveRequest.start_date >= date(year, m, 1))
 
         result = await db.execute(
-            select(LeaveRequest, Employee.name).join(
-                Employee, LeaveRequest.employee_id == Employee.id
-            ).where(and_(*conditions))
+            select(LeaveRequest, Employee.name)
+            .join(Employee, LeaveRequest.employee_id == Employee.id)
+            .where(and_(*conditions))
             .order_by(LeaveRequest.created_at.desc())
             .limit(100)
         )
@@ -227,9 +206,7 @@ class LeaveService(BaseService):
             for req, name in rows
         ]
 
-    async def get_leave_balance(
-        self, db: AsyncSession, employee_id: str, year: int
-    ) -> List[Dict[str, Any]]:
+    async def get_leave_balance(self, db: AsyncSession, employee_id: str, year: int) -> List[Dict[str, Any]]:
         """获取员工假期余额"""
         result = await db.execute(
             select(LeaveBalance).where(
@@ -251,9 +228,7 @@ class LeaveService(BaseService):
             for b in balances
         ]
 
-    async def init_annual_balance(
-        self, db: AsyncSession, store_id: str, employee_id: str, year: int
-    ):
+    async def init_annual_balance(self, db: AsyncSession, store_id: str, employee_id: str, year: int):
         """初始化年度假期余额"""
         # 查询配置
         result = await db.execute(
@@ -279,9 +254,7 @@ class LeaveService(BaseService):
 
         await db.flush()
 
-    async def _get_balance(
-        self, db: AsyncSession, employee_id: str, year: int, category: str
-    ) -> Optional[LeaveBalance]:
+    async def _get_balance(self, db: AsyncSession, employee_id: str, year: int, category: str) -> Optional[LeaveBalance]:
         """获取假期余额"""
         result = await db.execute(
             select(LeaveBalance).where(

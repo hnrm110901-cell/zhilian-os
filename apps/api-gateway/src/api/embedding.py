@@ -9,15 +9,16 @@ Embedding Model API
 4. 模型评估
 """
 
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from sqlalchemy.ext.asyncio import AsyncSession
+import logging
 from typing import List, Optional
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_tenant
 from ..services.embedding_model_service import EmbeddingModelService
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +27,10 @@ router = APIRouter(prefix="/api/v1/embedding", tags=["embedding"])
 
 # ==================== 请求模型 ====================
 
+
 class TrainModelRequest(BaseModel):
     """训练模型请求"""
+
     days: int = Field(90, description="训练数据天数")
     embedding_dim: int = Field(128, description="嵌入维度")
     window_size: int = Field(5, description="上下文窗口大小")
@@ -37,6 +40,7 @@ class TrainModelRequest(BaseModel):
 
 class SimilarityRequest(BaseModel):
     """相似度计算请求"""
+
     text1: str = Field(..., description="文本1")
     text2: str = Field(..., description="文本2")
     method: str = Field("cosine", description="相似度方法")
@@ -44,25 +48,30 @@ class SimilarityRequest(BaseModel):
 
 class FindSimilarDishesRequest(BaseModel):
     """查找相似菜品请求"""
+
     dish_name: str = Field(..., description="菜品名称")
     top_k: int = Field(10, description="返回数量")
 
 
 class RecommendDishesRequest(BaseModel):
     """推荐菜品请求"""
+
     order_dish_names: List[str] = Field(..., description="订单菜品列表")
     top_k: int = Field(5, description="推荐数量")
 
 
 class EmbeddingRequest(BaseModel):
     """获取嵌入向量请求"""
+
     text: str = Field(..., description="输入文本")
 
 
 # ==================== 响应模型 ====================
 
+
 class TrainModelResponse(BaseModel):
     """训练模型响应"""
+
     status: str
     message: str
     vocab_size: int
@@ -72,12 +81,14 @@ class TrainModelResponse(BaseModel):
 
 class SimilarityResponse(BaseModel):
     """相似度响应"""
+
     similarity: float
     method: str
 
 
 class SimilarDish(BaseModel):
     """相似菜品"""
+
     dish_id: int
     dish_name: str
     similarity: float
@@ -86,6 +97,7 @@ class SimilarDish(BaseModel):
 
 class RecommendedDish(BaseModel):
     """推荐菜品"""
+
     dish_id: int
     dish_name: str
     price: float
@@ -95,18 +107,20 @@ class RecommendedDish(BaseModel):
 
 class EmbeddingResponse(BaseModel):
     """嵌入向量响应"""
+
     embedding: List[float]
     dimension: int
 
 
 # ==================== API 端点 ====================
 
+
 @router.post("/train", response_model=TrainModelResponse)
 async def train_model(
     request: TrainModelRequest,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
-    tenant_id: str = Depends(get_current_tenant)
+    tenant_id: str = Depends(get_current_tenant),
 ):
     """
     训练嵌入模型
@@ -124,10 +138,7 @@ async def train_model(
 
         # 收集训练数据
         logger.info(f"Collecting training data for tenant {tenant_id}")
-        training_data = await service.collect_training_data(
-            tenant_id=tenant_id,
-            days=request.days
-        )
+        training_data = await service.collect_training_data(tenant_id=tenant_id, days=request.days)
 
         # 训练模型
         logger.info("Starting model training")
@@ -136,7 +147,7 @@ async def train_model(
             embedding_dim=request.embedding_dim,
             window_size=request.window_size,
             epochs=request.epochs,
-            learning_rate=request.learning_rate
+            learning_rate=request.learning_rate,
         )
 
         # 保存模型
@@ -144,17 +155,14 @@ async def train_model(
         service.save_model(model_path)
 
         # 计算训练样本数
-        total_samples = (
-            len(training_data["dish_texts"]) +
-            len(training_data["order_sequences"])
-        )
+        total_samples = len(training_data["dish_texts"]) + len(training_data["order_sequences"])
 
         return TrainModelResponse(
             status="success",
             message="模型训练完成",
             vocab_size=len(service.vocab),
             embedding_dim=request.embedding_dim,
-            training_samples=total_samples
+            training_samples=total_samples,
         )
 
     except Exception as e:
@@ -164,9 +172,7 @@ async def train_model(
 
 @router.post("/similarity", response_model=SimilarityResponse)
 async def calculate_similarity(
-    request: SimilarityRequest,
-    db: AsyncSession = Depends(get_db),
-    tenant_id: str = Depends(get_current_tenant)
+    request: SimilarityRequest, db: AsyncSession = Depends(get_db), tenant_id: str = Depends(get_current_tenant)
 ):
     """
     计算两个文本的相似度
@@ -183,22 +189,12 @@ async def calculate_similarity(
         service.load_model(model_path)
 
         # 计算相似度
-        similarity = service.calculate_similarity(
-            text1=request.text1,
-            text2=request.text2,
-            method=request.method
-        )
+        similarity = service.calculate_similarity(text1=request.text1, text2=request.text2, method=request.method)
 
-        return SimilarityResponse(
-            similarity=similarity,
-            method=request.method
-        )
+        return SimilarityResponse(similarity=similarity, method=request.method)
 
     except FileNotFoundError:
-        raise HTTPException(
-            status_code=404,
-            detail="模型未找到，请先训练模型"
-        )
+        raise HTTPException(status_code=404, detail="模型未找到，请先训练模型")
     except Exception as e:
         logger.error(f"Error calculating similarity: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -206,9 +202,7 @@ async def calculate_similarity(
 
 @router.post("/similar-dishes", response_model=List[SimilarDish])
 async def find_similar_dishes(
-    request: FindSimilarDishesRequest,
-    db: AsyncSession = Depends(get_db),
-    tenant_id: str = Depends(get_current_tenant)
+    request: FindSimilarDishesRequest, db: AsyncSession = Depends(get_db), tenant_id: str = Depends(get_current_tenant)
 ):
     """
     查找相似菜品
@@ -227,18 +221,13 @@ async def find_similar_dishes(
 
         # 查找相似菜品
         similar_dishes = await service.find_similar_dishes_async(
-            dish_name=request.dish_name,
-            top_k=request.top_k,
-            tenant_id=tenant_id
+            dish_name=request.dish_name, top_k=request.top_k, tenant_id=tenant_id
         )
 
         return [SimilarDish(**dish) for dish in similar_dishes]
 
     except FileNotFoundError:
-        raise HTTPException(
-            status_code=404,
-            detail="模型未找到，请先训练模型"
-        )
+        raise HTTPException(status_code=404, detail="模型未找到，请先训练模型")
     except Exception as e:
         logger.error(f"Error finding similar dishes: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -246,9 +235,7 @@ async def find_similar_dishes(
 
 @router.post("/recommend", response_model=List[RecommendedDish])
 async def recommend_dishes(
-    request: RecommendDishesRequest,
-    db: AsyncSession = Depends(get_db),
-    tenant_id: str = Depends(get_current_tenant)
+    request: RecommendDishesRequest, db: AsyncSession = Depends(get_db), tenant_id: str = Depends(get_current_tenant)
 ):
     """
     基于订单推荐菜品
@@ -273,18 +260,13 @@ async def recommend_dishes(
 
         # 推荐菜品
         recommendations = await service.recommend_dishes_by_order_async(
-            order_dish_names=request.order_dish_names,
-            top_k=request.top_k,
-            tenant_id=tenant_id
+            order_dish_names=request.order_dish_names, top_k=request.top_k, tenant_id=tenant_id
         )
 
         return [RecommendedDish(**dish) for dish in recommendations]
 
     except FileNotFoundError:
-        raise HTTPException(
-            status_code=404,
-            detail="模型未找到，请先训练模型"
-        )
+        raise HTTPException(status_code=404, detail="模型未找到，请先训练模型")
     except Exception as e:
         logger.error(f"Error recommending dishes: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -292,9 +274,7 @@ async def recommend_dishes(
 
 @router.post("/embedding", response_model=EmbeddingResponse)
 async def get_embedding(
-    request: EmbeddingRequest,
-    db: AsyncSession = Depends(get_db),
-    tenant_id: str = Depends(get_current_tenant)
+    request: EmbeddingRequest, db: AsyncSession = Depends(get_db), tenant_id: str = Depends(get_current_tenant)
 ):
     """
     获取文本的嵌入向量
@@ -314,21 +294,12 @@ async def get_embedding(
         embedding = service.get_embedding(request.text)
 
         if embedding is None:
-            raise HTTPException(
-                status_code=400,
-                detail="无法生成嵌入向量，文本可能不在词汇表中"
-            )
+            raise HTTPException(status_code=400, detail="无法生成嵌入向量，文本可能不在词汇表中")
 
-        return EmbeddingResponse(
-            embedding=embedding.tolist(),
-            dimension=len(embedding)
-        )
+        return EmbeddingResponse(embedding=embedding.tolist(), dimension=len(embedding))
 
     except FileNotFoundError:
-        raise HTTPException(
-            status_code=404,
-            detail="模型未找到，请先训练模型"
-        )
+        raise HTTPException(status_code=404, detail="模型未找到，请先训练模型")
     except HTTPException:
         raise
     except Exception as e:
@@ -337,10 +308,7 @@ async def get_embedding(
 
 
 @router.get("/model/status")
-async def get_model_status(
-    db: AsyncSession = Depends(get_db),
-    tenant_id: str = Depends(get_current_tenant)
-):
+async def get_model_status(db: AsyncSession = Depends(get_db), tenant_id: str = Depends(get_current_tenant)):
     """
     获取模型状态
 
@@ -351,26 +319,23 @@ async def get_model_status(
     - created_at: 创建时间
     """
     try:
-        import os
         import json
+        import os
 
         model_path = f"/tmp/embedding_model_{tenant_id}.json"
 
         if not os.path.exists(model_path):
-            return {
-                "exists": False,
-                "message": "模型未训练"
-            }
+            return {"exists": False, "message": "模型未训练"}
 
         # 读取模型元数据
-        with open(model_path, 'r') as f:
+        with open(model_path, "r") as f:
             model_data = json.load(f)
 
         return {
             "exists": True,
             "vocab_size": len(model_data["vocab"]),
             "embedding_dim": model_data["embedding_dim"],
-            "created_at": model_data["created_at"]
+            "created_at": model_data["created_at"],
         }
 
     except Exception as e:

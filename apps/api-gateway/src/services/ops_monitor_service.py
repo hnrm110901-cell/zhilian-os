@@ -7,6 +7,7 @@ OpsMonitorService — 运维监控数据聚合服务
 3. 告警收敛：converge_alerts（多信号→单根因事件）
 4. 食安状态：get_food_safety_status
 """
+
 from __future__ import annotations
 
 import uuid
@@ -14,29 +15,29 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 import structlog
-from sqlalchemy import select, func, text, and_
+from sqlalchemy import and_, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.ops import (
     OpsDeviceReading,
-    OpsNetworkHealth,
-    OpsSysHealthCheck,
-    OpsFoodSafetyRecord,
     OpsEvent,
     OpsEventSeverity,
     OpsEventStatus,
+    OpsFoodSafetyRecord,
+    OpsNetworkHealth,
+    OpsSysHealthCheck,
 )
 
 logger = structlog.get_logger()
 
 # ── 告警阈值常量（对应方案 第三章 3.1 表格）────────────────────────────────────
 
-_COLD_CHAIN_MAX_C = 8.0          # 冷藏超过8°C告警
-_FROZEN_MAX_C = -12.0            # 冷冻超过-12°C告警
-_FRIDGE_POWER_DEVIATION = 0.20   # 功率偏离历史基线 20% 告警
-_NETWORK_LATENCY_MS = 200.0      # 延迟超过 200ms 告警
-_PACKET_LOSS_PCT = 2.0           # 丢包超过 2% 告警
-_HTTP_TIMEOUT_MS = 3000.0        # HTTP 响应超过 3000ms 告警
+_COLD_CHAIN_MAX_C = 8.0  # 冷藏超过8°C告警
+_FROZEN_MAX_C = -12.0  # 冷冻超过-12°C告警
+_FRIDGE_POWER_DEVIATION = 0.20  # 功率偏离历史基线 20% 告警
+_NETWORK_LATENCY_MS = 200.0  # 延迟超过 200ms 告警
+_PACKET_LOSS_PCT = 2.0  # 丢包超过 2% 告警
+_HTTP_TIMEOUT_MS = 3000.0  # HTTP 响应超过 3000ms 告警
 
 # P0 系统连续失败阈值（次数）
 _P0_FAIL_THRESHOLD = 1
@@ -79,8 +80,12 @@ class OpsMonitorService:
         await session.flush()
         if is_alert:
             await self._create_ops_event(
-                session, store_id, "device_alert", OpsEventSeverity.HIGH,
-                device_name, alert_msg or f"{metric_type} 异常",
+                session,
+                store_id,
+                "device_alert",
+                OpsEventSeverity.HIGH,
+                device_name,
+                alert_msg or f"{metric_type} 异常",
                 {"metric_type": metric_type, "value": value_float},
             )
         return {"reading_id": str(reading.id), "is_alert": is_alert, "alert_message": alert_msg}
@@ -99,9 +104,7 @@ class OpsMonitorService:
         vlan: Optional[str] = None,
     ) -> Dict[str, Any]:
         """写入一条网络探针结果，并自动判断告警。"""
-        is_alert, alert_msg = self._eval_network_alert(
-            is_available, latency_ms, packet_loss_pct, status_code
-        )
+        is_alert, alert_msg = self._eval_network_alert(is_available, latency_ms, packet_loss_pct, status_code)
         record = OpsNetworkHealth(
             id=uuid.uuid4(),
             store_id=store_id,
@@ -122,8 +125,12 @@ class OpsMonitorService:
         if is_alert:
             severity = OpsEventSeverity.CRITICAL if not is_available else OpsEventSeverity.HIGH
             await self._create_ops_event(
-                session, store_id, "network_alert", severity,
-                f"{probe_type}:{target}", alert_msg or "网络异常",
+                session,
+                store_id,
+                "network_alert",
+                severity,
+                f"{probe_type}:{target}",
+                alert_msg or "网络异常",
                 {"vlan": vlan, "latency_ms": latency_ms, "packet_loss_pct": packet_loss_pct},
             )
         return {"record_id": str(record.id), "is_alert": is_alert}
@@ -149,7 +156,8 @@ class OpsMonitorService:
             consecutive = 0
 
         fail_threshold = {
-            "P0": _P0_FAIL_THRESHOLD, "P1": _P1_FAIL_THRESHOLD,
+            "P0": _P0_FAIL_THRESHOLD,
+            "P1": _P1_FAIL_THRESHOLD,
         }.get(priority, _P2_FAIL_THRESHOLD)
         is_alert = not is_available and consecutive >= fail_threshold
 
@@ -170,11 +178,16 @@ class OpsMonitorService:
         session.add(record)
         await session.flush()
         if is_alert:
-            severity = (OpsEventSeverity.CRITICAL if priority == "P0"
-                        else OpsEventSeverity.HIGH if priority == "P1"
-                        else OpsEventSeverity.MEDIUM)
+            severity = (
+                OpsEventSeverity.CRITICAL
+                if priority == "P0"
+                else OpsEventSeverity.HIGH if priority == "P1" else OpsEventSeverity.MEDIUM
+            )
             await self._create_ops_event(
-                session, store_id, "system_alert", severity,
+                session,
+                store_id,
+                "system_alert",
+                severity,
                 system_name,
                 f"系统 {system_name}（{priority}）连续 {consecutive} 次检测失败",
                 {"priority": priority, "consecutive": consecutive, "error": error_message},
@@ -219,11 +232,13 @@ class OpsMonitorService:
         await session.flush()
         if not is_compliant:
             await self._create_ops_event(
-                session, store_id, "food_safety", OpsEventSeverity.HIGH,
+                session,
+                store_id,
+                "food_safety",
+                OpsEventSeverity.HIGH,
                 device_name or record_type,
                 f"食安异常：{record_type} {value_float}{unit or ''} 超出阈值",
-                {"type": record_type, "value": value_float,
-                 "min": threshold_min, "max": threshold_max},
+                {"type": record_type, "value": value_float, "min": threshold_min, "max": threshold_max},
             )
         return {"record_id": str(record.id), "is_compliant": is_compliant}
 
@@ -318,9 +333,7 @@ class OpsMonitorService:
             select(
                 OpsFoodSafetyRecord.record_type,
                 func.count().label("total"),
-                func.sum(
-                    func.cast(~OpsFoodSafetyRecord.is_compliant, type_=func.count().type)
-                ).label("violations"),
+                func.sum(func.cast(~OpsFoodSafetyRecord.is_compliant, type_=func.count().type)).label("violations"),
             )
             .where(
                 and_(
@@ -353,12 +366,14 @@ class OpsMonitorService:
             violations = int(row.violations or 0)
             total_violations += violations
             compliance_rate = round((1 - violations / row.total) * 100, 1) if row.total else 100.0
-            type_summary.append({
-                "record_type": row.record_type,
-                "total": row.total,
-                "violations": violations,
-                "compliance_rate_pct": compliance_rate,
-            })
+            type_summary.append(
+                {
+                    "record_type": row.record_type,
+                    "total": row.total,
+                    "violations": violations,
+                    "compliance_rate_pct": compliance_rate,
+                }
+            )
 
         return {
             "store_id": store_id,
@@ -414,9 +429,7 @@ class OpsMonitorService:
             return True, f"HTTP {status_code} 服务端错误"
         return False, None
 
-    async def _get_consecutive_failures(
-        self, session: AsyncSession, store_id: str, system_name: str
-    ) -> int:
+    async def _get_consecutive_failures(self, session: AsyncSession, store_id: str, system_name: str) -> int:
         """获取该系统最近一次连续失败次数。"""
         stmt = (
             select(OpsSysHealthCheck.consecutive_failures)
@@ -455,49 +468,48 @@ class OpsMonitorService:
         )
         session.add(event)
 
-    async def _layer1_summary(
-        self, session: AsyncSession, store_id: str, since: datetime
-    ) -> Dict[str, Any]:
+    async def _layer1_summary(self, session: AsyncSession, store_id: str, since: datetime) -> Dict[str, Any]:
         total_stmt = select(func.count()).select_from(
             select(OpsDeviceReading.id)
-            .where(OpsDeviceReading.store_id == store_id,
-                   OpsDeviceReading.recorded_at >= since)
+            .where(OpsDeviceReading.store_id == store_id, OpsDeviceReading.recorded_at >= since)
             .subquery()
         )
         alert_stmt = select(func.count()).select_from(
             select(OpsDeviceReading.id)
-            .where(OpsDeviceReading.store_id == store_id,
-                   OpsDeviceReading.recorded_at >= since,
-                   OpsDeviceReading.is_alert.is_(True))
+            .where(
+                OpsDeviceReading.store_id == store_id,
+                OpsDeviceReading.recorded_at >= since,
+                OpsDeviceReading.is_alert.is_(True),
+            )
             .subquery()
         )
         total = (await session.execute(total_stmt)).scalar() or 0
         alerts = (await session.execute(alert_stmt)).scalar() or 0
         score = 100.0 if total == 0 else round(max(0.0, (1 - alerts / total) * 100), 1)
-        return {"total_readings": total, "alert_count": alerts,
-                "score": score, "status": _score_to_status(score)}
+        return {"total_readings": total, "alert_count": alerts, "score": score, "status": _score_to_status(score)}
 
-    async def _layer2_summary(
-        self, session: AsyncSession, store_id: str, since: datetime
-    ) -> Dict[str, Any]:
+    async def _layer2_summary(self, session: AsyncSession, store_id: str, since: datetime) -> Dict[str, Any]:
         total_stmt = select(func.count()).select_from(
             select(OpsNetworkHealth.id)
-            .where(OpsNetworkHealth.store_id == store_id,
-                   OpsNetworkHealth.recorded_at >= since)
+            .where(OpsNetworkHealth.store_id == store_id, OpsNetworkHealth.recorded_at >= since)
             .subquery()
         )
         unavail_stmt = select(func.count()).select_from(
             select(OpsNetworkHealth.id)
-            .where(OpsNetworkHealth.store_id == store_id,
-                   OpsNetworkHealth.recorded_at >= since,
-                   OpsNetworkHealth.is_available.is_(False))
+            .where(
+                OpsNetworkHealth.store_id == store_id,
+                OpsNetworkHealth.recorded_at >= since,
+                OpsNetworkHealth.is_available.is_(False),
+            )
             .subquery()
         )
         alert_stmt = select(func.count()).select_from(
             select(OpsNetworkHealth.id)
-            .where(OpsNetworkHealth.store_id == store_id,
-                   OpsNetworkHealth.recorded_at >= since,
-                   OpsNetworkHealth.is_alert.is_(True))
+            .where(
+                OpsNetworkHealth.store_id == store_id,
+                OpsNetworkHealth.recorded_at >= since,
+                OpsNetworkHealth.is_alert.is_(True),
+            )
             .subquery()
         )
         total = (await session.execute(total_stmt)).scalar() or 0
@@ -505,30 +517,35 @@ class OpsMonitorService:
         alerts = (await session.execute(alert_stmt)).scalar() or 0
         availability = round((1 - unavail / total) * 100, 1) if total else 100.0
         score = availability
-        return {"total_probes": total, "unavailable": unavail, "alert_count": alerts,
-                "availability_pct": availability, "score": score,
-                "status": _score_to_status(score)}
+        return {
+            "total_probes": total,
+            "unavailable": unavail,
+            "alert_count": alerts,
+            "availability_pct": availability,
+            "score": score,
+            "status": _score_to_status(score),
+        }
 
-    async def _layer3_summary(
-        self, session: AsyncSession, store_id: str, since: datetime
-    ) -> Dict[str, Any]:
+    async def _layer3_summary(self, session: AsyncSession, store_id: str, since: datetime) -> Dict[str, Any]:
         # 每个系统取最新一条记录
         subq = (
             select(
                 OpsSysHealthCheck.system_name,
                 func.max(OpsSysHealthCheck.recorded_at).label("latest"),
             )
-            .where(OpsSysHealthCheck.store_id == store_id,
-                   OpsSysHealthCheck.recorded_at >= since)
+            .where(OpsSysHealthCheck.store_id == store_id, OpsSysHealthCheck.recorded_at >= since)
             .group_by(OpsSysHealthCheck.system_name)
             .subquery()
         )
         stmt = (
             select(OpsSysHealthCheck)
-            .join(subq, and_(
-                OpsSysHealthCheck.system_name == subq.c.system_name,
-                OpsSysHealthCheck.recorded_at == subq.c.latest,
-            ))
+            .join(
+                subq,
+                and_(
+                    OpsSysHealthCheck.system_name == subq.c.system_name,
+                    OpsSysHealthCheck.recorded_at == subq.c.latest,
+                ),
+            )
             .where(OpsSysHealthCheck.store_id == store_id)
         )
         rows = (await session.execute(stmt)).scalars().all()
@@ -550,16 +567,9 @@ class OpsMonitorService:
             "down_list": [r.system_name for r in rows if not r.is_available],
         }
 
-    async def _food_safety_summary(
-        self, session: AsyncSession, store_id: str, since: datetime
-    ) -> Dict[str, Any]:
-        stmt = (
-            select(func.count(), func.sum(
-                func.cast(~OpsFoodSafetyRecord.is_compliant,
-                          type_=func.count().type)
-            ))
-            .where(OpsFoodSafetyRecord.store_id == store_id,
-                   OpsFoodSafetyRecord.recorded_at >= since)
+    async def _food_safety_summary(self, session: AsyncSession, store_id: str, since: datetime) -> Dict[str, Any]:
+        stmt = select(func.count(), func.sum(func.cast(~OpsFoodSafetyRecord.is_compliant, type_=func.count().type))).where(
+            OpsFoodSafetyRecord.store_id == store_id, OpsFoodSafetyRecord.recorded_at >= since
         )
         row = (await session.execute(stmt)).one()
         total, violations = row[0] or 0, int(row[1] or 0)
@@ -571,9 +581,7 @@ class OpsMonitorService:
             "status": "compliant" if violations == 0 else "violation",
         }
 
-    async def _count_alerts(
-        self, session: AsyncSession, store_id: str, table_name: str, since: datetime
-    ) -> Dict[str, Any]:
+    async def _count_alerts(self, session: AsyncSession, store_id: str, table_name: str, since: datetime) -> Dict[str, Any]:
         """通用告警计数（各表结构相同的 is_alert 字段）。"""
         model_map = {
             "ops_network_health": OpsNetworkHealth,
@@ -584,15 +592,10 @@ class OpsMonitorService:
         if not model:
             return {"total": 0, "alerts": 0}
         total_stmt = select(func.count()).select_from(
-            select(model.id)
-            .where(model.store_id == store_id, model.recorded_at >= since)
-            .subquery()
+            select(model.id).where(model.store_id == store_id, model.recorded_at >= since).subquery()
         )
         alert_stmt = select(func.count()).select_from(
-            select(model.id)
-            .where(model.store_id == store_id, model.recorded_at >= since,
-                   model.is_alert.is_(True))
-            .subquery()
+            select(model.id).where(model.store_id == store_id, model.recorded_at >= since, model.is_alert.is_(True)).subquery()
         )
         total = (await session.execute(total_stmt)).scalar() or 0
         alerts = (await session.execute(alert_stmt)).scalar() or 0
@@ -600,6 +603,7 @@ class OpsMonitorService:
 
 
 # ── 纯函数辅助 ────────────────────────────────────────────────────────────────
+
 
 def _score_to_status(score: float) -> str:
     if score >= 90:

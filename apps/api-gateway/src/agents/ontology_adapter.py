@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional
 
 import structlog
 
-from ..agents.llm_agent import LLMEnhancedAgent, AgentResult
+from ..agents.llm_agent import AgentResult, LLMEnhancedAgent
 
 logger = structlog.get_logger()
 
@@ -53,7 +53,9 @@ class KnowledgeAwareAgent(LLMEnhancedAgent):
             return self._neo4j_driver
         try:
             import os
+
             from neo4j import GraphDatabase
+
             uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
             user = os.getenv("NEO4J_USER", "neo4j")
             pw = os.getenv("NEO4J_PASSWORD", "")
@@ -185,6 +187,7 @@ class KnowledgeAwareAgent(LLMEnhancedAgent):
             return None
         row = rows[0]
         import json
+
         evidence = row.get("evidence_chain")
         scores = row.get("scores")
         try:

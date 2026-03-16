@@ -1,23 +1,23 @@
 """
 HR Performance & Contract API — 绩效考核 + 合同管理接口
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
-from typing import Optional, List
+
 from datetime import date, datetime
 from decimal import Decimal
+from typing import List, Optional
+
 import structlog
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+from sqlalchemy import and_, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
-from ..models.user import User
-from ..models.performance_review import (
-    PerformanceTemplate, PerformanceReview, ReviewStatus, ReviewLevel,
-)
-from ..models.employee_contract import EmployeeContract, ContractStatus, ContractType
 from ..models.employee import Employee
-from sqlalchemy import select, and_, func
-from sqlalchemy.ext.asyncio import AsyncSession
+from ..models.employee_contract import ContractStatus, ContractType, EmployeeContract
+from ..models.performance_review import PerformanceReview, PerformanceTemplate, ReviewLevel, ReviewStatus
+from ..models.user import User
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -25,10 +25,11 @@ router = APIRouter()
 
 # ── Request Models ─────────────────────────────────────────
 
+
 class CreateReviewRequest(BaseModel):
     store_id: str
     employee_id: str
-    review_period: str          # "2026-Q1" / "2026-03"
+    review_period: str  # "2026-Q1" / "2026-03"
     template_id: Optional[str] = None
 
 
@@ -62,6 +63,7 @@ class CreateContractRequest(BaseModel):
 
 # ── 绩效 ───────────────────────────────────────────────────
 
+
 @router.get("/hr/performance/reviews")
 async def list_reviews(
     store_id: str = Query(...),
@@ -78,9 +80,9 @@ async def list_reviews(
         conditions.append(PerformanceReview.status == status)
 
     result = await db.execute(
-        select(PerformanceReview, Employee.name, Employee.position).join(
-            Employee, PerformanceReview.employee_id == Employee.id
-        ).where(and_(*conditions))
+        select(PerformanceReview, Employee.name, Employee.position)
+        .join(Employee, PerformanceReview.employee_id == Employee.id)
+        .where(and_(*conditions))
         .order_by(PerformanceReview.created_at.desc())
     )
     rows = result.all()
@@ -206,6 +208,7 @@ async def submit_manager_review(
 
 # ── 合同 ───────────────────────────────────────────────────
 
+
 @router.get("/hr/contracts")
 async def list_contracts(
     store_id: str = Query(...),
@@ -219,9 +222,9 @@ async def list_contracts(
         conditions.append(EmployeeContract.status == status)
 
     result = await db.execute(
-        select(EmployeeContract, Employee.name).join(
-            Employee, EmployeeContract.employee_id == Employee.id
-        ).where(and_(*conditions))
+        select(EmployeeContract, Employee.name)
+        .join(Employee, EmployeeContract.employee_id == Employee.id)
+        .where(and_(*conditions))
         .order_by(EmployeeContract.end_date.asc().nullslast())
     )
     rows = result.all()
@@ -278,19 +281,21 @@ async def get_expiring_contracts(
 ):
     """获取即将到期的合同"""
     from datetime import timedelta
+
     deadline = date.today() + timedelta(days=days)
 
     result = await db.execute(
-        select(EmployeeContract, Employee.name).join(
-            Employee, EmployeeContract.employee_id == Employee.id
-        ).where(
+        select(EmployeeContract, Employee.name)
+        .join(Employee, EmployeeContract.employee_id == Employee.id)
+        .where(
             and_(
                 EmployeeContract.store_id == store_id,
                 EmployeeContract.status == ContractStatus.ACTIVE,
                 EmployeeContract.end_date.isnot(None),
                 EmployeeContract.end_date <= deadline,
             )
-        ).order_by(EmployeeContract.end_date.asc())
+        )
+        .order_by(EmployeeContract.end_date.asc())
     )
     rows = result.all()
     return {

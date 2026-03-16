@@ -10,52 +10,67 @@
 7. 公式校验：导入前验证语法和变量引用
 8. 安全求值：除零保护、溢出上限、负值兜底
 """
-from typing import Any, Dict, List, Optional, Callable, Tuple
+
+import calendar
+import re
 from datetime import date
 from decimal import Decimal
-import re
-import calendar
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
 import structlog
-
-from sqlalchemy import select, and_, delete
+from sqlalchemy import and_, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.models.salary_item import SalaryItemDefinition, SalaryItemRecord
+from src.models.attendance import AttendanceLog
 from src.models.city_wage_config import CityWageConfig
 from src.models.employee import Employee
 from src.models.payroll import SalaryStructure
-from src.models.attendance import AttendanceLog
+from src.models.salary_item import SalaryItemDefinition, SalaryItemRecord
 
 logger = structlog.get_logger()
 
 # 中文方括号变量正则
-VARIABLE_PATTERN = re.compile(r'【(.+?)】')
+VARIABLE_PATTERN = re.compile(r"【(.+?)】")
 
 # 金额上限：100_000_000 分 = 100万元，超过视为公式异常
 MAX_AMOUNT_FEN = 100_000_000
 
 # 所有已知变量名（用于公式校验）
 KNOWN_VARIABLES = {
-    "基本工资", "岗位补贴", "餐补", "交通补贴", "时薪",
-    "绩效系数", "绩效标准",
-    "月自然天数", "月工作日数", "总出勤天数", "工作日出勤天数",
-    "法定节日出勤天数", "周末出勤天数", "缺勤天数", "迟到次数",
-    "加班小时数", "请假天数",
-    "月最低工资", "小时最低工资",
-    "日薪标准", "司龄月数",
+    "基本工资",
+    "岗位补贴",
+    "餐补",
+    "交通补贴",
+    "时薪",
+    "绩效系数",
+    "绩效标准",
+    "月自然天数",
+    "月工作日数",
+    "总出勤天数",
+    "工作日出勤天数",
+    "法定节日出勤天数",
+    "周末出勤天数",
+    "缺勤天数",
+    "迟到次数",
+    "加班小时数",
+    "请假天数",
+    "月最低工资",
+    "小时最低工资",
+    "日薪标准",
+    "司龄月数",
 }
 
 # 工龄补贴阶梯（月→分）
 SENIORITY_SUBSIDY_TABLE = [
-    (13, 24, 5000),    # 13-24月: 50元/月
-    (24, 36, 10000),   # 24-36月: 100元/月
-    (36, 48, 15000),   # 36-48月: 150元/月
+    (13, 24, 5000),  # 13-24月: 50元/月
+    (24, 36, 10000),  # 24-36月: 100元/月
+    (36, 48, 15000),  # 36-48月: 150元/月
     (48, 99999, 20000),  # 48月以上: 200元/月
 ]
 
 
 class FormulaWarning:
     """公式计算过程中产生的警告"""
+
     def __init__(self, code: str, message: str):
         self.code = code
         self.message = message
@@ -66,6 +81,7 @@ class FormulaWarning:
 
 class _StringWarnings(list):
     """字符串警告列表 — 用于 test_formula，区别于 List[FormulaWarning]"""
+
     pass
 
 
@@ -74,7 +90,7 @@ class SalaryFormulaContext:
 
     def __init__(self):
         self.month_days: int = 30  # 月自然天数
-        self.work_days: int = 22   # 月工作日数
+        self.work_days: int = 22  # 月工作日数
         # 考勤
         self.total_attendance_days: float = 0  # 总出勤天数
         self.workday_days: float = 0  # 工作日出勤天数
@@ -104,9 +120,7 @@ class SalaryFormulaEngine:
 
     # ── 公式校验（不依赖DB） ──────────────────────────────────
 
-    def validate_formula(
-        self, formula: str, available_variables: Optional[List[str]] = None
-    ) -> Dict[str, Any]:
+    def validate_formula(self, formula: str, available_variables: Optional[List[str]] = None) -> Dict[str, Any]:
         """
         校验公式语法和变量引用，在保存/导入前调用。
         返回: {"valid": bool, "errors": ["未知变量: 【部门津贴】", ...], "warnings": [...]}
@@ -133,13 +147,13 @@ class SalaryFormulaEngine:
         brace_depth = 0
         paren_depth = 0
         for ch in formula:
-            if ch == '{':
+            if ch == "{":
                 brace_depth += 1
-            elif ch == '}':
+            elif ch == "}":
                 brace_depth -= 1
-            elif ch == '(':
+            elif ch == "(":
                 paren_depth += 1
-            elif ch == ')':
+            elif ch == ")":
                 paren_depth -= 1
             if brace_depth < 0:
                 errors.append("语法错误: 多余的 }")
@@ -232,14 +246,10 @@ class SalaryFormulaEngine:
 
         # 条件表达式
         if formula.startswith("如果"):
-            result = self._evaluate_condition_with_resolver(
-                formula, resolve_test_var, steps, warnings
-            )
+            result = self._evaluate_condition_with_resolver(formula, resolve_test_var, steps, warnings)
         else:
             # 普通表达式
-            result = self._evaluate_expression_with_resolver(
-                formula, resolve_test_var, steps, warnings
-            )
+            result = self._evaluate_expression_with_resolver(formula, resolve_test_var, steps, warnings)
 
         return {
             "result_fen": result,
@@ -292,15 +302,17 @@ class SalaryFormulaEngine:
         for item_def in items:
             amount = self._evaluate_item(item_def, employee, salary_structure, ctx)
             ctx.computed_items[item_def.item_name] = amount
-            results.append({
-                "item_id": str(item_def.id),
-                "item_name": item_def.item_name,
-                "item_code": item_def.item_code,
-                "item_category": item_def.item_category,
-                "amount_fen": amount,
-                "amount_yuan": amount / 100,
-                "formula": item_def.formula,
-            })
+            results.append(
+                {
+                    "item_id": str(item_def.id),
+                    "item_name": item_def.item_name,
+                    "item_code": item_def.item_code,
+                    "item_category": item_def.item_category,
+                    "amount_fen": amount,
+                    "amount_yuan": amount / 100,
+                    "formula": item_def.formula,
+                }
+            )
 
         # 6. 汇总
         total_income = sum(r["amount_fen"] for r in results if r["item_category"] in ("income", "subsidy"))
@@ -388,13 +400,15 @@ class SalaryFormulaEngine:
         for item_def in items:
             amount = self._evaluate_item(item_def, employee, salary_structure, ctx)
             ctx.computed_items[item_def.item_name] = amount
-            results.append({
-                "item_name": item_def.item_name,
-                "item_category": item_def.item_category,
-                "amount_fen": amount,
-                "amount_yuan": amount / 100,
-                "formula": item_def.formula,
-            })
+            results.append(
+                {
+                    "item_name": item_def.item_name,
+                    "item_category": item_def.item_category,
+                    "amount_fen": amount,
+                    "amount_yuan": amount / 100,
+                    "formula": item_def.formula,
+                }
+            )
 
         total_income = sum(r["amount_fen"] for r in results if r["item_category"] in ("income", "subsidy"))
         total_deduction = sum(r["amount_fen"] for r in results if r["item_category"] in ("deduction", "tax"))
@@ -424,6 +438,7 @@ class SalaryFormulaEngine:
             return {"error": "请安装 openpyxl"}
 
         import io
+
         wb = openpyxl.load_workbook(io.BytesIO(file_bytes), read_only=True)
         ws = wb.active
         rows = list(ws.iter_rows(values_only=True))
@@ -450,8 +465,12 @@ class SalaryFormulaEngine:
 
                 category = str(row_dict.get("类别") or row_dict.get("分类") or "income").strip()
                 category_map = {
-                    "收入": "income", "扣除": "deduction", "补贴": "subsidy",
-                    "税": "tax", "考勤": "attendance", "系统": "system",
+                    "收入": "income",
+                    "扣除": "deduction",
+                    "补贴": "subsidy",
+                    "税": "tax",
+                    "考勤": "attendance",
+                    "系统": "system",
                 }
                 category = category_map.get(category, category)
 
@@ -462,11 +481,13 @@ class SalaryFormulaEngine:
                 if formula:
                     validation = self.validate_formula(formula, batch_item_names)
                     if not validation["valid"]:
-                        errors.append({
-                            "row": row_num,
-                            "item_name": item_name,
-                            "error": f"公式校验失败: {'; '.join(validation['errors'])}",
-                        })
+                        errors.append(
+                            {
+                                "row": row_num,
+                                "item_name": item_name,
+                                "error": f"公式校验失败: {'; '.join(validation['errors'])}",
+                            }
+                        )
                         continue  # 跳过无效公式的行
 
                 item = SalaryItemDefinition(
@@ -491,17 +512,17 @@ class SalaryFormulaEngine:
 
     # ── 内部方法 ──────────────────────────────────────────────
 
-    async def _load_salary_items(
-        self, db: AsyncSession, store_id: str
-    ) -> List[SalaryItemDefinition]:
+    async def _load_salary_items(self, db: AsyncSession, store_id: str) -> List[SalaryItemDefinition]:
         """加载薪酬项定义（门店级 > 品牌级），按 calc_order 排序"""
         result = await db.execute(
-            select(SalaryItemDefinition).where(
+            select(SalaryItemDefinition)
+            .where(
                 and_(
                     SalaryItemDefinition.brand_id == self.brand_id,
                     SalaryItemDefinition.is_active.is_(True),
                 )
-            ).order_by(SalaryItemDefinition.calc_order)
+            )
+            .order_by(SalaryItemDefinition.calc_order)
         )
         all_items = result.scalars().all()
 
@@ -531,10 +552,7 @@ class SalaryFormulaEngine:
         year, month = int(pay_month[:4]), int(pay_month[5:7])
         ctx.month_days = calendar.monthrange(year, month)[1]
         # 计算工作日
-        ctx.work_days = sum(
-            1 for d in range(1, ctx.month_days + 1)
-            if date(year, month, d).weekday() < 5
-        )
+        ctx.work_days = sum(1 for d in range(1, ctx.month_days + 1) if date(year, month, d).weekday() < 5)
 
         # 考勤数据
         month_start = date(year, month, 1)
@@ -562,7 +580,7 @@ class SalaryFormulaEngine:
                 ctx.leave_days += 1
             if log.status == "late":
                 ctx.late_count += 1
-            ctx.overtime_hours += float(getattr(log, 'overtime_hours', 0) or 0)
+            ctx.overtime_hours += float(getattr(log, "overtime_hours", 0) or 0)
 
         # 绩效系数
         if salary_structure:
@@ -570,11 +588,13 @@ class SalaryFormulaEngine:
 
         # 城市最低工资
         city_result = await db.execute(
-            select(CityWageConfig).where(
+            select(CityWageConfig)
+            .where(
                 and_(
                     CityWageConfig.year == year,
                 )
-            ).limit(1)
+            )
+            .limit(1)
         )
         city_config = city_result.scalar_one_or_none()
         if city_config:
@@ -607,30 +627,26 @@ class SalaryFormulaEngine:
 
         # 条件表达式
         if formula.startswith("如果"):
-            result = self._evaluate_condition_with_resolver(
-                formula, resolver, warnings_list=ctx.warnings
-            )
+            result = self._evaluate_condition_with_resolver(formula, resolver, warnings_list=ctx.warnings)
         else:
             # 普通表达式
-            result = self._evaluate_expression_with_resolver(
-                formula, resolver, warnings_list=ctx.warnings
-            )
+            result = self._evaluate_expression_with_resolver(formula, resolver, warnings_list=ctx.warnings)
 
         # 非负保护（薪酬项金额不能为负，扣除项在汇总时减去）
         if item_def.item_category in ("income", "subsidy") and result < 0:
-            ctx.warnings.append(FormulaWarning(
-                "negative_capped",
-                f"薪酬项【{item_def.item_name}】计算结果为负({result}分)，已归零",
-            ))
+            ctx.warnings.append(
+                FormulaWarning(
+                    "negative_capped",
+                    f"薪酬项【{item_def.item_name}】计算结果为负({result}分)，已归零",
+                )
+            )
             result = 0
 
         return result
 
     # ── 条件分支解析器（基于花括号匹配，替代旧正则） ──────────
 
-    def _split_condition_blocks(
-        self, formula: str
-    ) -> Optional[List[Tuple[Optional[str], str]]]:
+    def _split_condition_blocks(self, formula: str) -> Optional[List[Tuple[Optional[str], str]]]:
         """
         将条件表达式拆分为 [(condition, expression), ...] 列表。
         condition 为 None 表示 "否则" 分支。
@@ -646,7 +662,7 @@ class SalaryFormulaEngine:
 
         while pos < len(text):
             # 跳过分号和空格
-            while pos < len(text) and text[pos] in ' ;\t\n\r':
+            while pos < len(text) and text[pos] in " ;\t\n\r":
                 pos += 1
             if pos >= len(text):
                 break
@@ -682,9 +698,7 @@ class SalaryFormulaEngine:
 
         return blocks if blocks else None
 
-    def _parse_one_branch(
-        self, text: str, pos: int
-    ) -> Tuple[Optional[str], Optional[str], int]:
+    def _parse_one_branch(self, text: str, pos: int) -> Tuple[Optional[str], Optional[str], int]:
         """
         从 pos 位置解析一个 "条件 则 { 表达式 }" 分支。
         返回 (condition, expression, new_pos)。失败时 expression 为 None。
@@ -701,18 +715,16 @@ class SalaryFormulaEngine:
         expr, pos = self._extract_brace_block(text, pos)
         return condition, expr, pos
 
-    def _extract_brace_block(
-        self, text: str, pos: int
-    ) -> Tuple[Optional[str], int]:
+    def _extract_brace_block(self, text: str, pos: int) -> Tuple[Optional[str], int]:
         """
         从 pos 位置开始，跳过空白后找到 { ... }，返回花括号内的内容。
         正确处理嵌套括号（包括普通圆括号在表达式内部的使用）。
         """
         # 跳过空白
-        while pos < len(text) and text[pos] in ' \t\n\r':
+        while pos < len(text) and text[pos] in " \t\n\r":
             pos += 1
 
-        if pos >= len(text) or text[pos] != '{':
+        if pos >= len(text) or text[pos] != "{":
             return None, pos
 
         pos += 1  # 跳过 {
@@ -720,9 +732,9 @@ class SalaryFormulaEngine:
         start = pos
 
         while pos < len(text) and depth > 0:
-            if text[pos] == '{':
+            if text[pos] == "{":
                 depth += 1
-            elif text[pos] == '}':
+            elif text[pos] == "}":
                 depth -= 1
             pos += 1
 
@@ -730,7 +742,7 @@ class SalaryFormulaEngine:
             return None, pos
 
         # pos 现在指向 } 之后一位
-        content = text[start:pos - 1].strip()
+        content = text[start : pos - 1].strip()
         return content, pos
 
     # ── 条件求值（通用版，支持真实计算和测试计算） ────────────
@@ -761,10 +773,7 @@ class SalaryFormulaEngine:
                 # 否则分支 — 直接执行
                 if steps is not None:
                     steps.append(f"进入否则分支: {expr}")
-                return self._safe_eval_math(
-                    self._substitute_variables(expr, resolver),
-                    formula, steps, warnings
-                )
+                return self._safe_eval_math(self._substitute_variables(expr, resolver), formula, steps, warnings)
             else:
                 # 求值条件
                 cond_result = self._evaluate_boolean_expr(condition, resolver)
@@ -773,10 +782,7 @@ class SalaryFormulaEngine:
                 if cond_result:
                     if steps is not None:
                         steps.append(f"条件成立，执行: {expr}")
-                    return self._safe_eval_math(
-                        self._substitute_variables(expr, resolver),
-                        formula, steps, warnings
-                    )
+                    return self._safe_eval_math(self._substitute_variables(expr, resolver), formula, steps, warnings)
 
         # 所有条件都不满足且无否则分支
         if steps is not None:
@@ -794,26 +800,20 @@ class SalaryFormulaEngine:
         格式: 如果 条件 则 值; 否则 值
         """
         # 按关键字切分（先匹配长的 "否则如果"，避免 "否则" 提前匹配）
-        parts = re.split(r'否则如果|如果|则|否则', formula)
-        parts = [p.strip().strip('{}; ') for p in parts if p.strip()]
+        parts = re.split(r"否则如果|如果|则|否则", formula)
+        parts = [p.strip().strip("{}; ") for p in parts if p.strip()]
 
         i = 0
         while i < len(parts) - 1:
             condition = parts[i]
             value_expr = parts[i + 1]
             if self._evaluate_boolean_expr(condition, resolver):
-                return self._safe_eval_math(
-                    self._substitute_variables(value_expr, resolver),
-                    formula, warnings_list=warnings
-                )
+                return self._safe_eval_math(self._substitute_variables(value_expr, resolver), formula, warnings_list=warnings)
             i += 2
 
         # 最后一个是否则
         if len(parts) % 2 == 1:
-            return self._safe_eval_math(
-                self._substitute_variables(parts[-1], resolver),
-                formula, warnings_list=warnings
-            )
+            return self._safe_eval_math(self._substitute_variables(parts[-1], resolver), formula, warnings_list=warnings)
         return 0
 
     # ── 布尔表达式求值（支持 且/或/不/比较运算符） ────────────
@@ -840,23 +840,23 @@ class SalaryFormulaEngine:
         expr = expr.replace("且", " and ")
         expr = expr.replace("或", " or ")
         # "不" 作为前缀否定，需要谨慎处理：只在它独立出现时替换
-        expr = re.sub(r'(?<![a-zA-Z0-9])不\s+', ' not ', expr)
+        expr = re.sub(r"(?<![a-zA-Z0-9])不\s+", " not ", expr)
 
         # 安全检查：只允许数字、比较运算符、逻辑运算符、括号、空格、小数点
         safe_expr = expr.strip()
         # 允许的 token: 数字、运算符、关键字
         # 用正则检查是否只含合法 token
         token_pattern = re.compile(
-            r'^[\s]*'
-            r'('
-            r'[0-9]+\.?[0-9]*'  # 数字
-            r'|>=|<=|!=|==|>|<'  # 比较运算符
-            r'|\+|-|\*|/|%'     # 算术运算符
-            r'|\(|\)'           # 括号
-            r'|and|or|not'      # 逻辑运算符
-            r'|True|False'      # 布尔字面量
-            r'|\s+'             # 空白
-            r')*$'
+            r"^[\s]*"
+            r"("
+            r"[0-9]+\.?[0-9]*"  # 数字
+            r"|>=|<=|!=|==|>|<"  # 比较运算符
+            r"|\+|-|\*|/|%"  # 算术运算符
+            r"|\(|\)"  # 括号
+            r"|and|or|not"  # 逻辑运算符
+            r"|True|False"  # 布尔字面量
+            r"|\s+"  # 空白
+            r")*$"
         )
         if not token_pattern.match(safe_expr):
             logger.warning("unsafe_condition_blocked", condition=condition, resolved=safe_expr)
@@ -883,9 +883,7 @@ class SalaryFormulaEngine:
             steps.append(f"变量替换后: {resolved}")
         return self._safe_eval_math(resolved, formula, steps, warnings)
 
-    def _substitute_variables(
-        self, text: str, resolver: Callable[[str], float]
-    ) -> str:
+    def _substitute_variables(self, text: str, resolver: Callable[[str], float]) -> str:
         """将【变量名】替换为数值字符串"""
         return VARIABLE_PATTERN.sub(
             lambda m: str(resolver(m.group(1))),
@@ -972,12 +970,11 @@ class SalaryFormulaEngine:
         ctx: SalaryFormulaContext,
     ) -> int:
         """求值普通数学表达式（含中文变量替换）— 保留向后兼容"""
+
         def resolver(var_name: str) -> float:
             return self._resolve_variable(var_name, employee, salary_structure, ctx)
 
-        return self._evaluate_expression_with_resolver(
-            formula, resolver, warnings=ctx.warnings
-        )
+        return self._evaluate_expression_with_resolver(formula, resolver, warnings=ctx.warnings)
 
     def _evaluate_condition(
         self,
@@ -987,12 +984,11 @@ class SalaryFormulaEngine:
         ctx: SalaryFormulaContext,
     ) -> int:
         """求值条件表达式 — 保留向后兼容"""
+
         def resolver(var_name: str) -> float:
             return self._resolve_variable(var_name, employee, salary_structure, ctx)
 
-        return self._evaluate_condition_with_resolver(
-            formula, resolver, warnings=ctx.warnings
-        )
+        return self._evaluate_condition_with_resolver(formula, resolver, warnings=ctx.warnings)
 
     def _check_condition(
         self,
@@ -1002,6 +998,7 @@ class SalaryFormulaEngine:
         ctx: SalaryFormulaContext,
     ) -> bool:
         """检查条件是否成立 — 保留向后兼容"""
+
         def resolver(var_name: str) -> float:
             return self._resolve_variable(var_name, employee, salary_structure, ctx)
 

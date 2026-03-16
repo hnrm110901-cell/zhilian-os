@@ -2,17 +2,18 @@
 Training Service - 培训管理数据库服务
 处理培训的数据库操作
 """
-import structlog
-import os
-from typing import Dict, Any, List, Optional
-from datetime import datetime, timedelta
-from sqlalchemy import select, func, and_, or_
-from sqlalchemy.orm import selectinload
-import uuid
 
+import os
+import uuid
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
+
+import structlog
+from sqlalchemy import and_, func, or_, select
+from sqlalchemy.orm import selectinload
 from src.core.database import get_db_session
-from src.models.kpi import KPI, KPIRecord
 from src.models.employee import Employee
+from src.models.kpi import KPI, KPIRecord
 
 logger = structlog.get_logger()
 
@@ -24,7 +25,7 @@ class TrainingService:
         self.store_id = store_id
         self.training_config = {
             "min_passing_score": int(os.getenv("TRAINING_MIN_PASSING_SCORE", "70")),
-            "certificate_validity_months": int(os.getenv("TRAINING_CERT_VALIDITY_MONTHS", "12"))
+            "certificate_validity_months": int(os.getenv("TRAINING_CERT_VALIDITY_MONTHS", "12")),
         }
         logger.info("TrainingService初始化", store_id=store_id)
 
@@ -32,16 +33,25 @@ class TrainingService:
         """从Store配置读取培训参数，失败时使用默认值"""
         try:
             from src.models.store import Store
+
             async with get_db_session() as session:
                 result = await session.execute(select(Store).where(Store.id == self.store_id))
                 store = result.scalar_one_or_none()
                 if store and store.config:
                     cfg = store.config
                     return {
-                        "min_passing_score": int(cfg.get("training_min_passing_score", os.getenv("TRAINING_MIN_PASSING_SCORE", "70"))),
-                        "certificate_validity_months": int(cfg.get("training_certificate_validity_months", os.getenv("TRAINING_CERT_VALIDITY_MONTHS", "12"))),
-                        "warning_threshold": float(cfg.get("training_warning_threshold", os.getenv("TRAINING_WARNING_THRESHOLD", "60.0"))),
-                        "critical_threshold": float(cfg.get("training_critical_threshold", os.getenv("TRAINING_CRITICAL_THRESHOLD", "50.0"))),
+                        "min_passing_score": int(
+                            cfg.get("training_min_passing_score", os.getenv("TRAINING_MIN_PASSING_SCORE", "70"))
+                        ),
+                        "certificate_validity_months": int(
+                            cfg.get("training_certificate_validity_months", os.getenv("TRAINING_CERT_VALIDITY_MONTHS", "12"))
+                        ),
+                        "warning_threshold": float(
+                            cfg.get("training_warning_threshold", os.getenv("TRAINING_WARNING_THRESHOLD", "60.0"))
+                        ),
+                        "critical_threshold": float(
+                            cfg.get("training_critical_threshold", os.getenv("TRAINING_CRITICAL_THRESHOLD", "50.0"))
+                        ),
                     }
         except Exception as e:
             logger.warning("读取培训配置失败，使用默认值", error=str(e))
@@ -53,9 +63,7 @@ class TrainingService:
         }
 
     async def assess_training_needs(
-        self,
-        staff_id: Optional[str] = None,
-        position: Optional[str] = None
+        self, staff_id: Optional[str] = None, position: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         评估培训需求
@@ -90,12 +98,7 @@ class TrainingService:
             return training_needs
 
     async def record_training_completion(
-        self,
-        staff_id: str,
-        course_name: str,
-        completion_date: str,
-        score: Optional[int] = None,
-        **kwargs
+        self, staff_id: str, course_name: str, completion_date: str, score: Optional[int] = None, **kwargs
     ) -> Dict[str, Any]:
         """
         记录培训完成情况
@@ -137,7 +140,7 @@ class TrainingService:
                         warning_threshold=warning_thr,
                         critical_threshold=critical_thr,
                         calculation_method="average",
-                        is_active="true"
+                        is_active="true",
                     )
                     session.add(kpi)
                     await session.flush()
@@ -157,8 +160,8 @@ class TrainingService:
                         "staff_id": staff_id,
                         "course_name": course_name,
                         "passed": (score or 100) >= min_passing,
-                        **kwargs
-                    }
+                        **kwargs,
+                    },
                 )
 
                 session.add(kpi_record)
@@ -173,7 +176,7 @@ class TrainingService:
                     "completion_date": completion_date,
                     "score": score,
                     "passed": (score or 100) >= min_passing,
-                    "status": kpi_record.status
+                    "status": kpi_record.status,
                 }
 
             except Exception as e:
@@ -182,10 +185,7 @@ class TrainingService:
                 raise
 
     async def get_training_progress(
-        self,
-        staff_id: Optional[str] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None
+        self, staff_id: Optional[str] = None, start_date: Optional[str] = None, end_date: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         获取培训进度
@@ -200,16 +200,7 @@ class TrainingService:
         """
         async with get_db_session() as session:
             # 查询培训相关的KPI记录
-            stmt = (
-                select(KPIRecord)
-                .join(KPI)
-                .where(
-                    and_(
-                        KPIRecord.store_id == self.store_id,
-                        KPI.category == "training"
-                    )
-                )
-            )
+            stmt = select(KPIRecord).join(KPI).where(and_(KPIRecord.store_id == self.store_id, KPI.category == "training"))
 
             if start_date:
                 start_dt = datetime.fromisoformat(start_date).date()
@@ -229,22 +220,22 @@ class TrainingService:
                 if staff_id and metadata.get("staff_id") != staff_id:
                     continue
 
-                progress_list.append({
-                    "record_id": str(record.id),
-                    "staff_id": metadata.get("staff_id"),
-                    "course_name": metadata.get("course_name"),
-                    "completion_date": record.record_date.isoformat(),
-                    "score": record.value,
-                    "passed": metadata.get("passed", False),
-                    "status": record.status
-                })
+                progress_list.append(
+                    {
+                        "record_id": str(record.id),
+                        "staff_id": metadata.get("staff_id"),
+                        "course_name": metadata.get("course_name"),
+                        "completion_date": record.record_date.isoformat(),
+                        "score": record.value,
+                        "passed": metadata.get("passed", False),
+                        "status": record.status,
+                    }
+                )
 
             return progress_list
 
     async def get_training_statistics(
-        self,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None
+        self, start_date: Optional[str] = None, end_date: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         获取培训统计
@@ -277,7 +268,7 @@ class TrainingService:
                         KPIRecord.store_id == self.store_id,
                         KPI.category == "training",
                         KPIRecord.record_date >= start_dt.date(),
-                        KPIRecord.record_date <= end_dt.date()
+                        KPIRecord.record_date <= end_dt.date(),
                     )
                 )
             )
@@ -287,10 +278,7 @@ class TrainingService:
 
             # 统计数据
             total_trainings = len(records)
-            passed_trainings = sum(
-                1 for r in records
-                if (r.kpi_metadata or {}).get("passed", False)
-            )
+            passed_trainings = sum(1 for r in records if (r.kpi_metadata or {}).get("passed", False))
             average_score = sum(r.value for r in records) / total_trainings if total_trainings > 0 else 0
 
             # 统计参与员工
@@ -308,24 +296,17 @@ class TrainingService:
                 course_counts[course_name] = course_counts.get(course_name, 0) + 1
 
             return {
-                "period": {
-                    "start_date": start_dt.isoformat(),
-                    "end_date": end_dt.isoformat()
-                },
+                "period": {"start_date": start_dt.isoformat(), "end_date": end_dt.isoformat()},
                 "total_trainings": total_trainings,
                 "passed_trainings": passed_trainings,
                 "failed_trainings": total_trainings - passed_trainings,
                 "pass_rate": round((passed_trainings / total_trainings * 100), 2) if total_trainings > 0 else 0,
                 "average_score": round(average_score, 2),
                 "unique_staff_count": len(unique_staff),
-                "course_breakdown": course_counts
+                "course_breakdown": course_counts,
             }
 
-    async def get_training_report(
-        self,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None
-    ) -> Dict[str, Any]:
+    async def get_training_report(self, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict[str, Any]:
         """
         获取培训报告
 
@@ -351,13 +332,10 @@ class TrainingService:
             "statistics": statistics,
             "recent_completions": progress[:10],  # 最近10条记录
             "training_needs": training_needs[:5],  # 前5个培训需求
-            "recommendations": self._generate_recommendations(statistics, training_needs)
+            "recommendations": self._generate_recommendations(statistics, training_needs),
         }
 
-    async def get_employee_training_history(
-        self,
-        staff_id: str
-    ) -> Dict[str, Any]:
+    async def get_employee_training_history(self, staff_id: str) -> Dict[str, Any]:
         """
         获取员工培训历史
 
@@ -392,9 +370,9 @@ class TrainingService:
                     "total_trainings": total_trainings,
                     "passed_trainings": passed_trainings,
                     "pass_rate": round((passed_trainings / total_trainings * 100), 2) if total_trainings > 0 else 0,
-                    "average_score": round(average_score, 2)
+                    "average_score": round(average_score, 2),
                 },
-                "training_history": progress
+                "training_history": progress,
             }
 
     def _identify_training_needs(self, employee: Employee) -> List[Dict[str, Any]]:
@@ -406,7 +384,7 @@ class TrainingService:
             "waiter": ["customer_service", "product_knowledge"],
             "chef": ["food_safety", "cooking_skills"],
             "cashier": ["pos_system", "customer_service"],
-            "manager": ["management", "leadership"]
+            "manager": ["management", "leadership"],
         }
 
         position = employee.position.lower() if employee.position else ""
@@ -418,27 +396,25 @@ class TrainingService:
                 break
 
         for training in required_trainings:
-            needs.append({
-                "need_id": f"NEED_{employee.id}_{training.upper()}",
-                "staff_id": employee.id,
-                "staff_name": employee.name,
-                "position": employee.position,
-                "skill_gap": training,
-                "current_level": "beginner",
-                "target_level": "intermediate",
-                "priority": "medium",
-                "recommended_courses": [training],
-                "reason": f"Required for {employee.position} position",
-                "identified_at": datetime.now().isoformat()
-            })
+            needs.append(
+                {
+                    "need_id": f"NEED_{employee.id}_{training.upper()}",
+                    "staff_id": employee.id,
+                    "staff_name": employee.name,
+                    "position": employee.position,
+                    "skill_gap": training,
+                    "current_level": "beginner",
+                    "target_level": "intermediate",
+                    "priority": "medium",
+                    "recommended_courses": [training],
+                    "reason": f"Required for {employee.position} position",
+                    "identified_at": datetime.now().isoformat(),
+                }
+            )
 
         return needs
 
-    def _generate_recommendations(
-        self,
-        statistics: Dict[str, Any],
-        training_needs: List[Dict[str, Any]]
-    ) -> List[str]:
+    def _generate_recommendations(self, statistics: Dict[str, Any], training_needs: List[Dict[str, Any]]) -> List[str]:
         """生成培训建议"""
         recommendations = []
 

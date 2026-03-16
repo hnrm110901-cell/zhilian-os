@@ -2,13 +2,12 @@
 Training Models — 培训课程/报名/考试/认证
 对标麦麦e学：课程→学习→考试→认证→学分
 """
+
 import uuid
 from datetime import datetime
-from sqlalchemy import (
-    Column, String, Integer, Boolean, Text, DateTime, Date,
-    ForeignKey, UniqueConstraint,
-)
-from sqlalchemy.dialects.postgresql import UUID, JSON
+
+from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy.dialects.postgresql import JSON, UUID
 
 from .base import Base, TimestampMixin
 
@@ -43,9 +42,7 @@ class TrainingEnrollment(Base, TimestampMixin):
     """培训报名/学习记录"""
 
     __tablename__ = "training_enrollments"
-    __table_args__ = (
-        UniqueConstraint("employee_id", "course_id", name="uq_training_enrollment"),
-    )
+    __table_args__ = (UniqueConstraint("employee_id", "course_id", name="uq_training_enrollment"),)
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     store_id = Column(String(50), nullable=False, index=True)

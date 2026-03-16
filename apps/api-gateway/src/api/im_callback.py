@@ -14,12 +14,14 @@ IM 通讯录变更回调 API — 企微/钉钉实时同步
    - 钉钉: https://api.zlsjos.cn/api/v1/im/callback/dingtalk/{brand_id}
 3. 平台会先发 GET 验证请求，通过后推送事件
 """
-from fastapi import APIRouter, Request, HTTPException, Query, Depends
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+
 import hashlib
 import json
+
 import structlog
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..models.brand_im_config import BrandIMConfig, IMPlatform
@@ -31,6 +33,7 @@ router = APIRouter()
 
 # ── 企业微信回调 ──────────────────────────────────────
 
+
 @router.get("/im/callback/wechat/{brand_id}")
 async def wechat_callback_verify(
     brand_id: str,
@@ -41,9 +44,7 @@ async def wechat_callback_verify(
     db: AsyncSession = Depends(get_db),
 ):
     """企业微信回调 URL 验证（GET 请求）"""
-    result = await db.execute(
-        select(BrandIMConfig).where(BrandIMConfig.brand_id == brand_id)
-    )
+    result = await db.execute(select(BrandIMConfig).where(BrandIMConfig.brand_id == brand_id))
     config = result.scalar_one_or_none()
     if not config or config.im_platform != IMPlatform.WECHAT_WORK:
         raise HTTPException(status_code=404, detail="未找到企微配置")
@@ -56,6 +57,7 @@ async def wechat_callback_verify(
 
     try:
         from ..utils.wechat_crypto import WeChatCrypto
+
         crypto = WeChatCrypto(
             token=token,
             encoding_aes_key=encoding_aes_key,
@@ -64,6 +66,7 @@ async def wechat_callback_verify(
         # 验证签名并解密 echostr
         decrypted = crypto.decrypt_message(echostr, msg_signature, timestamp, nonce)
         from fastapi.responses import PlainTextResponse
+
         return PlainTextResponse(content=decrypted)
     except Exception as e:
         logger.error("wechat_callback_verify_failed", brand_id=brand_id, error=str(e))
@@ -80,9 +83,7 @@ async def wechat_callback_event(
     db: AsyncSession = Depends(get_db),
 ):
     """企业微信通讯录变更事件回调（POST 请求）"""
-    result = await db.execute(
-        select(BrandIMConfig).where(BrandIMConfig.brand_id == brand_id)
-    )
+    result = await db.execute(select(BrandIMConfig).where(BrandIMConfig.brand_id == brand_id))
     config = result.scalar_one_or_none()
     if not config or config.im_platform != IMPlatform.WECHAT_WORK:
         raise HTTPException(status_code=404, detail="未找到企微配置")
@@ -91,6 +92,7 @@ async def wechat_callback_event(
 
     try:
         from ..utils.wechat_crypto import WeChatCrypto
+
         crypto = WeChatCrypto(
             token=config.wechat_token,
             encoding_aes_key=config.wechat_encoding_aes_key,
@@ -127,6 +129,7 @@ async def wechat_callback_event(
         # 返回 success 告知企微已接收
         response_xml = crypto.generate_response_xml("success", nonce, timestamp)
         from fastapi.responses import Response
+
         return Response(content=response_xml, media_type="application/xml")
 
     except Exception as e:
@@ -135,6 +138,7 @@ async def wechat_callback_event(
 
 
 # ── 钉钉回调 ──────────────────────────────────────────
+
 
 @router.post("/im/callback/dingtalk/{brand_id}")
 async def dingtalk_callback_event(
@@ -157,9 +161,7 @@ async def dingtalk_callback_event(
         ...
     }
     """
-    result = await db.execute(
-        select(BrandIMConfig).where(BrandIMConfig.brand_id == brand_id)
-    )
+    result = await db.execute(select(BrandIMConfig).where(BrandIMConfig.brand_id == brand_id))
     config = result.scalar_one_or_none()
     if not config or config.im_platform != IMPlatform.DINGTALK:
         raise HTTPException(status_code=404, detail="未找到钉钉配置")
@@ -227,6 +229,7 @@ async def dingtalk_callback_event(
 
 # ── 钉钉加解密工具 ──────────────────────────────────
 
+
 def _dingtalk_decrypt(
     encrypt_str: str,
     token: str,
@@ -238,6 +241,7 @@ def _dingtalk_decrypt(
     钉钉使用 AES-CBC 加密，key 为 base64decode(aes_key + "=")。
     """
     import base64
+
     from Crypto.Cipher import AES
 
     aes_key_bytes = base64.b64decode(aes_key + "=")
@@ -252,8 +256,8 @@ def _dingtalk_decrypt(
     content = decrypted[:-pad]
 
     # 格式: 16bytes_random + 4bytes_msg_len + msg + app_key
-    msg_len = int.from_bytes(content[16:20], byteorder='big')
-    msg = content[20:20 + msg_len].decode("utf-8")
+    msg_len = int.from_bytes(content[16:20], byteorder="big")
+    msg = content[20 : 20 + msg_len].decode("utf-8")
 
     return json.loads(msg)
 
@@ -268,6 +272,7 @@ def _dingtalk_encrypt(
     import base64
     import os
     import time
+
     from Crypto.Cipher import AES
 
     aes_key_bytes = base64.b64decode(aes_key + "=")
@@ -275,7 +280,7 @@ def _dingtalk_encrypt(
 
     msg = plaintext.encode("utf-8")
     random_bytes = os.urandom(16)
-    msg_len = len(msg).to_bytes(4, byteorder='big')
+    msg_len = len(msg).to_bytes(4, byteorder="big")
     content = random_bytes + msg_len + msg + app_key.encode("utf-8")
 
     # PKCS#7 填充

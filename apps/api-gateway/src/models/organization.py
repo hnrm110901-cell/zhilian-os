@@ -2,15 +2,18 @@
 Organization hierarchy: Group → Brand → Region
 + 6级组织架构树（集团 → 事业部 → 品牌 → 区域 → 门店 → 部门组）
 """
+
 import uuid
-from sqlalchemy import Column, String, Numeric, Boolean, Text, Integer, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID, ARRAY
+
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy.dialects.postgresql import ARRAY, UUID
 
 from .base import Base, TimestampMixin
 
 
 class Group(Base, TimestampMixin):
     """集团"""
+
     __tablename__ = "groups"
 
     group_id = Column(String(50), primary_key=True)
@@ -25,6 +28,7 @@ class Group(Base, TimestampMixin):
 
 class Brand(Base, TimestampMixin):
     """品牌"""
+
     __tablename__ = "brands"
 
     brand_id = Column(String(50), primary_key=True)
@@ -42,6 +46,7 @@ class Brand(Base, TimestampMixin):
 
 class Region(Base, TimestampMixin):
     """区域"""
+
     __tablename__ = "regions"
 
     region_id = Column(String(50), primary_key=True)

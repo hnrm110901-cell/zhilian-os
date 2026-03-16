@@ -13,6 +13,7 @@ Embedding Model 降级监控服务
 - 核心逻辑为纯函数（可单元测试）
 - 仅计算和判断，不依赖外部服务
 """
+
 import math
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -22,9 +23,10 @@ from typing import Optional
 @dataclass
 class SearchMetric:
     """单次搜索指标"""
+
     query_id: str
     timestamp: str
-    top_k_sim_scores: list[float]    # 返回结果的相似度分数
+    top_k_sim_scores: list[float]  # 返回结果的相似度分数
     latency_ms: float
     result_count: int
 
@@ -32,29 +34,31 @@ class SearchMetric:
 @dataclass
 class EmbeddingHealthReport:
     """模型健康报告"""
+
     period_start: str
     period_end: str
     total_queries: int
     avg_similarity: float
-    empty_rate: float           # 空结果率 0-1
+    empty_rate: float  # 空结果率 0-1
     latency_p50_ms: float
     latency_p99_ms: float
     degradation_detected: bool
     degradation_reasons: list[str]
-    health_score: int           # 0-100
+    health_score: int  # 0-100
 
 
 # ── 阈值配置 ────────────────────────────────────────────────────────────────
 
 DEFAULT_THRESHOLDS = {
-    "min_avg_similarity": 0.65,      # 平均相似度低于此值→降级
-    "max_empty_rate": 0.15,          # 空结果率超过此值→降级
-    "max_latency_p99_ms": 500,       # P99延迟超过此值→降级
-    "min_health_score": 60,          # 健康分低于此值→告警
+    "min_avg_similarity": 0.65,  # 平均相似度低于此值→降级
+    "max_empty_rate": 0.15,  # 空结果率超过此值→降级
+    "max_latency_p99_ms": 500,  # P99延迟超过此值→降级
+    "min_health_score": 60,  # 健康分低于此值→告警
 }
 
 
 # ── 纯函数 ──────────────────────────────────────────────────────────────────
+
 
 def compute_avg_similarity(metrics: list[SearchMetric]) -> float:
     """计算所有搜索结果的平均余弦相似度。"""
@@ -100,17 +104,11 @@ def detect_degradation(
     reasons = []
 
     if avg_similarity < t["min_avg_similarity"]:
-        reasons.append(
-            f"平均相似度 {avg_similarity:.3f} 低于阈值 {t['min_avg_similarity']}"
-        )
+        reasons.append(f"平均相似度 {avg_similarity:.3f} 低于阈值 {t['min_avg_similarity']}")
     if empty_rate > t["max_empty_rate"]:
-        reasons.append(
-            f"空结果率 {empty_rate:.1%} 超过阈值 {t['max_empty_rate']:.1%}"
-        )
+        reasons.append(f"空结果率 {empty_rate:.1%} 超过阈值 {t['max_empty_rate']:.1%}")
     if latency_p99_ms > t["max_latency_p99_ms"]:
-        reasons.append(
-            f"P99延迟 {latency_p99_ms:.0f}ms 超过阈值 {t['max_latency_p99_ms']}ms"
-        )
+        reasons.append(f"P99延迟 {latency_p99_ms:.0f}ms 超过阈值 {t['max_latency_p99_ms']}ms")
 
     return (len(reasons) > 0, reasons)
 

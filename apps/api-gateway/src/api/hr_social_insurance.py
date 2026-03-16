@@ -1,25 +1,28 @@
 """
 HR Social Insurance API -- 社保公积金配置管理
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import Optional
-from pydantic import BaseModel
+
 import uuid as uuid_mod
+from typing import Optional
+
 import structlog
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+from sqlalchemy import and_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
-from ..models.user import User
 from ..models.employee import Employee
-from ..models.social_insurance import SocialInsuranceConfig, EmployeeSocialInsurance
-from sqlalchemy import select, and_
-from sqlalchemy.ext.asyncio import AsyncSession
+from ..models.social_insurance import EmployeeSocialInsurance, SocialInsuranceConfig
+from ..models.user import User
 
 logger = structlog.get_logger()
 router = APIRouter()
 
 
 # ── 请求模型 ──────────────────────────────────────────
+
 
 class SocialInsuranceConfigRequest(BaseModel):
     region_code: str
@@ -58,6 +61,7 @@ class EmployeeSocialInsuranceRequest(BaseModel):
 
 # ── 区域配置 ──────────────────────────────────────────
 
+
 @router.get("/hr/social-insurance/configs")
 async def list_configs(
     effective_year: Optional[int] = Query(None),
@@ -66,9 +70,7 @@ async def list_configs(
     current_user: User = Depends(get_current_active_user),
 ):
     """获取社保公积金区域配置列表"""
-    query = select(SocialInsuranceConfig).where(
-        SocialInsuranceConfig.is_active.is_(True)
-    )
+    query = select(SocialInsuranceConfig).where(SocialInsuranceConfig.is_active.is_(True))
     if effective_year:
         query = query.where(SocialInsuranceConfig.effective_year == effective_year)
     if region_code:
@@ -97,13 +99,15 @@ async def list_configs(
                 "housing_fund_employer_pct": float(c.housing_fund_employer_pct),
                 "housing_fund_employee_pct": float(c.housing_fund_employee_pct),
                 "total_employer_pct": float(
-                    c.pension_employer_pct + c.medical_employer_pct
-                    + c.unemployment_employer_pct + c.injury_employer_pct
-                    + c.maternity_employer_pct + c.housing_fund_employer_pct
+                    c.pension_employer_pct
+                    + c.medical_employer_pct
+                    + c.unemployment_employer_pct
+                    + c.injury_employer_pct
+                    + c.maternity_employer_pct
+                    + c.housing_fund_employer_pct
                 ),
                 "total_employee_pct": float(
-                    c.pension_employee_pct + c.medical_employee_pct
-                    + c.unemployment_employee_pct + c.housing_fund_employee_pct
+                    c.pension_employee_pct + c.medical_employee_pct + c.unemployment_employee_pct + c.housing_fund_employee_pct
                 ),
             }
             for c in configs
@@ -143,6 +147,7 @@ async def create_config(
 
 
 # ── 员工参保 ──────────────────────────────────────────
+
 
 @router.get("/hr/social-insurance/employees")
 async def list_employee_insurances(

@@ -2,6 +2,7 @@
 Attendance Engine — 考勤计算引擎
 打卡→状态判定→扣款计算→月度汇总
 """
+
 import math
 import uuid
 from datetime import date, datetime, time, timedelta
@@ -9,7 +10,7 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 import structlog
-from sqlalchemy import select, and_, func, update
+from sqlalchemy import and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.attendance import AttendanceLog, AttendanceRule, ShiftTemplate
@@ -51,7 +52,7 @@ class AttendanceEngine:
         db: AsyncSession,
         employee_id: str,
         clock_time: datetime,
-        clock_type: str,       # "clock_in" | "clock_out"
+        clock_type: str,  # "clock_in" | "clock_out"
         gps_data: Optional[Dict[str, Any]] = None,
         source: str = "wechat",
     ) -> Dict[str, Any]:
@@ -93,9 +94,7 @@ class AttendanceEngine:
             scheduled_start = datetime.combine(work_date, shift.start_time, tzinfo=clock_time.tzinfo)
             if is_cross:
                 # 跨天班次：结束时间在次日
-                scheduled_end = datetime.combine(
-                    work_date + timedelta(days=1), shift.end_time, tzinfo=clock_time.tzinfo
-                )
+                scheduled_end = datetime.combine(work_date + timedelta(days=1), shift.end_time, tzinfo=clock_time.tzinfo)
             else:
                 scheduled_end = datetime.combine(work_date, shift.end_time, tzinfo=clock_time.tzinfo)
 
@@ -114,9 +113,7 @@ class AttendanceEngine:
                     shift = prev_shift
                     template = prev_template
                     work_date = prev_date
-                    scheduled_start = datetime.combine(
-                        prev_date, prev_shift.start_time, tzinfo=clock_time.tzinfo
-                    )
+                    scheduled_start = datetime.combine(prev_date, prev_shift.start_time, tzinfo=clock_time.tzinfo)
                     scheduled_end = datetime.combine(
                         prev_date + timedelta(days=1), prev_shift.end_time, tzinfo=clock_time.tzinfo
                     )
@@ -225,11 +222,7 @@ class AttendanceEngine:
                 )
 
             if update_values:
-                stmt = (
-                    update(AttendanceLog)
-                    .where(AttendanceLog.id == existing.id)
-                    .values(**update_values)
-                )
+                stmt = update(AttendanceLog).where(AttendanceLog.id == existing.id).values(**update_values)
                 await db.execute(stmt)
                 await db.flush()
 
@@ -290,9 +283,7 @@ class AttendanceEngine:
         ]
 
         for condition in candidates:
-            result = await db.execute(
-                select(AttendanceRule).where(condition).limit(1)
-            )
+            result = await db.execute(select(AttendanceRule).where(condition).limit(1))
             rule = result.scalar_one_or_none()
             if rule is not None:
                 return self._rule_to_dict(rule)
@@ -380,9 +371,7 @@ class AttendanceEngine:
 
             total_deduction_fen += log.deduction_fen or 0
 
-        workday_count = sum(
-            1 for log in logs if log.status in ("normal", "late", "early_leave")
-        )
+        workday_count = sum(1 for log in logs if log.status in ("normal", "late", "early_leave"))
 
         return {
             "employee_id": employee_id,
@@ -498,11 +487,13 @@ class AttendanceEngine:
             except Exception as e:
                 # savepoint 自动回滚，继续处理下一条
                 failed += 1
-                errors.append({
-                    "index": idx,
-                    "employee_id": record.get("employee_id"),
-                    "error": str(e),
-                })
+                errors.append(
+                    {
+                        "index": idx,
+                        "employee_id": record.get("employee_id"),
+                        "error": str(e),
+                    }
+                )
                 logger.error(
                     "批量导入打卡失败",
                     index=idx,
@@ -555,14 +546,16 @@ class AttendanceEngine:
         """按 shift_type(code) 匹配班次模板，门店级优先"""
         # 先查门店级
         result = await db.execute(
-            select(ShiftTemplate).where(
+            select(ShiftTemplate)
+            .where(
                 and_(
                     ShiftTemplate.brand_id == self.brand_id,
                     ShiftTemplate.store_id == self.store_id,
                     ShiftTemplate.code == shift_type,
                     ShiftTemplate.is_active.is_(True),
                 )
-            ).limit(1)
+            )
+            .limit(1)
         )
         template = result.scalar_one_or_none()
         if template:
@@ -570,14 +563,16 @@ class AttendanceEngine:
 
         # 品牌通用
         result = await db.execute(
-            select(ShiftTemplate).where(
+            select(ShiftTemplate)
+            .where(
                 and_(
                     ShiftTemplate.brand_id == self.brand_id,
                     ShiftTemplate.store_id.is_(None),
                     ShiftTemplate.code == shift_type,
                     ShiftTemplate.is_active.is_(True),
                 )
-            ).limit(1)
+            )
+            .limit(1)
         )
         return result.scalar_one_or_none()
 
@@ -589,13 +584,15 @@ class AttendanceEngine:
     ) -> Optional[AttendanceLog]:
         """获取当天已有考勤记录"""
         result = await db.execute(
-            select(AttendanceLog).where(
+            select(AttendanceLog)
+            .where(
                 and_(
                     AttendanceLog.store_id == self.store_id,
                     AttendanceLog.employee_id == employee_id,
                     AttendanceLog.work_date == work_date,
                 )
-            ).limit(1)
+            )
+            .limit(1)
         )
         return result.scalar_one_or_none()
 
@@ -607,10 +604,7 @@ class AttendanceEngine:
         dlat = math.radians(lat2 - lat1)
         dlng = math.radians(lng2 - lng1)
 
-        a = (
-            math.sin(dlat / 2) ** 2
-            + math.cos(lat1_r) * math.cos(lat2_r) * math.sin(dlng / 2) ** 2
-        )
+        a = math.sin(dlat / 2) ** 2 + math.cos(lat1_r) * math.cos(lat2_r) * math.sin(dlng / 2) ** 2
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
         return _EARTH_RADIUS_METERS * c
 

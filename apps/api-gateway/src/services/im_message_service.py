@@ -7,10 +7,11 @@
 - 无品牌配置时回退到全局企微 WeChatService
 - 消息去重 + 失败重试由底层 Service 处理
 """
+
 from typing import Any, Dict, List, Optional
 
 import structlog
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.brand_im_config import BrandIMConfig, IMPlatform
@@ -45,17 +46,19 @@ class IMMessageService:
                 )
                 platform = result.scalar_one_or_none()
                 if platform:
-                    return platform.value if hasattr(platform, 'value') else str(platform)
+                    return platform.value if hasattr(platform, "value") else str(platform)
             except Exception as e:
                 logger.warning("im_message.resolve_platform.failed", error=str(e))
         return "wechat_work"  # 默认企微
 
     async def _get_wechat(self):
         from .wechat_service import wechat_service
+
         return wechat_service
 
     async def _get_dingtalk(self, brand_id: Optional[str] = None):
         from .dingtalk_service import dingtalk_service
+
         # 尝试用品牌级配置覆盖
         if brand_id and self.db:
             try:

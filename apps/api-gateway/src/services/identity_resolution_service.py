@@ -12,17 +12,17 @@ CDP宪法：
 - backfill_orders(store_id)               回填存量订单的 consumer_id
 - refresh_profile(consumer_id)            刷新聚合统计
 """
+
 import logging
 import uuid as uuid_mod
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import select, update, func, and_
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import and_, func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-
-from src.models.consumer_identity import ConsumerIdentity
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.consumer_id_mapping import ConsumerIdMapping, IdType
+from src.models.consumer_identity import ConsumerIdentity
 
 logger = logging.getLogger(__name__)
 
@@ -79,8 +79,12 @@ class IdentityResolutionService:
 
             # 创建 phone mapping
             await self._upsert_mapping(
-                db, consumer.id, IdType.PHONE, phone,
-                store_id=store_id, source_system=source,
+                db,
+                consumer.id,
+                IdType.PHONE,
+                phone,
+                store_id=store_id,
+                source_system=source,
             )
             logger.info("CDP: 新建 consumer_id=%s phone=%s source=%s", consumer.id, phone, source)
         else:
@@ -101,18 +105,30 @@ class IdentityResolutionService:
         # Step 4: 为额外 hints 创建映射
         if wechat_openid:
             await self._upsert_mapping(
-                db, consumer.id, IdType.WECHAT_OPENID, wechat_openid,
-                store_id=store_id, source_system=source,
+                db,
+                consumer.id,
+                IdType.WECHAT_OPENID,
+                wechat_openid,
+                store_id=store_id,
+                source_system=source,
             )
         if wechat_unionid:
             await self._upsert_mapping(
-                db, consumer.id, IdType.WECHAT_UNIONID, wechat_unionid,
-                store_id=store_id, source_system=source,
+                db,
+                consumer.id,
+                IdType.WECHAT_UNIONID,
+                wechat_unionid,
+                store_id=store_id,
+                source_system=source,
             )
         if pos_member_id:
             await self._upsert_mapping(
-                db, consumer.id, IdType.POS_MEMBER_ID, pos_member_id,
-                store_id=store_id, source_system=source,
+                db,
+                consumer.id,
+                IdType.POS_MEMBER_ID,
+                pos_member_id,
+                store_id=store_id,
+                source_system=source,
             )
 
         return consumer.id
@@ -127,13 +143,10 @@ class IdentityResolutionService:
         external_id: str,
     ) -> Optional[uuid_mod.UUID]:
         """按外部ID查找 consumer_id，未找到返回 None"""
-        stmt = (
-            select(ConsumerIdMapping.consumer_id)
-            .where(
-                ConsumerIdMapping.id_type == id_type,
-                ConsumerIdMapping.external_id == external_id,
-                ConsumerIdMapping.is_active.is_(True),
-            )
+        stmt = select(ConsumerIdMapping.consumer_id).where(
+            ConsumerIdMapping.id_type == id_type,
+            ConsumerIdMapping.external_id == external_id,
+            ConsumerIdMapping.is_active.is_(True),
         )
         result = await db.execute(stmt)
         row = result.scalar_one_or_none()
@@ -179,9 +192,7 @@ class IdentityResolutionService:
 
         # 2. 迁移 mapping
         await db.execute(
-            update(ConsumerIdMapping)
-            .where(ConsumerIdMapping.consumer_id == loser_id)
-            .values(consumer_id=winner_id)
+            update(ConsumerIdMapping).where(ConsumerIdMapping.consumer_id == loser_id).values(consumer_id=winner_id)
         )
 
         # 3. 累加聚合统计
@@ -197,16 +208,12 @@ class IdentityResolutionService:
         # 4. 更新 orders/reservations/queues 中的 consumer_id
         # 使用 text import 延迟，避免循环导入
         from src.models.order import Order
-        from src.models.reservation import Reservation
         from src.models.queue import Queue
+        from src.models.reservation import Reservation
 
         for model in [Order, Reservation, Queue]:
             if hasattr(model, "consumer_id"):
-                await db.execute(
-                    update(model)
-                    .where(model.consumer_id == loser_id)
-                    .values(consumer_id=winner_id)
-                )
+                await db.execute(update(model).where(model.consumer_id == loser_id).values(consumer_id=winner_id))
 
         await db.flush()
         logger.info("CDP: merge loser=%s → winner=%s", loser_id, winner_id)
@@ -253,16 +260,13 @@ class IdentityResolutionService:
         for order_id, phone, name in rows:
             try:
                 consumer_id = await self.resolve(
-                    db, phone,
+                    db,
+                    phone,
                     store_id=store_id,
                     source="backfill",
                     display_name=name,
                 )
-                await db.execute(
-                    update(Order)
-                    .where(Order.id == order_id)
-                    .values(consumer_id=consumer_id)
-                )
+                await db.execute(update(Order).where(Order.id == order_id).values(consumer_id=consumer_id))
                 resolved += 1
             except Exception as e:
                 logger.warning("CDP backfill order=%s failed: %s", order_id, e)
@@ -271,7 +275,10 @@ class IdentityResolutionService:
         await db.flush()
         logger.info(
             "CDP backfill store=%s: total=%d resolved=%d failed=%d",
-            store_id, total, resolved, failed,
+            store_id,
+            total,
+            resolved,
+            failed,
         )
         return {"total": total, "resolved": resolved, "failed": failed}
 
@@ -307,16 +314,13 @@ class IdentityResolutionService:
         for res_id, phone, name in rows:
             try:
                 consumer_id = await self.resolve(
-                    db, phone,
+                    db,
+                    phone,
                     store_id=store_id,
                     source="backfill",
                     display_name=name,
                 )
-                await db.execute(
-                    update(Reservation)
-                    .where(Reservation.id == res_id)
-                    .values(consumer_id=consumer_id)
-                )
+                await db.execute(update(Reservation).where(Reservation.id == res_id).values(consumer_id=consumer_id))
                 resolved += 1
             except Exception as e:
                 logger.warning("CDP backfill reservation=%s failed: %s", res_id, e)
@@ -336,17 +340,14 @@ class IdentityResolutionService:
         """从 orders 表重新计算聚合统计并更新 ConsumerIdentity"""
         from src.models.order import Order
 
-        stmt = (
-            select(
-                func.count(Order.id).label("cnt"),
-                func.sum(Order.total_amount).label("total_yuan"),
-                func.min(Order.order_time).label("first_at"),
-                func.max(Order.order_time).label("last_at"),
-            )
-            .where(
-                Order.consumer_id == consumer_id,
-                Order.status != "cancelled",
-            )
+        stmt = select(
+            func.count(Order.id).label("cnt"),
+            func.sum(Order.total_amount).label("total_yuan"),
+            func.min(Order.order_time).label("first_at"),
+            func.max(Order.order_time).label("last_at"),
+        ).where(
+            Order.consumer_id == consumer_id,
+            Order.status != "cancelled",
         )
         result = await db.execute(stmt)
         row = result.one()
@@ -394,18 +395,9 @@ class IdentityResolutionService:
     # ------------------------------------------------------------------ #
     async def get_stats(self, db: AsyncSession) -> dict:
         """返回 CDP 基础统计"""
-        total = await db.scalar(
-            select(func.count(ConsumerIdentity.id))
-            .where(ConsumerIdentity.is_merged.is_(False))
-        )
-        merged = await db.scalar(
-            select(func.count(ConsumerIdentity.id))
-            .where(ConsumerIdentity.is_merged.is_(True))
-        )
-        mappings = await db.scalar(
-            select(func.count(ConsumerIdMapping.id))
-            .where(ConsumerIdMapping.is_active.is_(True))
-        )
+        total = await db.scalar(select(func.count(ConsumerIdentity.id)).where(ConsumerIdentity.is_merged.is_(False)))
+        merged = await db.scalar(select(func.count(ConsumerIdentity.id)).where(ConsumerIdentity.is_merged.is_(True)))
+        mappings = await db.scalar(select(func.count(ConsumerIdMapping.id)).where(ConsumerIdMapping.is_active.is_(True)))
         return {
             "total_consumers": total or 0,
             "merged_count": merged or 0,
@@ -416,15 +408,14 @@ class IdentityResolutionService:
     #  内部辅助
     # ------------------------------------------------------------------ #
     async def _find_by_phone(
-        self, db: AsyncSession, phone: str,
+        self,
+        db: AsyncSession,
+        phone: str,
     ) -> Optional[ConsumerIdentity]:
         """按手机号查找未合并的消费者"""
-        stmt = (
-            select(ConsumerIdentity)
-            .where(
-                ConsumerIdentity.primary_phone == phone,
-                ConsumerIdentity.is_merged.is_(False),
-            )
+        stmt = select(ConsumerIdentity).where(
+            ConsumerIdentity.primary_phone == phone,
+            ConsumerIdentity.is_merged.is_(False),
         )
         result = await db.execute(stmt)
         return result.scalar_one_or_none()
@@ -440,21 +431,25 @@ class IdentityResolutionService:
         source_system: Optional[str] = None,
     ) -> None:
         """插入或更新 ID 映射（PostgreSQL ON CONFLICT DO UPDATE）"""
-        stmt = pg_insert(ConsumerIdMapping).values(
-            consumer_id=consumer_id,
-            id_type=id_type.value if isinstance(id_type, IdType) else id_type,
-            external_id=external_id,
-            store_id=store_id,
-            source_system=source_system,
-            is_active=True,
-        ).on_conflict_do_update(
-            constraint="uq_id_type_external_id",
-            set_={
-                "consumer_id": consumer_id,
-                "is_active": True,
-                "store_id": store_id,
-                "source_system": source_system,
-            },
+        stmt = (
+            pg_insert(ConsumerIdMapping)
+            .values(
+                consumer_id=consumer_id,
+                id_type=id_type.value if isinstance(id_type, IdType) else id_type,
+                external_id=external_id,
+                store_id=store_id,
+                source_system=source_system,
+                is_active=True,
+            )
+            .on_conflict_do_update(
+                constraint="uq_id_type_external_id",
+                set_={
+                    "consumer_id": consumer_id,
+                    "is_active": True,
+                    "store_id": store_id,
+                    "source_system": source_system,
+                },
+            )
         )
         await db.execute(stmt)
 

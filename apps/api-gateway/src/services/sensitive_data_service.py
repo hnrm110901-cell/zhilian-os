@@ -13,12 +13,12 @@
   plain = await svc.get_sensitive_field(db, "EMP001", "id_card_no", "ADMIN01")
   masked = await svc.get_masked_field(db, "EMP001", "id_card_no")
 """
+
 from typing import Optional
 
 import structlog
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.crypto import field_crypto
 from src.models.employee import Employee
 from src.models.sensitive_audit_log import SensitiveDataAuditLog
@@ -259,10 +259,7 @@ class SensitiveDataService:
     @staticmethod
     def _validate_field(field_name: str) -> None:
         if field_name not in _SENSITIVE_FIELDS:
-            raise ValueError(
-                f"不支持的敏感字段: {field_name}，"
-                f"允许值: {list(_SENSITIVE_FIELDS.keys())}"
-            )
+            raise ValueError(f"不支持的敏感字段: {field_name}，" f"允许值: {list(_SENSITIVE_FIELDS.keys())}")
 
     @staticmethod
     async def _get_employee(db: AsyncSession, employee_id: str) -> Employee:

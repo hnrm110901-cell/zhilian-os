@@ -3,6 +3,7 @@ BusinessIntelAgent API — Phase 12
 经营智能体：营收异常 / KPI健康度 / 订单预测 / Top3决策 / 场景识别
 前缀: /api/v1/business-intel
 """
+
 from __future__ import annotations
 
 from datetime import date, datetime
@@ -11,24 +12,25 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import select, and_, desc
+from sqlalchemy import and_, desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
-from src.models.business_intel import (
-    BizMetricSnapshot, RevenueAlert, KpiScorecard,
-    OrderForecast, BizDecision, ScenarioRecord,
-)
+from src.models.business_intel import BizDecision, BizMetricSnapshot, KpiScorecard, OrderForecast, RevenueAlert, ScenarioRecord
 
 router = APIRouter(prefix="/api/v1/business-intel")
 
 # ─── 懒加载 Agent（避免启动时 DB 依赖）───────────────────────────────────────
 
+
 def _agents():
     from packages.agents.business_intel.src.agent import (
-        RevenueAnomalyAgent, KpiScorecardAgent, OrderForecastAgent,
-        BizInsightAgent, ScenarioMatchAgent,
+        BizInsightAgent,
+        KpiScorecardAgent,
+        OrderForecastAgent,
+        RevenueAnomalyAgent,
+        ScenarioMatchAgent,
     )
+
     return (
         RevenueAnomalyAgent(),
         KpiScorecardAgent(),
@@ -39,6 +41,7 @@ def _agents():
 
 
 # ─── Pydantic Schemas ─────────────────────────────────────────────────────────
+
 
 class SnapshotIn(BaseModel):
     brand_id: str
@@ -58,6 +61,7 @@ class SnapshotIn(BaseModel):
     staff_count: Optional[int] = None
     table_turnover_rate: Optional[float] = None
 
+
 class AnomalyDetectIn(BaseModel):
     brand_id: str
     store_id: str
@@ -65,29 +69,35 @@ class AnomalyDetectIn(BaseModel):
     actual_yuan: float
     expected_yuan: float
 
+
 class KpiSnapshotIn(BaseModel):
     brand_id: str
     store_id: str
     period: str = Field(..., example="2026-03")
     kpi_values: dict = Field(default_factory=dict)
 
+
 class ForecastIn(BaseModel):
     brand_id: str
     store_id: str
     horizon_days: int = Field(default=7, ge=1, le=30)
+
 
 class InsightIn(BaseModel):
     brand_id: str
     store_id: str
     context: Optional[dict] = None
 
+
 class ScenarioIn(BaseModel):
     brand_id: str
     store_id: str
     metrics: Optional[dict] = None
 
+
 class AlertResolveIn(BaseModel):
     resolution_note: Optional[str] = None
+
 
 class DecisionAcceptIn(BaseModel):
     accepted_rank: int = Field(..., ge=1, le=3)
@@ -96,14 +106,14 @@ class DecisionAcceptIn(BaseModel):
 
 # ─── 1. 指标快照 ──────────────────────────────────────────────────────────────
 
+
 @router.post("/snapshots", summary="录入门店日粒度指标快照")
 async def create_snapshot(body: SnapshotIn, db: AsyncSession = Depends(get_db)):
     """录入/更新门店日粒度指标快照（L1主数据）"""
     # 计算偏差%
     deviation_pct = None
     if body.expected_revenue_yuan and body.expected_revenue_yuan > 0:
-        deviation_pct = round((body.revenue_yuan - body.expected_revenue_yuan)
-                              / body.expected_revenue_yuan * 100, 2)
+        deviation_pct = round((body.revenue_yuan - body.expected_revenue_yuan) / body.expected_revenue_yuan * 100, 2)
 
     snap = BizMetricSnapshot(
         brand_id=body.brand_id,
@@ -127,9 +137,12 @@ async def create_snapshot(body: SnapshotIn, db: AsyncSession = Depends(get_db)):
     db.add(snap)
     await db.commit()
     await db.refresh(snap)
-    return {"id": snap.id, "snapshot_date": str(snap.snapshot_date),
-            "revenue_yuan": float(snap.revenue_yuan),
-            "deviation_pct": deviation_pct}
+    return {
+        "id": snap.id,
+        "snapshot_date": str(snap.snapshot_date),
+        "revenue_yuan": float(snap.revenue_yuan),
+        "deviation_pct": deviation_pct,
+    }
 
 
 @router.get("/snapshots", summary="查询指标快照列表")
@@ -140,28 +153,38 @@ async def list_snapshots(
     db: AsyncSession = Depends(get_db),
 ):
     from datetime import timedelta
+
     cutoff = date.today() - timedelta(days=days)
     result = await db.execute(
-        select(BizMetricSnapshot).where(
+        select(BizMetricSnapshot)
+        .where(
             and_(
                 BizMetricSnapshot.brand_id == brand_id,
                 BizMetricSnapshot.store_id == store_id,
                 BizMetricSnapshot.snapshot_date >= cutoff,
             )
-        ).order_by(desc(BizMetricSnapshot.snapshot_date))
+        )
+        .order_by(desc(BizMetricSnapshot.snapshot_date))
     )
     snaps = result.scalars().all()
-    return {"count": len(snaps), "snapshots": [
-        {"id": s.id, "date": str(s.snapshot_date),
-         "revenue_yuan": float(s.revenue_yuan),
-         "order_count": s.order_count,
-         "food_cost_ratio": s.food_cost_ratio,
-         "labor_cost_ratio": s.labor_cost_ratio}
-        for s in snaps
-    ]}
+    return {
+        "count": len(snaps),
+        "snapshots": [
+            {
+                "id": s.id,
+                "date": str(s.snapshot_date),
+                "revenue_yuan": float(s.revenue_yuan),
+                "order_count": s.order_count,
+                "food_cost_ratio": s.food_cost_ratio,
+                "labor_cost_ratio": s.labor_cost_ratio,
+            }
+            for s in snaps
+        ],
+    }
 
 
 # ─── 2. 营收异常检测 ──────────────────────────────────────────────────────────
+
 
 @router.post("/agents/detect-anomaly", summary="营收异常检测 Agent")
 async def detect_anomaly(body: AnomalyDetectIn, db: AsyncSession = Depends(get_db)):
@@ -195,17 +218,25 @@ async def list_alerts(
         conditions.append(RevenueAlert.is_resolved == False)
 
     result = await db.execute(
-        select(RevenueAlert).where(and_(*conditions))
-        .order_by(desc(RevenueAlert.created_at)).limit(limit)
+        select(RevenueAlert).where(and_(*conditions)).order_by(desc(RevenueAlert.created_at)).limit(limit)
     )
     alerts = result.scalars().all()
-    return {"count": len(alerts), "alerts": [
-        {"id": a.id, "store_id": a.store_id, "alert_date": str(a.alert_date),
-         "anomaly_level": a.anomaly_level, "deviation_pct": a.deviation_pct,
-         "impact_yuan": float(a.impact_yuan), "recommended_action": a.recommended_action,
-         "is_resolved": a.is_resolved}
-        for a in alerts
-    ]}
+    return {
+        "count": len(alerts),
+        "alerts": [
+            {
+                "id": a.id,
+                "store_id": a.store_id,
+                "alert_date": str(a.alert_date),
+                "anomaly_level": a.anomaly_level,
+                "deviation_pct": a.deviation_pct,
+                "impact_yuan": float(a.impact_yuan),
+                "recommended_action": a.recommended_action,
+                "is_resolved": a.is_resolved,
+            }
+            for a in alerts
+        ],
+    }
 
 
 @router.patch("/alerts/{alert_id}/resolve", summary="标记预警为已处理")
@@ -225,6 +256,7 @@ async def resolve_alert(
 
 
 # ─── 3. KPI 健康度快照 ────────────────────────────────────────────────────────
+
 
 @router.post("/agents/kpi-scorecard", summary="KPI健康度评分卡 Agent")
 async def kpi_scorecard(body: KpiSnapshotIn, db: AsyncSession = Depends(get_db)):
@@ -250,21 +282,29 @@ async def list_scorecards(
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
-        select(KpiScorecard).where(
-            and_(KpiScorecard.brand_id == brand_id, KpiScorecard.store_id == store_id)
-        ).order_by(desc(KpiScorecard.period)).limit(limit)
+        select(KpiScorecard)
+        .where(and_(KpiScorecard.brand_id == brand_id, KpiScorecard.store_id == store_id))
+        .order_by(desc(KpiScorecard.period))
+        .limit(limit)
     )
     cards = result.scalars().all()
-    return {"count": len(cards), "scorecards": [
-        {"id": c.id, "period": c.period,
-         "overall_health_score": c.overall_health_score,
-         "at_risk_count": c.at_risk_count,
-         "off_track_count": c.off_track_count}
-        for c in cards
-    ]}
+    return {
+        "count": len(cards),
+        "scorecards": [
+            {
+                "id": c.id,
+                "period": c.period,
+                "overall_health_score": c.overall_health_score,
+                "at_risk_count": c.at_risk_count,
+                "off_track_count": c.off_track_count,
+            }
+            for c in cards
+        ],
+    }
 
 
 # ─── 4. 订单量/营收预测 ───────────────────────────────────────────────────────
+
 
 @router.post("/agents/order-forecast", summary="订单量/营收预测 Agent")
 async def order_forecast(body: ForecastIn, db: AsyncSession = Depends(get_db)):
@@ -289,22 +329,30 @@ async def list_forecasts(
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
-        select(OrderForecast).where(
-            and_(OrderForecast.brand_id == brand_id, OrderForecast.store_id == store_id)
-        ).order_by(desc(OrderForecast.forecast_date)).limit(limit)
+        select(OrderForecast)
+        .where(and_(OrderForecast.brand_id == brand_id, OrderForecast.store_id == store_id))
+        .order_by(desc(OrderForecast.forecast_date))
+        .limit(limit)
     )
     forecasts = result.scalars().all()
-    return {"count": len(forecasts), "forecasts": [
-        {"id": f.id, "forecast_date": str(f.forecast_date),
-         "horizon_days": f.horizon_days,
-         "predicted_orders": f.predicted_orders,
-         "predicted_revenue_yuan": float(f.predicted_revenue_yuan),
-         "confidence": f.confidence}
-        for f in forecasts
-    ]}
+    return {
+        "count": len(forecasts),
+        "forecasts": [
+            {
+                "id": f.id,
+                "forecast_date": str(f.forecast_date),
+                "horizon_days": f.horizon_days,
+                "predicted_orders": f.predicted_orders,
+                "predicted_revenue_yuan": float(f.predicted_revenue_yuan),
+                "confidence": f.confidence,
+            }
+            for f in forecasts
+        ],
+    }
 
 
 # ─── 5. 综合经营洞察（Top3决策）─────────────────────────────────────────────
+
 
 @router.post("/agents/biz-insight", summary="综合经营洞察 Agent（Top3决策）")
 async def biz_insight(body: InsightIn, db: AsyncSession = Depends(get_db)):
@@ -336,17 +384,24 @@ async def list_decisions(
         conditions.append(BizDecision.status == status)
 
     result = await db.execute(
-        select(BizDecision).where(and_(*conditions))
-        .order_by(desc(BizDecision.decision_date)).limit(limit)
+        select(BizDecision).where(and_(*conditions)).order_by(desc(BizDecision.decision_date)).limit(limit)
     )
     decisions = result.scalars().all()
-    return {"count": len(decisions), "decisions": [
-        {"id": d.id, "store_id": d.store_id, "decision_date": str(d.decision_date),
-         "total_saving_yuan": float(d.total_saving_yuan),
-         "priority": d.priority, "status": d.status,
-         "top_recommendation": d.recommendations[0] if d.recommendations else None}
-        for d in decisions
-    ]}
+    return {
+        "count": len(decisions),
+        "decisions": [
+            {
+                "id": d.id,
+                "store_id": d.store_id,
+                "decision_date": str(d.decision_date),
+                "total_saving_yuan": float(d.total_saving_yuan),
+                "priority": d.priority,
+                "status": d.status,
+                "top_recommendation": d.recommendations[0] if d.recommendations else None,
+            }
+            for d in decisions
+        ],
+    }
 
 
 @router.patch("/decisions/{decision_id}/accept", summary="店长采纳决策建议")
@@ -373,13 +428,16 @@ async def today_decisions(
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
-        select(BizDecision).where(
+        select(BizDecision)
+        .where(
             and_(
                 BizDecision.brand_id == brand_id,
                 BizDecision.store_id == store_id,
                 BizDecision.decision_date == date.today(),
             )
-        ).order_by(desc(BizDecision.created_at)).limit(1)
+        )
+        .order_by(desc(BizDecision.created_at))
+        .limit(1)
     )
     decision = result.scalar_one_or_none()
     if not decision:
@@ -396,6 +454,7 @@ async def today_decisions(
 
 
 # ─── 6. 场景识别 ──────────────────────────────────────────────────────────────
+
 
 @router.post("/agents/scenario-match", summary="经营场景识别 Agent")
 async def scenario_match(body: ScenarioIn, db: AsyncSession = Depends(get_db)):
@@ -419,19 +478,23 @@ async def list_scenarios(
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
-        select(ScenarioRecord).where(
-            and_(ScenarioRecord.brand_id == brand_id, ScenarioRecord.store_id == store_id)
-        ).order_by(desc(ScenarioRecord.record_date)).limit(limit)
+        select(ScenarioRecord)
+        .where(and_(ScenarioRecord.brand_id == brand_id, ScenarioRecord.store_id == store_id))
+        .order_by(desc(ScenarioRecord.record_date))
+        .limit(limit)
     )
     records = result.scalars().all()
-    return {"count": len(records), "scenarios": [
-        {"id": r.id, "record_date": str(r.record_date),
-         "scenario_type": r.scenario_type, "confidence": r.confidence}
-        for r in records
-    ]}
+    return {
+        "count": len(records),
+        "scenarios": [
+            {"id": r.id, "record_date": str(r.record_date), "scenario_type": r.scenario_type, "confidence": r.confidence}
+            for r in records
+        ],
+    }
 
 
 # ─── 7. 驾驶舱（BFF汇总）────────────────────────────────────────────────────
+
 
 @router.get("/dashboard", summary="经营智能体驾驶舱（首屏BFF）")
 async def dashboard(
@@ -446,37 +509,38 @@ async def dashboard(
 
     # 今日决策
     decision_result = await db.execute(
-        select(BizDecision).where(
-            and_(BizDecision.brand_id == brand_id,
-                 BizDecision.store_id == store_id,
-                 BizDecision.decision_date == date.today())
-        ).order_by(desc(BizDecision.created_at)).limit(1)
+        select(BizDecision)
+        .where(
+            and_(BizDecision.brand_id == brand_id, BizDecision.store_id == store_id, BizDecision.decision_date == date.today())
+        )
+        .order_by(desc(BizDecision.created_at))
+        .limit(1)
     )
     decision = decision_result.scalar_one_or_none()
 
     # 未处理预警数
     alert_count_result = await db.execute(
         select(RevenueAlert).where(
-            and_(RevenueAlert.brand_id == brand_id,
-                 RevenueAlert.store_id == store_id,
-                 RevenueAlert.is_resolved == False)
+            and_(RevenueAlert.brand_id == brand_id, RevenueAlert.store_id == store_id, RevenueAlert.is_resolved == False)
         )
     )
     open_alerts = alert_count_result.scalars().all()
 
     # 最新KPI评分卡
     kpi_result = await db.execute(
-        select(KpiScorecard).where(
-            and_(KpiScorecard.brand_id == brand_id, KpiScorecard.store_id == store_id)
-        ).order_by(desc(KpiScorecard.period)).limit(1)
+        select(KpiScorecard)
+        .where(and_(KpiScorecard.brand_id == brand_id, KpiScorecard.store_id == store_id))
+        .order_by(desc(KpiScorecard.period))
+        .limit(1)
     )
     kpi = kpi_result.scalar_one_or_none()
 
     # 最新预测
     forecast_result = await db.execute(
-        select(OrderForecast).where(
-            and_(OrderForecast.brand_id == brand_id, OrderForecast.store_id == store_id)
-        ).order_by(desc(OrderForecast.forecast_date)).limit(1)
+        select(OrderForecast)
+        .where(and_(OrderForecast.brand_id == brand_id, OrderForecast.store_id == store_id))
+        .order_by(desc(OrderForecast.forecast_date))
+        .limit(1)
     )
     forecast = forecast_result.scalar_one_or_none()
 
@@ -493,11 +557,15 @@ async def dashboard(
         "open_alerts": {
             "count": len(open_alerts),
             "critical_count": sum(1 for a in open_alerts if a.anomaly_level in ("critical", "severe")),
-            "top_alert": {
-                "level": open_alerts[0].anomaly_level,
-                "impact_yuan": float(open_alerts[0].impact_yuan),
-                "action": open_alerts[0].recommended_action,
-            } if open_alerts else None,
+            "top_alert": (
+                {
+                    "level": open_alerts[0].anomaly_level,
+                    "impact_yuan": float(open_alerts[0].impact_yuan),
+                    "action": open_alerts[0].recommended_action,
+                }
+                if open_alerts
+                else None
+            ),
         },
         "kpi_health": {
             "overall_score": kpi.overall_health_score if kpi else None,
@@ -506,8 +574,11 @@ async def dashboard(
         },
         "forecast_7d": {
             "predicted_revenue_yuan": float(forecast.predicted_revenue_yuan) if forecast else None,
-            "trend_direction": "up" if (forecast and (forecast.trend_slope or 0) > 50)
-                               else ("down" if (forecast and (forecast.trend_slope or 0) < -50) else "stable"),
+            "trend_direction": (
+                "up"
+                if (forecast and (forecast.trend_slope or 0) > 50)
+                else ("down" if (forecast and (forecast.trend_slope or 0) < -50) else "stable")
+            ),
             "confidence": forecast.confidence if forecast else None,
         },
     }

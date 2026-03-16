@@ -2,8 +2,10 @@
 Schedule Demand Models — 门店岗位编制需求配置
 用于智能排班算法的需求侧输入：按日期类型+班次类型配置各岗位最低/最高人数。
 """
+
 import uuid
-from sqlalchemy import Column, String, Integer, Boolean
+
+from sqlalchemy import Boolean, Column, Integer, String
 from sqlalchemy.dialects.postgresql import UUID
 
 from .base import Base, TimestampMixin
@@ -19,6 +21,7 @@ class StoreStaffingDemand(Base, TimestampMixin):
       store=S001, position=waiter, day_type=weekend, shift_type=morning
       min_count=3, max_count=5
     """
+
     __tablename__ = "store_staffing_demands"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

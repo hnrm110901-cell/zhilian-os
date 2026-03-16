@@ -12,20 +12,18 @@ IM 入职引导机器人 — 新员工入职后自动推送入职任务清单
 - 复用 EmployeeGrowthPlan 追踪入职任务进度
 - 复用 EmployeeMilestone 记录入职里程碑
 """
-from typing import Any, Dict, List, Optional
-from datetime import date, timedelta
+
 import uuid
+from datetime import date, timedelta
+from typing import Any, Dict, List, Optional
 
 import structlog
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.employee import Employee
+from ..models.employee_growth import EmployeeGrowthPlan, EmployeeMilestone, GrowthPlanStatus, MilestoneType
 from ..models.store import Store
-from ..models.employee_growth import (
-    EmployeeMilestone, MilestoneType,
-    EmployeeGrowthPlan, GrowthPlanStatus,
-)
 from ..services.im_message_service import IMMessageService
 
 logger = structlog.get_logger()
@@ -93,17 +91,13 @@ class IMOnboardingRobot:
         4. 推送 IM 欢迎消息 + 任务清单
         """
         # 查询员工
-        emp_result = await self.db.execute(
-            select(Employee).where(Employee.id == employee_id)
-        )
+        emp_result = await self.db.execute(select(Employee).where(Employee.id == employee_id))
         employee = emp_result.scalar_one_or_none()
         if not employee:
             return {"error": f"员工 {employee_id} 不存在"}
 
         # 查门店名称
-        store_result = await self.db.execute(
-            select(Store).where(Store.id == employee.store_id)
-        )
+        store_result = await self.db.execute(select(Store).where(Store.id == employee.store_id))
         store = store_result.scalar_one_or_none()
         store_name = store.name if store else employee.store_id
 
@@ -124,8 +118,12 @@ class IMOnboardingRobot:
         send_result = {"sent": False}
         if im_userid:
             send_result = await self._push_onboarding_message(
-                brand_id, im_userid, employee.name, store_name,
-                employee.position, plan,
+                brand_id,
+                im_userid,
+                employee.name,
+                store_name,
+                employee.position,
+                plan,
             )
 
         await self.db.commit()
@@ -150,7 +148,9 @@ class IMOnboardingRobot:
         }
 
     async def _create_onboard_milestone(
-        self, employee: Employee, store_name: str,
+        self,
+        employee: Employee,
+        store_name: str,
     ) -> EmployeeMilestone:
         """创建入职里程碑"""
         milestone = EmployeeMilestone(
@@ -168,7 +168,8 @@ class IMOnboardingRobot:
         return milestone
 
     async def _create_onboarding_plan(
-        self, employee: Employee,
+        self,
+        employee: Employee,
     ) -> EmployeeGrowthPlan:
         """创建入职成长计划（含结构化任务清单）"""
         position = employee.position or "waiter"
@@ -182,21 +183,25 @@ class IMOnboardingRobot:
 
         # 通用任务
         for t in COMMON_TASKS:
-            all_tasks.append({
-                "task": t["task"],
-                "type": t["type"],
-                "due_date": (today + timedelta(days=t["days"])).isoformat(),
-                "done": False,
-            })
+            all_tasks.append(
+                {
+                    "task": t["task"],
+                    "type": t["type"],
+                    "due_date": (today + timedelta(days=t["days"])).isoformat(),
+                    "done": False,
+                }
+            )
 
         # 岗位专属任务
         for t in position_tasks:
-            all_tasks.append({
-                "task": t["task"],
-                "type": t["type"],
-                "due_date": (today + timedelta(days=t["days"])).isoformat(),
-                "done": False,
-            })
+            all_tasks.append(
+                {
+                    "task": t["task"],
+                    "type": t["type"],
+                    "due_date": (today + timedelta(days=t["days"])).isoformat(),
+                    "done": False,
+                }
+            )
 
         plan = EmployeeGrowthPlan(
             id=uuid.uuid4(),
@@ -240,8 +245,7 @@ class IMOnboardingRobot:
         content = (
             f"### 🎉 欢迎加入 {store_name}！\n\n"
             f"**{employee_name}** 您好，恭喜您成为 **{position_label}** 的一员！\n\n"
-            f"您的屯象OS系统账号已自动创建，以下是您的入职任务清单：\n\n"
-            + "\n".join(task_lines) + "\n\n"
+            f"您的屯象OS系统账号已自动创建，以下是您的入职任务清单：\n\n" + "\n".join(task_lines) + "\n\n"
             f"请在 **14天内** 完成以上任务。\n"
             f"如有疑问，请联系您的店长或导师。\n\n"
             f"💡 回复「个人信息」查看账号 | 回复「排班」查看班次"
@@ -249,7 +253,10 @@ class IMOnboardingRobot:
 
         try:
             result = await self.msg_service.send_markdown(
-                brand_id, im_userid, "入职引导", content,
+                brand_id,
+                im_userid,
+                "入职引导",
+                content,
             )
             return {"sent": True, **result}
         except Exception as e:
@@ -281,9 +288,7 @@ class IMOnboardingRobot:
 
         for plan in plans:
             emp_result = await self.db.execute(
-                select(Employee).where(
-                    and_(Employee.id == plan.employee_id, Employee.is_active.is_(True))
-                )
+                select(Employee).where(and_(Employee.id == plan.employee_id, Employee.is_active.is_(True)))
             )
             emp = emp_result.scalar_one_or_none()
             if not emp:
@@ -294,9 +299,7 @@ class IMOnboardingRobot:
                 continue
 
             # 获取品牌ID
-            store_result = await self.db.execute(
-                select(Store.brand_id).where(Store.id == emp.store_id)
-            )
+            store_result = await self.db.execute(select(Store.brand_id).where(Store.id == emp.store_id))
             store_brand = store_result.scalar_one_or_none()
             emp_brand_id = brand_id or store_brand
 
@@ -315,12 +318,14 @@ class IMOnboardingRobot:
 
             try:
                 await self.msg_service.send_markdown(
-                    emp_brand_id, im_userid, "入职任务提醒", content,
+                    emp_brand_id,
+                    im_userid,
+                    "入职任务提醒",
+                    content,
                 )
                 reminded += 1
             except Exception as e:
-                logger.warning("onboarding_remind.failed",
-                               employee_id=emp.id, error=str(e))
+                logger.warning("onboarding_remind.failed", employee_id=emp.id, error=str(e))
 
         return {"reminded": reminded, "total_pending": len(plans)}
 

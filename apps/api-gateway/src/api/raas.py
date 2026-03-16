@@ -4,30 +4,27 @@ RaaS API - Result-as-a-Service API
 
 核心理念: 不卖软件，卖结果
 """
+
+from datetime import datetime
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional
-from datetime import datetime
-
-from src.core.dependencies import get_db, get_current_user
-from src.services.raas_pricing_service import (
-    get_raas_pricing_service,
-    RaaSPricingService,
-    PricingTier,
-    EffectMetrics,
-    BaselineMetrics
-)
+from src.core.dependencies import get_current_user, get_db
 from src.models.user import User
+from src.services.raas_pricing_service import (
+    BaselineMetrics,
+    EffectMetrics,
+    PricingTier,
+    RaaSPricingService,
+    get_raas_pricing_service,
+)
 
 router = APIRouter(prefix="/api/v1/raas")
 
 
 @router.get("/pricing-tier/{store_id}")
-async def get_pricing_tier(
-    store_id: str,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+async def get_pricing_tier(store_id: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     获取门店当前的定价层级
 
@@ -46,16 +43,14 @@ async def get_pricing_tier(
             PricingTier.FREE_TRIAL: "基础版 - 免费试用3个月",
             PricingTier.COST_SAVING: "效果版 - 省下成本的20%作为服务费",
             PricingTier.REVENUE_GROWTH: "增长版 - 增加营收的15%作为分成",
-            PricingTier.MODEL_MARKETPLACE: "模型版 - 一次性购买行业模型"
-        }.get(tier, "未知")
+            PricingTier.MODEL_MARKETPLACE: "模型版 - 一次性购买行业模型",
+        }.get(tier, "未知"),
     }
 
 
 @router.get("/baseline/{store_id}")
 async def get_baseline_metrics(
-    store_id: str,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    store_id: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """
     获取门店的基线指标
@@ -70,10 +65,7 @@ async def get_baseline_metrics(
 
     baseline = await service.calculate_baseline(store_id, start_date, end_date)
 
-    return {
-        "store_id": store_id,
-        "baseline": baseline.model_dump()
-    }
+    return {"store_id": store_id, "baseline": baseline.model_dump()}
 
 
 @router.get("/effect-metrics/{store_id}")
@@ -82,7 +74,7 @@ async def get_effect_metrics(
     year: Optional[int] = None,
     month: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     获取门店的效果指标
@@ -109,28 +101,14 @@ async def get_effect_metrics(
     else:
         period_end = datetime(year, month + 1, 1)
 
-    effect_metrics = await service.calculate_effect_metrics(
-        store_id,
-        baseline,
-        period_start,
-        period_end
-    )
+    effect_metrics = await service.calculate_effect_metrics(store_id, baseline, period_start, period_end)
 
-    return {
-        "store_id": store_id,
-        "year": year,
-        "month": month,
-        "effect_metrics": effect_metrics.model_dump()
-    }
+    return {"store_id": store_id, "year": year, "month": month, "effect_metrics": effect_metrics.model_dump()}
 
 
 @router.get("/monthly-bill/{store_id}")
 async def get_monthly_bill(
-    store_id: str,
-    year: int,
-    month: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    store_id: str, year: int, month: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """
     生成月度账单
@@ -145,9 +123,7 @@ async def get_monthly_bill(
 
 @router.get("/value-proposition/{store_id}")
 async def get_value_proposition(
-    store_id: str,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    store_id: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """
     获取价值主张
@@ -165,29 +141,24 @@ async def get_value_proposition(
     # 商业话术
     value_proposition = {
         "headline": "屯象OS = 年薪只要几万块的数字总经理",
-        "features": [
-            "拥有行业Top10%管理经验",
-            "24小时不休息",
-            "永不离职",
-            "持续学习进化"
-        ],
+        "features": ["拥有行业Top10%管理经验", "24小时不休息", "永不离职", "持续学习进化"],
         "benefits": [
             f"在这个冬天，帮你每个月砍掉一个人工成本（省 ¥{effect_metrics.get('labor_cost_saved', 0):,.0f}）",
             f"省下 ¥{effect_metrics.get('food_waste_saved', 0):,.0f} 的烂菜叶",
             "让你的加盟店拥有和海底捞一样的管理大脑",
-            "一个戴在耳朵上的AI总经理"
+            "一个戴在耳朵上的AI总经理",
         ],
         "results": {
-            "cost_saved": effect_metrics.get('total_cost_saved', 0),
-            "revenue_growth": effect_metrics.get('total_revenue_growth', 0),
-            "total_value": effect_metrics.get('total_cost_saved', 0) + effect_metrics.get('total_revenue_growth', 0)
+            "cost_saved": effect_metrics.get("total_cost_saved", 0),
+            "revenue_growth": effect_metrics.get("total_revenue_growth", 0),
+            "total_value": effect_metrics.get("total_cost_saved", 0) + effect_metrics.get("total_revenue_growth", 0),
         },
         "pricing": {
             "model": "按效果付费",
             "free_trial": "3个月免费试用",
             "cost_saving_rate": "省下成本的20%",
-            "revenue_growth_rate": "增加营收的15%"
-        }
+            "revenue_growth_rate": "增加营收的15%",
+        },
     }
 
     return value_proposition

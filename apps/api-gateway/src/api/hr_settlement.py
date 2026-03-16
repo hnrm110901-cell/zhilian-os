@@ -2,24 +2,27 @@
 HR Settlement API — 离职结算接口
 计算/创建/审批/打款离职结算单
 """
+
+from datetime import date
+from typing import List, Optional
+from uuid import UUID
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from typing import Optional, List
-from datetime import date
-from uuid import UUID
-import structlog
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
 from ..models.user import User
 from ..services.settlement_service import SettlementService
-from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
 router = APIRouter()
 
 
 # ── Request / Response Models ────────────────────────────
+
 
 class SettlementCalcRequest(BaseModel):
     store_id: str
@@ -101,6 +104,7 @@ def _record_to_dict(record) -> dict:
 
 # ── API Endpoints ────────────────────────────────────────
 
+
 @router.post("/hr/settlement/calculate")
 async def calculate_settlement(
     req: SettlementCalcRequest,
@@ -180,8 +184,11 @@ async def list_settlements(
     """结算单列表"""
     svc = SettlementService(store_id, brand_id)
     result = await svc.list_settlements(
-        db, status=status, employee_id=employee_id,
-        offset=offset, limit=limit,
+        db,
+        status=status,
+        employee_id=employee_id,
+        offset=offset,
+        limit=limit,
     )
     return {
         "success": True,

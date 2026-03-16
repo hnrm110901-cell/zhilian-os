@@ -5,17 +5,18 @@ IM 员工自助服务 API
 1. /im/self-service — 直接 API 调用（前端/测试用）
 2. 被 im_callback 中的消息路由调用（员工通过企微/钉钉发消息触发）
 """
+
+from typing import Optional
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
 from ..models.user import User
 from ..services.im_employee_self_service import IMEmployeeSelfService
-
-import structlog
 
 logger = structlog.get_logger()
 router = APIRouter()

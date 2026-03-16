@@ -2,15 +2,17 @@
 API适配器集成接口
 提供第三方系统数据同步功能
 """
-from fastapi import APIRouter, HTTPException, Depends, Query, Header
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
-import structlog
 
-from ..services.adapter_integration_service import AdapterIntegrationService
-from ..services.neural_system import neural_system
+from typing import Any, Dict, List, Optional
+
+import structlog
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from pydantic import BaseModel, Field
+
 from ..core.dependencies import get_current_active_user
 from ..models.user import User
+from ..services.adapter_integration_service import AdapterIntegrationService
+from ..services.neural_system import neural_system
 
 logger = structlog.get_logger()
 
@@ -309,6 +311,7 @@ async def list_adapters():
         logger.error("获取适配器列表失败", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
+
 # ==================== P1-2 增强：适配器状态监控 + 供应商 Webhook ====================
 
 from datetime import datetime as _dt
@@ -316,6 +319,7 @@ from datetime import datetime as _dt
 
 class SupplierWebhookPayload(BaseModel):
     """供应商推送 webhook 数据结构"""
+
     supplier_id: str = Field(..., description="供应商ID")
     event_type: str = Field(..., description="事件类型：order_confirmed/shipment_dispatched/price_updated")
     store_id: Optional[str] = Field(None, description="目标门店")
@@ -333,14 +337,16 @@ async def get_adapters_status():
         adapters = list(integration_service.adapters.keys())
         status_list = []
         for name in adapters:
-            status_list.append({
-                "adapter": name,
-                "status": "connected",
-                "last_sync": _dt.now().isoformat(),
-                "error_rate": 0.0,
-                "sync_count_today": 0,
-                "last_error": None,
-            })
+            status_list.append(
+                {
+                    "adapter": name,
+                    "status": "connected",
+                    "last_sync": _dt.now().isoformat(),
+                    "error_rate": 0.0,
+                    "sync_count_today": 0,
+                    "last_error": None,
+                }
+            )
         return {"adapters": status_list, "total": len(status_list), "healthy": len(status_list)}
     except Exception as e:
         logger.error("获取适配器状态失败", error=str(e))

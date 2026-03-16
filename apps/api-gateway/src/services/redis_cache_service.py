@@ -4,12 +4,15 @@ Redis Cache Service
 
 提供统一的缓存接口，支持多种数据类型和过期策略
 """
-import os
-import redis.asyncio as redis
+
 import json
-import structlog
-from typing import Any, Optional, Union, List
+import os
 from datetime import timedelta
+from typing import Any, List, Optional, Union
+
+import redis.asyncio as redis
+import structlog
+
 from ..core.config import settings
 
 logger = structlog.get_logger()
@@ -32,11 +35,8 @@ class RedisCacheService:
             if sentinel_hosts_raw:
                 # Sentinel 模式
                 from redis.asyncio.sentinel import Sentinel
-                sentinels = [
-                    (h.split(":")[0], int(h.split(":")[1]))
-                    for h in sentinel_hosts_raw.split(",")
-                    if ":" in h
-                ]
+
+                sentinels = [(h.split(":")[0], int(h.split(":")[1])) for h in sentinel_hosts_raw.split(",") if ":" in h]
                 sentinel_kwargs = {}
                 if settings.REDIS_SENTINEL_PASSWORD:
                     sentinel_kwargs["password"] = settings.REDIS_SENTINEL_PASSWORD
@@ -57,7 +57,7 @@ class RedisCacheService:
                     settings.REDIS_URL,
                     encoding="utf-8",
                     decode_responses=True,
-                    max_connections=int(os.getenv("REDIS_MAX_CONNECTIONS", "50"))
+                    max_connections=int(os.getenv("REDIS_MAX_CONNECTIONS", "50")),
                 )
                 logger.info("Redis 直连模式初始化", url=settings.REDIS_URL)
 
@@ -112,12 +112,7 @@ class RedisCacheService:
             logger.error("获取缓存失败", key=key, error=str(e))
             return None
 
-    async def set(
-        self,
-        key: str,
-        value: Any,
-        expire: Optional[Union[int, timedelta]] = None
-    ) -> bool:
+    async def set(self, key: str, value: Any, expire: Optional[Union[int, timedelta]] = None) -> bool:
         """
         设置缓存值
 

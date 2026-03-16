@@ -2,16 +2,18 @@
 排队服务
 Queue Service for managing waiting lists
 """
-from typing import Dict, Any, List, Optional
-from datetime import datetime, timedelta
-from sqlalchemy import select, and_, func, desc
-from sqlalchemy.ext.asyncio import AsyncSession
-import os
-import structlog
-import uuid
 
-from ..models.queue import Queue, QueueStatus
+import os
+import uuid
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
+
+import structlog
+from sqlalchemy import and_, desc, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from ..core.database import get_db_session
+from ..models.queue import Queue, QueueStatus
 
 logger = structlog.get_logger()
 
@@ -46,9 +48,7 @@ class QueueService:
                 queue_number = await self._generate_queue_number(session, store_id)
 
                 # 预估等待时间
-                estimated_wait_time = await self._estimate_wait_time(
-                    session, store_id, party_size
-                )
+                estimated_wait_time = await self._estimate_wait_time(session, store_id, party_size)
 
                 # 创建排队记录
                 queue = Queue(
@@ -112,8 +112,7 @@ class QueueService:
         today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
         result = await session.execute(
-            select(func.max(Queue.queue_number))
-            .where(
+            select(func.max(Queue.queue_number)).where(
                 and_(
                     Queue.store_id == store_id,
                     Queue.created_at >= today_start,
@@ -145,8 +144,7 @@ class QueueService:
         """
         # 获取当前等待人数
         result = await session.execute(
-            select(func.count(Queue.queue_id))
-            .where(
+            select(func.count(Queue.queue_id)).where(
                 and_(
                     Queue.store_id == store_id,
                     Queue.status == QueueStatus.WAITING,
@@ -157,6 +155,7 @@ class QueueService:
 
         # 基于历史实际等待时间计算均值，fallback 15 分钟
         from datetime import timedelta
+
         hist_result = await session.execute(
             select(func.avg(Queue.actual_wait_time)).where(
                 and_(
@@ -267,9 +266,7 @@ class QueueService:
         """
         async with get_db_session() as session:
             try:
-                result = await session.execute(
-                    select(Queue).where(Queue.queue_id == queue_id)
-                )
+                result = await session.execute(select(Queue).where(Queue.queue_id == queue_id))
                 queue = result.scalar_one_or_none()
 
                 if not queue:
@@ -334,9 +331,7 @@ class QueueService:
         """
         async with get_db_session() as session:
             try:
-                result = await session.execute(
-                    select(Queue).where(Queue.queue_id == queue_id)
-                )
+                result = await session.execute(select(Queue).where(Queue.queue_id == queue_id))
                 queue = result.scalar_one_or_none()
 
                 if not queue:
@@ -431,8 +426,7 @@ class QueueService:
             try:
                 # 当前等待人数
                 waiting_result = await session.execute(
-                    select(func.count(Queue.queue_id))
-                    .where(
+                    select(func.count(Queue.queue_id)).where(
                         and_(
                             Queue.store_id == store_id,
                             Queue.status == QueueStatus.WAITING,
@@ -444,8 +438,7 @@ class QueueService:
                 # 今天总排队数
                 today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
                 today_result = await session.execute(
-                    select(func.count(Queue.queue_id))
-                    .where(
+                    select(func.count(Queue.queue_id)).where(
                         and_(
                             Queue.store_id == store_id,
                             Queue.created_at >= today_start,
@@ -456,8 +449,7 @@ class QueueService:
 
                 # 平均等待时间
                 avg_wait_result = await session.execute(
-                    select(func.avg(Queue.actual_wait_time))
-                    .where(
+                    select(func.avg(Queue.actual_wait_time)).where(
                         and_(
                             Queue.store_id == store_id,
                             Queue.created_at >= today_start,
@@ -501,18 +493,13 @@ class QueueService:
                         "customer_name": queue.customer_name,
                         "queue_number": queue.queue_number,
                         "table_number": queue.table_number or "待分配",
-                    }
+                    },
                 )
 
                 if sms_result.get("success"):
                     queue.notification_sent = True
                     queue.notification_method = "sms"
-                    logger.info(
-                        "排队通知发送成功",
-                        queue_id=queue.id,
-                        phone=queue.customer_phone,
-                        method="sms"
-                    )
+                    logger.info("排队通知发送成功", queue_id=queue.id, phone=queue.customer_phone, method="sms")
 
             # 同时发送企业微信通知（如果配置了）
             try:

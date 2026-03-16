@@ -3,6 +3,7 @@
 将 Neo4j 图谱当前快照导出为 JSON，供客户留存或迁移。
 Phase 3+: 全图模式，包含 Staff/WasteEvent/TrainingModule 节点与培训/损耗关系。
 """
+
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
@@ -28,11 +29,28 @@ def export_graph_snapshot(
     where_store = " WHERE n.store_id = $store_id" if store_id else ""
     params: Dict[str, Any] = {"store_id": store_id} if store_id else {}
 
-    stores = run("MATCH (n:Store) RETURN n.store_id AS store_id, n.name AS name, n.tenant_id AS tenant_id" + where_store, params if store_id else None)
-    dishes = run("MATCH (n:Dish) RETURN n.dish_id AS dish_id, n.name AS name, n.store_id AS store_id" + where_store, params if store_id else None)
-    ingredients = run("MATCH (n:Ingredient) RETURN n.ing_id AS ing_id, n.name AS name, n.unit AS unit, n.store_id AS store_id" + where_store, params if store_id else None)
-    boms = run("MATCH (n:BOM) RETURN n.bom_id AS bom_id, n.dish_id AS dish_id, n.store_id AS store_id, n.version AS version, n.effective_date AS effective_date" + where_store, params if store_id else None)
-    snapshots = run("MATCH (n:InventorySnapshot) RETURN n.snapshot_id AS snapshot_id, n.store_id AS store_id, n.ing_id AS ing_id, n.qty AS qty, n.ts AS ts, n.source AS source" + where_store, params if store_id else None)
+    stores = run(
+        "MATCH (n:Store) RETURN n.store_id AS store_id, n.name AS name, n.tenant_id AS tenant_id" + where_store,
+        params if store_id else None,
+    )
+    dishes = run(
+        "MATCH (n:Dish) RETURN n.dish_id AS dish_id, n.name AS name, n.store_id AS store_id" + where_store,
+        params if store_id else None,
+    )
+    ingredients = run(
+        "MATCH (n:Ingredient) RETURN n.ing_id AS ing_id, n.name AS name, n.unit AS unit, n.store_id AS store_id" + where_store,
+        params if store_id else None,
+    )
+    boms = run(
+        "MATCH (n:BOM) RETURN n.bom_id AS bom_id, n.dish_id AS dish_id, n.store_id AS store_id, n.version AS version, n.effective_date AS effective_date"
+        + where_store,
+        params if store_id else None,
+    )
+    snapshots = run(
+        "MATCH (n:InventorySnapshot) RETURN n.snapshot_id AS snapshot_id, n.store_id AS store_id, n.ing_id AS ing_id, n.qty AS qty, n.ts AS ts, n.source AS source"
+        + where_store,
+        params if store_id else None,
+    )
 
     return {
         "tenant_id": tenant_id,
@@ -74,14 +92,16 @@ def export_full_graph(
 
     # 节点
     staff = run(
-        "MATCH (n:Staff)" + (f" WHERE n.store_id = $store_id" if store_id else "")
+        "MATCH (n:Staff)"
+        + (f" WHERE n.store_id = $store_id" if store_id else "")
         + " RETURN n.staff_id AS staff_id, n.name AS name, n.role AS role, n.store_id AS store_id",
         p if store_id else None,
     )
     waste_events = run(
-        "MATCH (n:WasteEvent)" + (f" WHERE n.store_id = $store_id" if store_id else "")
+        "MATCH (n:WasteEvent)"
+        + (f" WHERE n.store_id = $store_id" if store_id else "")
         + " RETURN n.event_id AS event_id, n.store_id AS store_id, n.event_type AS event_type,"
-          " n.root_cause AS root_cause, n.amount AS amount",
+        " n.root_cause AS root_cause, n.amount AS amount",
         p if store_id else None,
     )
     training_modules = run(
@@ -112,14 +132,14 @@ def export_full_graph(
         "MATCH (s:Staff)-[r:NEEDS_TRAINING]->(m:TrainingModule)"
         + (f" WHERE s.store_id = $store_id" if store_id else "")
         + " RETURN s.staff_id AS from_id, m.module_id AS to_id,"
-          " r.urgency AS urgency, r.waste_event_id AS waste_event_id",
+        " r.urgency AS urgency, r.waste_event_id AS waste_event_id",
         p if store_id else None,
     )
     completed_training = run(
         "MATCH (s:Staff)-[r:COMPLETED_TRAINING]->(m:TrainingModule)"
         + (f" WHERE s.store_id = $store_id" if store_id else "")
         + " RETURN s.staff_id AS from_id, m.module_id AS to_id,"
-          " r.score AS score, r.completed_at AS completed_at",
+        " r.score AS score, r.completed_at AS completed_at",
         p if store_id else None,
     )
 

@@ -8,25 +8,25 @@ Payment Reconciliation Service
 - 生成对账批次与差异明细
 - 汇总统计
 """
+
 import csv
 import io
 import uuid
-from datetime import datetime, date, timedelta
-from typing import Dict, Any, Optional, List
+from datetime import date, datetime, timedelta
+from typing import Any, Dict, List, Optional
 
 import structlog
-from sqlalchemy import select, and_, func, case
+from sqlalchemy import and_, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db_session
+from src.models.order import Order, OrderStatus
 from src.models.payment_reconciliation import (
+    MatchStatus,
+    PaymentChannel,
     PaymentRecord,
     ReconciliationBatch,
     ReconciliationDiff,
-    PaymentChannel,
-    MatchStatus,
 )
-from src.models.order import Order, OrderStatus
 
 logger = structlog.get_logger()
 
@@ -75,10 +75,17 @@ class PaymentReconcileService:
                 if not header_found:
                     # 寻找 CSV 头行（包含 trade_no/交易时间/微信订单号 等关键词）
                     lower = stripped.lower()
-                    if any(kw in lower for kw in [
-                        "trade_no", "交易时间", "微信订单号", "支付宝交易号",
-                        "out_trade_no", "商户订单号",
-                    ]):
+                    if any(
+                        kw in lower
+                        for kw in [
+                            "trade_no",
+                            "交易时间",
+                            "微信订单号",
+                            "支付宝交易号",
+                            "out_trade_no",
+                            "商户订单号",
+                        ]
+                    ):
                         header_found = True
                         data_lines.append(stripped)
                     continue
@@ -148,21 +155,13 @@ class PaymentReconcileService:
         clean = {k.strip().strip("`").strip(): v.strip().strip("`").strip() for k, v in row.items() if k}
 
         trade_no = (
-            clean.get("trade_no")
-            or clean.get("微信订单号")
-            or clean.get("支付宝交易号")
-            or clean.get("交易号")
-            or ""
+            clean.get("trade_no") or clean.get("微信订单号") or clean.get("支付宝交易号") or clean.get("交易号") or ""
         ).strip()
 
         if not trade_no or trade_no == "0":
             return None
 
-        out_trade_no = (
-            clean.get("out_trade_no")
-            or clean.get("商户订单号")
-            or ""
-        ).strip()
+        out_trade_no = (clean.get("out_trade_no") or clean.get("商户订单号") or "").strip()
 
         # 金额解析（元 → 分）
         amount_str = (
@@ -175,33 +174,19 @@ class PaymentReconcileService:
         )
         amount_fen = self._yuan_to_fen(amount_str)
 
-        fee_str = (
-            clean.get("fee")
-            or clean.get("手续费")
-            or clean.get("服务费（元）")
-            or "0"
-        )
+        fee_str = clean.get("fee") or clean.get("手续费") or clean.get("服务费（元）") or "0"
         fee_fen = abs(self._yuan_to_fen(fee_str))
 
         settle_amount_fen = amount_fen - fee_fen
 
         # 交易时间
         time_str = (
-            clean.get("trade_time")
-            or clean.get("交易时间")
-            or clean.get("交易创建时间")
-            or clean.get("付款时间")
-            or ""
+            clean.get("trade_time") or clean.get("交易时间") or clean.get("交易创建时间") or clean.get("付款时间") or ""
         ).strip()
         trade_time = self._parse_datetime(time_str)
 
         # 交易类型
-        trade_type_raw = (
-            clean.get("trade_type")
-            or clean.get("交易类型")
-            or clean.get("类型")
-            or "payment"
-        ).strip()
+        trade_type_raw = (clean.get("trade_type") or clean.get("交易类型") or clean.get("类型") or "payment").strip()
         trade_type = "refund" if "退款" in trade_type_raw else "payment"
 
         return {
@@ -269,16 +254,22 @@ class PaymentReconcileService:
                 day_start = datetime.combine(reconcile_date, datetime.min.time())
                 day_end = datetime.combine(reconcile_date, datetime.max.time())
 
-                channel_records = (await session.execute(
-                    select(PaymentRecord).where(
-                        and_(
-                            PaymentRecord.brand_id == brand_id,
-                            PaymentRecord.channel == channel,
-                            PaymentRecord.trade_time >= day_start,
-                            PaymentRecord.trade_time <= day_end,
+                channel_records = (
+                    (
+                        await session.execute(
+                            select(PaymentRecord).where(
+                                and_(
+                                    PaymentRecord.brand_id == brand_id,
+                                    PaymentRecord.channel == channel,
+                                    PaymentRecord.trade_time >= day_start,
+                                    PaymentRecord.trade_time <= day_end,
+                                )
+                            )
                         )
                     )
-                )).scalars().all()
+                    .scalars()
+                    .all()
+                )
 
                 # 2. 获取POS侧订单
                 order_conditions = [
@@ -289,9 +280,7 @@ class PaymentReconcileService:
                 if hasattr(Order, "brand_id"):
                     order_conditions.append(Order.brand_id == brand_id)
 
-                pos_orders = (await session.execute(
-                    select(Order).where(and_(*order_conditions))
-                )).scalars().all()
+                pos_orders = (await session.execute(select(Order).where(and_(*order_conditions)))).scalars().all()
 
                 # 3. 统计
                 batch.channel_total_count = len(channel_records)
@@ -299,8 +288,7 @@ class PaymentReconcileService:
                 batch.channel_fee_fen = sum(r.fee_fen for r in channel_records)
                 batch.pos_total_count = len(pos_orders)
                 batch.pos_total_fen = sum(
-                    getattr(o, "total_amount", 0) or getattr(o, "final_amount", 0) or 0
-                    for o in pos_orders
+                    getattr(o, "total_amount", 0) or getattr(o, "final_amount", 0) or 0 for o in pos_orders
                 )
 
                 # 4. 匹配
@@ -339,16 +327,18 @@ class PaymentReconcileService:
                         # 检查金额差异
                         pos_amt = getattr(order, "total_amount", 0) or getattr(order, "final_amount", 0) or 0
                         if pos_amt != pr.amount_fen:
-                            diffs.append(ReconciliationDiff(
-                                batch_id=batch.id,
-                                diff_type="amount_mismatch",
-                                trade_no=pr.trade_no,
-                                pos_amount_fen=pos_amt,
-                                channel_amount_fen=pr.amount_fen,
-                                diff_amount_fen=pos_amt - pr.amount_fen,
-                                order_id=str(order.id),
-                                description=f"金额不符: POS={pos_amt / 100:.2f}元, 渠道={pr.amount_fen / 100:.2f}元",
-                            ))
+                            diffs.append(
+                                ReconciliationDiff(
+                                    batch_id=batch.id,
+                                    diff_type="amount_mismatch",
+                                    trade_no=pr.trade_no,
+                                    pos_amount_fen=pos_amt,
+                                    channel_amount_fen=pr.amount_fen,
+                                    diff_amount_fen=pos_amt - pr.amount_fen,
+                                    order_id=str(order.id),
+                                    description=f"金额不符: POS={pos_amt / 100:.2f}元, 渠道={pr.amount_fen / 100:.2f}元",
+                                )
+                            )
                         continue
 
                     # 策略2: out_trade_no 匹配
@@ -382,28 +372,32 @@ class PaymentReconcileService:
                     if not matched:
                         # 渠道有、POS无
                         pr.match_status = MatchStatus.UNMATCHED.value
-                        diffs.append(ReconciliationDiff(
-                            batch_id=batch.id,
-                            diff_type="channel_only",
-                            trade_no=pr.trade_no,
-                            channel_amount_fen=pr.amount_fen,
-                            diff_amount_fen=pr.amount_fen,
-                            description=f"渠道有POS无: {pr.trade_no}, 金额={pr.amount_fen / 100:.2f}元",
-                        ))
+                        diffs.append(
+                            ReconciliationDiff(
+                                batch_id=batch.id,
+                                diff_type="channel_only",
+                                trade_no=pr.trade_no,
+                                channel_amount_fen=pr.amount_fen,
+                                diff_amount_fen=pr.amount_fen,
+                                description=f"渠道有POS无: {pr.trade_no}, 金额={pr.amount_fen / 100:.2f}元",
+                            )
+                        )
 
                 # POS有、渠道无
                 for o in pos_orders:
                     oid = str(o.id)
                     if oid not in matched_order_ids:
                         pos_amt = getattr(o, "total_amount", 0) or getattr(o, "final_amount", 0) or 0
-                        diffs.append(ReconciliationDiff(
-                            batch_id=batch.id,
-                            diff_type="pos_only",
-                            pos_amount_fen=pos_amt,
-                            diff_amount_fen=pos_amt,
-                            order_id=oid,
-                            description=f"POS有渠道无: 订单={oid}, 金额={pos_amt / 100:.2f}元",
-                        ))
+                        diffs.append(
+                            ReconciliationDiff(
+                                batch_id=batch.id,
+                                diff_type="pos_only",
+                                pos_amount_fen=pos_amt,
+                                diff_amount_fen=pos_amt,
+                                order_id=oid,
+                                description=f"POS有渠道无: 订单={oid}, 金额={pos_amt / 100:.2f}元",
+                            )
+                        )
 
                 # 5. 更新批次统计
                 batch.matched_count = matched_count
@@ -475,45 +469,53 @@ class PaymentReconcileService:
                 conditions.append(ReconciliationBatch.reconcile_date <= end_date)
 
             # 总数
-            total = (await session.execute(
-                select(func.count()).select_from(ReconciliationBatch).where(and_(*conditions))
-            )).scalar() or 0
+            total = (
+                await session.execute(select(func.count()).select_from(ReconciliationBatch).where(and_(*conditions)))
+            ).scalar() or 0
 
             # 分页
             offset = (page - 1) * page_size
-            rows = (await session.execute(
-                select(ReconciliationBatch)
-                .where(and_(*conditions))
-                .order_by(ReconciliationBatch.reconcile_date.desc())
-                .offset(offset)
-                .limit(page_size)
-            )).scalars().all()
+            rows = (
+                (
+                    await session.execute(
+                        select(ReconciliationBatch)
+                        .where(and_(*conditions))
+                        .order_by(ReconciliationBatch.reconcile_date.desc())
+                        .offset(offset)
+                        .limit(page_size)
+                    )
+                )
+                .scalars()
+                .all()
+            )
 
             batches = []
             for b in rows:
-                batches.append({
-                    "id": str(b.id),
-                    "brand_id": b.brand_id,
-                    "channel": b.channel,
-                    "reconcile_date": b.reconcile_date.isoformat(),
-                    "pos_total_count": b.pos_total_count,
-                    "pos_total_fen": b.pos_total_fen,
-                    "pos_total_yuan": round(b.pos_total_fen / 100, 2),
-                    "channel_total_count": b.channel_total_count,
-                    "channel_total_fen": b.channel_total_fen,
-                    "channel_total_yuan": round(b.channel_total_fen / 100, 2),
-                    "channel_fee_fen": b.channel_fee_fen,
-                    "channel_fee_yuan": round(b.channel_fee_fen / 100, 2),
-                    "matched_count": b.matched_count,
-                    "unmatched_pos_count": b.unmatched_pos_count,
-                    "unmatched_channel_count": b.unmatched_channel_count,
-                    "diff_fen": b.diff_fen,
-                    "diff_yuan": round(b.diff_fen / 100, 2),
-                    "match_rate": b.match_rate,
-                    "status": b.status,
-                    "error_message": b.error_message,
-                    "created_at": b.created_at.isoformat() if b.created_at else None,
-                })
+                batches.append(
+                    {
+                        "id": str(b.id),
+                        "brand_id": b.brand_id,
+                        "channel": b.channel,
+                        "reconcile_date": b.reconcile_date.isoformat(),
+                        "pos_total_count": b.pos_total_count,
+                        "pos_total_fen": b.pos_total_fen,
+                        "pos_total_yuan": round(b.pos_total_fen / 100, 2),
+                        "channel_total_count": b.channel_total_count,
+                        "channel_total_fen": b.channel_total_fen,
+                        "channel_total_yuan": round(b.channel_total_fen / 100, 2),
+                        "channel_fee_fen": b.channel_fee_fen,
+                        "channel_fee_yuan": round(b.channel_fee_fen / 100, 2),
+                        "matched_count": b.matched_count,
+                        "unmatched_pos_count": b.unmatched_pos_count,
+                        "unmatched_channel_count": b.unmatched_channel_count,
+                        "diff_fen": b.diff_fen,
+                        "diff_yuan": round(b.diff_fen / 100, 2),
+                        "match_rate": b.match_rate,
+                        "status": b.status,
+                        "error_message": b.error_message,
+                        "created_at": b.created_at.isoformat() if b.created_at else None,
+                    }
+                )
 
             return {
                 "batches": batches,
@@ -530,37 +532,45 @@ class PaymentReconcileService:
         """获取对账批次详情（含差异记录）"""
         bid = uuid.UUID(batch_id)
         async with get_db_session() as session:
-            batch = (await session.execute(
-                select(ReconciliationBatch).where(ReconciliationBatch.id == bid)
-            )).scalar_one_or_none()
+            batch = (
+                await session.execute(select(ReconciliationBatch).where(ReconciliationBatch.id == bid))
+            ).scalar_one_or_none()
 
             if not batch:
                 return None
 
-            diffs = (await session.execute(
-                select(ReconciliationDiff)
-                .where(ReconciliationDiff.batch_id == bid)
-                .order_by(ReconciliationDiff.created_at.asc())
-            )).scalars().all()
+            diffs = (
+                (
+                    await session.execute(
+                        select(ReconciliationDiff)
+                        .where(ReconciliationDiff.batch_id == bid)
+                        .order_by(ReconciliationDiff.created_at.asc())
+                    )
+                )
+                .scalars()
+                .all()
+            )
 
             diff_list = []
             for d in diffs:
-                diff_list.append({
-                    "id": str(d.id),
-                    "diff_type": d.diff_type,
-                    "trade_no": d.trade_no,
-                    "pos_amount_fen": d.pos_amount_fen,
-                    "pos_amount_yuan": round(d.pos_amount_fen / 100, 2) if d.pos_amount_fen else None,
-                    "channel_amount_fen": d.channel_amount_fen,
-                    "channel_amount_yuan": round(d.channel_amount_fen / 100, 2) if d.channel_amount_fen else None,
-                    "diff_amount_fen": d.diff_amount_fen,
-                    "diff_amount_yuan": round(d.diff_amount_fen / 100, 2) if d.diff_amount_fen else None,
-                    "order_id": d.order_id,
-                    "description": d.description,
-                    "resolved": d.resolved,
-                    "resolved_by": d.resolved_by,
-                    "resolved_at": d.resolved_at.isoformat() if d.resolved_at else None,
-                })
+                diff_list.append(
+                    {
+                        "id": str(d.id),
+                        "diff_type": d.diff_type,
+                        "trade_no": d.trade_no,
+                        "pos_amount_fen": d.pos_amount_fen,
+                        "pos_amount_yuan": round(d.pos_amount_fen / 100, 2) if d.pos_amount_fen else None,
+                        "channel_amount_fen": d.channel_amount_fen,
+                        "channel_amount_yuan": round(d.channel_amount_fen / 100, 2) if d.channel_amount_fen else None,
+                        "diff_amount_fen": d.diff_amount_fen,
+                        "diff_amount_yuan": round(d.diff_amount_fen / 100, 2) if d.diff_amount_fen else None,
+                        "order_id": d.order_id,
+                        "description": d.description,
+                        "resolved": d.resolved,
+                        "resolved_by": d.resolved_by,
+                        "resolved_at": d.resolved_at.isoformat() if d.resolved_at else None,
+                    }
+                )
 
             return {
                 "batch": {
@@ -597,42 +607,46 @@ class PaymentReconcileService:
         cutoff = date.today() - timedelta(days=days)
 
         async with get_db_session() as session:
-            row = (await session.execute(
-                select(
-                    func.count(ReconciliationBatch.id).label("total_batches"),
-                    func.coalesce(func.sum(ReconciliationBatch.pos_total_fen), 0).label("total_pos_fen"),
-                    func.coalesce(func.sum(ReconciliationBatch.channel_total_fen), 0).label("total_channel_fen"),
-                    func.coalesce(func.sum(ReconciliationBatch.diff_fen), 0).label("total_diff_fen"),
-                    func.coalesce(func.sum(ReconciliationBatch.matched_count), 0).label("total_matched"),
-                    func.coalesce(func.sum(ReconciliationBatch.channel_fee_fen), 0).label("total_fee_fen"),
-                    func.coalesce(func.avg(ReconciliationBatch.match_rate), 0).label("avg_match_rate"),
-                    func.sum(case(
-                        (ReconciliationBatch.status == "completed", 1), else_=0
-                    )).label("completed_count"),
-                ).where(
-                    and_(
-                        ReconciliationBatch.brand_id == brand_id,
-                        ReconciliationBatch.reconcile_date >= cutoff,
+            row = (
+                await session.execute(
+                    select(
+                        func.count(ReconciliationBatch.id).label("total_batches"),
+                        func.coalesce(func.sum(ReconciliationBatch.pos_total_fen), 0).label("total_pos_fen"),
+                        func.coalesce(func.sum(ReconciliationBatch.channel_total_fen), 0).label("total_channel_fen"),
+                        func.coalesce(func.sum(ReconciliationBatch.diff_fen), 0).label("total_diff_fen"),
+                        func.coalesce(func.sum(ReconciliationBatch.matched_count), 0).label("total_matched"),
+                        func.coalesce(func.sum(ReconciliationBatch.channel_fee_fen), 0).label("total_fee_fen"),
+                        func.coalesce(func.avg(ReconciliationBatch.match_rate), 0).label("avg_match_rate"),
+                        func.sum(case((ReconciliationBatch.status == "completed", 1), else_=0)).label("completed_count"),
+                    ).where(
+                        and_(
+                            ReconciliationBatch.brand_id == brand_id,
+                            ReconciliationBatch.reconcile_date >= cutoff,
+                        )
                     )
                 )
-            )).one()
+            ).one()
 
             # 未解决差异数
-            unresolved = (await session.execute(
-                select(func.count()).select_from(ReconciliationDiff).where(
-                    and_(
-                        ReconciliationDiff.resolved == False,  # noqa: E712
-                        ReconciliationDiff.batch_id.in_(
-                            select(ReconciliationBatch.id).where(
-                                and_(
-                                    ReconciliationBatch.brand_id == brand_id,
-                                    ReconciliationBatch.reconcile_date >= cutoff,
+            unresolved = (
+                await session.execute(
+                    select(func.count())
+                    .select_from(ReconciliationDiff)
+                    .where(
+                        and_(
+                            ReconciliationDiff.resolved == False,  # noqa: E712
+                            ReconciliationDiff.batch_id.in_(
+                                select(ReconciliationBatch.id).where(
+                                    and_(
+                                        ReconciliationBatch.brand_id == brand_id,
+                                        ReconciliationBatch.reconcile_date >= cutoff,
+                                    )
                                 )
-                            )
-                        ),
+                            ),
+                        )
                     )
                 )
-            )).scalar() or 0
+            ).scalar() or 0
 
             total_pos_fen = int(row.total_pos_fen or 0)
             total_channel_fen = int(row.total_channel_fen or 0)
@@ -662,9 +676,7 @@ class PaymentReconcileService:
         """标记差异记录为已处理"""
         did = uuid.UUID(diff_id)
         async with get_db_session() as session:
-            diff = (await session.execute(
-                select(ReconciliationDiff).where(ReconciliationDiff.id == did)
-            )).scalar_one_or_none()
+            diff = (await session.execute(select(ReconciliationDiff).where(ReconciliationDiff.id == did))).scalar_one_or_none()
 
             if not diff:
                 return False

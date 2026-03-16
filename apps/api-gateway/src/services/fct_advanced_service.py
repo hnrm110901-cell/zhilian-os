@@ -9,6 +9,7 @@ FCT 高级功能服务
 - 核心逻辑为纯函数（可单元测试）
 - DB 交互在 async 方法中（可 mock）
 """
+
 import re
 import uuid
 from dataclasses import dataclass, field
@@ -25,9 +26,11 @@ logger = structlog.get_logger()
 # 1. 银企直连 — 纯函数
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class BankTransaction:
     """银行流水记录（轻量DTO）"""
+
     id: str
     tx_date: str
     direction: str  # credit / debit
@@ -42,9 +45,10 @@ class BankTransaction:
 @dataclass
 class MatchRule:
     """匹配规则"""
+
     rule_name: str
-    match_field: str       # counterparty / memo / amount
-    match_pattern: str     # SQL LIKE 模式 → Python 正则
+    match_field: str  # counterparty / memo / amount
+    match_pattern: str  # SQL LIKE 模式 → Python 正则
     target_account_code: str = ""
     priority: int = 0
 
@@ -120,9 +124,11 @@ def compute_bank_balance(
 # 2. 多实体合并 — 纯函数
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class EntityFinancials:
     """单实体财务摘要"""
+
     entity_id: str
     entity_name: str
     revenue_yuan: float = 0.0
@@ -133,6 +139,7 @@ class EntityFinancials:
 @dataclass
 class IntercompanyItem:
     """内部往来项"""
+
     from_entity_id: str
     to_entity_id: str
     amount_yuan: float
@@ -142,6 +149,7 @@ class IntercompanyItem:
 @dataclass
 class ConsolidationResult:
     """合并结果"""
+
     period: str
     entity_count: int
     total_revenue_yuan: float
@@ -209,9 +217,11 @@ def validate_intercompany_balance(
 # 3. 税务申报自动提取 — 纯函数
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class VoucherSummary:
     """凭证摘要（用于税务提取）"""
+
     account_code: str
     account_name: str
     debit_total: float = 0.0
@@ -221,6 +231,7 @@ class VoucherSummary:
 @dataclass
 class ExtractRule:
     """税务提取规则"""
+
     field_name: str
     field_label: str
     account_codes: list[str]
@@ -231,6 +242,7 @@ class ExtractRule:
 @dataclass
 class ExtractedField:
     """提取的申报字段"""
+
     field_name: str
     field_label: str
     value_yuan: float
@@ -266,12 +278,14 @@ def extract_tax_fields(
                 elif rule.direction == "net":
                     total += vs.debit_total - vs.credit_total
 
-        results.append(ExtractedField(
-            field_name=rule.field_name,
-            field_label=rule.field_label,
-            value_yuan=round(total, 2),
-            source_accounts=matched_accounts,
-        ))
+        results.append(
+            ExtractedField(
+                field_name=rule.field_name,
+                field_label=rule.field_label,
+                value_yuan=round(total, 2),
+                source_accounts=matched_accounts,
+            )
+        )
 
     return results
 

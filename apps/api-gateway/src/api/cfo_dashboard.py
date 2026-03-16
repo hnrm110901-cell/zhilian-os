@@ -8,12 +8,12 @@
   GET  /api/v1/cfo/actions             — 品牌行动清单
   POST /api/v1/cfo/report/save         — 持久化快照
 """
+
 from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.services import cfo_dashboard_service as svc
 
@@ -26,6 +26,7 @@ def _default_period() -> str:
 
 # ── BFF ──────────────────────────────────────────────────────────────────────
 
+
 @router.get("/dashboard")
 async def get_cfo_dashboard(
     brand_id: str = Query(..., description="品牌ID"),
@@ -37,6 +38,7 @@ async def get_cfo_dashboard(
 
 
 # ── 子模块端点 ────────────────────────────────────────────────────────────────
+
 
 @router.get("/health-overview")
 async def get_health_overview(
@@ -78,6 +80,7 @@ async def get_actions(
 
 # ── 快照持久化 ────────────────────────────────────────────────────────────────
 
+
 @router.post("/report/save")
 async def save_report(
     brand_id: str = Query(...),
@@ -92,6 +95,7 @@ async def save_report(
 
 
 # ── Meta ──────────────────────────────────────────────────────────────────────
+
 
 @router.get("/meta/grades")
 async def get_grade_meta():

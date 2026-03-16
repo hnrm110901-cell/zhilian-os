@@ -7,21 +7,15 @@
     instance = await engine.submit(db, template_code="leave", ...)
     await engine.approve(db, instance_id, approver_id, approver_name)
 """
-from datetime import datetime, timedelta, date
+
+from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 import structlog
-from sqlalchemy import select, and_, or_, update
+from sqlalchemy import and_, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.models.approval import (
-    ApprovalDelegation,
-    ApprovalInstance,
-    ApprovalRecord,
-    ApprovalStatus,
-    ApprovalTemplate,
-)
+from src.models.approval import ApprovalDelegation, ApprovalInstance, ApprovalRecord, ApprovalStatus, ApprovalTemplate
 from src.models.employee import Employee
 
 logger = structlog.get_logger()
@@ -57,9 +51,7 @@ class ApprovalEngine:
 
         # 2. 根据 amount_fen 判断是否需要额外审批层级
         if amount_fen is not None and template.amount_thresholds:
-            for threshold in sorted(
-                template.amount_thresholds, key=lambda t: t.get("threshold_fen", 0)
-            ):
+            for threshold in sorted(template.amount_thresholds, key=lambda t: t.get("threshold_fen", 0)):
                 thr = threshold.get("threshold_fen", 0)
                 extra_role = threshold.get("extra_approver_role")
                 if amount_fen >= thr and extra_role:
@@ -67,11 +59,13 @@ class ApprovalEngine:
                     existing_roles = {step.get("role") for step in chain}
                     if extra_role not in existing_roles:
                         new_level = max((s.get("level", 0) for s in chain), default=0) + 1
-                        chain.append({
-                            "level": new_level,
-                            "role": extra_role,
-                            "timeout_hours": 72,
-                        })
+                        chain.append(
+                            {
+                                "level": new_level,
+                                "role": extra_role,
+                                "timeout_hours": 72,
+                            }
+                        )
 
         # 重新排序
         chain.sort(key=lambda s: s.get("level", 0))
@@ -109,9 +103,7 @@ class ApprovalEngine:
         # 5. 通知第一级审批人
         if chain:
             first_role = chain[0].get("role", "store_manager")
-            approver = await self._resolve_approver(
-                db, first_role, store_id, brand_id
-            )
+            approver = await self._resolve_approver(db, first_role, store_id, brand_id)
             if approver:
                 await self._notify_approver(db, instance, approver, brand_id)
 
@@ -146,9 +138,7 @@ class ApprovalEngine:
         delegated_to_id = None
         delegated_to_name = None
 
-        delegation = await self._check_delegation(
-            db, approver_id, instance.template_code, instance.brand_id
-        )
+        delegation = await self._check_delegation(db, approver_id, instance.template_code, instance.brand_id)
         if delegation:
             delegated_to_id = delegation.delegate_id
             delegated_to_name = delegation.delegate_name
@@ -193,9 +183,7 @@ class ApprovalEngine:
 
             # 通知下一级审批人
             next_role = next_step.get("role", "store_manager")
-            approver = await self._resolve_approver(
-                db, next_role, instance.store_id, instance.brand_id
-            )
+            approver = await self._resolve_approver(db, next_role, instance.store_id, instance.brand_id)
             if approver:
                 await self._notify_approver(db, instance, approver, instance.brand_id)
 
@@ -310,9 +298,7 @@ class ApprovalEngine:
         )
 
         # 通知被委托人
-        await self._notify_approver(
-            db, instance, {"id": delegate_to_id, "name": delegate_to_name}, instance.brand_id
-        )
+        await self._notify_approver(db, instance, {"id": delegate_to_id, "name": delegate_to_name}, instance.brand_id)
 
         return instance
 
@@ -365,9 +351,7 @@ class ApprovalEngine:
 
                 # 通知下一级审批人
                 next_role = next_step.get("role", "store_manager")
-                approver = await self._resolve_approver(
-                    db, next_role, instance.store_id, instance.brand_id
-                )
+                approver = await self._resolve_approver(db, next_role, instance.store_id, instance.brand_id)
                 if approver:
                     await self._notify_approver(db, instance, approver, instance.brand_id)
 
@@ -382,9 +366,7 @@ class ApprovalEngine:
                 current_step = self._find_step(chain, instance.current_level)
                 if current_step:
                     role = current_step.get("role", "store_manager")
-                    approver = await self._resolve_approver(
-                        db, role, instance.store_id, instance.brand_id
-                    )
+                    approver = await self._resolve_approver(db, role, instance.store_id, instance.brand_id)
                     if approver:
                         await self._send_reminder(db, instance, approver, instance.brand_id)
                 # 延长 deadline 24h 避免反复催
@@ -426,27 +408,23 @@ class ApprovalEngine:
 
         # 获取我负责角色对应的待审批
         # 先找出该审批人在组织中的角色
-        emp_result = await db.execute(
-            select(Employee.position, Employee.store_id).where(
-                Employee.id == approver_id
-            )
-        )
+        emp_result = await db.execute(select(Employee.position, Employee.store_id).where(Employee.id == approver_id))
         emp_row = emp_result.first()
         approver_role = emp_row[0] if emp_row else None
 
         # 查找状态为 pending/escalated 的实例
         conditions = [
-            ApprovalInstance.status.in_([
-                ApprovalStatus.PENDING.value,
-                ApprovalStatus.ESCALATED.value,
-            ]),
+            ApprovalInstance.status.in_(
+                [
+                    ApprovalStatus.PENDING.value,
+                    ApprovalStatus.ESCALATED.value,
+                ]
+            ),
         ]
         if brand_id:
             conditions.append(ApprovalInstance.brand_id == brand_id)
 
-        result = await db.execute(
-            select(ApprovalInstance).where(and_(*conditions))
-        )
+        result = await db.execute(select(ApprovalInstance).where(and_(*conditions)))
         all_pending = result.scalars().all()
 
         # 过滤：当前级别的角色匹配审批人角色
@@ -470,9 +448,7 @@ class ApprovalEngine:
                 continue
             # 检查委托人的角色是否匹配
             for did in delegator_ids:
-                d_result = await db.execute(
-                    select(Employee.position).where(Employee.id == did)
-                )
+                d_result = await db.execute(select(Employee.position).where(Employee.id == did))
                 d_row = d_result.first()
                 if d_row:
                     d_role = role_map.get(d_row[0], d_row[0])
@@ -486,18 +462,14 @@ class ApprovalEngine:
     #  查询：审批轨迹
     # ──────────────────────────────────────────────────────────
 
-    async def get_approval_history(
-        self, db: AsyncSession, instance_id: UUID
-    ) -> Dict[str, Any]:
+    async def get_approval_history(self, db: AsyncSession, instance_id: UUID) -> Dict[str, Any]:
         """获取审批轨迹"""
         instance = await self._get_instance(db, instance_id)
         if not instance:
             raise ValueError(f"审批实例 {instance_id} 不存在")
 
         result = await db.execute(
-            select(ApprovalRecord)
-            .where(ApprovalRecord.instance_id == instance_id)
-            .order_by(ApprovalRecord.acted_at.asc())
+            select(ApprovalRecord).where(ApprovalRecord.instance_id == instance_id).order_by(ApprovalRecord.acted_at.asc())
         )
         records = result.scalars().all()
 
@@ -539,9 +511,7 @@ class ApprovalEngine:
     #  内部方法
     # ──────────────────────────────────────────────────────────
 
-    async def _get_template(
-        self, db: AsyncSession, template_code: str
-    ) -> Optional[ApprovalTemplate]:
+    async def _get_template(self, db: AsyncSession, template_code: str) -> Optional[ApprovalTemplate]:
         """获取审批模板"""
         result = await db.execute(
             select(ApprovalTemplate).where(
@@ -553,27 +523,19 @@ class ApprovalEngine:
         )
         return result.scalars().first()
 
-    async def _get_instance(
-        self, db: AsyncSession, instance_id: UUID
-    ) -> Optional[ApprovalInstance]:
+    async def _get_instance(self, db: AsyncSession, instance_id: UUID) -> Optional[ApprovalInstance]:
         """获取审批实例"""
-        result = await db.execute(
-            select(ApprovalInstance).where(ApprovalInstance.id == instance_id)
-        )
+        result = await db.execute(select(ApprovalInstance).where(ApprovalInstance.id == instance_id))
         return result.scalars().first()
 
-    def _find_step(
-        self, chain: List[Dict], level: int
-    ) -> Optional[Dict]:
+    def _find_step(self, chain: List[Dict], level: int) -> Optional[Dict]:
         """在审批链中找到指定 level 的步骤"""
         for step in chain:
             if step.get("level") == level:
                 return step
         return None
 
-    def _find_next_step(
-        self, chain: List[Dict], current_level: int
-    ) -> Optional[Dict]:
+    def _find_next_step(self, chain: List[Dict], current_level: int) -> Optional[Dict]:
         """找到下一级审批步骤"""
         chain_sorted = sorted(chain, key=lambda s: s.get("level", 0))
         for step in chain_sorted:
@@ -595,13 +557,15 @@ class ApprovalEngine:
         # 先在门店内查找
         for pos in positions:
             result = await db.execute(
-                select(Employee.id, Employee.name).where(
+                select(Employee.id, Employee.name)
+                .where(
                     and_(
                         Employee.store_id == store_id,
                         Employee.position == pos,
                         Employee.is_active.is_(True),
                     )
-                ).limit(1)
+                )
+                .limit(1)
             )
             row = result.first()
             if row:
@@ -610,12 +574,14 @@ class ApprovalEngine:
         # 跨门店查找（如 area_manager / hr_director / ceo 可能不在同一门店）
         for pos in positions:
             result = await db.execute(
-                select(Employee.id, Employee.name).where(
+                select(Employee.id, Employee.name)
+                .where(
                     and_(
                         Employee.position == pos,
                         Employee.is_active.is_(True),
                     )
-                ).limit(1)
+                )
+                .limit(1)
             )
             row = result.first()
             if row:
@@ -666,14 +632,13 @@ class ApprovalEngine:
         """通过 IM 通知审批人"""
         try:
             from src.services.im_message_service import IMMessageService
+
             im = IMMessageService(db)
 
             approver_id = approver.get("id", "")
             title = f"待审批: {instance.summary or instance.business_type}"
             description = (
-                f"申请人: {instance.applicant_name}\n"
-                f"类型: {instance.business_type}\n"
-                f"摘要: {instance.summary or '无'}"
+                f"申请人: {instance.applicant_name}\n" f"类型: {instance.business_type}\n" f"摘要: {instance.summary or '无'}"
             )
             if instance.amount_fen:
                 description += f"\n金额: {instance.amount_fen / 100:.2f} 元"
@@ -710,6 +675,7 @@ class ApprovalEngine:
         """通知申请人审批结果"""
         try:
             from src.services.im_message_service import IMMessageService
+
             im = IMMessageService(db)
 
             status_label = "已通过" if result_text == "approved" else "已驳回"
@@ -741,6 +707,7 @@ class ApprovalEngine:
         """发送催办通知"""
         try:
             from src.services.im_message_service import IMMessageService
+
             im = IMMessageService(db)
 
             content = (

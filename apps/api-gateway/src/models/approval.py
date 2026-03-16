@@ -2,14 +2,13 @@
 通用审批流引擎 — 多级路由/委托/催办/超期升级
 支持请假、薪资调整、入离调转、奖惩、合同续签等多业务审批场景
 """
+
 import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import (
-    Column, String, Integer, Boolean, Date, DateTime, Text, ForeignKey,
-)
-from sqlalchemy.dialects.postgresql import UUID, JSON
+from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSON, UUID
 
 from .base import Base, TimestampMixin
 
@@ -24,6 +23,7 @@ class ApprovalStatus(str, enum.Enum):
 
 class ApprovalTemplate(Base, TimestampMixin):
     """审批模板 — 定义审批路由规则"""
+
     __tablename__ = "approval_templates"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -50,6 +50,7 @@ class ApprovalTemplate(Base, TimestampMixin):
 
 class ApprovalInstance(Base, TimestampMixin):
     """审批实例 — 一次具体的审批流程"""
+
     __tablename__ = "hr_approval_instances"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -86,6 +87,7 @@ class ApprovalInstance(Base, TimestampMixin):
 
 class ApprovalRecord(Base, TimestampMixin):
     """审批记录 — 每一步的审批动作"""
+
     __tablename__ = "hr_approval_records"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -112,6 +114,7 @@ class ApprovalRecord(Base, TimestampMixin):
 
 class ApprovalDelegation(Base, TimestampMixin):
     """审批委托 — 休假时指定代理人"""
+
     __tablename__ = "hr_approval_delegations"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

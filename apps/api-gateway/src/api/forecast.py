@@ -1,17 +1,18 @@
 """
 Prophet 预测 API
 """
+
 from datetime import date, timedelta
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
-from ..models.order import Order
 from ..models.kpi import KPIRecord
+from ..models.order import Order
 from ..services.prophet_forecast_service import prophet_forecast_service
 
 router = APIRouter(prefix="/api/v1/forecast", tags=["forecast"])
@@ -128,6 +129,7 @@ async def invalidate_forecast_cache(
 
 # ==================== FEAT-002: 预测性备料建议 ====================
 
+
 @router.get("/daily-suggestion")
 async def get_daily_forecast_suggestion(
     store_id: str = Query(..., description="门店ID"),
@@ -146,17 +148,15 @@ async def get_daily_forecast_suggestion(
         store_id: 门店ID
         target_date: 目标日期（默认明日）
     """
-    from ..services.demand_forecaster import DemandForecaster
     from datetime import date as _date
+
+    from ..services.demand_forecaster import DemandForecaster
 
     if target_date:
         try:
             t_date = _date.fromisoformat(target_date)
         except ValueError:
-            raise HTTPException(
-                status_code=400,
-                detail={"message": f"日期格式错误，请使用 YYYY-MM-DD，实际值: {target_date}"}
-            )
+            raise HTTPException(status_code=400, detail={"message": f"日期格式错误，请使用 YYYY-MM-DD，实际值: {target_date}"})
     else:
         t_date = _date.today() + timedelta(days=1)
 

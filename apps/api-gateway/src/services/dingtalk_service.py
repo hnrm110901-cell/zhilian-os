@@ -10,13 +10,15 @@ DingTalk Message Service for message sending and user management
 - send_decision_card() 决策型卡片推送
 - send_templated_message() 标准化模板消息
 """
-from typing import Dict, Any, List, Optional
-import json
+
 import hashlib
-import httpx
+import json
 import os
-import structlog
 from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
+
+import httpx
+import structlog
 
 from ..core.config import settings
 
@@ -34,7 +36,6 @@ TEMPLATES: Dict[str, Any] = {
         f"**订单号**：{data.get('order_id', '-')}\n\n"
         f"---\n\n请尽快审批处理"
     ),
-
     "anomaly_alert": lambda data: (
         f"### 异常告警\n\n"
         f"**门店**：{data.get('store_name', data.get('store_id', ''))}\n\n"
@@ -43,7 +44,6 @@ TEMPLATES: Dict[str, Any] = {
         f"**严重级别**：{data.get('severity', 'medium')}\n\n"
         f"---\n\n请及时处理"
     ),
-
     "shift_report": lambda data: (
         f"### 班次报表\n\n"
         f"**门店**：{data.get('store_name', data.get('store_id', ''))}\n\n"
@@ -53,11 +53,10 @@ TEMPLATES: Dict[str, Any] = {
         f"**客流量**：{data.get('customer_count', 0)}\n\n"
         f"---\n\n班次已结束，数据已汇总"
     ),
-
     "daily_forecast": lambda data: (
         f"### 备料建议 — 明日 {data.get('target_date', '')}\n\n"
         f"**门店**：{data.get('store_name', data.get('store_id', ''))}\n\n"
-        + (f"> ⚠️ {data.get('note', '')}\n\n" if data.get('note') else "")
+        + (f"> ⚠️ {data.get('note', '')}\n\n" if data.get("note") else "")
         + f"**预估营收**：¥{data.get('estimated_revenue', 0):.0f}\n\n"
         f"**置信度**：{data.get('confidence', 'low')}\n\n"
         f"---\n\n建议提前备料"
@@ -120,9 +119,7 @@ class DingTalkService:
                     self.access_token = data["access_token"]
                     _token_ttl = int(os.getenv("DINGTALK_TOKEN_TTL", "7200"))
                     _refresh_buffer = int(os.getenv("DINGTALK_TOKEN_REFRESH_BUFFER", "300"))
-                    self.token_expire_time = datetime.now() + timedelta(
-                        seconds=_token_ttl - _refresh_buffer
-                    )
+                    self.token_expire_time = datetime.now() + timedelta(seconds=_token_ttl - _refresh_buffer)
                     logger.info("钉钉access_token获取成功")
                     return self.access_token
                 else:
@@ -253,9 +250,7 @@ class DingTalkService:
 
         return await self._send_work_notification(token, message_data)
 
-    async def _send_work_notification(
-        self, token: str, message_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def _send_work_notification(self, token: str, message_data: Dict[str, Any]) -> Dict[str, Any]:
         """统一发送钉钉工作通知"""
         try:
             async with httpx.AsyncClient() as client:
@@ -351,9 +346,7 @@ class DingTalkService:
         带 Redis 去重保护（TTL 24h）。
         """
         if not message_id:
-            message_id = hashlib.md5(
-                f"decision_card:{to_user_id}:{title}:{description[:50]}".encode()
-            ).hexdigest()
+            message_id = hashlib.md5(f"decision_card:{to_user_id}:{title}:{description[:50]}".encode()).hexdigest()
 
         if await self._is_duplicate(message_id):
             logger.info(
@@ -411,9 +404,7 @@ class DingTalkService:
     ) -> Dict[str, Any]:
         """使用模板发送标准化钉钉消息"""
         if template not in TEMPLATES:
-            raise ValueError(
-                f"未知模板: '{template}'。可用模板: {list(TEMPLATES.keys())}"
-            )
+            raise ValueError(f"未知模板: '{template}'。可用模板: {list(TEMPLATES.keys())}")
 
         if not message_id:
             message_id = hashlib.md5(
@@ -502,14 +493,10 @@ class DingTalkService:
                     if result.get("status") in ("sent", "skipped"):
                         succeeded += 1
                     else:
-                        await self._redis.rpush(
-                            FAILED_MSG_QUEUE_KEY, json.dumps(msg, default=str)
-                        )
+                        await self._redis.rpush(FAILED_MSG_QUEUE_KEY, json.dumps(msg, default=str))
                 except Exception as e:
                     logger.error("dingtalk.retry.failed", error=str(e))
-                    await self._redis.rpush(
-                        FAILED_MSG_QUEUE_KEY, json.dumps(msg, default=str)
-                    )
+                    await self._redis.rpush(FAILED_MSG_QUEUE_KEY, json.dumps(msg, default=str))
 
             except Exception as e:
                 logger.warning("dingtalk.retry.queue_error", error=str(e))

@@ -10,8 +10,9 @@
   - 《个人信息保护法》第五十一条 — 加密等安全技术措施
   - PCI-DSS Requirement 3.4 — 存储时不可读
 """
-import os
+
 import base64
+import os
 
 import structlog
 
@@ -19,6 +20,7 @@ logger = structlog.get_logger()
 
 try:
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
     _HAS_CRYPTOGRAPHY = True
 except ImportError:
     _HAS_CRYPTOGRAPHY = False
@@ -53,18 +55,15 @@ class FieldCrypto:
             try:
                 key = base64.b64decode(key_b64)
             except Exception as exc:
-                raise ValueError(
-                    "FIELD_ENCRYPTION_KEY base64 解码失败"
-                ) from exc
+                raise ValueError("FIELD_ENCRYPTION_KEY base64 解码失败") from exc
         if len(key) != 32:
             raise ValueError(
                 f"FIELD_ENCRYPTION_KEY 必须为 32 字节（当前 {len(key)} 字节），"
-                "请使用: python -c \"import os,base64; print(base64.b64encode(os.urandom(32)).decode())\""
+                '请使用: python -c "import os,base64; print(base64.b64encode(os.urandom(32)).decode())"'
             )
         if not _HAS_CRYPTOGRAPHY:
             raise RuntimeError(
-                "提供了 FIELD_ENCRYPTION_KEY 但 cryptography 包未安装，"
-                "无法启用加密: pip install cryptography>=42.0.0"
+                "提供了 FIELD_ENCRYPTION_KEY 但 cryptography 包未安装，" "无法启用加密: pip install cryptography>=42.0.0"
             )
         self._key = key
 
@@ -98,7 +97,7 @@ class FieldCrypto:
         if not ciphertext.startswith(self._PREFIX):
             return ciphertext  # 历史明文数据，原样返回
         try:
-            raw = base64.b64decode(ciphertext[len(self._PREFIX):])
+            raw = base64.b64decode(ciphertext[len(self._PREFIX) :])
         except Exception:
             logger.error("字段解密 base64 解码失败", value_prefix=ciphertext[:20])
             return ciphertext

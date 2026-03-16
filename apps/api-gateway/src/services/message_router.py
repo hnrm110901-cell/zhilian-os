@@ -4,9 +4,11 @@ Intelligent Message Router Service
 
 将用户消息路由到相应的Agent进行处理
 """
-from typing import Dict, Any, Optional, Tuple
-import structlog
+
 import re
+from typing import Any, Dict, Optional, Tuple
+
+import structlog
 
 logger = structlog.get_logger()
 
@@ -161,9 +163,7 @@ class MessageRouter:
         }
         return default_actions.get(agent_type, "query")
 
-    def _extract_params(
-        self, agent_type: str, action: str, content: str, user_id: str
-    ) -> Dict[str, Any]:
+    def _extract_params(self, agent_type: str, action: str, content: str, user_id: str) -> Dict[str, Any]:
         """
         从消息中提取参数
 
@@ -220,9 +220,7 @@ class MessageRouter:
 
         return params
 
-    def format_agent_response(
-        self, agent_type: str, action: str, result: Dict[str, Any]
-    ) -> str:
+    def format_agent_response(self, agent_type: str, action: str, result: Dict[str, Any]) -> str:
         """
         格式化Agent响应为用户友好的消息
 
@@ -309,8 +307,8 @@ class MessageRouter:
             for item in items[:5]:
                 msg += f"• {item.get('name')}\n"
                 msg += f"  库存：{item.get('quantity')} {item.get('unit')}\n"
-                status = item.get('status', 'normal')
-                if status == 'low':
+                status = item.get("status", "normal")
+                if status == "low":
                     msg += f"  ⚠️ 库存不足\n"
                 msg += "\n"
 

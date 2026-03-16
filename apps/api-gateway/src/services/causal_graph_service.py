@@ -55,9 +55,10 @@ class CausalGraphService:
         if self._driver is None:
             try:
                 from neo4j import GraphDatabase
-                uri  = os.getenv("NEO4J_URI",      "bolt://localhost:7687")
-                user = os.getenv("NEO4J_USER",     "neo4j")
-                pwd  = os.getenv("NEO4J_PASSWORD",  "")
+
+                uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+                user = os.getenv("NEO4J_USER", "neo4j")
+                pwd = os.getenv("NEO4J_PASSWORD", "")
                 if not pwd:
                     logger.warning("NEO4J_PASSWORD 未设置，跳过因果图谱查询")
                     return None
@@ -94,7 +95,7 @@ class CausalGraphService:
 
     async def get_waste_root_cause_summary(
         self,
-        store_id:    str,
+        store_id: str,
         window_days: int = DEFAULT_WINDOW_DAYS,
     ) -> List[str]:
         """
@@ -117,17 +118,13 @@ class CausalGraphService:
             """,
             {"store_id": store_id, "days": window_days},
         )
-        return [
-            f"近{window_days}天根因「{r['cause']}」出现 {r['freq']} 次，"
-            f"平均置信度 {r['avg_conf']:.0%}"
-            for r in rows
-        ]
+        return [f"近{window_days}天根因「{r['cause']}」出现 {r['freq']} 次，" f"平均置信度 {r['avg_conf']:.0%}" for r in rows]
 
     # ── 供应链溯源 ────────────────────────────────────────────────────────────
 
     async def get_ingredient_supply_chain(
         self,
-        store_id:    str,
+        store_id: str,
         window_days: int = DEFAULT_WINDOW_DAYS,
     ) -> List[str]:
         """
@@ -168,7 +165,7 @@ class CausalGraphService:
 
     async def get_bom_compliance_issues(
         self,
-        store_id:    str,
+        store_id: str,
         window_days: int = 30,
     ) -> List[str]:
         """
@@ -244,7 +241,7 @@ class CausalGraphService:
 
     async def get_staff_error_patterns(
         self,
-        store_id:    str,
+        store_id: str,
         window_days: int = 30,
     ) -> List[str]:
         """
@@ -267,30 +264,27 @@ class CausalGraphService:
         )
         hints = []
         SHIFT_LABELS = {
-            range(7, 10):  "早晚班交接（07-09时）",
+            range(7, 10): "早晚班交接（07-09时）",
             range(14, 17): "午晚班交接（14-16时）",
             range(21, 24): "晚班收尾（21-23时）",
         }
         for r in rows:
             hour = r.get("hour_of_day")
-            cnt  = r.get("cnt", 0)
+            cnt = r.get("cnt", 0)
             label = f"{hour}:00 附近"
             if hour is not None:
                 for rng, lbl in SHIFT_LABELS.items():
                     if int(hour) in rng:
                         label = lbl
                         break
-            hints.append(
-                f"员工操作失误集中在 {label}（{cnt} 次），"
-                f"建议强化该时段操作规范检查"
-            )
+            hints.append(f"员工操作失误集中在 {label}（{cnt} 次），" f"建议强化该时段操作规范检查")
         return hints
 
     # ── 跨店学习线索 ──────────────────────────────────────────────────────────
 
     async def get_cross_store_learning_hints(
         self,
-        store_id:    str,
+        store_id: str,
         metric_name: str = "waste_rate_p30d",
     ) -> List[str]:
         """
@@ -315,10 +309,10 @@ class CausalGraphService:
         )
         hints = []
         for r in rows:
-            self_val   = r.get("self_value") or 0
-            peer_val   = r.get("peer_value") or 0
-            gap        = (self_val - peer_val) / self_val if self_val else 0
-            sim_score  = r.get("sim_score", 0)
+            self_val = r.get("self_value") or 0
+            peer_val = r.get("peer_value") or 0
+            gap = (self_val - peer_val) / self_val if self_val else 0
+            sim_score = r.get("sim_score", 0)
             hints.append(
                 f"相似门店「{r['peer_id']}」{metric_name}={peer_val:.3f}，"
                 f"优于本店 {gap:.0%}（相似度 {sim_score:.2f}），"
@@ -330,7 +324,7 @@ class CausalGraphService:
 
     async def get_full_causal_summary(
         self,
-        store_id:    str,
+        store_id: str,
         window_days: int = DEFAULT_WINDOW_DAYS,
     ) -> List[str]:
         """
@@ -341,12 +335,12 @@ class CausalGraphService:
         all_hints: List[str] = []
 
         _queries = [
-            (self.get_waste_root_cause_summary,    (store_id, window_days)),
-            (self.get_ingredient_supply_chain,     (store_id, window_days)),
-            (self.get_bom_compliance_issues,       (store_id, window_days)),
-            (self.get_equipment_fault_chain,       (store_id,)),
-            (self.get_staff_error_patterns,        (store_id, window_days)),
-            (self.get_cross_store_learning_hints,  (store_id,)),
+            (self.get_waste_root_cause_summary, (store_id, window_days)),
+            (self.get_ingredient_supply_chain, (store_id, window_days)),
+            (self.get_bom_compliance_issues, (store_id, window_days)),
+            (self.get_equipment_fault_chain, (store_id,)),
+            (self.get_staff_error_patterns, (store_id, window_days)),
+            (self.get_cross_store_learning_hints, (store_id,)),
         ]
 
         for fn, args in _queries:

@@ -16,22 +16,24 @@ Key Management Service
 - 密钥长期不轮换
 """
 
-from typing import Dict, Optional
+import base64
+import json
+import logging
+import os
+import secrets
 from datetime import datetime, timedelta
+from typing import Dict, Optional
+
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2
-import base64
-import os
-import json
-import logging
-import secrets
 
 logger = logging.getLogger(__name__)
 
 
 class KMSException(Exception):
     """KMS异常"""
+
     pass
 
 
@@ -49,9 +51,7 @@ class KMSService:
         self.master_key = master_key or os.getenv("KMS_MASTER_KEY")
 
         if not self.master_key:
-            raise KMSException(
-                "Master key not found. Set KMS_MASTER_KEY environment variable."
-            )
+            raise KMSException("Master key not found. Set KMS_MASTER_KEY environment variable.")
 
         # 生成Fernet密钥
         self.fernet = self._generate_fernet_key(self.master_key)
@@ -79,10 +79,7 @@ class KMSService:
         if not salt_hex:
             # 生产环境必须预先设置 KMS_SALT 环境变量
             # 此处仅作为本地开发的安全回退，不应在生产中触发
-            logger.warning(
-                "KMS_SALT not set. Generating ephemeral salt. "
-                "Set KMS_SALT env var in production."
-            )
+            logger.warning("KMS_SALT not set. Generating ephemeral salt. " "Set KMS_SALT env var in production.")
             salt = secrets.token_bytes(32)
         else:
             salt = bytes.fromhex(salt_hex)
@@ -95,18 +92,11 @@ class KMSService:
             iterations=int(os.getenv("KMS_PBKDF2_ITERATIONS", "100000")),
         )
 
-        key = base64.urlsafe_b64encode(
-            kdf.derive(master_key.encode())
-        )
+        key = base64.urlsafe_b64encode(kdf.derive(master_key.encode()))
 
         return Fernet(key)
 
-    def encrypt_secret(
-        self,
-        key_id: str,
-        plaintext: str,
-        metadata: Optional[Dict] = None
-    ) -> str:
+    def encrypt_secret(self, key_id: str, plaintext: str, metadata: Optional[Dict] = None) -> str:
         """
         加密密钥
 
@@ -126,11 +116,9 @@ class KMSService:
             self.key_metadata[key_id] = {
                 "created_at": datetime.now().isoformat(),
                 "last_rotated": datetime.now().isoformat(),
-                "rotation_due": (
-                    datetime.now() + timedelta(days=self.rotation_days)
-                ).isoformat(),
+                "rotation_due": (datetime.now() + timedelta(days=self.rotation_days)).isoformat(),
                 "access_count": 0,
-                "metadata": metadata or {}
+                "metadata": metadata or {},
             }
 
             logger.info(f"Encrypted secret: {key_id}")
@@ -166,9 +154,7 @@ class KMSService:
             # 更新访问计数
             if key_id in self.key_metadata:
                 self.key_metadata[key_id]["access_count"] += 1
-                self.key_metadata[key_id]["last_accessed"] = (
-                    datetime.now().isoformat()
-                )
+                self.key_metadata[key_id]["last_accessed"] = datetime.now().isoformat()
 
             logger.debug("secret.decrypted", key_id=key_id)
 
@@ -181,12 +167,7 @@ class KMSService:
             logger.error(f"Decryption failed for {key_id}: {e}")
             raise KMSException(f"解密失败: {e}")
 
-    def rotate_key(
-        self,
-        key_id: str,
-        old_ciphertext: str,
-        new_plaintext: Optional[str] = None
-    ) -> str:
+    def rotate_key(self, key_id: str, old_ciphertext: str, new_plaintext: Optional[str] = None) -> str:
         """
         密钥轮换
 
@@ -208,15 +189,9 @@ class KMSService:
 
             # 更新元数据
             if key_id in self.key_metadata:
-                self.key_metadata[key_id]["last_rotated"] = (
-                    datetime.now().isoformat()
-                )
-                self.key_metadata[key_id]["rotation_due"] = (
-                    datetime.now() + timedelta(days=self.rotation_days)
-                ).isoformat()
-                self.key_metadata[key_id]["rotation_count"] = (
-                    self.key_metadata[key_id].get("rotation_count", 0) + 1
-                )
+                self.key_metadata[key_id]["last_rotated"] = datetime.now().isoformat()
+                self.key_metadata[key_id]["rotation_due"] = (datetime.now() + timedelta(days=self.rotation_days)).isoformat()
+                self.key_metadata[key_id]["rotation_count"] = self.key_metadata[key_id].get("rotation_count", 0) + 1
 
             logger.info(f"Rotated key: {key_id}")
 
@@ -242,9 +217,7 @@ class KMSService:
         if key_id not in self.key_metadata:
             return False
 
-        rotation_due = datetime.fromisoformat(
-            self.key_metadata[key_id]["rotation_due"]
-        )
+        rotation_due = datetime.fromisoformat(self.key_metadata[key_id]["rotation_due"])
 
         return datetime.now() >= rotation_due
 
@@ -259,16 +232,15 @@ class KMSService:
 
         for key_id in self.key_metadata:
             if self._should_rotate(key_id):
-                due_keys.append({
-                    "key_id": key_id,
-                    "rotation_due": self.key_metadata[key_id]["rotation_due"],
-                    "days_overdue": (
-                        datetime.now() -
-                        datetime.fromisoformat(
-                            self.key_metadata[key_id]["rotation_due"]
-                        )
-                    ).days
-                })
+                due_keys.append(
+                    {
+                        "key_id": key_id,
+                        "rotation_due": self.key_metadata[key_id]["rotation_due"],
+                        "days_overdue": (
+                            datetime.now() - datetime.fromisoformat(self.key_metadata[key_id]["rotation_due"])
+                        ).days,
+                    }
+                )
 
         return due_keys
 
@@ -288,12 +260,7 @@ class KMSService:
         else:
             logger.warning(f"Key not found: {key_id}")
 
-    def _audit_log(
-        self,
-        operation: str,
-        key_id: str,
-        metadata: Optional[Dict] = None
-    ):
+    def _audit_log(self, operation: str, key_id: str, metadata: Optional[Dict] = None):
         """
         审计日志
 
@@ -306,7 +273,7 @@ class KMSService:
             "timestamp": datetime.now().isoformat(),
             "operation": operation,
             "key_id": key_id,
-            "metadata": metadata or {}
+            "metadata": metadata or {},
         }
 
         logger.info(f"KMS Audit: {json.dumps(audit_entry)}")
@@ -314,10 +281,12 @@ class KMSService:
         # 写入审计日志表（异步，不阻塞主流程）
         try:
             import asyncio
+
             from src.models.audit_log import AuditLog
 
             async def _save():
                 from src.core.database import get_db_session
+
                 async with get_db_session() as session:
                     log = AuditLog(
                         action=f"kms_{operation}",
@@ -355,13 +324,7 @@ class KMSService:
         Returns:
             密钥列表
         """
-        return [
-            {
-                "key_id": key_id,
-                **metadata
-            }
-            for key_id, metadata in self.key_metadata.items()
-        ]
+        return [{"key_id": key_id, **metadata} for key_id, metadata in self.key_metadata.items()]
 
     def get_statistics(self) -> Dict:
         """
@@ -373,16 +336,13 @@ class KMSService:
         total_keys = len(self.key_metadata)
         keys_due_for_rotation = len(self.get_keys_due_for_rotation())
 
-        total_access_count = sum(
-            metadata.get("access_count", 0)
-            for metadata in self.key_metadata.values()
-        )
+        total_access_count = sum(metadata.get("access_count", 0) for metadata in self.key_metadata.values())
 
         return {
             "total_keys": total_keys,
             "keys_due_for_rotation": keys_due_for_rotation,
             "total_access_count": total_access_count,
-            "rotation_policy_days": self.rotation_days
+            "rotation_policy_days": self.rotation_days,
         }
 
 
@@ -400,10 +360,7 @@ def init_kms_service(master_key: Optional[str] = None):
 def get_kms_service() -> KMSService:
     """获取KMS服务实例"""
     if _kms_service is None:
-        raise KMSException(
-            "KMS Service not initialized. "
-            "Call init_kms_service() first."
-        )
+        raise KMSException("KMS Service not initialized. " "Call init_kms_service() first.")
     return _kms_service
 
 
@@ -421,11 +378,7 @@ def encrypt_api_key(key_id: str, api_key: str, provider: str) -> str:
         加密后的密文
     """
     kms = get_kms_service()
-    return kms.encrypt_secret(
-        key_id=key_id,
-        plaintext=api_key,
-        metadata={"provider": provider, "type": "api_key"}
-    )
+    return kms.encrypt_secret(key_id=key_id, plaintext=api_key, metadata={"provider": provider, "type": "api_key"})
 
 
 def decrypt_api_key(key_id: str, encrypted_key: str) -> str:
@@ -443,11 +396,7 @@ def decrypt_api_key(key_id: str, encrypted_key: str) -> str:
     return kms.decrypt_secret(key_id, encrypted_key)
 
 
-def rotate_api_key(
-    key_id: str,
-    old_encrypted_key: str,
-    new_api_key: str
-) -> str:
+def rotate_api_key(key_id: str, old_encrypted_key: str, new_api_key: str) -> str:
     """
     轮换API密钥
 

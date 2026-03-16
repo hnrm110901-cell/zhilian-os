@@ -2,15 +2,16 @@
 自定义报表模板 API
 支持报表模板 CRUD、按模板生成报表、定时订阅管理
 """
-from typing import Any, Dict, List, Optional
+
 from datetime import date
+from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
-
 from src.core.dependencies import get_current_active_user
 from src.models import User
-from src.services.custom_report_service import custom_report_service, DATA_SOURCE_FIELDS
+from src.services.custom_report_service import DATA_SOURCE_FIELDS, custom_report_service
 
 router = APIRouter()
 
@@ -18,6 +19,7 @@ router = APIRouter()
 # ------------------------------------------------------------------ #
 # Pydantic 模型                                                        #
 # ------------------------------------------------------------------ #
+
 
 class ColumnDef(BaseModel):
     field: str
@@ -87,6 +89,7 @@ class ScheduledReportUpdateRequest(BaseModel):
 # 数据源元数据                                                          #
 # ------------------------------------------------------------------ #
 
+
 @router.get("/report-templates/data-sources")
 async def get_data_sources(
     current_user: User = Depends(get_current_active_user),
@@ -96,17 +99,13 @@ async def get_data_sources(
 
     用于前端构建报表模板时的字段选择器。
     """
-    return {
-        "data_sources": [
-            {"source": source, "fields": fields}
-            for source, fields in DATA_SOURCE_FIELDS.items()
-        ]
-    }
+    return {"data_sources": [{"source": source, "fields": fields} for source, fields in DATA_SOURCE_FIELDS.items()]}
 
 
 # ------------------------------------------------------------------ #
 # 报表模板 CRUD                                                        #
 # ------------------------------------------------------------------ #
+
 
 @router.get("/report-templates", response_model=List[TemplateResponse])
 async def list_templates(
@@ -216,6 +215,7 @@ async def delete_template(
 # 报表生成                                                              #
 # ------------------------------------------------------------------ #
 
+
 @router.get("/report-templates/{template_id}/generate")
 async def generate_report(
     template_id: str,
@@ -254,6 +254,7 @@ async def generate_report(
 # ------------------------------------------------------------------ #
 # 定时报表订阅                                                          #
 # ------------------------------------------------------------------ #
+
 
 @router.get("/scheduled-reports")
 async def list_scheduled_reports(

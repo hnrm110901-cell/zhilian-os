@@ -13,6 +13,7 @@ Endpoints:
   GET  /developers/{dev_id}/webhooks   — Webhook 健康（成功率 / 失败）
   GET  /admin/leaderboard              — 管理端：开发者贡献排行榜
 """
+
 from __future__ import annotations
 
 import uuid
@@ -33,6 +34,7 @@ router = APIRouter(prefix="/api/v1/console", tags=["developer_console"])
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def _row(row) -> Dict[str, Any]:
     return dict(row._mapping)
@@ -59,10 +61,11 @@ async def _require_developer(dev_id: str, db: AsyncSession) -> Dict[str, Any]:
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
+
 @router.get("/developers/{dev_id}/overview")
 async def get_console_overview(
     dev_id: str,
-    db:     AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """
     控制台首屏聚合接口（BFF 模式）。
@@ -89,8 +92,8 @@ async def get_console_overview(
         )
         r = row.fetchone()
         api_usage = {
-            "month":          month,
-            "total_calls":    r.total or 0,
+            "month": month,
+            "total_calls": r.total or 0,
             "billable_calls": r.billable or 0,
         }
     except Exception as exc:
@@ -111,10 +114,10 @@ async def get_console_overview(
         )
         r = row.fetchone()
         plugin_summary = {
-            "total":        r.total or 0,
-            "published":    r.published or 0,
+            "total": r.total or 0,
+            "published": r.published or 0,
             "total_installs": r.installs or 0,
-            "avg_rating":   round(_float(r.avg_rating), 2) if r.avg_rating else None,
+            "avg_rating": round(_float(r.avg_rating), 2) if r.avg_rating else None,
         }
     except Exception as exc:
         logger.warning("console_plugin_summary_failed", dev_id=dev_id, error=str(exc))
@@ -133,10 +136,10 @@ async def get_console_overview(
         )
         r = row.fetchone()
         pending_fen = r.pending_fen or 0
-        paid_fen    = r.paid_fen or 0
+        paid_fen = r.paid_fen or 0
         revenue_summary = {
-            "pending_yuan":  round(pending_fen / 100, 2),
-            "paid_yuan":     round(paid_fen / 100, 2),
+            "pending_yuan": round(pending_fen / 100, 2),
+            "paid_yuan": round(paid_fen / 100, 2),
         }
     except Exception as exc:
         logger.warning("console_revenue_summary_failed", dev_id=dev_id, error=str(exc))
@@ -154,7 +157,7 @@ async def get_console_overview(
         )
         r = row.fetchone()
         webhook_health = {
-            "active_count":  r.total or 0,
+            "active_count": r.total or 0,
             "failing_count": r.failing or 0,
         }
     except Exception as exc:
@@ -165,9 +168,7 @@ async def get_console_overview(
     try:
         row = await db.execute(
             text(
-                "SELECT * FROM developer_console_snapshots "
-                "WHERE developer_id = :did "
-                "ORDER BY snapshot_date DESC LIMIT 1"
+                "SELECT * FROM developer_console_snapshots " "WHERE developer_id = :did " "ORDER BY snapshot_date DESC LIMIT 1"
             ),
             {"did": dev_id},
         )
@@ -182,24 +183,24 @@ async def get_console_overview(
 
     return {
         "developer": {
-            "id":         dev["id"],
-            "name":       dev.get("company_name") or dev.get("name"),
-            "tier":       dev.get("tier", "free"),
-            "status":     dev.get("status"),
+            "id": dev["id"],
+            "name": dev.get("company_name") or dev.get("name"),
+            "tier": dev.get("tier", "free"),
+            "status": dev.get("status"),
         },
-        "api_usage":       api_usage,
-        "plugin_summary":  plugin_summary,
+        "api_usage": api_usage,
+        "plugin_summary": plugin_summary,
         "revenue_summary": revenue_summary,
-        "webhook_health":  webhook_health,
+        "webhook_health": webhook_health,
         "latest_snapshot": snapshot,
-        "as_of":           today.isoformat(),
+        "as_of": today.isoformat(),
     }
 
 
 @router.post("/developers/{dev_id}/snapshot", status_code=200)
 async def compute_snapshot(
     dev_id: str,
-    db:     AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """
     计算并存储今日快照（幂等，同日重复调用会覆盖数据）。
@@ -242,8 +243,8 @@ async def compute_snapshot(
             {"did": dev_id},
         )
         res = r.fetchone()
-        published  = res.pub or 0
-        installs   = res.inst or 0
+        published = res.pub or 0
+        installs = res.inst or 0
         avg_rating = round(_float(res.avgr), 2) if res.avgr else None
     except Exception as exc:
         logger.warning("snapshot_plugin_failed", dev_id=dev_id, error=str(exc))
@@ -261,12 +262,12 @@ async def compute_snapshot(
             {"did": dev_id},
         )
         res = r.fetchone()
-        pending_yuan   = round((res.pend or 0) / 100, 2)
+        pending_yuan = round((res.pend or 0) / 100, 2)
         last_paid_yuan = round((res.paid or 0) / 100, 2)
     except Exception as exc:
         logger.warning("snapshot_revenue_failed", dev_id=dev_id, error=str(exc))
 
-    webhook_count   = 0
+    webhook_count = 0
     webhook_failing = 0
     try:
         r = await db.execute(
@@ -278,7 +279,7 @@ async def compute_snapshot(
             {"did": dev_id},
         )
         res = r.fetchone()
-        webhook_count   = res.cnt or 0
+        webhook_count = res.cnt or 0
         webhook_failing = res.fail or 0
     except Exception as exc:
         logger.warning("snapshot_webhook_failed", dev_id=dev_id, error=str(exc))
@@ -287,10 +288,7 @@ async def compute_snapshot(
     quota_pct = 0.0
     try:
         r = await db.execute(
-            text(
-                "SELECT free_quota, billable_calls "
-                "FROM api_billing_cycles WHERE developer_id = :did AND period = :m"
-            ),
+            text("SELECT free_quota, billable_calls " "FROM api_billing_cycles WHERE developer_id = :did AND period = :m"),
             {"did": dev_id, "m": month},
         )
         res = r.fetchone()
@@ -321,26 +319,34 @@ async def compute_snapshot(
             "webhook_failure_count = EXCLUDED.webhook_failure_count"
         ),
         {
-            "id": snap_id, "did": dev_id, "sd": today.isoformat(),
-            "at": api_today, "am": api_month, "qp": quota_pct,
-            "pub": published, "inst": installs, "avgr": avg_rating,
-            "py": pending_yuan, "lpy": last_paid_yuan,
-            "wc": webhook_count, "wf": webhook_failing,
+            "id": snap_id,
+            "did": dev_id,
+            "sd": today.isoformat(),
+            "at": api_today,
+            "am": api_month,
+            "qp": quota_pct,
+            "pub": published,
+            "inst": installs,
+            "avgr": avg_rating,
+            "py": pending_yuan,
+            "lpy": last_paid_yuan,
+            "wc": webhook_count,
+            "wf": webhook_failing,
         },
     )
     await db.commit()
 
     return {
-        "snapshot_date":    today.isoformat(),
-        "api_calls_today":  api_today,
-        "api_calls_month":  api_month,
+        "snapshot_date": today.isoformat(),
+        "api_calls_today": api_today,
+        "api_calls_month": api_month,
         "api_quota_used_pct": quota_pct,
         "published_plugins": published,
-        "total_installs":   installs,
-        "avg_rating":       avg_rating,
+        "total_installs": installs,
+        "avg_rating": avg_rating,
         "pending_settlement_yuan": pending_yuan,
-        "last_paid_yuan":   last_paid_yuan,
-        "webhook_count":    webhook_count,
+        "last_paid_yuan": last_paid_yuan,
+        "webhook_count": webhook_count,
         "webhook_failure_count": webhook_failing,
     }
 
@@ -348,8 +354,8 @@ async def compute_snapshot(
 @router.get("/developers/{dev_id}/trend")
 async def get_api_trend(
     dev_id: str,
-    days:   int = Query(7, ge=1, le=30),
-    db:     AsyncSession = Depends(get_db),
+    days: int = Query(7, ge=1, le=30),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """近 N 天 API 调用趋势。"""
     await _require_developer(dev_id, db)
@@ -378,7 +384,7 @@ async def get_api_trend(
 @router.get("/developers/{dev_id}/plugins")
 async def get_developer_plugins_health(
     dev_id: str,
-    db:     AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """开发者插件健康列表（安装量 + 评分 + 状态）。"""
     await _require_developer(dev_id, db)
@@ -402,7 +408,7 @@ async def get_developer_plugins_health(
 @router.get("/developers/{dev_id}/revenue")
 async def get_developer_revenue(
     dev_id: str,
-    db:     AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """收入历史（近12期结算记录）。"""
     await _require_developer(dev_id, db)
@@ -419,7 +425,7 @@ async def get_developer_revenue(
     for r in rows.fetchall():
         d = _row(r)
         d["gross_revenue_yuan"] = round((d.get("gross_revenue_fen") or 0) / 100, 2)
-        d["net_payout_yuan"]    = round((d.get("net_payout_fen")    or 0) / 100, 2)
+        d["net_payout_yuan"] = round((d.get("net_payout_fen") or 0) / 100, 2)
         records.append(d)
     return {"developer_id": dev_id, "records": records, "total": len(records)}
 
@@ -427,7 +433,7 @@ async def get_developer_revenue(
 @router.get("/developers/{dev_id}/webhooks")
 async def get_developer_webhook_health(
     dev_id: str,
-    db:     AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """Webhook 健康状态（各订阅成功率）。"""
     await _require_developer(dev_id, db)
@@ -457,7 +463,7 @@ async def get_developer_webhook_health(
 @router.get("/admin/leaderboard")
 async def get_developer_leaderboard(
     limit: int = Query(20, ge=1, le=100),
-    db:    AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """
     管理端：开发者贡献排行榜（按累计净分成金额降序）。
@@ -480,8 +486,8 @@ async def get_developer_leaderboard(
     board = []
     for i, r in enumerate(rows.fetchall()):
         d = _row(r)
-        d["rank"]         = i + 1
-        d["net_yuan"]     = round((d.get("net_fen") or 0) / 100, 2)
+        d["rank"] = i + 1
+        d["net_yuan"] = round((d.get("net_fen") or 0) / 100, 2)
         d["total_installs"] = d.get("total_installs") or 0
         board.append(d)
     return {"leaderboard": board, "total": len(board)}

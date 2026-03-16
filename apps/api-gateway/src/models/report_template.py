@@ -2,9 +2,11 @@
 自定义报表模板模型
 支持报表模板管理和定时报表订阅
 """
-import uuid
+
 import enum
-from sqlalchemy import Column, String, Boolean, Text, JSON, ForeignKey, Integer
+import uuid
+
+from sqlalchemy import JSON, Boolean, Column, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 

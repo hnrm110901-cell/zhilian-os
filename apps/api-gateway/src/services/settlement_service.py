@@ -3,20 +3,20 @@
 Settlement Service: computes final pay, unused annual leave compensation,
 and economic compensation (N / N+1 / 2N) per Chinese Labor Law.
 """
+
 import calendar
 from datetime import date, datetime, timedelta
 from typing import Optional
 from uuid import UUID
 
 import structlog
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.models.employee import Employee
-from src.models.payroll import PayrollRecord, PayrollStatus
-from src.models.leave import LeaveBalance, LeaveCategory
-from src.models.settlement import SettlementRecord, SettlementStatus
 from src.models.attendance import AttendanceLog
+from src.models.employee import Employee
+from src.models.leave import LeaveBalance, LeaveCategory
+from src.models.payroll import PayrollRecord, PayrollStatus
+from src.models.settlement import SettlementRecord, SettlementStatus
 
 logger = structlog.get_logger()
 
@@ -76,13 +76,21 @@ class SettlementService:
 
         # 3. 未休年假补偿
         annual_leave = await self._calc_annual_leave_compensation(
-            db, employee_id, daily_wage_fen, method=annual_leave_method,
+            db,
+            employee_id,
+            daily_wage_fen,
+            method=annual_leave_method,
         )
 
         # 4. 经济补偿金
         econ_comp = await self._calc_economic_compensation(
-            db, employee_id, separation_type, compensation_type,
-            last_work_date, hire_date, avg_monthly,
+            db,
+            employee_id,
+            separation_type,
+            compensation_type,
+            last_work_date,
+            hire_date,
+            avg_monthly,
         )
 
         # 5. 汇总
@@ -149,9 +157,16 @@ class SettlementService:
     ) -> SettlementRecord:
         """创建结算单（计算并入库）"""
         calc = await self.calculate_settlement(
-            db, employee_id, last_work_date, separation_type,
-            compensation_type, annual_leave_method,
-            overtime_pay_fen, bonus_fen, deduction_fen, deduction_detail,
+            db,
+            employee_id,
+            last_work_date,
+            separation_type,
+            compensation_type,
+            annual_leave_method,
+            overtime_pay_fen,
+            bonus_fen,
+            deduction_fen,
+            deduction_detail,
         )
 
         record = SettlementRecord(
@@ -201,9 +216,7 @@ class SettlementService:
 
     async def get_settlement(self, db: AsyncSession, settlement_id: UUID) -> Optional[SettlementRecord]:
         """获取结算单详情"""
-        result = await db.execute(
-            select(SettlementRecord).where(SettlementRecord.id == settlement_id)
-        )
+        result = await db.execute(select(SettlementRecord).where(SettlementRecord.id == settlement_id))
         return result.scalar_one_or_none()
 
     async def list_settlements(
@@ -215,12 +228,8 @@ class SettlementService:
         limit: int = 20,
     ) -> dict:
         """结算单列表"""
-        query = select(SettlementRecord).where(
-            SettlementRecord.store_id == self.store_id
-        )
-        count_query = select(func.count()).select_from(SettlementRecord).where(
-            SettlementRecord.store_id == self.store_id
-        )
+        query = select(SettlementRecord).where(SettlementRecord.store_id == self.store_id)
+        count_query = select(func.count()).select_from(SettlementRecord).where(SettlementRecord.store_id == self.store_id)
 
         if status:
             query = query.where(SettlementRecord.status == status)
@@ -257,9 +266,7 @@ class SettlementService:
 
         record.handover_items = handover_items
         # 检查是否全部交接完毕
-        record.handover_completed = all(
-            item.get("returned", False) for item in handover_items
-        ) if handover_items else False
+        record.handover_completed = all(item.get("returned", False) for item in handover_items) if handover_items else False
 
         await db.flush()
         logger.info("settlement.handover_updated", settlement_id=str(settlement_id))
@@ -320,9 +327,7 @@ class SettlementService:
 
     async def _get_employee(self, db: AsyncSession, employee_id: str) -> Optional[Employee]:
         """获取员工信息"""
-        result = await db.execute(
-            select(Employee).where(Employee.id == employee_id)
-        )
+        result = await db.execute(select(Employee).where(Employee.id == employee_id))
         return result.scalar_one_or_none()
 
     async def _calc_last_month_salary(
@@ -366,8 +371,7 @@ class SettlementService:
         month_end_exclusive = last_work_date + timedelta(days=1)
 
         actual_work_days_result = await db.execute(
-            select(func.count(AttendanceLog.id))
-            .where(
+            select(func.count(AttendanceLog.id)).where(
                 AttendanceLog.employee_id == employee_id,
                 AttendanceLog.work_date >= month_start,
                 AttendanceLog.work_date < month_end_exclusive,
@@ -519,12 +523,14 @@ class SettlementService:
             .where(
                 PayrollRecord.employee_id == employee_id,
                 PayrollRecord.store_id == self.store_id,
-                PayrollRecord.status.in_([
-                    PayrollStatus.CONFIRMED.value,
-                    PayrollStatus.PAID.value,
-                    "confirmed",
-                    "paid",
-                ]),
+                PayrollRecord.status.in_(
+                    [
+                        PayrollStatus.CONFIRMED.value,
+                        PayrollStatus.PAID.value,
+                        "confirmed",
+                        "paid",
+                    ]
+                ),
             )
             .order_by(PayrollRecord.pay_month.desc())
             .limit(months)
@@ -552,10 +558,7 @@ class SettlementService:
             return 0
 
         # 计算总月数
-        total_months = (
-            (last_work_date.year - hire_date.year) * 12
-            + (last_work_date.month - hire_date.month)
-        )
+        total_months = (last_work_date.year - hire_date.year) * 12 + (last_work_date.month - hire_date.month)
         # 日期补偿
         if last_work_date.day >= hire_date.day:
             pass  # 已满整月
@@ -571,7 +574,7 @@ class SettlementService:
         if remaining_months == 0:
             service_x10 = full_years * 10
         elif remaining_months < 6:
-            service_x10 = full_years * 10 + 5   # 不满6个月算0.5年
+            service_x10 = full_years * 10 + 5  # 不满6个月算0.5年
         else:
             service_x10 = (full_years + 1) * 10  # 满6个月不满1年算1年
 

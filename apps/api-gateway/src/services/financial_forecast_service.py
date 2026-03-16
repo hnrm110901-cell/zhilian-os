@@ -9,6 +9,7 @@
 算法：加权移动平均（WMA）作为点估计，线性趋势辅助判断方向。
 置信区间：基于历史波动的 ±1.96σ（95% CI）。
 """
+
 from __future__ import annotations
 
 import math
@@ -24,18 +25,19 @@ logger = structlog.get_logger()
 
 # ── 常量 ─────────────────────────────────────────────────────────────────────
 
-HISTORY_PERIODS  = 6         # 默认使用最近6期历史
-MIN_PERIODS      = 2         # 最少需要2期才能预测
-FORECAST_TYPES   = ("revenue", "food_cost_rate", "profit_margin", "health_score")
+HISTORY_PERIODS = 6  # 默认使用最近6期历史
+MIN_PERIODS = 2  # 最少需要2期才能预测
+FORECAST_TYPES = ("revenue", "food_cost_rate", "profit_margin", "health_score")
 
 FORECAST_TYPE_LABELS = {
-    "revenue":        "月净收入 (¥)",
+    "revenue": "月净收入 (¥)",
     "food_cost_rate": "食材成本率 (%)",
-    "profit_margin":  "利润率 (%)",
-    "health_score":   "健康评分",
+    "profit_margin": "利润率 (%)",
+    "health_score": "健康评分",
 }
 
 # ── 内部工具 ──────────────────────────────────────────────────────────────────
+
 
 def _safe_float(val) -> Optional[float]:
     if val is None:
@@ -68,6 +70,7 @@ def _prev_periods(target_period: str, n: int) -> List[str]:
 # 纯函数层（无 DB 依赖，全部可直接单元测试）
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def linear_trend(
     values: List[float],
     periods_ahead: int = 1,
@@ -95,16 +98,16 @@ def linear_trend(
 
     num = sum((i - x_mean) * (values[i] - y_mean) for i in range(n))
     den = sum((i - x_mean) ** 2 for i in range(n))
-    slope     = num / den if den > 0 else 0.0
+    slope = num / den if den > 0 else 0.0
     intercept = y_mean - slope * x_mean
 
-    x_pred    = n - 1 + periods_ahead
+    x_pred = n - 1 + periods_ahead
     predicted = intercept + slope * x_pred
 
     # 残差标准误差
     residuals = [values[i] - (intercept + slope * i) for i in range(n)]
     if n > 2:
-        se = math.sqrt(sum(r ** 2 for r in residuals) / (n - 2))
+        se = math.sqrt(sum(r**2 for r in residuals) / (n - 2))
     else:
         se = abs(values[-1] - values[0]) * 0.1 + 1e-6
 
@@ -122,10 +125,10 @@ def weighted_moving_avg(
     if not values:
         return 0.0
 
-    n       = len(values)
-    weights = list(range(1, n + 1))   # [1, 2, ..., n]
+    n = len(values)
+    weights = list(range(1, n + 1))  # [1, 2, ..., n]
     total_w = sum(weights)
-    wma     = sum(weights[i] * values[i] for i in range(n)) / total_w
+    wma = sum(weights[i] * values[i] for i in range(n)) / total_w
 
     if periods_ahead <= 1:
         return wma
@@ -158,9 +161,9 @@ def confidence_interval(
     if len(values) < 2:
         margin = abs(predicted) * 0.1 + 1e-6
         return (predicted - margin, predicted + margin)
-    mean     = sum(values) / len(values)
+    mean = sum(values) / len(values)
     variance = sum((v - mean) ** 2 for v in values) / (len(values) - 1)
-    std      = math.sqrt(variance)
+    std = math.sqrt(variance)
     return (predicted - z * std, predicted + z * std)
 
 
@@ -170,7 +173,7 @@ def trend_direction(values: List[float]) -> str:
         return "flat"
     _, _, _ = (0, 0, 0)
     slope = linear_trend(values)[0] - values[-1]
-    pct   = slope / (abs(values[-1]) + 1e-9) * 100
+    pct = slope / (abs(values[-1]) + 1e-9) * 100
     if pct > 1.0:
         return "up"
     if pct < -1.0:
@@ -181,6 +184,7 @@ def trend_direction(values: List[float]) -> str:
 # ══════════════════════════════════════════════════════════════════════════════
 # DB 函数层
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 async def _upsert_forecast(
     db: AsyncSession,
@@ -211,9 +215,15 @@ async def _upsert_forecast(
                 updated_at       = EXCLUDED.updated_at
         """),
         {
-            "sid": store_id, "tp": target_period, "ft": forecast_type,
-            "pv": round(predicted, 4), "lb": round(lower, 4), "ub": round(upper, 4),
-            "method": method, "np": n_periods, "now": now,
+            "sid": store_id,
+            "tp": target_period,
+            "ft": forecast_type,
+            "pv": round(predicted, 4),
+            "lb": round(lower, 4),
+            "ub": round(upper, 4),
+            "method": method,
+            "np": n_periods,
+            "now": now,
         },
     )
 
@@ -233,9 +243,9 @@ async def _fetch_profit_history(
     rows = await db.execute(stmt, {"sid": store_id, "periods": periods})
     return [
         {
-            "period":           r[0],
+            "period": r[0],
             "net_revenue_yuan": _to_float(r[1]),
-            "food_cost_yuan":   _to_float(r[2]),
+            "food_cost_yuan": _to_float(r[2]),
             "profit_margin_pct": _to_float(r[3]),
         }
         for r in rows.fetchall()
@@ -277,20 +287,17 @@ def _make_forecast_result(
     direction = trend_direction(values)
 
     return {
-        "forecast_type":   forecast_type,
-        "target_period":   target_period,
+        "forecast_type": forecast_type,
+        "target_period": target_period,
         "predicted_value": round(predicted, 4),
-        "lower_bound":     round(lower, 4),
-        "upper_bound":     round(upper, 4),
-        "confidence_pct":  95.0,
-        "method":          "weighted_moving_avg",
+        "lower_bound": round(lower, 4),
+        "upper_bound": round(upper, 4),
+        "confidence_pct": 95.0,
+        "method": "weighted_moving_avg",
         "based_on_periods": len(values),
         "trend_direction": direction,
-        "history":         [
-            {"period": p, "value": v}
-            for p, v in zip(hist_periods[-len(values):], values)
-        ],
-        "label":           FORECAST_TYPE_LABELS.get(forecast_type, forecast_type),
+        "history": [{"period": p, "value": v} for p, v in zip(hist_periods[-len(values) :], values)],
+        "label": FORECAST_TYPE_LABELS.get(forecast_type, forecast_type),
     }
 
 
@@ -302,13 +309,19 @@ async def compute_revenue_forecast(
 ) -> Optional[Dict[str, Any]]:
     periods = _prev_periods(target_period, n)
     history = await _fetch_profit_history(db, store_id, periods)
-    values  = [r["net_revenue_yuan"] for r in history]
-    result  = _make_forecast_result("revenue", values, target_period, periods)
+    values = [r["net_revenue_yuan"] for r in history]
+    result = _make_forecast_result("revenue", values, target_period, periods)
     if result:
         await _upsert_forecast(
-            db, store_id, target_period, "revenue",
-            result["predicted_value"], result["lower_bound"], result["upper_bound"],
-            "weighted_moving_avg", len(values),
+            db,
+            store_id,
+            target_period,
+            "revenue",
+            result["predicted_value"],
+            result["lower_bound"],
+            result["upper_bound"],
+            "weighted_moving_avg",
+            len(values),
         )
     return result
 
@@ -321,7 +334,7 @@ async def compute_food_cost_rate_forecast(
 ) -> Optional[Dict[str, Any]]:
     periods = _prev_periods(target_period, n)
     history = await _fetch_profit_history(db, store_id, periods)
-    values  = []
+    values = []
     for r in history:
         if r["net_revenue_yuan"] > 0:
             rate = r["food_cost_yuan"] / r["net_revenue_yuan"] * 100
@@ -331,9 +344,15 @@ async def compute_food_cost_rate_forecast(
     result = _make_forecast_result("food_cost_rate", values, target_period, periods)
     if result:
         await _upsert_forecast(
-            db, store_id, target_period, "food_cost_rate",
-            result["predicted_value"], result["lower_bound"], result["upper_bound"],
-            "weighted_moving_avg", len(values),
+            db,
+            store_id,
+            target_period,
+            "food_cost_rate",
+            result["predicted_value"],
+            result["lower_bound"],
+            result["upper_bound"],
+            "weighted_moving_avg",
+            len(values),
         )
     return result
 
@@ -346,13 +365,19 @@ async def compute_profit_margin_forecast(
 ) -> Optional[Dict[str, Any]]:
     periods = _prev_periods(target_period, n)
     history = await _fetch_profit_history(db, store_id, periods)
-    values  = [r["profit_margin_pct"] for r in history]
-    result  = _make_forecast_result("profit_margin", values, target_period, periods)
+    values = [r["profit_margin_pct"] for r in history]
+    result = _make_forecast_result("profit_margin", values, target_period, periods)
     if result:
         await _upsert_forecast(
-            db, store_id, target_period, "profit_margin",
-            result["predicted_value"], result["lower_bound"], result["upper_bound"],
-            "weighted_moving_avg", len(values),
+            db,
+            store_id,
+            target_period,
+            "profit_margin",
+            result["predicted_value"],
+            result["lower_bound"],
+            result["upper_bound"],
+            "weighted_moving_avg",
+            len(values),
         )
     return result
 
@@ -365,13 +390,19 @@ async def compute_health_score_forecast(
 ) -> Optional[Dict[str, Any]]:
     periods = _prev_periods(target_period, n)
     history = await _fetch_health_history(db, store_id, periods)
-    values  = [r["total_score"] for r in history]
-    result  = _make_forecast_result("health_score", values, target_period, periods)
+    values = [r["total_score"] for r in history]
+    result = _make_forecast_result("health_score", values, target_period, periods)
     if result:
         await _upsert_forecast(
-            db, store_id, target_period, "health_score",
-            result["predicted_value"], result["lower_bound"], result["upper_bound"],
-            "weighted_moving_avg", len(values),
+            db,
+            store_id,
+            target_period,
+            "health_score",
+            result["predicted_value"],
+            result["lower_bound"],
+            result["upper_bound"],
+            "weighted_moving_avg",
+            len(values),
         )
     return result
 
@@ -386,14 +417,14 @@ async def compute_all_forecasts(
     子任务独立 try/except：单个失败不影响整体。
     """
     results: Dict[str, Any] = {
-        "store_id":      store_id,
+        "store_id": store_id,
         "target_period": target_period,
     }
     for fn, key in [
-        (compute_revenue_forecast,         "revenue"),
-        (compute_food_cost_rate_forecast,   "food_cost_rate"),
-        (compute_profit_margin_forecast,    "profit_margin"),
-        (compute_health_score_forecast,     "health_score"),
+        (compute_revenue_forecast, "revenue"),
+        (compute_food_cost_rate_forecast, "food_cost_rate"),
+        (compute_profit_margin_forecast, "profit_margin"),
+        (compute_health_score_forecast, "health_score"),
     ]:
         try:
             results[key] = await fn(db, store_id, target_period)
@@ -428,19 +459,21 @@ async def get_forecast(
 
     result = {"store_id": store_id, "target_period": target_period, "forecasts": []}
     for r in rows:
-        result["forecasts"].append({
-            "forecast_type":    r[0],
-            "predicted_value":  _safe_float(r[1]),
-            "lower_bound":      _safe_float(r[2]),
-            "upper_bound":      _safe_float(r[3]),
-            "confidence_pct":   _safe_float(r[4]),
-            "method":           r[5],
-            "based_on_periods": r[6],
-            "actual_value":     _safe_float(r[7]),
-            "accuracy_pct":     _safe_float(r[8]),
-            "computed_at":      r[9].isoformat() if r[9] else None,
-            "label":            FORECAST_TYPE_LABELS.get(r[0], r[0]),
-        })
+        result["forecasts"].append(
+            {
+                "forecast_type": r[0],
+                "predicted_value": _safe_float(r[1]),
+                "lower_bound": _safe_float(r[2]),
+                "upper_bound": _safe_float(r[3]),
+                "confidence_pct": _safe_float(r[4]),
+                "method": r[5],
+                "based_on_periods": r[6],
+                "actual_value": _safe_float(r[7]),
+                "accuracy_pct": _safe_float(r[8]),
+                "computed_at": r[9].isoformat() if r[9] else None,
+                "label": FORECAST_TYPE_LABELS.get(r[0], r[0]),
+            }
+        )
     return result
 
 
@@ -466,12 +499,12 @@ async def get_forecast_accuracy_history(
     )
     return [
         {
-            "forecast_type":   r[0],
-            "target_period":   r[1],
+            "forecast_type": r[0],
+            "target_period": r[1],
             "predicted_value": _safe_float(r[2]),
-            "actual_value":    _safe_float(r[3]),
-            "accuracy_pct":    _safe_float(r[4]),
-            "label":           FORECAST_TYPE_LABELS.get(r[0], r[0]),
+            "actual_value": _safe_float(r[3]),
+            "accuracy_pct": _safe_float(r[4]),
+            "label": FORECAST_TYPE_LABELS.get(r[0], r[0]),
         }
         for r in rows.fetchall()
     ]
@@ -501,10 +534,10 @@ async def backfill_actual_values(
     profit_row = profit_row.fetchone()
 
     if profit_row:
-        rev   = _to_float(profit_row[0])
-        fc    = _to_float(profit_row[1])
-        pm    = _to_float(profit_row[2])
-        fcr   = fc / rev * 100 if rev > 0 else 0.0
+        rev = _to_float(profit_row[0])
+        fc = _to_float(profit_row[1])
+        pm = _to_float(profit_row[2])
+        fcr = fc / rev * 100 if rev > 0 else 0.0
 
         for ft, actual in [("revenue", rev), ("food_cost_rate", fcr), ("profit_margin", pm)]:
             pred_row = await db.execute(
@@ -523,9 +556,14 @@ async def backfill_actual_values(
                         SET actual_value = :av, accuracy_pct = :ap, updated_at = :now
                         WHERE store_id = :sid AND target_period = :tp AND forecast_type = :ft
                     """),
-                    {"av": round(actual, 4), "ap": acc,
-                     "now": datetime.now(timezone.utc).replace(tzinfo=None),
-                     "sid": store_id, "tp": period, "ft": ft},
+                    {
+                        "av": round(actual, 4),
+                        "ap": acc,
+                        "now": datetime.now(timezone.utc).replace(tzinfo=None),
+                        "sid": store_id,
+                        "tp": period,
+                        "ft": ft,
+                    },
                 )
                 updated += 1
 
@@ -557,9 +595,13 @@ async def backfill_actual_values(
                     SET actual_value = :av, accuracy_pct = :ap, updated_at = :now
                     WHERE store_id = :sid AND target_period = :tp AND forecast_type = 'health_score'
                 """),
-                {"av": round(actual_score, 4), "ap": acc,
-                 "now": datetime.now(timezone.utc).replace(tzinfo=None),
-                 "sid": store_id, "tp": period},
+                {
+                    "av": round(actual_score, 4),
+                    "ap": acc,
+                    "now": datetime.now(timezone.utc).replace(tzinfo=None),
+                    "sid": store_id,
+                    "tp": period,
+                },
             )
             updated += 1
 
@@ -600,9 +642,9 @@ async def get_brand_forecast_summary(
     for ft, vals in by_type.items():
         if vals:
             summary["by_type"][ft] = {
-                "avg":   round(sum(vals) / len(vals), 4),
-                "min":   round(min(vals), 4),
-                "max":   round(max(vals), 4),
+                "avg": round(sum(vals) / len(vals), 4),
+                "min": round(min(vals), 4),
+                "max": round(max(vals), 4),
                 "count": len(vals),
                 "label": FORECAST_TYPE_LABELS.get(ft, ft),
             }

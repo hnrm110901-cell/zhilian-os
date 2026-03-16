@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
@@ -37,7 +37,7 @@ logger = structlog.get_logger()
 
 # Redis Key 模板：decision_flow:{store_id}:{date}:{window_slug}
 _KEY_TPL = "decision_flow:{store_id}:{date}:{window}"
-_TTL_SECONDS = int(86400)   # 默认保留 24 小时
+_TTL_SECONDS = int(86400)  # 默认保留 24 小时
 
 
 def _window_slug(push_window: str) -> str:
@@ -49,6 +49,7 @@ def _window_slug(push_window: str) -> str:
 # 子状态：单条决策的执行记录
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class DecisionRecord:
     """
@@ -57,13 +58,14 @@ class DecisionRecord:
     BettaFish Search 记录单次搜索的 query/url/content/score；
     DecisionRecord 记录单条决策的 title/action/saving/approved 状态。
     """
-    rank: int                          # 1-3
+
+    rank: int  # 1-3
     title: str
     action: str
-    source: str                        # "inventory" / "food_cost" / "reasoning"
+    source: str  # "inventory" / "food_cost" / "reasoning"
     expected_saving_yuan: float
     confidence_pct: float
-    approved: Optional[bool] = None    # None=待审批, True=已通过, False=已拒绝
+    approved: Optional[bool] = None  # None=待审批, True=已通过, False=已拒绝
     approved_at: Optional[str] = None  # ISO datetime
 
     def to_dict(self) -> Dict[str, Any]:
@@ -90,6 +92,7 @@ class DecisionRecord:
 # 主状态类
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class DecisionFlowState:
     """
@@ -103,18 +106,18 @@ class DecisionFlowState:
     """
 
     # ── 标识 ──────────────────────────────────────────────────────────────────
-    flow_id: str                           # UUID，本次流程唯一标识
+    flow_id: str  # UUID，本次流程唯一标识
     store_id: str
-    push_window: str                       # "08:00晨推" / "12:00午推" / "17:30战前" / "20:30晚推"
-    trigger_time: str                      # ISO datetime
+    push_window: str  # "08:00晨推" / "12:00午推" / "17:30战前" / "20:30晚推"
+    trigger_time: str  # ISO datetime
 
     # ── 步骤1：场景识别（scenario_matcher）───────────────────────────────────
-    scenario_type: Optional[str] = None    # "peak_hour_surge" / "cost_overrun" / ...
-    scenario_label: Optional[str] = None   # "高峰超负荷" / "成本超标" / ...
+    scenario_type: Optional[str] = None  # "peak_hour_surge" / "cost_overrun" / ...
+    scenario_label: Optional[str] = None  # "高峰超负荷" / "成本超标" / ...
 
     # ── 步骤2：Top3 决策（decision_priority_engine）──────────────────────────
     decisions: List[DecisionRecord] = field(default_factory=list)
-    total_candidates: int = 0             # 参与评分的候选决策总数
+    total_candidates: int = 0  # 参与评分的候选决策总数
 
     # ── 步骤3：叙事生成（narrative_engine，可选）──────────────────────────────
     narrative: Optional[str] = None
@@ -125,15 +128,15 @@ class DecisionFlowState:
     push_error: Optional[str] = None
 
     # ── 审批追踪 ───────────────────────────────────────────────────────────────
-    pending_count: int = 0               # 待审批决策数
+    pending_count: int = 0  # 待审批决策数
     approved_count: int = 0
 
     # ── P3 ForumEngine 预留槽位 ────────────────────────────────────────────────
     debate_rounds: int = 0
-    mediator_guidance: Optional[str] = None   # 主持人 LLM 的仲裁意见
+    mediator_guidance: Optional[str] = None  # 主持人 LLM 的仲裁意见
 
     # ── 完成标记 ───────────────────────────────────────────────────────────────
-    completed_at: Optional[str] = None    # ISO datetime，None 表示流程未结束
+    completed_at: Optional[str] = None  # ISO datetime，None 表示流程未结束
 
     # ─────────────────────────────────────────────────────────────────────────
     # 工厂方法
@@ -153,14 +156,9 @@ class DecisionFlowState:
     # 状态填充辅助
     # ─────────────────────────────────────────────────────────────────────────
 
-    def set_decisions_from_engine(
-        self, engine_output: List[Dict[str, Any]], total_candidates: int = 0
-    ) -> None:
+    def set_decisions_from_engine(self, engine_output: List[Dict[str, Any]], total_candidates: int = 0) -> None:
         """从 decision_priority_engine.get_top3() 的输出填充 decisions 列表。"""
-        self.decisions = [
-            DecisionRecord.from_engine_dict(d, rank=i + 1)
-            for i, d in enumerate(engine_output)
-        ]
+        self.decisions = [DecisionRecord.from_engine_dict(d, rank=i + 1) for i, d in enumerate(engine_output)]
         self.total_candidates = total_candidates
         self.pending_count = len(self.decisions)
 
@@ -180,10 +178,7 @@ class DecisionFlowState:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "DecisionFlowState":
         decisions_raw = data.pop("decisions", [])
-        state = cls(**{
-            k: v for k, v in data.items()
-            if k in cls.__dataclass_fields__
-        })
+        state = cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
         state.decisions = [DecisionRecord.from_dict(d) for d in decisions_raw]
         return state
 
@@ -194,17 +189,17 @@ class DecisionFlowState:
         对标 BettaFish State.get_summary()，返回流程关键指标。
         """
         return {
-            "flow_id":          self.flow_id,
-            "store_id":         self.store_id,
-            "push_window":      self.push_window,
-            "trigger_time":     self.trigger_time,
-            "scenario":         self.scenario_label or self.scenario_type,
-            "decision_count":   len(self.decisions),
+            "flow_id": self.flow_id,
+            "store_id": self.store_id,
+            "push_window": self.push_window,
+            "trigger_time": self.trigger_time,
+            "scenario": self.scenario_label or self.scenario_type,
+            "decision_count": len(self.decisions),
             "total_saving_yuan": sum(d.expected_saving_yuan for d in self.decisions),
-            "push_sent":        self.push_sent,
-            "push_message_id":  self.push_message_id,
-            "pending_count":    self.pending_count,
-            "completed_at":     self.completed_at,
+            "push_sent": self.push_sent,
+            "push_message_id": self.push_message_id,
+            "pending_count": self.pending_count,
+            "completed_at": self.completed_at,
         }
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -231,6 +226,7 @@ class DecisionFlowState:
         """
         try:
             from .redis_cache_service import redis_cache
+
             key = self._redis_key(target_date)
             await redis_cache.set(key, self.to_dict(), expire=ttl_seconds)
             logger.info(
@@ -262,6 +258,7 @@ class DecisionFlowState:
         """
         try:
             from .redis_cache_service import redis_cache
+
             key = _KEY_TPL.format(
                 store_id=store_id,
                 date=(target_date or date.today()).isoformat(),

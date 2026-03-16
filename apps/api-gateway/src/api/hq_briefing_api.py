@@ -13,13 +13,14 @@ HQ Briefing & Execution Feedback API
 """
 
 from typing import Literal, Optional
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-import structlog
 
-from ..core.dependencies import get_current_active_user
 from ..core.database import get_db
+from ..core.dependencies import get_current_active_user
 from ..models.user import User
 
 router = APIRouter(tags=["hq_briefing"])
@@ -28,16 +29,16 @@ logger = structlog.get_logger()
 
 # ── Request Models ────────────────────────────────────────────────────────────
 
+
 class ExecutionFeedbackRequest(BaseModel):
-    store_id:            str   = Field(..., description="门店 ID")
-    outcome:             Literal["success", "failure", "partial"] = Field(
-        ..., description="执行结果"
-    )
-    actual_impact_yuan:  float = Field(..., description="实际¥影响（元）")
-    note:                Optional[str] = Field(None, description="备注")
+    store_id: str = Field(..., description="门店 ID")
+    outcome: Literal["success", "failure", "partial"] = Field(..., description="执行结果")
+    actual_impact_yuan: float = Field(..., description="实际¥影响（元）")
+    note: Optional[str] = Field(None, description="备注")
 
 
 # ── HQ 简报端点 ───────────────────────────────────────────────────────────────
+
 
 @router.get("/api/v1/briefing/hq", summary="获取多店简报（老板版）")
 async def get_hq_briefing(
@@ -48,6 +49,7 @@ async def get_hq_briefing(
     返回当日多店简报：各店健康分排名、预警门店、全局Top3决策、合并营收。
     """
     from ..services.hq_briefing_service import generate_hq_briefing
+
     try:
         return await generate_hq_briefing(db)
     except Exception as exc:
@@ -61,6 +63,7 @@ async def push_hq_briefing(
     db: AsyncSession = Depends(get_db),
 ):
     from ..services.hq_briefing_service import push_hq_briefing
+
     try:
         return await push_hq_briefing(db, dry_run=False)
     except Exception as exc:
@@ -73,6 +76,7 @@ async def dry_run_hq_briefing(
     db: AsyncSession = Depends(get_db),
 ):
     from ..services.hq_briefing_service import push_hq_briefing
+
     try:
         return await push_hq_briefing(db, dry_run=True)
     except Exception as exc:
@@ -85,6 +89,7 @@ async def trigger_hq_celery(
 ):
     try:
         from ..core.celery_tasks import push_hq_daily_briefing
+
         task = push_hq_daily_briefing.apply_async(queue="default", priority=8)
         return {"task_id": task.id, "status": "queued"}
     except Exception as exc:
@@ -92,6 +97,7 @@ async def trigger_hq_celery(
 
 
 # ── 执行反馈端点 ──────────────────────────────────────────────────────────────
+
 
 @router.post(
     "/api/v1/decisions/{decision_id}/feedback",
@@ -112,6 +118,7 @@ async def submit_feedback(
     - **actual_impact_yuan**: 实际¥影响（正数=收益，负数=损失）
     """
     from ..services.execution_feedback_service import submit_execution_feedback
+
     try:
         return await submit_execution_feedback(
             decision_id=decision_id,
@@ -123,8 +130,7 @@ async def submit_feedback(
             db=db,
         )
     except Exception as exc:
-        logger.error("feedback_api.submit_failed",
-                     decision_id=decision_id, error=str(exc))
+        logger.error("feedback_api.submit_failed", decision_id=decision_id, error=str(exc))
         raise HTTPException(status_code=500, detail=str(exc))
 
 
@@ -134,7 +140,7 @@ async def submit_feedback(
 )
 async def get_feedback_history(
     store_id: str,
-    days:  int = Query(30, ge=7, le=90, description="查询天数"),
+    days: int = Query(30, ge=7, le=90, description="查询天数"),
     limit: int = Query(20, ge=1, le=100),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
@@ -146,6 +152,7 @@ async def get_feedback_history(
     - 逐条执行明细
     """
     from ..services.execution_feedback_service import get_feedback_history
+
     try:
         return await get_feedback_history(store_id, db, days=days, limit=limit)
     except Exception as exc:

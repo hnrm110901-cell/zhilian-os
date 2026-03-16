@@ -10,14 +10,10 @@ BOM（物料清单）模型 — 版本化配方管理
 
 import uuid
 from datetime import datetime
-from sqlalchemy import (
-    Column, String, Numeric, Text, Boolean, DateTime,
-    ForeignKey, UniqueConstraint, Index, Integer,
-)
+
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
-
 from sqlalchemy.orm import relationship
-
 from src.models.base import Base, TimestampMixin
 
 
@@ -28,6 +24,7 @@ class BOMTemplate(Base, TimestampMixin):
     同一道菜可以有多个版本（price change / season change / supplier change）。
     某一时刻只有一个版本处于 is_active=True 的"当前版本"。
     """
+
     __tablename__ = "bom_templates"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -55,7 +52,7 @@ class BOMTemplate(Base, TimestampMixin):
     approved_at = Column(DateTime)
 
     # BOM 作用域 / 渠道 / 继承（Task3A P0 字段）
-    scope = Column(String(20), nullable=False, server_default='store')
+    scope = Column(String(20), nullable=False, server_default="store")
     # store | region | brand | group
     scope_id = Column(String(100), nullable=True)
     # 门店/区域/品牌/集团 ID，scope='store' 时对应 store_id
@@ -66,7 +63,7 @@ class BOMTemplate(Base, TimestampMixin):
         ForeignKey("bom_templates.id", ondelete="SET NULL"),
         nullable=True,
     )
-    is_delta = Column(Boolean, nullable=False, server_default='false')
+    is_delta = Column(Boolean, nullable=False, server_default="false")
     # True=差异 BOM（仅存变更行），False=完整 BOM
 
     # 元数据
@@ -100,10 +97,7 @@ class BOMTemplate(Base, TimestampMixin):
     @property
     def total_cost(self) -> float:
         """计算 BOM 食材总成本（分）"""
-        return sum(
-            (item.standard_qty * (item.unit_cost or 0))
-            for item in self.items
-        )
+        return sum((item.standard_qty * (item.unit_cost or 0)) for item in self.items)
 
 
 class BOMItem(Base, TimestampMixin):
@@ -113,6 +107,7 @@ class BOMItem(Base, TimestampMixin):
     与 InventoryItem 通过 ingredient_id 关联；
     unit_cost 在 BOMItem 层面快照（与 InventoryItem.unit_cost 保持同步）。
     """
+
     __tablename__ = "bom_items"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -139,7 +134,7 @@ class BOMItem(Base, TimestampMixin):
     prep_notes = Column(Text)  # 加工说明
 
     # Delta BOM 动作（Task3A P0 字段）
-    item_action = Column(String(20), nullable=False, server_default='ADD')
+    item_action = Column(String(20), nullable=False, server_default="ADD")
     # ADD | OVERRIDE | REMOVE
     ingredient_master_id = Column(String(50), nullable=True)
     # 软引用 canonical_id（集团食材主档，无 FK 约束）

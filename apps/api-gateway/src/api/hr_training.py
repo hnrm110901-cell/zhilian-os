@@ -1,27 +1,30 @@
 """
 培训认证API — 课程/报名/学习/考试/师徒/看板
 """
+
+import uuid as uuid_mod
+from datetime import date, datetime
+from typing import List, Optional
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional, List
-from datetime import datetime, date
-import uuid as uuid_mod
-import structlog
+from sqlalchemy import and_, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
-from ..models.user import User
-from ..models.training import TrainingCourse, TrainingEnrollment, TrainingExam, ExamAttempt
-from ..models.mentorship import Mentorship
 from ..models.employee import Employee
-from sqlalchemy import select, and_, func
-from sqlalchemy.ext.asyncio import AsyncSession
+from ..models.mentorship import Mentorship
+from ..models.training import ExamAttempt, TrainingCourse, TrainingEnrollment, TrainingExam
+from ..models.user import User
 
 logger = structlog.get_logger()
 router = APIRouter()
 
 
 # ── 课程管理 ──
+
 
 class CourseRequest(BaseModel):
     brand_id: str
@@ -109,6 +112,7 @@ async def create_course(
 
 # ── 报名/学习进度 ──
 
+
 @router.post("/hr/training/courses/{course_id}/enroll")
 async def enroll_course(
     course_id: str,
@@ -154,9 +158,11 @@ async def my_courses(
     current_user: User = Depends(get_current_active_user),
 ):
     """我的课程（含进度）"""
-    query = select(TrainingEnrollment, TrainingCourse).join(
-        TrainingCourse, TrainingEnrollment.course_id == TrainingCourse.id
-    ).where(TrainingEnrollment.employee_id == employee_id)
+    query = (
+        select(TrainingEnrollment, TrainingCourse)
+        .join(TrainingCourse, TrainingEnrollment.course_id == TrainingCourse.id)
+        .where(TrainingEnrollment.employee_id == employee_id)
+    )
     if status:
         query = query.where(TrainingEnrollment.status == status)
 
@@ -237,6 +243,7 @@ async def complete_enrollment(
         # 创建培训完成里程碑
         try:
             from ..models.employee_growth import EmployeeMilestone, MilestoneType
+
             milestone = EmployeeMilestone(
                 store_id=enrollment.store_id,
                 employee_id=enrollment.employee_id,
@@ -259,6 +266,7 @@ async def complete_enrollment(
 
 
 # ── 考试 ──
+
 
 @router.post("/hr/training/exams/{exam_id}/submit")
 async def submit_exam(
@@ -312,9 +320,9 @@ async def my_certificates(
 ):
     """我的证书"""
     result = await db.execute(
-        select(TrainingEnrollment, TrainingCourse).join(
-            TrainingCourse, TrainingEnrollment.course_id == TrainingCourse.id
-        ).where(
+        select(TrainingEnrollment, TrainingCourse)
+        .join(TrainingCourse, TrainingEnrollment.course_id == TrainingCourse.id)
+        .where(
             and_(
                 TrainingEnrollment.employee_id == employee_id,
                 TrainingEnrollment.status == "completed",
@@ -340,6 +348,7 @@ async def my_certificates(
 
 
 # ── 师徒制 ──
+
 
 class MentorshipRequest(BaseModel):
     store_id: str
@@ -403,6 +412,7 @@ async def create_mentorship(
 ):
     """创建师徒关系"""
     from datetime import datetime as dt
+
     mentorship = Mentorship(
         store_id=req.store_id,
         brand_id=req.brand_id,
@@ -451,6 +461,7 @@ async def review_mentorship(
 
 # ── 培训看板 ──
 
+
 @router.get("/hr/training/dashboard")
 async def training_dashboard(
     store_id: str = Query(None),
@@ -485,11 +496,9 @@ async def training_dashboard(
 
     # 学分统计（已完成的课程学分总和）
     credits_result = await db.execute(
-        select(func.sum(TrainingCourse.credits)).join(
-            TrainingEnrollment, TrainingEnrollment.course_id == TrainingCourse.id
-        ).where(
-            TrainingEnrollment.status == "completed"
-        )
+        select(func.sum(TrainingCourse.credits))
+        .join(TrainingEnrollment, TrainingEnrollment.course_id == TrainingCourse.id)
+        .where(TrainingEnrollment.status == "completed")
     )
     total_credits = credits_result.scalar() or 0
 

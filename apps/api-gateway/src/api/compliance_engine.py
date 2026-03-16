@@ -2,11 +2,12 @@
 合规引擎 API — /api/v1/compliance-engine
 统一合规评分计算、告警管理、自动操作、仪表盘。
 """
+
+from datetime import date
+from typing import Any, Dict, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
-from datetime import date
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
@@ -21,6 +22,7 @@ svc = ComplianceEngineService()
 
 # ── Pydantic Schemas ─────────────────────────────────────────────────────────
 
+
 class ComputeRequest(BaseModel):
     brand_id: str
 
@@ -30,6 +32,7 @@ class ResolveRequest(BaseModel):
 
 
 # ── 序列化辅助 ────────────────────────────────────────────────────────────────
+
 
 def _serialize_score(s) -> Dict[str, Any]:
     return {
@@ -68,6 +71,7 @@ def _serialize_alert(a) -> Dict[str, Any]:
 
 
 # ── 评分端点 ──────────────────────────────────────────────────────────────────
+
 
 @router.post("/compute")
 async def compute_scores(
@@ -119,6 +123,7 @@ async def get_score_detail(
 
 # ── 告警端点 ──────────────────────────────────────────────────────────────────
 
+
 @router.post("/alerts/generate")
 async def generate_alerts(
     body: ComputeRequest,
@@ -147,7 +152,12 @@ async def list_alerts(
 ):
     """分页查询合规告警"""
     alerts, total = await svc.get_alerts(
-        db, brand_id, severity, is_resolved, page, page_size,
+        db,
+        brand_id,
+        severity,
+        is_resolved,
+        page,
+        page_size,
     )
     return {
         "items": [_serialize_alert(a) for a in alerts],
@@ -174,6 +184,7 @@ async def resolve_alert(
 
 # ── 自动操作端点 ──────────────────────────────────────────────────────────────
 
+
 @router.post("/auto-actions")
 async def execute_auto_actions(
     body: ComputeRequest,
@@ -191,6 +202,7 @@ async def execute_auto_actions(
 
 
 # ── 仪表盘端点 ────────────────────────────────────────────────────────────────
+
 
 @router.get("/dashboard")
 async def get_dashboard(

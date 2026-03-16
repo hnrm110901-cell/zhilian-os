@@ -4,20 +4,22 @@ Approval Workflow API
 
 提供Human-in-the-loop决策审批接口
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, List, Dict, Any
-from datetime import datetime
+
 import os
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 import structlog
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.dependencies import get_current_active_user, get_db, require_permission
 from ..core.permissions import Permission
 from ..models import User
-from ..models.decision_log import DecisionLog, DecisionType, DecisionStatus, DecisionOutcome
+from ..models.decision_log import DecisionLog, DecisionOutcome, DecisionStatus, DecisionType
 from ..services.approval_service import approval_service
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 
 logger = structlog.get_logger()
 
@@ -29,6 +31,7 @@ router = APIRouter()
 
 class CreateApprovalRequest(BaseModel):
     """创建审批请求"""
+
     decision_type: str = Field(..., description="决策类型")
     agent_type: str = Field(..., description="Agent类型")
     agent_method: str = Field(..., description="Agent方法名")
@@ -43,22 +46,26 @@ class CreateApprovalRequest(BaseModel):
 
 class ApproveDecisionRequest(BaseModel):
     """批准决策请求"""
+
     manager_feedback: Optional[str] = Field(None, description="店长反馈意见")
 
 
 class RejectDecisionRequest(BaseModel):
     """拒绝决策请求"""
+
     manager_feedback: str = Field(..., description="拒绝原因")
 
 
 class ModifyDecisionRequest(BaseModel):
     """修改决策请求"""
+
     modified_decision: Dict[str, Any] = Field(..., description="修改后的决策")
     manager_feedback: Optional[str] = Field(None, description="修改说明")
 
 
 class RecordOutcomeRequest(BaseModel):
     """记录决策结果请求"""
+
     outcome: str = Field(..., description="决策结果: success, failure, partial, pending")
     actual_result: Dict[str, Any] = Field(..., description="实际结果数据")
     expected_result: Dict[str, Any] = Field(..., description="预期结果数据")
@@ -67,6 +74,7 @@ class RecordOutcomeRequest(BaseModel):
 
 class DecisionLogResponse(BaseModel):
     """决策日志响应"""
+
     id: str
     decision_type: str
     agent_type: str
@@ -91,6 +99,7 @@ class DecisionLogResponse(BaseModel):
 
 class DecisionStatisticsResponse(BaseModel):
     """决策统计响应"""
+
     total: int
     approved: int
     rejected: int
@@ -108,9 +117,7 @@ class DecisionStatisticsResponse(BaseModel):
 
 @router.post("/approvals", summary="创建审批请求", response_model=DecisionLogResponse)
 async def create_approval(
-    request: CreateApprovalRequest,
-    current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
+    request: CreateApprovalRequest, current_user: User = Depends(get_current_active_user), db: AsyncSession = Depends(get_db)
 ):
     """
     创建审批请求
@@ -137,7 +144,7 @@ async def create_approval(
             ai_alternatives=request.ai_alternatives,
             context_data=request.context_data,
             rag_context=request.rag_context,
-            db=db
+            db=db,
         )
 
         logger.info(
@@ -145,7 +152,7 @@ async def create_approval(
             decision_id=decision_log.id,
             decision_type=request.decision_type,
             store_id=request.store_id,
-            user_id=current_user.id
+            user_id=current_user.id,
         )
 
         return decision_log.to_dict()
@@ -163,7 +170,7 @@ async def get_approvals(
     start_date: Optional[str] = Query(None, description="开始日期 YYYY-MM-DD"),
     end_date: Optional[str] = Query(None, description="结束日期 YYYY-MM-DD"),
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     获取审批决策列表（支持多状态过滤）
@@ -181,9 +188,8 @@ async def get_approvals(
         # 门店权限：店长只能看自己管理的门店
         if current_user.role in ["store_manager", "assistant_manager"] and not store_id:
             from ..models.store import Store as StoreModel
-            mgr_stores_result = await db.execute(
-                select(StoreModel.id).where(StoreModel.manager_id == current_user.id)
-            )
+
+            mgr_stores_result = await db.execute(select(StoreModel.id).where(StoreModel.manager_id == current_user.id))
             managed_ids = [r[0] for r in mgr_stores_result.all()]
             if managed_ids:
                 stmt = stmt.where(DecisionLog.store_id.in_(managed_ids))
@@ -216,7 +222,7 @@ async def get_decision_statistics(
     start_date: Optional[datetime] = Query(None, description="开始日期"),
     end_date: Optional[datetime] = Query(None, description="结束日期"),
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     获取决策统计数据
@@ -225,10 +231,7 @@ async def get_decision_statistics(
     """
     try:
         statistics = await approval_service.get_decision_statistics(
-            store_id=store_id,
-            start_date=start_date,
-            end_date=end_date,
-            db=db
+            store_id=store_id, start_date=start_date, end_date=end_date, db=db
         )
 
         return statistics
@@ -240,9 +243,7 @@ async def get_decision_statistics(
 
 @router.get("/approvals/{decision_id}", summary="获取审批详情", response_model=DecisionLogResponse)
 async def get_approval_detail(
-    decision_id: str,
-    current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
+    decision_id: str, current_user: User = Depends(get_current_active_user), db: AsyncSession = Depends(get_db)
 ):
     """
     获取审批详情
@@ -269,7 +270,7 @@ async def approve_decision(
     decision_id: str,
     request: ApproveDecisionRequest,
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     批准决策
@@ -278,17 +279,10 @@ async def approve_decision(
     """
     try:
         decision_log = await approval_service.approve_decision(
-            decision_id=decision_id,
-            manager_id=current_user.id,
-            manager_feedback=request.manager_feedback,
-            db=db
+            decision_id=decision_id, manager_id=current_user.id, manager_feedback=request.manager_feedback, db=db
         )
 
-        logger.info(
-            "decision_approved",
-            decision_id=decision_id,
-            manager_id=current_user.id
-        )
+        logger.info("decision_approved", decision_id=decision_id, manager_id=current_user.id)
 
         return decision_log.to_dict()
 
@@ -304,7 +298,7 @@ async def reject_decision(
     decision_id: str,
     request: RejectDecisionRequest,
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     拒绝决策
@@ -314,18 +308,10 @@ async def reject_decision(
     """
     try:
         decision_log = await approval_service.reject_decision(
-            decision_id=decision_id,
-            manager_id=current_user.id,
-            manager_feedback=request.manager_feedback,
-            db=db
+            decision_id=decision_id, manager_id=current_user.id, manager_feedback=request.manager_feedback, db=db
         )
 
-        logger.info(
-            "decision_rejected",
-            decision_id=decision_id,
-            manager_id=current_user.id,
-            reason=request.manager_feedback
-        )
+        logger.info("decision_rejected", decision_id=decision_id, manager_id=current_user.id, reason=request.manager_feedback)
 
         return decision_log.to_dict()
 
@@ -341,7 +327,7 @@ async def modify_decision(
     decision_id: str,
     request: ModifyDecisionRequest,
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     修改决策
@@ -355,14 +341,10 @@ async def modify_decision(
             manager_id=current_user.id,
             modified_decision=request.modified_decision,
             manager_feedback=request.manager_feedback,
-            db=db
+            db=db,
         )
 
-        logger.info(
-            "decision_modified",
-            decision_id=decision_id,
-            manager_id=current_user.id
-        )
+        logger.info("decision_modified", decision_id=decision_id, manager_id=current_user.id)
 
         return decision_log.to_dict()
 
@@ -378,7 +360,7 @@ async def record_decision_outcome(
     decision_id: str,
     request: RecordOutcomeRequest,
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     记录决策结果
@@ -399,14 +381,11 @@ async def record_decision_outcome(
             actual_result=request.actual_result,
             expected_result=request.expected_result,
             business_impact=request.business_impact,
-            db=db
+            db=db,
         )
 
         logger.info(
-            "decision_outcome_recorded",
-            decision_id=decision_id,
-            outcome=request.outcome,
-            trust_score=decision_log.trust_score
+            "decision_outcome_recorded", decision_id=decision_id, outcome=request.outcome, trust_score=decision_log.trust_score
         )
 
         return decision_log.to_dict()
@@ -428,7 +407,7 @@ async def wechat_approval_callback(
     user_id: str = Query(..., description="用户ID"),
     feedback: Optional[str] = Query(None, description="反馈意见"),
     modified_data: Optional[Dict[str, Any]] = None,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     企微审批回调
@@ -438,58 +417,43 @@ async def wechat_approval_callback(
     try:
         if action == "approve":
             decision_log = await approval_service.approve_decision(
-                decision_id=decision_id,
-                manager_id=user_id,
-                manager_feedback=feedback,
-                db=db
+                decision_id=decision_id, manager_id=user_id, manager_feedback=feedback, db=db
             )
         elif action == "reject":
             if not feedback:
                 raise HTTPException(status_code=400, detail="Feedback is required for rejection")
             decision_log = await approval_service.reject_decision(
-                decision_id=decision_id,
-                manager_id=user_id,
-                manager_feedback=feedback,
-                db=db
+                decision_id=decision_id, manager_id=user_id, manager_feedback=feedback, db=db
             )
         elif action == "modify":
             if not modified_data:
                 raise HTTPException(status_code=400, detail="Modified data is required")
             decision_log = await approval_service.modify_decision(
-                decision_id=decision_id,
-                manager_id=user_id,
-                modified_decision=modified_data,
-                manager_feedback=feedback,
-                db=db
+                decision_id=decision_id, manager_id=user_id, modified_decision=modified_data, manager_feedback=feedback, db=db
             )
         else:
             raise HTTPException(status_code=400, detail=f"Invalid action: {action}")
 
-        logger.info(
-            "wechat_callback_processed",
-            decision_id=decision_id,
-            action=action,
-            user_id=user_id
-        )
+        logger.info("wechat_callback_processed", decision_id=decision_id, action=action, user_id=user_id)
 
         # 审批后调度 48h 效果反馈检查
         if action in ("approve", "modify"):
             try:
                 from src.core.celery_tasks import check_decision_impact
+
                 check_decision_impact.apply_async(
                     args=[decision_id],
                     countdown=int(os.getenv("DECISION_FEEDBACK_DELAY_SECONDS", str(48 * 3600))),
                 )
                 logger.info("decision_feedback_scheduled", decision_id=decision_id)
             except Exception as sched_err:
-                logger.warning("decision_feedback_schedule_failed",
-                               decision_id=decision_id, error=str(sched_err))
+                logger.warning("decision_feedback_schedule_failed", decision_id=decision_id, error=str(sched_err))
 
         return {
             "success": True,
             "message": "Callback processed successfully",
             "decision_id": decision_log.id,
-            "status": decision_log.decision_status.value
+            "status": decision_log.decision_status.value,
         }
 
     except HTTPException:

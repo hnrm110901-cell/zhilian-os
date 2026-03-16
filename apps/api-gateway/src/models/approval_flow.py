@@ -2,53 +2,59 @@
 Approval Flow Models — 通用审批引擎
 支持请假、加班、薪资确认、招聘Offer等多种审批场景
 """
+
 import enum
 import uuid
 from datetime import datetime
-from sqlalchemy import (
-    Column, String, Integer, Numeric, Boolean, Date, DateTime,
-    Text, ForeignKey, Enum as SAEnum,
-)
-from sqlalchemy.dialects.postgresql import UUID, JSON
+
+from sqlalchemy import Boolean, Column, Date, DateTime
+from sqlalchemy import Enum as SAEnum
+from sqlalchemy import ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy.dialects.postgresql import JSON, UUID
 
 from .base import Base, TimestampMixin
 
 
 class ApprovalType(str, enum.Enum):
     """审批类型"""
-    LEAVE = "leave"                 # 请假
-    OVERTIME = "overtime"           # 加班
-    PAYROLL_CONFIRM = "payroll"     # 薪资确认
-    OFFER = "offer"                 # 招聘Offer
-    CONTRACT = "contract"           # 合同签署
-    TRANSFER = "transfer"           # 调岗
-    RESIGNATION = "resignation"     # 离职
-    GENERAL = "general"             # 通用
+
+    LEAVE = "leave"  # 请假
+    OVERTIME = "overtime"  # 加班
+    PAYROLL_CONFIRM = "payroll"  # 薪资确认
+    OFFER = "offer"  # 招聘Offer
+    CONTRACT = "contract"  # 合同签署
+    TRANSFER = "transfer"  # 调岗
+    RESIGNATION = "resignation"  # 离职
+    GENERAL = "general"  # 通用
 
 
 class ApprovalStatus(str, enum.Enum):
     """审批状态"""
-    PENDING = "pending"             # 待审批
-    APPROVED = "approved"           # 已通过
-    REJECTED = "rejected"           # 已驳回
-    WITHDRAWN = "withdrawn"         # 已撤回
-    EXPIRED = "expired"             # 已过期
+
+    PENDING = "pending"  # 待审批
+    APPROVED = "approved"  # 已通过
+    REJECTED = "rejected"  # 已驳回
+    WITHDRAWN = "withdrawn"  # 已撤回
+    EXPIRED = "expired"  # 已过期
 
 
 class ApprovalNodeType(str, enum.Enum):
     """审批节点类型"""
-    SINGLE = "single"               # 单人审批
-    AND_SIGN = "and_sign"           # 会签（所有人通过）
-    OR_SIGN = "or_sign"             # 或签（任一人通过）
+
+    SINGLE = "single"  # 单人审批
+    AND_SIGN = "and_sign"  # 会签（所有人通过）
+    OR_SIGN = "or_sign"  # 或签（任一人通过）
 
 
 # ── 1. 审批流程模板 ────────────────────────────────────────
+
 
 class ApprovalFlowTemplate(Base, TimestampMixin):
     """
     审批流程定义：定义审批节点链。
     每种审批类型可配置不同的审批流（如请假3天以上需总部审批）。
     """
+
     __tablename__ = "approval_flow_templates"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -84,11 +90,13 @@ class ApprovalFlowTemplate(Base, TimestampMixin):
 
 # ── 2. 审批实例 ────────────────────────────────────────────
 
+
 class ApprovalInstance(Base, TimestampMixin):
     """
     审批实例：每次发起审批创建一条。
     关联到具体的业务数据（请假单、加班单等）。
     """
+
     __tablename__ = "approval_instances"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -112,8 +120,8 @@ class ApprovalInstance(Base, TimestampMixin):
     applicant_name = Column(String(100), nullable=True)
 
     # 关联业务
-    business_type = Column(String(50), nullable=False)   # "leave_request", "overtime_request", etc.
-    business_id = Column(String(50), nullable=False)      # 业务记录ID
+    business_type = Column(String(50), nullable=False)  # "leave_request", "overtime_request", etc.
+    business_id = Column(String(50), nullable=False)  # 业务记录ID
 
     # 审批标题和摘要
     title = Column(String(200), nullable=False)
@@ -136,19 +144,18 @@ class ApprovalInstance(Base, TimestampMixin):
     expired_at = Column(DateTime, nullable=True)
 
     def __repr__(self):
-        return (
-            f"<ApprovalInstance(type='{self.approval_type}', "
-            f"status='{self.status}', applicant='{self.applicant_id}')>"
-        )
+        return f"<ApprovalInstance(type='{self.approval_type}', " f"status='{self.status}', applicant='{self.applicant_id}')>"
 
 
 # ── 3. 审批节点记录 ────────────────────────────────────────
+
 
 class ApprovalNodeRecord(Base, TimestampMixin):
     """
     审批节点执行记录：每个审批步骤一条。
     记录谁审批了、什么时候、审批意见。
     """
+
     __tablename__ = "approval_node_records"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -167,12 +174,9 @@ class ApprovalNodeRecord(Base, TimestampMixin):
     approver_role = Column(String(50), nullable=True)
 
     # 审批结果
-    action = Column(String(20), nullable=True)    # approved / rejected
+    action = Column(String(20), nullable=True)  # approved / rejected
     comment = Column(Text, nullable=True)
     acted_at = Column(DateTime, nullable=True)
 
     def __repr__(self):
-        return (
-            f"<ApprovalNodeRecord(instance='{self.instance_id}', "
-            f"step={self.step}, action='{self.action}')>"
-        )
+        return f"<ApprovalNodeRecord(instance='{self.instance_id}', " f"step={self.step}, action='{self.action}')>"

@@ -1,18 +1,19 @@
 """
 健康检查API
 """
+
+from datetime import datetime
+
+import structlog
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from datetime import datetime
-import structlog
-
-from src.core.dependencies import get_current_active_user
 from src.core.config import settings
-from src.services.wechat_service import wechat_service
-from src.services.feishu_service import feishu_service
-from src.services.aoqiwei_service import aoqiwei_service
-from src.services.pinzhi_service import pinzhi_service
+from src.core.dependencies import get_current_active_user
 from src.models import User
+from src.services.aoqiwei_service import aoqiwei_service
+from src.services.feishu_service import feishu_service
+from src.services.pinzhi_service import pinzhi_service
+from src.services.wechat_service import wechat_service
 
 logger = structlog.get_logger()
 
@@ -55,9 +56,7 @@ async def health_check():
     - `timestamp`: 当前服务器时间
     - `version`: API版本号
     """
-    return HealthResponse(
-        status="healthy", timestamp=datetime.now(), version="0.1.0"
-    )
+    return HealthResponse(status="healthy", timestamp=datetime.now(), version="0.1.0")
 
 
 @router.get("/ready")
@@ -89,9 +88,11 @@ async def readiness_check():
     - `ready`: 所有依赖服务正常
     - `not_ready`: 至少一个依赖服务不可用
     """
-    from ..core.database import get_db_session
-    from sqlalchemy import text
     import redis
+    from sqlalchemy import text
+
+    from ..core.database import get_db_session
+
     checks = {}
     all_healthy = True
 
@@ -99,7 +100,7 @@ async def readiness_check():
         return {
             "status": "ready",
             "checks": {"database": "healthy(test)", "redis": "healthy(test)"},
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
 
     # 检查数据库连接
@@ -126,11 +127,7 @@ async def readiness_check():
 
     status = "ready" if all_healthy else "not_ready"
 
-    return {
-        "status": status,
-        "checks": checks,
-        "timestamp": datetime.now().isoformat()
-    }
+    return {"status": status, "checks": checks, "timestamp": datetime.now().isoformat()}
 
 
 @router.get("/live")
@@ -219,7 +216,7 @@ async def agents_health():
             "status": status,
             "total_agents": total_agents,
             "agents": agents_status.get("agents", {}),
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
 
     except Exception as e:
@@ -229,7 +226,7 @@ async def agents_health():
             "total_agents": 0,
             "agents": {},
             "error": str(e),
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
 
 
@@ -275,10 +272,7 @@ async def external_systems_health(
     # 计算总体状态
     total_systems = len(systems)
     configured_systems = sum(1 for s in systems.values() if s.get("configured", False))
-    healthy_systems = sum(
-        1 for s in systems.values()
-        if s.get("status") in ["healthy", "configured"]
-    )
+    healthy_systems = sum(1 for s in systems.values() if s.get("status") in ["healthy", "configured"])
 
     overall_status = "healthy" if healthy_systems == total_systems else "degraded"
     if configured_systems == 0:
@@ -401,18 +395,9 @@ async def config_validation(
     }
 
     # 计算完整性
-    wechat_complete = all(
-        wechat_configs[k]
-        for k in ("WECHAT_CORP_ID", "WECHAT_CORP_SECRET", "WECHAT_AGENT_ID")
-    )
-    feishu_complete = all(
-        feishu_configs[k]
-        for k in ("FEISHU_APP_ID", "FEISHU_APP_SECRET")
-    )
-    wechat_webhook_secure = all(
-        wechat_configs[k]
-        for k in ("WECHAT_TOKEN", "WECHAT_ENCODING_AES_KEY")
-    )
+    wechat_complete = all(wechat_configs[k] for k in ("WECHAT_CORP_ID", "WECHAT_CORP_SECRET", "WECHAT_AGENT_ID"))
+    feishu_complete = all(feishu_configs[k] for k in ("FEISHU_APP_ID", "FEISHU_APP_SECRET"))
+    wechat_webhook_secure = all(wechat_configs[k] for k in ("WECHAT_TOKEN", "WECHAT_ENCODING_AES_KEY"))
     feishu_webhook_secure = feishu_configs["FEISHU_VERIFICATION_TOKEN"]
     aoqiwei_complete = all(aoqiwei_configs.values())
     pinzhi_complete = all(pinzhi_configs.values())
@@ -444,12 +429,14 @@ async def config_validation(
         },
         "summary": {
             "required_complete": all(required_configs.values()),
-            "optional_systems_configured": sum([
-                wechat_complete,
-                feishu_complete,
-                aoqiwei_complete,
-                pinzhi_complete,
-            ]),
+            "optional_systems_configured": sum(
+                [
+                    wechat_complete,
+                    feishu_complete,
+                    aoqiwei_complete,
+                    pinzhi_complete,
+                ]
+            ),
             "total_optional_systems": 4,
         },
         "timestamp": datetime.now().isoformat(),

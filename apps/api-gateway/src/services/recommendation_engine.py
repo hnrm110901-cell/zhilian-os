@@ -7,21 +7,23 @@ Provides personalized recommendations, dynamic pricing, and precision marketing
 """
 
 import os
-from typing import Dict, List, Optional, Any, Tuple
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from dataclasses import dataclass
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
-from sqlalchemy.orm import selectinload
+from typing import Any, Dict, List, Optional, Tuple
+
 import numpy as np
 import structlog
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 logger = structlog.get_logger()
 
 
 class RecommendationType(Enum):
     """Recommendation type enum"""
+
     DISH = "dish"  # 菜品推荐
     COMBO = "combo"  # 套餐推荐
     UPSELL = "upsell"  # 加购推荐
@@ -30,6 +32,7 @@ class RecommendationType(Enum):
 
 class PricingStrategy(Enum):
     """Pricing strategy enum"""
+
     PEAK_HOUR = "peak_hour"  # 高峰时段定价
     OFF_PEAK = "off_peak"  # 低峰时段定价
     DEMAND_BASED = "demand_based"  # 需求定价
@@ -40,6 +43,7 @@ class PricingStrategy(Enum):
 @dataclass
 class DishRecommendation:
     """Dish recommendation"""
+
     dish_id: str
     dish_name: str
     score: float  # 0-1
@@ -52,6 +56,7 @@ class DishRecommendation:
 @dataclass
 class PricingRecommendation:
     """Pricing recommendation"""
+
     dish_id: str
     current_price: float
     recommended_price: float
@@ -65,6 +70,7 @@ class PricingRecommendation:
 @dataclass
 class MarketingCampaign:
     """Marketing campaign"""
+
     campaign_id: str
     target_segment: str
     dish_ids: List[str]
@@ -103,7 +109,7 @@ class IntelligentRecommendationEngine:
         customer_id: str,
         store_id: str,
         context: Optional[Dict[str, Any]] = None,
-        top_k: int = int(os.getenv("RECOMMEND_TOP_K", "5"))
+        top_k: int = int(os.getenv("RECOMMEND_TOP_K", "5")),
     ) -> List[DishRecommendation]:
         """
         Recommend dishes for a customer
@@ -141,47 +147,40 @@ class IntelligentRecommendationEngine:
                 continue
 
             # Calculate score components
-            cf_score = await self._collaborative_filtering_score(
-                customer_id, dish["dish_id"]
-            )
-            cb_score = self._content_based_score(
-                customer_history, dish
-            )
+            cf_score = await self._collaborative_filtering_score(customer_id, dish["dish_id"])
+            cb_score = self._content_based_score(customer_history, dish)
             context_score = self._context_score(dish, context)
             business_score = self._business_score(dish, store_id)
 
             # Weighted combination
             final_score = (
-                float(os.getenv("RECOMMEND_CF_WEIGHT", "0.3")) * cf_score +
-                float(os.getenv("RECOMMEND_CB_WEIGHT", "0.3")) * cb_score +
-                float(os.getenv("RECOMMEND_CONTEXT_WEIGHT", "0.2")) * context_score +
-                float(os.getenv("RECOMMEND_BUSINESS_WEIGHT", "0.2")) * business_score
+                float(os.getenv("RECOMMEND_CF_WEIGHT", "0.3")) * cf_score
+                + float(os.getenv("RECOMMEND_CB_WEIGHT", "0.3")) * cb_score
+                + float(os.getenv("RECOMMEND_CONTEXT_WEIGHT", "0.2")) * context_score
+                + float(os.getenv("RECOMMEND_BUSINESS_WEIGHT", "0.2")) * business_score
             )
 
             # Generate reason
-            reason = self._generate_recommendation_reason(
-                dish, cf_score, cb_score, context_score, business_score
-            )
+            reason = self._generate_recommendation_reason(dish, cf_score, cb_score, context_score, business_score)
 
-            recommendations.append(DishRecommendation(
-                dish_id=dish["dish_id"],
-                dish_name=dish["name"],
-                score=final_score,
-                reason=reason,
-                price=dish["price"],
-                estimated_profit=dish["profit_margin"] * dish["price"],
-                confidence=min(cf_score, cb_score)  # Conservative estimate
-            ))
+            recommendations.append(
+                DishRecommendation(
+                    dish_id=dish["dish_id"],
+                    dish_name=dish["name"],
+                    score=final_score,
+                    reason=reason,
+                    price=dish["price"],
+                    estimated_profit=dish["profit_margin"] * dish["price"],
+                    confidence=min(cf_score, cb_score),  # Conservative estimate
+                )
+            )
 
         # Sort by score and return top K
         recommendations.sort(key=lambda x: x.score, reverse=True)
         return recommendations[:top_k]
 
     async def optimize_pricing(
-        self,
-        store_id: str,
-        dish_id: str,
-        context: Optional[Dict[str, Any]] = None
+        self, store_id: str, dish_id: str, context: Optional[Dict[str, Any]] = None
     ) -> PricingRecommendation:
         """
         Optimize pricing for a dish
@@ -225,17 +224,11 @@ class IntelligentRecommendationEngine:
 
         # Calculate expected impact
         price_change_pct = (recommended_price - current_price) / current_price if current_price else 0.0
-        expected_demand_change = self._estimate_demand_change(
-            dish_id, price_change_pct
-        )
-        expected_revenue_change = self._estimate_revenue_change(
-            current_price, recommended_price, expected_demand_change
-        )
+        expected_demand_change = self._estimate_demand_change(dish_id, price_change_pct)
+        expected_revenue_change = self._estimate_revenue_change(current_price, recommended_price, expected_demand_change)
 
         # Generate reason
-        reason = self._generate_pricing_reason(
-            strategy, price_change_pct, context
-        )
+        reason = self._generate_pricing_reason(strategy, price_change_pct, context)
 
         return PricingRecommendation(
             dish_id=dish_id,
@@ -245,15 +238,11 @@ class IntelligentRecommendationEngine:
             strategy=strategy,
             expected_demand_change=expected_demand_change,
             expected_revenue_change=expected_revenue_change,
-            reason=reason
+            reason=reason,
         )
 
     async def generate_marketing_campaign(
-        self,
-        store_id: str,
-        objective: str,
-        budget: float,
-        target_segment: Optional[str] = None
+        self, store_id: str, objective: str, budget: float, target_segment: Optional[str] = None
     ) -> MarketingCampaign:
         """
         Generate precision marketing campaign
@@ -282,30 +271,20 @@ class IntelligentRecommendationEngine:
         segment_data = self._get_segment_data(store_id, target_segment)
 
         # Select dishes to promote
-        promoted_dishes = await self._select_promotion_dishes(
-            store_id, objective, segment_data
-        )
+        promoted_dishes = await self._select_promotion_dishes(store_id, objective, segment_data)
 
         # Calculate optimal discount rate
-        discount_rate = self._calculate_optimal_discount(
-            promoted_dishes, segment_data, budget
-        )
+        discount_rate = self._calculate_optimal_discount(promoted_dishes, segment_data, budget)
 
         # Estimate campaign performance
-        expected_conversion = self._estimate_conversion_rate(
-            target_segment, discount_rate
-        )
-        expected_revenue = self._estimate_campaign_revenue(
-            promoted_dishes, expected_conversion, discount_rate, segment_data
-        )
+        expected_conversion = self._estimate_conversion_rate(target_segment, discount_rate)
+        expected_revenue = self._estimate_campaign_revenue(promoted_dishes, expected_conversion, discount_rate, segment_data)
 
         # Determine campaign duration
         duration_days = self._calculate_campaign_duration(budget, expected_revenue)
 
         # Generate reason
-        reason = self._generate_campaign_reason(
-            objective, target_segment, promoted_dishes, discount_rate
-        )
+        reason = self._generate_campaign_reason(objective, target_segment, promoted_dishes, discount_rate)
 
         campaign_id = f"campaign_{store_id}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
 
@@ -317,15 +296,10 @@ class IntelligentRecommendationEngine:
             expected_conversion=expected_conversion,
             expected_revenue=expected_revenue,
             duration_days=duration_days,
-            reason=reason
+            reason=reason,
         )
 
-    async def get_recommendation_performance(
-        self,
-        store_id: str,
-        start_date: datetime,
-        end_date: datetime
-    ) -> Dict[str, Any]:
+    async def get_recommendation_performance(self, store_id: str, start_date: datetime, end_date: datetime) -> Dict[str, Any]:
         """
         Get recommendation performance metrics
         获取推荐性能指标
@@ -345,8 +319,11 @@ class IntelligentRecommendationEngine:
             }
         try:
             from ..models.order import Order, OrderStatus
+
             count_result = await self.db.execute(
-                select(func.count()).select_from(Order).where(
+                select(func.count())
+                .select_from(Order)
+                .where(
                     Order.store_id == store_id,
                     Order.order_time >= start_date,
                     Order.order_time <= end_date,
@@ -371,34 +348,37 @@ class IntelligentRecommendationEngine:
 
     # Helper methods for recommendation logic
 
-    async def _get_customer_history(
-        self,
-        customer_id: str,
-        store_id: str
-    ) -> List[Dict[str, Any]]:
+    async def _get_customer_history(self, customer_id: str, store_id: str) -> List[Dict[str, Any]]:
         """Get customer order history"""
         if not self.db:
             return []
         try:
             from ..models.order import Order, OrderItem, OrderStatus
+
             result = await self.db.execute(
-                select(Order).options(selectinload(Order.items)).where(
+                select(Order)
+                .options(selectinload(Order.items))
+                .where(
                     Order.store_id == store_id,
                     Order.customer_phone == customer_id,
                     Order.status == OrderStatus.COMPLETED.value,
-                ).order_by(Order.order_time.desc()).limit(20)
+                )
+                .order_by(Order.order_time.desc())
+                .limit(20)
             )
             orders = result.scalars().all()
             history = []
             for order in orders:
                 for item in order.items:
-                    history.append({
-                        "order_id": order.id,
-                        "dish_id": item.item_id,
-                        "dish_name": item.item_name,
-                        "quantity": item.quantity,
-                        "order_time": order.order_time.isoformat() if order.order_time else None,
-                    })
+                    history.append(
+                        {
+                            "order_id": order.id,
+                            "dish_id": item.item_id,
+                            "dish_name": item.item_name,
+                            "quantity": item.quantity,
+                            "order_time": order.order_time.isoformat() if order.order_time else None,
+                        }
+                    )
             return history
         except Exception:
             return []
@@ -409,9 +389,8 @@ class IntelligentRecommendationEngine:
             return []
         try:
             from ..models.dish import Dish
-            result = await self.db.execute(
-                select(Dish).where(Dish.store_id == store_id, Dish.is_available == True)
-            )
+
+            result = await self.db.execute(select(Dish).where(Dish.store_id == store_id, Dish.is_available == True))
             dishes = result.scalars().all()
             return [
                 {
@@ -433,33 +412,35 @@ class IntelligentRecommendationEngine:
             return False
         try:
             from ..models.order import Order, OrderItem, OrderStatus
+
             cutoff = datetime.now() - timedelta(days=7)
             result = await self.db.execute(
-                select(OrderItem).join(Order, Order.id == OrderItem.order_id).where(
+                select(OrderItem)
+                .join(Order, Order.id == OrderItem.order_id)
+                .where(
                     Order.customer_phone == customer_id,
                     Order.order_time >= cutoff,
                     OrderItem.item_id == dish_id,
-                ).limit(1)
+                )
+                .limit(1)
             )
             return result.scalar_one_or_none() is not None
         except Exception:
             return False
 
-    async def _collaborative_filtering_score(
-        self,
-        customer_id: str,
-        dish_id: str
-    ) -> float:
+    async def _collaborative_filtering_score(self, customer_id: str, dish_id: str) -> float:
         """Calculate collaborative filtering score based on order co-occurrence"""
         if not self.db:
             return 0.5
         try:
             from ..models.order import Order, OrderItem, OrderStatus
+
             # Count how many completed orders for this store include this dish
             dish_count = await self.db.execute(
-                select(func.count()).select_from(OrderItem).join(
-                    Order, Order.id == OrderItem.order_id
-                ).where(OrderItem.item_id == dish_id, Order.status == OrderStatus.COMPLETED.value)
+                select(func.count())
+                .select_from(OrderItem)
+                .join(Order, Order.id == OrderItem.order_id)
+                .where(OrderItem.item_id == dish_id, Order.status == OrderStatus.COMPLETED.value)
             )
             dish_orders = dish_count.scalar() or 0
             total_count = await self.db.execute(
@@ -473,11 +454,7 @@ class IntelligentRecommendationEngine:
         except Exception:
             return 0.5
 
-    def _content_based_score(
-        self,
-        customer_history: List[Dict[str, Any]],
-        dish: Dict[str, Any]
-    ) -> float:
+    def _content_based_score(self, customer_history: List[Dict[str, Any]], dish: Dict[str, Any]) -> float:
         """Calculate content-based filtering score via tag overlap"""
         if not customer_history:
             return 0.5
@@ -487,7 +464,7 @@ class IntelligentRecommendationEngine:
         # Collect tags from customer's past orders
         history_tags: Dict[str, int] = {}
         for item in customer_history:
-            for tag in (item.get("tags") or []):
+            for tag in item.get("tags") or []:
                 history_tags[tag] = history_tags.get(tag, 0) + 1
         if not history_tags:
             return 0.5
@@ -495,11 +472,7 @@ class IntelligentRecommendationEngine:
         max_possible = sum(history_tags.values())
         return min(0.95, 0.4 + (overlap / max_possible) * 0.55) if max_possible else 0.5
 
-    def _context_score(
-        self,
-        dish: Dict[str, Any],
-        context: Dict[str, Any]
-    ) -> float:
+    def _context_score(self, dish: Dict[str, Any], context: Dict[str, Any]) -> float:
         """Calculate context-aware score"""
         score = float(os.getenv("RECOMMEND_CONTEXT_BASE_SCORE", "0.5"))
 
@@ -517,11 +490,7 @@ class IntelligentRecommendationEngine:
 
         return min(score, 1.0)
 
-    def _business_score(
-        self,
-        dish: Dict[str, Any],
-        store_id: str
-    ) -> float:
+    def _business_score(self, dish: Dict[str, Any], store_id: str) -> float:
         """Calculate business score (profit, inventory)"""
         score = 0.0
 
@@ -536,12 +505,7 @@ class IntelligentRecommendationEngine:
         return min(score, 1.0)
 
     def _generate_recommendation_reason(
-        self,
-        dish: Dict[str, Any],
-        cf_score: float,
-        cb_score: float,
-        context_score: float,
-        business_score: float
+        self, dish: Dict[str, Any], cf_score: float, cb_score: float, context_score: float, business_score: float
     ) -> str:
         """Generate human-readable recommendation reason"""
         reasons = []
@@ -557,15 +521,12 @@ class IntelligentRecommendationEngine:
 
         return "、".join(reasons) if reasons else "为您精选"
 
-    async def _get_dish_data(
-        self,
-        store_id: str,
-        dish_id: str
-    ) -> Dict[str, Any]:
+    async def _get_dish_data(self, store_id: str, dish_id: str) -> Dict[str, Any]:
         """Get dish data"""
         if self.db:
             try:
                 from ..models.dish import Dish
+
                 result = await self.db.execute(select(Dish).where(Dish.id == dish_id))
                 dish = result.scalar_one_or_none()
                 if dish:
@@ -579,11 +540,7 @@ class IntelligentRecommendationEngine:
                 logger.warning("recommendation_dish_pricing_failed", dish_id=dish_id, error=str(e))
         return {"dish_id": dish_id, "price": 0.0, "cost": 0.0, "profit_margin": 0.0}
 
-    def _determine_pricing_strategy(
-        self,
-        dish: Dict[str, Any],
-        context: Dict[str, Any]
-    ) -> PricingStrategy:
+    def _determine_pricing_strategy(self, dish: Dict[str, Any], context: Dict[str, Any]) -> PricingStrategy:
         """Determine optimal pricing strategy"""
         hour = context.get("hour", 12)
         inventory_level = context.get("inventory_level", 0.5)
@@ -602,42 +559,28 @@ class IntelligentRecommendationEngine:
 
         return PricingStrategy.DEMAND_BASED
 
-    def _peak_hour_pricing(
-        self,
-        dish: Dict[str, Any],
-        context: Dict[str, Any]
-    ) -> float:
+    def _peak_hour_pricing(self, dish: Dict[str, Any], context: Dict[str, Any]) -> float:
         """Calculate peak hour pricing"""
         current_price = dish["price"]
         # Increase price by 10-15% during peak hours
         return current_price * float(os.getenv("PRICING_PEAK_RATIO", "1.12"))
 
-    def _off_peak_pricing(
-        self,
-        dish: Dict[str, Any],
-        context: Dict[str, Any]
-    ) -> float:
+    def _off_peak_pricing(self, dish: Dict[str, Any], context: Dict[str, Any]) -> float:
         """Calculate off-peak pricing"""
         current_price = dish["price"]
         # Decrease price by 10-20% during off-peak hours
         return current_price * 0.85
 
-    def _demand_based_pricing(
-        self,
-        dish: Dict[str, Any],
-        context: Dict[str, Any]
-    ) -> float:
+    def _demand_based_pricing(self, dish: Dict[str, Any], context: Dict[str, Any]) -> float:
         """Calculate demand-based pricing"""
         current_price = dish["price"]
         demand_level = context.get("demand_level", 0.5)
         # Adjust based on demand
-        return current_price * (float(os.getenv("PRICING_DEMAND_BASE", "0.9")) + float(os.getenv("PRICING_DEMAND_FACTOR", "0.2")) * demand_level)
+        return current_price * (
+            float(os.getenv("PRICING_DEMAND_BASE", "0.9")) + float(os.getenv("PRICING_DEMAND_FACTOR", "0.2")) * demand_level
+        )
 
-    def _inventory_based_pricing(
-        self,
-        dish: Dict[str, Any],
-        context: Dict[str, Any]
-    ) -> float:
+    def _inventory_based_pricing(self, dish: Dict[str, Any], context: Dict[str, Any]) -> float:
         """Calculate inventory-based pricing"""
         current_price = dish["price"]
         inventory_level = context.get("inventory_level", 0.5)
@@ -646,45 +589,27 @@ class IntelligentRecommendationEngine:
             return current_price * float(os.getenv("PRICING_INVENTORY_CLEAR_RATIO", "0.8"))
         return current_price
 
-    def _competitor_based_pricing(
-        self,
-        dish: Dict[str, Any],
-        context: Dict[str, Any]
-    ) -> float:
+    def _competitor_based_pricing(self, dish: Dict[str, Any], context: Dict[str, Any]) -> float:
         """Calculate competitor-based pricing"""
         current_price = dish["price"]
         competitor_price = context.get("competitor_price", current_price)
         # Price slightly below competitor
         return competitor_price * 0.95
 
-    def _estimate_demand_change(
-        self,
-        dish_id: str,
-        price_change_pct: float
-    ) -> float:
+    def _estimate_demand_change(self, dish_id: str, price_change_pct: float) -> float:
         """Estimate demand change from price change"""
         # Use price elasticity
         elasticity = self.price_elasticity.get(dish_id, -1.5)
         return elasticity * price_change_pct
 
-    def _estimate_revenue_change(
-        self,
-        current_price: float,
-        new_price: float,
-        demand_change: float
-    ) -> float:
+    def _estimate_revenue_change(self, current_price: float, new_price: float, demand_change: float) -> float:
         """Estimate revenue change"""
         # Simplified calculation
         price_effect = (new_price - current_price) / current_price if current_price else 0.0
         total_effect = price_effect + demand_change
         return total_effect
 
-    def _generate_pricing_reason(
-        self,
-        strategy: PricingStrategy,
-        price_change_pct: float,
-        context: Dict[str, Any]
-    ) -> str:
+    def _generate_pricing_reason(self, strategy: PricingStrategy, price_change_pct: float, context: Dict[str, Any]) -> str:
         """Generate pricing reason"""
         if strategy == PricingStrategy.PEAK_HOUR:
             return "高峰时段，需求旺盛，建议提价"
@@ -697,11 +622,7 @@ class IntelligentRecommendationEngine:
         else:
             return "参考竞品定价"
 
-    def _identify_target_segment(
-        self,
-        store_id: str,
-        objective: str
-    ) -> str:
+    def _identify_target_segment(self, store_id: str, objective: str) -> str:
         """Identify target customer segment"""
         if objective == "increase_revenue":
             return "high_value"
@@ -712,55 +633,30 @@ class IntelligentRecommendationEngine:
         else:
             return "all"
 
-    def _get_segment_data(
-        self,
-        store_id: str,
-        segment: str
-    ) -> Dict[str, Any]:
+    def _get_segment_data(self, store_id: str, segment: str) -> Dict[str, Any]:
         """Get customer segment data"""
-        return {
-            "segment": segment,
-            "size": 500,
-            "avg_order_value": 120.0,
-            "visit_frequency": 2.5
-        }
+        return {"segment": segment, "size": 500, "avg_order_value": 120.0, "visit_frequency": 2.5}
 
     async def _select_promotion_dishes(
-        self,
-        store_id: str,
-        objective: str,
-        segment_data: Dict[str, Any]
+        self, store_id: str, objective: str, segment_data: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
         """Select dishes for promotion"""
         # Simplified
         return (await self._get_available_dishes(store_id))[:3]
 
-    def _calculate_optimal_discount(
-        self,
-        dishes: List[Dict[str, Any]],
-        segment_data: Dict[str, Any],
-        budget: float
-    ) -> float:
+    def _calculate_optimal_discount(self, dishes: List[Dict[str, Any]], segment_data: Dict[str, Any], budget: float) -> float:
         """Calculate optimal discount rate"""
         # Simplified: 15-20% discount
         return 0.18
 
-    def _estimate_conversion_rate(
-        self,
-        segment: str,
-        discount_rate: float
-    ) -> float:
+    def _estimate_conversion_rate(self, segment: str, discount_rate: float) -> float:
         """Estimate campaign conversion rate"""
         base_rate = float(os.getenv("RECOMMEND_BASE_CONVERSION_RATE", "0.05"))  # base conversion
         discount_boost = discount_rate * float(os.getenv("RECOMMEND_DISCOUNT_BOOST_FACTOR", "0.5"))  # Discount effect
         return min(base_rate + discount_boost, float(os.getenv("RECOMMEND_MAX_CONVERSION_RATE", "0.25")))
 
     def _estimate_campaign_revenue(
-        self,
-        dishes: List[Dict[str, Any]],
-        conversion_rate: float,
-        discount_rate: float,
-        segment_data: Dict[str, Any]
+        self, dishes: List[Dict[str, Any]], conversion_rate: float, discount_rate: float, segment_data: Dict[str, Any]
     ) -> float:
         """Estimate campaign revenue"""
         segment_size = segment_data["size"]
@@ -769,21 +665,13 @@ class IntelligentRecommendationEngine:
         revenue_per_order = avg_order_value * (1 - discount_rate)
         return expected_orders * revenue_per_order
 
-    def _calculate_campaign_duration(
-        self,
-        budget: float,
-        expected_revenue: float
-    ) -> int:
+    def _calculate_campaign_duration(self, budget: float, expected_revenue: float) -> int:
         """Calculate optimal campaign duration"""
         # Simplified: 7-14 days
         return 10
 
     def _generate_campaign_reason(
-        self,
-        objective: str,
-        segment: str,
-        dishes: List[Dict[str, Any]],
-        discount_rate: float
+        self, objective: str, segment: str, dishes: List[Dict[str, Any]], discount_rate: float
     ) -> str:
         """Generate campaign reason"""
         return f"针对{segment}客群，推广{len(dishes)}道菜品，折扣{discount_rate*100:.0f}%，预期提升营收"

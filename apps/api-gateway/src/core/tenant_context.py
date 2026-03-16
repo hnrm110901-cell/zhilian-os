@@ -2,10 +2,12 @@
 租户上下文管理器
 提供线程安全的租户隔离机制（支持 store_id 和 brand_id 双层隔离）
 """
-from contextvars import ContextVar
-from typing import Optional
-from functools import wraps
+
 import asyncio
+from contextvars import ContextVar
+from functools import wraps
+from typing import Optional
+
 import structlog
 
 logger = structlog.get_logger()
@@ -97,6 +99,7 @@ def with_tenant(store_id: str):
         async def some_function():
             pass
     """
+
     def decorator(func):
         @wraps(func)
         async def async_wrapper(*args, **kwargs):

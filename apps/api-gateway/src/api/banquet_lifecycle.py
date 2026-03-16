@@ -18,16 +18,11 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.core.dependencies import get_current_user
-from src.models.user import User
 from src.models.banquet_lifecycle import BanquetStage
-from src.services.banquet_lifecycle_service import (
-    BanquetLifecycleService,
-    StageTransitionError,
-    RoomConflictError,
-)
+from src.models.user import User
+from src.services.banquet_lifecycle_service import BanquetLifecycleService, RoomConflictError, StageTransitionError
 
 router = APIRouter(
     prefix="/api/v1/banquet-lifecycle",
@@ -36,22 +31,23 @@ router = APIRouter(
 
 # 7 阶段中文标签（用于 Phase 2 前端 PipelineTab）
 _PIPELINE_STAGE_LABELS: dict[str, str] = {
-    "lead":        "商机",
-    "intent":      "意向",
-    "room_lock":   "锁台",
-    "signed":      "已签约",
+    "lead": "商机",
+    "intent": "意向",
+    "room_lock": "锁台",
+    "signed": "已签约",
     "preparation": "准备中",
-    "service":     "服务中",
-    "completed":   "已完成",
-    "cancelled":   "已取消",
+    "service": "服务中",
+    "completed": "已完成",
+    "cancelled": "已取消",
 }
 
 
 # ── Pydantic Schemas ──────────────────────────────────────────────────────────
 
+
 class AdvanceStageRequest(BaseModel):
-    to_stage: str              = Field(..., description="目标阶段：lead/intent/room_lock/signed/preparation/service/completed/cancelled")
-    reason:   Optional[str]   = Field(None, description="变更原因")
+    to_stage: str = Field(..., description="目标阶段：lead/intent/room_lock/signed/preparation/service/completed/cancelled")
+    reason: Optional[str] = Field(None, description="变更原因")
     metadata: Optional[Dict[str, Any]] = Field(None, description="额外元数据（合同编号、定金等）")
 
 
@@ -61,16 +57,17 @@ class InitStageRequest(BaseModel):
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
+
 @router.get(
     "/{store_id}/pipeline",
     summary="查看宴会销售漏斗（7 阶段分组视图）",
 )
 async def get_pipeline(
-    store_id:       str,
+    store_id: str,
     event_date_gte: Optional[str] = Query(None, description="宴会日期下限 YYYY-MM-DD"),
     event_date_lte: Optional[str] = Query(None, description="宴会日期上限 YYYY-MM-DD"),
-    db:  AsyncSession = Depends(get_db),
-    _:   User         = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """
     查看宴会销售漏斗：
@@ -94,22 +91,22 @@ async def get_pipeline(
     stages_dict: dict = raw.get("stages", {})
     pipeline_array = [
         {
-            "stage":       stage_key,
+            "stage": stage_key,
             "stage_label": _PIPELINE_STAGE_LABELS.get(stage_key, stage_key),
-            "count":       len(leads),
+            "count": len(leads),
             "leads": [
                 {
-                    "banquet_id":    item.get("reservation_id"),
-                    "banquet_type":  item.get("banquet_details_type", "宴会"),
+                    "banquet_id": item.get("reservation_id"),
+                    "banquet_type": item.get("banquet_details_type", "宴会"),
                     "expected_date": item.get("reservation_date"),
-                    "contact_name":  item.get("customer_name"),
-                    "amount_yuan":   item.get("estimated_budget"),
+                    "contact_name": item.get("customer_name"),
+                    "amount_yuan": item.get("estimated_budget"),
                 }
                 for item in leads
             ],
         }
         for stage_key, leads in stages_dict.items()
-        if stage_key != "cancelled"   # 已取消不在管道中展示
+        if stage_key != "cancelled"  # 已取消不在管道中展示
     ]
 
     return {
@@ -124,12 +121,12 @@ async def get_pipeline(
     summary="宴会销控日历（月视图 + 吉日感知）",
 )
 async def get_availability_calendar(
-    store_id:     str,
-    year:         int,
-    month:        int,
+    store_id: str,
+    year: int,
+    month: int,
     max_capacity: int = Query(200, ge=1, description="场地最大接待人数"),
-    db:  AsyncSession = Depends(get_db),
-    _:   User         = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """
     宴会销控日历（月视图），供销售顾问参考：
@@ -160,11 +157,11 @@ async def get_availability_calendar(
     # Phase 2: add `days` alias for calendar array, and `capacity` per day
     calendar = result.get("calendar", [])
     for day in calendar:
-        day["capacity"] = max_capacity   # frontend uses cell.capacity for full check
+        day["capacity"] = max_capacity  # frontend uses cell.capacity for full check
 
     return {
         **result,
-        "days": calendar,   # frontend reads raw?.days
+        "days": calendar,  # frontend reads raw?.days
     }
 
 
@@ -173,10 +170,10 @@ async def get_availability_calendar(
     summary="漏斗转化率统计",
 )
 async def get_funnel_stats(
-    store_id:  str,
+    store_id: str,
     days_back: int = Query(90, ge=1, le=365, description="统计过去 N 天（默认 90 天）"),
-    db:  AsyncSession = Depends(get_db),
-    _:   User         = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """
     宴会销售漏斗转化率统计：
@@ -196,10 +193,10 @@ async def get_funnel_stats(
     summary="查看阶段变更历史",
 )
 async def get_stage_history(
-    store_id:       str,
+    store_id: str,
     reservation_id: str,
-    db:  AsyncSession = Depends(get_db),
-    _:   User         = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """
     查看指定宴会预约的完整阶段变更历史（时间线）。
@@ -209,10 +206,10 @@ async def get_stage_history(
     svc = BanquetLifecycleService(db)
     history = await svc.get_stage_history(reservation_id)
     return {
-        "store_id":       store_id,
+        "store_id": store_id,
         "reservation_id": reservation_id,
-        "history":        history,
-        "total_changes":  len(history),
+        "history": history,
+        "total_changes": len(history),
     }
 
 
@@ -222,11 +219,11 @@ async def get_stage_history(
     status_code=status.HTTP_201_CREATED,
 )
 async def init_stage(
-    store_id:       str,
+    store_id: str,
     reservation_id: str,
-    body:           InitStageRequest,
-    db:   AsyncSession = Depends(get_db),
-    user: User         = Depends(get_current_user),
+    body: InitStageRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
     """
     将宴会预约初始化到「商机(lead)」阶段，正式进入 7 阶段销售漏斗。
@@ -244,8 +241,8 @@ async def init_stage(
         await db.commit()
         return {
             "reservation_id": reservation_id,
-            "banquet_stage":  reservation.banquet_stage,
-            "message":        "宴会预约已进入销售漏斗（lead 阶段）",
+            "banquet_stage": reservation.banquet_stage,
+            "message": "宴会预约已进入销售漏斗（lead 阶段）",
         }
     except (StageTransitionError, ValueError) as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
@@ -256,11 +253,11 @@ async def init_stage(
     summary="推进宴会阶段",
 )
 async def advance_stage(
-    store_id:       str,
+    store_id: str,
     reservation_id: str,
-    body:           AdvanceStageRequest,
-    db:   AsyncSession = Depends(get_db),
-    user: User         = Depends(get_current_user),
+    body: AdvanceStageRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
     """
     推进宴会预约到目标阶段（严格按状态机校验合法性）：
@@ -290,7 +287,7 @@ async def advance_stage(
         )
 
     operator = str(user.id) if hasattr(user, "id") else "store_manager"
-    svc      = BanquetLifecycleService(db)
+    svc = BanquetLifecycleService(db)
 
     try:
         reservation = await svc.advance_stage(
@@ -303,18 +300,18 @@ async def advance_stage(
         )
         await db.commit()
         return {
-            "reservation_id":   reservation_id,
-            "banquet_stage":    reservation.banquet_stage,
-            "room_locked_at":   reservation.room_locked_at.isoformat() if reservation.room_locked_at else None,
-            "signed_at":        reservation.signed_at.isoformat() if reservation.signed_at else None,
-            "message":          f"阶段已更新为 {reservation.banquet_stage}",
+            "reservation_id": reservation_id,
+            "banquet_stage": reservation.banquet_stage,
+            "room_locked_at": reservation.room_locked_at.isoformat() if reservation.room_locked_at else None,
+            "signed_at": reservation.signed_at.isoformat() if reservation.signed_at else None,
+            "message": f"阶段已更新为 {reservation.banquet_stage}",
         }
     except StageTransitionError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT,      detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
     except RoomConflictError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT,      detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,     detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
 @router.post(
@@ -323,8 +320,8 @@ async def advance_stage(
 )
 async def release_expired_locks(
     store_id: str,
-    db:  AsyncSession = Depends(get_db),
-    _:   User         = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """
     手动触发超时锁台释放检查。
@@ -334,12 +331,12 @@ async def release_expired_locks(
 
     通常由 Celery 定时任务每天运行；此端点供手动触发使用。
     """
-    svc      = BanquetLifecycleService(db)
+    svc = BanquetLifecycleService(db)
     released = await svc.release_expired_locks()
     await db.commit()
     return {
-        "store_id":        store_id,
-        "released_count":  len(released),
-        "released_ids":    released,
-        "message":         f"已释放 {len(released)} 个超时锁台预约",
+        "store_id": store_id,
+        "released_count": len(released),
+        "released_ids": released,
+        "message": f"已释放 {len(released)} 个超时锁台预约",
     }

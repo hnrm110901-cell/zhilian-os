@@ -2,18 +2,22 @@
 HR Approval Service — 人事审批引擎
 支持请假、加班、调岗等HR审批流程
 """
-from typing import Optional, Dict, Any, List
+
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 import structlog
-
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.services.base_service import BaseService
 from src.models.approval_flow import (
-    ApprovalFlowTemplate, ApprovalInstance, ApprovalNodeRecord,
-    ApprovalType, ApprovalStatus, ApprovalNodeType,
+    ApprovalFlowTemplate,
+    ApprovalInstance,
+    ApprovalNodeRecord,
+    ApprovalNodeType,
+    ApprovalStatus,
+    ApprovalType,
 )
+from src.services.base_service import BaseService
 
 logger = structlog.get_logger()
 
@@ -22,7 +26,8 @@ class HRApprovalService(BaseService):
     """人事审批引擎"""
 
     async def create_instance(
-        self, db: AsyncSession,
+        self,
+        db: AsyncSession,
         approval_type: str,
         applicant_id: str,
         applicant_name: str,
@@ -37,9 +42,9 @@ class HRApprovalService(BaseService):
         sid = store_id or self.store_id
 
         template = await self._find_template(db, approval_type, sid)
-        nodes = template.nodes if template else [
-            {"step": 1, "node_type": "single", "role": "store_manager", "label": "店长审批"}
-        ]
+        nodes = (
+            template.nodes if template else [{"step": 1, "node_type": "single", "role": "store_manager", "label": "店长审批"}]
+        )
 
         instance = ApprovalInstance(
             store_id=sid,
@@ -62,7 +67,8 @@ class HRApprovalService(BaseService):
         return instance
 
     async def approve(
-        self, db: AsyncSession,
+        self,
+        db: AsyncSession,
         instance_id: str,
         approver_id: str,
         approver_name: str = "",
@@ -99,7 +105,8 @@ class HRApprovalService(BaseService):
         return instance
 
     async def reject(
-        self, db: AsyncSession,
+        self,
+        db: AsyncSession,
         instance_id: str,
         approver_id: str,
         approver_name: str = "",
@@ -132,9 +139,7 @@ class HRApprovalService(BaseService):
         await db.flush()
         return instance
 
-    async def withdraw(
-        self, db: AsyncSession, instance_id: str, applicant_id: str
-    ) -> ApprovalInstance:
+    async def withdraw(self, db: AsyncSession, instance_id: str, applicant_id: str) -> ApprovalInstance:
         """撤回审批"""
         instance = await db.get(ApprovalInstance, instance_id)
         if not instance:
@@ -148,18 +153,18 @@ class HRApprovalService(BaseService):
         await db.flush()
         return instance
 
-    async def get_pending_list(
-        self, db: AsyncSession, store_id: str = None
-    ) -> List[Dict[str, Any]]:
+    async def get_pending_list(self, db: AsyncSession, store_id: str = None) -> List[Dict[str, Any]]:
         """获取待审批列表"""
         sid = store_id or self.store_id
         result = await db.execute(
-            select(ApprovalInstance).where(
+            select(ApprovalInstance)
+            .where(
                 and_(
                     ApprovalInstance.status == ApprovalStatus.PENDING,
                     ApprovalInstance.store_id == sid,
                 )
-            ).order_by(ApprovalInstance.created_at.desc())
+            )
+            .order_by(ApprovalInstance.created_at.desc())
         )
         return [
             {
@@ -176,17 +181,14 @@ class HRApprovalService(BaseService):
             for inst in result.scalars().all()
         ]
 
-    async def get_my_approvals(
-        self, db: AsyncSession, applicant_id: str, status: str = None
-    ) -> List[Dict[str, Any]]:
+    async def get_my_approvals(self, db: AsyncSession, applicant_id: str, status: str = None) -> List[Dict[str, Any]]:
         """获取我发起的审批"""
         conditions = [ApprovalInstance.applicant_id == applicant_id]
         if status:
             conditions.append(ApprovalInstance.status == status)
 
         result = await db.execute(
-            select(ApprovalInstance).where(and_(*conditions))
-            .order_by(ApprovalInstance.created_at.desc()).limit(50)
+            select(ApprovalInstance).where(and_(*conditions)).order_by(ApprovalInstance.created_at.desc()).limit(50)
         )
         return [
             {
@@ -200,17 +202,17 @@ class HRApprovalService(BaseService):
             for inst in result.scalars().all()
         ]
 
-    async def _find_template(
-        self, db: AsyncSession, approval_type: str, store_id: str
-    ) -> Optional[ApprovalFlowTemplate]:
+    async def _find_template(self, db: AsyncSession, approval_type: str, store_id: str) -> Optional[ApprovalFlowTemplate]:
         """查找审批模板（门店级 > 全局）"""
         result = await db.execute(
-            select(ApprovalFlowTemplate).where(
+            select(ApprovalFlowTemplate)
+            .where(
                 and_(
                     ApprovalFlowTemplate.approval_type == approval_type,
                     ApprovalFlowTemplate.is_active.is_(True),
                 )
-            ).order_by(ApprovalFlowTemplate.priority.desc())
+            )
+            .order_by(ApprovalFlowTemplate.priority.desc())
         )
         templates = result.scalars().all()
         for t in templates:

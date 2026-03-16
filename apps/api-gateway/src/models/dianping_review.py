@@ -2,14 +2,11 @@
 大众点评评论模型
 存储从大众点评/美团/Google等平台同步的用户评论数据
 """
+
 import uuid
 
-from sqlalchemy import (
-    Boolean, Column, DateTime, Integer, Numeric, String, Text,
-    Index,
-)
+from sqlalchemy import Boolean, Column, DateTime, Index, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSON, UUID
-
 from src.models.base import Base, TimestampMixin
 
 
@@ -18,6 +15,7 @@ class DianpingReview(Base, TimestampMixin):
     大众点评评论表
     存储来自多平台的用户评论，支持情感分析和商家回复
     """
+
     __tablename__ = "dianping_reviews"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -63,6 +61,5 @@ class DianpingReview(Base, TimestampMixin):
 
     def __repr__(self):
         return (
-            f"<DianpingReview(id={self.id}, review_id={self.review_id}, "
-            f"rating={self.rating}, sentiment={self.sentiment})>"
+            f"<DianpingReview(id={self.id}, review_id={self.review_id}, " f"rating={self.rating}, sentiment={self.sentiment})>"
         )

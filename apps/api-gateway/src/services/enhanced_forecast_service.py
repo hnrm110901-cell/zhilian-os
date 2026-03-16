@@ -2,15 +2,16 @@
 增强的销售预测服务
 集成节假日、天气、商圈活动等多维度特征
 """
-from datetime import date, datetime, timedelta
-from typing import Dict, List, Optional, Any
-import structlog
-import numpy as np
-import os
 
-from src.services.forecast_features import ChineseHolidays, WeatherImpact, BusinessDistrictEvents
+import os
+from datetime import date, datetime, timedelta
+from typing import Any, Dict, List, Optional
+
+import numpy as np
+import structlog
 from src.services.auspicious_date_service import AuspiciousDateService
 from src.services.base_service import BaseService
+from src.services.forecast_features import BusinessDistrictEvents, ChineseHolidays, WeatherImpact
 
 logger = structlog.get_logger()
 
@@ -48,12 +49,7 @@ class EnhancedForecastService(BaseService):
         computed_weekend_factor = await self._compute_weekend_factor(store_id)
 
         # 2. 计算各维度影响因子
-        factors = self._calculate_impact_factors(
-            target_date,
-            weather_forecast,
-            events,
-            weekend_factor=computed_weekend_factor
-        )
+        factors = self._calculate_impact_factors(target_date, weather_forecast, events, weekend_factor=computed_weekend_factor)
 
         # 3. 综合预测
         base_sales = historical_baseline["average_sales"]
@@ -133,10 +129,7 @@ class EnhancedForecastService(BaseService):
             weather_type = weather_forecast.get("weather")
 
             if temperature is not None:
-                temp_impact = WeatherImpact.get_temperature_impact(
-                    temperature,
-                    self.restaurant_type
-                )
+                temp_impact = WeatherImpact.get_temperature_impact(temperature, self.restaurant_type)
                 if temp_impact != 1.0:
                     factors["temperature_factor"] = temp_impact
 
@@ -196,9 +189,11 @@ class EnhancedForecastService(BaseService):
     async def _compute_weekend_factor(self, store_id: str) -> float:
         """从过去30天DailyReport计算实际周末/工作日营收比"""
         try:
-            from sqlalchemy import select, func as sa_func
+            from sqlalchemy import func as sa_func
+            from sqlalchemy import select
             from src.core.database import get_db_session
             from src.models.daily_report import DailyReport
+
             cutoff = date.today() - timedelta(days=int(os.getenv("FORECAST_HISTORY_DAYS", "30")))
             async with get_db_session() as session:
                 result = await session.execute(
@@ -261,14 +256,38 @@ class EnhancedForecastService(BaseService):
         # Fallback to industry baseline
         is_weekend = weekday in [5, 6]
         if self.restaurant_type == "火锅":
-            base_sales = int(os.getenv("FORECAST_HOTPOT_WEEKEND_SALES", "68000")) if is_weekend else int(os.getenv("FORECAST_HOTPOT_WEEKDAY_SALES", "42000"))
-            std_dev = int(os.getenv("FORECAST_HOTPOT_WEEKEND_STD", "11000")) if is_weekend else int(os.getenv("FORECAST_HOTPOT_WEEKDAY_STD", "7000"))
+            base_sales = (
+                int(os.getenv("FORECAST_HOTPOT_WEEKEND_SALES", "68000"))
+                if is_weekend
+                else int(os.getenv("FORECAST_HOTPOT_WEEKDAY_SALES", "42000"))
+            )
+            std_dev = (
+                int(os.getenv("FORECAST_HOTPOT_WEEKEND_STD", "11000"))
+                if is_weekend
+                else int(os.getenv("FORECAST_HOTPOT_WEEKDAY_STD", "7000"))
+            )
         elif self.restaurant_type == "快餐":
-            base_sales = int(os.getenv("FORECAST_FASTFOOD_WEEKEND_SALES", "25000")) if is_weekend else int(os.getenv("FORECAST_FASTFOOD_WEEKDAY_SALES", "18000"))
-            std_dev = int(os.getenv("FORECAST_FASTFOOD_WEEKEND_STD", "4500")) if is_weekend else int(os.getenv("FORECAST_FASTFOOD_WEEKDAY_STD", "3500"))
+            base_sales = (
+                int(os.getenv("FORECAST_FASTFOOD_WEEKEND_SALES", "25000"))
+                if is_weekend
+                else int(os.getenv("FORECAST_FASTFOOD_WEEKDAY_SALES", "18000"))
+            )
+            std_dev = (
+                int(os.getenv("FORECAST_FASTFOOD_WEEKEND_STD", "4500"))
+                if is_weekend
+                else int(os.getenv("FORECAST_FASTFOOD_WEEKDAY_STD", "3500"))
+            )
         else:
-            base_sales = int(os.getenv("FORECAST_RESTAURANT_WEEKEND_SALES", "55000")) if is_weekend else int(os.getenv("FORECAST_RESTAURANT_WEEKDAY_SALES", "35000"))
-            std_dev = int(os.getenv("FORECAST_RESTAURANT_WEEKEND_STD", "9000")) if is_weekend else int(os.getenv("FORECAST_RESTAURANT_WEEKDAY_STD", "6000"))
+            base_sales = (
+                int(os.getenv("FORECAST_RESTAURANT_WEEKEND_SALES", "55000"))
+                if is_weekend
+                else int(os.getenv("FORECAST_RESTAURANT_WEEKDAY_SALES", "35000"))
+            )
+            std_dev = (
+                int(os.getenv("FORECAST_RESTAURANT_WEEKEND_STD", "9000"))
+                if is_weekend
+                else int(os.getenv("FORECAST_RESTAURANT_WEEKDAY_STD", "6000"))
+            )
 
         return {
             "average_sales": base_sales,
@@ -276,11 +295,7 @@ class EnhancedForecastService(BaseService):
             "sample_count": 0,
         }
 
-    def _generate_explanation(
-        self,
-        factors: Dict[str, float],
-        historical_baseline: Dict[str, float]
-    ) -> str:
+    def _generate_explanation(self, factors: Dict[str, float], historical_baseline: Dict[str, float]) -> str:
         """
         生成预测说明
 
@@ -379,9 +394,9 @@ class EnhancedForecastService(BaseService):
         day_type = "周末" if target_date.weekday() in [5, 6] else "工作日"
 
         # 从数据库获取历史客流数据（过去8周同星期）
+        from sqlalchemy import func, select
         from src.core.database import get_db_session
         from src.models.daily_report import DailyReport
-        from sqlalchemy import select, func
 
         historical_traffic = None
         async with get_db_session() as session:
@@ -398,11 +413,7 @@ class EnhancedForecastService(BaseService):
                 historical_traffic = float(avg_traffic)
         from src.services.baseline_data_service import IndustryBaselineData
 
-        baseline = IndustryBaselineData.get_traffic_baseline(
-            self.restaurant_type,
-            day_type,
-            meal_period
-        )
+        baseline = IndustryBaselineData.get_traffic_baseline(self.restaurant_type, day_type, meal_period)
 
         if historical_traffic:
             base_traffic = historical_traffic

@@ -10,13 +10,13 @@ HR业务规则引擎 — 三级继承查询 + 系统默认兜底
 6. brand_id only（品牌默认）
 7. 系统默认值（硬编码兜底，不依赖数据库）
 """
-from typing import Optional
+
 import uuid as uuid_mod
+from typing import Optional
 
 import structlog
-from sqlalchemy import select, and_, or_, case, desc
+from sqlalchemy import and_, case, desc, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.models.hr_business_rule import HRBusinessRule, RuleCategory
 
 logger = structlog.get_logger()
@@ -24,16 +24,16 @@ logger = structlog.get_logger()
 # ── 系统默认值（第7级兜底） ──────────────────────────────
 
 DEFAULT_ATTENDANCE_PENALTY = {
-    "late_per_time_fen": 5000,          # 50元/次
-    "absent_per_day_fen": 20000,        # 200元/天
-    "early_leave_per_time_fen": 3000,   # 30元/次
+    "late_per_time_fen": 5000,  # 50元/次
+    "absent_per_day_fen": 20000,  # 200元/天
+    "early_leave_per_time_fen": 3000,  # 30元/次
 }
 
 DEFAULT_SENIORITY_TIERS = [
-    {"min_months": 13, "max_months": 24, "amount_fen": 5000},     # 50元/月
-    {"min_months": 24, "max_months": 36, "amount_fen": 10000},    # 100元/月
-    {"min_months": 36, "max_months": 48, "amount_fen": 15000},    # 150元/月
-    {"min_months": 48, "max_months": 99999, "amount_fen": 20000}, # 200元/月
+    {"min_months": 13, "max_months": 24, "amount_fen": 5000},  # 50元/月
+    {"min_months": 24, "max_months": 36, "amount_fen": 10000},  # 100元/月
+    {"min_months": 36, "max_months": 48, "amount_fen": 15000},  # 150元/月
+    {"min_months": 48, "max_months": 99999, "amount_fen": 20000},  # 200元/月
 ]
 
 DEFAULT_OVERTIME_RATE = {
@@ -172,7 +172,11 @@ class HRRuleEngine:
                 else_=0,
             )
             + case(
-                (HRBusinessRule.employment_type == employment_type, 1) if employment_type else (HRBusinessRule.employment_type.is_(None), 0),
+                (
+                    (HRBusinessRule.employment_type == employment_type, 1)
+                    if employment_type
+                    else (HRBusinessRule.employment_type.is_(None), 0)
+                ),
                 else_=0,
             )
         )
@@ -321,11 +325,7 @@ class HRRuleEngine:
         返回插入的规则数量。
         """
         # 检查是否已有规则
-        stmt = (
-            select(HRBusinessRule.id)
-            .where(HRBusinessRule.brand_id == self.brand_id)
-            .limit(1)
-        )
+        stmt = select(HRBusinessRule.id).where(HRBusinessRule.brand_id == self.brand_id).limit(1)
         result = await db.execute(stmt)
         if result.scalar_one_or_none() is not None:
             logger.info("hr_rules_seed_skipped", brand_id=self.brand_id, reason="rules_exist")

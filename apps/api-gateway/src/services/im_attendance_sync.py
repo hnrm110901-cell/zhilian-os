@@ -11,18 +11,19 @@ IM 打卡/考勤数据同步服务
   - POST /attendance/list
   - 支持按用户 + 日期范围查询
 """
-from typing import Any, Dict, List, Optional
-from datetime import datetime, date, timedelta
+
 import os
+from datetime import date, datetime, timedelta
+from typing import Any, Dict, List, Optional
 
 import httpx
 import structlog
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.brand_im_config import BrandIMConfig, IMPlatform
 from ..models.employee import Employee
-from ..services.im_sync_service import WeChatWorkAdapter, DingTalkAdapter
+from ..services.im_sync_service import DingTalkAdapter, WeChatWorkAdapter
 
 logger = structlog.get_logger()
 
@@ -46,9 +47,7 @@ class IMAttendanceSyncService:
             {"synced": int, "errors": int, "records": [...]}
         """
         result = await self.db.execute(
-            select(BrandIMConfig).where(
-                and_(BrandIMConfig.brand_id == brand_id, BrandIMConfig.is_active.is_(True))
-            )
+            select(BrandIMConfig).where(and_(BrandIMConfig.brand_id == brand_id, BrandIMConfig.is_active.is_(True)))
         )
         config = result.scalar_one_or_none()
         if not config:
@@ -83,9 +82,7 @@ class IMAttendanceSyncService:
         )
         return {"synced": synced, "errors": errors, "total_fetched": len(records)}
 
-    async def _fetch_wechat_attendance(
-        self, config: BrandIMConfig, start_date: date, end_date: date
-    ) -> List[Dict[str, Any]]:
+    async def _fetch_wechat_attendance(self, config: BrandIMConfig, start_date: date, end_date: date) -> List[Dict[str, Any]]:
         """从企微拉取打卡数据"""
         corp_id = config.wechat_corp_id or ""
         corp_secret = config.wechat_corp_secret or ""
@@ -95,9 +92,8 @@ class IMAttendanceSyncService:
 
         # 获取该品牌所有有企微ID的员工
         from ..models.store import Store
-        store_result = await self.db.execute(
-            select(Store.id).where(Store.brand_id == config.brand_id)
-        )
+
+        store_result = await self.db.execute(select(Store.id).where(Store.brand_id == config.brand_id))
         store_ids = [r[0] for r in store_result.all()]
 
         emp_result = await self.db.execute(
@@ -122,7 +118,7 @@ class IMAttendanceSyncService:
 
         async with httpx.AsyncClient() as client:
             for i in range(0, len(userid_list), 100):
-                batch = userid_list[i:i + 100]
+                batch = userid_list[i : i + 100]
                 try:
                     resp = await client.post(
                         f"https://qyapi.weixin.qq.com/cgi-bin/checkin/getcheckindata",
@@ -138,18 +134,18 @@ class IMAttendanceSyncService:
                     data = resp.json()
                     if data.get("errcode") == 0:
                         for item in data.get("checkindata", []):
-                            records.append({
-                                "platform": "wechat_work",
-                                "userid": item.get("userid"),
-                                "checkin_type": item.get("checkin_type"),
-                                "checkin_time": datetime.fromtimestamp(
-                                    item.get("checkin_time", 0)
-                                ),
-                                "exception_type": item.get("exception_type"),
-                                "location_title": item.get("location_title"),
-                                "notes": item.get("notes"),
-                                "raw": item,
-                            })
+                            records.append(
+                                {
+                                    "platform": "wechat_work",
+                                    "userid": item.get("userid"),
+                                    "checkin_type": item.get("checkin_type"),
+                                    "checkin_time": datetime.fromtimestamp(item.get("checkin_time", 0)),
+                                    "exception_type": item.get("exception_type"),
+                                    "location_title": item.get("location_title"),
+                                    "notes": item.get("notes"),
+                                    "raw": item,
+                                }
+                            )
                 except Exception as e:
                     logger.warning("wechat_attendance_fetch_failed", error=str(e))
 
@@ -166,9 +162,8 @@ class IMAttendanceSyncService:
         token = await adapter.get_access_token()
 
         from ..models.store import Store
-        store_result = await self.db.execute(
-            select(Store.id).where(Store.brand_id == config.brand_id)
-        )
+
+        store_result = await self.db.execute(select(Store.id).where(Store.brand_id == config.brand_id))
         store_ids = [r[0] for r in store_result.all()]
 
         emp_result = await self.db.execute(
@@ -191,7 +186,7 @@ class IMAttendanceSyncService:
 
         async with httpx.AsyncClient() as client:
             for i in range(0, len(userid_list), 50):
-                batch = userid_list[i:i + 50]
+                batch = userid_list[i : i + 50]
                 offset = 0
                 while True:
                     try:
@@ -212,17 +207,21 @@ class IMAttendanceSyncService:
                             break
 
                         for item in data.get("recordresult", []):
-                            records.append({
-                                "platform": "dingtalk",
-                                "userid": item.get("userId"),
-                                "checkin_type": item.get("checkType"),
-                                "checkin_time": datetime.strptime(
-                                    item.get("userCheckTime", ""), "%Y-%m-%d %H:%M:%S"
-                                ) if item.get("userCheckTime") else None,
-                                "location_title": item.get("locationResult"),
-                                "time_result": item.get("timeResult"),
-                                "raw": item,
-                            })
+                            records.append(
+                                {
+                                    "platform": "dingtalk",
+                                    "userid": item.get("userId"),
+                                    "checkin_type": item.get("checkType"),
+                                    "checkin_time": (
+                                        datetime.strptime(item.get("userCheckTime", ""), "%Y-%m-%d %H:%M:%S")
+                                        if item.get("userCheckTime")
+                                        else None
+                                    ),
+                                    "location_title": item.get("locationResult"),
+                                    "time_result": item.get("timeResult"),
+                                    "raw": item,
+                                }
+                            )
 
                         if not data.get("hasMore"):
                             break
@@ -234,9 +233,7 @@ class IMAttendanceSyncService:
 
         return records
 
-    async def _save_attendance_record(
-        self, record: Dict[str, Any], config: BrandIMConfig
-    ):
+    async def _save_attendance_record(self, record: Dict[str, Any], config: BrandIMConfig):
         """保存考勤记录到本地表"""
         userid = record["userid"]
         platform = record["platform"]
@@ -247,13 +244,9 @@ class IMAttendanceSyncService:
 
         # 查找员工
         if platform == "wechat_work":
-            emp_result = await self.db.execute(
-                select(Employee).where(Employee.wechat_userid == userid)
-            )
+            emp_result = await self.db.execute(select(Employee).where(Employee.wechat_userid == userid))
         else:
-            emp_result = await self.db.execute(
-                select(Employee).where(Employee.dingtalk_userid == userid)
-            )
+            emp_result = await self.db.execute(select(Employee).where(Employee.dingtalk_userid == userid))
         employee = emp_result.scalar_one_or_none()
         if not employee:
             return
@@ -261,6 +254,7 @@ class IMAttendanceSyncService:
         # 写入考勤记录（如果模型存在）
         try:
             from ..models.hr_attendance import AttendanceRecord
+
             attendance_date = checkin_time.date()
 
             # 检查是否已存在

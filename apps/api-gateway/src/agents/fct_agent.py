@@ -4,13 +4,13 @@ FCT Agent - 业财税资金一体化智能体（Phase 3）
 支持：get_report（period_summary/aggregate/trend/by_entity/by_region/comparison 同比环比）、explain_voucher、reconciliation_status。
 合并部署且 FCT_ENABLED 时注册；独立形态可不使用。
 """
-import time
-from typing import Dict, Any, List
 
-from src.core.base_agent import BaseAgent, AgentResponse
-from src.core.database import get_db_session
+import time
+from typing import Any, Dict, List
 
 import structlog
+from src.core.base_agent import AgentResponse, BaseAgent
+from src.core.database import get_db_session
 
 logger = structlog.get_logger()
 
@@ -36,9 +36,11 @@ class FctAgent(BaseAgent):
             )
         try:
             from src.services.fct_service import fct_service
+
             async with get_db_session(enable_tenant_isolation=False) as session:
                 if action == "get_report":
                     from datetime import date
+
                     sd = params.get("start_date")
                     ed = params.get("end_date")
                     report_type = params.get("report_type", "period_summary")
@@ -69,13 +71,9 @@ class FctAgent(BaseAgent):
                             group_by=params.get("group_by", "day"),
                         )
                     elif report_type == "by_entity":
-                        out = await fct_service.get_report_by_entity(
-                            session, tenant_id=tenant_id, start_date=sd, end_date=ed
-                        )
+                        out = await fct_service.get_report_by_entity(session, tenant_id=tenant_id, start_date=sd, end_date=ed)
                     elif report_type == "by_region":
-                        out = await fct_service.get_report_by_region(
-                            session, tenant_id=tenant_id, start_date=sd, end_date=ed
-                        )
+                        out = await fct_service.get_report_by_region(session, tenant_id=tenant_id, start_date=sd, end_date=ed)
                     elif report_type == "comparison":
                         out = await fct_service.get_report_comparison(
                             session,
@@ -106,10 +104,24 @@ class FctAgent(BaseAgent):
                     v = await fct_service.get_voucher_by_id(session, voucher_id)
                     if not v:
                         return AgentResponse(success=False, error="凭证不存在", execution_time=time.time() - start)
-                    lines = [{"line_no": l.line_no, "account": l.account_code, "debit": float(l.debit or 0), "credit": float(l.credit or 0), "desc": l.description} for l in v.lines]
+                    lines = [
+                        {
+                            "line_no": l.line_no,
+                            "account": l.account_code,
+                            "debit": float(l.debit or 0),
+                            "credit": float(l.credit or 0),
+                            "desc": l.description,
+                        }
+                        for l in v.lines
+                    ]
                     return AgentResponse(
                         success=True,
-                        data={"voucher_no": v.voucher_no, "biz_date": str(v.biz_date), "description": v.description, "lines": lines},
+                        data={
+                            "voucher_no": v.voucher_no,
+                            "biz_date": str(v.biz_date),
+                            "description": v.description,
+                            "lines": lines,
+                        },
                         execution_time=time.time() - start,
                     )
                 if action == "reconciliation_status":

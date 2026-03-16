@@ -1,32 +1,33 @@
 """
 IM 通讯录同步 API — 商户 IM 平台配置 + 通讯录同步
 """
+
+import uuid as uuid_mod
+from datetime import date, datetime, timedelta
+from typing import List, Optional
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional, List
-from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
+from ..models.brand_im_config import BrandIMConfig, IMPlatform, IMSyncLog
 from ..models.user import User
-from ..models.brand_im_config import BrandIMConfig, IMSyncLog, IMPlatform
-from ..services.im_sync_service import IMSyncService
 from ..services.im_attendance_sync import IMAttendanceSyncService
-from ..services.im_org_sync import IMOrgSyncService
-from ..services.im_onboarding_robot import IMOnboardingRobot
 from ..services.im_milestone_notifier import IMMilestoneNotifier
-
-import uuid as uuid_mod
-from datetime import date, timedelta
-import structlog
+from ..services.im_onboarding_robot import IMOnboardingRobot
+from ..services.im_org_sync import IMOrgSyncService
+from ..services.im_sync_service import IMSyncService
 
 logger = structlog.get_logger()
 router = APIRouter()
 
 
 # ── 请求模型 ──────────────────────────────────────────
+
 
 class IMConfigRequest(BaseModel):
     brand_id: str
@@ -80,6 +81,7 @@ class DeptStoreMappingRequest(BaseModel):
 
 # ── IM 配置管理 ──────────────────────────────────────
 
+
 @router.get("/merchants/{brand_id}/im/config")
 async def get_im_config(
     brand_id: str,
@@ -87,9 +89,7 @@ async def get_im_config(
     current_user: User = Depends(get_current_active_user),
 ):
     """获取品牌 IM 平台配置"""
-    result = await db.execute(
-        select(BrandIMConfig).where(BrandIMConfig.brand_id == brand_id)
-    )
+    result = await db.execute(select(BrandIMConfig).where(BrandIMConfig.brand_id == brand_id))
     config = result.scalar_one_or_none()
     if not config:
         return {"configured": False, "brand_id": brand_id}
@@ -97,7 +97,7 @@ async def get_im_config(
     return {
         "configured": True,
         "brand_id": config.brand_id,
-        "im_platform": config.im_platform.value if hasattr(config.im_platform, 'value') else str(config.im_platform),
+        "im_platform": config.im_platform.value if hasattr(config.im_platform, "value") else str(config.im_platform),
         "wechat_corp_id": config.wechat_corp_id,
         "wechat_agent_id": config.wechat_agent_id,
         "has_wechat_secret": bool(config.wechat_corp_secret),
@@ -140,9 +140,7 @@ async def save_im_config(
             raise HTTPException(status_code=400, detail="钉钉需要填写 app_key 和 app_secret")
 
     # 查找或创建
-    result = await db.execute(
-        select(BrandIMConfig).where(BrandIMConfig.brand_id == brand_id)
-    )
+    result = await db.execute(select(BrandIMConfig).where(BrandIMConfig.brand_id == brand_id))
     config = result.scalar_one_or_none()
 
     if config:
@@ -206,9 +204,7 @@ async def update_im_config(
     current_user: User = Depends(get_current_active_user),
 ):
     """更新 IM 配置（部分更新）"""
-    result = await db.execute(
-        select(BrandIMConfig).where(BrandIMConfig.brand_id == brand_id)
-    )
+    result = await db.execute(select(BrandIMConfig).where(BrandIMConfig.brand_id == brand_id))
     config = result.scalar_one_or_none()
     if not config:
         raise HTTPException(status_code=404, detail="未找到IM配置，请先创建")
@@ -223,6 +219,7 @@ async def update_im_config(
 
 
 # ── 通讯录同步 ──────────────────────────────────────
+
 
 @router.post("/merchants/{brand_id}/im/sync")
 async def trigger_sync(
@@ -250,10 +247,7 @@ async def get_sync_logs(
 ):
     """获取通讯录同步日志"""
     result = await db.execute(
-        select(IMSyncLog)
-        .where(IMSyncLog.brand_id == brand_id)
-        .order_by(IMSyncLog.created_at.desc())
-        .limit(limit)
+        select(IMSyncLog).where(IMSyncLog.brand_id == brand_id).order_by(IMSyncLog.created_at.desc()).limit(limit)
     )
     logs = result.scalars().all()
     return {
@@ -281,6 +275,7 @@ async def get_sync_logs(
 
 # ── IM 平台连接测试 ──────────────────────────────────
 
+
 @router.post("/merchants/{brand_id}/im/test-connection")
 async def test_im_connection(
     brand_id: str,
@@ -288,9 +283,7 @@ async def test_im_connection(
     current_user: User = Depends(get_current_active_user),
 ):
     """测试 IM 平台连接（验证凭证是否有效）"""
-    result = await db.execute(
-        select(BrandIMConfig).where(BrandIMConfig.brand_id == brand_id)
-    )
+    result = await db.execute(select(BrandIMConfig).where(BrandIMConfig.brand_id == brand_id))
     config = result.scalar_one_or_none()
     if not config:
         raise HTTPException(status_code=404, detail="未找到IM配置")
@@ -318,6 +311,7 @@ async def test_im_connection(
 
 # ── 部门→门店映射 ──────────────────────────────────
 
+
 @router.get("/merchants/{brand_id}/im/departments")
 async def list_im_departments(
     brand_id: str,
@@ -325,9 +319,7 @@ async def list_im_departments(
     current_user: User = Depends(get_current_active_user),
 ):
     """获取 IM 平台部门列表（用于配置部门→门店映射）"""
-    result = await db.execute(
-        select(BrandIMConfig).where(BrandIMConfig.brand_id == brand_id)
-    )
+    result = await db.execute(select(BrandIMConfig).where(BrandIMConfig.brand_id == brand_id))
     config = result.scalar_one_or_none()
     if not config:
         raise HTTPException(status_code=404, detail="未找到IM配置")
@@ -360,9 +352,7 @@ async def update_department_mapping(
     current_user: User = Depends(get_current_active_user),
 ):
     """更新部门→门店映射"""
-    result = await db.execute(
-        select(BrandIMConfig).where(BrandIMConfig.brand_id == brand_id)
-    )
+    result = await db.execute(select(BrandIMConfig).where(BrandIMConfig.brand_id == brand_id))
     config = result.scalar_one_or_none()
     if not config:
         raise HTTPException(status_code=404, detail="未找到IM配置")
@@ -378,6 +368,7 @@ async def update_department_mapping(
 
 
 # ── 考勤数据同步 ──────────────────────────────────
+
 
 @router.post("/merchants/{brand_id}/im/attendance-sync")
 async def sync_attendance(
@@ -399,6 +390,7 @@ async def sync_attendance(
 
 
 # ── 组织架构同步（Phase 4 #13）──────────────────────
+
 
 class OrgSyncRequest(BaseModel):
     auto_create_store: bool = False  # 是否为无对应门店的叶子部门自动创建门店
@@ -423,7 +415,8 @@ async def sync_org_structure(
     service = IMOrgSyncService(db)
     try:
         result = await service.sync_org_structure(
-            brand_id, auto_create_store=auto_create,
+            brand_id,
+            auto_create_store=auto_create,
         )
         if "error" in result:
             raise HTTPException(status_code=400, detail=result["error"])
@@ -435,6 +428,7 @@ async def sync_org_structure(
 
 
 # ── 入职引导机器人（Phase 4 #10）──────────────────────
+
 
 @router.post("/merchants/{brand_id}/im/onboarding/{employee_id}")
 async def trigger_onboarding(
@@ -457,6 +451,7 @@ async def trigger_onboarding(
 
 
 # ── 里程碑通知（Phase 4 #21）──────────────────────
+
 
 @router.post("/merchants/{brand_id}/im/notify-milestone/{milestone_id}")
 async def notify_milestone(

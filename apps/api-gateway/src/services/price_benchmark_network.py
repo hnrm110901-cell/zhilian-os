@@ -16,6 +16,7 @@
   - 纯函数，可单元测试
   - 金额单位：分/基本单位
 """
+
 from __future__ import annotations
 
 import math
@@ -26,44 +27,48 @@ from typing import Optional
 @dataclass
 class PriceDataPoint:
     """单条匿名采购价格数据"""
-    ingredient_name: str            # 标准化食材名称
-    category: str                   # 分类：seafood/meat/vegetable/dry_goods/oil/seasoning
-    city: str                       # 城市
-    unit: str                       # 基本单位（kg/piece/bottle）
-    unit_cost_fen: int              # 单价（分/基本单位）
-    purchase_date: str              # YYYY-MM
-    quality_grade: str = "standard" # standard/premium/economy
+
+    ingredient_name: str  # 标准化食材名称
+    category: str  # 分类：seafood/meat/vegetable/dry_goods/oil/seasoning
+    city: str  # 城市
+    unit: str  # 基本单位（kg/piece/bottle）
+    unit_cost_fen: int  # 单价（分/基本单位）
+    purchase_date: str  # YYYY-MM
+    quality_grade: str = "standard"  # standard/premium/economy
 
 
 @dataclass
 class PriceBenchmarkResult:
     """单个食材的价格基准"""
+
     ingredient_name: str
     category: str
     city: str
     unit: str
     your_price_fen: int
-    p25_fen: int                    # 低价区间（前25%的价格）
-    p50_fen: int                    # 中位数
-    p75_fen: int                    # 高价区间
-    sample_count: int               # 参与聚合的客户数
-    percentile_rank: float          # 你在所有客户中的排名百分位 (0-100, 100=最贵)
-    saving_potential_fen: int       # 如果降到P25能省多少/单位
-    verdict: str                    # cheap/fair/expensive/very_expensive
+    p25_fen: int  # 低价区间（前25%的价格）
+    p50_fen: int  # 中位数
+    p75_fen: int  # 高价区间
+    sample_count: int  # 参与聚合的客户数
+    percentile_rank: float  # 你在所有客户中的排名百分位 (0-100, 100=最贵)
+    saving_potential_fen: int  # 如果降到P25能省多少/单位
+    verdict: str  # cheap/fair/expensive/very_expensive
 
 
 @dataclass
 class SupplierSuggestion:
     """匿名供应商推荐"""
+
     ingredient_name: str
     current_price_fen: int
     benchmark_p25_fen: int
     saving_pct: float
     suggestion: str
-    anonymous_source: str           # "同城3家客户在用更优供应商"
+    anonymous_source: str  # "同城3家客户在用更优供应商"
 
 
 # ── 辅助函数 ────────────────────────────────────────────────────────────────
+
 
 def _yuan(fen: int) -> float:
     return round((fen or 0) / 100, 2)
@@ -155,20 +160,22 @@ def aggregate_price_benchmark(
         verdict = classify_price(rank)
         saving = max(0, your_price - p25)
 
-        results.append(PriceBenchmarkResult(
-            ingredient_name=name,
-            category=category,
-            city=city,
-            unit=unit,
-            your_price_fen=your_price,
-            p25_fen=p25,
-            p50_fen=p50,
-            p75_fen=p75,
-            sample_count=len(prices),
-            percentile_rank=rank,
-            saving_potential_fen=saving,
-            verdict=verdict,
-        ))
+        results.append(
+            PriceBenchmarkResult(
+                ingredient_name=name,
+                category=category,
+                city=city,
+                unit=unit,
+                your_price_fen=your_price,
+                p25_fen=p25,
+                p50_fen=p50,
+                p75_fen=p75,
+                sample_count=len(prices),
+                percentile_rank=rank,
+                saving_potential_fen=saving,
+                verdict=verdict,
+            )
+        )
 
     # 按节省潜力降序排列
     results.sort(key=lambda r: r.saving_potential_fen, reverse=True)
@@ -194,18 +201,20 @@ def generate_supplier_suggestions(
 
         cheaper_count = max(1, int(b.sample_count * (1 - b.percentile_rank / 100)))
 
-        suggestions.append(SupplierSuggestion(
-            ingredient_name=b.ingredient_name,
-            current_price_fen=b.your_price_fen,
-            benchmark_p25_fen=b.p25_fen,
-            saving_pct=saving_pct,
-            suggestion=(
-                f"{b.ingredient_name}当前采购价 ¥{_yuan(b.your_price_fen)}/{b.unit}，"
-                f"同城P25价格 ¥{_yuan(b.p25_fen)}/{b.unit}，"
-                f"切换供应商预计节省 {saving_pct:.0f}%"
-            ),
-            anonymous_source=f"同城{cheaper_count}家客户在用更优价供应商",
-        ))
+        suggestions.append(
+            SupplierSuggestion(
+                ingredient_name=b.ingredient_name,
+                current_price_fen=b.your_price_fen,
+                benchmark_p25_fen=b.p25_fen,
+                saving_pct=saving_pct,
+                suggestion=(
+                    f"{b.ingredient_name}当前采购价 ¥{_yuan(b.your_price_fen)}/{b.unit}，"
+                    f"同城P25价格 ¥{_yuan(b.p25_fen)}/{b.unit}，"
+                    f"切换供应商预计节省 {saving_pct:.0f}%"
+                ),
+                anonymous_source=f"同城{cheaper_count}家客户在用更优价供应商",
+            )
+        )
 
     suggestions.sort(key=lambda s: s.saving_pct, reverse=True)
     return suggestions[:top_n]
@@ -239,12 +248,14 @@ def compute_total_saving_potential(
             continue
         monthly_save = int(b.saving_potential_fen * qty)
         total_saving_fen += monthly_save
-        item_savings.append({
-            "name": b.ingredient_name,
-            "monthly_saving_yuan": _yuan(monthly_save),
-            "unit_saving_yuan": _yuan(b.saving_potential_fen),
-            "monthly_qty": qty,
-        })
+        item_savings.append(
+            {
+                "name": b.ingredient_name,
+                "monthly_saving_yuan": _yuan(monthly_save),
+                "unit_saving_yuan": _yuan(b.saving_potential_fen),
+                "monthly_qty": qty,
+            }
+        )
 
     item_savings.sort(key=lambda x: x["monthly_saving_yuan"], reverse=True)
 

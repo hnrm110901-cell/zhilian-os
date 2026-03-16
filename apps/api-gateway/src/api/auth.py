@@ -1,18 +1,20 @@
 """
 Authentication API endpoints
 """
+
+from typing import List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict
-from typing import Optional, List
 
+from ..core.database import get_db_session
+from ..core.dependencies import get_current_active_user, require_role
+from ..core.permissions import get_user_permissions
 from ..models.user import User, UserRole
 from ..services.auth_service import AuthService
 from ..services.enterprise_oauth_service import EnterpriseOAuthService
-from ..services.sms_service import sms_service
 from ..services.qr_login_service import qr_login_service
-from ..core.dependencies import get_current_active_user, require_role
-from ..core.permissions import get_user_permissions
-from ..core.database import get_db_session
+from ..services.sms_service import sms_service
 
 router = APIRouter()
 auth_service = AuthService()
@@ -559,6 +561,7 @@ async def dingtalk_oauth_callback(request: OAuthCallbackRequest):
 #  SMS 短信验证码登录
 # ══════════════════════════════════════════════════════════════
 
+
 @router.post("/sms/send")
 async def sms_send_code(request: SMSSendRequest):
     """
@@ -634,6 +637,7 @@ async def sms_login(request: SMSLoginRequest):
 # ══════════════════════════════════════════════════════════════
 #  QR 扫码登录
 # ══════════════════════════════════════════════════════════════
+
 
 @router.post("/qr/generate")
 async def qr_generate():
@@ -766,4 +770,3 @@ async def update_user(
         store_id=user.store_id,
         is_active=user.is_active,
     )
-

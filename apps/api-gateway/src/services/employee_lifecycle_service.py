@@ -2,18 +2,18 @@
 Employee Lifecycle Service -- 员工生命周期服务
 试岗→入职→转正 全流程 + 企业微信通知
 """
-from typing import Optional, Dict, Any
+
+import uuid
 from datetime import date, timedelta
 from decimal import Decimal
-import uuid
+from typing import Any, Dict, Optional
+
 import structlog
-
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.models.employee import Employee
-from src.models.employee_lifecycle import EmployeeChange, ChangeType
-from src.models.employee_contract import EmployeeContract, ContractType, ContractStatus
+from src.models.employee_contract import ContractStatus, ContractType, EmployeeContract
+from src.models.employee_lifecycle import ChangeType, EmployeeChange
 from src.models.payroll import SalaryStructure
 
 logger = structlog.get_logger()
@@ -22,9 +22,7 @@ logger = structlog.get_logger()
 class EmployeeLifecycleService:
     """员工生命周期服务：试岗→入职→转正"""
 
-    async def start_trial(
-        self, db: AsyncSession, data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def start_trial(self, db: AsyncSession, data: Dict[str, Any]) -> Dict[str, Any]:
         """
         试岗登记：创建员工（employment_status=trial）+ 试岗变动记录。
         试岗期默认7天，到期需决定是否正式入职。
@@ -35,9 +33,7 @@ class EmployeeLifecycleService:
         hire_date = date.fromisoformat(data["hire_date"])
 
         # 检查ID是否已存在
-        exists = await db.execute(
-            select(Employee.id).where(Employee.id == employee_id)
-        )
+        exists = await db.execute(select(Employee.id).where(Employee.id == employee_id))
         if exists.scalars().first():
             raise ValueError(f"员工ID {employee_id} 已存在")
 
@@ -90,31 +86,22 @@ class EmployeeLifecycleService:
             "trial_end_date": str(trial_end),
         }
 
-    async def confirm_onboard(
-        self, db: AsyncSession, data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def confirm_onboard(self, db: AsyncSession, data: Dict[str, Any]) -> Dict[str, Any]:
         """
         正式入职：试岗通过 → 签合同 → 建薪资方案。
         employment_status: trial → probation
         """
         employee_id = data["employee_id"]
 
-        emp_result = await db.execute(
-            select(Employee).where(Employee.id == employee_id)
-        )
+        emp_result = await db.execute(select(Employee).where(Employee.id == employee_id))
         employee = emp_result.scalar_one_or_none()
         if not employee:
             raise ValueError(f"员工 {employee_id} 不存在")
         if employee.employment_status not in ("trial", None, ""):
-            raise ValueError(
-                f"员工当前状态为 {employee.employment_status}，"
-                f"不可执行入职操作（需要trial状态）"
-            )
+            raise ValueError(f"员工当前状态为 {employee.employment_status}，" f"不可执行入职操作（需要trial状态）")
 
         probation_months = data.get("probation_months", 3)
-        effective_date = date.fromisoformat(
-            data.get("effective_date", str(date.today()))
-        )
+        effective_date = date.fromisoformat(data.get("effective_date", str(date.today())))
         probation_end = effective_date + timedelta(days=probation_months * 30)
 
         # 更新员工状态
@@ -193,29 +180,21 @@ class EmployeeLifecycleService:
             "trial_salary_yuan": trial_salary / 100,
         }
 
-    async def confirm_probation_pass(
-        self, db: AsyncSession, data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def confirm_probation_pass(self, db: AsyncSession, data: Dict[str, Any]) -> Dict[str, Any]:
         """
         转正：试用期结束 → 正式员工 → 调整薪资到100%。
         employment_status: probation → regular
         """
         employee_id = data["employee_id"]
 
-        emp_result = await db.execute(
-            select(Employee).where(Employee.id == employee_id)
-        )
+        emp_result = await db.execute(select(Employee).where(Employee.id == employee_id))
         employee = emp_result.scalar_one_or_none()
         if not employee:
             raise ValueError(f"员工 {employee_id} 不存在")
         if employee.employment_status != "probation":
-            raise ValueError(
-                f"员工当前状态为 {employee.employment_status}，不可转正（需要probation状态）"
-            )
+            raise ValueError(f"员工当前状态为 {employee.employment_status}，不可转正（需要probation状态）")
 
-        effective_date = date.fromisoformat(
-            data.get("effective_date", str(date.today()))
-        )
+        effective_date = date.fromisoformat(data.get("effective_date", str(date.today())))
 
         # 更新员工状态
         employee.employment_status = "regular"
@@ -223,12 +202,15 @@ class EmployeeLifecycleService:
 
         # 查询合同获取约定薪资
         contract_result = await db.execute(
-            select(EmployeeContract).where(
+            select(EmployeeContract)
+            .where(
                 and_(
                     EmployeeContract.employee_id == employee_id,
                     EmployeeContract.status == ContractStatus.ACTIVE,
                 )
-            ).order_by(EmployeeContract.start_date.desc()).limit(1)
+            )
+            .order_by(EmployeeContract.start_date.desc())
+            .limit(1)
         )
         contract = contract_result.scalar_one_or_none()
         agreed_salary = contract.agreed_salary_fen if contract else 0
@@ -258,29 +240,21 @@ class EmployeeLifecycleService:
             employee_id=employee_id,
             base_salary_fen=to_salary,
             position_allowance_fen=(
-                data.get("position_allowance_fen")
-                or (current_salary.position_allowance_fen if current_salary else 0)
+                data.get("position_allowance_fen") or (current_salary.position_allowance_fen if current_salary else 0)
             ),
             meal_allowance_fen=(
-                data.get("meal_allowance_fen")
-                or (current_salary.meal_allowance_fen if current_salary else 0)
+                data.get("meal_allowance_fen") or (current_salary.meal_allowance_fen if current_salary else 0)
             ),
             transport_allowance_fen=(
-                data.get("transport_allowance_fen")
-                or (current_salary.transport_allowance_fen if current_salary else 0)
+                data.get("transport_allowance_fen") or (current_salary.transport_allowance_fen if current_salary else 0)
             ),
             performance_coefficient=data.get("performance_coefficient", Decimal("1.0")),
             social_insurance_fen=(
-                data.get("social_insurance_fen")
-                or (current_salary.social_insurance_fen if current_salary else 0)
+                data.get("social_insurance_fen") or (current_salary.social_insurance_fen if current_salary else 0)
             ),
-            housing_fund_fen=(
-                data.get("housing_fund_fen")
-                or (current_salary.housing_fund_fen if current_salary else 0)
-            ),
+            housing_fund_fen=(data.get("housing_fund_fen") or (current_salary.housing_fund_fen if current_salary else 0)),
             special_deduction_fen=(
-                data.get("special_deduction_fen")
-                or (current_salary.special_deduction_fen if current_salary else 0)
+                data.get("special_deduction_fen") or (current_salary.special_deduction_fen if current_salary else 0)
             ),
             effective_date=effective_date,
             remark="转正薪资（100%）",
@@ -319,12 +293,11 @@ class EmployeeLifecycleService:
             "base_salary_yuan": to_salary / 100,
         }
 
-    async def _notify_wechat(
-        self, store_id: str, title: str, description: str
-    ):
+    async def _notify_wechat(self, store_id: str, title: str, description: str):
         """发送企业微信通知（失败静默）"""
         try:
             from src.services.wechat_service import WeChatService
+
             wechat = WeChatService()
             if wechat.is_configured():
                 await wechat.send_markdown_message(

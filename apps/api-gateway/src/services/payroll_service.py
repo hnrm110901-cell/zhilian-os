@@ -5,42 +5,39 @@ Payroll Service — 薪酬计算引擎
   1. 标准模式：基于HRRuleEngine三级级联规则
   2. 公式引擎模式：当品牌配置了SalaryItemDefinition时自动切换
 """
-from typing import Optional, Dict, Any, List
+
+import calendar
 from datetime import date, datetime
 from decimal import Decimal
-import calendar
+from typing import Any, Dict, List, Optional
+
 import structlog
-
-from sqlalchemy import select, and_, func
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from src.models.attendance import AttendanceLog
+from src.models.commission import CommissionRecord
+from src.models.employee import Employee
+from src.models.payroll import PayrollRecord, PayrollStatus, SalaryStructure, TaxDeclaration, TaxStatus
+from src.models.reward_penalty import RewardPenaltyRecord, RewardPenaltyStatus, RewardPenaltyType
+from src.models.salary_item import SalaryItemDefinition
+from src.models.social_insurance import EmployeeSocialInsurance, SocialInsuranceConfig
+from src.models.store import Store
 from src.services.base_service import BaseService
 from src.services.hr_rule_engine import HRRuleEngine
 from src.services.salary_formula_engine import SalaryFormulaEngine
-from src.models.payroll import (
-    SalaryStructure, PayrollRecord, TaxDeclaration,
-    PayrollStatus, TaxStatus,
-)
-from src.models.attendance import AttendanceLog
-from src.models.employee import Employee
-from src.models.store import Store
-from src.models.commission import CommissionRecord
-from src.models.reward_penalty import RewardPenaltyRecord, RewardPenaltyType, RewardPenaltyStatus
-from src.models.social_insurance import SocialInsuranceConfig, EmployeeSocialInsurance
-from src.models.salary_item import SalaryItemDefinition
 
 logger = structlog.get_logger()
 
 # ── 个税税率表（7级超额累进） ──────────────────────────────
 # 年度累计应纳税所得额区间（元）→ 税率、速算扣除数（元）
 TAX_BRACKETS = [
-    (36000,    0.03, 0),
-    (144000,   0.10, 2520),
-    (300000,   0.20, 16920),
-    (420000,   0.25, 31920),
-    (660000,   0.30, 52920),
-    (960000,   0.35, 85920),
-    (float('inf'), 0.45, 181920),
+    (36000, 0.03, 0),
+    (144000, 0.10, 2520),
+    (300000, 0.20, 16920),
+    (420000, 0.25, 31920),
+    (660000, 0.30, 52920),
+    (960000, 0.35, 85920),
+    (float("inf"), 0.45, 181920),
 ]
 
 # 每月基本减除费用（元）
@@ -68,9 +65,7 @@ def _compute_tax_yuan(cumulative_taxable_income_yuan: float) -> tuple:
 class PayrollService(BaseService):
     """薪酬计算服务"""
 
-    async def get_salary_structure(
-        self, db: AsyncSession, employee_id: str
-    ) -> Optional[SalaryStructure]:
+    async def get_salary_structure(self, db: AsyncSession, employee_id: str) -> Optional[SalaryStructure]:
         """获取员工当前生效的薪资方案"""
         result = await db.execute(
             select(SalaryStructure).where(
@@ -82,9 +77,7 @@ class PayrollService(BaseService):
         )
         return result.scalar_one_or_none()
 
-    async def upsert_salary_structure(
-        self, db: AsyncSession, data: Dict[str, Any]
-    ) -> SalaryStructure:
+    async def upsert_salary_structure(self, db: AsyncSession, data: Dict[str, Any]) -> SalaryStructure:
         """创建或更新薪资方案（自动停用旧方案）"""
         employee_id = data["employee_id"]
 
@@ -116,25 +109,23 @@ class PayrollService(BaseService):
         logger.info("salary_structure_upserted", employee_id=employee_id)
         return structure
 
-    async def _has_salary_item_definitions(
-        self, db: AsyncSession, brand_id: str
-    ) -> bool:
+    async def _has_salary_item_definitions(self, db: AsyncSession, brand_id: str) -> bool:
         """检查品牌是否配置了薪酬项定义（决定使用公式引擎还是标准模式）"""
         result = await db.execute(
-            select(SalaryItemDefinition.id).where(
+            select(SalaryItemDefinition.id)
+            .where(
                 and_(
                     SalaryItemDefinition.brand_id == brand_id,
                     SalaryItemDefinition.is_active.is_(True),
                 )
-            ).limit(1)
+            )
+            .limit(1)
         )
         return result.scalar_one_or_none() is not None
 
     async def _get_brand_id(self, db: AsyncSession, store_id: str) -> str:
         """从门店ID获取品牌ID"""
-        result = await db.execute(
-            select(Store.brand_id).where(Store.id == store_id)
-        )
+        result = await db.execute(select(Store.brand_id).where(Store.id == store_id))
         brand_id = result.scalar_one_or_none()
         if not brand_id:
             raise ValueError(f"门店 {store_id} 不存在或未关联品牌")
@@ -157,24 +148,16 @@ class PayrollService(BaseService):
         employment_type = employee.employment_type
 
         # 考勤扣款规则
-        late_deduction_per_time = await engine.get_late_deduction_fen(
-            db, position, employment_type
-        )
-        absent_deduction_per_day = await engine.get_absent_deduction_fen(
-            db, position, employment_type
-        )
-        early_leave_deduction_per_time = await engine.get_early_leave_deduction_fen(
-            db, position, employment_type
-        )
+        late_deduction_per_time = await engine.get_late_deduction_fen(db, position, employment_type)
+        absent_deduction_per_day = await engine.get_absent_deduction_fen(db, position, employment_type)
+        early_leave_deduction_per_time = await engine.get_early_leave_deduction_fen(db, position, employment_type)
 
         # 加班倍数
         overtime_rates = await engine.get_overtime_rates(db, position)
 
         # 工龄补贴
         seniority_months = employee.seniority_months or 0
-        seniority_subsidy = await engine.get_seniority_subsidy_fen(
-            db, seniority_months, position
-        )
+        seniority_subsidy = await engine.get_seniority_subsidy_fen(db, seniority_months, position)
 
         # 全勤奖
         full_attendance_bonus = await engine.get_full_attendance_bonus_fen(db, position)
@@ -204,9 +187,7 @@ class PayrollService(BaseService):
             "resolved_at": datetime.utcnow().isoformat(),
         }
 
-    async def calculate_payroll(
-        self, db: AsyncSession, employee_id: str, pay_month: str
-    ) -> PayrollRecord:
+    async def calculate_payroll(self, db: AsyncSession, employee_id: str, pay_month: str) -> PayrollRecord:
         """
         为员工计算指定月份工资。
         pay_month 格式: "YYYY-MM"
@@ -228,9 +209,7 @@ class PayrollService(BaseService):
             raise ValueError(f"员工 {employee_id} 无生效薪资方案")
 
         # 获取员工信息（含岗位、用工类型、工龄）
-        emp_result = await db.execute(
-            select(Employee).where(Employee.id == employee_id)
-        )
+        emp_result = await db.execute(select(Employee).where(Employee.id == employee_id))
         employee = emp_result.scalar_one_or_none()
         if not employee:
             raise ValueError(f"员工 {employee_id} 不存在")
@@ -240,9 +219,7 @@ class PayrollService(BaseService):
 
         # 2. 检查是否使用公式引擎模式
         if await self._has_salary_item_definitions(db, brand_id):
-            return await self._calculate_with_formula_engine(
-                db, employee, structure, pay_month, store_id, brand_id
-            )
+            return await self._calculate_with_formula_engine(db, employee, structure, pay_month, store_id, brand_id)
 
         # 3. 标准模式：查询考勤
         year, month = int(pay_month[:4]), int(pay_month[5:7])
@@ -250,13 +227,14 @@ class PayrollService(BaseService):
         month_end = date(year, month, calendar.monthrange(year, month)[1])
         work_days_in_month = _count_work_days(year, month)
 
-        attendance = await self._get_attendance_summary(
-            db, employee_id, month_start, month_end
-        )
+        attendance = await self._get_attendance_summary(db, employee_id, month_start, month_end)
 
         # 4. 通过HRRuleEngine解析业务规则
         rules = await self._resolve_rules(
-            db, employee, store_id, brand_id,
+            db,
+            employee,
+            store_id,
+            brand_id,
             attendance_days=attendance.get("attendance_days", 0),
         )
 
@@ -281,9 +259,7 @@ class PayrollService(BaseService):
         performance_bonus = int(base * max(0, perf_coeff - 1))
 
         # 加班费 = 时薪 × 加班倍数 × 加班小时数（使用规则引擎的倍数）
-        hourly_rate = structure.hourly_rate_fen or (
-            int(base / work_days_in_month / 8) if work_days_in_month > 0 else 0
-        )
+        hourly_rate = structure.hourly_rate_fen or (int(base / work_days_in_month / 8) if work_days_in_month > 0 else 0)
         overtime_rate = rules["overtime_rates"].get("weekday", 1.5)
         overtime_pay = int(hourly_rate * overtime_rate * float(attendance.get("overtime_hours", 0)))
 
@@ -291,21 +267,28 @@ class PayrollService(BaseService):
         commission_total = await self._get_commission_total(db, employee_id, pay_month)
 
         # 奖惩合计（已审批）
-        reward_total, penalty_total = await self._get_reward_penalty_totals(
-            db, employee_id, pay_month
-        )
+        reward_total, penalty_total = await self._get_reward_penalty_totals(db, employee_id, pay_month)
 
         # 全勤奖（从规则引擎获取）
         full_attendance_bonus = 0
-        if (attendance.get("absence_days", 0) == 0
-                and attendance.get("late_count", 0) == 0
-                and attendance.get("early_leave_count", 0) == 0):
+        if (
+            attendance.get("absence_days", 0) == 0
+            and attendance.get("late_count", 0) == 0
+            and attendance.get("early_leave_count", 0) == 0
+        ):
             full_attendance_bonus = rules["full_attendance_bonus_fen"]
 
         gross = (
-            base + position + meal + transport
-            + seniority_subsidy + performance_bonus + overtime_pay
-            + commission_total + reward_total + full_attendance_bonus
+            base
+            + position
+            + meal
+            + transport
+            + seniority_subsidy
+            + performance_bonus
+            + overtime_pay
+            + commission_total
+            + reward_total
+            + full_attendance_bonus
         )
 
         # 6. 计算扣款（使用规则引擎的扣款金额）
@@ -323,22 +306,22 @@ class PayrollService(BaseService):
         early_leave_deduction = early_leave_count * rules["early_leave_deduction_per_time_fen"]
 
         # 社保公积金（优先使用个性化配置，兜底用薪资方案固定值）
-        social, housing = await self._calculate_social_insurance(
-            db, employee_id, year, structure
-        )
+        social, housing = await self._calculate_social_insurance(db, employee_id, year, structure)
 
         # 个税计算（应税收入 = 应发 - 缺勤扣 - 迟到扣 - 早退扣 - 罚款）
         taxable_gross = gross - absence_deduction - late_deduction - early_leave_deduction - penalty_total
         tax_fen = await self._calculate_monthly_tax(
-            db, employee_id, pay_month,
+            db,
+            employee_id,
+            pay_month,
             max(0, taxable_gross),
-            social, housing,
+            social,
+            housing,
             structure.special_deduction_fen,
         )
 
         total_deduction = (
-            absence_deduction + late_deduction + early_leave_deduction
-            + penalty_total + social + housing + tax_fen
+            absence_deduction + late_deduction + early_leave_deduction + penalty_total + social + housing + tax_fen
         )
         net = gross - total_deduction
 
@@ -432,28 +415,25 @@ class PayrollService(BaseService):
         此方法负责将结果同步到PayrollRecord。
         """
         formula_engine = SalaryFormulaEngine(brand_id=brand_id)
-        result = await formula_engine.calculate_employee_salary(
-            db, employee.id, pay_month, store_id
-        )
+        result = await formula_engine.calculate_employee_salary(db, employee.id, pay_month, store_id)
 
         # 获取考勤摘要（用于PayrollRecord统计字段）
         year, month = int(pay_month[:4]), int(pay_month[5:7])
         month_start = date(year, month, 1)
         month_end = date(year, month, calendar.monthrange(year, month)[1])
-        attendance = await self._get_attendance_summary(
-            db, employee.id, month_start, month_end
-        )
+        attendance = await self._get_attendance_summary(db, employee.id, month_start, month_end)
 
         # 社保公积金
-        social, housing = await self._calculate_social_insurance(
-            db, employee.id, year, structure
-        )
+        social, housing = await self._calculate_social_insurance(db, employee.id, year, structure)
 
         # 个税
         tax_fen = await self._calculate_monthly_tax(
-            db, employee.id, pay_month,
+            db,
+            employee.id,
+            pay_month,
             max(0, result["total_income_fen"]),
-            social, housing,
+            social,
+            housing,
             structure.special_deduction_fen,
         )
 
@@ -535,9 +515,7 @@ class PayrollService(BaseService):
         )
         return record
 
-    async def batch_calculate(
-        self, db: AsyncSession, store_id: str, pay_month: str
-    ) -> Dict[str, Any]:
+    async def batch_calculate(self, db: AsyncSession, store_id: str, pay_month: str) -> Dict[str, Any]:
         """批量算薪：为门店所有在职员工计算指定月份工资"""
         result = await db.execute(
             select(Employee).where(
@@ -571,9 +549,7 @@ class PayrollService(BaseService):
             "total_net_salary_yuan": total_net_fen / 100,
         }
 
-    async def confirm_payroll(
-        self, db: AsyncSession, payroll_id: str, confirmed_by: str
-    ) -> PayrollRecord:
+    async def confirm_payroll(self, db: AsyncSession, payroll_id: str, confirmed_by: str) -> PayrollRecord:
         """确认工资单（待发放）"""
         record = await db.get(PayrollRecord, payroll_id)
         if not record:
@@ -585,9 +561,7 @@ class PayrollService(BaseService):
         await db.flush()
         return record
 
-    async def mark_paid(
-        self, db: AsyncSession, store_id: str, pay_month: str
-    ) -> int:
+    async def mark_paid(self, db: AsyncSession, store_id: str, pay_month: str) -> int:
         """标记门店整月工资已发放"""
         result = await db.execute(
             select(PayrollRecord).where(
@@ -605,43 +579,42 @@ class PayrollService(BaseService):
         await db.flush()
         return len(records)
 
-    async def get_payroll_list(
-        self, db: AsyncSession, store_id: str, pay_month: str
-    ) -> List[Dict[str, Any]]:
+    async def get_payroll_list(self, db: AsyncSession, store_id: str, pay_month: str) -> List[Dict[str, Any]]:
         """获取门店月度工资表"""
         result = await db.execute(
-            select(PayrollRecord, Employee.name, Employee.position).join(
-                Employee, PayrollRecord.employee_id == Employee.id
-            ).where(
+            select(PayrollRecord, Employee.name, Employee.position)
+            .join(Employee, PayrollRecord.employee_id == Employee.id)
+            .where(
                 and_(
                     PayrollRecord.store_id == store_id,
                     PayrollRecord.pay_month == pay_month,
                 )
-            ).order_by(Employee.name)
+            )
+            .order_by(Employee.name)
         )
         rows = result.all()
         items = []
         for record, name, position in rows:
-            items.append({
-                "id": str(record.id),
-                "employee_id": record.employee_id,
-                "employee_name": name,
-                "position": position,
-                "pay_month": record.pay_month,
-                "status": record.status.value if record.status else "draft",
-                "gross_salary_yuan": record.gross_salary_fen / 100,
-                "total_deduction_yuan": record.total_deduction_fen / 100,
-                "net_salary_yuan": record.net_salary_fen / 100,
-                "tax_yuan": record.tax_fen / 100,
-                "attendance_days": float(record.attendance_days or 0),
-                "overtime_hours": float(record.overtime_hours or 0),
-                "paid_at": record.paid_at.isoformat() if record.paid_at else None,
-            })
+            items.append(
+                {
+                    "id": str(record.id),
+                    "employee_id": record.employee_id,
+                    "employee_name": name,
+                    "position": position,
+                    "pay_month": record.pay_month,
+                    "status": record.status.value if record.status else "draft",
+                    "gross_salary_yuan": record.gross_salary_fen / 100,
+                    "total_deduction_yuan": record.total_deduction_fen / 100,
+                    "net_salary_yuan": record.net_salary_fen / 100,
+                    "tax_yuan": record.tax_fen / 100,
+                    "attendance_days": float(record.attendance_days or 0),
+                    "overtime_hours": float(record.overtime_hours or 0),
+                    "paid_at": record.paid_at.isoformat() if record.paid_at else None,
+                }
+            )
         return items
 
-    async def get_payroll_summary(
-        self, db: AsyncSession, store_id: str, pay_month: str
-    ) -> Dict[str, Any]:
+    async def get_payroll_summary(self, db: AsyncSession, store_id: str, pay_month: str) -> Dict[str, Any]:
         """获取门店月度薪酬汇总"""
         result = await db.execute(
             select(
@@ -680,9 +653,7 @@ class PayrollService(BaseService):
 
     # ── 内部方法 ──────────────────────────────────────────
 
-    async def _get_commission_total(
-        self, db: AsyncSession, employee_id: str, pay_month: str
-    ) -> int:
+    async def _get_commission_total(self, db: AsyncSession, employee_id: str, pay_month: str) -> int:
         """汇总员工当月所有提成记录（分）"""
         result = await db.execute(
             select(func.coalesce(func.sum(CommissionRecord.commission_fen), 0)).where(
@@ -694,9 +665,7 @@ class PayrollService(BaseService):
         )
         return result.scalar() or 0
 
-    async def _get_reward_penalty_totals(
-        self, db: AsyncSession, employee_id: str, pay_month: str
-    ) -> tuple:
+    async def _get_reward_penalty_totals(self, db: AsyncSession, employee_id: str, pay_month: str) -> tuple:
         """
         汇总员工当月已审批的奖励和罚款（分）。
         返回 (reward_total, penalty_total)
@@ -705,13 +674,15 @@ class PayrollService(BaseService):
             select(
                 RewardPenaltyRecord.rp_type,
                 func.coalesce(func.sum(RewardPenaltyRecord.amount_fen), 0).label("total"),
-            ).where(
+            )
+            .where(
                 and_(
                     RewardPenaltyRecord.employee_id == employee_id,
                     RewardPenaltyRecord.pay_month == pay_month,
                     RewardPenaltyRecord.status == RewardPenaltyStatus.APPROVED,
                 )
-            ).group_by(RewardPenaltyRecord.rp_type)
+            )
+            .group_by(RewardPenaltyRecord.rp_type)
         )
         rows = result.all()
         reward = 0
@@ -724,8 +695,7 @@ class PayrollService(BaseService):
         return reward, penalty
 
     async def _calculate_social_insurance(
-        self, db: AsyncSession, employee_id: str, year: int,
-        structure: SalaryStructure
+        self, db: AsyncSession, employee_id: str, year: int, structure: SalaryStructure
     ) -> tuple:
         """
         计算员工社保公积金个人扣款（分）。
@@ -750,11 +720,7 @@ class PayrollService(BaseService):
             return structure.social_insurance_fen, structure.housing_fund_fen
 
         # 查询区域配置
-        config_result = await db.execute(
-            select(SocialInsuranceConfig).where(
-                SocialInsuranceConfig.id == emp_si.config_id
-            )
-        )
+        config_result = await db.execute(select(SocialInsuranceConfig).where(SocialInsuranceConfig.id == emp_si.config_id))
         config = config_result.scalar_one_or_none()
         if not config:
             return structure.social_insurance_fen, structure.housing_fund_fen
@@ -782,10 +748,7 @@ class PayrollService(BaseService):
 
         return social, housing
 
-    async def _get_attendance_summary(
-        self, db: AsyncSession, employee_id: str,
-        start: date, end: date
-    ) -> Dict[str, Any]:
+    async def _get_attendance_summary(self, db: AsyncSession, employee_id: str, start: date, end: date) -> Dict[str, Any]:
         """从 AttendanceLog 聚合考勤数据"""
         result = await db.execute(
             select(AttendanceLog).where(
@@ -831,9 +794,14 @@ class PayrollService(BaseService):
         }
 
     async def _calculate_monthly_tax(
-        self, db: AsyncSession, employee_id: str, pay_month: str,
+        self,
+        db: AsyncSession,
+        employee_id: str,
+        pay_month: str,
         taxable_gross_fen: int,
-        social_fen: int, housing_fen: int, special_deduction_fen: int,
+        social_fen: int,
+        housing_fen: int,
+        special_deduction_fen: int,
     ) -> int:
         """
         累计预扣法计算个税。
@@ -856,12 +824,15 @@ class PayrollService(BaseService):
 
         if prev_months:
             result = await db.execute(
-                select(TaxDeclaration).where(
+                select(TaxDeclaration)
+                .where(
                     and_(
                         TaxDeclaration.employee_id == employee_id,
                         TaxDeclaration.tax_month.in_(prev_months),
                     )
-                ).order_by(TaxDeclaration.tax_month.desc()).limit(1)
+                )
+                .order_by(TaxDeclaration.tax_month.desc())
+                .limit(1)
             )
             last_record = result.scalar_one_or_none()
             if last_record:
@@ -872,10 +843,7 @@ class PayrollService(BaseService):
         # 本月累加
         monthly_income = max(0, taxable_gross_fen)
         monthly_deduction = (
-            int(MONTHLY_EXEMPTION_YUAN * 100)  # 起征点（分）
-            + social_fen
-            + housing_fen
-            + special_deduction_fen
+            int(MONTHLY_EXEMPTION_YUAN * 100) + social_fen + housing_fen + special_deduction_fen  # 起征点（分）
         )
 
         new_cumulative_income = cumulative_income_fen + monthly_income

@@ -1,19 +1,19 @@
 """
 HR业务规则配置 API — 管理考勤扣款/工龄补贴/加班倍数等可配置规则
 """
-from typing import Optional, List
+
+from typing import List, Optional
 from uuid import UUID
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import select, and_, delete
+from sqlalchemy import and_, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
-import structlog
-
 from src.core.database import get_db
 from src.core.dependencies import get_current_active_user
-from src.models.user import User
 from src.models.hr_business_rule import HRBusinessRule, RuleCategory
+from src.models.user import User
 from src.services.hr_rule_engine import HRRuleEngine
 
 logger = structlog.get_logger()
@@ -21,6 +21,7 @@ router = APIRouter()
 
 
 # ── 请求/响应模型 ──────────────────────────────────────
+
 
 class RuleCreateRequest(BaseModel):
     brand_id: str
@@ -96,6 +97,7 @@ def _rule_to_response(rule: HRBusinessRule) -> dict:
 # 注意: 固定路径端点必须在 {rule_id} 路径参数端点之前注册，
 # 否则 FastAPI 会尝试将 "effective" 等字符串解析为 UUID。
 
+
 @router.get("/hr/rules/effective", summary="查询生效规则")
 async def get_effective_rules(
     brand_id: str = Query(...),
@@ -163,10 +165,7 @@ async def preview_payroll_impact(
         # 假设平均每人每月迟到 1 次
         avg_late_per_person = 1
         diff_fen = (new_late - old_late) * avg_late_per_person * employee_count
-        description = (
-            f"迟到扣款 {old_late / 100:.0f}元→{new_late / 100:.0f}元/次，"
-            f"按{employee_count}人均1次/月估算"
-        )
+        description = f"迟到扣款 {old_late / 100:.0f}元→{new_late / 100:.0f}元/次，" f"按{employee_count}人均1次/月估算"
 
     elif category == RuleCategory.FULL_ATTENDANCE.value:
         old_bonus = current_rule.get("bonus_fen", 0) if current_rule.get("enabled") else 0
@@ -174,10 +173,7 @@ async def preview_payroll_impact(
         # 假设 80% 员工可获得全勤奖
         eligible_ratio = 0.8
         diff_fen = int((new_bonus - old_bonus) * employee_count * eligible_ratio)
-        description = (
-            f"全勤奖 {old_bonus / 100:.0f}元→{new_bonus / 100:.0f}元/月，"
-            f"按{employee_count}人×80%获得率估算"
-        )
+        description = f"全勤奖 {old_bonus / 100:.0f}元→{new_bonus / 100:.0f}元/月，" f"按{employee_count}人×80%获得率估算"
 
     elif category == RuleCategory.MEAL_SUBSIDY.value:
         old_per_day = current_rule.get("per_day_fen", 0)
@@ -185,8 +181,7 @@ async def preview_payroll_impact(
         work_days = 22
         diff_fen = (new_per_day - old_per_day) * work_days * employee_count
         description = (
-            f"餐补 {old_per_day / 100:.0f}元→{new_per_day / 100:.0f}元/日，"
-            f"按{employee_count}人×{work_days}工作日估算"
+            f"餐补 {old_per_day / 100:.0f}元→{new_per_day / 100:.0f}元/日，" f"按{employee_count}人×{work_days}工作日估算"
         )
 
     elif category == RuleCategory.SENIORITY_SUBSIDY.value:
@@ -209,6 +204,7 @@ async def preview_payroll_impact(
 
 # ── CRUD 端点（含路径参数，必须在固定路径之后） ──────────
 
+
 @router.get("/hr/rules", summary="查询规则列表")
 async def list_rules(
     brand_id: str = Query(...),
@@ -227,11 +223,7 @@ async def list_rules(
     if is_active is not None:
         conditions.append(HRBusinessRule.is_active == is_active)
 
-    stmt = (
-        select(HRBusinessRule)
-        .where(and_(*conditions))
-        .order_by(HRBusinessRule.category, HRBusinessRule.priority.desc())
-    )
+    stmt = select(HRBusinessRule).where(and_(*conditions)).order_by(HRBusinessRule.category, HRBusinessRule.priority.desc())
     result = await db.execute(stmt)
     rules = result.scalars().all()
     return {"items": [_rule_to_response(r) for r in rules], "total": len(rules)}
@@ -249,6 +241,7 @@ async def create_rule(
         raise HTTPException(400, f"无效类别: {req.category}，可选: {sorted(valid_categories)}")
 
     import uuid as uuid_mod
+
     rule = HRBusinessRule(
         id=uuid_mod.uuid4(),
         brand_id=req.brand_id,

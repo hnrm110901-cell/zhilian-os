@@ -1,27 +1,30 @@
 """
 HR Employee API — 员工花名册 + 入离职流程
 """
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from typing import Optional, List
+
 from datetime import date
-from pydantic import BaseModel
+from typing import List, Optional
+
 import structlog
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel
+from sqlalchemy import and_, func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
-from ..models.user import User
 from ..models.employee import Employee
-from ..models.employee_lifecycle import EmployeeChange, ChangeType
 from ..models.employee_contract import EmployeeContract
+from ..models.employee_lifecycle import ChangeType, EmployeeChange
+from ..models.user import User
 from ..services.data_masking_service import DataMaskingService
-from sqlalchemy import select, and_, func, or_
-from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
 router = APIRouter()
 
 
 # ── 花名册 ──────────────────────────────────────────────────
+
 
 @router.get("/hr/employees")
 async def list_employees(
@@ -57,9 +60,7 @@ async def list_employees(
 
     # 分页
     result = await db.execute(
-        query.order_by(Employee.hire_date.desc().nullslast())
-        .offset((page - 1) * page_size)
-        .limit(page_size)
+        query.order_by(Employee.hire_date.desc().nullslast()).offset((page - 1) * page_size).limit(page_size)
     )
     employees = result.scalars().all()
 
@@ -105,9 +106,7 @@ async def get_employee_detail(
     current_user: User = Depends(get_current_active_user),
 ):
     """员工详情：基本信息 + 合同 + 变动记录（敏感字段按角色自动脱敏）"""
-    emp = await db.execute(
-        select(Employee).where(Employee.id == employee_id)
-    )
+    emp = await db.execute(select(Employee).where(Employee.id == employee_id))
     employee = emp.scalars().first()
     if not employee:
         raise HTTPException(status_code=404, detail="员工不存在")
@@ -192,6 +191,7 @@ async def get_employee_detail(
 
 # ── 入职 ──────────────────────────────────────────────────
 
+
 class OnboardRequest(BaseModel):
     store_id: str
     employee_id: str
@@ -213,9 +213,7 @@ async def onboard_employee(
     import uuid
 
     # 检查ID是否已存在
-    exists = await db.execute(
-        select(Employee.id).where(Employee.id == body.employee_id)
-    )
+    exists = await db.execute(select(Employee.id).where(Employee.id == body.employee_id))
     if exists.scalars().first():
         raise HTTPException(status_code=409, detail="员工ID已存在")
 
@@ -255,6 +253,7 @@ async def onboard_employee(
 
 # ── 离职 ──────────────────────────────────────────────────
 
+
 class ResignRequest(BaseModel):
     store_id: str
     employee_id: str
@@ -273,9 +272,7 @@ async def resign_employee(
     """离职登记：更新员工状态 + 离职变动记录"""
     import uuid
 
-    emp = await db.execute(
-        select(Employee).where(Employee.id == body.employee_id)
-    )
+    emp = await db.execute(select(Employee).where(Employee.id == body.employee_id))
     employee = emp.scalars().first()
     if not employee:
         raise HTTPException(status_code=404, detail="员工不存在")
@@ -312,6 +309,7 @@ async def resign_employee(
 
 # ── 员工变动记录 ──────────────────────────────────────────
 
+
 @router.get("/hr/employee-changes")
 async def list_employee_changes(
     store_id: str = Query(...),
@@ -330,9 +328,7 @@ async def list_employee_changes(
     if change_type:
         query = query.where(EmployeeChange.change_type == change_type)
 
-    result = await db.execute(
-        query.order_by(EmployeeChange.effective_date.desc()).limit(limit)
-    )
+    result = await db.execute(query.order_by(EmployeeChange.effective_date.desc()).limit(limit))
     rows = result.all()
 
     return {

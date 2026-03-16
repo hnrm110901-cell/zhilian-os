@@ -5,10 +5,11 @@
   - 《劳动法》《劳动合同法》— 薪酬/考勤/假勤变更可追溯
   - 《个人信息保护法》— 员工信息变更全链路留痕
 """
+
 import uuid
 
-from sqlalchemy import Column, String, Text, Integer, Index
-from sqlalchemy.dialects.postgresql import UUID, JSON
+from sqlalchemy import Column, Index, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSON, UUID
 
 from .base import Base, TimestampMixin
 

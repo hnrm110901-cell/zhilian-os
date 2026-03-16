@@ -4,14 +4,15 @@
 - 实时状态（JOIN今日预订）
 - 分配预订到桌
 """
-from datetime import date, datetime, time
-from typing import List, Optional, Dict, Any
+
 import uuid
+from datetime import date, datetime, time
+from typing import Any, Dict, List, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import select, and_, func
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
@@ -26,6 +27,7 @@ router = APIRouter(prefix="/api/v1/floor-plan", tags=["floor_plan"])
 
 
 # ── Pydantic Models ──
+
 
 class TableResponse(BaseModel):
     id: str
@@ -45,9 +47,11 @@ class TableResponse(BaseModel):
     status: str
     is_active: bool
 
+
 class TableRealtimeResponse(TableResponse):
     current_reservation: Optional[Dict[str, Any]] = None
     realtime_status: str = "available"
+
 
 class TableLayoutItem(BaseModel):
     id: Optional[str] = None  # None = 新建
@@ -65,9 +69,11 @@ class TableLayoutItem(BaseModel):
     area_name: str = ""
     is_active: bool = True
 
+
 class BatchLayoutRequest(BaseModel):
     tables: List[TableLayoutItem]
     deleted_ids: List[str] = []
+
 
 class AssignReservationRequest(BaseModel):
     reservation_id: str
@@ -95,6 +101,7 @@ def _to_response(t: TableDefinition) -> TableResponse:
 
 
 # ── Endpoints ──
+
 
 @router.get("/{store_id}/tables", response_model=List[TableResponse])
 async def get_tables(
@@ -146,12 +153,14 @@ async def get_tables_realtime(
             and_(
                 Reservation.store_id == store_id,
                 Reservation.reservation_date == today,
-                Reservation.status.in_([
-                    ReservationStatus.PENDING,
-                    ReservationStatus.CONFIRMED,
-                    ReservationStatus.ARRIVED,
-                    ReservationStatus.SEATED,
-                ]),
+                Reservation.status.in_(
+                    [
+                        ReservationStatus.PENDING,
+                        ReservationStatus.CONFIRMED,
+                        ReservationStatus.ARRIVED,
+                        ReservationStatus.SEATED,
+                    ]
+                ),
             )
         )
     )
@@ -190,11 +199,13 @@ async def get_tables_realtime(
                 "status": reservation.status.value if hasattr(reservation.status, "value") else str(reservation.status),
             }
 
-        responses.append(TableRealtimeResponse(
-            **base.model_dump(),
-            current_reservation=current_res,
-            realtime_status=realtime_status,
-        ))
+        responses.append(
+            TableRealtimeResponse(
+                **base.model_dump(),
+                current_reservation=current_res,
+                realtime_status=realtime_status,
+            )
+        )
 
     return responses
 
@@ -299,9 +310,7 @@ async def assign_reservation_to_table(
         raise HTTPException(status_code=404, detail="桌台不存在")
 
     # 查找预订
-    res_result = await session.execute(
-        select(Reservation).where(Reservation.id == req.reservation_id)
-    )
+    res_result = await session.execute(select(Reservation).where(Reservation.id == req.reservation_id))
     reservation = res_result.scalar_one_or_none()
     if not reservation:
         raise HTTPException(status_code=404, detail="预订不存在")
@@ -310,9 +319,7 @@ async def assign_reservation_to_table(
     reservation.table_number = table.table_number
     await session.commit()
 
-    logger.info("table_assigned",
-                table_number=table.table_number,
-                reservation_id=req.reservation_id)
+    logger.info("table_assigned", table_number=table.table_number, reservation_id=req.reservation_id)
     return {
         "success": True,
         "table_number": table.table_number,

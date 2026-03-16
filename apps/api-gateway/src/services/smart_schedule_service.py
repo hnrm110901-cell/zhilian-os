@@ -15,20 +15,20 @@ Smart Schedule Service — 智能排班服务
 - 尊重员工排班偏好（可选）
 - 公平分配周末班和节假日班
 """
+
 import json
-import structlog
 import uuid
-from typing import Dict, Any, List, Optional, Tuple
-from datetime import date, datetime, timedelta, time
 from collections import defaultdict
+from datetime import date, datetime, time, timedelta
+from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import select, and_, func
+import structlog
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.models.employee import Employee
-from src.models.schedule import Schedule, Shift
 from src.models.attendance import ShiftTemplate
+from src.models.employee import Employee
 from src.models.leave import LeaveRequest, LeaveRequestStatus
+from src.models.schedule import Schedule, Shift
 from src.models.schedule_demand import StoreStaffingDemand
 
 logger = structlog.get_logger()
@@ -57,16 +57,16 @@ DEFAULT_BASE_STAFFING = {
 
 # 日期类型需求倍率
 DAY_TYPE_MULTIPLIER = {
-    "weekday": 0.8,     # 周一至周四
-    "friday": 1.0,      # 周五
-    "weekend": 1.2,     # 周六日
-    "holiday": 1.5,     # 节假日
+    "weekday": 0.8,  # 周一至周四
+    "friday": 1.0,  # 周五
+    "weekend": 1.2,  # 周六日
+    "holiday": 1.5,  # 节假日
 }
 
 # 中国法定节假日列表（需定期维护，此处示例2026年）
 # 实际生产环境应从配置表或外部API获取
 HOLIDAYS_2026 = {
-    date(2026, 1, 1),   # 元旦
+    date(2026, 1, 1),  # 元旦
     date(2026, 1, 2),
     date(2026, 1, 3),
     date(2026, 2, 17),  # 春节
@@ -76,10 +76,10 @@ HOLIDAYS_2026 = {
     date(2026, 2, 21),
     date(2026, 2, 22),
     date(2026, 2, 23),
-    date(2026, 4, 5),   # 清明
+    date(2026, 4, 5),  # 清明
     date(2026, 4, 6),
     date(2026, 4, 7),
-    date(2026, 5, 1),   # 劳动节
+    date(2026, 5, 1),  # 劳动节
     date(2026, 5, 2),
     date(2026, 5, 3),
     date(2026, 5, 4),
@@ -111,11 +111,11 @@ MAX_WEEKLY_DAYS = 6
 MAX_CONSECUTIVE_DAYS = 6
 
 # 劳动法约束类型标识（用于 unresolved 原因追溯）
-CONSTRAINT_NIGHT_MINOR = "night_minor"          # 未成年工夜班限制
-CONSTRAINT_NIGHT_PREGNANT = "night_pregnant"     # 孕期员工夜班限制
-CONSTRAINT_NIGHT_MEDICAL = "night_medical"       # 医疗限制夜班
-CONSTRAINT_MAX_HOURS = "max_daily_hours"         # 超日工时上限
-CONSTRAINT_MAX_CONSECUTIVE = "max_consecutive"   # 超连续工作天数
+CONSTRAINT_NIGHT_MINOR = "night_minor"  # 未成年工夜班限制
+CONSTRAINT_NIGHT_PREGNANT = "night_pregnant"  # 孕期员工夜班限制
+CONSTRAINT_NIGHT_MEDICAL = "night_medical"  # 医疗限制夜班
+CONSTRAINT_MAX_HOURS = "max_daily_hours"  # 超日工时上限
+CONSTRAINT_MAX_CONSECUTIVE = "max_consecutive"  # 超连续工作天数
 
 DAY_NAMES_CN = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
 
@@ -198,14 +198,10 @@ class SmartScheduleService:
 
         # 4. 获取上周排班（用于计算连续工作天数、公平性）
         prev_week_start = week_start - timedelta(days=7)
-        prev_schedules = await self._get_existing_shifts(
-            db, store_id, prev_week_start, week_start - timedelta(days=1)
-        )
+        prev_schedules = await self._get_existing_shifts(db, store_id, prev_week_start, week_start - timedelta(days=1))
 
         # 5. 构建员工状态跟踪器
-        tracker = self._build_employee_tracker(
-            all_employees, leaves, prev_schedules, week_start
-        )
+        tracker = self._build_employee_tracker(all_employees, leaves, prev_schedules, week_start)
 
         # 6. 逐日生成排班
         daily_schedules = []
@@ -224,14 +220,10 @@ class SmartScheduleService:
             if demand_forecast and str(current_date) in demand_forecast:
                 day_demand = demand_forecast[str(current_date)]
             else:
-                day_demand = await self._get_demand_forecast(
-                    db, store_id, current_date
-                )
+                day_demand = await self._get_demand_forecast(db, store_id, current_date)
 
             # 获取当日可用员工
-            available = self._get_available_employees_for_date(
-                tracker, current_date
-            )
+            available = self._get_available_employees_for_date(tracker, current_date)
 
             # 贪心分配
             assignments, warnings, unresolved = self._assign_shifts_greedy(
@@ -279,9 +271,7 @@ class SmartScheduleService:
 
         # 7. 统计公平性得分
         fairness_score = self._calculate_fairness_score(tracker, all_employees)
-        scheduled_employees = sum(
-            1 for t in tracker.values() if t["scheduled_dates"]
-        )
+        scheduled_employees = sum(1 for t in tracker.values() if t["scheduled_dates"])
 
         # 8. 生成连续工作预警
         consecutive_warnings = self._check_consecutive_warnings(tracker, week_end)
@@ -294,11 +284,7 @@ class SmartScheduleService:
             for pos, needed in ds["demand"].items():
                 total_demand_slots += needed
                 total_covered_slots += min(ds["coverage"].get(pos, 0), needed)
-        coverage_rate = (
-            round(total_covered_slots / total_demand_slots, 2)
-            if total_demand_slots > 0
-            else 1.0
-        )
+        coverage_rate = round(total_covered_slots / total_demand_slots, 2) if total_demand_slots > 0 else 1.0
 
         result = {
             "store_id": store_id,
@@ -350,13 +336,10 @@ class SmartScheduleService:
         ]
         """
         # 获取当日排班
-        stmt = (
-            select(Schedule)
-            .where(
-                and_(
-                    Schedule.store_id == store_id,
-                    Schedule.schedule_date == schedule_date,
-                )
+        stmt = select(Schedule).where(
+            and_(
+                Schedule.store_id == store_id,
+                Schedule.schedule_date == schedule_date,
             )
         )
         result = await db.execute(stmt)
@@ -463,14 +446,11 @@ class SmartScheduleService:
         """
         week_end = week_start + timedelta(days=6)
 
-        stmt = (
-            select(Schedule)
-            .where(
-                and_(
-                    Schedule.store_id == store_id,
-                    Schedule.schedule_date >= week_start,
-                    Schedule.schedule_date <= week_end,
-                )
+        stmt = select(Schedule).where(
+            and_(
+                Schedule.store_id == store_id,
+                Schedule.schedule_date >= week_start,
+                Schedule.schedule_date <= week_end,
             )
         )
         result = await db.execute(stmt)
@@ -529,29 +509,28 @@ class SmartScheduleService:
         week_end = week_start + timedelta(days=6)
 
         # 获取当周排班
-        stmt = (
-            select(Schedule)
-            .where(
-                and_(
-                    Schedule.store_id == store_id,
-                    Schedule.schedule_date >= week_start,
-                    Schedule.schedule_date <= week_end,
-                )
+        stmt = select(Schedule).where(
+            and_(
+                Schedule.store_id == store_id,
+                Schedule.schedule_date >= week_start,
+                Schedule.schedule_date <= week_end,
             )
         )
         result = await db.execute(stmt)
         schedules = result.scalars().all()
 
         if not schedules:
-            return [{
-                "type": "warning",
-                "title": "排班缺失",
-                "detail": "本周尚未生成排班，建议先运行自动排班",
-                "action": "generate_schedule",
-                "expected_saving_yuan": 0,
-                "confidence": 1.0,
-                "priority": "high",
-            }]
+            return [
+                {
+                    "type": "warning",
+                    "title": "排班缺失",
+                    "detail": "本周尚未生成排班，建议先运行自动排班",
+                    "action": "generate_schedule",
+                    "expected_saving_yuan": 0,
+                    "confidence": 1.0,
+                    "priority": "high",
+                }
+            ]
 
         # 获取员工信息用于分析
         employees = await self._get_store_employees(db, store_id)
@@ -564,26 +543,24 @@ class SmartScheduleService:
         all_shifts = shift_result.scalars().all()
 
         # ── 1. 劳动法合规性扫描（规则引擎，始终执行） ──
-        labor_violations = self._scan_labor_violations(
-            all_shifts, schedules, emp_map
-        )
+        labor_violations = self._scan_labor_violations(all_shifts, schedules, emp_map)
         # 统一字段格式
         compliance_suggestions = []
         for v in labor_violations:
-            compliance_suggestions.append({
-                "type": "compliance",
-                "title": v["title"],
-                "detail": v["description"],
-                "action": v["action"],
-                "expected_saving_yuan": 0,
-                "confidence": v.get("confidence", 1.0),
-                "priority": "high",
-            })
+            compliance_suggestions.append(
+                {
+                    "type": "compliance",
+                    "title": v["title"],
+                    "detail": v["description"],
+                    "action": v["action"],
+                    "expected_saving_yuan": 0,
+                    "confidence": v.get("confidence", 1.0),
+                    "priority": "high",
+                }
+            )
 
         # ── 2. 收集排班上下文数据 ──
-        context = self._build_schedule_context(
-            store_id, week_start, schedules, all_shifts, emp_map
-        )
+        context = self._build_schedule_context(store_id, week_start, schedules, all_shifts, emp_map)
 
         # ── 3. 尝试 LLM 分析（成本优化、公平性、效率） ──
         ai_suggestions = await self._get_ai_suggestions(context)
@@ -593,21 +570,21 @@ class SmartScheduleService:
             all_suggestions = compliance_suggestions + ai_suggestions
         else:
             # LLM 不可用，fallback 到规则引擎
-            rule_suggestions = self._get_rule_based_suggestions(
-                all_shifts, schedules, emp_map
-            )
+            rule_suggestions = self._get_rule_based_suggestions(all_shifts, schedules, emp_map)
             all_suggestions = compliance_suggestions + rule_suggestions
 
         if not all_suggestions:
-            all_suggestions.append({
-                "type": "efficiency",
-                "title": "排班状况良好",
-                "detail": "当前排班无明显优化空间",
-                "action": None,
-                "expected_saving_yuan": 0,
-                "confidence": 0.90,
-                "priority": "low",
-            })
+            all_suggestions.append(
+                {
+                    "type": "efficiency",
+                    "title": "排班状况良好",
+                    "detail": "当前排班无明显优化空间",
+                    "action": None,
+                    "expected_saving_yuan": 0,
+                    "confidence": 0.90,
+                    "priority": "low",
+                }
+            )
 
         return all_suggestions
 
@@ -688,9 +665,7 @@ class SmartScheduleService:
             expected_weekly = base * len(schedules)
             actual = position_counts.get(pos, 0)
             if actual < expected_weekly * 0.7:
-                coverage_gaps.append(
-                    f"{pos} 实际{actual}班次 vs 预期{expected_weekly}班次（不足30%+）"
-                )
+                coverage_gaps.append(f"{pos} 实际{actual}班次 vs 预期{expected_weekly}班次（不足30%+）")
 
         # 员工工时分布（用名字而非 ID）
         hours_by_name: Dict[str, float] = {}
@@ -700,14 +675,8 @@ class SmartScheduleService:
             hours_by_name[name] = round(hours, 1)
 
         # 用工类型分布
-        fulltime_count = sum(
-            1 for e in emp_map.values()
-            if e.employment_type == "regular"
-        )
-        parttime_count = sum(
-            1 for e in emp_map.values()
-            if e.employment_type in ("part_time", "parttime")
-        )
+        fulltime_count = sum(1 for e in emp_map.values() if e.employment_type == "regular")
+        parttime_count = sum(1 for e in emp_map.values() if e.employment_type in ("part_time", "parttime"))
 
         context = {
             "store_id": store_id,
@@ -734,9 +703,7 @@ class SmartScheduleService:
         }
         return context
 
-    async def _get_ai_suggestions(
-        self, context: Dict[str, Any]
-    ) -> Optional[List[Dict[str, Any]]]:
+    async def _get_ai_suggestions(self, context: Dict[str, Any]) -> Optional[List[Dict[str, Any]]]:
         """
         调用 LLM 进行排班深度分析。
         返回 None 表示 LLM 不可用，需 fallback 到规则引擎。
@@ -786,15 +753,17 @@ class SmartScheduleService:
             # 校验并规范化每条建议
             validated: List[Dict[str, Any]] = []
             for s in raw_suggestions:
-                validated.append({
-                    "type": s.get("type", "efficiency"),
-                    "title": s.get("title", "优化建议"),
-                    "detail": s.get("detail", ""),
-                    "action": s.get("action"),
-                    "expected_saving_yuan": float(s.get("expected_saving_yuan", 0)),
-                    "confidence": min(1.0, max(0.0, float(s.get("confidence", 0.5)))),
-                    "priority": s.get("priority", "medium"),
-                })
+                validated.append(
+                    {
+                        "type": s.get("type", "efficiency"),
+                        "title": s.get("title", "优化建议"),
+                        "detail": s.get("detail", ""),
+                        "action": s.get("action"),
+                        "expected_saving_yuan": float(s.get("expected_saving_yuan", 0)),
+                        "confidence": min(1.0, max(0.0, float(s.get("confidence", 0.5)))),
+                        "priority": s.get("priority", "medium"),
+                    }
+                )
 
             logger.info(
                 "ai_schedule_suggestions_generated",
@@ -849,19 +818,21 @@ class SmartScheduleService:
                 max_name_str = max_name.name if max_name else str(max_emp)[:8]
                 min_name_str = min_name.name if min_name else str(min_emp)[:8]
 
-                suggestions.append({
-                    "type": "fairness",
-                    "title": "工时分配不均",
-                    "detail": (
-                        f"{max_name_str} 本周 {max_hours:.0f}h，"
-                        f"{min_name_str} 仅 {min_hours:.0f}h，"
-                        f"建议调整使工时差距 < 16h"
-                    ),
-                    "action": "rebalance_hours",
-                    "expected_saving_yuan": 0,
-                    "confidence": 0.85,
-                    "priority": "medium",
-                })
+                suggestions.append(
+                    {
+                        "type": "fairness",
+                        "title": "工时分配不均",
+                        "detail": (
+                            f"{max_name_str} 本周 {max_hours:.0f}h，"
+                            f"{min_name_str} 仅 {min_hours:.0f}h，"
+                            f"建议调整使工时差距 < 16h"
+                        ),
+                        "action": "rebalance_hours",
+                        "expected_saving_yuan": 0,
+                        "confidence": 0.85,
+                        "priority": "medium",
+                    }
+                )
 
         # 分析2：周末班集中
         weekend_counts: Dict[str, int] = defaultdict(int)
@@ -878,15 +849,17 @@ class SmartScheduleService:
                 emp_id = max(weekend_counts, key=weekend_counts.get)
                 emp_obj = emp_map.get(emp_id)
                 name = emp_obj.name if emp_obj else str(emp_id)[:8]
-                suggestions.append({
-                    "type": "fairness",
-                    "title": "周末班过于集中",
-                    "detail": f"{name} 本周有 {max_wk} 个周末班次，建议分摊给其他同事",
-                    "action": "redistribute_weekend",
-                    "expected_saving_yuan": 0,
-                    "confidence": 0.80,
-                    "priority": "medium",
-                })
+                suggestions.append(
+                    {
+                        "type": "fairness",
+                        "title": "周末班过于集中",
+                        "detail": f"{name} 本周有 {max_wk} 个周末班次，建议分摊给其他同事",
+                        "action": "redistribute_weekend",
+                        "expected_saving_yuan": 0,
+                        "confidence": 0.80,
+                        "priority": "medium",
+                    }
+                )
 
         # 分析3：人力成本优化（兼职替换建议）
         fulltime_weekend_hours = 0.0
@@ -895,25 +868,25 @@ class SmartScheduleService:
                 if sched.id == shift.schedule_id and sched.schedule_date.weekday() >= 5:
                     emp = emp_map.get(shift.employee_id)
                     if emp and emp.employment_type == "regular":
-                        fulltime_weekend_hours += self._calc_shift_hours(
-                            shift.start_time, shift.end_time
-                        )
+                        fulltime_weekend_hours += self._calc_shift_hours(shift.start_time, shift.end_time)
                     break
 
         if fulltime_weekend_hours > 20:
             estimated_save_yuan = round(fulltime_weekend_hours * 15, 2)
-            suggestions.append({
-                "type": "cost_optimization",
-                "title": "周末可用兼职替换正式工",
-                "detail": (
-                    f"本周周末正式工累计 {fulltime_weekend_hours:.0f}h，"
-                    f"建议用兼职替换部分班次，预估月度可节省 ¥{estimated_save_yuan:.2f}"
-                ),
-                "action": "replace_with_parttime",
-                "expected_saving_yuan": estimated_save_yuan,
-                "confidence": 0.70,
-                "priority": "medium",
-            })
+            suggestions.append(
+                {
+                    "type": "cost_optimization",
+                    "title": "周末可用兼职替换正式工",
+                    "detail": (
+                        f"本周周末正式工累计 {fulltime_weekend_hours:.0f}h，"
+                        f"建议用兼职替换部分班次，预估月度可节省 ¥{estimated_save_yuan:.2f}"
+                    ),
+                    "action": "replace_with_parttime",
+                    "expected_saving_yuan": estimated_save_yuan,
+                    "confidence": 0.70,
+                    "priority": "medium",
+                }
+            )
 
         return suggestions
 
@@ -943,14 +916,11 @@ class SmartScheduleService:
         else:
             month_end = month.replace(month=month.month + 1, day=1) - timedelta(days=1)
 
-        stmt = (
-            select(Schedule)
-            .where(
-                and_(
-                    Schedule.store_id == store_id,
-                    Schedule.schedule_date >= month_start,
-                    Schedule.schedule_date <= month_end,
-                )
+        stmt = select(Schedule).where(
+            and_(
+                Schedule.store_id == store_id,
+                Schedule.schedule_date >= month_start,
+                Schedule.schedule_date <= month_end,
             )
         )
         result = await db.execute(stmt)
@@ -998,8 +968,7 @@ class SmartScheduleService:
 
         # 用工结构分析
         fulltime_hours = sum(
-            h for eid, h in emp_hours.items()
-            if emp_map.get(eid) and emp_map[eid].employment_type == "regular"
+            h for eid, h in emp_hours.items() if emp_map.get(eid) and emp_map[eid].employment_type == "regular"
         )
         parttime_hours = total_labor_hours - fulltime_hours
 
@@ -1012,28 +981,17 @@ class SmartScheduleService:
                 "total_overtime_hours": round(total_overtime, 1),
                 "estimated_labor_cost_yuan": round(estimated_labor_cost, 2),
                 "overtime_cost_yuan": round(overtime_cost, 2),
-                "overtime_cost_ratio": round(
-                    overtime_cost / estimated_labor_cost * 100, 1
-                ) if estimated_labor_cost > 0 else 0,
-                "avg_hours_per_employee": round(
-                    total_labor_hours / len(emp_hours), 1
-                ) if emp_hours else 0,
-                "fulltime_hours_ratio": round(
-                    fulltime_hours / total_labor_hours * 100, 1
-                ) if total_labor_hours > 0 else 0,
+                "overtime_cost_ratio": round(overtime_cost / estimated_labor_cost * 100, 1) if estimated_labor_cost > 0 else 0,
+                "avg_hours_per_employee": round(total_labor_hours / len(emp_hours), 1) if emp_hours else 0,
+                "fulltime_hours_ratio": round(fulltime_hours / total_labor_hours * 100, 1) if total_labor_hours > 0 else 0,
                 "employee_count": len(emp_hours),
                 "schedule_days": len(schedules),
             },
             "workforce_structure": {
                 "fulltime_hours": round(fulltime_hours, 1),
                 "parttime_hours": round(parttime_hours, 1),
-                "fulltime_count": sum(
-                    1 for e in emp_map.values() if e.employment_type == "regular"
-                ),
-                "parttime_count": sum(
-                    1 for e in emp_map.values()
-                    if e.employment_type in ("part_time", "parttime")
-                ),
+                "fulltime_count": sum(1 for e in emp_map.values() if e.employment_type == "regular"),
+                "parttime_count": sum(1 for e in emp_map.values() if e.employment_type in ("part_time", "parttime")),
             },
             "suggestions": [],
         }
@@ -1050,35 +1008,37 @@ class SmartScheduleService:
 
         # Fallback: 规则引擎建议
         if total_overtime > 20:
-            analysis_data["suggestions"].append({
-                "type": "cost_optimization",
-                "title": "加班工时偏高",
-                "detail": (
-                    f"本月加班 {total_overtime:.0f}h，加班费约 ¥{overtime_cost:.2f}，"
-                    f"建议增加兼职或调整排班密度以减少加班"
-                ),
-                "action": "reduce_overtime",
-                "expected_saving_yuan": round(overtime_cost * 0.5, 2),
-                "confidence": 0.75,
-                "priority": "high",
-            })
+            analysis_data["suggestions"].append(
+                {
+                    "type": "cost_optimization",
+                    "title": "加班工时偏高",
+                    "detail": (
+                        f"本月加班 {total_overtime:.0f}h，加班费约 ¥{overtime_cost:.2f}，"
+                        f"建议增加兼职或调整排班密度以减少加班"
+                    ),
+                    "action": "reduce_overtime",
+                    "expected_saving_yuan": round(overtime_cost * 0.5, 2),
+                    "confidence": 0.75,
+                    "priority": "high",
+                }
+            )
 
         if parttime_hours > 0 and fulltime_hours / total_labor_hours > 0.9 and total_labor_hours > 0:
-            analysis_data["suggestions"].append({
-                "type": "cost_optimization",
-                "title": "兼职工比例偏低",
-                "detail": "正式工工时占比超90%，周末高峰时段可增加兼职工降低人力成本",
-                "action": "increase_parttime_ratio",
-                "expected_saving_yuan": round(fulltime_hours * 0.1 * 15, 2),
-                "confidence": 0.65,
-                "priority": "medium",
-            })
+            analysis_data["suggestions"].append(
+                {
+                    "type": "cost_optimization",
+                    "title": "兼职工比例偏低",
+                    "detail": "正式工工时占比超90%，周末高峰时段可增加兼职工降低人力成本",
+                    "action": "increase_parttime_ratio",
+                    "expected_saving_yuan": round(fulltime_hours * 0.1 * 15, 2),
+                    "confidence": 0.65,
+                    "priority": "medium",
+                }
+            )
 
         return analysis_data
 
-    async def _get_ai_labor_analysis(
-        self, data: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+    async def _get_ai_labor_analysis(self, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """调用 LLM 分析人力成本效率"""
         system_prompt = """你是一位连锁餐饮人力成本效率分析专家。
 基于以下门店月度人力数据，给出深度分析和优化建议。
@@ -1160,12 +1120,14 @@ class SmartScheduleService:
                     sched_date = sched.schedule_date
                     break
 
-            emp_shifts[shift.employee_id].append({
-                "date": sched_date,
-                "start_time": shift.start_time,
-                "end_time": shift.end_time,
-                "shift_type": shift.shift_type,
-            })
+            emp_shifts[shift.employee_id].append(
+                {
+                    "date": sched_date,
+                    "start_time": shift.start_time,
+                    "end_time": shift.end_time,
+                    "shift_type": shift.shift_type,
+                }
+            )
 
         for emp_id, shift_list in emp_shifts.items():
             emp = emp_map.get(emp_id)
@@ -1181,48 +1143,54 @@ class SmartScheduleService:
 
                     # 未成年工夜班违规
                     if self._is_minor(emp):
-                        violations.append({
-                            "type": "violation",
-                            "title": f"【违法】未成年工 {emp.name} 被安排夜班",
-                            "description": (
-                                f"{emp.name}（未满18周岁）在 {s['date']} 被安排夜班"
-                                f"（{s['start_time']}~{s['end_time']}），"
-                                f"违反《劳动法》第64条，必须立即调整"
-                            ),
-                            "action": "remove_night_shift",
-                            "impact_yuan": None,
-                            "confidence": 1.0,
-                        })
+                        violations.append(
+                            {
+                                "type": "violation",
+                                "title": f"【违法】未成年工 {emp.name} 被安排夜班",
+                                "description": (
+                                    f"{emp.name}（未满18周岁）在 {s['date']} 被安排夜班"
+                                    f"（{s['start_time']}~{s['end_time']}），"
+                                    f"违反《劳动法》第64条，必须立即调整"
+                                ),
+                                "action": "remove_night_shift",
+                                "impact_yuan": None,
+                                "confidence": 1.0,
+                            }
+                        )
 
                     # 孕期员工夜班违规
                     prefs = emp.preferences or {}
                     if prefs.get("is_pregnant"):
-                        violations.append({
-                            "type": "violation",
-                            "title": f"【违法】孕期员工 {emp.name} 被安排夜班",
-                            "description": (
-                                f"{emp.name}（孕期）在 {s['date']} 被安排夜班"
-                                f"（{s['start_time']}~{s['end_time']}），"
-                                f"违反《劳动法》第61条，必须立即调整"
-                            ),
-                            "action": "remove_night_shift",
-                            "impact_yuan": None,
-                            "confidence": 1.0,
-                        })
+                        violations.append(
+                            {
+                                "type": "violation",
+                                "title": f"【违法】孕期员工 {emp.name} 被安排夜班",
+                                "description": (
+                                    f"{emp.name}（孕期）在 {s['date']} 被安排夜班"
+                                    f"（{s['start_time']}~{s['end_time']}），"
+                                    f"违反《劳动法》第61条，必须立即调整"
+                                ),
+                                "action": "remove_night_shift",
+                                "impact_yuan": None,
+                                "confidence": 1.0,
+                            }
+                        )
 
                     # 医疗限制员工夜班
                     if prefs.get("medical_restriction"):
-                        violations.append({
-                            "type": "violation",
-                            "title": f"【注意】医疗限制员工 {emp.name} 被安排夜班",
-                            "description": (
-                                f"{emp.name}（{prefs.get('medical_note', '医疗限制')}）"
-                                f"在 {s['date']} 被安排夜班，建议调整"
-                            ),
-                            "action": "remove_night_shift",
-                            "impact_yuan": None,
-                            "confidence": 0.95,
-                        })
+                        violations.append(
+                            {
+                                "type": "violation",
+                                "title": f"【注意】医疗限制员工 {emp.name} 被安排夜班",
+                                "description": (
+                                    f"{emp.name}（{prefs.get('medical_note', '医疗限制')}）"
+                                    f"在 {s['date']} 被安排夜班，建议调整"
+                                ),
+                                "action": "remove_night_shift",
+                                "impact_yuan": None,
+                                "confidence": 0.95,
+                            }
+                        )
 
             # ── 检查2：连续工作天数 ──
             work_dates = sorted(set(s["date"] for s in shift_list if s["date"]))
@@ -1237,40 +1205,39 @@ class SmartScheduleService:
                         current_streak = 1
 
                 if max_streak > MAX_CONSECUTIVE_DAYS:
-                    violations.append({
-                        "type": "violation",
-                        "title": f"【违规】{emp.name} 连续工作{max_streak}天",
-                        "description": (
-                            f"{emp.name} 连续工作 {max_streak} 天（上限 {MAX_CONSECUTIVE_DAYS} 天），"
-                            f"违反连续工作天数限制，需安排休息日"
-                        ),
-                        "action": "add_rest_day",
-                        "impact_yuan": None,
-                        "confidence": 1.0,
-                    })
+                    violations.append(
+                        {
+                            "type": "violation",
+                            "title": f"【违规】{emp.name} 连续工作{max_streak}天",
+                            "description": (
+                                f"{emp.name} 连续工作 {max_streak} 天（上限 {MAX_CONSECUTIVE_DAYS} 天），"
+                                f"违反连续工作天数限制，需安排休息日"
+                            ),
+                            "action": "add_rest_day",
+                            "impact_yuan": None,
+                            "confidence": 1.0,
+                        }
+                    )
 
             # ── 检查3：单日工时超上限 ──
             work_hour_type = emp.work_hour_type or "标准工时"
-            max_hours = (
-                MAX_DAILY_HOURS_COMPREHENSIVE
-                if work_hour_type == "综合工时"
-                else MAX_DAILY_HOURS
-            )
+            max_hours = MAX_DAILY_HOURS_COMPREHENSIVE if work_hour_type == "综合工时" else MAX_DAILY_HOURS
             for s in shift_list:
                 if s["start_time"] and s["end_time"]:
                     hours = self._calc_shift_hours(s["start_time"], s["end_time"])
                     if hours > max_hours:
-                        violations.append({
-                            "type": "violation",
-                            "title": f"【违规】{emp.name} 在 {s['date']} 工时超限",
-                            "description": (
-                                f"{emp.name} 在 {s['date']} 排班 {hours:.1f}h，"
-                                f"超过{work_hour_type}制上限 {max_hours}h"
-                            ),
-                            "action": "reduce_hours",
-                            "impact_yuan": None,
-                            "confidence": 1.0,
-                        })
+                        violations.append(
+                            {
+                                "type": "violation",
+                                "title": f"【违规】{emp.name} 在 {s['date']} 工时超限",
+                                "description": (
+                                    f"{emp.name} 在 {s['date']} 排班 {hours:.1f}h，" f"超过{work_hour_type}制上限 {max_hours}h"
+                                ),
+                                "action": "reduce_hours",
+                                "impact_yuan": None,
+                                "confidence": 1.0,
+                            }
+                        )
 
         return violations
 
@@ -1278,9 +1245,7 @@ class SmartScheduleService:
     # 内部方法：数据获取
     # ──────────────────────────────────────────────────────────
 
-    async def _get_shift_templates(
-        self, db: AsyncSession, brand_id: str, store_id: str
-    ) -> List[ShiftTemplate]:
+    async def _get_shift_templates(self, db: AsyncSession, brand_id: str, store_id: str) -> List[ShiftTemplate]:
         """获取班次模板（门店级优先，品牌级兜底）"""
         stmt = (
             select(ShiftTemplate)
@@ -1288,8 +1253,7 @@ class SmartScheduleService:
                 and_(
                     ShiftTemplate.brand_id == brand_id,
                     ShiftTemplate.is_active.is_(True),
-                    (ShiftTemplate.store_id == store_id)
-                    | ShiftTemplate.store_id.is_(None),
+                    (ShiftTemplate.store_id == store_id) | ShiftTemplate.store_id.is_(None),
                 )
             )
             .order_by(ShiftTemplate.sort_order, ShiftTemplate.start_time)
@@ -1297,9 +1261,7 @@ class SmartScheduleService:
         result = await db.execute(stmt)
         return list(result.scalars().all())
 
-    async def _get_store_employees(
-        self, db: AsyncSession, store_id: str
-    ) -> List[Employee]:
+    async def _get_store_employees(self, db: AsyncSession, store_id: str) -> List[Employee]:
         """获取门店所有在职员工"""
         stmt = (
             select(Employee)
@@ -1307,9 +1269,7 @@ class SmartScheduleService:
                 and_(
                     Employee.store_id == store_id,
                     Employee.is_active.is_(True),
-                    Employee.employment_status.in_(
-                        ["regular", "probation", "trial"]
-                    ),
+                    Employee.employment_status.in_(["regular", "probation", "trial"]),
                 )
             )
             .order_by(Employee.position, Employee.name)
@@ -1325,15 +1285,12 @@ class SmartScheduleService:
         end: date,
     ) -> List[LeaveRequest]:
         """获取指定日期范围内已批准的请假"""
-        stmt = (
-            select(LeaveRequest)
-            .where(
-                and_(
-                    LeaveRequest.store_id == store_id,
-                    LeaveRequest.status == LeaveRequestStatus.APPROVED,
-                    LeaveRequest.start_date <= end,
-                    LeaveRequest.end_date >= start,
-                )
+        stmt = select(LeaveRequest).where(
+            and_(
+                LeaveRequest.store_id == store_id,
+                LeaveRequest.status == LeaveRequestStatus.APPROVED,
+                LeaveRequest.start_date <= end,
+                LeaveRequest.end_date >= start,
             )
         )
         result = await db.execute(stmt)
@@ -1363,16 +1320,16 @@ class SmartScheduleService:
 
         shifts = []
         for schedule, shift in rows:
-            shifts.append({
-                "employee_id": shift.employee_id,
-                "date": schedule.schedule_date,
-                "shift_type": shift.shift_type,
-            })
+            shifts.append(
+                {
+                    "employee_id": shift.employee_id,
+                    "date": schedule.schedule_date,
+                    "shift_type": shift.shift_type,
+                }
+            )
         return shifts
 
-    async def _get_demand_forecast(
-        self, db: AsyncSession, store_id: str, target_date: date
-    ) -> Dict[str, int]:
+    async def _get_demand_forecast(self, db: AsyncSession, store_id: str, target_date: date) -> Dict[str, int]:
         """
         获取指定日期的人力需求预测。
         优先从 store_staffing_demands 表读取配置，
@@ -1381,14 +1338,11 @@ class SmartScheduleService:
         day_type = self._get_day_type(target_date)
 
         # 尝试从配置表获取
-        stmt = (
-            select(StoreStaffingDemand)
-            .where(
-                and_(
-                    StoreStaffingDemand.store_id == store_id,
-                    StoreStaffingDemand.day_type == day_type,
-                    StoreStaffingDemand.is_active.is_(True),
-                )
+        stmt = select(StoreStaffingDemand).where(
+            and_(
+                StoreStaffingDemand.store_id == store_id,
+                StoreStaffingDemand.day_type == day_type,
+                StoreStaffingDemand.is_active.is_(True),
             )
         )
         result = await db.execute(stmt)
@@ -1419,11 +1373,11 @@ class SmartScheduleService:
         if d in HOLIDAYS_2026:
             return "holiday"
         weekday = d.weekday()
-        if weekday < 4:      # 0=周一 ~ 3=周四
+        if weekday < 4:  # 0=周一 ~ 3=周四
             return "weekday"
-        elif weekday == 4:    # 周五
+        elif weekday == 4:  # 周五
             return "friday"
-        else:                 # 5=周六, 6=周日
+        else:  # 5=周六, 6=周日
             return "weekend"
 
     def _build_employee_tracker(
@@ -1507,9 +1461,7 @@ class SmartScheduleService:
 
         return tracker
 
-    def _get_available_employees_for_date(
-        self, tracker: Dict[str, Dict[str, Any]], target_date: date
-    ) -> List[Dict[str, Any]]:
+    def _get_available_employees_for_date(self, tracker: Dict[str, Dict[str, Any]], target_date: date) -> List[Dict[str, Any]]:
         """获取某日可排班的员工列表（排除请假、已达最大天数等）"""
         available = []
         for emp_id, t in tracker.items():
@@ -1526,13 +1478,9 @@ class SmartScheduleService:
             while check in scheduled:
                 streak += 1
                 check -= timedelta(days=1)
-            total_consecutive = streak + (
-                consecutive if streak > 0 and not scheduled else 0
-            )
+            total_consecutive = streak + (consecutive if streak > 0 and not scheduled else 0)
             # 加上从上周延续的连续天数（仅当本周第一个排班日连续时）
-            if streak == 0 and target_date == min(
-                (d for d in scheduled), default=target_date
-            ):
+            if streak == 0 and target_date == min((d for d in scheduled), default=target_date):
                 total_consecutive = consecutive
 
             # 重新计算：从 target_date-1 往前看实际连续
@@ -1555,23 +1503,25 @@ class SmartScheduleService:
                 continue
 
             emp = t["employee"]
-            available.append({
-                "employee_id": emp.id,
-                "employee_name": emp.name,
-                "position": emp.position or "waiter",
-                "employment_type": emp.employment_type or "regular",
-                "daily_wage_fen": emp.daily_wage_standard_fen or 0,
-                "skills": emp.skills or [],
-                "preferences": emp.preferences or {},
-                "consecutive_days": total_consecutive,
-                "weekly_hours": t["weekly_hours"],
-                "weekend_count": t["weekend_count"],
-                "is_minor": t["is_minor"],
-                "is_pregnant": t["is_pregnant"],
-                "has_medical_restriction": t["has_medical_restriction"],
-                "medical_note": t.get("medical_note", ""),
-                "work_hour_type": t.get("work_hour_type", "标准工时"),
-            })
+            available.append(
+                {
+                    "employee_id": emp.id,
+                    "employee_name": emp.name,
+                    "position": emp.position or "waiter",
+                    "employment_type": emp.employment_type or "regular",
+                    "daily_wage_fen": emp.daily_wage_standard_fen or 0,
+                    "skills": emp.skills or [],
+                    "preferences": emp.preferences or {},
+                    "consecutive_days": total_consecutive,
+                    "weekly_hours": t["weekly_hours"],
+                    "weekend_count": t["weekend_count"],
+                    "is_minor": t["is_minor"],
+                    "is_pregnant": t["is_pregnant"],
+                    "has_medical_restriction": t["has_medical_restriction"],
+                    "medical_note": t.get("medical_note", ""),
+                    "work_hour_type": t.get("work_hour_type", "标准工时"),
+                }
+            )
 
         return available
 
@@ -1618,19 +1568,17 @@ class SmartScheduleService:
             filled = 0
 
             # 筛选该岗位的候选人
-            candidates = [
-                e for e in available
-                if e["employee_id"] not in assigned_ids
-                and self._matches_position(e, position)
-            ]
+            candidates = [e for e in available if e["employee_id"] not in assigned_ids and self._matches_position(e, position)]
 
             # 按公平性排序
-            candidates.sort(key=lambda e: (
-                e["consecutive_days"],           # 连续天数少的优先
-                e["weekend_count"],              # 周末班少的优先
-                e["weekly_hours"],               # 本周工时少的优先
-                0 if e["position"] == position else 1,  # 精确匹配优先
-            ))
+            candidates.sort(
+                key=lambda e: (
+                    e["consecutive_days"],  # 连续天数少的优先
+                    e["weekend_count"],  # 周末班少的优先
+                    e["weekly_hours"],  # 本周工时少的优先
+                    0 if e["position"] == position else 1,  # 精确匹配优先
+                )
+            )
 
             # 记录因劳动法约束被跳过的人数，用于 unresolved 原因分析
             skipped_by_constraint: Dict[str, int] = defaultdict(int)
@@ -1642,9 +1590,7 @@ class SmartScheduleService:
                 emp_id = candidate["employee_id"]
 
                 # 选择班次
-                shift_type, start_t, end_t, template_id = self._pick_shift(
-                    template_map, position, current_date
-                )
+                shift_type, start_t, end_t, template_id = self._pick_shift(template_map, position, current_date)
 
                 # ── 劳动法强制约束检查（违反则跳过，不可覆盖） ──
 
@@ -1653,9 +1599,7 @@ class SmartScheduleService:
                 if is_night:
                     restriction_reason = self._is_restricted_from_night(candidate)
                     if restriction_reason:
-                        warnings.append(
-                            f"{candidate['employee_name']}({restriction_reason})不可安排夜班，已自动跳过"
-                        )
+                        warnings.append(f"{candidate['employee_name']}({restriction_reason})不可安排夜班，已自动跳过")
                         skipped_by_constraint[restriction_reason] += 1
                         continue
 
@@ -1663,11 +1607,7 @@ class SmartScheduleService:
                 hours = self._calc_shift_hours(start_t, end_t)
 
                 # 约束2：每日工时上限 — 标准工时制不超过8h，综合工时制不超过10h
-                max_hours = (
-                    MAX_DAILY_HOURS_COMPREHENSIVE
-                    if candidate.get("work_hour_type") == "综合工时"
-                    else MAX_DAILY_HOURS
-                )
+                max_hours = MAX_DAILY_HOURS_COMPREHENSIVE if candidate.get("work_hour_type") == "综合工时" else MAX_DAILY_HOURS
                 if hours > max_hours:
                     warnings.append(
                         f"{candidate['employee_name']} 班次 {hours:.1f}h 超过"
@@ -1702,17 +1642,19 @@ class SmartScheduleService:
                 if candidate["daily_wage_fen"]:
                     cost_fen = int(candidate["daily_wage_fen"] * hours / 8)
 
-                assignments.append({
-                    "employee_id": emp_id,
-                    "employee_name": candidate["employee_name"],
-                    "position": position,
-                    "shift_type": shift_type,
-                    "shift_template_id": template_id,
-                    "start_time": start_t.strftime("%H:%M") if isinstance(start_t, time) else start_t,
-                    "end_time": end_t.strftime("%H:%M") if isinstance(end_t, time) else end_t,
-                    "hours": hours,
-                    "cost_fen": cost_fen,
-                })
+                assignments.append(
+                    {
+                        "employee_id": emp_id,
+                        "employee_name": candidate["employee_name"],
+                        "position": position,
+                        "shift_type": shift_type,
+                        "shift_template_id": template_id,
+                        "start_time": start_t.strftime("%H:%M") if isinstance(start_t, time) else start_t,
+                        "end_time": end_t.strftime("%H:%M") if isinstance(end_t, time) else end_t,
+                        "hours": hours,
+                        "cost_fen": cost_fen,
+                    }
+                )
                 assigned_ids.add(emp_id)
                 filled += 1
 
@@ -1720,13 +1662,9 @@ class SmartScheduleService:
             if filled < needed:
                 gap = needed - filled
                 day_cn = DAY_NAMES_CN[current_date.weekday()]
-                reason_parts = [
-                    f"{current_date} ({day_cn}) 缺 {gap} 名{self._position_cn(position)}"
-                ]
+                reason_parts = [f"{current_date} ({day_cn}) 缺 {gap} 名{self._position_cn(position)}"]
                 if skipped_by_constraint:
-                    constraint_details = "、".join(
-                        f"{reason}{count}人" for reason, count in skipped_by_constraint.items()
-                    )
+                    constraint_details = "、".join(f"{reason}{count}人" for reason, count in skipped_by_constraint.items())
                     reason_parts.append(f"（因劳动法约束跳过: {constraint_details}）")
                 unresolved.append("".join(reason_parts))
 
@@ -1748,9 +1686,7 @@ class SmartScheduleService:
             return True
         return False
 
-    def _build_template_map(
-        self, templates: List[Any]
-    ) -> Dict[str, Dict[str, Any]]:
+    def _build_template_map(self, templates: List[Any]) -> Dict[str, Dict[str, Any]]:
         """构建班次模板索引：code → template 信息"""
         result = {}
         for t in templates:
@@ -1941,9 +1877,7 @@ class SmartScheduleService:
             end_minutes += 24 * 60
         return (end_minutes - start_minutes) / 60
 
-    def _calculate_fairness_score(
-        self, tracker: Dict[str, Dict[str, Any]], employees: List[Employee]
-    ) -> float:
+    def _calculate_fairness_score(self, tracker: Dict[str, Dict[str, Any]], employees: List[Employee]) -> float:
         """
         计算公平性得分（0~1）。
         基于本周各员工排班天数和周末班次的标准差。
@@ -1969,15 +1903,13 @@ class SmartScheduleService:
         # 标准差归一化
         avg_days = sum(days_list) / len(days_list)
         variance = sum((d - avg_days) ** 2 for d in days_list) / len(days_list)
-        std_days = variance ** 0.5
+        std_days = variance**0.5
 
         # 得分：std=0 → 1.0, std=3 → 0.0
         score = max(0.0, 1.0 - std_days / 3.0)
         return round(score, 2)
 
-    def _check_consecutive_warnings(
-        self, tracker: Dict[str, Dict[str, Any]], week_end: date
-    ) -> List[str]:
+    def _check_consecutive_warnings(self, tracker: Dict[str, Dict[str, Any]], week_end: date) -> List[str]:
         """检查本周末连续工作天数，对下周给出预警"""
         warnings = []
         for emp_id, t in tracker.items():

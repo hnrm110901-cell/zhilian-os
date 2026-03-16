@@ -15,29 +15,41 @@
   供应链风险扫描（SupplyChainRiskAgent）
   驾驶舱汇总
 """
+
+import sys
 import uuid
-from datetime import datetime, date
-from typing import Optional
+from datetime import date, datetime
 from decimal import Decimal
+from pathlib import Path as _Path
+from typing import Optional
 
-from fastapi import APIRouter, Depends, Query, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
+from sqlalchemy import and_, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, func, desc
-
 from src.core.database import get_db
 from src.core.dependencies import get_current_user
-from src.models.user import User
 from src.models.supplier_agent import (
-    SupplierProfile, MaterialCatalog,
-    SupplierQuote, SupplierContract, SupplierDelivery,
-    PriceComparison, SupplierEvaluation, SourcingRecommendation,
-    ContractAlert, SupplyRiskEvent, SupplierAgentLog,
-    SupplierTierEnum, QuoteStatusEnum, ContractStatusEnum,
-    DeliveryStatusEnum, RiskLevelEnum, AlertTypeEnum, SupplierAgentTypeEnum,
+    AlertTypeEnum,
+    ContractAlert,
+    ContractStatusEnum,
+    DeliveryStatusEnum,
+    MaterialCatalog,
+    PriceComparison,
+    QuoteStatusEnum,
+    RiskLevelEnum,
+    SourcingRecommendation,
+    SupplierAgentLog,
+    SupplierAgentTypeEnum,
+    SupplierContract,
+    SupplierDelivery,
+    SupplierEvaluation,
+    SupplierProfile,
+    SupplierQuote,
+    SupplierTierEnum,
+    SupplyRiskEvent,
 )
-import sys
-from pathlib import Path as _Path
+from src.models.user import User
 
 
 def _load_supplier_agents():
@@ -48,135 +60,142 @@ def _load_supplier_agents():
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
     from packages.agents.supplier.src.agent import (
-        PriceComparisonAgent, SupplierRatingAgent, AutoSourcingAgent,
-        ContractRiskAgent, SupplyChainRiskAgent,
+        AutoSourcingAgent,
+        ContractRiskAgent,
+        PriceComparisonAgent,
+        SupplierRatingAgent,
+        SupplyChainRiskAgent,
     )
+
     return PriceComparisonAgent, SupplierRatingAgent, AutoSourcingAgent, ContractRiskAgent, SupplyChainRiskAgent
 
 
-_PriceComparisonAgent, _SupplierRatingAgent, _AutoSourcingAgent, \
-    _ContractRiskAgent, _SupplyChainRiskAgent = _load_supplier_agents()
+_PriceComparisonAgent, _SupplierRatingAgent, _AutoSourcingAgent, _ContractRiskAgent, _SupplyChainRiskAgent = (
+    _load_supplier_agents()
+)
 
 router = APIRouter(prefix="/api/v1/supplier-agent", tags=["supplier-agent"])
 
-_price_agent     = _PriceComparisonAgent()
-_rating_agent    = _SupplierRatingAgent()
-_sourcing_agent  = _AutoSourcingAgent()
-_contract_agent  = _ContractRiskAgent()
-_risk_agent      = _SupplyChainRiskAgent()
+_price_agent = _PriceComparisonAgent()
+_rating_agent = _SupplierRatingAgent()
+_sourcing_agent = _AutoSourcingAgent()
+_contract_agent = _ContractRiskAgent()
+_risk_agent = _SupplyChainRiskAgent()
 
 
 # ──────────── Schemas ─────────────────────────────────────────────────────────
 
+
 class SupplierProfileCreateReq(BaseModel):
-    supplier_id:       str
-    brand_id:          str
-    tier:              str = "approved"
-    category_tags:     list[str] = []
-    region_coverage:   list[str] = []
-    min_order_yuan:    float = 0
-    internal_notes:    Optional[str] = None
+    supplier_id: str
+    brand_id: str
+    tier: str = "approved"
+    category_tags: list[str] = []
+    region_coverage: list[str] = []
+    min_order_yuan: float = 0
+    internal_notes: Optional[str] = None
 
 
 class SupplierProfileUpdateReq(BaseModel):
-    tier:              Optional[str] = None
-    certified:         Optional[bool] = None
-    cert_expiry:       Optional[str] = None
-    category_tags:     Optional[list[str]] = None
-    min_order_yuan:    Optional[float] = None
-    risk_flags:        Optional[list[str]] = None
-    internal_notes:    Optional[str] = None
+    tier: Optional[str] = None
+    certified: Optional[bool] = None
+    cert_expiry: Optional[str] = None
+    category_tags: Optional[list[str]] = None
+    min_order_yuan: Optional[float] = None
+    risk_flags: Optional[list[str]] = None
+    internal_notes: Optional[str] = None
 
 
 class MaterialCatalogCreateReq(BaseModel):
-    brand_id:          str
-    material_code:     str
-    material_name:     str
-    spec:              Optional[str] = None
-    base_unit:         str = "kg"
-    category:          Optional[str] = None
+    brand_id: str
+    material_code: str
+    material_name: str
+    spec: Optional[str] = None
+    base_unit: str = "kg"
+    category: Optional[str] = None
     benchmark_price_yuan: float = 0
     safety_stock_days: int = 3
-    reorder_point_kg:  float = 0
+    reorder_point_kg: float = 0
 
 
 class QuoteCreateReq(BaseModel):
-    brand_id:          str
-    supplier_id:       str
-    material_id:       Optional[str] = None
-    material_name:     str
-    spec:              Optional[str] = None
-    unit:              str = "kg"
-    quantity:          float
-    unit_price_yuan:   float
-    valid_until:       Optional[str] = None
-    delivery_days:     int = 3
-    min_order_qty:     float = 0
-    notes:             Optional[str] = None
-    store_id:          Optional[str] = None
+    brand_id: str
+    supplier_id: str
+    material_id: Optional[str] = None
+    material_name: str
+    spec: Optional[str] = None
+    unit: str = "kg"
+    quantity: float
+    unit_price_yuan: float
+    valid_until: Optional[str] = None
+    delivery_days: int = 3
+    min_order_qty: float = 0
+    notes: Optional[str] = None
+    store_id: Optional[str] = None
 
 
 class ContractCreateReq(BaseModel):
-    brand_id:          str
-    supplier_id:       str
-    contract_no:       str
-    contract_name:     Optional[str] = None
-    start_date:        str
-    end_date:          str
-    auto_renew:        bool = False
+    brand_id: str
+    supplier_id: str
+    contract_no: str
+    contract_name: Optional[str] = None
+    start_date: str
+    end_date: str
+    auto_renew: bool = False
     renewal_notice_days: int = 30
     annual_value_yuan: float = 0
-    payment_terms:     str = "net30"
+    payment_terms: str = "net30"
     delivery_guarantee: bool = False
     price_lock_months: int = 0
-    penalty_clause:    bool = False
+    penalty_clause: bool = False
     covered_categories: list[str] = []
 
 
 class DeliveryCreateReq(BaseModel):
-    brand_id:          str
-    store_id:          str
-    supplier_id:       str
+    brand_id: str
+    store_id: str
+    supplier_id: str
     purchase_order_id: Optional[str] = None
-    promised_date:     str
-    ordered_qty:       float
-    received_qty:      float = 0
-    rejected_qty:      float = 0
-    reject_reason:     Optional[str] = None
-    quality_score:     Optional[float] = None
-    freshness_ok:      Optional[bool] = None
-    notes:             Optional[str] = None
+    promised_date: str
+    ordered_qty: float
+    received_qty: float = 0
+    rejected_qty: float = 0
+    reject_reason: Optional[str] = None
+    quality_score: Optional[float] = None
+    freshness_ok: Optional[bool] = None
+    notes: Optional[str] = None
 
 
 class PriceCompareReq(BaseModel):
-    brand_id:    str
+    brand_id: str
     material_id: str
     required_qty: float
-    store_id:    Optional[str] = None
+    store_id: Optional[str] = None
 
 
 class RatingReq(BaseModel):
-    brand_id:       str
-    supplier_id:    str
-    eval_period:    str          # "2026-03"
-    service_score:  Optional[float] = None
+    brand_id: str
+    supplier_id: str
+    eval_period: str  # "2026-03"
+    service_score: Optional[float] = None
 
 
 class SourcingReq(BaseModel):
-    brand_id:       str
-    material_id:    str
-    required_qty:   float
-    needed_by_date: str          # "2026-03-20"
-    store_id:       Optional[str] = None
-    trigger:        str = "manual"
+    brand_id: str
+    material_id: str
+    required_qty: float
+    needed_by_date: str  # "2026-03-20"
+    store_id: Optional[str] = None
+    trigger: str = "manual"
 
 
 class AlertResolveReq(BaseModel):
     resolved_by: str
-    note:        Optional[str] = None
+    note: Optional[str] = None
 
 
 # ──────────── 供应商档案 ──────────────────────────────────────────────────────
+
 
 @router.post("/profiles", summary="创建供应商档案")
 async def create_profile(
@@ -262,6 +281,7 @@ async def update_profile(
 
 # ──────────── 物料目录 ────────────────────────────────────────────────────────
 
+
 @router.post("/materials", summary="创建物料目录")
 async def create_material(
     req: MaterialCatalogCreateReq,
@@ -295,9 +315,7 @@ async def list_materials(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    q = select(MaterialCatalog).where(
-        and_(MaterialCatalog.brand_id == brand_id, MaterialCatalog.is_active == True)
-    )
+    q = select(MaterialCatalog).where(and_(MaterialCatalog.brand_id == brand_id, MaterialCatalog.is_active == True))
     if category:
         q = q.where(MaterialCatalog.category == category)
     result = await db.execute(q.order_by(MaterialCatalog.category, MaterialCatalog.material_name))
@@ -322,6 +340,7 @@ async def list_materials(
 
 
 # ──────────── 报价管理 ────────────────────────────────────────────────────────
+
 
 @router.post("/quotes", summary="提交供应商报价")
 async def create_quote(
@@ -392,6 +411,7 @@ async def list_quotes(
 
 
 # ──────────── 合同管理 ────────────────────────────────────────────────────────
+
 
 @router.post("/contracts", summary="创建供应商合同")
 async def create_contract(
@@ -477,6 +497,7 @@ async def activate_contract(
 
 # ──────────── 收货记录 ────────────────────────────────────────────────────────
 
+
 @router.post("/deliveries", summary="记录收货")
 async def create_delivery(
     req: DeliveryCreateReq,
@@ -524,6 +545,7 @@ async def create_delivery(
 
 
 # ──────────── Agent 接口 ──────────────────────────────────────────────────────
+
 
 @router.post("/agents/price-compare", summary="[Agent] 多供应商比价")
 async def agent_price_compare(
@@ -607,6 +629,7 @@ async def agent_scan_supply_risk(
 
 # ──────────── 预警管理 ────────────────────────────────────────────────────────
 
+
 @router.get("/alerts", summary="查询供应商预警列表")
 async def list_alerts(
     brand_id: str = Query(...),
@@ -616,18 +639,14 @@ async def list_alerts(
     current_user: User = Depends(get_current_user),
 ):
     # 合同预警
-    cq = select(ContractAlert).where(
-        and_(ContractAlert.brand_id == brand_id, ContractAlert.is_resolved == is_resolved)
-    )
+    cq = select(ContractAlert).where(and_(ContractAlert.brand_id == brand_id, ContractAlert.is_resolved == is_resolved))
     if risk_level:
         cq = cq.where(ContractAlert.risk_level == RiskLevelEnum(risk_level))
     c_result = await db.execute(cq.order_by(desc(ContractAlert.created_at)).limit(50))
     contract_alerts = c_result.scalars().all()
 
     # 供应链风险
-    rq = select(SupplyRiskEvent).where(
-        and_(SupplyRiskEvent.brand_id == brand_id, SupplyRiskEvent.is_resolved == is_resolved)
-    )
+    rq = select(SupplyRiskEvent).where(and_(SupplyRiskEvent.brand_id == brand_id, SupplyRiskEvent.is_resolved == is_resolved))
     if risk_level:
         rq = rq.where(SupplyRiskEvent.risk_level == RiskLevelEnum(risk_level))
     r_result = await db.execute(rq.order_by(desc(SupplyRiskEvent.created_at)).limit(50))
@@ -684,6 +703,7 @@ async def resolve_contract_alert(
 
 # ──────────── 寻源推荐管理 ───────────────────────────────────────────────────
 
+
 @router.get("/sourcing-recommendations", summary="查询寻源推荐列表")
 async def list_sourcing_recommendations(
     brand_id: str = Query(...),
@@ -691,10 +711,12 @@ async def list_sourcing_recommendations(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    q = select(SourcingRecommendation).where(
-        and_(SourcingRecommendation.brand_id == brand_id,
-             SourcingRecommendation.status == status)
-    ).order_by(desc(SourcingRecommendation.created_at)).limit(50)
+    q = (
+        select(SourcingRecommendation)
+        .where(and_(SourcingRecommendation.brand_id == brand_id, SourcingRecommendation.status == status))
+        .order_by(desc(SourcingRecommendation.created_at))
+        .limit(50)
+    )
     result = await db.execute(q)
     recs = result.scalars().all()
     return {
@@ -737,6 +759,7 @@ async def accept_sourcing_recommendation(
 
 # ──────────── 驾驶舱 ─────────────────────────────────────────────────────────
 
+
 @router.get("/dashboard", summary="供应商管理驾驶舱")
 async def get_dashboard(
     brand_id: str = Query(...),
@@ -757,19 +780,26 @@ async def get_dashboard(
     # 活跃合同数 & 即将到期（30天内）
     contract_result = await db.execute(
         select(func.count(SupplierContract.id)).where(
-            and_(SupplierContract.brand_id == brand_id,
-                 SupplierContract.status == ContractStatusEnum.ACTIVE)
+            and_(SupplierContract.brand_id == brand_id, SupplierContract.status == ContractStatusEnum.ACTIVE)
         )
     )
     active_contracts = contract_result.scalar() or 0
 
     expiring_result = await db.execute(
         select(func.count(SupplierContract.id)).where(
-            and_(SupplierContract.brand_id == brand_id,
-                 SupplierContract.status.in_([ContractStatusEnum.ACTIVE, ContractStatusEnum.EXPIRING]),
-                 SupplierContract.end_date <= today.replace(day=today.day + 30)
-                 if today.day <= 1 else SupplierContract.end_date <= date(today.year, today.month, today.day + 30)
-                 if today.day + 30 <= 28 else SupplierContract.end_date >= today)
+            and_(
+                SupplierContract.brand_id == brand_id,
+                SupplierContract.status.in_([ContractStatusEnum.ACTIVE, ContractStatusEnum.EXPIRING]),
+                (
+                    SupplierContract.end_date <= today.replace(day=today.day + 30)
+                    if today.day <= 1
+                    else (
+                        SupplierContract.end_date <= date(today.year, today.month, today.day + 30)
+                        if today.day + 30 <= 28
+                        else SupplierContract.end_date >= today
+                    )
+                ),
+            )
         )
     )
 
@@ -788,16 +818,14 @@ async def get_dashboard(
     # 待处理寻源推荐
     pending_sourcing_result = await db.execute(
         select(func.count(SourcingRecommendation.id)).where(
-            and_(SourcingRecommendation.brand_id == brand_id,
-                 SourcingRecommendation.status == "pending")
+            and_(SourcingRecommendation.brand_id == brand_id, SourcingRecommendation.status == "pending")
         )
     )
 
     # 本月累计节省¥
     saving_result = await db.execute(
         select(func.sum(PriceComparison.estimated_saving_yuan)).where(
-            and_(PriceComparison.brand_id == brand_id,
-                 PriceComparison.comparison_date >= date(today.year, today.month, 1))
+            and_(PriceComparison.brand_id == brand_id, PriceComparison.comparison_date >= date(today.year, today.month, 1))
         )
     )
     monthly_saving = float(saving_result.scalar() or 0)

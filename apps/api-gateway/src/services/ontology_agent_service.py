@@ -9,22 +9,23 @@ OntologyAgent Service — 本体知识智能（Sprint 6）
 
 定位：数据治理的自动巡检员，确保系统知识库的完整性和准确性
 """
+
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, List
+from typing import List, Optional
 
-from sqlalchemy import select, func, and_, case
+from sqlalchemy import and_, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from src.models.bom import BOMItem, BOMTemplate
 from src.models.dish import Dish, DishCategory
-from src.models.order import Order, OrderItem
 from src.models.inventory import InventoryItem
-from src.models.bom import BOMTemplate, BOMItem
+from src.models.order import Order, OrderItem
 
 logger = logging.getLogger(__name__)
 
 
 # ── 纯函数 ──────────────────────────────────────────────────────
+
 
 def compute_knowledge_coverage(
     total_entities: int,
@@ -84,11 +85,7 @@ def compute_ontology_health_score(
 
     权重：菜品40% + BOM35% + 食材25%
     """
-    score = (
-        dish_coverage * 100 * 0.40
-        + bom_coverage * 100 * 0.35
-        + inventory_coverage * 100 * 0.25
-    )
+    score = dish_coverage * 100 * 0.40 + bom_coverage * 100 * 0.35 + inventory_coverage * 100 * 0.25
     return round(min(max(score, 0), 100), 1)
 
 
@@ -106,67 +103,87 @@ class OntologyAgentService:
         返回：实体统计 + 各维度覆盖率 + 健康评分 + 数据质量等级
         """
         # 菜品覆盖率（有价格+有分类=完整）
-        dish_total = await db.scalar(
-            select(func.count(Dish.id)).where(
-                Dish.store_id == store_id,
-                Dish.is_available.is_(True),
+        dish_total = (
+            await db.scalar(
+                select(func.count(Dish.id)).where(
+                    Dish.store_id == store_id,
+                    Dish.is_available.is_(True),
+                )
             )
-        ) or 0
+            or 0
+        )
 
-        dish_complete = await db.scalar(
-            select(func.count(Dish.id)).where(
-                Dish.store_id == store_id,
-                Dish.is_available.is_(True),
-                Dish.price.isnot(None),
-                Dish.category_id.isnot(None),
+        dish_complete = (
+            await db.scalar(
+                select(func.count(Dish.id)).where(
+                    Dish.store_id == store_id,
+                    Dish.is_available.is_(True),
+                    Dish.price.isnot(None),
+                    Dish.category_id.isnot(None),
+                )
             )
-        ) or 0
+            or 0
+        )
 
         dish_coverage = compute_knowledge_coverage(dish_total, dish_complete)
 
         # BOM覆盖率（有BOM模板的菜品占比）
-        dishes_with_bom = await db.scalar(
-            select(func.count(func.distinct(BOMTemplate.dish_id))).where(
-                BOMTemplate.store_id == store_id,
-                BOMTemplate.is_active.is_(True),
+        dishes_with_bom = (
+            await db.scalar(
+                select(func.count(func.distinct(BOMTemplate.dish_id))).where(
+                    BOMTemplate.store_id == store_id,
+                    BOMTemplate.is_active.is_(True),
+                )
             )
-        ) or 0
+            or 0
+        )
 
         bom_coverage = compute_knowledge_coverage(dish_total, dishes_with_bom)
 
         # 食材覆盖率（有单位成本的食材占比）
-        inv_total = await db.scalar(
-            select(func.count(InventoryItem.id)).where(
-                InventoryItem.store_id == store_id,
+        inv_total = (
+            await db.scalar(
+                select(func.count(InventoryItem.id)).where(
+                    InventoryItem.store_id == store_id,
+                )
             )
-        ) or 0
+            or 0
+        )
 
-        inv_complete = await db.scalar(
-            select(func.count(InventoryItem.id)).where(
-                InventoryItem.store_id == store_id,
-                InventoryItem.unit_cost.isnot(None),
-                InventoryItem.unit.isnot(None),
+        inv_complete = (
+            await db.scalar(
+                select(func.count(InventoryItem.id)).where(
+                    InventoryItem.store_id == store_id,
+                    InventoryItem.unit_cost.isnot(None),
+                    InventoryItem.unit.isnot(None),
+                )
             )
-        ) or 0
+            or 0
+        )
 
         inv_coverage = compute_knowledge_coverage(inv_total, inv_complete)
 
         # BOM关系密度
-        bom_item_count = await db.scalar(
-            select(func.count(BOMItem.id))
-            .join(BOMTemplate, BOMTemplate.id == BOMItem.bom_id)
-            .where(
-                BOMTemplate.store_id == store_id,
-                BOMTemplate.is_active.is_(True),
+        bom_item_count = (
+            await db.scalar(
+                select(func.count(BOMItem.id))
+                .join(BOMTemplate, BOMTemplate.id == BOMItem.bom_id)
+                .where(
+                    BOMTemplate.store_id == store_id,
+                    BOMTemplate.is_active.is_(True),
+                )
             )
-        ) or 0
+            or 0
+        )
 
         total_entities = dish_total + inv_total
         relationship_density = compute_relationship_density(bom_item_count, total_entities)
 
         # 健康评分
         health_score = compute_ontology_health_score(
-            dish_coverage, bom_coverage, inv_coverage,
+            dish_coverage,
+            bom_coverage,
+            inv_coverage,
         )
         quality = classify_data_quality(health_score / 100)
 
@@ -204,17 +221,17 @@ class OntologyAgentService:
                 DishCategory.name,
                 func.count(Dish.id),
             )
-            .outerjoin(Dish, and_(
-                Dish.category_id == DishCategory.id,
-                Dish.is_available.is_(True),
-            ))
+            .outerjoin(
+                Dish,
+                and_(
+                    Dish.category_id == DishCategory.id,
+                    Dish.is_available.is_(True),
+                ),
+            )
             .where(DishCategory.store_id == store_id)
             .group_by(DishCategory.name)
         )
-        dish_distribution = {
-            (row[0] or "未分类"): row[1]
-            for row in dish_by_cat.all()
-        }
+        dish_distribution = {(row[0] or "未分类"): row[1] for row in dish_by_cat.all()}
 
         # 食材按类别分布
         inv_by_cat = await db.execute(
@@ -225,24 +242,24 @@ class OntologyAgentService:
             .where(InventoryItem.store_id == store_id)
             .group_by(InventoryItem.category)
         )
-        inv_distribution = {
-            (row[0] or "未分类"): row[1]
-            for row in inv_by_cat.all()
-        }
+        inv_distribution = {(row[0] or "未分类"): row[1] for row in inv_by_cat.all()}
 
         # 孤立菜品（有菜品但没BOM）
-        orphan_dishes = await db.scalar(
-            select(func.count(Dish.id)).where(
-                Dish.store_id == store_id,
-                Dish.is_available.is_(True),
-                ~Dish.id.in_(
-                    select(BOMTemplate.dish_id).where(
-                        BOMTemplate.store_id == store_id,
-                        BOMTemplate.is_active.is_(True),
-                    )
-                ),
+        orphan_dishes = (
+            await db.scalar(
+                select(func.count(Dish.id)).where(
+                    Dish.store_id == store_id,
+                    Dish.is_available.is_(True),
+                    ~Dish.id.in_(
+                        select(BOMTemplate.dish_id).where(
+                            BOMTemplate.store_id == store_id,
+                            BOMTemplate.is_active.is_(True),
+                        )
+                    ),
+                )
             )
-        ) or 0
+            or 0
+        )
 
         return {
             "dish_by_category": dish_distribution,
@@ -274,13 +291,15 @@ class OntologyAgentService:
             .limit(limit)
         )
         for row in no_price.all():
-            issues.append({
-                "entity_type": "dish",
-                "entity_id": str(row[0]),
-                "entity_name": row[1],
-                "issue": "missing_price",
-                "severity": "high",
-            })
+            issues.append(
+                {
+                    "entity_type": "dish",
+                    "entity_id": str(row[0]),
+                    "entity_name": row[1],
+                    "issue": "missing_price",
+                    "severity": "high",
+                }
+            )
 
         # 缺单位成本的食材
         no_cost = await db.execute(
@@ -292,13 +311,15 @@ class OntologyAgentService:
             .limit(limit)
         )
         for row in no_cost.all():
-            issues.append({
-                "entity_type": "inventory_item",
-                "entity_id": str(row[0]),
-                "entity_name": row[1],
-                "issue": "missing_unit_cost",
-                "severity": "medium",
-            })
+            issues.append(
+                {
+                    "entity_type": "inventory_item",
+                    "entity_id": str(row[0]),
+                    "entity_name": row[1],
+                    "issue": "missing_unit_cost",
+                    "severity": "medium",
+                }
+            )
 
         # 空BOM模板（有模板但无明细项）
         empty_bom = await db.execute(
@@ -306,20 +327,20 @@ class OntologyAgentService:
             .where(
                 BOMTemplate.store_id == store_id,
                 BOMTemplate.is_active.is_(True),
-                ~BOMTemplate.id.in_(
-                    select(func.distinct(BOMItem.bom_id))
-                ),
+                ~BOMTemplate.id.in_(select(func.distinct(BOMItem.bom_id))),
             )
             .limit(limit)
         )
         for row in empty_bom.all():
-            issues.append({
-                "entity_type": "bom_template",
-                "entity_id": str(row[0]),
-                "entity_name": f"BOM for dish {row[1]}",
-                "issue": "empty_bom_no_items",
-                "severity": "high",
-            })
+            issues.append(
+                {
+                    "entity_type": "bom_template",
+                    "entity_id": str(row[0]),
+                    "entity_name": f"BOM for dish {row[1]}",
+                    "issue": "empty_bom_no_items",
+                    "severity": "high",
+                }
+            )
 
         return issues
 

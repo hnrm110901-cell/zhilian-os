@@ -1,11 +1,12 @@
 """
 跨店洞察 API
 """
+
 from datetime import date, timedelta
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
@@ -45,9 +46,7 @@ async def _fetch_store_metric(
     store_ids = [r.store_id for r in rows]
     names = {}
     if store_ids:
-        name_result = await db.execute(
-            select(Store.id, Store.name).where(Store.id.in_(store_ids))
-        )
+        name_result = await db.execute(select(Store.id, Store.name).where(Store.id.in_(store_ids)))
         names = {r.id: r.name for r in name_result.all()}
 
     return [
@@ -131,7 +130,10 @@ async def period_comparison(
         if store_ids:
             nr = await db.execute(select(Store.id, Store.name).where(Store.id.in_(store_ids)))
             names = {r.id: r.name for r in nr.all()}
-        return [{"store_id": r.store_id, "store_name": names.get(r.store_id, r.store_id), "value": float(r.value or 0)} for r in rows]
+        return [
+            {"store_id": r.store_id, "store_name": names.get(r.store_id, r.store_id), "value": float(r.value or 0)}
+            for r in rows
+        ]
 
     current_data = await fetch_range(current_start, today)
     previous_data = await fetch_range(previous_start, previous_end)

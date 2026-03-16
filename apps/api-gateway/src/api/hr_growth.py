@@ -2,36 +2,48 @@
 HR Growth API — 员工成长旅程
 技能矩阵 · 职业路径 · 里程碑 · 成长计划 · 幸福指数 · 全旅程视图
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import Optional, List
+
+import uuid as uuid_mod
 from datetime import date, datetime
 from decimal import Decimal
-from pydantic import BaseModel
-import uuid as uuid_mod
+from typing import List, Optional
+
 import structlog
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+from sqlalchemy import and_, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
-from ..models.user import User
 from ..models.employee import Employee
 from ..models.employee_growth import (
-    SkillDefinition, EmployeeSkill, CareerPath,
-    EmployeeMilestone, EmployeeGrowthPlan, EmployeeWellbeing,
-    SkillLevel, MilestoneType, GrowthPlanStatus,
+    CareerPath,
+    EmployeeGrowthPlan,
+    EmployeeMilestone,
+    EmployeeSkill,
+    EmployeeWellbeing,
+    GrowthPlanStatus,
+    MilestoneType,
+    SkillDefinition,
+    SkillLevel,
 )
+from ..models.user import User
 from ..services.hr_growth_agent_service import (
-    analyze_skill_gaps, assess_promotion_readiness,
-    generate_growth_plan, check_and_trigger_milestones,
-    compute_wellbeing_insights, get_employee_journey,
+    analyze_skill_gaps,
+    assess_promotion_readiness,
+    check_and_trigger_milestones,
+    compute_wellbeing_insights,
+    generate_growth_plan,
+    get_employee_journey,
 )
-from sqlalchemy import select, and_, func
-from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
 router = APIRouter()
 
 
 # ── 请求模型 ──────────────────────────────────────────
+
 
 class SkillDefinitionRequest(BaseModel):
     store_id: Optional[str] = None
@@ -72,7 +84,7 @@ class WellbeingSubmitRequest(BaseModel):
     store_id: str
     employee_id: str
     period: Optional[str] = None
-    achievement_score: int       # 1-10
+    achievement_score: int  # 1-10
     belonging_score: int
     growth_score: int
     balance_score: int
@@ -85,6 +97,7 @@ class WellbeingSubmitRequest(BaseModel):
 
 # ── 技能矩阵 ──────────────────────────────────────────
 
+
 @router.get("/hr/growth/skills/definitions")
 async def list_skill_definitions(
     store_id: Optional[str] = Query(None),
@@ -95,9 +108,7 @@ async def list_skill_definitions(
     """获取技能定义列表"""
     query = select(SkillDefinition).where(SkillDefinition.is_active.is_(True))
     if store_id:
-        query = query.where(
-            (SkillDefinition.store_id == store_id) | (SkillDefinition.store_id.is_(None))
-        )
+        query = query.where((SkillDefinition.store_id == store_id) | (SkillDefinition.store_id.is_(None)))
     if category:
         query = query.where(SkillDefinition.skill_category == category)
 
@@ -110,7 +121,7 @@ async def list_skill_definitions(
                 "skill_name": s.skill_name,
                 "skill_category": s.skill_category,
                 "applicable_positions": s.applicable_positions,
-                "required_level": s.required_level.value if hasattr(s.required_level, 'value') else str(s.required_level),
+                "required_level": s.required_level.value if hasattr(s.required_level, "value") else str(s.required_level),
                 "promotion_weight": s.promotion_weight,
                 "description": s.description,
             }
@@ -178,6 +189,7 @@ async def get_skill_gaps(
 
 # ── 职业路径 ──────────────────────────────────────────
 
+
 @router.get("/hr/growth/career-paths")
 async def list_career_paths(
     store_id: Optional[str] = Query(None),
@@ -188,9 +200,7 @@ async def list_career_paths(
     """获取职业发展路径"""
     query = select(CareerPath).where(CareerPath.is_active.is_(True))
     if store_id:
-        query = query.where(
-            (CareerPath.store_id == store_id) | (CareerPath.store_id.is_(None))
-        )
+        query = query.where((CareerPath.store_id == store_id) | (CareerPath.store_id.is_(None)))
     if from_position:
         query = query.where(CareerPath.from_position == from_position)
 
@@ -253,6 +263,7 @@ async def get_promotion_readiness(
 
 # ── 成长计划 ──────────────────────────────────────────
 
+
 @router.get("/hr/growth/plans")
 async def list_growth_plans(
     store_id: str = Query(...),
@@ -312,6 +323,7 @@ async def generate_ai_growth_plan(
 
 # ── 里程碑 ──────────────────────────────────────────
 
+
 @router.get("/hr/growth/milestones")
 async def list_milestones(
     store_id: str = Query(...),
@@ -329,9 +341,7 @@ async def list_milestones(
     if employee_id:
         query = query.where(EmployeeMilestone.employee_id == employee_id)
 
-    result = await db.execute(
-        query.order_by(EmployeeMilestone.achieved_at.desc()).limit(limit)
-    )
+    result = await db.execute(query.order_by(EmployeeMilestone.achieved_at.desc()).limit(limit))
     rows = result.all()
     return {
         "items": [
@@ -365,6 +375,7 @@ async def scan_milestones(
 
 # ── 幸福指数 ──────────────────────────────────────────
 
+
 @router.post("/hr/growth/wellbeing")
 async def submit_wellbeing(
     body: WellbeingSubmitRequest,
@@ -377,8 +388,11 @@ async def submit_wellbeing(
 
     # 计算综合分
     scores = [
-        body.achievement_score, body.belonging_score,
-        body.growth_score, body.balance_score, body.culture_score,
+        body.achievement_score,
+        body.belonging_score,
+        body.growth_score,
+        body.balance_score,
+        body.culture_score,
     ]
     overall = round(sum(scores) / len(scores), 1)
 
@@ -438,6 +452,7 @@ async def get_wellbeing_insights(
 
 
 # ── 全旅程视图 ────────────────────────────────────────
+
 
 @router.get("/hr/growth/journey/{employee_id}")
 async def get_journey(

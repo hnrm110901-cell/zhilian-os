@@ -12,12 +12,13 @@ IM 组织架构同步服务 — IM 部门层级 → 屯象OS 门店/区域结构
 - 复用 BrandIMConfig.department_store_mapping 作为映射源
 - 不新建表，利用 Store 模型已有字段
 """
-from typing import Any, Dict, List, Optional
-from datetime import datetime
+
 import uuid as uuid_mod
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 import structlog
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.brand_im_config import BrandIMConfig, IMPlatform
@@ -88,9 +89,7 @@ class IMOrgSyncService:
             dept["path"] = self._build_dept_path(dept, dept_map)
 
         # 获取已有门店
-        store_result = await self.db.execute(
-            select(Store).where(Store.brand_id == brand_id)
-        )
+        store_result = await self.db.execute(select(Store).where(Store.brand_id == brand_id))
         existing_stores = {s.name: s for s in store_result.scalars().all()}
 
         # 获取部门→门店映射
@@ -126,9 +125,7 @@ class IMOrgSyncService:
                 stats["matched"] += 1
 
                 # 更新 region 字段为上级部门路径
-                store_result2 = await self.db.execute(
-                    select(Store).where(Store.id == matched_store_id)
-                )
+                store_result2 = await self.db.execute(select(Store).where(Store.id == matched_store_id))
                 store = store_result2.scalar_one_or_none()
                 if store and parent_name:
                     region = dept.get("path", parent_name)
@@ -139,7 +136,9 @@ class IMOrgSyncService:
             elif auto_create_store and self._is_leaf_department(dept, departments):
                 # 仅为叶子部门（没有子部门的）自动创建门店
                 new_store = await self._create_store_from_dept(
-                    dept, brand_id, dept.get("path", ""),
+                    dept,
+                    brand_id,
+                    dept.get("path", ""),
                 )
                 if new_store:
                     existing_stores[dept_name] = new_store
@@ -150,12 +149,14 @@ class IMOrgSyncService:
                     stats["stores_created"] += 1
                     stats["matched"] += 1
             else:
-                stats["unmatched"].append({
-                    "dept_id": dept["id"],
-                    "dept_name": dept_name,
-                    "parent_name": parent_name,
-                    "path": dept.get("path", ""),
-                })
+                stats["unmatched"].append(
+                    {
+                        "dept_id": dept["id"],
+                        "dept_name": dept_name,
+                        "parent_name": parent_name,
+                        "path": dept.get("path", ""),
+                    }
+                )
 
         # 保存更新后的映射
         if stats["stores_created"] > 0:
@@ -185,17 +186,21 @@ class IMOrgSyncService:
 
         for d in raw_departments:
             if is_wechat:
-                departments.append({
-                    "id": d.get("id"),
-                    "name": d.get("name", ""),
-                    "parentid": d.get("parentid", 0),
-                })
+                departments.append(
+                    {
+                        "id": d.get("id"),
+                        "name": d.get("name", ""),
+                        "parentid": d.get("parentid", 0),
+                    }
+                )
             else:
-                departments.append({
-                    "id": d.get("dept_id"),
-                    "name": d.get("name", ""),
-                    "parentid": d.get("parent_id", 1),
-                })
+                departments.append(
+                    {
+                        "id": d.get("dept_id"),
+                        "name": d.get("name", ""),
+                        "parentid": d.get("parent_id", 1),
+                    }
+                )
 
         # 补充 parent_name
         dept_name_map = {d["id"]: d["name"] for d in departments}
@@ -252,9 +257,7 @@ class IMOrgSyncService:
         code = f"IM_{str(dept['id'])[:10]}"
 
         # 检查编码是否已存在
-        existing = await self.db.execute(
-            select(Store).where(Store.code == code)
-        )
+        existing = await self.db.execute(select(Store).where(Store.code == code))
         if existing.scalar_one_or_none():
             return None
 

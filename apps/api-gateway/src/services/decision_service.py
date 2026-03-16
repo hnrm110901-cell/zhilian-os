@@ -2,14 +2,15 @@
 Decision Agent Service with Database Integration
 Provides decision support using real database data
 """
-from datetime import datetime, date, timedelta
-from typing import List, Dict, Any, Optional
-from sqlalchemy import select, and_, desc, func
-from sqlalchemy.ext.asyncio import AsyncSession
-from collections import defaultdict
-from statistics import mean
-import os
 
+import os
+from collections import defaultdict
+from datetime import date, datetime, timedelta
+from statistics import mean
+from typing import Any, Dict, List, Optional
+
+from sqlalchemy import and_, desc, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_db_session
 from src.models import KPI, KPIRecord, Store
 from src.repositories import KPIRepository
@@ -21,11 +22,7 @@ class DecisionService:
     def __init__(self, store_id: str = "STORE001"):
         self.store_id = store_id
 
-    async def get_decision_report(
-        self,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None
-    ) -> Dict[str, Any]:
+    async def get_decision_report(self, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict[str, Any]:
         """
         Get comprehensive decision report from database
 
@@ -41,12 +38,12 @@ class DecisionService:
             if not end_date:
                 end_dt = date.today()
             else:
-                end_dt = date.fromisoformat(end_date.split('T')[0])
+                end_dt = date.fromisoformat(end_date.split("T")[0])
 
             if not start_date:
                 start_dt = end_dt - timedelta(days=int(os.getenv("DECISION_DEFAULT_DAYS", "30")))
             else:
-                start_dt = date.fromisoformat(start_date.split('T')[0])
+                start_dt = date.fromisoformat(start_date.split("T")[0])
 
             # Get KPI data from database
             kpis = await self._get_kpis_from_db(session, start_dt, end_dt)
@@ -72,29 +69,20 @@ class DecisionService:
                 "insights_summary": {
                     "total_insights": len(insights),
                     "high_impact": sum(1 for i in insights if i["impact_level"] == "high"),
-                    "key_insights": insights[:5]
+                    "key_insights": insights[:5],
                 },
                 "recommendations_summary": {
                     "total_recommendations": len(recommendations),
                     "priority_distribution": self._count_by_priority(recommendations),
-                    "critical_recommendations": [
-                        r for r in recommendations if r["priority"] == "critical"
-                    ][:5]
+                    "critical_recommendations": [r for r in recommendations if r["priority"] == "critical"][:5],
                 },
                 "overall_health_score": health_score,
-                "action_required": sum(
-                    1 for r in recommendations if r["priority"] in ["critical", "high"]
-                )
+                "action_required": sum(1 for r in recommendations if r["priority"] in ["critical", "high"]),
             }
 
-    async def _get_kpis_from_db(
-        self,
-        session: AsyncSession,
-        start_date: date,
-        end_date: date
-    ) -> List[Dict[str, Any]]:
+    async def _get_kpis_from_db(self, session: AsyncSession, start_date: date, end_date: date) -> List[Dict[str, Any]]:
         """Get KPI data from database - optimized to avoid N+1 queries"""
-        from sqlalchemy import func, case
+        from sqlalchemy import case, func
         from sqlalchemy.orm import aliased
 
         # Get all active KPIs
@@ -110,24 +98,15 @@ class DecisionService:
         latest_subq = (
             select(
                 KPIRecord.kpi_id,
-                KPIRecord.value.label('current_value'),
+                KPIRecord.value.label("current_value"),
                 KPIRecord.target_value,
                 KPIRecord.achievement_rate,
                 KPIRecord.trend,
                 KPIRecord.status,
                 KPIRecord.record_date,
-                func.row_number().over(
-                    partition_by=KPIRecord.kpi_id,
-                    order_by=desc(KPIRecord.record_date)
-                ).label('rn')
+                func.row_number().over(partition_by=KPIRecord.kpi_id, order_by=desc(KPIRecord.record_date)).label("rn"),
             )
-            .where(
-                and_(
-                    KPIRecord.kpi_id.in_(kpi_ids),
-                    KPIRecord.store_id == self.store_id,
-                    KPIRecord.record_date <= end_date
-                )
-            )
+            .where(and_(KPIRecord.kpi_id.in_(kpi_ids), KPIRecord.store_id == self.store_id, KPIRecord.record_date <= end_date))
             .subquery()
         )
 
@@ -162,7 +141,7 @@ class DecisionService:
                 "unit": kpi_def.unit,
                 "achievement_rate": latest_record.achievement_rate or 0,
                 "trend": latest_record.trend or "stable",
-                "status": latest_record.status or "on_track"
+                "status": latest_record.status or "on_track",
             }
             kpis.append(kpi_data)
 
@@ -180,14 +159,10 @@ class DecisionService:
             "total_kpis": len(kpis),
             "status_distribution": dict(status_counts),
             "on_track_rate": on_track_rate,
-            "key_kpis": kpis[:5]  # Top 5 KPIs
+            "key_kpis": kpis[:5],  # Top 5 KPIs
         }
 
-    async def _generate_insights_from_db(
-        self,
-        session: AsyncSession,
-        kpis: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+    async def _generate_insights_from_db(self, session: AsyncSession, kpis: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Generate insights based on real KPI data"""
         insights = []
 
@@ -199,35 +174,37 @@ class DecisionService:
                     "title": f"{kpi['metric_name']}未达标",
                     "description": f"{kpi['metric_name']}当前为{kpi['current_value']:.2f}{kpi['unit']}，目标为{kpi['target_value']:.2f}{kpi['unit']}，达成率仅{kpi['achievement_rate']:.1%}",
                     "category": kpi["category"],
-                    "impact_level": "high" if kpi["achievement_rate"] < float(os.getenv("DECISION_HIGH_IMPACT_THRESHOLD", "0.80")) else "medium",
+                    "impact_level": (
+                        "high"
+                        if kpi["achievement_rate"] < float(os.getenv("DECISION_HIGH_IMPACT_THRESHOLD", "0.80"))
+                        else "medium"
+                    ),
                     "data_points": [
                         {"label": "当前值", "value": kpi["current_value"]},
                         {"label": "目标值", "value": kpi["target_value"]},
-                        {"label": "达成率", "value": kpi["achievement_rate"]}
+                        {"label": "达成率", "value": kpi["achievement_rate"]},
                     ],
-                    "discovered_at": datetime.now().isoformat()
+                    "discovered_at": datetime.now().isoformat(),
                 }
                 insights.append(insight)
 
         # Add general insights if no specific issues
         if not insights:
-            insights.append({
-                "insight_id": f"INSIGHT_GENERAL_{datetime.now().strftime('%Y%m%d%H%M%S')}",
-                "title": "整体运营良好",
-                "description": "所有KPI指标均在正常范围内，建议继续保持当前运营策略",
-                "category": "general",
-                "impact_level": "low",
-                "data_points": [],
-                "discovered_at": datetime.now().isoformat()
-            })
+            insights.append(
+                {
+                    "insight_id": f"INSIGHT_GENERAL_{datetime.now().strftime('%Y%m%d%H%M%S')}",
+                    "title": "整体运营良好",
+                    "description": "所有KPI指标均在正常范围内，建议继续保持当前运营策略",
+                    "category": "general",
+                    "impact_level": "low",
+                    "data_points": [],
+                    "discovered_at": datetime.now().isoformat(),
+                }
+            )
 
         return insights
 
-    def _generate_recommendations(
-        self,
-        kpis: List[Dict[str, Any]],
-        insights: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+    def _generate_recommendations(self, kpis: List[Dict[str, Any]], insights: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Generate recommendations based on KPIs and insights"""
         recommendations = []
 
@@ -244,14 +221,10 @@ class DecisionService:
                     "priority": priority,
                     "rationale": f"达成率仅{kpi['achievement_rate']:.1%}，低于预期",
                     "expected_impact": f"提升{kpi['metric_name']}至目标水平",
-                    "action_items": [
-                        "分析根本原因",
-                        "制定改进计划",
-                        "实施并监控效果"
-                    ],
+                    "action_items": ["分析根本原因", "制定改进计划", "实施并监控效果"],
                     "estimated_cost": None,
                     "estimated_roi": None,
-                    "created_at": datetime.now().isoformat()
+                    "created_at": datetime.now().isoformat(),
                 }
                 recommendations.append(recommendation)
 

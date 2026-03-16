@@ -18,40 +18,44 @@
   - 金额单位：分（fen），展示时用 _yuan() 转换
   - 每个函数入参为简单数据结构（dict/list），不依赖ORM对象
 """
+
 from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
 from typing import Optional
 
-
 # ── 数据结构 ────────────────────────────────────────────────────────────────
+
 
 @dataclass
 class DishSale:
     """单品销售记录（日汇总）"""
+
     dish_id: str
     dish_name: str
     sold_qty: int
-    revenue_fen: int               # 该品营收（分）
-    bom_cost_fen_per_unit: int     # BOM理论单份成本（分）
+    revenue_fen: int  # 该品营收（分）
+    bom_cost_fen_per_unit: int  # BOM理论单份成本（分）
 
 
 @dataclass
 class IngredientUsage:
     """食材日用量"""
+
     ingredient_id: str
     ingredient_name: str
-    theoretical_qty: float         # BOM理论总用量（基本单位）
-    actual_qty: float              # 实际出库量（基本单位）
-    unit: str                      # 单位
-    unit_cost_fen: int             # 当日均价（分/基本单位）
-    prev_unit_cost_fen: int = 0    # 上期均价（用于价格归因）
+    theoretical_qty: float  # BOM理论总用量（基本单位）
+    actual_qty: float  # 实际出库量（基本单位）
+    unit: str  # 单位
+    unit_cost_fen: int  # 当日均价（分/基本单位）
+    prev_unit_cost_fen: int = 0  # 上期均价（用于价格归因）
 
 
 @dataclass
 class WasteRecord:
     """损耗记录"""
+
     ingredient_id: str
     ingredient_name: str
     waste_qty: float
@@ -63,22 +67,24 @@ class WasteRecord:
 @dataclass
 class DishVarianceResult:
     """菜品级差异结果"""
+
     dish_id: str
     dish_name: str
     sold_qty: int
     theoretical_cost_fen: int
     actual_cost_fen: int
     variance_fen: int
-    variance_pct: float            # (actual-theo)/theo × 100
+    variance_pct: float  # (actual-theo)/theo × 100
     top_ingredients: list[dict] = field(default_factory=list)
 
 
 @dataclass
 class AttributionResult:
     """单因素归因结果"""
+
     factor: str
     contribution_fen: int
-    contribution_pct: float        # 占总差异的比例
+    contribution_pct: float  # 占总差异的比例
     description: str
     action: str
     detail: dict = field(default_factory=dict)
@@ -87,6 +93,7 @@ class AttributionResult:
 @dataclass
 class CostTruthReport:
     """完整成本真相报告"""
+
     store_id: str
     truth_date: str
     revenue_fen: int
@@ -105,6 +112,7 @@ class CostTruthReport:
 
 
 # ── 辅助函数 ────────────────────────────────────────────────────────────────
+
 
 def _yuan(fen: int) -> float:
     """分→元"""
@@ -139,6 +147,7 @@ def classify_severity(variance_pct: float) -> str:
 
 # ── 核心纯函数 ──────────────────────────────────────────────────────────────
 
+
 def compute_dish_variance(
     sales: list[DishSale],
     ingredient_usages: list[IngredientUsage],
@@ -172,15 +181,17 @@ def compute_dish_variance(
         variance = actual - theo
         pct = _safe_pct(variance, theo) if theo > 0 else 0.0
 
-        results.append(DishVarianceResult(
-            dish_id=s.dish_id,
-            dish_name=s.dish_name,
-            sold_qty=s.sold_qty,
-            theoretical_cost_fen=theo,
-            actual_cost_fen=actual,
-            variance_fen=variance,
-            variance_pct=pct,
-        ))
+        results.append(
+            DishVarianceResult(
+                dish_id=s.dish_id,
+                dish_name=s.dish_name,
+                sold_qty=s.sold_qty,
+                theoretical_cost_fen=theo,
+                actual_cost_fen=actual,
+                variance_fen=variance,
+                variance_pct=pct,
+            )
+        )
 
     # 按差异金额绝对值降序
     results.sort(key=lambda r: abs(r.variance_fen), reverse=True)
@@ -201,17 +212,19 @@ def compute_ingredient_variance(
         variance_qty = u.actual_qty - u.theoretical_qty
         variance_cost = actual_cost - theo_cost
 
-        results.append({
-            "ingredient_id": u.ingredient_id,
-            "name": u.ingredient_name,
-            "unit": u.unit,
-            "theoretical_qty": round(u.theoretical_qty, 2),
-            "actual_qty": round(u.actual_qty, 2),
-            "variance_qty": round(variance_qty, 2),
-            "variance_cost_fen": variance_cost,
-            "variance_cost_yuan": _yuan(variance_cost),
-            "unit_cost_fen": u.unit_cost_fen,
-        })
+        results.append(
+            {
+                "ingredient_id": u.ingredient_id,
+                "name": u.ingredient_name,
+                "unit": u.unit,
+                "theoretical_qty": round(u.theoretical_qty, 2),
+                "actual_qty": round(u.actual_qty, 2),
+                "variance_qty": round(variance_qty, 2),
+                "variance_cost_fen": variance_cost,
+                "variance_cost_yuan": _yuan(variance_cost),
+                "unit_cost_fen": u.unit_cost_fen,
+            }
+        )
 
     results.sort(key=lambda r: abs(r["variance_cost_fen"]), reverse=True)
     return results
@@ -246,12 +259,14 @@ def attribute_variance(
             impact = int(delta_per_unit * u.actual_qty)
             price_change_fen += impact
             if abs(impact) > 0:
-                price_detail.append({
-                    "name": u.ingredient_name,
-                    "prev_price_fen": u.prev_unit_cost_fen,
-                    "curr_price_fen": u.unit_cost_fen,
-                    "impact_yuan": _yuan(impact),
-                })
+                price_detail.append(
+                    {
+                        "name": u.ingredient_name,
+                        "prev_price_fen": u.prev_unit_cost_fen,
+                        "curr_price_fen": u.unit_cost_fen,
+                        "impact_yuan": _yuan(impact),
+                    }
+                )
     price_detail.sort(key=lambda x: abs(x["impact_yuan"]), reverse=True)
 
     # ── 2. 损耗报废 ──
@@ -261,17 +276,17 @@ def attribute_variance(
     for w in wastes:
         cost = int(w.waste_qty * w.unit_cost_fen)
         waste_fen += cost
-        waste_by_ingredient[w.ingredient_id] = (
-            waste_by_ingredient.get(w.ingredient_id, 0) + w.waste_qty
-        )
+        waste_by_ingredient[w.ingredient_id] = waste_by_ingredient.get(w.ingredient_id, 0) + w.waste_qty
         if cost > 0:
-            waste_detail.append({
-                "name": w.ingredient_name,
-                "qty": round(w.waste_qty, 2),
-                "unit": w.unit,
-                "cost_yuan": _yuan(cost),
-                "cause": w.root_cause,
-            })
+            waste_detail.append(
+                {
+                    "name": w.ingredient_name,
+                    "qty": round(w.waste_qty, 2),
+                    "unit": w.unit,
+                    "cost_yuan": _yuan(cost),
+                    "cause": w.root_cause,
+                }
+            )
     waste_detail.sort(key=lambda x: abs(x["cost_yuan"]), reverse=True)
 
     # ── 3. 用量超标 ──
@@ -283,12 +298,14 @@ def attribute_variance(
         if excess > 0:
             cost = int(excess * u.unit_cost_fen)
             overrun_fen += cost
-            overrun_detail.append({
-                "name": u.ingredient_name,
-                "excess_qty": round(excess, 2),
-                "unit": u.unit,
-                "cost_yuan": _yuan(cost),
-            })
+            overrun_detail.append(
+                {
+                    "name": u.ingredient_name,
+                    "excess_qty": round(excess, 2),
+                    "unit": u.unit,
+                    "cost_yuan": _yuan(cost),
+                }
+            )
     overrun_detail.sort(key=lambda x: abs(x["cost_yuan"]), reverse=True)
 
     # ── 4. 出成率偏差（简化：从 usage_overrun 中分离 yield 相关）──
@@ -311,8 +328,7 @@ def attribute_variance(
             total_rev = sum(d.revenue_fen for d in dish_list)
             if total_rev == 0:
                 return 0.0
-            high_cost = [d for d in dish_list
-                         if d.bom_cost_fen_per_unit * d.sold_qty / max(d.revenue_fen, 1) > 0.35]
+            high_cost = [d for d in dish_list if d.bom_cost_fen_per_unit * d.sold_qty / max(d.revenue_fen, 1) > 0.35]
             high_rev = sum(d.revenue_fen for d in high_cost)
             return round(high_rev / total_rev * 100, 1)
 
@@ -329,34 +345,56 @@ def attribute_variance(
     results = []
 
     factors = [
-        ("price_change", price_change_fen, price_detail,
-         "采购单价变动导致成本上升" if price_change_fen > 0 else "采购单价变动（降低）",
-         "与供应商重新议价，或对比同城同品质供应商报价"),
-        ("waste_loss", waste_fen, waste_detail,
-         f"损耗报废 ¥{_yuan(waste_fen)}",
-         "排查高损耗食材的存储条件和操作流程，引入标准操作SOP"),
-        ("usage_overrun", overrun_fen, overrun_detail,
-         f"用量超标（BOM偏差）¥{_yuan(overrun_fen)}",
-         "核查切配标准，考虑引入电子秤称重抽检"),
-        ("yield_variance", yield_fen, yield_detail,
-         "出成率偏差（切配/烹饪损耗超预期）",
-         "培训切配标准手法，记录实际出成率并更新BOM的waste_factor"),
-        ("mix_shift", mix_fen, mix_detail,
-         f"销售结构变化（高成本菜品占比{'上升' if mix_fen > 0 else '下降'}）",
-         "考虑推广高毛利菜品，调整菜单推荐顺序"),
+        (
+            "price_change",
+            price_change_fen,
+            price_detail,
+            "采购单价变动导致成本上升" if price_change_fen > 0 else "采购单价变动（降低）",
+            "与供应商重新议价，或对比同城同品质供应商报价",
+        ),
+        (
+            "waste_loss",
+            waste_fen,
+            waste_detail,
+            f"损耗报废 ¥{_yuan(waste_fen)}",
+            "排查高损耗食材的存储条件和操作流程，引入标准操作SOP",
+        ),
+        (
+            "usage_overrun",
+            overrun_fen,
+            overrun_detail,
+            f"用量超标（BOM偏差）¥{_yuan(overrun_fen)}",
+            "核查切配标准，考虑引入电子秤称重抽检",
+        ),
+        (
+            "yield_variance",
+            yield_fen,
+            yield_detail,
+            "出成率偏差（切配/烹饪损耗超预期）",
+            "培训切配标准手法，记录实际出成率并更新BOM的waste_factor",
+        ),
+        (
+            "mix_shift",
+            mix_fen,
+            mix_detail,
+            f"销售结构变化（高成本菜品占比{'上升' if mix_fen > 0 else '下降'}）",
+            "考虑推广高毛利菜品，调整菜单推荐顺序",
+        ),
     ]
 
     for factor_name, fen, detail, desc, action in factors:
         if fen == 0 and factor_name != "mix_shift":
             continue
-        results.append(AttributionResult(
-            factor=factor_name,
-            contribution_fen=fen,
-            contribution_pct=round(abs(fen) / abs_total * 100, 1),
-            description=desc,
-            action=action,
-            detail={"items": detail} if isinstance(detail, list) else detail,
-        ))
+        results.append(
+            AttributionResult(
+                factor=factor_name,
+                contribution_fen=fen,
+                contribution_pct=round(abs(fen) / abs_total * 100, 1),
+                description=desc,
+                action=action,
+                detail={"items": detail} if isinstance(detail, list) else detail,
+            )
+        )
 
     # 按贡献绝对值降序
     results.sort(key=lambda r: abs(r.contribution_fen), reverse=True)
@@ -428,7 +466,11 @@ def build_cost_truth_report(
 
     # 五因归因
     attributions = attribute_variance(
-        variance_fen, usages, wastes, sales, prev_period_sales,
+        variance_fen,
+        usages,
+        wastes,
+        sales,
+        prev_period_sales,
     )
 
     # 月末预测
@@ -437,7 +479,10 @@ def build_cost_truth_report(
     if mtd_revenue_fen > 0 and days_elapsed > 0:
         mtd_pct = _safe_pct(mtd_actual_cost_fen, mtd_revenue_fen)
         predicted_eom = predict_month_end_cost_rate(
-            mtd_revenue_fen, mtd_actual_cost_fen, days_elapsed, days_in_month,
+            mtd_revenue_fen,
+            mtd_actual_cost_fen,
+            days_elapsed,
+            days_in_month,
         )
 
     return CostTruthReport(
@@ -465,10 +510,7 @@ def generate_one_sentence_insight(report: CostTruthReport) -> str:
     例：「今日实际成本率34.2%，超目标2.2pp，主因：鲈鱼用量超标（占差异45%），建议核查切配标准」
     """
     if report.variance_pct <= 0:
-        return (
-            f"今日成本率 {report.actual_pct:.1f}%，"
-            f"低于理论值 {abs(report.variance_pct):.1f}pp，控制良好"
-        )
+        return f"今日成本率 {report.actual_pct:.1f}%，" f"低于理论值 {abs(report.variance_pct):.1f}pp，控制良好"
 
     # 找最大归因
     top_attr = report.attributions[0] if report.attributions else None
@@ -480,9 +522,7 @@ def generate_one_sentence_insight(report: CostTruthReport) -> str:
         parts.append(f"超目标 {gap}pp")
 
     if top_attr:
-        parts.append(
-            f"主因：{top_attr.description}（占差异 {top_attr.contribution_pct:.0f}%）"
-        )
+        parts.append(f"主因：{top_attr.description}（占差异 {top_attr.contribution_pct:.0f}%）")
         parts.append(f"建议：{top_attr.action}")
 
     return "，".join(parts)

@@ -8,12 +8,13 @@
 - 每天10:00 → check_inventory_alert（库存预警）
 - 每天03:00 → perform_daily_reconciliation（POS对账）
 """
-import asyncio
-from datetime import date, datetime
-from typing import Optional, Dict
-import os
-import structlog
 
+import asyncio
+import os
+from datetime import date, datetime
+from typing import Dict, Optional
+
+import structlog
 from src.core.clock import now_local
 
 logger = structlog.get_logger()
@@ -68,6 +69,7 @@ class TaskScheduler:
                 last = self._last_run["revenue_anomaly"]
                 if last is None or (now - last).total_seconds() >= int(os.getenv("SCHEDULER_REVENUE_ANOMALY_INTERVAL", "900")):
                     from src.core.celery_tasks import detect_revenue_anomaly
+
                     detect_revenue_anomaly.delay()
                     self._last_run["revenue_anomaly"] = now
                     logger.info("scheduler_triggered", task="detect_revenue_anomaly")
@@ -76,16 +78,14 @@ class TaskScheduler:
                 last = self._last_run["daily_report"]
                 _report_hour = int(os.getenv("DAILY_REPORT_SCHEDULE_HOUR", "22"))
                 _report_minute = int(os.getenv("DAILY_REPORT_SCHEDULE_MINUTE", "30"))
-                if (now.hour == _report_hour and now.minute == _report_minute and
-                        (last is None or last.date() < today)):
+                if now.hour == _report_hour and now.minute == _report_minute and (last is None or last.date() < today):
+                    from sqlalchemy import select
                     from src.core.celery_tasks import generate_and_send_daily_report
                     from src.core.database import get_db_session
                     from src.models.store import Store
-                    from sqlalchemy import select
+
                     async with get_db_session() as session:
-                        result = await session.execute(
-                            select(Store.id).where(Store.is_active == True)
-                        )
+                        result = await session.execute(select(Store.id).where(Store.is_active == True))
                         store_ids = [str(row[0]) for row in result.all()]
                     for sid in store_ids:
                         generate_and_send_daily_report.delay(sid)
@@ -96,9 +96,9 @@ class TaskScheduler:
                 last = self._last_run["inventory_alert"]
                 _inv_hour = int(os.getenv("INVENTORY_ALERT_SCHEDULE_HOUR", "10"))
                 _inv_minute = int(os.getenv("INVENTORY_ALERT_SCHEDULE_MINUTE", "0"))
-                if (now.hour == _inv_hour and now.minute == _inv_minute and
-                        (last is None or last.date() < today)):
+                if now.hour == _inv_hour and now.minute == _inv_minute and (last is None or last.date() < today):
                     from src.core.celery_tasks import check_inventory_alert
+
                     check_inventory_alert.delay()
                     self._last_run["inventory_alert"] = now
                     logger.info("scheduler_triggered", task="check_inventory_alert")
@@ -107,16 +107,14 @@ class TaskScheduler:
                 last = self._last_run["reconciliation"]
                 _recon_hour = int(os.getenv("RECONCILIATION_SCHEDULE_HOUR", "3"))
                 _recon_minute = int(os.getenv("RECONCILIATION_SCHEDULE_MINUTE", "0"))
-                if (now.hour == _recon_hour and now.minute == _recon_minute and
-                        (last is None or last.date() < today)):
+                if now.hour == _recon_hour and now.minute == _recon_minute and (last is None or last.date() < today):
+                    from sqlalchemy import select
                     from src.core.celery_tasks import perform_daily_reconciliation
                     from src.core.database import get_db_session
                     from src.models.store import Store
-                    from sqlalchemy import select
+
                     async with get_db_session() as session:
-                        result = await session.execute(
-                            select(Store.id).where(Store.is_active == True)
-                        )
+                        result = await session.execute(select(Store.id).where(Store.is_active == True))
                         store_ids = [str(row[0]) for row in result.all()]
                     for sid in store_ids:
                         perform_daily_reconciliation.delay(sid)

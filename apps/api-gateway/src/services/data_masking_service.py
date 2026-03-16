@@ -17,10 +17,10 @@
   masked_list = DataMaskingService.mask_employee_list(employees, role_level=1)
   level = DataMaskingService.get_role_level("store_manager")  # → 2
 """
+
 from typing import Optional
 
 import structlog
-
 from src.core.crypto import field_crypto
 
 logger = structlog.get_logger()
@@ -45,7 +45,7 @@ class DataMaskingService:
     # 每个 lambda 接收明文值，返回脱敏后的字符串
     MASKING_RULES: dict[str, dict[int, callable]] = {
         "phone": {
-            3: lambda v: v,                           # admin: 13812345678
+            3: lambda v: v,  # admin: 13812345678
             2: lambda v: v[:3] + "****" + v[-4:] if len(v) >= 7 else "****",
             1: lambda v: "****" + v[-4:] if len(v) >= 4 else "****",
             0: lambda v: "****",
@@ -57,19 +57,19 @@ class DataMaskingService:
             0: lambda v: "****",
         },
         "id_card_no": {
-            3: lambda v: v,                           # admin: 430111199901011234
+            3: lambda v: v,  # admin: 430111199901011234
             2: lambda v: v[:3] + "***********" + v[-4:] if len(v) >= 7 else "****",
             1: lambda v: "**************" + v[-4:] if len(v) >= 4 else "****",
             0: lambda v: "****",
         },
         "bank_account": {
-            3: lambda v: v,                           # admin: 6222031234567890
+            3: lambda v: v,  # admin: 6222031234567890
             2: lambda v: "****" + v[-4:] if len(v) >= 4 else "****",
             1: lambda v: "****" + v[-4:] if len(v) >= 4 else "****",
             0: lambda v: "****",
         },
         "email": {
-            3: lambda v: v,                           # admin: zhangsan@example.com
+            3: lambda v: v,  # admin: zhangsan@example.com
             2: lambda v: v[0] + "***@" + v.split("@")[1] if "@" in v and len(v) > 1 else "***",
             1: lambda v: "***@***",
             0: lambda v: "****",

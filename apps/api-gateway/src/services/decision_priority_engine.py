@@ -32,7 +32,6 @@ from typing import Any, Dict, List, Optional, Tuple
 import structlog
 from sqlalchemy import and_, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.models.inventory import InventoryItem, InventoryStatus
 from src.services.financial_impact_calculator import FinancialImpactCalculator
 from src.services.food_cost_service import FoodCostService
@@ -41,17 +40,17 @@ logger = structlog.get_logger()
 
 # ── 四个决策推送窗口 ────────────────────────────────────────────────────────────
 _DECISION_WINDOWS: List[Tuple[int, int, str]] = [
-    (8,  0,  "08:00晨推"),
-    (12, 0,  "12:00午推"),
+    (8, 0, "08:00晨推"),
+    (12, 0, "12:00午推"),
     (17, 30, "17:30战前"),
     (20, 30, "20:30晚推"),
 ]
 
 # ── 执行难度 → 执行分映射 ────────────────────────────────────────────────────
 _EXECUTION_SCORES: Dict[str, float] = {
-    "easy":   100.0,
-    "medium":  60.0,
-    "hard":    30.0,
+    "easy": 100.0,
+    "medium": 60.0,
+    "hard": 30.0,
 }
 
 
@@ -59,24 +58,27 @@ _EXECUTION_SCORES: Dict[str, float] = {
 # 数据类
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class DecisionCandidate:
     """单条决策候选（汇总自各数据源）"""
-    title:                str
-    action:               str
-    source:               str        # "inventory" | "food_cost" | "reasoning"
-    expected_saving_yuan: float      # 预期节省 ¥
-    expected_cost_yuan:   float      # 预期成本 ¥（采购/执行成本）
-    confidence:           float      # 0.0 – 1.0
-    urgency_hours:        float      # 距最近决策窗口的小时数
-    execution_difficulty: str        # "easy" | "medium" | "hard"
-    decision_window_label: str       # 推送窗口标签
-    context:              Dict[str, Any] = field(default_factory=dict)
+
+    title: str
+    action: str
+    source: str  # "inventory" | "food_cost" | "reasoning"
+    expected_saving_yuan: float  # 预期节省 ¥
+    expected_cost_yuan: float  # 预期成本 ¥（采购/执行成本）
+    confidence: float  # 0.0 – 1.0
+    urgency_hours: float  # 距最近决策窗口的小时数
+    execution_difficulty: str  # "easy" | "medium" | "hard"
+    decision_window_label: str  # 推送窗口标签
+    context: Dict[str, Any] = field(default_factory=dict)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 纯函数（无 IO，可单元测试）
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def _hours_to_next_window(now: datetime) -> Tuple[float, str]:
     """
@@ -91,9 +93,7 @@ def _hours_to_next_window(now: datetime) -> Tuple[float, str]:
             delta = (window - now).total_seconds() / 3600
             return round(delta, 2), label
     # 当天所有窗口已过，下一个为明天 08:00晨推
-    tomorrow_8 = (now + timedelta(days=1)).replace(
-        hour=8, minute=0, second=0, microsecond=0
-    )
+    tomorrow_8 = (now + timedelta(days=1)).replace(hour=8, minute=0, second=0, microsecond=0)
     delta = (tomorrow_8 - now).total_seconds() / 3600
     return round(delta, 2), "08:00晨推"
 
@@ -164,25 +164,26 @@ def _format_decision(
         candidate.expected_cost_yuan,
     )
     return {
-        "rank":                   rank,
-        "title":                  candidate.title,
-        "action":                 candidate.action,
-        "source":                 candidate.source,
-        "expected_saving_yuan":   round(candidate.expected_saving_yuan, 2),
-        "expected_cost_yuan":     round(candidate.expected_cost_yuan, 2),
-        "net_benefit_yuan":       roi["net_benefit_yuan"],
-        "confidence_pct":         round(candidate.confidence * 100, 1),
-        "urgency_hours":          candidate.urgency_hours,
-        "execution_difficulty":   candidate.execution_difficulty,
-        "decision_window_label":  candidate.decision_window_label,
-        "priority_score":         priority_score,
-        "context":                candidate.context,
+        "rank": rank,
+        "title": candidate.title,
+        "action": candidate.action,
+        "source": candidate.source,
+        "expected_saving_yuan": round(candidate.expected_saving_yuan, 2),
+        "expected_cost_yuan": round(candidate.expected_cost_yuan, 2),
+        "net_benefit_yuan": roi["net_benefit_yuan"],
+        "confidence_pct": round(candidate.confidence * 100, 1),
+        "urgency_hours": candidate.urgency_hours,
+        "execution_difficulty": candidate.execution_difficulty,
+        "decision_window_label": candidate.decision_window_label,
+        "priority_score": priority_score,
+        "context": candidate.context,
     }
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # DecisionPriorityEngine
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class DecisionPriorityEngine:
     """
@@ -312,7 +313,7 @@ class DecisionPriorityEngine:
             return []
 
         variance_pct = variance.get("variance_pct", 0.0)
-        monthly_rev  = revenue_yuan / 7 * 30  # 周转月营收估算
+        monthly_rev = revenue_yuan / 7 * 30  # 周转月营收估算
 
         # 预期节省：本月内将差异修正到0可节省的¥
         expected_saving = round(monthly_rev * max(0, variance_pct) / 100, 2)
@@ -324,10 +325,7 @@ class DecisionPriorityEngine:
         candidates = [
             DecisionCandidate(
                 title=f"食材成本率超标 {variance_pct:+.1f}%（当前 {actual_pct:.1f}%）",
-                action=(
-                    f"关注主要损耗食材：{top3_str}；"
-                    f"本月可节省 ¥{expected_saving:.2f}"
-                ),
+                action=(f"关注主要损耗食材：{top3_str}；" f"本月可节省 ¥{expected_saving:.2f}"),
                 source="food_cost",
                 expected_saving_yuan=expected_saving,
                 expected_cost_yuan=0.0,
@@ -444,10 +442,8 @@ class DecisionPriorityEngine:
         仅处理 P1/P2 级别维度。
         """
         try:
-            from src.services.reasoning_engine import (
-                UniversalReasoningEngine,
-                ReasoningContext,
-            )
+            from src.services.reasoning_engine import ReasoningContext, UniversalReasoningEngine
+
             engine = UniversalReasoningEngine(db)
             ctx = ReasoningContext(
                 store_id=self.store_id,
@@ -572,17 +568,11 @@ class DecisionPriorityEngine:
             return []
 
         # ── 评分 & 排序 ─────────────────────────────────────────────────────
-        scored = [
-            (candidate, compute_priority_score(candidate, monthly_revenue_yuan))
-            for candidate in all_candidates
-        ]
+        scored = [(candidate, compute_priority_score(candidate, monthly_revenue_yuan)) for candidate in all_candidates]
         scored.sort(key=lambda x: x[1], reverse=True)
 
         # ── 格式化 Top 3 ────────────────────────────────────────────────────
-        top3 = [
-            _format_decision(candidate, score, rank + 1)
-            for rank, (candidate, score) in enumerate(scored[:3])
-        ]
+        top3 = [_format_decision(candidate, score, rank + 1) for rank, (candidate, score) in enumerate(scored[:3])]
 
         self.logger.info(
             "get_top3_completed",

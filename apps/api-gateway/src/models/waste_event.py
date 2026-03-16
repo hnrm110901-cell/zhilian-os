@@ -20,32 +20,29 @@ WasteEventType 枚举：
 import enum
 import uuid
 from datetime import datetime
-from sqlalchemy import (
-    Column, String, Numeric, Text, Boolean, DateTime,
-    ForeignKey, Enum, Integer, Index, Float,
-)
-from sqlalchemy.dialects.postgresql import UUID, JSON
-from sqlalchemy.orm import relationship
 
+from sqlalchemy import Boolean, Column, DateTime, Enum, Float, ForeignKey, Index, Integer, Numeric, String, Text
+from sqlalchemy.dialects.postgresql import JSON, UUID
+from sqlalchemy.orm import relationship
 from src.models.base import Base, TimestampMixin
 
 
 class WasteEventType(str, enum.Enum):
-    COOKING_LOSS   = "cooking_loss"
-    SPOILAGE       = "spoilage"
-    OVER_PREP      = "over_prep"
-    DROP_DAMAGE    = "drop_damage"
+    COOKING_LOSS = "cooking_loss"
+    SPOILAGE = "spoilage"
+    OVER_PREP = "over_prep"
+    DROP_DAMAGE = "drop_damage"
     QUALITY_REJECT = "quality_reject"
-    TRANSFER_LOSS  = "transfer_loss"
-    UNKNOWN        = "unknown"
+    TRANSFER_LOSS = "transfer_loss"
+    UNKNOWN = "unknown"
 
 
 class WasteEventStatus(str, enum.Enum):
-    PENDING   = "pending"     # 已记录，待推理
-    ANALYZING = "analyzing"   # 推理中
-    ANALYZED  = "analyzed"    # 推理完成
-    VERIFIED  = "verified"    # 人工验证
-    CLOSED    = "closed"      # 已关闭
+    PENDING = "pending"  # 已记录，待推理
+    ANALYZING = "analyzing"  # 推理中
+    ANALYZED = "analyzed"  # 推理完成
+    VERIFIED = "verified"  # 人工验证
+    CLOSED = "closed"  # 已关闭
 
 
 class WasteEvent(Base, TimestampMixin):
@@ -55,6 +52,7 @@ class WasteEvent(Base, TimestampMixin):
     一次损耗事件 = 某个门店 + 某道菜/某种食材 + 某个数量 + 某个时间点
     推理结论写回 root_cause / confidence / evidence（来自 WasteReasoningEngine）
     """
+
     __tablename__ = "waste_events"
 
     # 主键
@@ -80,25 +78,25 @@ class WasteEvent(Base, TimestampMixin):
 
     # 理论消耗（BOM 计算值，用于差异分析）
     theoretical_qty = Column(Numeric(10, 4), nullable=True)
-    variance_qty = Column(Numeric(10, 4), nullable=True)     # actual - theoretical
-    variance_pct = Column(Float, nullable=True)               # variance / theoretical
+    variance_qty = Column(Numeric(10, 4), nullable=True)  # actual - theoretical
+    variance_pct = Column(Float, nullable=True)  # variance / theoretical
 
     # 发生时间（用户填写，可能早于创建时间）
     occurred_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
 
     # 操作人（归责）
-    reported_by = Column(String(100), nullable=True)         # 记录人（员工 ID）
-    assigned_staff_id = Column(String(100), nullable=True)   # 疑似责任人
+    reported_by = Column(String(100), nullable=True)  # 记录人（员工 ID）
+    assigned_staff_id = Column(String(100), nullable=True)  # 疑似责任人
 
     # 推理结论（由 WasteReasoningEngine 回写）
-    root_cause = Column(String(50), nullable=True)           # staff_error / food_quality / ...
+    root_cause = Column(String(50), nullable=True)  # staff_error / food_quality / ...
     confidence = Column(Float, nullable=True)
-    evidence = Column(JSON, nullable=True)                    # 推理证据链快照
-    scores = Column(JSON, nullable=True)                      # 各维度评分
+    evidence = Column(JSON, nullable=True)  # 推理证据链快照
+    scores = Column(JSON, nullable=True)  # 各维度评分
 
     # 处置
-    action_taken = Column(Text, nullable=True)               # 实际处置措施
-    wechat_action_id = Column(String(50), nullable=True)     # 关联企微 Action ID
+    action_taken = Column(Text, nullable=True)  # 实际处置措施
+    wechat_action_id = Column(String(50), nullable=True)  # 关联企微 Action ID
 
     # 图片附件（可选）
     photo_urls = Column(JSON, nullable=True)

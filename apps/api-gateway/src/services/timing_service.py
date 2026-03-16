@@ -22,7 +22,6 @@ from typing import Any, Dict, List, Optional
 import structlog
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.models.workflow import PhaseStatus, WorkflowPhase, WorkflowStatus
 
 logger = structlog.get_logger()
@@ -58,15 +57,17 @@ class TimingService:
         Returns:
             已自动锁定的阶段列表，格式 ["STORE001/procurement", ...]
         """
-        now      = datetime.utcnow()
-        locked   = []
-        warned   = []
+        now = datetime.utcnow()
+        locked = []
+        warned = []
 
         stmt = select(WorkflowPhase).where(
-            WorkflowPhase.status.in_([
-                PhaseStatus.RUNNING.value,
-                PhaseStatus.REVIEWING.value,
-            ])
+            WorkflowPhase.status.in_(
+                [
+                    PhaseStatus.RUNNING.value,
+                    PhaseStatus.REVIEWING.value,
+                ]
+            )
         )
         phases = (await self.db.execute(stmt)).scalars().all()
 
@@ -104,13 +105,13 @@ class TimingService:
     def get_time_remaining(
         self,
         phase: WorkflowPhase,
-        now:   Optional[datetime] = None,
+        now: Optional[datetime] = None,
     ) -> timedelta:
         """返回距 deadline 的剩余时间（负数表示已过期）"""
         if now is None:
             now = datetime.utcnow()
         if phase.deadline is None:
-            return timedelta(hours=24)   # 无 deadline = 宽松
+            return timedelta(hours=24)  # 无 deadline = 宽松
         return phase.deadline - now
 
     def is_overdue(self, phase: WorkflowPhase) -> bool:
@@ -119,7 +120,7 @@ class TimingService:
     def format_countdown(self, phase: WorkflowPhase) -> str:
         """返回可读倒计时字符串，如 '剩余 23 分钟' 或 '已逾期 5 分钟'"""
         remaining = self.get_time_remaining(phase)
-        secs      = int(remaining.total_seconds())
+        secs = int(remaining.total_seconds())
         if secs < 0:
             mins = abs(secs) // 60
             return f"已逾期 {mins} 分钟"
@@ -131,9 +132,7 @@ class TimingService:
 
     # ── 当前工作流所有阶段的 deadline 摘要 ───────────────────────────────────
 
-    async def get_workflow_countdown(
-        self, workflow_id
-    ) -> List[Dict[str, Any]]:
+    async def get_workflow_countdown(self, workflow_id) -> List[Dict[str, Any]]:
         """
         返回工作流所有阶段的 deadline 状态摘要（供前端倒计时组件使用）。
 
@@ -141,25 +140,23 @@ class TimingService:
             [{phase_name, phase_order, deadline_str, status,
               countdown, is_overdue, locked_at}]
         """
-        stmt = (
-            select(WorkflowPhase)
-            .where(WorkflowPhase.workflow_id == workflow_id)
-            .order_by(WorkflowPhase.phase_order)
-        )
+        stmt = select(WorkflowPhase).where(WorkflowPhase.workflow_id == workflow_id).order_by(WorkflowPhase.phase_order)
         phases = (await self.db.execute(stmt)).scalars().all()
 
         result = []
         for phase in phases:
-            result.append({
-                "phase_name":  phase.phase_name,
-                "phase_order": phase.phase_order,
-                "deadline":    phase.deadline.strftime("%H:%M") if phase.deadline else None,
-                "status":      phase.status,
-                "countdown":   self.format_countdown(phase),
-                "is_overdue":  self.is_overdue(phase),
-                "locked_at":   phase.locked_at.isoformat() if phase.locked_at else None,
-                "locked_by":   phase.locked_by,
-            })
+            result.append(
+                {
+                    "phase_name": phase.phase_name,
+                    "phase_order": phase.phase_order,
+                    "deadline": phase.deadline.strftime("%H:%M") if phase.deadline else None,
+                    "status": phase.status,
+                    "countdown": self.format_countdown(phase),
+                    "is_overdue": self.is_overdue(phase),
+                    "locked_at": phase.locked_at.isoformat() if phase.locked_at else None,
+                    "locked_by": phase.locked_by,
+                }
+            )
         return result
 
     # ── 内部方法 ──────────────────────────────────────────────────────────────
@@ -167,6 +164,7 @@ class TimingService:
     async def _auto_lock(self, phase: WorkflowPhase) -> None:
         """自动锁定过期阶段（调用 WorkflowEngine.lock_phase）"""
         from src.services.workflow_engine import WorkflowEngine
+
         engine = WorkflowEngine(self.db)
         await engine.lock_phase(phase.id, locked_by="auto")
         logger.info(
@@ -175,28 +173,26 @@ class TimingService:
             deadline=str(phase.deadline),
         )
 
-    async def _send_deadline_warning(
-        self, phase: WorkflowPhase, minutes_remaining: int
-    ) -> None:
+    async def _send_deadline_warning(self, phase: WorkflowPhase, minutes_remaining: int) -> None:
         """发送 deadline 预警到企业微信（非致命）"""
         try:
-            from src.services.wechat_action_fsm import get_wechat_fsm, ActionCategory, ActionPriority
-
             # 查询所属门店 ID
             from src.models.workflow import DailyWorkflow
+            from src.services.wechat_action_fsm import ActionCategory, ActionPriority, get_wechat_fsm
+
             wf_stmt = select(DailyWorkflow).where(DailyWorkflow.id == phase.workflow_id)
             wf = (await self.db.execute(wf_stmt)).scalar_one_or_none()
             store_id = wf.store_id if wf else "unknown"
 
             PHASE_LABELS = {
                 "initial_plan": "初版规划",
-                "procurement":  "采购确认",
-                "scheduling":   "排班确认",
-                "menu":         "菜单确认",
-                "menu_sync":    "菜单同步",
-                "marketing":    "营销推送",
+                "procurement": "采购确认",
+                "scheduling": "排班确认",
+                "menu": "菜单确认",
+                "menu_sync": "菜单同步",
+                "marketing": "营销推送",
             }
-            label    = PHASE_LABELS.get(phase.phase_name, phase.phase_name)
+            label = PHASE_LABELS.get(phase.phase_name, phase.phase_name)
             priority = ActionPriority.P0 if minutes_remaining <= 5 else ActionPriority.P1
             receiver = os.getenv("WECHAT_DEFAULT_RECEIVER", "store_manager")
 

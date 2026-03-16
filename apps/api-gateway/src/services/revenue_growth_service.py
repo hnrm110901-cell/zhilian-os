@@ -10,15 +10,15 @@ RevenueGrowth Service — 增收月报（Sprint 4）
 
 Sprint 4 KPI: 增收月报可量化 ¥ 影响
 """
+
 import logging
 from datetime import datetime, timedelta
 from typing import Optional
 
-from sqlalchemy import select, func, and_
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.models.order import Order, OrderItem
 from src.models.consumer_identity import ConsumerIdentity
+from src.models.order import Order, OrderItem
 from src.models.private_domain import PrivateDomainMember
 from src.models.reservation import Reservation
 
@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 # ── 纯函数 ──────────────────────────────────────────────────────
+
 
 def compute_revenue_growth(
     current_yuan: float,
@@ -123,22 +124,35 @@ class RevenueGrowthService:
 
         # 3. 唤醒回店营收（consumer_id 在唤醒名单中 + 本月有订单）
         wakeup_revenue = await self._estimate_wakeup_revenue(
-            db, store_id, month_start, month_end,
+            db,
+            store_id,
+            month_start,
+            month_end,
         )
 
         # 4. 新客营收（本月新建 consumer_id 的消费）
         referral_revenue = await self._estimate_new_customer_revenue(
-            db, store_id, month_start, month_end,
+            db,
+            store_id,
+            month_start,
+            month_end,
         )
 
         # 5. 毛利改善（本月 vs 上月的平均毛利率差 × 营收）
         margin_improvement = await self._estimate_margin_improvement(
-            db, store_id, month_start, month_end, prev_start,
+            db,
+            store_id,
+            month_start,
+            month_end,
+            prev_start,
         )
 
         # 6. Agent 贡献汇总
         contribution = compute_agent_contribution(
-            wakeup_revenue, referral_revenue, margin_improvement, current_revenue,
+            wakeup_revenue,
+            referral_revenue,
+            margin_improvement,
+            current_revenue,
         )
 
         return {
@@ -247,6 +261,7 @@ class RevenueGrowthService:
 
         公式：(本月均毛利率 - 上月均毛利率) × 本月营收
         """
+
         async def _avg_margin(start, end):
             result = await db.scalar(
                 select(func.avg(OrderItem.gross_margin))

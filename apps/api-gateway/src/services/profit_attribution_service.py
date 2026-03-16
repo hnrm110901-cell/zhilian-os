@@ -6,6 +6,7 @@
 数据来源：business_events 表（经营事件流水）
 输出：profit_attribution_results 缓存 + 实时归因明细
 """
+
 from __future__ import annotations
 
 import json
@@ -71,27 +72,24 @@ def build_attribution_detail(
     return {
         "revenue_breakdown": {
             "gross_revenue_yuan": round(gross_revenue, 2),
-            "refund_yuan":        round(refund, 2),
-            "net_revenue_yuan":   round(net_revenue, 2),
-            "refund_rate_pct":    _pct(refund, gross_revenue),
+            "refund_yuan": round(refund, 2),
+            "net_revenue_yuan": round(net_revenue, 2),
+            "refund_rate_pct": _pct(refund, gross_revenue),
         },
         "cost_breakdown": {
-            "food_cost":            {"yuan": round(food_cost, 2),
-                                     "pct_of_revenue": _pct(food_cost, net_revenue)},
-            "waste_cost":           {"yuan": round(waste_cost, 2),
-                                     "pct_of_revenue": _pct(waste_cost, net_revenue)},
-            "platform_commission":  {"yuan": round(platform_commission, 2),
-                                     "pct_of_revenue": _pct(platform_commission, net_revenue)},
-            "labor_cost":           {"yuan": round(labor_cost, 2),
-                                     "pct_of_revenue": _pct(labor_cost, net_revenue)},
-            "other_expense":        {"yuan": round(other_expense, 2),
-                                     "pct_of_revenue": _pct(other_expense, net_revenue)},
-            "total_cost":           {"yuan": round(total_cost, 2),
-                                     "pct_of_revenue": _pct(total_cost, net_revenue)},
+            "food_cost": {"yuan": round(food_cost, 2), "pct_of_revenue": _pct(food_cost, net_revenue)},
+            "waste_cost": {"yuan": round(waste_cost, 2), "pct_of_revenue": _pct(waste_cost, net_revenue)},
+            "platform_commission": {
+                "yuan": round(platform_commission, 2),
+                "pct_of_revenue": _pct(platform_commission, net_revenue),
+            },
+            "labor_cost": {"yuan": round(labor_cost, 2), "pct_of_revenue": _pct(labor_cost, net_revenue)},
+            "other_expense": {"yuan": round(other_expense, 2), "pct_of_revenue": _pct(other_expense, net_revenue)},
+            "total_cost": {"yuan": round(total_cost, 2), "pct_of_revenue": _pct(total_cost, net_revenue)},
         },
         "profit_summary": {
-            "gross_profit_yuan":  round(gross_profit, 2),
-            "profit_margin_pct":  _pct(gross_profit, net_revenue),
+            "gross_profit_yuan": round(gross_profit, 2),
+            "profit_margin_pct": _pct(gross_profit, net_revenue),
         },
     }
 
@@ -110,60 +108,83 @@ async def compute_profit_attribution(
 
     # 如非强制，先检查当日缓存
     if not force:
-        cached = (await db.execute(text("""
+        cached = (
+            await db.execute(
+                text("""
             SELECT * FROM profit_attribution_results
             WHERE store_id = :sid AND period = :period AND calc_date = :today
             LIMIT 1
-        """), {"sid": store_id, "period": period, "today": today})).fetchone()
+        """),
+                {"sid": store_id, "period": period, "today": today},
+            )
+        ).fetchone()
         if cached:
             return _row_to_dict(cached)
 
     # ── 从事件流水聚合各维度金额 ──────────────────────────────────────────
-    rows = (await db.execute(text("""
+    rows = (
+        await db.execute(
+            text("""
         SELECT event_type, SUM(amount_yuan) AS total_yuan, COUNT(*) AS cnt
         FROM business_events
         WHERE store_id = :sid AND period = :period
         GROUP BY event_type
-    """), {"sid": store_id, "period": period})).fetchall()
+    """),
+            {"sid": store_id, "period": period},
+        )
+    ).fetchall()
 
     # 汇总
     by_type: Dict[str, float] = {r.event_type: _safe_float(r.total_yuan) for r in rows}
     event_count = sum(r.cnt for r in rows)
 
-    gross_revenue       = by_type.get("sale", 0.0)
-    refund              = by_type.get("refund", 0.0)
-    net_revenue         = gross_revenue - refund
+    gross_revenue = by_type.get("sale", 0.0)
+    refund = by_type.get("refund", 0.0)
+    net_revenue = gross_revenue - refund
 
     # 食材成本 = 采购 + 收货（如重复则取较大值；通常只选一种来源）
     # 简化规则：purchase 为主，receipt 为补充（若没有 purchase）
     purchase_cost = by_type.get("purchase", 0.0)
-    receipt_cost  = by_type.get("receipt", 0.0)
+    receipt_cost = by_type.get("receipt", 0.0)
     food_cost = purchase_cost if purchase_cost > 0 else receipt_cost
 
-    waste_cost          = by_type.get("waste", 0.0)
+    waste_cost = by_type.get("waste", 0.0)
     platform_commission = by_type.get("settlement", 0.0)
     # expense + payment 都算其他费用
-    other_expense       = by_type.get("expense", 0.0) + by_type.get("payment", 0.0)
-    labor_cost          = 0.0  # Phase 5 Month 1 暂从 expense 中不做细分
+    other_expense = by_type.get("expense", 0.0) + by_type.get("payment", 0.0)
+    labor_cost = 0.0  # Phase 5 Month 1 暂从 expense 中不做细分
 
-    total_cost    = food_cost + waste_cost + platform_commission + labor_cost + other_expense
-    gross_profit  = net_revenue - total_cost
-    margin_pct    = _pct(gross_profit, net_revenue) if net_revenue > 0 else 0.0
+    total_cost = food_cost + waste_cost + platform_commission + labor_cost + other_expense
+    gross_profit = net_revenue - total_cost
+    margin_pct = _pct(gross_profit, net_revenue) if net_revenue > 0 else 0.0
 
     detail = build_attribution_detail(
-        gross_revenue, refund, net_revenue,
-        food_cost, waste_cost, platform_commission,
-        labor_cost, other_expense, total_cost, gross_profit,
+        gross_revenue,
+        refund,
+        net_revenue,
+        food_cost,
+        waste_cost,
+        platform_commission,
+        labor_cost,
+        other_expense,
+        total_cost,
+        gross_profit,
     )
 
     # ── 幂等 upsert ──────────────────────────────────────────────────────
-    existing = (await db.execute(text("""
+    existing = (
+        await db.execute(
+            text("""
         SELECT id FROM profit_attribution_results
         WHERE store_id = :sid AND period = :period AND calc_date = :today
-    """), {"sid": store_id, "period": period, "today": today})).fetchone()
+    """),
+            {"sid": store_id, "period": period, "today": today},
+        )
+    ).fetchone()
 
     if existing:
-        await db.execute(text("""
+        await db.execute(
+            text("""
             UPDATE profit_attribution_results SET
                 gross_revenue_yuan       = :grev,
                 refund_yuan              = :ref,
@@ -179,17 +200,30 @@ async def compute_profit_attribution(
                 attribution_detail       = :detail,
                 event_count              = :ecount
             WHERE store_id = :sid AND period = :period AND calc_date = :today
-        """), {
-            "grev": gross_revenue, "ref": refund, "nrev": net_revenue,
-            "fc": food_cost, "wc": waste_cost, "pc": platform_commission,
-            "lc": labor_cost, "oe": other_expense, "tc": total_cost,
-            "gp": gross_profit, "pmp": margin_pct,
-            "detail": json.dumps(detail), "ecount": event_count,
-            "sid": store_id, "period": period, "today": today,
-        })
+        """),
+            {
+                "grev": gross_revenue,
+                "ref": refund,
+                "nrev": net_revenue,
+                "fc": food_cost,
+                "wc": waste_cost,
+                "pc": platform_commission,
+                "lc": labor_cost,
+                "oe": other_expense,
+                "tc": total_cost,
+                "gp": gross_profit,
+                "pmp": margin_pct,
+                "detail": json.dumps(detail),
+                "ecount": event_count,
+                "sid": store_id,
+                "period": period,
+                "today": today,
+            },
+        )
     else:
         rid = str(uuid.uuid4())
-        await db.execute(text("""
+        await db.execute(
+            text("""
             INSERT INTO profit_attribution_results
               (id, store_id, period, calc_date,
                gross_revenue_yuan, refund_yuan, net_revenue_yuan,
@@ -204,43 +238,55 @@ async def compute_profit_attribution(
                :lc, :oe, :tc,
                :gp, :pmp,
                :detail, :ecount, NOW())
-        """), {
-            "id": rid,
-            "grev": gross_revenue, "ref": refund, "nrev": net_revenue,
-            "fc": food_cost, "wc": waste_cost, "pc": platform_commission,
-            "lc": labor_cost, "oe": other_expense, "tc": total_cost,
-            "gp": gross_profit, "pmp": margin_pct,
-            "detail": json.dumps(detail), "ecount": event_count,
-            "sid": store_id, "period": period, "today": today,
-        })
+        """),
+            {
+                "id": rid,
+                "grev": gross_revenue,
+                "ref": refund,
+                "nrev": net_revenue,
+                "fc": food_cost,
+                "wc": waste_cost,
+                "pc": platform_commission,
+                "lc": labor_cost,
+                "oe": other_expense,
+                "tc": total_cost,
+                "gp": gross_profit,
+                "pmp": margin_pct,
+                "detail": json.dumps(detail),
+                "ecount": event_count,
+                "sid": store_id,
+                "period": period,
+                "today": today,
+            },
+        )
 
     await db.commit()
-    logger.info("profit_attribution_computed",
-                store_id=store_id, period=period,
-                net_revenue=net_revenue, gross_profit=gross_profit)
+    logger.info(
+        "profit_attribution_computed", store_id=store_id, period=period, net_revenue=net_revenue, gross_profit=gross_profit
+    )
 
     return {
-        "store_id":  store_id,
-        "period":    period,
+        "store_id": store_id,
+        "period": period,
         "calc_date": today,
         "revenue": {
             "gross_revenue_yuan": round(gross_revenue, 2),
-            "refund_yuan":        round(refund, 2),
-            "net_revenue_yuan":   round(net_revenue, 2),
+            "refund_yuan": round(refund, 2),
+            "net_revenue_yuan": round(net_revenue, 2),
         },
         "costs": {
-            "food_cost_yuan":           round(food_cost, 2),
-            "waste_cost_yuan":          round(waste_cost, 2),
+            "food_cost_yuan": round(food_cost, 2),
+            "waste_cost_yuan": round(waste_cost, 2),
             "platform_commission_yuan": round(platform_commission, 2),
-            "labor_cost_yuan":          round(labor_cost, 2),
-            "other_expense_yuan":       round(other_expense, 2),
-            "total_cost_yuan":          round(total_cost, 2),
+            "labor_cost_yuan": round(labor_cost, 2),
+            "other_expense_yuan": round(other_expense, 2),
+            "total_cost_yuan": round(total_cost, 2),
         },
         "profit": {
             "gross_profit_yuan": round(gross_profit, 2),
             "profit_margin_pct": margin_pct,
         },
-        "event_count":        event_count,
+        "event_count": event_count,
         "attribution_detail": detail,
     }
 
@@ -254,26 +300,26 @@ def _row_to_dict(row: Any) -> Dict[str, Any]:
         except (json.JSONDecodeError, TypeError):
             detail = None
     return {
-        "store_id":  row.store_id,
-        "period":    row.period,
+        "store_id": row.store_id,
+        "period": row.period,
         "calc_date": str(row.calc_date),
         "revenue": {
             "gross_revenue_yuan": _safe_float(row.gross_revenue_yuan),
-            "refund_yuan":        _safe_float(row.refund_yuan),
-            "net_revenue_yuan":   _safe_float(row.net_revenue_yuan),
+            "refund_yuan": _safe_float(row.refund_yuan),
+            "net_revenue_yuan": _safe_float(row.net_revenue_yuan),
         },
         "costs": {
-            "food_cost_yuan":           _safe_float(row.food_cost_yuan),
-            "waste_cost_yuan":          _safe_float(row.waste_cost_yuan),
+            "food_cost_yuan": _safe_float(row.food_cost_yuan),
+            "waste_cost_yuan": _safe_float(row.waste_cost_yuan),
             "platform_commission_yuan": _safe_float(row.platform_commission_yuan),
-            "labor_cost_yuan":          _safe_float(row.labor_cost_yuan),
-            "other_expense_yuan":       _safe_float(row.other_expense_yuan),
-            "total_cost_yuan":          _safe_float(row.total_cost_yuan),
+            "labor_cost_yuan": _safe_float(row.labor_cost_yuan),
+            "other_expense_yuan": _safe_float(row.other_expense_yuan),
+            "total_cost_yuan": _safe_float(row.total_cost_yuan),
         },
         "profit": {
             "gross_profit_yuan": _safe_float(row.gross_profit_yuan),
             "profit_margin_pct": _safe_float(row.profit_margin_pct),
         },
-        "event_count":        row.event_count,
+        "event_count": row.event_count,
         "attribution_detail": detail,
     }

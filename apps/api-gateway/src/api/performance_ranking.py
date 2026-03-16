@@ -6,18 +6,17 @@ Prefix: /api/v1/fin-ranking
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.services.performance_ranking_service import (
-    compute_period_rankings,
-    get_store_ranking,
-    get_leaderboard,
-    get_benchmark_gaps,
-    get_ranking_trend,
-    get_brand_ranking_summary,
-    METRICS,
-    METRIC_LABELS,
     BENCHMARK_TYPES,
+    METRIC_LABELS,
+    METRICS,
+    compute_period_rankings,
+    get_benchmark_gaps,
+    get_brand_ranking_summary,
+    get_leaderboard,
+    get_ranking_trend,
+    get_store_ranking,
 )
 
 router = APIRouter(prefix="/api/v1/fin-ranking", tags=["performance_ranking"])
@@ -26,6 +25,7 @@ router = APIRouter(prefix="/api/v1/fin-ranking", tags=["performance_ranking"])
 # ---------------------------------------------------------------------------
 # 计算触发
 # ---------------------------------------------------------------------------
+
 
 @router.post("/compute")
 async def compute_rankings(
@@ -40,6 +40,7 @@ async def compute_rankings(
 # ---------------------------------------------------------------------------
 # 门店维度查询
 # ---------------------------------------------------------------------------
+
 
 @router.get("/store/{store_id}")
 async def store_ranking(
@@ -83,6 +84,7 @@ async def store_trend(
 # 排行榜
 # ---------------------------------------------------------------------------
 
+
 @router.get("/leaderboard")
 async def leaderboard(
     period: str = Query(..., description="YYYY-MM"),
@@ -97,15 +99,16 @@ async def leaderboard(
     return {
         "period": period,
         "metric": metric,
-        "label":  METRIC_LABELS.get(metric, metric),
-        "count":  len(board),
-        "board":  board,
+        "label": METRIC_LABELS.get(metric, metric),
+        "count": len(board),
+        "board": board,
     }
 
 
 # ---------------------------------------------------------------------------
 # 品牌维度
 # ---------------------------------------------------------------------------
+
 
 @router.get("/brand-summary")
 async def brand_summary(
@@ -121,13 +124,14 @@ async def brand_summary(
 # 元数据
 # ---------------------------------------------------------------------------
 
+
 @router.get("/meta")
 async def meta():
     """返回支持的指标与基准类型。"""
     return {
-        "metrics":         list(METRICS),
-        "metric_labels":   METRIC_LABELS,
+        "metrics": list(METRICS),
+        "metric_labels": METRIC_LABELS,
         "benchmark_types": list(BENCHMARK_TYPES),
-        "tiers":           ["top", "above_avg", "below_avg", "laggard"],
-        "rank_changes":    ["improved", "declined", "stable", "new"],
+        "tiers": ["top", "above_avg", "below_avg", "laggard"],
+        "rank_changes": ["improved", "declined", "stable", "new"],
     }

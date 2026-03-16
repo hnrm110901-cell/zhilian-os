@@ -6,23 +6,26 @@
 - 按客户维度查触达历史（防止重复触达）
 - 按门店维度汇总触达效果
 """
+
+import uuid
+from datetime import date, datetime, timedelta
+from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
-from datetime import date, datetime, timedelta
-import uuid
+from sqlalchemy import and_, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
-from ..models.user import User
 from ..models.notification import Notification
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, func
+from ..models.user import User
 
 router = APIRouter()
 
 
 # ── 营销触达记录查询 ─────────────────────────────────────────────
+
 
 @router.get("/api/v1/marketing-touchpoints/customer")
 async def get_customer_touchpoints(
@@ -43,35 +46,42 @@ async def get_customer_touchpoints(
 
     # 从通知表查询发送给该客户的营销消息
     result = await session.execute(
-        select(Notification).where(
+        select(Notification)
+        .where(
             and_(
                 Notification.store_id == store_id,
                 Notification.created_at >= since,
                 # 通过 metadata JSON 字段匹配手机号
             )
-        ).order_by(Notification.created_at.desc()).limit(50)
+        )
+        .order_by(Notification.created_at.desc())
+        .limit(50)
     )
     notifications = result.scalars().all()
 
     # 过滤匹配手机号的通知
     touchpoints = []
     for n in notifications:
-        meta = n.metadata_json if hasattr(n, 'metadata_json') else {}
+        meta = n.metadata_json if hasattr(n, "metadata_json") else {}
         if isinstance(meta, dict) and meta.get("customer_phone") == customer_phone:
-            touchpoints.append({
-                "id": str(n.id),
-                "type": n.type.value if hasattr(n.type, 'value') else str(n.type),
-                "title": n.title,
-                "content": n.content[:100] if n.content else None,
-                "channel": meta.get("channel", "system"),
-                "sent_at": n.created_at.isoformat() if n.created_at else None,
-                "is_read": n.is_read if hasattr(n, 'is_read') else None,
-            })
+            touchpoints.append(
+                {
+                    "id": str(n.id),
+                    "type": n.type.value if hasattr(n.type, "value") else str(n.type),
+                    "title": n.title,
+                    "content": n.content[:100] if n.content else None,
+                    "channel": meta.get("channel", "system"),
+                    "sent_at": n.created_at.isoformat() if n.created_at else None,
+                    "is_read": n.is_read if hasattr(n, "is_read") else None,
+                }
+            )
 
     # 计算触达频率
-    recent_7d = sum(1 for t in touchpoints
-                    if t.get("sent_at") and
-                    datetime.fromisoformat(t["sent_at"]) > datetime.utcnow() - timedelta(days=7))
+    recent_7d = sum(
+        1
+        for t in touchpoints
+        if t.get("sent_at") and datetime.fromisoformat(t["sent_at"]) > datetime.utcnow() - timedelta(days=7)
+    )
 
     return {
         "customer_phone": customer_phone[:3] + "****" + customer_phone[-4:],
@@ -98,7 +108,7 @@ async def get_touchpoint_summary(
     query = (
         select(
             Notification.type,
-            func.count().label('count'),
+            func.count().label("count"),
         )
         .where(
             and_(
@@ -117,10 +127,12 @@ async def get_touchpoint_summary(
     for r in rows:
         count = int(r.count)
         total += count
-        channels.append({
-            "type": r.type.value if hasattr(r.type, 'value') else str(r.type),
-            "count": count,
-        })
+        channels.append(
+            {
+                "type": r.type.value if hasattr(r.type, "value") else str(r.type),
+                "count": count,
+            }
+        )
 
     return {
         "store_id": store_id,

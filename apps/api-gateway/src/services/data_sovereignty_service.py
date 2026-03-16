@@ -3,6 +3,7 @@
 - 加密导出：导出的 JSON 使用客户密钥 AES-256 加密，屯象无法解密。
 - 断开权：导出后删除该租户/门店在图谱中的数据，停服后本地可保留导出文件。
 """
+
 from __future__ import annotations
 
 import base64
@@ -11,7 +12,6 @@ import json
 from typing import Any, Dict, List, Optional
 
 import structlog
-
 from src.core.config import settings
 from src.ontology import get_ontology_repository
 from src.services.ontology_export_service import export_graph_snapshot
@@ -29,8 +29,8 @@ def encrypt_export_json(export_dict: Dict[str, Any], customer_key: str) -> str:
     """使用客户密钥 AES-256-CBC 加密导出 JSON，返回 base64 密文。"""
     try:
         from Crypto.Cipher import AES
-        from Crypto.Util.Padding import pad
         from Crypto.Random import get_random_bytes
+        from Crypto.Util.Padding import pad
     except ImportError:
         raise RuntimeError("需要 pycryptodome 库以支持加密导出: pip install pycryptodome")
     key = _aes_key_from_customer(customer_key)
@@ -80,7 +80,12 @@ def export_encrypted(
     if key:
         try:
             cipher_b64 = encrypt_export_json(snapshot, key)
-            return {"encrypted": True, "cipher_base64": cipher_b64, "algorithm": "AES-256-CBC", "note": "客户自持密钥解密，屯象无法解密"}
+            return {
+                "encrypted": True,
+                "cipher_base64": cipher_b64,
+                "algorithm": "AES-256-CBC",
+                "note": "客户自持密钥解密，屯象无法解密",
+            }
         except Exception as e:
             logger.warning("data_sovereignty_encrypt_failed", error=str(e))
             return {"error": f"加密失败: {e}", "encrypted": False}

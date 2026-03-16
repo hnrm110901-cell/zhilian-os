@@ -4,16 +4,16 @@
 与 fct.py 契约一致，但使用 API Key 认证（X-API-Key），不依赖屯象OS 用户与权限。
 用于独立服务部署时对外暴露；租户可通过请求体或 X-Tenant-Id 传递。
 """
+
 from datetime import date
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Header
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
-
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.config import settings
 from src.core.database import get_db
 from src.services.fct_service import fct_service
-from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 
@@ -139,7 +139,15 @@ async def create_manual_voucher(
         if isinstance(biz_date, str):
             biz_date = date.fromisoformat(biz_date)
         return await fct_service.create_manual_voucher(
-            session, tenant_id=body["tenant_id"], entity_id=body["entity_id"], biz_date=biz_date, lines=body["lines"], description=body.get("description"), attachments=body.get("attachments"), budget_check=body.get("budget_check"), budget_occupy=body.get("budget_occupy")
+            session,
+            tenant_id=body["tenant_id"],
+            entity_id=body["entity_id"],
+            biz_date=biz_date,
+            lines=body["lines"],
+            description=body.get("description"),
+            attachments=body.get("attachments"),
+            budget_check=body.get("budget_check"),
+            budget_occupy=body.get("budget_occupy"),
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -154,7 +162,13 @@ async def update_voucher_status(
 ) -> Dict[str, Any]:
     """凭证状态变更。body: { status, budget_check?, budget_occupy? }"""
     try:
-        return await fct_service.update_voucher_status(session, voucher_id=voucher_id, target_status=body["status"], budget_check=body.get("budget_check"), budget_occupy=body.get("budget_occupy"))
+        return await fct_service.update_voucher_status(
+            session,
+            voucher_id=voucher_id,
+            target_status=body["status"],
+            budget_check=body.get("budget_check"),
+            budget_occupy=body.get("budget_occupy"),
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -220,7 +234,16 @@ async def get_ledger_entries(
 ) -> Dict[str, Any]:
     try:
         return await fct_service.get_ledger_entries(
-            session, tenant_id=tenant_id, entity_id=entity_id, start_date=start_date, end_date=end_date, period=period, account_code=account_code, posted_only=posted_only, skip=skip, limit=limit
+            session,
+            tenant_id=tenant_id,
+            entity_id=entity_id,
+            start_date=start_date,
+            end_date=end_date,
+            period=period,
+            account_code=account_code,
+            posted_only=posted_only,
+            skip=skip,
+            limit=limit,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -313,7 +336,14 @@ async def get_cash_transactions(
     _: None = Depends(verify_fct_api_key),
 ) -> Dict[str, Any]:
     return await fct_service.list_cash_transactions(
-        session, tenant_id=tenant_id, entity_id=entity_id, start_date=start_date, end_date=end_date, status=status, skip=skip, limit=limit
+        session,
+        tenant_id=tenant_id,
+        entity_id=entity_id,
+        start_date=start_date,
+        end_date=end_date,
+        status=status,
+        skip=skip,
+        limit=limit,
     )
 
 
@@ -329,7 +359,17 @@ async def create_cash_transaction(
         if isinstance(tx_date, str):
             tx_date = date.fromisoformat(tx_date)
         return await fct_service.create_cash_transaction(
-            session, tenant_id=body["tenant_id"], entity_id=body["entity_id"], tx_date=tx_date, amount=float(body["amount"]), direction=body["direction"], description=body.get("description"), ref_id=body.get("ref_id"), generate_voucher=body.get("generate_voucher", False), budget_check=body.get("budget_check"), budget_occupy=body.get("budget_occupy")
+            session,
+            tenant_id=body["tenant_id"],
+            entity_id=body["entity_id"],
+            tx_date=tx_date,
+            amount=float(body["amount"]),
+            direction=body["direction"],
+            description=body.get("description"),
+            ref_id=body.get("ref_id"),
+            generate_voucher=body.get("generate_voucher", False),
+            budget_check=body.get("budget_check"),
+            budget_occupy=body.get("budget_occupy"),
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -345,7 +385,11 @@ async def match_cash_transaction(
     """body: match_id?（不传或空则取消匹配）, match_type?, remark?"""
     try:
         return await fct_service.match_cash_transaction(
-            session, transaction_id=transaction_id, match_id=body.get("match_id"), match_type=body.get("match_type"), remark=body.get("remark")
+            session,
+            transaction_id=transaction_id,
+            match_id=body.get("match_id"),
+            match_type=body.get("match_type"),
+            remark=body.get("remark"),
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -397,7 +441,14 @@ async def get_tax_invoices(
     _: None = Depends(verify_fct_api_key),
 ) -> Dict[str, Any]:
     return await fct_service.list_tax_invoices(
-        session, tenant_id=tenant_id, entity_id=entity_id, invoice_type=invoice_type, start_date=start_date, end_date=end_date, skip=skip, limit=limit
+        session,
+        tenant_id=tenant_id,
+        entity_id=entity_id,
+        invoice_type=invoice_type,
+        start_date=start_date,
+        end_date=end_date,
+        skip=skip,
+        limit=limit,
     )
 
 
@@ -413,7 +464,16 @@ async def create_tax_invoice(
         if isinstance(inv_date, str):
             inv_date = date.fromisoformat(inv_date)
         return await fct_service.create_tax_invoice(
-            session, tenant_id=body["tenant_id"], entity_id=body["entity_id"], invoice_type=body["invoice_type"], invoice_no=body.get("invoice_no"), amount=body.get("amount"), tax_amount=body.get("tax_amount"), invoice_date=inv_date, status=body.get("status") or "draft", extra=body.get("extra")
+            session,
+            tenant_id=body["tenant_id"],
+            entity_id=body["entity_id"],
+            invoice_type=body["invoice_type"],
+            invoice_no=body.get("invoice_no"),
+            amount=body.get("amount"),
+            tax_amount=body.get("tax_amount"),
+            invoice_date=inv_date,
+            status=body.get("status") or "draft",
+            extra=body.get("extra"),
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -432,7 +492,14 @@ async def update_tax_invoice(
         if isinstance(inv_date, str):
             inv_date = date.fromisoformat(inv_date)
         return await fct_service.update_tax_invoice(
-            session, invoice_id=invoice_id, invoice_no=body.get("invoice_no"), amount=body.get("amount"), tax_amount=body.get("tax_amount"), invoice_date=inv_date, status=body.get("status"), extra=body.get("extra")
+            session,
+            invoice_id=invoice_id,
+            invoice_no=body.get("invoice_no"),
+            amount=body.get("amount"),
+            tax_amount=body.get("tax_amount"),
+            invoice_date=inv_date,
+            status=body.get("status"),
+            extra=body.get("extra"),
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -491,9 +558,7 @@ async def get_reports(
         if not tenant_id or not period:
             raise HTTPException(status_code=400, detail="consolidated 报表需传 tenant_id 与 period(YYYYMM)")
         try:
-            return await fct_service.get_report_consolidated(
-                session, tenant_id=tenant_id, period=period, group_by=group_by
-            )
+            return await fct_service.get_report_consolidated(session, tenant_id=tenant_id, period=period, group_by=group_by)
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
     if not tenant_id:
@@ -502,6 +567,7 @@ async def get_reports(
     if period and len(period) == 6:
         try:
             from calendar import monthrange
+
             _start = date(int(period[:4]), int(period[4:6]), 1)
             _end = date(int(period[:4]), int(period[4:6]), monthrange(int(period[:4]), int(period[4:6]))[1])
         except (ValueError, TypeError):
@@ -519,20 +585,26 @@ async def get_reports(
             session, tenant_id=tenant_id, entity_id=entity_id, start_date=_start, end_date=_end, group_by=group_by or "day"
         )
     if report_type == "by_entity":
-        return await fct_service.get_report_by_entity(
-            session, tenant_id=tenant_id, start_date=_start, end_date=_end
-        )
+        return await fct_service.get_report_by_entity(session, tenant_id=tenant_id, start_date=_start, end_date=_end)
     if report_type == "by_region":
-        return await fct_service.get_report_by_region(
-            session, tenant_id=tenant_id, start_date=_start, end_date=_end
-        )
+        return await fct_service.get_report_by_region(session, tenant_id=tenant_id, start_date=_start, end_date=_end)
     if report_type == "comparison":
         return await fct_service.get_report_comparison(
-            session, tenant_id=tenant_id, entity_id=entity_id, start_date=_start, end_date=_end, compare_type=compare_type or "yoy"
+            session,
+            tenant_id=tenant_id,
+            entity_id=entity_id,
+            start_date=_start,
+            end_date=_end,
+            compare_type=compare_type or "yoy",
         )
     if report_type == "plan_vs_actual":
         return await fct_service.get_plan_vs_actual(
-            session, tenant_id=tenant_id, entity_id=entity_id, start_date=_start, end_date=_end, granularity=granularity or "month"
+            session,
+            tenant_id=tenant_id,
+            entity_id=entity_id,
+            start_date=_start,
+            end_date=_end,
+            granularity=granularity or "month",
         )
     supported = fct_service.get_supported_report_types()
     raise HTTPException(
@@ -580,7 +652,13 @@ async def upsert_petty_cash(
     _: None = Depends(verify_fct_api_key),
 ) -> Dict[str, Any]:
     return await fct_service.upsert_petty_cash(
-        session, tenant_id=body["tenant_id"], entity_id=body["entity_id"], cash_type=body["cash_type"], amount_limit=float(body["amount_limit"]), status=body.get("status") or "active", extra=body.get("extra")
+        session,
+        tenant_id=body["tenant_id"],
+        entity_id=body["entity_id"],
+        cash_type=body["cash_type"],
+        amount_limit=float(body["amount_limit"]),
+        status=body.get("status") or "active",
+        extra=body.get("extra"),
     )
 
 
@@ -594,7 +672,9 @@ async def list_petty_cash(
     session: AsyncSession = Depends(get_db_fct),
     _: None = Depends(verify_fct_api_key),
 ) -> Dict[str, Any]:
-    return await fct_service.list_petty_cash(session, tenant_id=tenant_id, entity_id=entity_id, cash_type=cash_type, skip=skip, limit=limit)
+    return await fct_service.list_petty_cash(
+        session, tenant_id=tenant_id, entity_id=entity_id, cash_type=cash_type, skip=skip, limit=limit
+    )
 
 
 @router.post("/petty-cash/records", summary="备用金流水：申请/冲销/还款")
@@ -607,7 +687,14 @@ async def add_petty_cash_record(
     if isinstance(biz_date, str):
         biz_date = date.fromisoformat(biz_date)
     return await fct_service.add_petty_cash_record(
-        session, petty_cash_id=body["petty_cash_id"], record_type=body["record_type"], amount=float(body["amount"]), biz_date=biz_date, ref_type=body.get("ref_type"), ref_id=body.get("ref_id"), description=body.get("description")
+        session,
+        petty_cash_id=body["petty_cash_id"],
+        record_type=body["record_type"],
+        amount=float(body["amount"]),
+        biz_date=biz_date,
+        ref_type=body.get("ref_type"),
+        ref_id=body.get("ref_id"),
+        description=body.get("description"),
     )
 
 
@@ -621,7 +708,9 @@ async def list_petty_cash_records(
     session: AsyncSession = Depends(get_db_fct),
     _: None = Depends(verify_fct_api_key),
 ) -> Dict[str, Any]:
-    return await fct_service.list_petty_cash_records(session, petty_cash_id=petty_cash_id, start_date=start_date, end_date=end_date, skip=skip, limit=limit)
+    return await fct_service.list_petty_cash_records(
+        session, petty_cash_id=petty_cash_id, start_date=start_date, end_date=end_date, skip=skip, limit=limit
+    )
 
 
 # ---------- Phase 4：预算占位 ----------
@@ -632,7 +721,15 @@ async def upsert_budget(
     _: None = Depends(verify_fct_api_key),
 ) -> Dict[str, Any]:
     return await fct_service.upsert_budget(
-        session, tenant_id=body["tenant_id"], budget_type=body["budget_type"], period=body["period"], category=body["category"], amount=float(body["amount"]), entity_id=body.get("entity_id") or "", status=body.get("status") or "active", extra=body.get("extra")
+        session,
+        tenant_id=body["tenant_id"],
+        budget_type=body["budget_type"],
+        period=body["period"],
+        category=body["category"],
+        amount=float(body["amount"]),
+        entity_id=body.get("entity_id") or "",
+        status=body.get("status") or "active",
+        extra=body.get("extra"),
     )
 
 
@@ -647,7 +744,15 @@ async def check_budget(
     session: AsyncSession = Depends(get_db_fct),
     _: None = Depends(verify_fct_api_key),
 ) -> Dict[str, Any]:
-    return await fct_service.check_budget(session, tenant_id=tenant_id, budget_type=budget_type, period=period, category=category, amount_to_use=amount_to_use, entity_id=entity_id or "")
+    return await fct_service.check_budget(
+        session,
+        tenant_id=tenant_id,
+        budget_type=budget_type,
+        period=period,
+        category=category,
+        amount_to_use=amount_to_use,
+        entity_id=entity_id or "",
+    )
 
 
 @router.post("/budgets/occupy", summary="预算占用")
@@ -657,7 +762,13 @@ async def occupy_budget(
     _: None = Depends(verify_fct_api_key),
 ) -> Dict[str, Any]:
     return await fct_service.occupy_budget(
-        session, tenant_id=body["tenant_id"], budget_type=body["budget_type"], period=body["period"], category=body["category"], amount=float(body["amount"]), entity_id=body.get("entity_id") or ""
+        session,
+        tenant_id=body["tenant_id"],
+        budget_type=body["budget_type"],
+        period=body["period"],
+        category=body["category"],
+        amount=float(body["amount"]),
+        entity_id=body.get("entity_id") or "",
     )
 
 
@@ -734,8 +845,8 @@ async def create_approval(
       - extra: { approved_by, comment, ... }
     """
     tenant_id = body.get("tenant_id")
-    ref_type  = body.get("ref_type")
-    ref_id    = body.get("ref_id")
+    ref_type = body.get("ref_type")
+    ref_id = body.get("ref_id")
     if not tenant_id or not ref_type or not ref_id:
         raise HTTPException(status_code=400, detail="tenant_id / ref_type / ref_id 为必填字段")
     try:

@@ -3,6 +3,7 @@
 库存差异检测 → BOM 偏差计算 → 时间窗口关联员工 → 供应商批次定位 → 根因评分（TOP3）
 输出带溯源的根因报告。
 """
+
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
@@ -11,8 +12,7 @@ from typing import Any, Dict, List, Optional
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.models import Schedule, Shift, PurchaseOrder, Order, OrderItem, Dish
+from src.models import Dish, Order, OrderItem, PurchaseOrder, Schedule, Shift
 from src.ontology import get_ontology_repository
 from src.services.bom_resolver import BOMResolverService
 
@@ -46,14 +46,16 @@ async def _step1_inventory_variance(
         qty_last = float(snaps_sorted[-1].get("qty", 0))
         diff = qty_last - qty_first
         rate = (diff / qty_first * 100) if qty_first else 0
-        variances.append({
-            "ing_id": ing_id,
-            "qty_start": qty_first,
-            "qty_end": qty_last,
-            "diff": diff,
-            "diff_rate_pct": round(rate, 2),
-            "trace": [snaps_sorted[0].get("ts"), snaps_sorted[-1].get("ts")],
-        })
+        variances.append(
+            {
+                "ing_id": ing_id,
+                "qty_start": qty_first,
+                "qty_end": qty_last,
+                "diff": diff,
+                "diff_rate_pct": round(rate, 2),
+                "trace": [snaps_sorted[0].get("ts"), snaps_sorted[-1].get("ts")],
+            }
+        )
     return variances
 
 
@@ -103,9 +105,7 @@ async def _step2_bom_deviation(
         try:
             if active_dishes and dt_start and dt_end:
                 for dish in active_dishes:
-                    qty = await BOMResolverService.get_theoretical_qty(
-                        session, str(dish.id), store_id, ing_id
-                    )
+                    qty = await BOMResolverService.get_theoretical_qty(session, str(dish.id), store_id, ing_id)
                     if qty > 0:
                         bom_dish_ids.append(str(dish.id))
                         sales_q = (
@@ -126,7 +126,9 @@ async def _step2_bom_deviation(
         except Exception as e:
             logger.debug(
                 "waste_reasoning_step2_resolver_error",
-                ing_id=ing_id, store_id=store_id, error=str(e),
+                ing_id=ing_id,
+                store_id=store_id,
+                error=str(e),
             )
 
         # ── Fallback: 原 Neo4j Cypher 路径 ──────────────────────────────
@@ -145,25 +147,31 @@ async def _step2_bom_deviation(
                         )
                         bom_rows = [dict(rec) for rec in r]
                     if not bom_rows:
-                        deviations.append({
-                            "ing_id": ing_id,
-                            "actual": actual_consumption,
-                            "expected": 0,
-                            "deviation": actual_consumption,
-                            "anomaly": actual_consumption > 0,
-                            "trace": "无BOM关联",
-                        })
+                        deviations.append(
+                            {
+                                "ing_id": ing_id,
+                                "actual": actual_consumption,
+                                "expected": 0,
+                                "deviation": actual_consumption,
+                                "anomaly": actual_consumption > 0,
+                                "trace": "无BOM关联",
+                            }
+                        )
                         continue
                     expected = 0.0
                     if dt_start and dt_end:
                         for row in bom_rows:
                             dish_id_neo = row.get("dish_id")
                             std_qty = float(row.get("std_qty", 0))
-                            q = select(OrderItem).join(Order, OrderItem.order_id == Order.id).where(
-                                Order.store_id == store_id,
-                                Order.order_time >= dt_start,
-                                Order.order_time <= dt_end,
-                                OrderItem.item_id == str(dish_id_neo),
+                            q = (
+                                select(OrderItem)
+                                .join(Order, OrderItem.order_id == Order.id)
+                                .where(
+                                    Order.store_id == store_id,
+                                    Order.order_time >= dt_start,
+                                    Order.order_time <= dt_end,
+                                    OrderItem.item_id == str(dish_id_neo),
+                                )
                             )
                             res = await session.execute(q)
                             items = res.scalars().all()
@@ -171,30 +179,32 @@ async def _step2_bom_deviation(
                             expected += std_qty * sales
                     bom_dish_ids = [row.get("dish_id") for row in bom_rows]
                 except Exception as e:
-                    logger.debug(
-                        "waste_reasoning_bom_expected_skip", ing_id=ing_id, error=str(e)
-                    )
+                    logger.debug("waste_reasoning_bom_expected_skip", ing_id=ing_id, error=str(e))
             else:
                 # Neo4j 不可用且 resolver 也失败
-                deviations.append({
-                    "ing_id": ing_id,
-                    "actual": actual_consumption,
-                    "expected": 0,
-                    "deviation": actual_consumption,
-                    "anomaly": actual_consumption > 0,
-                    "trace": "无BOM关联",
-                })
+                deviations.append(
+                    {
+                        "ing_id": ing_id,
+                        "actual": actual_consumption,
+                        "expected": 0,
+                        "deviation": actual_consumption,
+                        "anomaly": actual_consumption > 0,
+                        "trace": "无BOM关联",
+                    }
+                )
                 continue
 
         dev = actual_consumption - expected
-        deviations.append({
-            "ing_id": ing_id,
-            "actual": actual_consumption,
-            "expected": expected,
-            "deviation": dev,
-            "anomaly": abs(dev) > (expected * 0.2 if expected else 0),
-            "trace": bom_dish_ids,
-        })
+        deviations.append(
+            {
+                "ing_id": ing_id,
+                "actual": actual_consumption,
+                "expected": expected,
+                "deviation": dev,
+                "anomaly": abs(dev) > (expected * 0.2 if expected else 0),
+                "trace": bom_dish_ids,
+            }
+        )
     return deviations
 
 
@@ -245,12 +255,14 @@ async def _step4_supplier_batch(
             if ing_id and str(it_ing) != str(ing_id):
                 continue
             ed = getattr(po, "expected_delivery", None)
-            batches.append({
-                "supplier_id": po.supplier_id,
-                "order_id": po.id,
-                "ing_id": it_ing,
-                "trace": ed.isoformat() if ed else str(po.id),
-            })
+            batches.append(
+                {
+                    "supplier_id": po.supplier_id,
+                    "order_id": po.id,
+                    "ing_id": it_ing,
+                    "trace": ed.isoformat() if ed else str(po.id),
+                }
+            )
     return batches[:20]
 
 
@@ -264,38 +276,46 @@ def _step5_root_cause_score(
     candidates: List[Dict[str, Any]] = []
     for v in variances:
         if abs(v.get("diff_rate_pct", 0)) > 10:
-            candidates.append({
-                "dimension": "inventory_variance",
-                "ing_id": v.get("ing_id"),
-                "score": min(100, abs(v.get("diff_rate_pct", 0)) * 2),
-                "reason": f"库存变化率 {v.get('diff_rate_pct')}%",
-                "trace": v.get("trace", []),
-            })
+            candidates.append(
+                {
+                    "dimension": "inventory_variance",
+                    "ing_id": v.get("ing_id"),
+                    "score": min(100, abs(v.get("diff_rate_pct", 0)) * 2),
+                    "reason": f"库存变化率 {v.get('diff_rate_pct')}%",
+                    "trace": v.get("trace", []),
+                }
+            )
     for d in deviations:
         if d.get("anomaly"):
-            candidates.append({
-                "dimension": "bom_deviation",
-                "ing_id": d.get("ing_id"),
-                "score": 70,
-                "reason": f"BOM偏差 实际{d.get('actual')} vs 预期{d.get('expected')}",
-                "trace": d.get("trace", []),
-            })
+            candidates.append(
+                {
+                    "dimension": "bom_deviation",
+                    "ing_id": d.get("ing_id"),
+                    "score": 70,
+                    "reason": f"BOM偏差 实际{d.get('actual')} vs 预期{d.get('expected')}",
+                    "trace": d.get("trace", []),
+                }
+            )
     for s in staff[:5]:
-        candidates.append({
-            "dimension": "time_window_staff",
-            "staff_id": s.get("staff_id"),
-            "score": 40,
-            "reason": "当班员工",
-            "trace": s.get("trace", []),
-        })
+        candidates.append(
+            {
+                "dimension": "time_window_staff",
+                "staff_id": s.get("staff_id"),
+                "score": 40,
+                "reason": "当班员工",
+                "trace": s.get("trace", []),
+            }
+        )
     for b in batches[:3]:
-        candidates.append({
-            "dimension": "supplier_batch",
-            "supplier_id": b.get("supplier_id"),
-            "score": 50,
-            "reason": "近期采购批次",
-            "trace": b.get("trace", []),
-        })
+        candidates.append(
+            {
+                "dimension": "supplier_batch",
+                "supplier_id": b.get("supplier_id"),
+                "score": 50,
+                "reason": "近期采购批次",
+                "trace": b.get("trace", []),
+            }
+        )
     candidates.sort(key=lambda x: x.get("score", 0), reverse=True)
     return candidates[:3]
 
@@ -340,6 +360,7 @@ async def run_waste_reasoning(
     if top3:
         try:
             from src.core.celery_tasks import dispatch_training_recommendation
+
             for i, cause in enumerate(top3):
                 dimension = cause.get("dimension", "")
                 if dimension:

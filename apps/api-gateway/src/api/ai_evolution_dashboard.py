@@ -4,9 +4,10 @@ AI Evolution Dashboard
 
 让客户用数据回答：AI这周帮我省了多少钱？AI变聪明了吗？
 """
-from fastapi import APIRouter, Query
+
 from typing import Optional
 
+from fastapi import APIRouter, Query
 from src.services.ai_evolution_service import AIEvolutionService
 
 router = APIRouter()

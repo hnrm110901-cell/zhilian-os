@@ -1,7 +1,9 @@
 """
 本体图谱 Cypher：约束与索引（用于 Neo4j 初始化）
 """
-from .schema import NodeLabel, NODE_ID_PROP, ExtensionNodeLabel, EXTENSION_ID_PROP
+
+from .schema import EXTENSION_ID_PROP, NODE_ID_PROP, ExtensionNodeLabel, NodeLabel
+
 
 # 创建唯一性约束（保证节点唯一，便于 MERGE）
 def constraints_cypher() -> list[str]:
@@ -11,10 +13,7 @@ def constraints_cypher() -> list[str]:
         if prop:
             # Neo4j 5.x: CREATE CONSTRAINT ... FOR (n:Label) REQUIRE n.prop IS UNIQUE
             name = f"constraint_{label.value}_{prop}_unique"
-            statements.append(
-                f"CREATE CONSTRAINT {name} IF NOT EXISTS "
-                f"FOR (n:{label.value}) REQUIRE n.{prop} IS UNIQUE"
-            )
+            statements.append(f"CREATE CONSTRAINT {name} IF NOT EXISTS " f"FOR (n:{label.value}) REQUIRE n.{prop} IS UNIQUE")
     return statements
 
 
@@ -25,10 +24,7 @@ def extension_constraints_cypher() -> list[str]:
         prop = EXTENSION_ID_PROP.get(label.value)
         if prop:
             name = f"constraint_{label.value}_{prop}_unique"
-            statements.append(
-                f"CREATE CONSTRAINT {name} IF NOT EXISTS "
-                f"FOR (n:{label.value}) REQUIRE n.{prop} IS UNIQUE"
-            )
+            statements.append(f"CREATE CONSTRAINT {name} IF NOT EXISTS " f"FOR (n:{label.value}) REQUIRE n.{prop} IS UNIQUE")
     return statements
 
 

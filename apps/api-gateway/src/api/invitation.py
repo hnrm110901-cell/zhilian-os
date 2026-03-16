@@ -1,20 +1,21 @@
 """
 AI邀请函API — 管理端 + 公开端
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 import structlog
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
+from ..middleware.public_rate_limiter import check_ip_rate_limit
 from ..models.invitation import Invitation, InvitationTemplate
 from ..models.user import User
 from ..services.invitation_service import invitation_service
-from ..middleware.public_rate_limiter import check_ip_rate_limit
 
 logger = structlog.get_logger()
 
@@ -22,6 +23,7 @@ router = APIRouter(prefix="/api/v1", tags=["invitation"])
 
 
 # ── Pydantic Models ──
+
 
 class CreateInvitationRequest(BaseModel):
     store_id: str
@@ -38,11 +40,13 @@ class CreateInvitationRequest(BaseModel):
     venue_lat: Optional[float] = None
     venue_lng: Optional[float] = None
 
+
 class GenerateTextRequest(BaseModel):
-    genre: str = "现代诗"      # 藏头诗/现代诗/对联/文言文/古诗/口号
-    mood: str = "正式"          # 简约/豪放/正式
-    emotion: str = "庆祝"      # 庆祝/感恩/回忆/庄重/鼓励
+    genre: str = "现代诗"  # 藏头诗/现代诗/对联/文言文/古诗/口号
+    mood: str = "正式"  # 简约/豪放/正式
+    emotion: str = "庆祝"  # 庆祝/感恩/回忆/庄重/鼓励
     guest_name: str = ""
+
 
 class RSVPRequest(BaseModel):
     guest_name: str = Field(..., max_length=100)
@@ -51,6 +55,7 @@ class RSVPRequest(BaseModel):
     dietary_restrictions: str = ""
     message: str = ""  # 祝福语
     status: str = "attending"
+
 
 class InvitationResponse(BaseModel):
     id: str
@@ -97,6 +102,7 @@ def _get_public_db():
 
 
 # ── 管理端（需登录） ──
+
 
 @router.post("/invitations", response_model=InvitationResponse, status_code=201)
 async def create_invitation(
@@ -182,6 +188,7 @@ async def get_rsvps(
 
 
 # ── 公开端（无需登录） ──
+
 
 @router.get("/public/invitation/{share_token}")
 async def view_invitation(

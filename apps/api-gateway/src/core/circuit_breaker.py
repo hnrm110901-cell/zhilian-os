@@ -2,19 +2,22 @@
 Circuit Breaker模式实现
 用于防止向量数据库Silent Failure导致的级联故障
 """
-import time
-import structlog
-import os
-from enum import Enum
-from typing import Callable, Any
-from functools import wraps
+
 import asyncio
+import os
+import time
+from enum import Enum
+from functools import wraps
+from typing import Any, Callable
+
+import structlog
 
 logger = structlog.get_logger()
 
 
 class CircuitState(str, Enum):
     """熔断器状态"""
+
     CLOSED = "closed"  # 正常状态，允许请求通过
     OPEN = "open"  # 熔断状态，拒绝请求
     HALF_OPEN = "half_open"  # 半开状态，允许部分请求测试服务是否恢复
@@ -203,6 +206,7 @@ class CircuitBreaker:
 
 class CircuitBreakerOpenError(Exception):
     """熔断器打开异常"""
+
     pass
 
 

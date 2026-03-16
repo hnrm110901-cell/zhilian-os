@@ -22,7 +22,6 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.core.dependencies import get_current_user
 from src.models.user import User
@@ -33,17 +32,19 @@ router = APIRouter(prefix="/api/v1/l3", tags=["l3_knowledge"])
 
 # ── Pydantic Schemas ──────────────────────────────────────────────────────────
 
+
 class MaterializeIn(BaseModel):
-    target_date:  Optional[date] = Field(None, description="物化日期（默认昨日）")
-    store_ids:    Optional[List[str]] = Field(None, description="指定门店列表（None=全部）")
+    target_date: Optional[date] = Field(None, description="物化日期（默认昨日）")
+    store_ids: Optional[List[str]] = Field(None, description="指定门店列表（None=全部）")
 
 
 class SyncGraphIn(BaseModel):
-    store_ids:   Optional[List[str]] = Field(None, description="指定门店列表（None=全部）")
+    store_ids: Optional[List[str]] = Field(None, description="指定门店列表（None=全部）")
     metric_date: Optional[date] = Field(None, description="基准日期（默认昨日）")
 
 
 # ── 基准 / 百分位端点 ──────────────────────────────────────────────────────────
+
 
 @router.get(
     "/stores/{store_id}/benchmarks",
@@ -51,10 +52,10 @@ class SyncGraphIn(BaseModel):
     response_model=List[dict],
 )
 async def get_store_benchmarks(
-    store_id:    str,
+    store_id: str,
     metric_date: Optional[date] = Query(None, description="查询日期，默认昨日"),
-    db:          AsyncSession = Depends(get_db),
-    _:           User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """
     返回指定门店在同伴组中所有 6 个核心指标的百分位报告：
@@ -76,11 +77,11 @@ async def get_store_benchmarks(
     response_model=List[dict],
 )
 async def get_similar_stores(
-    store_id:  str,
-    top_n:     int   = Query(5, ge=1, le=20, description="返回数量"),
+    store_id: str,
+    top_n: int = Query(5, ge=1, le=20, description="返回数量"),
     min_score: float = Query(0.55, ge=0.0, le=1.0, description="相似度最低阈值"),
-    db:        AsyncSession = Depends(get_db),
-    _:         User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """
     从 store_similarity_cache 返回与目标门店最相似的 Top-N 门店，
@@ -97,22 +98,23 @@ async def get_similar_stores(
 )
 async def get_peer_group(
     store_id: str,
-    db:       AsyncSession = Depends(get_db),
-    _:        User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """
     返回门店所属同伴组的完整信息（tier / region / store_count / member_ids）。
     """
-    from sqlalchemy import select
-    from src.models.cross_store import StorePeerGroup, CrossStoreMetric
     from datetime import timedelta
+
+    from sqlalchemy import select
+    from src.models.cross_store import CrossStoreMetric, StorePeerGroup
 
     # 通过最近一条 metric 记录推断同伴组
     yesterday = date.today() - timedelta(days=1)
     stmt = (
         select(CrossStoreMetric.peer_group, CrossStoreMetric.peer_count)
         .where(
-            CrossStoreMetric.store_id    == store_id,
+            CrossStoreMetric.store_id == store_id,
             CrossStoreMetric.metric_date == yesterday,
         )
         .limit(1)
@@ -131,16 +133,17 @@ async def get_peer_group(
         return {"group_key": group_key, "store_count": row[1]}
 
     return {
-        "group_key":   group.group_key,
-        "tier":        group.tier,
-        "region":      group.region,
+        "group_key": group.group_key,
+        "tier": group.tier,
+        "region": group.region,
         "store_count": group.store_count,
-        "store_ids":   group.store_ids,
-        "updated_at":  group.updated_at.isoformat() if group.updated_at else None,
+        "store_ids": group.store_ids,
+        "updated_at": group.updated_at.isoformat() if group.updated_at else None,
     }
 
 
 # ── 标杆 / BOM 分析端点 ────────────────────────────────────────────────────────
+
 
 @router.get(
     "/stores/best-practice",
@@ -148,13 +151,13 @@ async def get_peer_group(
     response_model=List[dict],
 )
 async def get_best_practice_stores(
-    metric_name:    str   = Query(..., description="指标名: waste_rate/cost_ratio/bom_compliance/..."),
-    top_n:          int   = Query(5, ge=1, le=20),
-    direction:      str   = Query("lower_better", pattern="^(lower_better|higher_better)$"),
+    metric_name: str = Query(..., description="指标名: waste_rate/cost_ratio/bom_compliance/..."),
+    top_n: int = Query(5, ge=1, le=20),
+    direction: str = Query("lower_better", pattern="^(lower_better|higher_better)$"),
     peer_group_key: Optional[str] = Query(None, description="同伴组 key，如 standard_华东"),
-    metric_date:    Optional[date] = Query(None, description="查询日期，默认昨日"),
-    db:             AsyncSession = Depends(get_db),
-    _:              User = Depends(get_current_user),
+    metric_date: Optional[date] = Query(None, description="查询日期，默认昨日"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """
     返回同组内某指标表现最佳的 Top-N 门店排行榜。
@@ -178,10 +181,10 @@ async def get_best_practice_stores(
     response_model=List[dict],
 )
 async def get_bom_variance(
-    dish_id:     Optional[str] = Query(None, description="指定菜品 ID（None=全部）"),
+    dish_id: Optional[str] = Query(None, description="指定菜品 ID（None=全部）"),
     min_variance: float = Query(0.10, ge=0.0, le=1.0, description="最小方差过滤阈值"),
-    db:          AsyncSession = Depends(get_db),
-    _:           User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """
     分析同一菜品在不同门店 BOM 配方中的用量差异。
@@ -199,6 +202,7 @@ async def get_bom_variance(
 
 # ── 运维操作端点（需要 admin/manager 权限） ────────────────────────────────────
 
+
 @router.post(
     "/materialize",
     summary="触发日维度指标物化",
@@ -206,8 +210,8 @@ async def get_bom_variance(
 )
 async def trigger_materialize(
     body: MaterializeIn = MaterializeIn(),
-    db:   AsyncSession = Depends(get_db),
-    _:    User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """
     将各门店当日核心指标写入 `cross_store_metrics` 物化表，
@@ -231,8 +235,8 @@ async def trigger_materialize(
 )
 async def trigger_sync_graph(
     body: SyncGraphIn = SyncGraphIn(),
-    db:   AsyncSession = Depends(get_db),
-    _:    User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """
     将门店节点 + SIMILAR_TO / BENCHMARK_OF / SHARES_RECIPE / OCCURRED_IN 边
@@ -255,13 +259,14 @@ async def trigger_sync_graph(
 )
 async def seed_cross_store_rules(
     db: AsyncSession = Depends(get_db),
-    _:  User = Depends(get_current_user),
+    _: User = Depends(get_current_user),
 ):
     """
     幂等植入 50 条 CROSS_STORE 类推理规则。
     已存在的 rule_code 自动跳过，可重复调用。
     """
     from src.services.knowledge_rule_service import KnowledgeRuleService
+
     svc = KnowledgeRuleService(db)
     result = await svc.seed_cross_store_rules()
     await db.commit()

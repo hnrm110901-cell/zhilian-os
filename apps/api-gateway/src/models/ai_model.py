@@ -1,10 +1,15 @@
 """
 AI 模型市场数据模型
 """
-from sqlalchemy import Column, String, Integer, Float, DateTime, Text, Enum as SQLEnum, ForeignKey, Numeric
-from sqlalchemy.orm import relationship
-from datetime import datetime
+
 import enum
+from datetime import datetime
+
+from sqlalchemy import Column, DateTime
+from sqlalchemy import Enum as SQLEnum
+from sqlalchemy import Float, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy.orm import relationship
+
 from .base import Base
 
 
@@ -37,6 +42,7 @@ class PurchaseStatus(str, enum.Enum):
 
 class AIModel(Base):
     """AI 模型表"""
+
     __tablename__ = "ai_models"
 
     id = Column(String(36), primary_key=True)
@@ -59,6 +65,7 @@ class AIModel(Base):
 
 class ModelPurchaseRecord(Base):
     """模型购买记录表"""
+
     __tablename__ = "model_purchases"
 
     id = Column(String(36), primary_key=True)
@@ -75,6 +82,7 @@ class ModelPurchaseRecord(Base):
 
 class DataContributionRecord(Base):
     """数据贡献记录表"""
+
     __tablename__ = "data_contributions"
 
     id = Column(String(36), primary_key=True)
