@@ -4,7 +4,8 @@
 
 interface RequestOptions extends RequestInit {
   requiresAuth?: boolean;
-  _retry?: boolean; // Internal flag to prevent infinite retry loops
+  _retry?: boolean;        // Internal flag to prevent 401-refresh infinite loops
+  _networkRetry?: boolean; // Internal flag to prevent network-error infinite loops
 }
 
 class APIClient {
@@ -87,7 +88,7 @@ class APIClient {
     endpoint: string,
     options: RequestOptions = {}
   ): Promise<T> {
-    const { requiresAuth = true, _retry = false, ...fetchOptions } = options;
+    const { requiresAuth = true, _retry = false, _networkRetry = false, ...fetchOptions } = options;
 
     const url = `${this.baseURL}${endpoint}`;
     const headers = {
@@ -95,10 +96,29 @@ class APIClient {
       ...fetchOptions.headers,
     };
 
-    const response = await fetch(url, {
-      ...fetchOptions,
-      headers,
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        ...fetchOptions,
+        headers,
+        signal: controller.signal,
+      });
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        throw new Error('网络请求超时，请检查网络连接');
+      }
+      // Network error: retry once after 1s
+      if (!_networkRetry) {
+        await new Promise<void>(resolve => setTimeout(resolve, 1000));
+        return this.request<T>(endpoint, { ...options, _networkRetry: true });
+      }
+      throw new Error('网络连接失败，请稍后重试');
+    }
+    clearTimeout(timeoutId);
 
     // Handle 401 Unauthorized - try to refresh token
     if (response.status === 401 && requiresAuth && !_retry) {

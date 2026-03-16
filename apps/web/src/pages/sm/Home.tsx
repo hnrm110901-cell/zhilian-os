@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Form, Input, InputNumber, Modal, Select } from 'antd';
+import { Form, Input, InputNumber, message, Modal, Select } from 'antd';
+import { useAuth } from '../../contexts/AuthContext';
 import {
   ZCard, ZKpi, ZBadge, ZButton, ZSkeleton, ZEmpty, HealthRing, UrgencyList,
 } from '../../design-system/components';
@@ -10,8 +11,6 @@ import { apiClient } from '../../services/api';
 import { handleApiError, showInfo, showSuccess } from '../../utils/message';
 import RecommendationCard from '../../components/RecommendationCard';
 import styles from './Home.module.css';
-
-const STORE_ID = localStorage.getItem('store_id') || 'STORE001';
 
 interface DailyDecision {
   has_decision: boolean;
@@ -107,6 +106,8 @@ const REJECT_REASON_OPTIONS = [
 
 export default function SmHome() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const storeId = user?.store_id ?? '';
   const [data, setData] = useState<MobileHomeSummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -142,8 +143,9 @@ export default function SmHome() {
   };
 
   const queryAdviceByDate = useCallback(async (dateStr: string): Promise<AdviceCardData | null> => {
+    if (!storeId) return null;
     try {
-      const adviceResp = await apiClient.get<StaffingAdvicePayload>(`/api/v1/workforce/stores/${STORE_ID}/staffing-advice`, {
+      const adviceResp = await apiClient.get<StaffingAdvicePayload>(`/api/v1/workforce/stores/${storeId}/staffing-advice`, {
         params: { date: dateStr, meal_period: 'all_day' },
       });
       if (adviceResp.exists) {
@@ -165,7 +167,7 @@ export default function SmHome() {
     }
 
     try {
-      const forecast = await apiClient.get<any>(`/api/v1/workforce/stores/${STORE_ID}/labor-forecast`, {
+      const forecast = await apiClient.get<any>(`/api/v1/workforce/stores/${storeId}/labor-forecast`, {
         params: { date: dateStr },
       });
       const periods = forecast?.periods || {};
@@ -184,9 +186,10 @@ export default function SmHome() {
     } catch {
       return null;
     }
-  }, []);
+  }, [storeId]);
 
   const loadStaffingAdvice = useCallback(async () => {
+    if (!storeId) return;
     setAdviceLoading(true);
     try {
       const now = new Date();
@@ -196,7 +199,7 @@ export default function SmHome() {
         queryAdviceByDate(today),
         queryAdviceByDate(tomorrow),
       ]);
-      const history = await apiClient.get<AdviceHistoryResp>(`/api/v1/workforce/stores/${STORE_ID}/staffing-advice/history`, {
+      const history = await apiClient.get<AdviceHistoryResp>(`/api/v1/workforce/stores/${storeId}/staffing-advice/history`, {
         params: { days: 7 },
       });
       setAdviceMap({
@@ -207,10 +210,11 @@ export default function SmHome() {
     } catch {
       setAdviceMap({ today: null, tomorrow: null });
       setAdviceHistory(null);
+      message.warning('人力建议数据加载失败，已显示缓存');
     } finally {
       setAdviceLoading(false);
     }
-  }, [queryAdviceByDate]);
+  }, [queryAdviceByDate, storeId]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -226,16 +230,17 @@ export default function SmHome() {
   }, []);
 
   const loadDailyDecision = useCallback(async () => {
+    if (!storeId) return;
     setDecisionLoading(true);
     try {
-      const resp = await apiClient.get<DailyDecision>(`/api/v1/brain/stores/${STORE_ID}/today`);
+      const resp = await apiClient.get<DailyDecision>(`/api/v1/brain/stores/${storeId}/today`);
       setDailyDecision(resp);
     } catch {
       setDailyDecision(null);
     } finally {
       setDecisionLoading(false);
     }
-  }, []);
+  }, [storeId]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { loadStaffingAdvice(); }, [loadStaffingAdvice]);
@@ -255,7 +260,7 @@ export default function SmHome() {
     try {
       const values = await adviceForm.validateFields();
       setAdviceSubmitting(true);
-      const resp = await apiClient.post<any>(`/api/v1/workforce/stores/${STORE_ID}/staffing-advice/confirm`, {
+      const resp = await apiClient.post<any>(`/api/v1/workforce/stores/${storeId}/staffing-advice/confirm`, {
         advice_date: advice.date,
         meal_period: advice.meal_period,
         action: values.action,
@@ -278,7 +283,7 @@ export default function SmHome() {
     } finally {
       setAdviceSubmitting(false);
     }
-  }, [adviceForm, adviceKey, adviceMap, loadStaffingAdvice]);
+  }, [adviceForm, adviceKey, adviceMap, loadStaffingAdvice, storeId]);
 
   const today = new Date().toLocaleDateString('zh-CN', {
     month: 'long', day: 'numeric', weekday: 'short',
@@ -333,7 +338,7 @@ export default function SmHome() {
       <div className={styles.header}>
         <div>
           <div className={styles.greeting}>{greeting()}，{data?.role_name || '店长'}</div>
-          <div className={styles.date}>{today} · {STORE_ID}</div>
+          <div className={styles.date}>{today} · {storeId}</div>
         </div>
         <ZButton variant="ghost" size="sm" onClick={() => { load(); loadStaffingAdvice(); loadDailyDecision(); }}>↺ 刷新</ZButton>
       </div>
@@ -629,7 +634,7 @@ export default function SmHome() {
 
       {/* AI 经营推荐 */}
       <div style={{ margin: '0 12px 12px' }}>
-        <RecommendationCard storeId={STORE_ID} compact maxItems={3} />
+        <RecommendationCard storeId={storeId} compact maxItems={3} />
       </div>
 
       <Modal
