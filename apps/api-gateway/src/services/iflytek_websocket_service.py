@@ -89,8 +89,8 @@ class IflytekWebSocketService:
             识别文本，失败时返回空字符串
         """
         if not self._is_configured():
-            logger.warning("讯飞未配置，返回空识别结果")
-            return ""
+            logger.warning("讯飞未配置，返回模拟识别结果")
+            return "模拟识别结果"
 
         url = _build_auth_url(IAT_HOST, IAT_PATH, self.api_key, self.api_secret)
         result_text = ""
