@@ -32,15 +32,14 @@ from sqlalchemy.dialects import postgresql
 
 
 def _create_enum_safe(name: str, values: list[str]) -> None:
-    """创建 enum，已存在则跳过"""
-    op.execute(f"""
-        DO $$
-        BEGIN
-            CREATE TYPE {name} AS ENUM ({', '.join(f"'{v}'" for v in values)});
-        EXCEPTION
-            WHEN duplicate_object THEN NULL;
-        END $$;
-    """)
+    """安全创建 PostgreSQL ENUM（已存在则跳过，兼容 offline SQL 生成模式）"""
+    vals = ", ".join(f"'{v}'" for v in values)
+    op.execute(sa.text(
+        f"DO $$ BEGIN "
+        f"CREATE TYPE {name} AS ENUM ({vals}); "
+        f"EXCEPTION WHEN duplicate_object THEN NULL; "
+        f"END $$"
+    ))
 
 
 def upgrade() -> None:

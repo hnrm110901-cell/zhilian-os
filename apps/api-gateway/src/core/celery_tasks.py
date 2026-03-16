@@ -4759,6 +4759,8 @@ def marketing_auto_outreach(self, store_id: str = None) -> Dict[str, Any]:
     async def _run():
         from ..services.marketing_agent_service import MarketingAgentService
         from ..models.store import Store
+        from ..core.database import get_db_session
+        from datetime import datetime
 
         results = []
         async with get_db_session() as session:

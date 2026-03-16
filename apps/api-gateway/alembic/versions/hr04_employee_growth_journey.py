@@ -23,16 +23,14 @@ depends_on = None
 
 
 def _create_enum_safe(name, values):
-    """安全创建 PostgreSQL ENUM"""
-    from sqlalchemy import text
-    conn = op.get_bind()
-    result = conn.execute(
-        text("SELECT 1 FROM pg_type WHERE typname = :name"),
-        {"name": name},
-    )
-    if result.fetchone() is None:
-        enum_type = sa.Enum(*values, name=name)
-        enum_type.create(conn)
+    """安全创建 PostgreSQL ENUM（已存在则跳过，兼容 offline SQL 生成模式）"""
+    vals = ", ".join(f"'{v}'" for v in values)
+    op.execute(sa.text(
+        f"DO $$ BEGIN "
+        f"CREATE TYPE {name} AS ENUM ({vals}); "
+        f"EXCEPTION WHEN duplicate_object THEN NULL; "
+        f"END $$"
+    ))
 
 
 def upgrade():
