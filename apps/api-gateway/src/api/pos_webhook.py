@@ -11,6 +11,7 @@ Webhook POS 适配器
 支持的 POS 格式（通过 source 字段区分）：
   - meituan   美团收银
   - keruyun   客如云
+  - pinzhi    品智收银（专用端点 /{store_id}/pinzhi-order + MD5 签名）
   - generic   通用格式（自定义字段映射）
 """
 
@@ -25,6 +26,9 @@ from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import BaseModel
 from src.core.database import get_db_session
 from src.models.order import Order, OrderItem, OrderStatus
+
+# 品智签名验证需要 token
+PINZHI_WEBHOOK_TOKEN = os.getenv("PINZHI_WEBHOOK_TOKEN", "")
 
 logger = structlog.get_logger()
 
@@ -135,9 +139,86 @@ def _normalize_keruyun(raw: Dict[str, Any]) -> WebhookOrderPayload:
     )
 
 
+def _normalize_pinzhi(raw: Dict[str, Any]) -> WebhookOrderPayload:
+    """
+    品智 POS Webhook 字段映射
+
+    品智原始字段（参考 queryOrderListV2.do / Webhook 推送）：
+      billId, billNo, orderSource, tableNo, openTime, payTime,
+      dishPriceTotal, specialOfferPrice, realPrice, billStatus,
+      dishList[{dishId, dishName, dishPrice, dishNum}]
+    金额单位：分（整数）
+    """
+    items = [
+        WebhookOrderItem(
+            item_id=str(d.get("dishId", "")),
+            item_name=d.get("dishName", ""),
+            quantity=int(d.get("dishNum", d.get("quantity", 1))),
+            unit_price=int(d.get("dishPrice", d.get("price", 0))),
+            subtotal=int(d.get("dishPrice", d.get("price", 0)))
+            * int(d.get("dishNum", d.get("quantity", 1))),
+        )
+        for d in raw.get("dishList", [])
+    ]
+
+    # billStatus: 1=已结账 0=未结账 2=已退单
+    bill_status = raw.get("billStatus", 0)
+    status_map = {1: "completed", 0: "pending", 2: "cancelled"}
+    status = status_map.get(bill_status, "pending")
+
+    return WebhookOrderPayload(
+        source="pinzhi",
+        external_order_id=str(raw.get("billId", raw.get("billNo", ""))),
+        table_number=raw.get("tableNo"),
+        customer_name=raw.get("vipCard"),  # 品智用 vipCard 标识客户
+        customer_phone=None,
+        status=status,
+        total_amount=int(raw.get("dishPriceTotal", 0)),
+        discount_amount=int(raw.get("specialOfferPrice", 0)),
+        final_amount=int(raw.get("realPrice", 0)),
+        order_time=raw.get("payTime") or raw.get("openTime"),
+        items=items,
+        notes=raw.get("remark"),
+        raw=raw,
+    )
+
+
+def _pinzhi_generate_sign(token: str, params: Dict[str, Any]) -> str:
+    """
+    品智 MD5 签名算法（内联实现，避免跨包导入问题）。
+    规则：参数按 key ASCII 升序拼接（排除 sign/pageIndex/pageSize），
+    末尾加 &token=xxx，整体 MD5 取 32 位小写 hex。
+    """
+    filtered = {
+        k: v
+        for k, v in params.items()
+        if k not in ("sign", "pageIndex", "pageSize") and v is not None
+    }
+    ordered = sorted(filtered.items())
+    param_str = "&".join(f"{k}={v}" for k, v in ordered)
+    param_str += f"&token={token}"
+    return hashlib.md5(param_str.encode("utf-8")).hexdigest()
+
+
+def _verify_pinzhi_signature(raw: Dict[str, Any]) -> bool:
+    """
+    验证品智 Webhook 推送签名（MD5）。
+    品智签名规则：参数按 key ASCII 升序拼接 + token，MD5 取 hex。
+    未配置 PINZHI_WEBHOOK_TOKEN 时跳过验证。
+    """
+    if not PINZHI_WEBHOOK_TOKEN:
+        return True
+    sign = raw.get("sign", "")
+    if not sign:
+        return False
+    expected = _pinzhi_generate_sign(PINZHI_WEBHOOK_TOKEN, raw)
+    return expected == sign
+
+
 NORMALIZERS = {
     "meituan": _normalize_meituan,
     "keruyun": _normalize_keruyun,
+    "pinzhi": _normalize_pinzhi,
 }
 
 
@@ -235,12 +316,46 @@ async def receive_pos_order(
     return {"success": True, "order_id": order_id, "source": source}
 
 
+@router.post("/{store_id}/pinzhi-order")
+async def receive_pinzhi_order(
+    store_id: str,
+    request: Request,
+):
+    """
+    品智 POS 专用 Webhook 端点
+
+    品智 POS 推送订单到此端点，使用品智自有的 MD5 签名验证。
+    配置方式：在品智后台设置 Webhook URL 为
+      POST {base}/api/v1/pos-webhook/{store_id}/pinzhi-order
+
+    签名验证：配置 PINZHI_WEBHOOK_TOKEN 环境变量后自动启用。
+    """
+    raw = await request.json()
+
+    # 品智签名验证（MD5，与品智 API 签名规则一致）
+    if not _verify_pinzhi_signature(raw):
+        raise HTTPException(status_code=401, detail="品智签名验证失败")
+
+    payload = _normalize_pinzhi(raw)
+    order_id = await _upsert_order(store_id, payload)
+
+    logger.info(
+        "pinzhi_webhook.order_received",
+        store_id=store_id,
+        order_id=order_id,
+        bill_id=raw.get("billId"),
+    )
+
+    return {"success": True, "order_id": order_id, "source": "pinzhi"}
+
+
 @router.get("/{store_id}/test")
 async def test_webhook_endpoint(store_id: str):
     """连通性测试，POS 系统配置 Webhook 后可先 GET 验证"""
     return {
         "status": "ok",
         "store_id": store_id,
-        "supported_sources": ["meituan", "keruyun", "generic"],
+        "supported_sources": ["meituan", "keruyun", "pinzhi", "generic"],
         "signature_required": bool(WEBHOOK_SECRET),
+        "pinzhi_signature_required": bool(PINZHI_WEBHOOK_TOKEN),
     }
