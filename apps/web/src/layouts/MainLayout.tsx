@@ -101,6 +101,8 @@ interface SidebarItem {
   key: string;
   label: string;
   icon: React.ReactNode;
+  hidden?: boolean;     // 完全隐藏（stub 页面）
+  comingSoon?: boolean; // 显示为灰色禁用 + "即将上线" tooltip
 }
 
 interface SidebarGroup {
@@ -129,7 +131,7 @@ const DOMAIN_SIDEBAR: DomainSidebar = {
       items: [
         { key: '/finance',              icon: <DollarOutlined />,     label: '财务管理' },
         { key: '/budget-management',    icon: <DollarOutlined />,     label: '预算管理' },
-        { key: '/settlement-risk',      icon: <SafetyOutlined />,     label: '结算风控' },
+        { key: '/settlement-risk',      icon: <SafetyOutlined />,     label: '结算风控',   comingSoon: true },
         { key: '/financial-alerts',     icon: <BellOutlined />,       label: '财务预警' },
       ],
     },
@@ -170,7 +172,7 @@ const DOMAIN_SIDEBAR: DomainSidebar = {
       groupLabel: '前厅接待',
       items: [
         { key: '/queue',                icon: <TeamOutlined />,            label: '排队叫号' },
-        { key: '/floor-plan',          icon: <EnvironmentOutlined />,     label: '桌台实况' },
+        { key: '/floor-plan',          icon: <EnvironmentOutlined />,     label: '桌台实况',  hidden: true },
         { key: '/service',              icon: <CustomerServiceOutlined />, label: '服务质量' },
       ],
     },
@@ -181,7 +183,7 @@ const DOMAIN_SIDEBAR: DomainSidebar = {
         { key: '/banquet-sales',        icon: <FundOutlined />,            label: '宴会销控' },
         { key: '/event-orders',         icon: <FileTextOutlined />,        label: 'EO执行单' },
         { key: '/reservation-analytics', icon: <PieChartOutlined />,     label: '预订分析' },
-        { key: '/reservation-ai',      icon: <RobotOutlined />,           label: 'AI预订助手' },
+        { key: '/reservation-ai',      icon: <RobotOutlined />,           label: 'AI预订助手', comingSoon: true },
         { key: '/invitation-manager',  icon: <ShareAltOutlined />,        label: 'AI邀请函' },
       ],
     },
@@ -207,7 +209,7 @@ const DOMAIN_SIDEBAR: DomainSidebar = {
         { key: '/customer360',         icon: <UserOutlined />,      label: '客户360' },
         { key: '/private-domain',      icon: <TeamOutlined />,      label: '私域运营' },
         { key: '/cdp-monitor',         icon: <DatabaseOutlined />,  label: '数据中台' },
-        { key: '/customer-risk',       icon: <SafetyOutlined />,    label: '客户风控' },
+        { key: '/customer-risk',       icon: <SafetyOutlined />,    label: '客户风控',   comingSoon: true },
       ],
     },
     {
@@ -230,7 +232,7 @@ const DOMAIN_SIDEBAR: DomainSidebar = {
         { key: '/dishes',              icon: <ShoppingOutlined />,     label: '菜品管理' },
         { key: '/bom-management',      icon: <ReadOutlined />,         label: 'BOM配方' },
         { key: '/dish-cost',           icon: <DollarOutlined />,       label: '菜品成本' },
-        { key: '/dish-rd',             icon: <ExperimentOutlined />,   label: '菜品研发' },
+        { key: '/dish-rd',             icon: <ExperimentOutlined />,   label: '菜品研发',   hidden: true },
       ],
     },
     {
@@ -811,8 +813,8 @@ const MainLayout: React.FC = () => {
 
           {filteredSidebarGroups.map((group) => {
             const expanded = sidebarFilter ? true : isGroupExpanded(group.groupLabel);
-            // 过滤权限
-            const visibleItems = group.items.filter(item => isRouteAllowed(item.key));
+            // 过滤权限和隐藏项
+            const visibleItems = group.items.filter(item => !item.hidden && isRouteAllowed(item.key));
             if (visibleItems.length === 0) return null;
 
             return (
@@ -832,15 +834,23 @@ const MainLayout: React.FC = () => {
 
                 {/* Group Items */}
                 {expanded && visibleItems.map((item) => (
-                  <Tooltip key={item.key} title={sidebarCollapsed ? item.label : ''} placement="right">
+                  <Tooltip
+                    key={item.key}
+                    title={item.comingSoon ? '即将上线' : sidebarCollapsed ? item.label : ''}
+                    placement="right"
+                  >
                     <button
                       className={`${styles.sidebarItem} ${
                         location.pathname === item.key ? styles.sidebarItemActive : ''
                       } ${sidebarCollapsed ? styles.sidebarItemCollapsed : ''}`}
-                      onClick={() => navigate(item.key)}
+                      style={item.comingSoon ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
+                      onClick={() => { if (!item.comingSoon) navigate(item.key); }}
                     >
                       <span className={styles.sidebarItemIcon}>{item.icon}</span>
                       {!sidebarCollapsed && item.label}
+                      {!sidebarCollapsed && item.comingSoon && (
+                        <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-tertiary)', fontWeight: 400 }}>即将</span>
+                      )}
                     </button>
                   </Tooltip>
                 ))}

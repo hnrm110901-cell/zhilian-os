@@ -6,7 +6,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import {
   Row, Col, Card, Select, Button, Alert, Tag, Table, Statistic,
   Space, Spin, Typography, Divider, Badge,
-  List, Tooltip,
+  List, Tooltip, message,
 } from 'antd';
 import {
   CheckCircleOutlined, ReloadOutlined, WarningOutlined,
@@ -80,6 +80,8 @@ const DailyHubPage: React.FC = () => {
       ]);
       if (boardRes.status === 'fulfilled') setBoard(boardRes.value);
       if (kpiData.status === 'fulfilled')  setKpi(kpiData.value);
+      const failCount = [boardRes, kpiData].filter(r => r.status === 'rejected').length;
+      if (failCount > 0) message.warning('部分数据加载失败，已显示缓存');
     } finally {
       setLoading(false);
     }

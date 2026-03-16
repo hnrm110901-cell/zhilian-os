@@ -85,8 +85,8 @@ class TestAgentEndpoints:
             },
         )
 
-        # Should return 403 Forbidden without authentication
-        assert response.status_code == 403
+        # Should return 401 Unauthorized without authentication
+        assert response.status_code == 401
 
     def test_schedule_agent_with_auth(self, client, auth_headers):
         """Test schedule agent endpoint with authentication"""
