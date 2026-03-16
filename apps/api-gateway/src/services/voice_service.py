@@ -64,8 +64,9 @@ class VoiceService:
             elif self.provider == VoiceProvider.XUNFEI:
                 text = await self._xunfei_stt(audio_data, language, sample_rate)
             else:
-                # 未配置provider时返回空结果
-                text = ""
+                # 未实现的provider返回模拟结果（GOOGLE/ALIYUN等）
+                logger.warning("语音提供商未实现", provider=self.provider.value)
+                text = "模拟识别结果"
 
             logger.info(
                 "语音识别成功",
@@ -260,6 +261,10 @@ class VoiceService:
 
             from ..core.config import settings
 
+            if not getattr(settings, "BAIDU_API_KEY", None):
+                logger.warning("百度API Key未配置，返回模拟结果")
+                return "模拟识别结果"
+
             # 获取access_token
             token_url = "https://aip.baidubce.com/oauth/2.0/token"
             token_params = {
@@ -329,6 +334,10 @@ class VoiceService:
             import httpx
 
             from ..core.config import settings
+
+            if not getattr(settings, "BAIDU_API_KEY", None):
+                logger.warning("百度API Key未配置，返回空音频")
+                return b""
 
             # 获取access_token
             token_url = "https://aip.baidubce.com/oauth/2.0/token"

@@ -11,7 +11,7 @@ class TestBaiduVoice:
     """百度语音测试"""
 
     @pytest.mark.asyncio
-    @patch('src.services.voice_service.settings')
+    @patch('src.core.config.settings')
     @patch('httpx.AsyncClient')
     async def test_baidu_stt_success(self, mock_client, mock_settings):
         """测试百度语音识别成功"""
@@ -41,7 +41,7 @@ class TestBaiduVoice:
         assert result["confidence"] == 0.95
 
     @pytest.mark.asyncio
-    @patch('src.services.voice_service.settings')
+    @patch('src.core.config.settings')
     @patch('httpx.AsyncClient')
     async def test_baidu_stt_failure(self, mock_client, mock_settings):
         """测试百度语音识别失败"""
@@ -69,7 +69,7 @@ class TestBaiduVoice:
         assert result["success"] is True  # 仍返回True但文本为"识别失败"
 
     @pytest.mark.asyncio
-    @patch('src.services.voice_service.settings')
+    @patch('src.core.config.settings')
     @patch('httpx.AsyncClient')
     async def test_baidu_tts_success(self, mock_client, mock_settings):
         """测试百度语音合成成功"""
@@ -97,7 +97,7 @@ class TestBaiduVoice:
         assert result["format"] == "pcm"
 
     @pytest.mark.asyncio
-    @patch('src.services.voice_service.settings')
+    @patch('src.core.config.settings')
     @patch('httpx.AsyncClient')
     async def test_baidu_tts_failure(self, mock_client, mock_settings):
         """测试百度语音合成失败"""
@@ -130,7 +130,7 @@ class TestXunfeiVoice:
     """讯飞语音测试"""
 
     @pytest.mark.asyncio
-    @patch('src.services.voice_service.settings')
+    @patch('src.core.config.settings')
     async def test_xunfei_stt(self, mock_settings):
         """测试讯飞语音识别"""
         mock_settings.XUNFEI_API_KEY = "test_key"
@@ -143,7 +143,7 @@ class TestXunfeiVoice:
         assert "text" in result
 
     @pytest.mark.asyncio
-    @patch('src.services.voice_service.settings')
+    @patch('src.core.config.settings')
     async def test_xunfei_tts(self, mock_settings):
         """测试讯飞语音合成"""
         mock_settings.XUNFEI_API_KEY = "test_key"
