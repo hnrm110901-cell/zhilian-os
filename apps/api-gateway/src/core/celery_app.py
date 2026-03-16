@@ -179,6 +179,10 @@ celery_app.conf.update(
             "queue": "default",
             "routing_key": "default",
         },
+        "src.core.celery_tasks.generate_and_send_weekly_report": {
+            "queue": "default",
+            "routing_key": "default",
+        },
         "src.core.celery_tasks.refresh_private_domain_rfm": {
             "queue": "low_priority",
             "routing_key": "low_priority",
@@ -803,6 +807,17 @@ celery_app.conf.update(
             "schedule": crontab(minute="*/5"),
             "args": (),
             "options": {"queue": "default", "priority": 7},
+        },
+        # 周报：每周五 10:00 UTC（北京 18:00）生成本周汇总 + 企微推送
+        "generate-weekly-report": {
+            "task": "src.core.celery_tasks.generate_and_send_weekly_report",
+            "schedule": crontab(
+                hour=int(os.getenv("WEEKLY_REPORT_HOUR", "10")),
+                minute=int(os.getenv("WEEKLY_REPORT_MINUTE", "0")),
+                day_of_week=int(os.getenv("WEEKLY_REPORT_DOW", "5")),  # 5=Friday
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 5},
         },
     },
 )

@@ -587,6 +587,84 @@ def generate_and_send_daily_report(
     return asyncio.run(_run())
 
 
+# ── 周报生成（每周五 10:00 UTC / 北京时间 18:00）──────────────────────────────
+
+
+@celery_app.task(bind=True, max_retries=2, default_retry_delay=300)
+def generate_and_send_weekly_report(self) -> Dict[str, Any]:
+    """
+    为所有活跃门店生成周报（汇总本周 7 天 DailyReport）。
+
+    周报内容：本周营收/订单/客流汇总 + 周环比 + 每日趋势。
+    通过企微推送给店长和管理员。
+
+    调度：每周五 10:00 UTC（beat_schedule 配置）
+    """
+    import asyncio
+
+    async def _run():
+        from src.services.weekly_report_service import WeeklyReportService
+
+        svc = WeeklyReportService()
+        result = await svc.generate_all_stores()
+
+        # 推送周报摘要到企微
+        sent_count = 0
+        try:
+            from src.core.database import get_db_session
+            from src.models.user import User, UserRole
+            from src.services.wechat_work_message_service import wechat_work_message_service
+
+            for report in result.get("reports", []):
+                store_id = report["store_id"]
+                summary = report.get("summary", "")
+                if not summary:
+                    continue
+
+                async with get_db_session() as session:
+                    from sqlalchemy import select
+
+                    mgr_result = await session.execute(
+                        select(User).where(
+                            User.store_id == store_id,
+                            User.is_active == True,
+                            User.role.in_([UserRole.STORE_MANAGER, UserRole.ADMIN]),
+                            User.wechat_user_id.isnot(None),
+                        )
+                    )
+                    managers = mgr_result.scalars().all()
+
+                for mgr in managers:
+                    try:
+                        await wechat_work_message_service.send_text_message(
+                            user_id=mgr.wechat_user_id, content=summary,
+                        )
+                        sent_count += 1
+                    except Exception:
+                        pass  # 发送失败不阻塞
+        except Exception as e:
+            logger.warning("weekly_report.push_failed", error=str(e))
+
+        logger.info(
+            "weekly_report.all_done",
+            stores=result.get("reports_generated", 0),
+            errors=result.get("errors", 0),
+            sent=sent_count,
+        )
+        return {
+            "success": True,
+            "stores_processed": result.get("reports_generated", 0),
+            "errors": result.get("errors", 0),
+            "sent_count": sent_count,
+        }
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        logger.error("weekly_report.failed", error=str(exc))
+        raise self.retry(exc=exc)
+
+
 @celery_app.task(
     base=CallbackTask,
     bind=True,
