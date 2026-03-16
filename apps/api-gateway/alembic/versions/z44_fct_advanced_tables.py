@@ -121,25 +121,30 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime, server_default=sa.func.now()),
     )
 
-    # 3. 税务申报自动提取
-    op.create_table(
-        "fct_tax_declarations",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True),
-        sa.Column("entity_id", sa.String(50), nullable=False, index=True),
-        sa.Column("period", sa.String(7), nullable=False),
-        sa.Column("declaration_type", sa.String(30), nullable=False),
-        sa.Column("status", sa.String(20), nullable=False, server_default="draft"),
-        sa.Column("taxable_revenue_yuan", sa.Numeric(15, 2), server_default="0"),
-        sa.Column("tax_deductible_yuan", sa.Numeric(15, 2), server_default="0"),
-        sa.Column("tax_payable_yuan", sa.Numeric(15, 2), server_default="0"),
-        sa.Column("line_items", sa.JSON),
-        sa.Column("extraction_log", sa.JSON),
-        sa.Column("reviewer_notes", sa.Text),
-        sa.Column("submitted_at", sa.DateTime),
-        sa.Column("created_at", sa.DateTime, server_default=sa.func.now()),
-        sa.Column("updated_at", sa.DateTime, server_default=sa.func.now()),
-        sa.UniqueConstraint("entity_id", "period", "declaration_type", name="uq_tax_decl_entity_period_type"),
-    )
+    # 3. 税务申报自动提取（表可能已由 t01_fct_phase3 创建，安全跳过）
+    op.execute(sa.text("""
+        DO $$ BEGIN
+            CREATE TABLE fct_tax_declarations (
+                id UUID PRIMARY KEY,
+                entity_id VARCHAR(50) NOT NULL,
+                period VARCHAR(7) NOT NULL,
+                declaration_type VARCHAR(30) NOT NULL,
+                status VARCHAR(20) NOT NULL DEFAULT 'draft',
+                taxable_revenue_yuan NUMERIC(15,2) DEFAULT 0,
+                tax_deductible_yuan NUMERIC(15,2) DEFAULT 0,
+                tax_payable_yuan NUMERIC(15,2) DEFAULT 0,
+                line_items JSON,
+                extraction_log JSON,
+                reviewer_notes TEXT,
+                submitted_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT now(),
+                updated_at TIMESTAMP DEFAULT now(),
+                CONSTRAINT uq_tax_decl_entity_period_type UNIQUE (entity_id, period, declaration_type)
+            );
+            CREATE INDEX ix_fct_tax_declarations_entity_id ON fct_tax_declarations (entity_id);
+        EXCEPTION WHEN duplicate_table THEN NULL;
+        END $$
+    """))
 
     op.create_table(
         "fct_tax_extract_rules",
@@ -159,7 +164,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_table("fct_tax_extract_rules")
-    op.drop_table("fct_tax_declarations")
+    op.execute("DROP TABLE IF EXISTS fct_tax_declarations CASCADE")
     op.drop_table("fct_intercompany_items")
     op.drop_table("fct_consolidation_runs")
     op.drop_table("fct_entities")

@@ -17,74 +17,51 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.create_table(
-        'settlement_records',
-        sa.Column('id', UUID(as_uuid=True), primary_key=True),
-        sa.Column('store_id', sa.String(50), nullable=False, index=True),
-        sa.Column('brand_id', sa.String(50), nullable=False),
-        sa.Column('employee_id', sa.String(50), nullable=False, index=True),
-        sa.Column('employee_name', sa.String(100), nullable=True),
-
-        # 离职信息
-        sa.Column('separation_type', sa.String(30), nullable=False),
-        sa.Column('last_work_date', sa.Date, nullable=False),
-        sa.Column('separation_date', sa.Date, nullable=False),
-
-        # 最后月工资
-        sa.Column('work_days_last_month', sa.Integer, server_default='0'),
-        sa.Column('last_month_salary_fen', sa.Integer, server_default='0'),
-
-        # 未休年假补偿
-        sa.Column('unused_annual_days', sa.Integer, server_default='0'),
-        sa.Column('annual_leave_compensation_fen', sa.Integer, server_default='0'),
-        sa.Column('annual_leave_calc_method', sa.String(20), server_default='legal'),
-
-        # 经济补偿金
-        sa.Column('service_years', sa.Integer, server_default='0'),
-        sa.Column('compensation_months', sa.Integer, server_default='0'),
-        sa.Column('compensation_base_fen', sa.Integer, server_default='0'),
-        sa.Column('economic_compensation_fen', sa.Integer, server_default='0'),
-        sa.Column('compensation_type', sa.String(20), server_default='none'),
-
-        # 其他
-        sa.Column('overtime_pay_fen', sa.Integer, server_default='0'),
-        sa.Column('bonus_fen', sa.Integer, server_default='0'),
-        sa.Column('deduction_fen', sa.Integer, server_default='0'),
-        sa.Column('deduction_detail', sa.Text, nullable=True),
-
-        # 汇总
-        sa.Column('total_payable_fen', sa.Integer, server_default='0'),
-
-        # 交接
-        sa.Column('handover_items', JSON, nullable=True),
-        sa.Column('handover_completed', sa.Boolean, server_default='false'),
-
-        # 状态
-        sa.Column('status', sa.String(20), server_default='draft'),
-        sa.Column('approval_instance_id', UUID(as_uuid=True), nullable=True),
-
-        # 打款
-        sa.Column('paid_at', sa.DateTime, nullable=True),
-        sa.Column('paid_by', sa.String(100), nullable=True),
-
-        # 计算快照
-        sa.Column('calculation_snapshot', JSON, nullable=True),
-
-        sa.Column('remark', sa.Text, nullable=True),
-
-        # TimestampMixin
-        sa.Column('created_at', sa.DateTime, nullable=False, server_default=sa.func.now()),
-        sa.Column('updated_at', sa.DateTime, nullable=False, server_default=sa.func.now()),
-    )
-
-    # 复合索引：按门店+状态查询
-    op.create_index(
-        'ix_settlement_store_status',
-        'settlement_records',
-        ['store_id', 'status'],
-    )
+    # settlement_records 表可能已由 z15_settlement_risk 创建，安全跳过
+    op.execute(sa.text("""
+        DO $$ BEGIN
+            CREATE TABLE settlement_records (
+                id UUID PRIMARY KEY,
+                store_id VARCHAR(50) NOT NULL,
+                brand_id VARCHAR(50) NOT NULL,
+                employee_id VARCHAR(50) NOT NULL,
+                employee_name VARCHAR(100),
+                separation_type VARCHAR(30) NOT NULL,
+                last_work_date DATE NOT NULL,
+                separation_date DATE NOT NULL,
+                work_days_last_month INTEGER DEFAULT 0,
+                last_month_salary_fen INTEGER DEFAULT 0,
+                unused_annual_days INTEGER DEFAULT 0,
+                annual_leave_compensation_fen INTEGER DEFAULT 0,
+                annual_leave_calc_method VARCHAR(20) DEFAULT 'legal',
+                service_years INTEGER DEFAULT 0,
+                compensation_months INTEGER DEFAULT 0,
+                compensation_base_fen INTEGER DEFAULT 0,
+                economic_compensation_fen INTEGER DEFAULT 0,
+                compensation_type VARCHAR(20) DEFAULT 'none',
+                overtime_pay_fen INTEGER DEFAULT 0,
+                bonus_fen INTEGER DEFAULT 0,
+                deduction_fen INTEGER DEFAULT 0,
+                deduction_detail TEXT,
+                total_payable_fen INTEGER DEFAULT 0,
+                handover_items JSON,
+                handover_completed BOOLEAN DEFAULT false,
+                status VARCHAR(20) DEFAULT 'draft',
+                approval_instance_id UUID,
+                paid_at TIMESTAMP,
+                paid_by VARCHAR(100),
+                calculation_snapshot JSON,
+                remark TEXT,
+                created_at TIMESTAMP NOT NULL DEFAULT now(),
+                updated_at TIMESTAMP NOT NULL DEFAULT now()
+            );
+            CREATE INDEX ix_settlement_store_id ON settlement_records (store_id);
+            CREATE INDEX ix_settlement_employee_id ON settlement_records (employee_id);
+            CREATE INDEX ix_settlement_store_status ON settlement_records (store_id, status);
+        EXCEPTION WHEN duplicate_table THEN NULL;
+        END $$
+    """))
 
 
 def downgrade() -> None:
-    op.drop_index('ix_settlement_store_status', table_name='settlement_records')
-    op.drop_table('settlement_records')
+    op.execute('DROP TABLE IF EXISTS settlement_records CASCADE')
