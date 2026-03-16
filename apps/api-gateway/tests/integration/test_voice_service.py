@@ -25,11 +25,11 @@ from src.services.voice_service import VoiceService, VoiceCommandRouter, VoicePr
 class TestVoiceServiceSpeechToText:
 
     @pytest.mark.asyncio
-    async def test_unsupported_provider_returns_empty_text(self):
+    async def test_unsupported_provider_returns_mock_text(self):
         svc = VoiceService(VoiceProvider.GOOGLE)
         result = await svc.speech_to_text(b"audio")
         assert result["success"] is True
-        assert result["text"] == ""
+        assert result["text"] == "模拟识别结果"
 
     @pytest.mark.asyncio
     async def test_unsupported_provider_has_language_in_result(self):
