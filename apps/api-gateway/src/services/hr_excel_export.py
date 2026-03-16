@@ -13,7 +13,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, Border, Side, PatternFill, numbers
 from openpyxl.utils import get_column_letter
 
-from sqlalchemy import select, and_, func
+from sqlalchemy import select, and_, func, Integer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.employee import Employee

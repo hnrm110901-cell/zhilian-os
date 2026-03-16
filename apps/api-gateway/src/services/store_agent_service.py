@@ -13,7 +13,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Optional, List
 
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.order import Order, OrderItem

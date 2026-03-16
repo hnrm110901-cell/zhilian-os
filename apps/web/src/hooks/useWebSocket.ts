@@ -16,6 +16,7 @@ export function useWebSocket(url: string | null, options: UseWebSocketOptions = 
   const wsRef = useRef<WebSocket | null>(null);
   const retriesRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const connectRef = useRef<() => void>();
   const [connected, setConnected] = useState(false);
 
   const connect = useCallback(() => {
@@ -43,7 +44,7 @@ export function useWebSocket(url: string | null, options: UseWebSocketOptions = 
       setConnected(false);
       if (retriesRef.current < maxRetries) {
         retriesRef.current += 1;
-        timerRef.current = setTimeout(connect, reconnectDelay);
+        timerRef.current = setTimeout(() => { connectRef.current?.(); }, reconnectDelay);
       }
     };
 
@@ -51,6 +52,11 @@ export function useWebSocket(url: string | null, options: UseWebSocketOptions = 
       ws.close();
     };
   }, [url, onMessage, reconnectDelay, maxRetries]);
+
+  // Keep connectRef in sync with the latest connect callback
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
 
   useEffect(() => {
     connect();
