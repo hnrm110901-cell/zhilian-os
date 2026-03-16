@@ -90,7 +90,7 @@ describe('StorageService', () => {
     it('should add prefix to keys', () => {
       storageService.set('test', 'value');
       // Check that the actual localStorage key has the prefix
-      expect(localStorage.getItem('zhilian_os_test')).toBeTruthy();
+      expect(localStorage.getItem('tunxiang_os_test')).toBeTruthy();
     });
 
     it('should handle keys with special characters', () => {

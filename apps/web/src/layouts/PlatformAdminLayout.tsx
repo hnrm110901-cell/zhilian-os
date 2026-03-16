@@ -180,7 +180,7 @@ const PlatformAdminLayout: React.FC = () => {
   const toggleGroup = (groupKey: string) => {
     setOpenGroups((prev) => {
       const next = new Set(prev);
-      next.has(groupKey) ? next.delete(groupKey) : next.add(groupKey);
+      if (next.has(groupKey)) { next.delete(groupKey); } else { next.add(groupKey); }
       return next;
     });
   };
