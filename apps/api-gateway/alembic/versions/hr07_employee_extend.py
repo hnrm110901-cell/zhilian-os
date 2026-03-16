@@ -1,7 +1,7 @@
 """hr07 — 员工模型扩展 + 组织架构表
 
 Revision ID: hr07
-Revises: z48_cdp_pdm_link
+Revises: hr06
 Create Date: 2026-03-15
 
 Adds:
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID
 
 revision = 'hr07'
-down_revision = 'z48_cdp_pdm_link'
+down_revision = 'hr06'
 branch_labels = None
 depends_on = None
 

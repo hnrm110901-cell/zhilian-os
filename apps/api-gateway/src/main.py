@@ -64,6 +64,7 @@ from src.api import cross_store_insights
 from src.api import report_templates
 from src.api import competitive_analysis
 from src.api import federated
+from src.api import federated_learning
 from src.api import export_jobs
 from src.api import backups
 from src.api import private_domain
@@ -510,6 +511,7 @@ app.include_router(decision_validator.router, tags=["decision_validator"])
 
 # Phase 4: 智能优化期 (Intelligence Optimization Period)
 app.include_router(federated.router)
+app.include_router(federated_learning.router, tags=["federated-learning"])
 app.include_router(recommendations.router, tags=["recommendations"])
 app.include_router(agent_collaboration.router, tags=["agent_collaboration"])
 
