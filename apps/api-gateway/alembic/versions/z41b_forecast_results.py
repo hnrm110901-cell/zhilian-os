@@ -2,16 +2,16 @@
 
 补齐 FEAT-002 预测性备料引擎的 forecast_results 持久化表。
 
-Revision ID: z41
-Revises: z40
+Revision ID: z41b
+Revises: z41
 Create Date: 2026-03-12
 """
 from alembic import op
 import sqlalchemy as sa
 
 
-revision = "z41"
-down_revision = "z40"
+revision = "z41b"
+down_revision = "z41"
 branch_labels = None
 depends_on = None
 

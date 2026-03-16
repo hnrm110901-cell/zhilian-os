@@ -4,7 +4,7 @@ Agent OKR — P1 统一量化日志
 agent_response_logs + agent_okr_snapshots
 
 Revision ID: z42
-Revises: z41
+Revises: z41b
 Create Date: 2026-03-12
 """
 from alembic import op
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 revision = 'z42'
-down_revision = 'z41'
+down_revision = 'z41b'
 branch_labels = None
 depends_on = None
 

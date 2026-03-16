@@ -3366,19 +3366,6 @@ class StandaloneFCTService:
             result["voucher_sync"] = sync
 
         return result
-        if ref_type in {"voucher", "fct_voucher"}:
-            stmt = select(Voucher).where(Voucher.id == ref_id)
-            voucher = (await session.execute(stmt)).scalar_one_or_none()
-            if voucher:
-                v_status = (voucher.status or "").lower()
-                approval_status = "approved" if v_status in {"approved", "posted", "reversed"} else "pending"
-                records.append({
-                    "step": 1,
-                    "status": approval_status,
-                    "ref_status": v_status,
-                    "extra": {"voucher_no": voucher.voucher_no},
-                })
-        return {"tenant_id": tenant_id, "ref_type": ref_type, "ref_id": ref_id, "records": records}
 
     # ── 报表 ──────────────────────────────────────────────────────────────────
 
