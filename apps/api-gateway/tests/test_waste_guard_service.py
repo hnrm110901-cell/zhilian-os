@@ -39,9 +39,9 @@ class TestActionForCauses:
         ]
         assert _action_for_causes(causes) == _ROOT_CAUSE_ACTIONS["over_prep"]
 
-    def test_unknown_root_cause_returns_default(self):
+    def test_unknown_root_cause_returns_unknown_action(self):
         causes = [{"root_cause": None, "event_type": None, "event_count": 1}]
-        assert _action_for_causes(causes) == _DEFAULT_ACTION
+        assert _action_for_causes(causes) == _ROOT_CAUSE_ACTIONS["unknown"]
 
     def test_event_type_used_when_root_cause_none(self):
         causes = [{"root_cause": None, "event_type": "spoilage", "event_count": 2}]

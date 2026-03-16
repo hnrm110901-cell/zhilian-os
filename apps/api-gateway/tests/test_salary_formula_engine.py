@@ -260,7 +260,7 @@ class TestFormulaValidation:
         assert any("非法字符" in e for e in v["errors"])
 
     def test_syntax_error_expression(self, engine):
-        v = engine.validate_formula("【基本工资】 + + 100")
+        v = engine.validate_formula("【基本工资】 + * 100")
         assert v["valid"] is False
 
 
