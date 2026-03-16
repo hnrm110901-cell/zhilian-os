@@ -3341,6 +3341,112 @@ def execute_journey_step(
 
 
 # ============================================================
+# 私域增长：旅程 catch-up dispatcher（每 5 分钟）
+# ============================================================
+
+
+@celery_app.task(bind=True, max_retries=2, default_retry_delay=60)
+def dispatch_stale_journeys(self) -> Dict[str, Any]:
+    """
+    扫描所有 RUNNING 旅程中 next_action_at 已过期的步骤，重新调度执行。
+
+    解决场景：Celery worker 重启 / countdown 任务丢失 / Redis broker 清空后，
+    旅程卡在 running 状态无人处理。
+
+    逻辑：
+      1. 查询 status='running' AND next_action_at <= NOW() 的旅程（上限 100）
+      2. 对每条旅程，调度 execute_journey_step(current_step) 立即执行
+      3. 将 next_action_at 设为 NULL 避免重复调度（execute_step 完成后会设置下一步的时间）
+
+    调度周期：celery beat 每 5 分钟触发一次
+    """
+    import asyncio
+
+    async def _run() -> Dict[str, Any]:
+        from src.core.database import get_db_session
+
+        dispatched = 0
+        errors = []
+
+        async with get_db_session() as session:
+            from sqlalchemy import text as sa_text
+
+            # 查询过期的 running 旅程
+            result = await session.execute(
+                sa_text("""
+                    SELECT id, journey_type, current_step, total_steps
+                    FROM private_domain_journeys
+                    WHERE status = 'running'
+                      AND next_action_at IS NOT NULL
+                      AND next_action_at <= NOW()
+                    ORDER BY next_action_at ASC
+                    LIMIT 100
+                """)
+            )
+            stale_journeys = result.fetchall()
+
+            if not stale_journeys:
+                return {"dispatched": 0, "total_stale": 0}
+
+            for journey in stale_journeys:
+                j_id = str(journey.id)
+                step_idx = journey.current_step or 0
+
+                if step_idx >= (journey.total_steps or 0):
+                    # 步骤已超出范围，标记完成
+                    await session.execute(
+                        sa_text("""
+                            UPDATE private_domain_journeys
+                            SET status = 'completed', next_action_at = NULL,
+                                completed_at = NOW(), updated_at = NOW()
+                            WHERE id = :id
+                        """),
+                        {"id": j_id},
+                    )
+                    continue
+
+                try:
+                    # 清除 next_action_at 防止下次轮询重复调度
+                    await session.execute(
+                        sa_text("""
+                            UPDATE private_domain_journeys
+                            SET next_action_at = NULL, updated_at = NOW()
+                            WHERE id = :id AND next_action_at IS NOT NULL
+                        """),
+                        {"id": j_id},
+                    )
+
+                    # 调度立即执行（countdown=0）
+                    execute_journey_step.apply_async(
+                        args=[j_id, step_idx, None],
+                        countdown=0,
+                    )
+                    dispatched += 1
+                except Exception as e:
+                    errors.append({"journey_id": j_id, "error": str(e)[:100]})
+
+            await session.commit()
+
+        logger.info(
+            "dispatch_stale_journeys.done",
+            total_stale=len(stale_journeys),
+            dispatched=dispatched,
+            errors=len(errors),
+        )
+        return {
+            "total_stale": len(stale_journeys),
+            "dispatched": dispatched,
+            "errors": errors[:5],
+        }
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        logger.error("dispatch_stale_journeys.failed", error=str(exc))
+        raise self.retry(exc=exc)
+
+
+# ============================================================
 # 私域增长：RFM 数据刷新（每日凌晨 03:00）
 # ============================================================
 
