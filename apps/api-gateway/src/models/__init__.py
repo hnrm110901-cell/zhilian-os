@@ -419,6 +419,9 @@ __all__ = [
 
 from .agent_collab import AgentCollabSnapshot, AgentConflict, GlobalOptimizationLog
 from .agent_okr import AgentOKRSnapshot, AgentResponseLog
+
+# HR — 补全缺失模型导入
+from .approval import ApprovalDelegation, ApprovalInstance, ApprovalRecord, ApprovalTemplate
 from .approval_flow import ApprovalFlowTemplate, ApprovalInstance, ApprovalNodeRecord, ApprovalNodeType
 from .approval_flow import ApprovalStatus as HRApprovalStatus
 from .approval_flow import ApprovalType
@@ -433,6 +436,7 @@ from .banquet_sales import (
     FunnelStage,
     SalesFunnelRecord,
 )
+from .brand_im_config import BrandIMConfig, IMSyncLog
 from .business_intel import (
     AnomalyLevelEnum,
     BizDecision,
@@ -448,6 +452,8 @@ from .business_intel import (
     ScenarioRecord,
     ScenarioTypeEnum,
 )
+from .city_wage_config import CityWageConfig
+from .commission import CommissionRecord, CommissionRule
 from .consumer_id_mapping import ConsumerIdMapping, IdType
 
 # Sprint 1 — CDP 地基层
@@ -456,11 +462,21 @@ from .cost_truth import CostTruthDaily, CostTruthDishDetail, CostVarianceAttribu
 from .customer_ownership import CustomerOwnership, CustomerRiskAlert, RiskLevel, RiskType, TransferReason
 from .daily_summary import DailyPnlSummary, DailyRevenueSummary, DailyWasteSummary
 from .decision_lifecycle import DecisionLifecycle
+from .decision_record import DecisionRecord
 from .employee_contract import ContractStatus, ContractType, EmployeeContract
+from .employee_growth import (
+    CareerPath,
+    EmployeeGrowthPlan,
+    EmployeeMilestone,
+    EmployeeSkill,
+    EmployeeWellbeing,
+    SkillDefinition,
+)
 from .employee_lifecycle import ChangeType, EmployeeChange
 
 # Phase P3 — EO执行引擎
 from .event_staff import EventStaff, StaffConfirmStatus, StaffRole
+from .exit_interview import ExitInterview
 from .fct_advanced import (
     FCTBankAccount,
     FCTBankMatchRule,
@@ -475,6 +491,7 @@ from .fct_advanced import (
 # 替换易订 — R3 桌台平面图 + R4 AI邀请函
 from .floor_plan import TableDefinition, TableShape, TableStatus
 from .hall_showcase import HallShowcase
+from .hr_business_rule import HRBusinessRule
 from .ingredient_master import IngredientMaster
 from .inventory_ext import InventoryBatch, InventoryCount
 from .invitation import Invitation, InvitationRSVP, InvitationTemplate, RSVPStatus
@@ -529,12 +546,16 @@ from .reservation_channel import ChannelType, ReservationChannel
 
 # P0 补齐 — 预排菜模型
 from .reservation_pre_order import PreOrderStatus, ReservationPreOrder
+from .reward_penalty import RewardPenaltyRecord
+from .salary_item import SalaryItemDefinition, SalaryItemRecord
+from .schedule_demand import StoreStaffingDemand
 
 # HR W1-2 — 敏感数据审计日志
 from .sensitive_audit_log import SensitiveDataAuditLog
 
 # HR W2-2 — 离职结算
 from .settlement import CompensationType, SeparationType, SettlementRecord, SettlementStatus
+from .social_insurance import EmployeeSocialInsurance, SocialInsuranceConfig
 
 # HR Phase 4 — 培训认证/师徒制
 from .training import ExamAttempt, TrainingCourse, TrainingEnrollment, TrainingExam

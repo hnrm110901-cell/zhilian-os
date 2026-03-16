@@ -235,6 +235,30 @@ celery_app.conf.update(
             "queue": "default",
             "routing_key": "default",
         },
+        "src.core.celery_tasks.scheduled_im_roster_sync": {
+            "queue": "default",
+            "routing_key": "default",
+        },
+        "src.core.celery_tasks.retry_failed_dingtalk_messages": {
+            "queue": "high_priority",
+            "routing_key": "high_priority",
+        },
+        "src.core.celery_tasks.remind_incomplete_onboarding": {
+            "queue": "default",
+            "routing_key": "default",
+        },
+        "src.core.celery_tasks.sweep_milestone_notifications": {
+            "queue": "default",
+            "routing_key": "default",
+        },
+        "check_approval_timeouts": {
+            "queue": "default",
+            "routing_key": "default",
+        },
+        "src.core.celery_tasks.run_decision_effect_reviews": {
+            "queue": "default",
+            "routing_key": "default",
+        },
     },
     # Celery Beat定时任务调度
     beat_schedule={
@@ -686,6 +710,76 @@ celery_app.conf.update(
         "evaluate-decision-effects": {
             "task": "src.core.celery_tasks.evaluate_decision_effects",
             "schedule": crontab(hour=3, minute=30),
+            "args": (),
+            "options": {"queue": "default", "priority": 5},
+        },
+        # IM 通讯录定时同步（每日 02:00，在 POS 对账前完成人员同步）
+        "scheduled-im-roster-sync": {
+            "task": "src.core.celery_tasks.scheduled_im_roster_sync",
+            "schedule": crontab(
+                hour=int(os.getenv("IM_SYNC_HOUR", "2")),
+                minute=int(os.getenv("IM_SYNC_MINUTE", "0")),
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 6},
+        },
+        # IM 考勤数据同步（每日 06:00，同步昨日打卡数据）
+        "scheduled-im-attendance-sync": {
+            "task": "src.core.celery_tasks.scheduled_im_attendance_sync",
+            "schedule": crontab(
+                hour=int(os.getenv("IM_ATTENDANCE_SYNC_HOUR", "6")),
+                minute=int(os.getenv("IM_ATTENDANCE_SYNC_MINUTE", "0")),
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 5},
+        },
+        # 每5分钟重试失败的钉钉消息
+        "retry-failed-dingtalk-messages": {
+            "task": "src.core.celery_tasks.retry_failed_dingtalk_messages",
+            "schedule": crontab(minute="*/5"),
+            "args": (),
+            "options": {"queue": "high_priority", "priority": 8},
+        },
+        # Phase 4: 每日 09:00 提醒入职任务未完成的新员工
+        "remind-incomplete-onboarding": {
+            "task": "src.core.celery_tasks.remind_incomplete_onboarding",
+            "schedule": crontab(
+                hour=int(os.getenv("ONBOARDING_REMIND_HOUR", "9")),
+                minute=int(os.getenv("ONBOARDING_REMIND_MINUTE", "0")),
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 5},
+        },
+        # Phase 4: 每日 10:00 扫描未推送的里程碑/技能认证通知
+        "sweep-milestone-notifications": {
+            "task": "src.core.celery_tasks.sweep_milestone_notifications",
+            "schedule": crontab(
+                hour=int(os.getenv("MILESTONE_SWEEP_HOUR", "10")),
+                minute=int(os.getenv("MILESTONE_SWEEP_MINUTE", "0")),
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 5},
+        },
+        # Phase 3 HR: 每日 08:00 合规告警扫描（健康证/合同/身份证到期）
+        "check-compliance-alerts-daily": {
+            "task": "check_compliance_alerts",
+            "schedule": crontab(hour=8, minute=0),  # 每日 08:00
+            "options": {"queue": "default"},
+        },
+        # W2-1: 每小时整点检查超期审批（自动升级/催办）
+        "check-approval-timeouts-hourly": {
+            "task": "check_approval_timeouts",
+            "schedule": crontab(minute=0),  # 每小时整点
+            "args": (),
+            "options": {"queue": "default", "priority": 6},
+        },
+        # Phase 2 飞轮: 每日 04:00 扫描已执行决策的30/60/90天效果回顾
+        "decision-flywheel-effect-review": {
+            "task": "src.core.celery_tasks.run_decision_effect_reviews",
+            "schedule": crontab(
+                hour=int(os.getenv("FLYWHEEL_REVIEW_HOUR", "4")),
+                minute=int(os.getenv("FLYWHEEL_REVIEW_MINUTE", "0")),
+            ),
             "args": (),
             "options": {"queue": "default", "priority": 5},
         },

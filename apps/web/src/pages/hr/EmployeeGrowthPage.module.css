@@ -1,0 +1,114 @@
+.page { padding: 24px; max-width: 1400px; margin: 0 auto; }
+.header { display: flex; align-items: center; gap: 24px; margin-bottom: 20px; }
+.title { font-size: 20px; font-weight: 600; color: rgba(255,255,255,0.92); margin: 0; }
+.tabs { display: flex; gap: 4px; }
+.tab {
+  padding: 6px 16px; border-radius: 6px; border: none;
+  background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.6);
+  cursor: pointer; font-size: 13px;
+}
+.tabActive { background: rgba(10,175,154,0.15); color: #0AAF9A; }
+.filterRow { display: flex; gap: 12px; margin-bottom: 16px; align-items: center; }
+.select {
+  padding: 6px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.85); font-size: 13px;
+}
+.btn {
+  padding: 6px 16px; border-radius: 6px; border: none;
+  background: rgba(10,175,154,0.15); color: #0AAF9A;
+  cursor: pointer; font-size: 13px; font-weight: 500;
+}
+.btn:hover { background: rgba(10,175,154,0.25); }
+.btnPrimary { background: #0AAF9A; color: #0B1A20; }
+.btnPrimary:hover { background: #0CC4AD; }
+
+/* ── 卡片网格 ── */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.card {
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px; padding: 16px;
+}
+.cardTitle { font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.85); margin: 0 0 12px; }
+.cardSub { font-size: 12px; color: rgba(255,255,255,0.5); margin: 0 0 4px; }
+
+/* ── 统计卡 ── */
+.statsRow { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+.statCard {
+  flex: 1; min-width: 160px; background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 14px 16px;
+}
+.statLabel { font-size: 12px; color: rgba(255,255,255,0.5); margin: 0 0 4px; }
+.statValue { font-size: 22px; font-weight: 700; color: rgba(255,255,255,0.92); margin: 0; }
+.statMint { color: #0AAF9A; }
+
+/* ── 里程碑墙 ── */
+.milestoneWall { display: flex; flex-wrap: wrap; gap: 12px; }
+.milestone {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px; padding: 10px 14px;
+}
+.milestoneBadge { font-size: 20px; }
+.milestoneInfo { flex: 1; }
+.milestoneTitle { font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.85); }
+.milestoneMeta { font-size: 11px; color: rgba(255,255,255,0.45); }
+
+/* ── 成长计划 ── */
+.planCard {
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px; padding: 16px; margin-bottom: 12px;
+}
+.planHeader { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.planName { font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.85); margin: 0; }
+.progressBar {
+  height: 6px; border-radius: 3px; background: rgba(255,255,255,0.08);
+  overflow: hidden; margin-top: 8px;
+}
+.progressFill { height: 100%; border-radius: 3px; background: #0AAF9A; transition: width 0.3s; }
+
+/* ── 技能雷达 ── */
+.skillList { display: flex; flex-direction: column; gap: 8px; }
+.skillRow { display: flex; align-items: center; gap: 12px; }
+.skillName { width: 100px; font-size: 12px; color: rgba(255,255,255,0.7); text-align: right; flex-shrink: 0; }
+.skillBarWrap { flex: 1; height: 8px; border-radius: 4px; background: rgba(255,255,255,0.08); }
+.skillBarFill { height: 100%; border-radius: 4px; background: #0AAF9A; transition: width 0.3s; }
+.skillScore { width: 32px; font-size: 12px; color: rgba(255,255,255,0.6); text-align: right; }
+
+/* ── 幸福指数 ── */
+.wellbeingGrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 16px; }
+.dimCard {
+  text-align: center; background: rgba(255,255,255,0.04);
+  border-radius: 8px; padding: 12px 8px;
+}
+.dimScore { font-size: 24px; font-weight: 700; color: #0AAF9A; }
+.dimLabel { font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 4px; }
+.dimLow { color: #FF6B6B; }
+
+/* ── 表格 ── */
+.tableWrap { overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.table th {
+  text-align: left; padding: 10px 12px;
+  color: rgba(255,255,255,0.5); font-weight: 500;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.table td {
+  padding: 10px 12px; color: rgba(255,255,255,0.85);
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+/* ── 状态徽章 ── */
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px;
+}
+.badgeActive { background: rgba(10,175,154,0.15); color: #0AAF9A; }
+.badgeCompleted { background: rgba(76,175,80,0.15); color: #4CAF50; }
+.badgePaused { background: rgba(255,193,7,0.15); color: #FFC107; }
+.badgeAI { background: rgba(138,43,226,0.15); color: #BA68C8; }
+
+.empty { text-align: center; padding: 40px; color: rgba(255,255,255,0.38); }
+.loading { text-align: center; padding: 60px; color: rgba(255,255,255,0.38); }
+
+/* ── 警告行 ── */
+.warnRow { color: #FF6B6B; }
+.warnIcon { margin-right: 4px; }

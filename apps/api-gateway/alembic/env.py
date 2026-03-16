@@ -35,6 +35,20 @@ import src.models.agent_config  # noqa: F401
 import src.models.consumer_identity  # noqa: F401 — Sprint 1 CDP
 import src.models.consumer_id_mapping  # noqa: F401 — Sprint 1 CDP
 
+# HR 模块 — 业人一体化
+import src.models.payroll  # noqa: F401
+import src.models.approval_flow  # noqa: F401
+import src.models.leave  # noqa: F401
+import src.models.employee_lifecycle  # noqa: F401
+import src.models.recruitment  # noqa: F401
+import src.models.performance_review  # noqa: F401
+import src.models.employee_contract  # noqa: F401
+import src.models.commission  # noqa: F401
+import src.models.reward_penalty  # noqa: F401
+import src.models.social_insurance  # noqa: F401
+import src.models.employee_growth  # noqa: F401
+import src.models.brand_im_config  # noqa: F401
+
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config

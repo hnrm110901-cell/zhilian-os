@@ -28,17 +28,77 @@ class EnterpriseOAuthService:
     def __init__(self) -> None:
         self.auth_service = AuthService()
 
-    async def wechat_work_oauth_login(self, code: str, state: Optional[str] = None) -> Dict[str, Any]:
+    async def _resolve_wechat_credentials(self, brand_id: Optional[str] = None) -> tuple:
+        """解析企微凭证：优先品牌级配置，回退全局 settings"""
+        if brand_id:
+            try:
+                from sqlalchemy import and_, select
+
+                from ..core.database import get_db_session
+                from ..models.brand_im_config import BrandIMConfig, IMPlatform
+
+                async with get_db_session() as db:
+                    result = await db.execute(
+                        select(BrandIMConfig).where(
+                            and_(
+                                BrandIMConfig.brand_id == brand_id,
+                                BrandIMConfig.is_active.is_(True),
+                                BrandIMConfig.im_platform == IMPlatform.WECHAT_WORK,
+                            )
+                        )
+                    )
+                    config = result.scalar_one_or_none()
+                    if config and config.wechat_corp_id and config.wechat_corp_secret:
+                        return config.wechat_corp_id, config.wechat_corp_secret, brand_id
+            except Exception as e:
+                logger.warning("resolve_wechat_credentials.fallback", error=str(e))
+        return settings.WECHAT_CORP_ID, settings.WECHAT_CORP_SECRET, brand_id
+
+    async def _resolve_dingtalk_credentials(self, brand_id: Optional[str] = None) -> tuple:
+        """解析钉钉凭证：优先品牌级配置，回退全局 settings"""
+        if brand_id:
+            try:
+                from sqlalchemy import and_, select
+
+                from ..core.database import get_db_session
+                from ..models.brand_im_config import BrandIMConfig, IMPlatform
+
+                async with get_db_session() as db:
+                    result = await db.execute(
+                        select(BrandIMConfig).where(
+                            and_(
+                                BrandIMConfig.brand_id == brand_id,
+                                BrandIMConfig.is_active.is_(True),
+                                BrandIMConfig.im_platform == IMPlatform.DINGTALK,
+                            )
+                        )
+                    )
+                    config = result.scalar_one_or_none()
+                    if config and config.dingtalk_app_key and config.dingtalk_app_secret:
+                        return config.dingtalk_app_key, config.dingtalk_app_secret, brand_id
+            except Exception as e:
+                logger.warning("resolve_dingtalk_credentials.fallback", error=str(e))
+        return settings.DINGTALK_APP_KEY, settings.DINGTALK_APP_SECRET, brand_id
+
+    async def wechat_work_oauth_login(
+        self,
+        code: str,
+        state: Optional[str] = None,
+        brand_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
         企业微信OAuth登录
 
         Args:
             code: OAuth授权码
             state: 状态参数
+            brand_id: 品牌ID（优先使用品牌级凭证）
 
         Returns:
             登录结果(包含token和用户信息)
         """
+        corp_id, corp_secret, resolved_brand = await self._resolve_wechat_credentials(brand_id)
+
         try:
             # 1. 使用code获取access_token
             token_url = "https://qyapi.weixin.qq.com/cgi-bin/gettoken"
@@ -46,8 +106,8 @@ class EnterpriseOAuthService:
                 token_response = await client.get(
                     token_url,
                     params={
-                        "corpid": settings.WECHAT_CORP_ID,
-                        "corpsecret": settings.WECHAT_CORP_SECRET,
+                        "corpid": corp_id,
+                        "corpsecret": corp_secret,
                     },
                     timeout=float(os.getenv("HTTP_TIMEOUT", "30.0")),
                 )
@@ -100,6 +160,7 @@ class EnterpriseOAuthService:
                     mobile=user_detail.get("mobile"),
                     department=user_detail.get("department", []),
                     position=user_detail.get("position"),
+                    brand_id=resolved_brand,
                 )
 
                 # 5. 生成JWT token（包含 store_id/brand_id，与 create_tokens_for_user 保持一致）
@@ -237,17 +298,25 @@ class EnterpriseOAuthService:
             logger.error("飞书OAuth登录失败", error=str(e))
             raise
 
-    async def dingtalk_oauth_login(self, auth_code: str, state: Optional[str] = None) -> Dict[str, Any]:
+    async def dingtalk_oauth_login(
+        self,
+        auth_code: str,
+        state: Optional[str] = None,
+        brand_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
         钉钉OAuth登录
 
         Args:
             auth_code: OAuth授权码
             state: 状态参数
+            brand_id: 品牌ID（优先使用品牌级凭证）
 
         Returns:
             登录结果
         """
+        app_key, app_secret, resolved_brand = await self._resolve_dingtalk_credentials(brand_id)
+
         try:
             # 1. 获取access_token
             token_url = "https://oapi.dingtalk.com/gettoken"
@@ -255,8 +324,8 @@ class EnterpriseOAuthService:
                 token_response = await client.get(
                     token_url,
                     params={
-                        "appkey": settings.DINGTALK_APP_KEY,
-                        "appsecret": settings.DINGTALK_APP_SECRET,
+                        "appkey": app_key,
+                        "appsecret": app_secret,
                     },
                     timeout=float(os.getenv("HTTP_TIMEOUT", "30.0")),
                 )
@@ -307,6 +376,7 @@ class EnterpriseOAuthService:
                     mobile=user_info.get("mobile"),
                     department=user_info.get("dept_id_list", []),
                     position=user_info.get("title"),
+                    brand_id=resolved_brand,
                 )
 
                 # 5. 生成JWT token（包含 store_id/brand_id）
@@ -378,6 +448,8 @@ class EnterpriseOAuthService:
             department = kwargs.get("department")
             position = kwargs.get("position")
 
+        brand_id = kwargs.get("brand_id")
+
         if not provider or not provider_user_id or not username:
             raise ValueError("provider/provider_user_id/username are required")
 
@@ -399,6 +471,11 @@ class EnterpriseOAuthService:
             logger.info("更新现有用户", user_id=str(existing.id), username=username)
             return updated or existing
 
+        # 根据品牌解析默认门店
+        default_store_id = "STORE001"
+        if brand_id:
+            default_store_id = await self._resolve_default_store(brand_id) or default_store_id
+
         new_user = await self._maybe_await(
             self.auth_service.register_user(
                 username=username,
@@ -406,11 +483,37 @@ class EnterpriseOAuthService:
                 password=f"{provider}_{provider_user_id}",
                 full_name=full_name or username,
                 role=role_value,
-                store_id="STORE001",
+                store_id=default_store_id,
             )
         )
-        logger.info("创建新用户", username=username, role=role_str, provider=provider)
+        logger.info("创建新用户", username=username, role=role_str, provider=provider, brand_id=brand_id)
         return new_user
+
+    async def _resolve_default_store(self, brand_id: str) -> Optional[str]:
+        """查询品牌默认门店：先查 BrandIMConfig.default_store_id，再查品牌下第一个门店"""
+        try:
+            from sqlalchemy import select
+
+            from ..core.database import get_db_session
+            from ..models.brand_im_config import BrandIMConfig
+            from ..models.store import Store
+
+            async with get_db_session() as db:
+                # 优先使用 IM 配置里的 default_store_id
+                config_result = await db.execute(
+                    select(BrandIMConfig.default_store_id).where(BrandIMConfig.brand_id == brand_id)
+                )
+                row = config_result.scalar_one_or_none()
+                if row:
+                    return row
+
+                # 回退到品牌下第一个门店
+                store_result = await db.execute(select(Store.id).where(Store.brand_id == brand_id).limit(1))
+                store_row = store_result.scalar_one_or_none()
+                return str(store_row) if store_row else None
+        except Exception as e:
+            logger.warning("resolve_default_store.failed", brand_id=brand_id, error=str(e))
+            return None
 
     def _determine_role(self, position: Optional[str], department: Optional[Any]) -> str:
         """

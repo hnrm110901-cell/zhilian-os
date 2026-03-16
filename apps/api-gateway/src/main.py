@@ -105,6 +105,7 @@ from src.api import (
     external_factors,
     fct_public,
     federated,
+    federated_learning,
     finance,
     financial_closing,
     food_safety,
@@ -564,6 +565,7 @@ app.include_router(decision_validator.router, tags=["decision_validator"])
 
 # Phase 4: 智能优化期 (Intelligence Optimization Period)
 app.include_router(federated.router)
+app.include_router(federated_learning.router, tags=["federated-learning"])
 app.include_router(recommendations.router, tags=["recommendations"])
 app.include_router(agent_collaboration.router, tags=["agent_collaboration"])
 
