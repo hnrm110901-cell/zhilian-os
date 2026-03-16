@@ -727,7 +727,7 @@ const ElemePage: React.FC = () => {
                     </div>
                   </Card>
                 ) : (
-                  <Empty description="点击"刷新门店信息"加载" />
+                  <Empty description={'点击"刷新门店信息"加载'} />
                 )}
               </div>
             ),
