@@ -28,7 +28,7 @@ import inspect
 import json
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import structlog
@@ -307,16 +307,20 @@ class JourneyOrchestrator:
         now = datetime.utcnow()
         unique_journey_id = f"{journey_id}:{customer_id}:{now.strftime('%Y%m%d%H%M%S')}"
 
+        # 计算第一步的预期执行时间（用于 catch-up dispatcher）
+        first_step_delay = definition.steps[0].delay_minutes if definition.steps else 0
+        next_action_at = now + timedelta(minutes=first_step_delay)
+
         await db.execute(
             text("""
                 INSERT INTO private_domain_journeys
                     (id, journey_id, store_id, customer_id, journey_type,
                      status, current_step, total_steps,
-                     started_at, step_history, created_at, updated_at)
+                     started_at, next_action_at, step_history, created_at, updated_at)
                 VALUES
                     (:id, :journey_id, :store_id, :customer_id, :journey_type,
                      'running', 0, :total_steps,
-                     :started_at, '[]'::json, NOW(), NOW())
+                     :started_at, :next_action_at, '[]'::json, NOW(), NOW())
                 ON CONFLICT (journey_id) DO NOTHING
             """),
             {
@@ -327,6 +331,7 @@ class JourneyOrchestrator:
                 "journey_type": journey_id,
                 "total_steps": len(definition.steps),
                 "started_at": now,
+                "next_action_at": next_action_at,
             },
         )
         await db.commit()
@@ -481,20 +486,28 @@ class JourneyOrchestrator:
         is_last = step_index >= len(definition.steps) - 1
         new_status = "completed" if is_last else "running"
 
+        # 计算下一步的预期执行时间（用于 catch-up dispatcher）
+        next_action_at = None
+        if not is_last:
+            next_step = definition.steps[step_index + 1]
+            next_action_at = datetime.utcnow() + timedelta(minutes=next_step.delay_minutes)
+
         await db.execute(
             text("""
                 UPDATE private_domain_journeys
-                SET current_step  = :step,
-                    step_history  = :history::json,
-                    status        = :status,
-                    completed_at  = :completed_at,
-                    updated_at    = NOW()
+                SET current_step   = :step,
+                    step_history   = :history::json,
+                    status         = :status,
+                    next_action_at = :next_action_at,
+                    completed_at   = :completed_at,
+                    updated_at     = NOW()
                 WHERE id = :id
             """),
             {
                 "step": step_index + 1,
                 "history": json.dumps(existing_history),
                 "status": new_status,
+                "next_action_at": next_action_at,
                 "completed_at": datetime.utcnow() if is_last else None,
                 "id": journey_db_id,
             },

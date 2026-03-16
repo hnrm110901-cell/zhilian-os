@@ -175,6 +175,10 @@ celery_app.conf.update(
             "queue": "default",
             "routing_key": "default",
         },
+        "src.core.celery_tasks.dispatch_stale_journeys": {
+            "queue": "default",
+            "routing_key": "default",
+        },
         "src.core.celery_tasks.refresh_private_domain_rfm": {
             "queue": "low_priority",
             "routing_key": "low_priority",
@@ -792,6 +796,13 @@ celery_app.conf.update(
                 "queue": "default",
                 "priority": 8,
             },
+        },
+        # 私域旅程 catch-up：每5分钟扫描 next_action_at 过期的 running 旅程并重新调度
+        "dispatch-stale-journeys": {
+            "task": "src.core.celery_tasks.dispatch_stale_journeys",
+            "schedule": crontab(minute="*/5"),
+            "args": (),
+            "options": {"queue": "default", "priority": 7},
         },
     },
 )
