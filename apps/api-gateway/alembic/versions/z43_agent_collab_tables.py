@@ -15,24 +15,24 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.execute("""
+    op.execute(sa.text("""DO $$ BEGIN
         CREATE TYPE conflict_type_enum AS ENUM (
             'resource_contention','financial_constraint','timing_conflict',
             'priority_clash','contradictory_action'
-        )
-    """)
-    op.execute("""
-        CREATE TYPE conflict_severity_enum AS ENUM ('low','medium','high')
-    """)
-    op.execute("""
-        CREATE TYPE arbitration_status_enum AS ENUM ('pending','resolved','escalated')
-    """)
-    op.execute("""
+        );
+        EXCEPTION WHEN duplicate_object THEN NULL; END $$"""))
+    op.execute(sa.text("""DO $$ BEGIN
+        CREATE TYPE conflict_severity_enum AS ENUM ('low','medium','high');
+        EXCEPTION WHEN duplicate_object THEN NULL; END $$"""))
+    op.execute(sa.text("""DO $$ BEGIN
+        CREATE TYPE arbitration_status_enum AS ENUM ('pending','resolved','escalated');
+        EXCEPTION WHEN duplicate_object THEN NULL; END $$"""))
+    op.execute(sa.text("""DO $$ BEGIN
         CREATE TYPE arbitration_method_enum AS ENUM (
             'priority_wins','financial_first','revenue_first','risk_first',
             'manual_override','merge_recommendations'
-        )
-    """)
+        );
+        EXCEPTION WHEN duplicate_object THEN NULL; END $$"""))
 
     op.create_table(
         "agent_conflicts",
