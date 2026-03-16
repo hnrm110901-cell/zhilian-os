@@ -14,7 +14,7 @@ Revises: hr03
 """
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSON, ARRAY
+from sqlalchemy.dialects.postgresql import UUID, JSON, ARRAY, ENUM as PG_ENUM
 
 revision = 'hr04'
 down_revision = 'hr03'
@@ -57,7 +57,7 @@ def upgrade():
         sa.Column("skill_name", sa.String(100), nullable=False),
         sa.Column("skill_category", sa.String(50), nullable=False),
         sa.Column("applicable_positions", JSON, nullable=True),
-        sa.Column("required_level", sa.Enum(
+        sa.Column("required_level", PG_ENUM(
             "novice", "apprentice", "journeyman", "expert", "master",
             name="skill_level_enum", create_type=False,
         ), nullable=False, server_default="journeyman"),
@@ -74,7 +74,7 @@ def upgrade():
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("employee_id", sa.String(50), sa.ForeignKey("employees.id"), nullable=False, index=True),
         sa.Column("skill_id", UUID(as_uuid=True), sa.ForeignKey("skill_definitions.id"), nullable=False),
-        sa.Column("current_level", sa.Enum(
+        sa.Column("current_level", PG_ENUM(
             "novice", "apprentice", "journeyman", "expert", "master",
             name="skill_level_enum", create_type=False,
         ), nullable=False, server_default="novice"),
@@ -82,7 +82,7 @@ def upgrade():
         sa.Column("assessed_by", sa.String(100), nullable=True),
         sa.Column("assessed_at", sa.Date, nullable=True),
         sa.Column("evidence", sa.Text, nullable=True),
-        sa.Column("next_target_level", sa.Enum(
+        sa.Column("next_target_level", PG_ENUM(
             "novice", "apprentice", "journeyman", "expert", "master",
             name="skill_level_enum", create_type=False,
         ), nullable=True),
@@ -118,7 +118,7 @@ def upgrade():
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("store_id", sa.String(50), nullable=False, index=True),
         sa.Column("employee_id", sa.String(50), sa.ForeignKey("employees.id"), nullable=False, index=True),
-        sa.Column("milestone_type", sa.Enum(
+        sa.Column("milestone_type", PG_ENUM(
             "onboard", "trial_pass", "probation_pass", "first_praise",
             "skill_up", "zero_waste_month", "sales_champion", "anniversary",
             "promotion", "mentor_first", "culture_star", "training_complete",
@@ -145,7 +145,7 @@ def upgrade():
         sa.Column("store_id", sa.String(50), nullable=False, index=True),
         sa.Column("employee_id", sa.String(50), sa.ForeignKey("employees.id"), nullable=False, index=True),
         sa.Column("plan_name", sa.String(200), nullable=False),
-        sa.Column("status", sa.Enum(
+        sa.Column("status", PG_ENUM(
             "active", "completed", "paused", "cancelled",
             name="growth_plan_status_enum", create_type=False,
         ), nullable=False, server_default="active"),

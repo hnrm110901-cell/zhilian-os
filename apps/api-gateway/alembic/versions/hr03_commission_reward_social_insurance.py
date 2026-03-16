@@ -18,7 +18,7 @@ Revises: hr02
 """
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSON
+from sqlalchemy.dialects.postgresql import UUID, JSON, ENUM as PG_ENUM
 
 revision = 'hr03'
 down_revision = 'hr02'
@@ -64,11 +64,11 @@ def upgrade():
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("store_id", sa.String(50), nullable=False, index=True),
         sa.Column("name", sa.String(100), nullable=False),
-        sa.Column("commission_type", sa.Enum(
+        sa.Column("commission_type", PG_ENUM(
             "sales_amount", "dish_count", "service_fee", "membership", "custom",
             name="commission_type_enum", create_type=False,
         ), nullable=False),
-        sa.Column("calc_method", sa.Enum(
+        sa.Column("calc_method", PG_ENUM(
             "fixed_per_unit", "percentage", "tiered",
             name="commission_calc_method_enum", create_type=False,
         ), nullable=False),
@@ -111,18 +111,18 @@ def upgrade():
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("store_id", sa.String(50), nullable=False, index=True),
         sa.Column("employee_id", sa.String(50), sa.ForeignKey("employees.id"), nullable=False, index=True),
-        sa.Column("rp_type", sa.Enum(
+        sa.Column("rp_type", PG_ENUM(
             "reward", "penalty",
             name="reward_penalty_type_enum", create_type=False,
         ), nullable=False),
-        sa.Column("category", sa.Enum(
+        sa.Column("category", PG_ENUM(
             "service_excellence", "sales_champion", "zero_waste", "innovation",
             "attendance_perfect", "team_contribution", "customer_praise",
             "food_safety", "hygiene", "discipline", "customer_complaint",
             "equipment_damage", "waste_excess", "other",
             name="reward_penalty_category_enum", create_type=False,
         ), nullable=False),
-        sa.Column("status", sa.Enum(
+        sa.Column("status", PG_ENUM(
             "pending", "approved", "rejected", "cancelled",
             name="reward_penalty_status_enum", create_type=False,
         ), nullable=False, server_default="pending"),

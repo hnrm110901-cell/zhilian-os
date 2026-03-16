@@ -14,7 +14,7 @@ Revises: hr04
 """
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSON
+from sqlalchemy.dialects.postgresql import UUID, JSON, ENUM as PG_ENUM
 
 revision = 'hr05'
 down_revision = 'hr04'
@@ -42,7 +42,7 @@ def upgrade():
         "brand_im_configs",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("brand_id", sa.String(50), nullable=False, unique=True, index=True),
-        sa.Column("im_platform", sa.Enum(
+        sa.Column("im_platform", PG_ENUM(
             "wechat_work", "dingtalk",
             name="im_platform_enum", create_type=False,
         ), nullable=False),
