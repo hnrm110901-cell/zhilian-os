@@ -6,7 +6,7 @@ Create Date: 2026-03-12
 """
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, ENUM as PG_ENUM
 
 revision = 'z43'
 down_revision = 'z42'
@@ -14,34 +14,28 @@ branch_labels = None
 depends_on = None
 
 
+def _create_enum_safe(name: str, values: list) -> None:
+    """安全创建 PostgreSQL ENUM（已存在则跳过，兼容 offline SQL 生成模式）"""
+    vals = ", ".join(f"'{v}'" for v in values)
+    op.execute(sa.text(
+        f"DO $$ BEGIN "
+        f"CREATE TYPE {name} AS ENUM ({vals}); "
+        f"EXCEPTION WHEN duplicate_object THEN NULL; "
+        f"END $$"
+    ))
+
+
 def upgrade() -> None:
-    op.execute(sa.text("""
-        DO $$ BEGIN
-        CREATE TYPE conflict_type_enum AS ENUM (
-            'resource_contention','financial_constraint','timing_conflict',
-            'priority_clash','contradictory_action'
-        );
-        EXCEPTION WHEN duplicate_object THEN NULL;
-        END $$
-    """))
-    op.execute(sa.text("""
-        DO $$ BEGIN
-        CREATE TYPE conflict_severity_enum AS ENUM ('low','medium','high');
-        EXCEPTION WHEN duplicate_object THEN NULL;
-        END $$
-    """))
-    op.execute(sa.text("""
-        DO $$ BEGIN
-        CREATE TYPE arbitration_status_enum AS ENUM ('pending','resolved','escalated');
-        EXCEPTION WHEN duplicate_object THEN NULL;
-        END $$
-    """))
-    op.execute("""
-        CREATE TYPE arbitration_method_enum AS ENUM (
-            'priority_wins','financial_first','revenue_first','risk_first',
-            'manual_override','merge_recommendations'
-        )
-    """)
+    _create_enum_safe("conflict_type_enum", [
+        "resource_contention", "financial_constraint", "timing_conflict",
+        "priority_clash", "contradictory_action",
+    ])
+    _create_enum_safe("conflict_severity_enum", ["low", "medium", "high"])
+    _create_enum_safe("arbitration_status_enum", ["pending", "resolved", "escalated"])
+    _create_enum_safe("arbitration_method_enum", [
+        "priority_wins", "financial_first", "revenue_first",
+        "risk_first", "manual_override", "merge_recommendations",
+    ])
 
     op.create_table(
         "agent_conflicts",
@@ -52,12 +46,12 @@ def upgrade() -> None:
         sa.Column("agent_b",             sa.String(64), nullable=False),
         sa.Column("recommendation_a_id", sa.String(36), nullable=True),
         sa.Column("recommendation_b_id", sa.String(36), nullable=True),
-        sa.Column("conflict_type",       sa.Enum("resource_contention","financial_constraint","timing_conflict","priority_clash","contradictory_action", name="conflict_type_enum"), nullable=False),
-        sa.Column("severity",            sa.Enum("low","medium","high", name="conflict_severity_enum"), nullable=False),
+        sa.Column("conflict_type",       PG_ENUM("resource_contention","financial_constraint","timing_conflict","priority_clash","contradictory_action", name="conflict_type_enum", create_type=False), nullable=False),
+        sa.Column("severity",            PG_ENUM("low","medium","high", name="conflict_severity_enum", create_type=False), nullable=False),
         sa.Column("description",         sa.Text, nullable=False),
         sa.Column("conflict_data",       JSONB, nullable=True),
-        sa.Column("arbitration_status",  sa.Enum("pending","resolved","escalated", name="arbitration_status_enum"), nullable=False, server_default="pending"),
-        sa.Column("arbitration_method",  sa.Enum("priority_wins","financial_first","revenue_first","risk_first","manual_override","merge_recommendations", name="arbitration_method_enum"), nullable=True),
+        sa.Column("arbitration_status",  PG_ENUM("pending","resolved","escalated", name="arbitration_status_enum", create_type=False), nullable=False, server_default="pending"),
+        sa.Column("arbitration_method",  PG_ENUM("priority_wins","financial_first","revenue_first","risk_first","manual_override","merge_recommendations", name="arbitration_method_enum", create_type=False), nullable=True),
         sa.Column("winning_agent",       sa.String(64), nullable=True),
         sa.Column("arbitration_note",    sa.Text, nullable=True),
         sa.Column("impact_yuan_saved",   sa.Numeric(14, 2), nullable=True),
