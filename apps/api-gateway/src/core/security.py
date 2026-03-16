@@ -1,20 +1,22 @@
 """
 Security utilities for authentication and authorization
 """
-from datetime import datetime, timedelta
-from typing import Optional
-from types import SimpleNamespace
-from jose import JWTError, jwt
-import bcrypt
+
 import os
+from datetime import datetime, timedelta
+from types import SimpleNamespace
+from typing import Optional
+
+import bcrypt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..models.user import User
 from .config import settings
 from .database import get_db
-from ..models.user import User
 
 # JWT settings
 ALGORITHM = "HS256"
@@ -29,9 +31,9 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     plain_password = plain_password[:72]
     # Convert to bytes if string
     if isinstance(plain_password, str):
-        plain_password = plain_password.encode('utf-8')
+        plain_password = plain_password.encode("utf-8")
     if isinstance(hashed_password, str):
-        hashed_password = hashed_password.encode('utf-8')
+        hashed_password = hashed_password.encode("utf-8")
     return bcrypt.checkpw(plain_password, hashed_password)
 
 
@@ -41,10 +43,10 @@ def get_password_hash(password: str) -> str:
     password = password[:72]
     # Convert to bytes if string
     if isinstance(password, str):
-        password = password.encode('utf-8')
+        password = password.encode("utf-8")
     salt = bcrypt.gensalt()
     hashed = bcrypt.hashpw(password, salt)
-    return hashed.decode('utf-8')
+    return hashed.decode("utf-8")
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:

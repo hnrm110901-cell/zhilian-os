@@ -4,6 +4,7 @@ Phase 1：Store、Dish、Ingredient（InventoryItem）同步；P1：Order、Staf
 BOM 双向同步：图谱 BOM 变更后回写 PG Dish.bom_version / effective_date。
 Phase 3：门店同步后自动计算 SIMILAR_TO 相似度关系（同城市/同地区/规模相近）。
 """
+
 from __future__ import annotations
 
 from datetime import date
@@ -13,9 +14,8 @@ from uuid import UUID
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-
-from src.models import Store, Dish, DishCategory, InventoryItem, Order, OrderItem, Employee
-from src.ontology import get_ontology_repository, NodeLabel, RelType
+from src.models import Dish, DishCategory, Employee, InventoryItem, Order, OrderItem, Store
+from src.ontology import NodeLabel, RelType, get_ontology_repository
 
 # InventoryItem.id 作为 ing_id；Store.id 作为 store_id；Dish.id 转为 str 作为 dish_id
 
@@ -94,14 +94,8 @@ def _compute_store_similarities(stores: list, repo) -> None:
 
         # 规模相近加权
         if score > 0:
-            area_similar = (
-                area_a > 0 and area_b > 0
-                and abs(area_a - area_b) / max(area_a, area_b) <= 0.3
-            )
-            seats_similar = (
-                seats_a > 0 and seats_b > 0
-                and abs(seats_a - seats_b) / max(seats_a, seats_b) <= 0.2
-            )
+            area_similar = area_a > 0 and area_b > 0 and abs(area_a - area_b) / max(area_a, area_b) <= 0.3
+            seats_similar = seats_a > 0 and seats_b > 0 and abs(seats_a - seats_b) / max(seats_a, seats_b) <= 0.2
             if area_similar or seats_similar:
                 score = min(1.0, score + 0.1)
                 reason = reason + "+scale"
@@ -116,9 +110,12 @@ def _compute_store_similarities(stores: list, repo) -> None:
                 )
             except Exception as e:
                 import structlog
+
                 structlog.get_logger().warning(
                     "store_similarity_compute_failed",
-                    store_a=sid_a, store_b=sid_b, error=str(e),
+                    store_a=sid_a,
+                    store_b=sid_b,
+                    error=str(e),
                 )
 
 
@@ -220,9 +217,13 @@ async def sync_staff_to_graph(
         )
         if e.store_id:
             repo.merge_relation(
-                NodeLabel.Staff.value, "staff_id", e.id,
+                NodeLabel.Staff.value,
+                "staff_id",
+                e.id,
                 RelType.BELONGS_TO.value,
-                NodeLabel.Store.value, "store_id", e.store_id,
+                NodeLabel.Store.value,
+                "store_id",
+                e.store_id,
             )
         count += 1
     return count
@@ -259,17 +260,25 @@ async def sync_orders_to_graph(
         )
         if o.store_id:
             repo.merge_relation(
-                NodeLabel.Order.value, "order_id", o.id,
+                NodeLabel.Order.value,
+                "order_id",
+                o.id,
                 RelType.BELONGS_TO.value,
-                NodeLabel.Store.value, "store_id", o.store_id,
+                NodeLabel.Store.value,
+                "store_id",
+                o.store_id,
             )
         for item in o.items or []:
             # item_id 视为 dish_id（与 Dish 节点关联）
             dish_id = str(item.item_id)
             repo.merge_relation(
-                NodeLabel.Order.value, "order_id", o.id,
+                NodeLabel.Order.value,
+                "order_id",
+                o.id,
                 RelType.CONTAINS.value,
-                NodeLabel.Dish.value, "dish_id", dish_id,
+                NodeLabel.Dish.value,
+                "dish_id",
+                dish_id,
                 rel_props={"quantity": getattr(item, "quantity", 1)},
             )
         count += 1
@@ -283,7 +292,8 @@ async def sync_ontology_from_pg(
 ) -> dict:
     """统一入口：同步 Store、Dish、Ingredient、Staff、Order 到图谱。"""
     stores_n = await sync_stores_to_graph(
-        session, tenant_id,
+        session,
+        tenant_id,
         store_ids=[store_id] if store_id else None,
     )
     dishes_n = await sync_dishes_to_graph(session, tenant_id, store_id)
@@ -328,9 +338,13 @@ def push_normalized_order_to_graph(
         tenant_id=tenant_id,
     )
     repo.merge_relation(
-        NodeLabel.Order.value, "order_id", order_id,
+        NodeLabel.Order.value,
+        "order_id",
+        order_id,
         RelType.BELONGS_TO.value,
-        NodeLabel.Store.value, "store_id", store_id,
+        NodeLabel.Store.value,
+        "store_id",
+        store_id,
     )
     for it in items:
         dish_id = str(it.get("item_id") or it.get("dish_id") or "")
@@ -338,9 +352,13 @@ def push_normalized_order_to_graph(
             continue
         qty = int(it.get("quantity", 1))
         repo.merge_relation(
-            NodeLabel.Order.value, "order_id", order_id,
+            NodeLabel.Order.value,
+            "order_id",
+            order_id,
             RelType.CONTAINS.value,
-            NodeLabel.Dish.value, "dish_id", dish_id,
+            NodeLabel.Dish.value,
+            "dish_id",
+            dish_id,
             rel_props={"quantity": qty},
         )
     return True
@@ -363,11 +381,7 @@ async def sync_bom_version_to_pg(
         if uid is None:
             return False
         eff_date = date.fromisoformat(effective_date)
-        stmt = (
-            update(Dish)
-            .where(Dish.id == uid)
-            .values(bom_version=str(version), effective_date=eff_date)
-        )
+        stmt = update(Dish).where(Dish.id == uid).values(bom_version=str(version), effective_date=eff_date)
         result = await session.execute(stmt)
         return result.rowcount > 0
     except (ValueError, TypeError):

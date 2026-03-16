@@ -1,0 +1,46 @@
+name: PR Check
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  branch-policy:
+    name: Validate Branch Name
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check branch naming convention
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          echo "Checking branch: ${HEAD_REF}"
+          if [[ ! "${HEAD_REF}" =~ ^(feat/(claude-code|codex|cli)-[a-z0-9._-]+|fix/[a-z0-9._-]+|chore/[a-z0-9._-]+|docs/[a-z0-9._-]+|refactor/[a-z0-9._-]+|test/[a-z0-9._-]+)$ ]]; then
+            echo "Invalid branch name: ${HEAD_REF}"
+            echo "Expected formats:"
+            echo "  feat/claude-code-*"
+            echo "  feat/codex-*"
+            echo "  feat/cli-*"
+            echo "  fix/*, chore/*, docs/*, refactor/*, test/*"
+            exit 1
+          fi
+
+  pr-title:
+    name: Validate PR Title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Conventional Commit style PR title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          echo "Checking PR title: ${PR_TITLE}"
+          if [[ ! "${PR_TITLE}" =~ ^(feat|fix|chore|docs|refactor|test|ci|build|perf|style|revert)(\([a-z0-9._/-]+\))?!?:\ .+ ]]; then
+            echo "PR title must follow Conventional Commits, for example:"
+            echo "  feat(edge): add shokz commissioning diagnostics"
+            exit 1
+          fi

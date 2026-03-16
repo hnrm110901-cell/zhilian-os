@@ -5,15 +5,19 @@ POST /api/v1/execution/execute           — 执行指令
 POST /api/v1/execution/{id}/rollback     — 回滚执行（30分钟窗口）
 GET  /api/v1/execution/audit-logs        — 查询审计日志
 """
-from typing import Any, Dict, List, Optional
-from datetime import datetime
-from fastapi import APIRouter, HTTPException, Depends, Request, status
-from pydantic import BaseModel
-import structlog
 
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+import structlog
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel
 from src.core.trusted_executor import (
-    TrustedExecutor, ExecutionError, PermissionDeniedError, ApprovalRequiredError,
+    ApprovalRequiredError,
+    ExecutionError,
+    PermissionDeniedError,
     RollbackWindowExpiredError,
+    TrustedExecutor,
 )
 
 logger = structlog.get_logger()
@@ -22,6 +26,7 @@ router = APIRouter(prefix="/api/v1/execution", tags=["execution"])
 
 
 # ==================== Request / Response 模型 ====================
+
 
 class ExecuteRequest(BaseModel):
     command_type: str
@@ -46,6 +51,7 @@ class AuditLogFilter(BaseModel):
 
 # ==================== 依赖注入 ====================
 
+
 async def get_current_user(request: Request) -> Dict[str, Any]:
     """获取当前用户（从 request.state.user 注入，由 JWT 中间件填充）"""
     user = getattr(request.state, "user", None)
@@ -67,6 +73,7 @@ async def get_executor() -> TrustedExecutor:
 
 
 # ==================== 端点 ====================
+
 
 @router.post("/execute")
 async def execute_command(
@@ -172,9 +179,9 @@ async def get_audit_logs(
     支持按门店、品牌、指令类型、操作人、状态过滤。
     """
     try:
+        from sqlalchemy import and_, select
         from src.core.database import AsyncSessionLocal
         from src.models.execution_audit import ExecutionRecord
-        from sqlalchemy import select, and_
 
         conditions = []
         if store_id:

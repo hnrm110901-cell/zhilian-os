@@ -12,6 +12,7 @@ Endpoints:
   GET  /dashboard/{store_id}         — BFF：一次请求返回全部数据
   GET  /brand-summary                — 多门店健康排行（CEO 视角）
 """
+
 from __future__ import annotations
 
 from typing import Optional
@@ -41,7 +42,7 @@ router = APIRouter(prefix="/api/v1/finance-health", tags=["finance_health"])
 @router.post("/compute/{store_id}")
 async def trigger_compute(
     store_id: str,
-    period:   str = Query(..., description="YYYY-MM"),
+    period: str = Query(..., description="YYYY-MM"),
     db: AsyncSession = Depends(get_db),
 ):
     """触发健康评分计算（实时聚合所有维度数据，结果写入 DB）。"""
@@ -52,7 +53,7 @@ async def trigger_compute(
 @router.get("/score/{store_id}")
 async def get_score(
     store_id: str,
-    period:   str = Query(..., description="YYYY-MM"),
+    period: str = Query(..., description="YYYY-MM"),
     db: AsyncSession = Depends(get_db),
 ):
     """获取已缓存的评分（未计算则 404；可先调用 /compute）。"""
@@ -68,7 +69,7 @@ async def get_score(
 @router.get("/trend/{store_id}")
 async def get_trend(
     store_id: str,
-    periods:  int = Query(6, ge=1, le=24, description="最多查询几个历史期间"),
+    periods: int = Query(6, ge=1, le=24, description="最多查询几个历史期间"),
     db: AsyncSession = Depends(get_db),
 ):
     """返回历史健康评分趋势（升序，最旧→最新，用于折线图）。"""
@@ -79,7 +80,7 @@ async def get_trend(
 @router.get("/insights/{store_id}")
 async def list_insights(
     store_id: str,
-    period:   str = Query(..., description="YYYY-MM"),
+    period: str = Query(..., description="YYYY-MM"),
     db: AsyncSession = Depends(get_db),
 ):
     insights = await get_finance_insights(db, store_id=store_id, period=period)
@@ -89,7 +90,7 @@ async def list_insights(
 @router.get("/profit-trend/{store_id}")
 async def get_raw_profit_trend(
     store_id: str,
-    periods:  int = Query(6, ge=1, le=24),
+    periods: int = Query(6, ge=1, le=24),
     db: AsyncSession = Depends(get_db),
 ):
     """原始利润指标多期趋势（升序）。"""
@@ -100,7 +101,7 @@ async def get_raw_profit_trend(
 @router.get("/dashboard/{store_id}")
 async def get_dashboard(
     store_id: str,
-    period:   str = Query(..., description="YYYY-MM"),
+    period: str = Query(..., description="YYYY-MM"),
     db: AsyncSession = Depends(get_db),
 ):
     """BFF：一次请求返回评分 + 洞察 + 利润趋势 + 健康评分趋势（子查询失败降级为空）。"""
@@ -109,7 +110,7 @@ async def get_dashboard(
 
 @router.get("/brand-summary")
 async def get_brand_summary(
-    period:   str           = Query(..., description="YYYY-MM"),
+    period: str = Query(..., description="YYYY-MM"),
     brand_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
@@ -121,6 +122,6 @@ async def get_brand_summary(
 async def list_grades():
     return {
         "thresholds": GRADE_THRESHOLDS,
-        "max_scores":  MAX_SCORES,
-        "dimensions":  list(MAX_SCORES.keys()),
+        "max_scores": MAX_SCORES,
+        "dimensions": list(MAX_SCORES.keys()),
     }

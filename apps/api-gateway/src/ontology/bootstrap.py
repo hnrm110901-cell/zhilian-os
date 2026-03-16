@@ -12,8 +12,10 @@
 """
 
 import os
+
 import structlog
-from neo4j import GraphDatabase, exceptions as neo4j_exc
+from neo4j import GraphDatabase
+from neo4j import exceptions as neo4j_exc
 
 logger = structlog.get_logger()
 
@@ -110,9 +112,7 @@ def bootstrap(uri: str = NEO4J_URI, user: str = NEO4J_USER, password: str = NEO4
     멱等性：多次执行安全（IF NOT EXISTS 保证）
     """
     if not password:
-        raise EnvironmentError(
-            "NEO4J_PASSWORD 未设置。请在 .env 中配置 NEO4J_PASSWORD=<密码>"
-        )
+        raise EnvironmentError("NEO4J_PASSWORD 未设置。请在 .env 中配置 NEO4J_PASSWORD=<密码>")
 
     logger.info("正在连接 Neo4j", uri=uri, user=user)
 

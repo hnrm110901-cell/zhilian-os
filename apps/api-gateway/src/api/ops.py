@@ -2,24 +2,27 @@
 运维 Agent 专属 API
 OpsAgent dedicated endpoints
 """
-from typing import Optional
-from fastapi import APIRouter, Depends, Query, HTTPException
-from pydantic import BaseModel
 
-from ..core.dependencies import require_permission, get_db
-from ..core.permissions import Permission
-from ..models.user import User
-from ..core.prompt_injection_guard import prompt_injection_guard, InputSource, SanitizationLevel, PromptInjectionException
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..core.dependencies import get_db, require_permission
+from ..core.permissions import Permission
+from ..core.prompt_injection_guard import InputSource, PromptInjectionException, SanitizationLevel, prompt_injection_guard
+from ..models.user import User
 
 router = APIRouter()
 
 
 # ─────────────────────────── Request Models ───────────────────────────
 
+
 class DiagnoseRequest(BaseModel):
     store_id: str
-    component: Optional[str] = None   # pos / router / printer / kds …
+    component: Optional[str] = None  # pos / router / printer / kds …
     symptom: str
 
 
@@ -30,7 +33,7 @@ class RunbookRequest(BaseModel):
 
 class LinkSwitchRequest(BaseModel):
     store_id: str
-    quality_score: float              # 主链路质量分 0-100
+    quality_score: float  # 主链路质量分 0-100
 
 
 class NLQueryRequest(BaseModel):
@@ -40,10 +43,11 @@ class NLQueryRequest(BaseModel):
 
 # V2.0 新增 Request Models ──────────────────────────────────────────────
 
+
 class DeviceReadingRequest(BaseModel):
     store_id: str
     device_name: str
-    metric_type: str                  # temperature/power/online_status/tpm/clean_days
+    metric_type: str  # temperature/power/online_status/tpm/clean_days
     value_float: Optional[float] = None
     value_bool: Optional[bool] = None
     unit: Optional[str] = None
@@ -52,21 +56,21 @@ class DeviceReadingRequest(BaseModel):
 
 class NetworkHealthRequest(BaseModel):
     store_id: str
-    probe_type: str                   # icmp/http/dns/bandwidth/wifi/vpn
+    probe_type: str  # icmp/http/dns/bandwidth/wifi/vpn
     target: str
     is_available: bool = True
     latency_ms: Optional[float] = None
     packet_loss_pct: Optional[float] = None
     bandwidth_mbps: Optional[float] = None
     status_code: Optional[int] = None
-    vlan: Optional[str] = None        # vlan10/vlan20/wan …
+    vlan: Optional[str] = None  # vlan10/vlan20/wan …
 
 
 class SysHealthRequest(BaseModel):
     store_id: str
     system_name: str
-    priority: str                     # P0/P1/P2/P3
-    check_method: str                 # api_heartbeat/db_probe/port_check/process_check
+    priority: str  # P0/P1/P2/P3
+    check_method: str  # api_heartbeat/db_probe/port_check/process_check
     is_available: bool
     response_ms: Optional[float] = None
     http_status: Optional[int] = None
@@ -75,7 +79,7 @@ class SysHealthRequest(BaseModel):
 
 class FoodSafetyRequest(BaseModel):
     store_id: str
-    record_type: str                  # cold_chain/fridge_power/ice_machine_clean/oil_quality/safety_device
+    record_type: str  # cold_chain/fridge_power/ice_machine_clean/oil_quality/safety_device
     device_name: Optional[str] = None
     value_float: Optional[float] = None
     threshold_min: Optional[float] = None
@@ -86,12 +90,15 @@ class FoodSafetyRequest(BaseModel):
 
 # ─────────────────────────── Helpers ───────────────────────────
 
+
 def _get_ops_agent():
     from ..agents.ops_agent import OpsAgent
+
     return OpsAgent()
 
 
 # ─────────────────────────── 原有端点 ───────────────────────────
+
 
 @router.get("/health/{store_id}")
 async def health_check(
@@ -114,11 +121,14 @@ async def diagnose_fault(
 ):
     """故障根因分析（目标 80% 故障 5 分钟内定位）"""
     agent = _get_ops_agent()
-    result = await agent.execute("diagnose_fault", {
-        "store_id": body.store_id,
-        "component": body.component,
-        "symptom": body.symptom,
-    })
+    result = await agent.execute(
+        "diagnose_fault",
+        {
+            "store_id": body.store_id,
+            "component": body.component,
+            "symptom": body.symptom,
+        },
+    )
     if not result.success:
         raise HTTPException(status_code=500, detail=result.error)
     return result.data
@@ -131,10 +141,13 @@ async def runbook_suggestion(
 ):
     """修复步骤 / Runbook 建议"""
     agent = _get_ops_agent()
-    result = await agent.execute("runbook_suggestion", {
-        "store_id": body.store_id,
-        "fault_type": body.fault_type,
-    })
+    result = await agent.execute(
+        "runbook_suggestion",
+        {
+            "store_id": body.store_id,
+            "fault_type": body.fault_type,
+        },
+    )
     if not result.success:
         raise HTTPException(status_code=500, detail=result.error)
     return result.data
@@ -148,10 +161,13 @@ async def predict_maintenance(
 ):
     """预测性维护建议（打印机/路由器/KDS/门禁等）"""
     agent = _get_ops_agent()
-    result = await agent.execute("predict_maintenance", {
-        "store_id": store_id,
-        "device_type": device_type or "",
-    })
+    result = await agent.execute(
+        "predict_maintenance",
+        {
+            "store_id": store_id,
+            "device_type": device_type or "",
+        },
+    )
     if not result.success:
         raise HTTPException(status_code=500, detail=result.error)
     return result.data
@@ -165,10 +181,13 @@ async def security_advice(
 ):
     """安全加固建议（弱密码/非授权设备/固件漏洞/VPN）"""
     agent = _get_ops_agent()
-    result = await agent.execute("security_advice", {
-        "store_id": store_id,
-        "focus": focus,
-    })
+    result = await agent.execute(
+        "security_advice",
+        {
+            "store_id": store_id,
+            "focus": focus,
+        },
+    )
     if not result.success:
         raise HTTPException(status_code=500, detail=result.error)
     return result.data
@@ -181,10 +200,13 @@ async def link_switch_advice(
 ):
     """主备链路切换建议（质量分 <70 时 30 秒内切换）"""
     agent = _get_ops_agent()
-    result = await agent.execute("link_switch_advice", {
-        "store_id": body.store_id,
-        "quality_score": body.quality_score,
-    })
+    result = await agent.execute(
+        "link_switch_advice",
+        {
+            "store_id": body.store_id,
+            "quality_score": body.quality_score,
+        },
+    )
     if not result.success:
         raise HTTPException(status_code=500, detail=result.error)
     return result.data
@@ -219,16 +241,20 @@ async def nl_query(
         raise HTTPException(status_code=400, detail=f"输入包含非法内容: {e}")
 
     agent = _get_ops_agent()
-    result = await agent.execute("nl_query", {
-        "store_id": body.store_id,
-        "question": sanitized_question,
-    })
+    result = await agent.execute(
+        "nl_query",
+        {
+            "store_id": body.store_id,
+            "question": sanitized_question,
+        },
+    )
     if not result.success:
         raise HTTPException(status_code=500, detail=result.error)
     return result.data
 
 
 # ─────────────────────────── V2.0 新增端点 ───────────────────────────
+
 
 @router.get("/dashboard/{store_id}")
 async def store_dashboard(
@@ -242,11 +268,14 @@ async def store_dashboard(
     返回三层健康分、活跃告警数、以及 Claude 生成的摘要建议。
     """
     agent = _get_ops_agent()
-    result = await agent.execute("store_dashboard", {
-        "store_id": store_id,
-        "session": db,
-        "window_minutes": window_minutes,
-    })
+    result = await agent.execute(
+        "store_dashboard",
+        {
+            "store_id": store_id,
+            "session": db,
+            "window_minutes": window_minutes,
+        },
+    )
     if not result.success:
         raise HTTPException(status_code=500, detail=result.error)
     return result.data
@@ -260,6 +289,7 @@ async def record_device_reading(
 ):
     """写入 IoT 设备读数（边缘网关上报入口）。自动判断告警并写入 ops_events。"""
     from ..services.ops_monitor_service import OpsMonitorService
+
     svc = OpsMonitorService()
     result = await svc.record_device_reading(
         db,
@@ -283,6 +313,7 @@ async def record_network_health(
 ):
     """写入网络探针结果（边缘网关上报入口）。"""
     from ..services.ops_monitor_service import OpsMonitorService
+
     svc = OpsMonitorService()
     result = await svc.record_network_health(
         db,
@@ -308,6 +339,7 @@ async def record_sys_health(
 ):
     """写入系统心跳结果。P0 系统第1次失败即告警，P1 连续2次，P2/P3 连续3次。"""
     from ..services.ops_monitor_service import OpsMonitorService
+
     svc = OpsMonitorService()
     result = await svc.record_sys_health(
         db,
@@ -332,6 +364,7 @@ async def record_food_safety(
 ):
     """写入食安记录。超出 threshold_min/max 自动标记违规并创建 OpsEvent。"""
     from ..services.ops_monitor_service import OpsMonitorService
+
     svc = OpsMonitorService()
     result = await svc.record_food_safety(
         db,
@@ -360,11 +393,14 @@ async def food_safety_status(
     对应方案 3.2 食安设备监控SOP + 2026年6月食安新规合规要求。
     """
     agent = _get_ops_agent()
-    result = await agent.execute("food_safety_status", {
-        "store_id": store_id,
-        "session": db,
-        "days": days,
-    })
+    result = await agent.execute(
+        "food_safety_status",
+        {
+            "store_id": store_id,
+            "session": db,
+            "days": days,
+        },
+    )
     if not result.success:
         raise HTTPException(status_code=500, detail=result.error)
     return result.data
@@ -382,11 +418,14 @@ async def converge_alerts(
     对应方案 5.2 故障关联分析（外网断/交换机故障/软件崩溃/队列积压）。
     """
     agent = _get_ops_agent()
-    result = await agent.execute("alert_convergence", {
-        "store_id": store_id,
-        "session": db,
-        "window_minutes": window_minutes,
-    })
+    result = await agent.execute(
+        "alert_convergence",
+        {
+            "store_id": store_id,
+            "session": db,
+            "window_minutes": window_minutes,
+        },
+    )
     if not result.success:
         raise HTTPException(status_code=500, detail=result.error)
     return result.data

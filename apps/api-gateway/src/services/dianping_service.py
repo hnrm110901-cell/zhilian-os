@@ -2,31 +2,71 @@
 大众点评评论监控服务
 提供评论同步、情感分析、统计汇总、关键词云等业务逻辑
 """
-import uuid
+
 import random
+import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 import structlog
-from sqlalchemy import select, func, case, and_, or_, desc
+from sqlalchemy import and_, case, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.models.dianping_review import DianpingReview
 
 logger = structlog.get_logger()
 
 # ── 情感分析关键词 ─────────────────────────────────────────────────
 
-POSITIVE_KEYWORDS = ["好吃", "推荐", "满意", "不错", "优秀", "新鲜", "干净",
-                     "热情", "实惠", "好评", "喜欢", "美味", "赞", "超棒", "惊喜"]
-NEGATIVE_KEYWORDS = ["难吃", "差评", "不满", "投诉", "差", "脏", "慢", "贵",
-                     "凉了", "态度差", "不新鲜", "等太久", "失望", "难以下咽", "退款"]
+POSITIVE_KEYWORDS = [
+    "好吃",
+    "推荐",
+    "满意",
+    "不错",
+    "优秀",
+    "新鲜",
+    "干净",
+    "热情",
+    "实惠",
+    "好评",
+    "喜欢",
+    "美味",
+    "赞",
+    "超棒",
+    "惊喜",
+]
+NEGATIVE_KEYWORDS = [
+    "难吃",
+    "差评",
+    "不满",
+    "投诉",
+    "差",
+    "脏",
+    "慢",
+    "贵",
+    "凉了",
+    "态度差",
+    "不新鲜",
+    "等太久",
+    "失望",
+    "难以下咽",
+    "退款",
+]
 
 # ── Mock数据生成（模拟大众点评API返回） ─────────────────────────────
 
-_MOCK_AUTHORS = ["美食达人小王", "吃货日记", "老饕客", "小红薯爱吃", "湘菜控",
-                 "快乐星球", "深夜食堂", "周末觅食", "辣妹子", "嘴巴停不下来"]
+_MOCK_AUTHORS = [
+    "美食达人小王",
+    "吃货日记",
+    "老饕客",
+    "小红薯爱吃",
+    "湘菜控",
+    "快乐星球",
+    "深夜食堂",
+    "周末觅食",
+    "辣妹子",
+    "嘴巴停不下来",
+]
 
 _MOCK_AVATARS = [
     "https://img.dianping.com/avatar/u1.jpg",
@@ -74,9 +114,7 @@ class DianpingService:
             ext_review_id = f"dp_{brand_id}_{store_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{i}"
 
             # 检查是否已存在
-            exists = await db.execute(
-                select(DianpingReview.id).where(DianpingReview.review_id == ext_review_id)
-            )
+            exists = await db.execute(select(DianpingReview.id).where(DianpingReview.review_id == ext_review_id))
             if exists.scalar_one_or_none():
                 skipped += 1
                 continue
@@ -96,10 +134,15 @@ class DianpingService:
                 author_avatar_url=random.choice(_MOCK_AVATARS),
                 rating=rating,
                 content=content,
-                images=random.choice([None, [
-                    "https://img.dianping.com/photo/r1.jpg",
-                    "https://img.dianping.com/photo/r2.jpg",
-                ]]),
+                images=random.choice(
+                    [
+                        None,
+                        [
+                            "https://img.dianping.com/photo/r1.jpg",
+                            "https://img.dianping.com/photo/r2.jpg",
+                        ],
+                    ]
+                ),
                 review_date=review_date,
                 source=random.choice(["dianping", "meituan"]),
                 is_read=False,
@@ -124,8 +167,7 @@ class DianpingService:
                 self._analyze_sentiment_for_review(review)
             await db.commit()
 
-        logger.info("评论同步完成", brand_id=brand_id, store_id=store_id,
-                    synced=synced, skipped=skipped)
+        logger.info("评论同步完成", brand_id=brand_id, store_id=store_id, synced=synced, skipped=skipped)
         return {"synced": synced, "skipped": skipped, "total": num_reviews}
 
     async def list_reviews(
@@ -179,9 +221,7 @@ class DianpingService:
 
     async def get_review(self, db: AsyncSession, review_id: str) -> Optional[Dict[str, Any]]:
         """获取单条评论详情"""
-        result = await db.execute(
-            select(DianpingReview).where(DianpingReview.review_id == review_id)
-        )
+        result = await db.execute(select(DianpingReview).where(DianpingReview.review_id == review_id))
         review = result.scalar_one_or_none()
         return self._to_dict(review) if review else None
 
@@ -192,9 +232,7 @@ class DianpingService:
         reply_content: str,
     ) -> Dict[str, Any]:
         """保存商家回复"""
-        result = await db.execute(
-            select(DianpingReview).where(DianpingReview.review_id == review_id)
-        )
+        result = await db.execute(select(DianpingReview).where(DianpingReview.review_id == review_id))
         review = result.scalar_one_or_none()
         if not review:
             raise ValueError(f"评论不存在: {review_id}")
@@ -210,9 +248,7 @@ class DianpingService:
 
     async def mark_read(self, db: AsyncSession, review_ids: List[str]) -> int:
         """批量标记为已读"""
-        result = await db.execute(
-            select(DianpingReview).where(DianpingReview.review_id.in_(review_ids))
-        )
+        result = await db.execute(select(DianpingReview).where(DianpingReview.review_id.in_(review_ids)))
         reviews = result.scalars().all()
         count = 0
         for review in reviews:
@@ -224,9 +260,7 @@ class DianpingService:
 
     async def analyze_sentiment(self, db: AsyncSession, review_id: str) -> Dict[str, Any]:
         """对单条评论进行情感分析"""
-        result = await db.execute(
-            select(DianpingReview).where(DianpingReview.review_id == review_id)
-        )
+        result = await db.execute(select(DianpingReview).where(DianpingReview.review_id == review_id))
         review = result.scalar_one_or_none()
         if not review:
             raise ValueError(f"评论不存在: {review_id}")
@@ -256,15 +290,15 @@ class DianpingService:
             select(
                 DianpingReview.sentiment,
                 func.count(DianpingReview.id),
-            ).where(base_cond).group_by(DianpingReview.sentiment)
+            )
+            .where(base_cond)
+            .group_by(DianpingReview.sentiment)
         )
         sentiment_dist = {s or "unknown": c for s, c in sentiment_q.all()}
 
         # 未读数
         unread_q = await db.execute(
-            select(func.count(DianpingReview.id)).where(
-                and_(base_cond, DianpingReview.is_read == False)
-            )
+            select(func.count(DianpingReview.id)).where(and_(base_cond, DianpingReview.is_read == False))
         )
         unread_count = unread_q.scalar() or 0
 
@@ -275,9 +309,10 @@ class DianpingService:
                 func.date_trunc("day", DianpingReview.review_date).label("day"),
                 func.count(DianpingReview.id).label("count"),
                 func.avg(DianpingReview.rating).label("avg_r"),
-            ).where(
-                and_(base_cond, DianpingReview.review_date >= seven_days_ago)
-            ).group_by("day").order_by("day")
+            )
+            .where(and_(base_cond, DianpingReview.review_date >= seven_days_ago))
+            .group_by("day")
+            .order_by("day")
         )
         trend = [
             {

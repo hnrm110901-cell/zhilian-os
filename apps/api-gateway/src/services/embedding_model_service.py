@@ -9,16 +9,17 @@ Restaurant Industry Embedding Model Training Service
 4. 相似度计算
 """
 
-import os
-import numpy as np
-from typing import List, Dict, Optional, Tuple
-from datetime import datetime, timedelta
-import inspect
 import asyncio
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
+import inspect
 import json
 import logging
+import os
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Tuple
+
+import numpy as np
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -35,9 +36,7 @@ class EmbeddingModelService:
     # ==================== 数据收集 ====================
 
     async def collect_training_data(
-        self,
-        tenant_id: Optional[str] = None,
-        days: int = int(os.getenv("EMBEDDING_TRAIN_DATA_DAYS", "90"))
+        self, tenant_id: Optional[str] = None, days: int = int(os.getenv("EMBEDDING_TRAIN_DATA_DAYS", "90"))
     ) -> Dict[str, List]:
         """
         收集训练数据
@@ -52,11 +51,11 @@ class EmbeddingModelService:
         start_date = datetime.now() - timedelta(days=days)
 
         training_data = {
-            "dish_texts": [],      # 菜品文本
-            "order_sequences": [], # 订单序列
-            "review_texts": [],    # 评价文本
-            "ingredient_pairs": [], # 食材配对
-            "tag_combinations": []  # 标签组合
+            "dish_texts": [],  # 菜品文本
+            "order_sequences": [],  # 订单序列
+            "review_texts": [],  # 评价文本
+            "ingredient_pairs": [],  # 食材配对
+            "tag_combinations": [],  # 标签组合
         }
 
         try:
@@ -171,7 +170,7 @@ class EmbeddingModelService:
         current_word = ""
 
         for char in text:
-            if '\u4e00' <= char <= '\u9fff':  # 中文字符
+            if "\u4e00" <= char <= "\u9fff":  # 中文字符
                 if current_word:
                     tokens.append(current_word)
                     current_word = ""
@@ -215,11 +214,7 @@ class EmbeddingModelService:
         vocab = {
             word: idx
             for idx, (word, freq) in enumerate(
-                sorted(
-                    [(w, f) for w, f in word_freq.items() if f >= min_freq],
-                    key=lambda x: x[1],
-                    reverse=True
-                )
+                sorted([(w, f) for w, f in word_freq.items() if f >= min_freq], key=lambda x: x[1], reverse=True)
             )
         }
 
@@ -234,7 +229,7 @@ class EmbeddingModelService:
         embedding_dim: int = int(os.getenv("EMBEDDING_DIM", "128")),
         window_size: int = int(os.getenv("EMBEDDING_WINDOW_SIZE", "5")),
         epochs: int = int(os.getenv("EMBEDDING_EPOCHS", "10")),
-        learning_rate: float = float(os.getenv("EMBEDDING_LEARNING_RATE", "0.025"))
+        learning_rate: float = float(os.getenv("EMBEDDING_LEARNING_RATE", "0.025")),
     ) -> np.ndarray:
         """
         训练 Word2Vec 模型（Skip-gram）
@@ -333,17 +328,17 @@ class EmbeddingModelService:
             "embeddings": self.model.tolist(),
             "vocab": self.vocab,
             "embedding_dim": self.embedding_dim,
-            "created_at": datetime.now().isoformat()
+            "created_at": datetime.now().isoformat(),
         }
 
-        with open(model_path, 'w', encoding='utf-8') as f:
+        with open(model_path, "w", encoding="utf-8") as f:
             json.dump(model_data, f, ensure_ascii=False, indent=2)
 
         logger.info(f"Model saved to {model_path}")
 
     def load_model(self, model_path: str):
         """从文件加载模型"""
-        with open(model_path, 'r', encoding='utf-8') as f:
+        with open(model_path, "r", encoding="utf-8") as f:
             model_data = json.load(f)
 
         self.model = np.array(model_data["embeddings"])
@@ -383,12 +378,7 @@ class EmbeddingModelService:
         embeddings = [self.model[tid] for tid in token_ids]
         return np.mean(embeddings, axis=0)
 
-    def calculate_similarity(
-        self,
-        text1: str,
-        text2: str,
-        method: str = "cosine"
-    ) -> float:
+    def calculate_similarity(self, text1: str, text2: str, method: str = "cosine") -> float:
         """
         计算两个文本的相似度
 
@@ -425,10 +415,7 @@ class EmbeddingModelService:
             raise ValueError(f"Unknown similarity method: {method}")
 
     async def find_similar_dishes_async(
-        self,
-        dish_name: str,
-        top_k: int = int(os.getenv("EMBEDDING_SEARCH_TOP_K", "10")),
-        tenant_id: Optional[str] = None
+        self, dish_name: str, top_k: int = int(os.getenv("EMBEDDING_SEARCH_TOP_K", "10")), tenant_id: Optional[str] = None
     ) -> List[Dict]:
         """
         查找相似菜品
@@ -478,12 +465,14 @@ class EmbeddingModelService:
                 dish_text += " " + raw_description
 
             similarity = self.calculate_similarity(dish_name, dish_text)
-            similarities.append({
-                "dish_id": dish.id,
-                "dish_name": raw_name,
-                "similarity": similarity,
-                "tags": json.loads(dish.tags) if dish.tags else []
-            })
+            similarities.append(
+                {
+                    "dish_id": dish.id,
+                    "dish_name": raw_name,
+                    "similarity": similarity,
+                    "tags": json.loads(dish.tags) if dish.tags else [],
+                }
+            )
 
         # 排序并返回 top_k
         similarities.sort(key=lambda x: x["similarity"], reverse=True)
@@ -493,7 +482,7 @@ class EmbeddingModelService:
         self,
         order_dish_names: List[str],
         top_k: int = int(os.getenv("EMBEDDING_RECOMMEND_TOP_K", "5")),
-        tenant_id: Optional[str] = None
+        tenant_id: Optional[str] = None,
     ) -> List[Dict]:
         """
         基于订单中的菜品推荐其他菜品
@@ -550,27 +539,25 @@ class EmbeddingModelService:
 
             # 计算余弦相似度
             similarity = float(
-                np.dot(avg_embedding, dish_embedding) /
-                (np.linalg.norm(avg_embedding) * np.linalg.norm(dish_embedding))
+                np.dot(avg_embedding, dish_embedding) / (np.linalg.norm(avg_embedding) * np.linalg.norm(dish_embedding))
             )
 
-            recommendations.append({
-                "dish_id": dish.id,
-                "dish_name": raw_name,
-                "price": float(dish.price),
-                "similarity": similarity,
-                "reason": "基于您的订单偏好推荐"
-            })
+            recommendations.append(
+                {
+                    "dish_id": dish.id,
+                    "dish_name": raw_name,
+                    "price": float(dish.price),
+                    "similarity": similarity,
+                    "reason": "基于您的订单偏好推荐",
+                }
+            )
 
         # 排序并返回 top_k
         recommendations.sort(key=lambda x: x["similarity"], reverse=True)
         return recommendations[:top_k]
 
     def find_similar_dishes(
-        self,
-        dish_name: str,
-        top_k: int = int(os.getenv("EMBEDDING_SEARCH_TOP_K", "10")),
-        tenant_id: Optional[str] = None
+        self, dish_name: str, top_k: int = int(os.getenv("EMBEDDING_SEARCH_TOP_K", "10")), tenant_id: Optional[str] = None
     ) -> List[Dict]:
         """同步兼容接口（供现有调用方与单测使用）。"""
         return _run_sync(self.find_similar_dishes_async(dish_name, top_k=top_k, tenant_id=tenant_id))
@@ -579,17 +566,14 @@ class EmbeddingModelService:
         self,
         order_dish_names: List[str],
         top_k: int = int(os.getenv("EMBEDDING_RECOMMEND_TOP_K", "5")),
-        tenant_id: Optional[str] = None
+        tenant_id: Optional[str] = None,
     ) -> List[Dict]:
         """同步兼容接口（供现有调用方与单测使用）。"""
         return _run_sync(self.recommend_dishes_by_order_async(order_dish_names, top_k=top_k, tenant_id=tenant_id))
 
     # ==================== 模型评估 ====================
 
-    def evaluate_model(
-        self,
-        test_pairs: List[Tuple[str, str, float]]
-    ) -> Dict[str, float]:
+    def evaluate_model(self, test_pairs: List[Tuple[str, str, float]]) -> Dict[str, float]:
         """
         评估模型性能
 
@@ -618,19 +602,12 @@ class EmbeddingModelService:
         mae = np.mean(np.abs(predictions - ground_truths))
         correlation = np.corrcoef(predictions, ground_truths)[0, 1]
 
-        return {
-            "mse": float(mse),
-            "mae": float(mae),
-            "correlation": float(correlation),
-            "num_samples": len(test_pairs)
-        }
+        return {"mse": float(mse), "mae": float(mae), "correlation": float(correlation), "num_samples": len(test_pairs)}
 
     # ==================== 批量处理 ====================
 
     async def batch_compute_embeddings(
-        self,
-        texts: List[str],
-        batch_size: int = int(os.getenv("EMBEDDING_BATCH_SIZE", "100"))
+        self, texts: List[str], batch_size: int = int(os.getenv("EMBEDDING_BATCH_SIZE", "100"))
     ) -> List[Optional[np.ndarray]]:
         """
         批量计算嵌入向量
@@ -645,7 +622,7 @@ class EmbeddingModelService:
         embeddings = []
 
         for i in range(0, len(texts), batch_size):
-            batch = texts[i:i + batch_size]
+            batch = texts[i : i + batch_size]
             batch_embeddings = [self.get_embedding(text) for text in batch]
             embeddings.extend(batch_embeddings)
 

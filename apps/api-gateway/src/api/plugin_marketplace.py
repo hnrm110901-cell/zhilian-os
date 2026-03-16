@@ -2,6 +2,7 @@
 
 ISV 插件提交、管理员审核、门店安装/卸载。
 """
+
 import json
 import uuid
 from typing import Optional
@@ -11,7 +12,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 
 logger = structlog.get_logger()

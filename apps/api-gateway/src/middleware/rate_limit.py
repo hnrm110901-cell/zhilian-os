@@ -3,16 +3,18 @@ API速率限制中间件
 防止API滥用，保护系统资源
 使用Redis存储，支持分布式部署
 """
-import time
+
+import json
 import os
-from typing import Dict, Optional
+import time
 from datetime import datetime, timedelta
+from typing import Dict, Optional
+
+import redis.asyncio as redis
 import structlog
-from fastapi import Request, HTTPException, status
+from fastapi import HTTPException, Request, status
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
-import redis.asyncio as redis
-import json
 
 logger = structlog.get_logger()
 
@@ -157,14 +159,14 @@ class RedisRateLimiter:
                     "limit": max_requests,
                     "window": window,
                     "current": current_count,
-                    "retry_after": retry_after
+                    "retry_after": retry_after,
                 }
 
             return True, {
                 "client_id": client_id,
                 "limit": max_requests,
                 "window": window,
-                "remaining": max_requests - new_count
+                "remaining": max_requests - new_count,
             }
 
         except redis.RedisError as e:
@@ -175,7 +177,7 @@ class RedisRateLimiter:
                 "limit": max_requests,
                 "window": window,
                 "remaining": max_requests,
-                "fallback": True
+                "fallback": True,
             }
 
     async def reset(self, client_id: str, path: str = "*"):
@@ -223,10 +225,7 @@ class RedisRateLimiter:
                 ttl = await self.redis_client.ttl(key)
                 path = key.split(":", 2)[2]
 
-                stats[path] = {
-                    "count": int(count) if count else 0,
-                    "ttl": ttl
-                }
+                stats[path] = {"count": int(count) if count else 0, "ttl": ttl}
 
             return stats
         except redis.RedisError as e:
@@ -283,7 +282,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 client_id=info["client_id"],
                 path=request.url.path,
                 limit=info["limit"],
-                window=info["window"]
+                window=info["window"],
             )
 
             return JSONResponse(
@@ -293,13 +292,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                     "message": f"Too many requests. Please try again in {info['retry_after']} seconds.",
                     "limit": info["limit"],
                     "window": info["window"],
-                    "retry_after": info["retry_after"]
+                    "retry_after": info["retry_after"],
                 },
                 headers={
                     "Retry-After": str(info["retry_after"]),
                     "X-RateLimit-Limit": str(info["limit"]),
                     "X-RateLimit-Window": str(info["window"]),
-                }
+                },
             )
 
         # 请求允许，添加速率限制头

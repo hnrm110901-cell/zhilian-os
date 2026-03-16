@@ -8,7 +8,6 @@ from typing import Any, Dict, Optional
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-
 HUNAN_BENCHMARKS = {
     "small": {
         "labor_cost_rate_target": 24.0,
@@ -85,14 +84,12 @@ class LaborBenchmarkService:
         end_date = date(year + 1, 1, 1) if mon == 12 else date(year, mon + 1, 1)
 
         store_result = await db.execute(
-            text(
-                """
+            text("""
                 SELECT id, name, area, seats
                 FROM stores
                 WHERE id = :store_id
                 LIMIT 1
-                """
-            ),
+                """),
             {"store_id": store_id},
         )
         store_row = store_result.fetchone()
@@ -103,8 +100,7 @@ class LaborBenchmarkService:
         benchmark = get_hunan_benchmark(size_tier)
 
         snap_result = await db.execute(
-            text(
-                """
+            text("""
                 SELECT
                     AVG(actual_labor_cost_rate) AS avg_rate,
                     AVG(
@@ -117,8 +113,7 @@ class LaborBenchmarkService:
                 WHERE store_id = :store_id
                   AND snapshot_date >= :start_date
                   AND snapshot_date < :end_date
-                """
-            ),
+                """),
             {
                 "store_id": store_id,
                 "start_date": start_date,
@@ -166,8 +161,7 @@ class LaborBenchmarkService:
         else:
             size_filter = "((s.area >= 250 OR s.seats >= 120) AND (s.area < 500 AND s.seats < 220))"
 
-        query = text(
-            f"""
+        query = text(f"""
             SELECT
                 COUNT(DISTINCT l.store_id) AS store_count,
                 AVG(l.actual_labor_cost_rate) AS avg_rate,
@@ -182,8 +176,7 @@ class LaborBenchmarkService:
             WHERE l.snapshot_date >= :start_date
               AND l.snapshot_date < :end_date
               AND {size_filter}
-            """
-        )
+            """)
         result = await db.execute(query, {"start_date": start_date, "end_date": end_date})
         row = result.fetchone()
 

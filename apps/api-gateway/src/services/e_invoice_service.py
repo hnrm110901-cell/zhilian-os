@@ -1,10 +1,12 @@
 """电子发票服务 — 统一封装诺诺/百旺开票能力"""
-from typing import Optional, List, Dict, Any
-from datetime import datetime
-from sqlalchemy import select, desc, func
-from sqlalchemy.ext.asyncio import AsyncSession
-import structlog
+
 import uuid
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+import structlog
+from sqlalchemy import desc, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
 
@@ -79,9 +81,7 @@ class EInvoiceService:
         """提交发票到开票平台"""
         from src.models.e_invoice import EInvoice
 
-        result = await session.execute(
-            select(EInvoice).where(EInvoice.id == uuid.UUID(invoice_id))
-        )
+        result = await session.execute(select(EInvoice).where(EInvoice.id == uuid.UUID(invoice_id)))
         invoice = result.scalar_one_or_none()
         if not invoice:
             raise ValueError("发票不存在")
@@ -101,16 +101,18 @@ class EInvoiceService:
         }
 
     @staticmethod
-    async def handle_callback(session: AsyncSession, platform_serial_no: str,
-                               invoice_code: str, invoice_number: str,
-                               pdf_url: Optional[str] = None,
-                               status: str = "issued") -> Dict[str, Any]:
+    async def handle_callback(
+        session: AsyncSession,
+        platform_serial_no: str,
+        invoice_code: str,
+        invoice_number: str,
+        pdf_url: Optional[str] = None,
+        status: str = "issued",
+    ) -> Dict[str, Any]:
         """处理开票平台回调"""
         from src.models.e_invoice import EInvoice
 
-        result = await session.execute(
-            select(EInvoice).where(EInvoice.platform_serial_no == platform_serial_no)
-        )
+        result = await session.execute(select(EInvoice).where(EInvoice.platform_serial_no == platform_serial_no))
         invoice = result.scalar_one_or_none()
         if not invoice:
             raise ValueError(f"未找到流水号 {platform_serial_no} 的发票")
@@ -129,9 +131,7 @@ class EInvoiceService:
         """作废发票"""
         from src.models.e_invoice import EInvoice
 
-        result = await session.execute(
-            select(EInvoice).where(EInvoice.id == uuid.UUID(invoice_id))
-        )
+        result = await session.execute(select(EInvoice).where(EInvoice.id == uuid.UUID(invoice_id)))
         invoice = result.scalar_one_or_none()
         if not invoice:
             raise ValueError("发票不存在")
@@ -191,15 +191,17 @@ class EInvoiceService:
     @staticmethod
     async def get_stats(session: AsyncSession, brand_id: str) -> Dict[str, Any]:
         """发票统计"""
-        from src.models.e_invoice import EInvoice
         from sqlalchemy import func as sa_func
+        from src.models.e_invoice import EInvoice
 
         result = await session.execute(
             select(
                 EInvoice.status,
                 sa_func.count(EInvoice.id).label("count"),
                 sa_func.coalesce(sa_func.sum(EInvoice.total_amount_fen), 0).label("total_fen"),
-            ).where(EInvoice.brand_id == brand_id).group_by(EInvoice.status)
+            )
+            .where(EInvoice.brand_id == brand_id)
+            .group_by(EInvoice.status)
         )
         rows = result.all()
         stats = {r.status: {"count": r.count, "total_fen": r.total_fen} for r in rows}

@@ -2,13 +2,15 @@
 美团等位API集成服务
 Meituan Queue API Integration Service
 """
-from typing import Dict, Any, List, Optional
-import os
-import httpx
+
 import hashlib
-import time
 import json
+import os
+import time
+from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
+
+import httpx
 import structlog
 
 from ..core.config import settings
@@ -22,8 +24,8 @@ class MeituanQueueService:
     def __init__(self):
         self.base_url = "https://api-open-cater.meituan.com"
         self.business_id = "49"  # 到店餐饮排队业务ID
-        self.developer_id = settings.MEITUAN_DEVELOPER_ID if hasattr(settings, 'MEITUAN_DEVELOPER_ID') else ""
-        self.sign_key = settings.MEITUAN_SIGN_KEY if hasattr(settings, 'MEITUAN_SIGN_KEY') else ""
+        self.developer_id = settings.MEITUAN_DEVELOPER_ID if hasattr(settings, "MEITUAN_DEVELOPER_ID") else ""
+        self.sign_key = settings.MEITUAN_SIGN_KEY if hasattr(settings, "MEITUAN_SIGN_KEY") else ""
 
     def _generate_sign(self, params: Dict[str, Any]) -> str:
         """
@@ -45,7 +47,7 @@ class MeituanQueueService:
         sign_str = f"{sign_str}{self.sign_key}"
 
         # MD5加密
-        sign = hashlib.md5(sign_str.encode('utf-8')).hexdigest()
+        sign = hashlib.md5(sign_str.encode("utf-8")).hexdigest()
 
         return sign
 
@@ -92,9 +94,7 @@ class MeituanQueueService:
                 response = await client.post(
                     url,
                     data=urlencode(params),
-                    headers={
-                        "Content-Type": "application/x-www-form-urlencoded;charset=utf-8"
-                    },
+                    headers={"Content-Type": "application/x-www-form-urlencoded;charset=utf-8"},
                 )
 
                 result = response.json()

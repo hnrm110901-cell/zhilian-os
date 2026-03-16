@@ -16,62 +16,67 @@ Marketing Agent Service
 - 私域转化率：20%+
 """
 
-from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta, date
-from pydantic import BaseModel
-from enum import Enum
-import numpy as np
 import logging
 import os
+from datetime import date, datetime, timedelta
 from decimal import Decimal
-from sqlalchemy import select, func
+from enum import Enum
+from typing import Any, Dict, List, Optional
+
+import numpy as np
+from pydantic import BaseModel
+from sqlalchemy import func, select
 from src.core.database import get_db_session
-from src.models.order import Order, OrderStatus, OrderItem
 from src.models.dish import Dish
+from src.models.order import Order, OrderItem, OrderStatus
 
 logger = logging.getLogger(__name__)
 
 
 class CustomerSegment(str, Enum):
     """客户分群"""
-    HIGH_VALUE = "high_value"          # 高价值客户
-    POTENTIAL = "potential"            # 潜力客户
-    AT_RISK = "at_risk"                # 流失风险客户
-    LOST = "lost"                      # 已流失客户
-    NEW = "new"                        # 新客户
+
+    HIGH_VALUE = "high_value"  # 高价值客户
+    POTENTIAL = "potential"  # 潜力客户
+    AT_RISK = "at_risk"  # 流失风险客户
+    LOST = "lost"  # 已流失客户
+    NEW = "new"  # 新客户
 
 
 class MarketingChannel(str, Enum):
     """营销渠道"""
-    WECHAT = "wechat"                  # 企业微信
-    SMS = "sms"                        # 短信
-    APP_PUSH = "app_push"              # APP推送
-    IN_STORE = "in_store"              # 店内营销
+
+    WECHAT = "wechat"  # 企业微信
+    SMS = "sms"  # 短信
+    APP_PUSH = "app_push"  # APP推送
+    IN_STORE = "in_store"  # 店内营销
 
 
 class CouponStrategy(BaseModel):
     """优惠券策略"""
-    coupon_type: str                   # 券类型（满减/折扣/代金）
-    amount: Decimal                    # 金额
-    threshold: Optional[Decimal]       # 门槛
-    valid_days: int                    # 有效天数
-    target_segment: CustomerSegment    # 目标客群
-    expected_conversion: float         # 预期转化率
-    expected_roi: float                # 预期ROI
+
+    coupon_type: str  # 券类型（满减/折扣/代金）
+    amount: Decimal  # 金额
+    threshold: Optional[Decimal]  # 门槛
+    valid_days: int  # 有效天数
+    target_segment: CustomerSegment  # 目标客群
+    expected_conversion: float  # 预期转化率
+    expected_roi: float  # 预期ROI
 
 
 class MarketingCampaign(BaseModel):
     """营销活动"""
+
     campaign_id: str
     name: str
-    objective: str                     # 目标（拉新/促活/挽回）
+    objective: str  # 目标（拉新/促活/挽回）
     target_segment: CustomerSegment
     channel: MarketingChannel
     coupon_strategy: CouponStrategy
     start_time: datetime
     end_time: datetime
     budget: Decimal
-    expected_reach: int                # 预期触达人数
+    expected_reach: int  # 预期触达人数
 
 
 class MarketingAgentService:
@@ -82,11 +87,7 @@ class MarketingAgentService:
 
     # ==================== 顾客画像 ====================
 
-    async def build_customer_profile(
-        self,
-        customer_id: str,
-        tenant_id: str
-    ) -> Dict[str, Any]:
+    async def build_customer_profile(self, customer_id: str, tenant_id: str) -> Dict[str, Any]:
         """
         构建顾客画像
 
@@ -120,7 +121,7 @@ class MarketingAgentService:
             "value_score": value_score,
             "churn_risk": churn_risk,
             "segment": self._determine_segment(value_score, churn_risk),
-            "updated_at": datetime.now()
+            "updated_at": datetime.now(),
         }
 
         logger.info(f"Built customer profile for {customer_id}")
@@ -132,9 +133,7 @@ class MarketingAgentService:
         # customer_id 为手机号
         async with get_db_session() as session:
             result = await session.execute(
-                select(Order.customer_name, Order.customer_phone).where(
-                    Order.customer_phone == customer_id
-                ).limit(1)
+                select(Order.customer_name, Order.customer_phone).where(Order.customer_phone == customer_id).limit(1)
             )
             row = result.one_or_none()
 
@@ -147,10 +146,7 @@ class MarketingAgentService:
             "member_level": "regular",
         }
 
-    async def _analyze_consumption_behavior(
-        self,
-        customer_id: str
-    ) -> Dict:
+    async def _analyze_consumption_behavior(self, customer_id: str) -> Dict:
         """分析消费行为"""
         async with get_db_session() as session:
             result = await session.execute(
@@ -220,6 +216,7 @@ class MarketingAgentService:
         # 推断偏好星期
         if days:
             from collections import Counter
+
             most_common_dow = Counter(days).most_common(1)[0][0]
             day_names = {0: "周日", 1: "周一", 2: "周二", 3: "周三", 4: "周四", 5: "周五", 6: "周六"}
             preferred_day = day_names.get(most_common_dow, "周末")
@@ -237,10 +234,7 @@ class MarketingAgentService:
             "preferred_day": preferred_day,
         }
 
-    async def _vectorize_taste_preference(
-        self,
-        customer_id: str
-    ) -> List[float]:
+    async def _vectorize_taste_preference(self, customer_id: str) -> List[float]:
         """向量化口味偏好（基于历史订单菜品类别统计）"""
         # 5维特征向量：[辣度偏好, 素食偏好, 海鲜偏好, 肉类偏好, 甜品偏好]
         async with get_db_session() as session:
@@ -303,7 +297,7 @@ class MarketingAgentService:
         _r_weight = float(os.getenv("RFM_RECENCY_WEIGHT", "0.3"))
         _f_weight = float(os.getenv("RFM_FREQUENCY_WEIGHT", "0.3"))
         _m_weight = float(os.getenv("RFM_MONETARY_WEIGHT", "0.4"))
-        value_score = (r_score * _r_weight + f_score * _f_weight + m_score * _m_weight)
+        value_score = r_score * _r_weight + f_score * _f_weight + m_score * _m_weight
 
         return value_score
 
@@ -328,17 +322,19 @@ class MarketingAgentService:
 
         return risk
 
-    def _determine_segment(
-        self,
-        value_score: float,
-        churn_risk: float
-    ) -> CustomerSegment:
+    def _determine_segment(self, value_score: float, churn_risk: float) -> CustomerSegment:
         """确定客户分群"""
-        if value_score > float(os.getenv("SEGMENT_HIGH_VALUE_SCORE", "70")) and churn_risk < float(os.getenv("SEGMENT_HIGH_VALUE_CHURN", "0.3")):
+        if value_score > float(os.getenv("SEGMENT_HIGH_VALUE_SCORE", "70")) and churn_risk < float(
+            os.getenv("SEGMENT_HIGH_VALUE_CHURN", "0.3")
+        ):
             return CustomerSegment.HIGH_VALUE
-        elif value_score > float(os.getenv("SEGMENT_POTENTIAL_SCORE", "50")) and churn_risk < float(os.getenv("SEGMENT_POTENTIAL_CHURN", "0.5")):
+        elif value_score > float(os.getenv("SEGMENT_POTENTIAL_SCORE", "50")) and churn_risk < float(
+            os.getenv("SEGMENT_POTENTIAL_CHURN", "0.5")
+        ):
             return CustomerSegment.POTENTIAL
-        elif value_score > float(os.getenv("SEGMENT_AT_RISK_SCORE", "40")) and churn_risk > float(os.getenv("SEGMENT_AT_RISK_CHURN", "0.5")):
+        elif value_score > float(os.getenv("SEGMENT_AT_RISK_SCORE", "40")) and churn_risk > float(
+            os.getenv("SEGMENT_AT_RISK_CHURN", "0.5")
+        ):
             return CustomerSegment.AT_RISK
         elif churn_risk > float(os.getenv("SEGMENT_LOST_CHURN", "0.8")):
             return CustomerSegment.LOST
@@ -347,12 +343,7 @@ class MarketingAgentService:
 
     # ==================== 智能营销决策 ====================
 
-    async def generate_coupon_strategy(
-        self,
-        scenario: str,
-        tenant_id: str,
-        context: Optional[Dict] = None
-    ) -> CouponStrategy:
+    async def generate_coupon_strategy(self, scenario: str, tenant_id: str, context: Optional[Dict] = None) -> CouponStrategy:
         """
         生成发券策略
 
@@ -370,10 +361,9 @@ class MarketingAgentService:
         cfg: Dict = {}
         try:
             from src.models.store import Store
+
             async with get_db_session() as session:
-                store_result = await session.execute(
-                    select(Store).where(Store.id == tenant_id)
-                )
+                store_result = await session.execute(select(Store).where(Store.id == tenant_id))
                 store = store_result.scalar_one_or_none()
                 if store and store.config:
                     cfg = store.config
@@ -388,7 +378,7 @@ class MarketingAgentService:
                 valid_days=int(cfg.get("coupon_traffic_decline_days", 7)),
                 target_segment=CustomerSegment.AT_RISK,
                 expected_conversion=float(cfg.get("coupon_traffic_decline_conversion", 0.25)),
-                expected_roi=float(cfg.get("coupon_traffic_decline_roi", 3.5))
+                expected_roi=float(cfg.get("coupon_traffic_decline_roi", 3.5)),
             )
 
         elif scenario == "new_product_launch":
@@ -399,7 +389,7 @@ class MarketingAgentService:
                 valid_days=int(cfg.get("coupon_new_product_days", 14)),
                 target_segment=CustomerSegment.HIGH_VALUE,
                 expected_conversion=float(cfg.get("coupon_new_product_conversion", 0.35)),
-                expected_roi=float(cfg.get("coupon_new_product_roi", 4.2))
+                expected_roi=float(cfg.get("coupon_new_product_roi", 4.2)),
             )
 
         elif scenario == "member_day":
@@ -410,7 +400,7 @@ class MarketingAgentService:
                 valid_days=int(cfg.get("coupon_member_day_valid_days", os.getenv("MARKETING_MEMBER_DAY_VALID_DAYS", "1"))),
                 target_segment=CustomerSegment.POTENTIAL,
                 expected_conversion=float(cfg.get("coupon_member_day_conversion", 0.40)),
-                expected_roi=float(cfg.get("coupon_member_day_roi", 5.0))
+                expected_roi=float(cfg.get("coupon_member_day_roi", 5.0)),
             )
 
         else:
@@ -421,15 +411,10 @@ class MarketingAgentService:
                 valid_days=int(cfg.get("coupon_default_days", 7)),
                 target_segment=CustomerSegment.NEW,
                 expected_conversion=float(cfg.get("coupon_default_conversion", 0.20)),
-                expected_roi=float(cfg.get("coupon_default_roi", 2.8))
+                expected_roi=float(cfg.get("coupon_default_roi", 2.8)),
             )
 
-    async def create_marketing_campaign(
-        self,
-        objective: str,
-        tenant_id: str,
-        budget: float
-    ) -> MarketingCampaign:
+    async def create_marketing_campaign(self, objective: str, tenant_id: str, budget: float) -> MarketingCampaign:
         """
         创建营销活动
 
@@ -459,9 +444,7 @@ class MarketingAgentService:
             scenario = "default"
 
         # 生成优惠券策略
-        coupon_strategy = await self.generate_coupon_strategy(
-            scenario, tenant_id
-        )
+        coupon_strategy = await self.generate_coupon_strategy(scenario, tenant_id)
 
         # 计算预期触达人数
         budget_decimal = Decimal(str(budget))
@@ -477,7 +460,7 @@ class MarketingAgentService:
             start_time=datetime.now(),
             end_time=datetime.now() + timedelta(days=int(os.getenv("MARKETING_CAMPAIGN_DAYS", "7"))),
             budget=budget_decimal,
-            expected_reach=expected_reach
+            expected_reach=expected_reach,
         )
 
         logger.info(f"Created marketing campaign: {campaign.campaign_id}")
@@ -486,12 +469,7 @@ class MarketingAgentService:
 
     # ==================== 个性化推荐 ====================
 
-    async def recommend_dishes(
-        self,
-        customer_id: str,
-        tenant_id: str,
-        top_k: int = 5
-    ) -> List[Dict]:
+    async def recommend_dishes(self, customer_id: str, tenant_id: str, top_k: int = 5) -> List[Dict]:
         """
         个性化菜品推荐
 
@@ -509,13 +487,16 @@ class MarketingAgentService:
         # 2. 从数据库查询门店可售菜品（按评分+销量排序）
         async with get_db_session() as session:
             result = await session.execute(
-                select(Dish).where(
+                select(Dish)
+                .where(
                     Dish.store_id == tenant_id,
                     Dish.is_available == True,
-                ).order_by(
+                )
+                .order_by(
                     Dish.rating.desc(),
                     Dish.total_sales.desc(),
-                ).limit(top_k * 3)
+                )
+                .limit(top_k * 3)
             )
             dishes = result.scalars().all()
 
@@ -535,12 +516,7 @@ class MarketingAgentService:
 
     # ==================== 私域运营自动化 ====================
 
-    async def auto_trigger_marketing(
-        self,
-        trigger_type: str,
-        customer_id: str,
-        tenant_id: str
-    ):
+    async def auto_trigger_marketing(self, trigger_type: str, customer_id: str, tenant_id: str):
         """
         自动触发营销
 
@@ -561,15 +537,12 @@ class MarketingAgentService:
             # 复购提醒
             await self._send_repurchase_reminder(customer_id, tenant_id)
 
-    async def _send_birthday_coupon(
-        self,
-        customer_id: str,
-        tenant_id: str
-    ):
+    async def _send_birthday_coupon(self, customer_id: str, tenant_id: str):
         """发送生日优惠券"""
         cfg: Dict = {}
         try:
             from src.models.store import Store
+
             async with get_db_session() as session:
                 store_result = await session.execute(select(Store).where(Store.id == tenant_id))
                 store = store_result.scalar_one_or_none()
@@ -582,28 +555,26 @@ class MarketingAgentService:
             "type": "生日专享券",
             "amount": Decimal(str(cfg.get("birthday_coupon_amount", "50.0"))),
             "threshold": Decimal(str(cfg.get("birthday_coupon_threshold", "100.0"))),
-            "valid_days": int(cfg.get("birthday_coupon_days", 7))
+            "valid_days": int(cfg.get("birthday_coupon_days", 7)),
         }
 
         message = f"🎂 生日快乐！送您{coupon['amount']}元生日券，满{coupon['threshold']}可用"
 
         try:
             from src.services.wechat_work_message_service import WeChatWorkMessageService
+
             wechat = WeChatWorkMessageService()
             await wechat.send_text_message(customer_id, message)
         except Exception as e:
             logger.warning(f"企微发送生日券失败: {e}")
         logger.info(f"Sent birthday coupon to {customer_id}")
 
-    async def _send_winback_offer(
-        self,
-        customer_id: str,
-        tenant_id: str
-    ):
+    async def _send_winback_offer(self, customer_id: str, tenant_id: str):
         """发送挽回优惠"""
         cfg: Dict = {}
         try:
             from src.models.store import Store
+
             async with get_db_session() as session:
                 store_result = await session.execute(select(Store).where(Store.id == tenant_id))
                 store = store_result.scalar_one_or_none()
@@ -616,24 +587,21 @@ class MarketingAgentService:
             "type": "专属挽回券",
             "amount": Decimal(str(cfg.get("winback_coupon_amount", "30.0"))),
             "threshold": Decimal(str(cfg.get("winback_coupon_threshold", "80.0"))),
-            "valid_days": int(cfg.get("winback_coupon_days", 14))
+            "valid_days": int(cfg.get("winback_coupon_days", 14)),
         }
 
         message = f"好久不见！特别为您准备了{coupon['amount']}元优惠券，期待您的光临"
 
         try:
             from src.services.wechat_work_message_service import WeChatWorkMessageService
+
             wechat = WeChatWorkMessageService()
             await wechat.send_text_message(customer_id, message)
         except Exception as e:
             logger.warning(f"企微发送挽回券失败: {e}")
         logger.info(f"Sent winback offer to {customer_id}")
 
-    async def _send_repurchase_reminder(
-        self,
-        customer_id: str,
-        tenant_id: str
-    ):
+    async def _send_repurchase_reminder(self, customer_id: str, tenant_id: str):
         """发送复购提醒"""
         # 获取顾客喜欢的菜品
         profile = await self.build_customer_profile(customer_id, tenant_id)
@@ -643,6 +611,7 @@ class MarketingAgentService:
 
         try:
             from src.services.wechat_work_message_service import WeChatWorkMessageService
+
             wechat = WeChatWorkMessageService()
             await wechat.send_text_message(customer_id, message)
         except Exception as e:
@@ -651,10 +620,7 @@ class MarketingAgentService:
 
     # ==================== 营销效果分析 ====================
 
-    async def analyze_campaign_performance(
-        self,
-        campaign_id: str
-    ) -> Dict[str, Any]:
+    async def analyze_campaign_performance(self, campaign_id: str) -> Dict[str, Any]:
         """
         分析营销活动效果
 
@@ -668,9 +634,7 @@ class MarketingAgentService:
         from src.models.marketing_campaign import MarketingCampaign
 
         async with get_db_session() as session:
-            result = await session.execute(
-                select(MarketingCampaign).where(MarketingCampaign.id == campaign_id)
-            )
+            result = await session.execute(select(MarketingCampaign).where(MarketingCampaign.id == campaign_id))
             campaign = result.scalar_one_or_none()
 
         if campaign:
@@ -716,16 +680,20 @@ class MarketingAgentService:
         """
         async with get_db_session() as session:
             now = datetime.now()
-            stmt = select(
-                Order.customer_phone,
-                func.count(Order.id).label("order_count"),
-                func.coalesce(func.sum(Order.final_amount), 0).label("total_amount"),
-                func.max(Order.order_time).label("last_order_time"),
-            ).where(
-                Order.store_id == store_id,
-                Order.customer_phone.isnot(None),
-                Order.status.in_([OrderStatus.COMPLETED, OrderStatus.SERVED]),
-            ).group_by(Order.customer_phone)
+            stmt = (
+                select(
+                    Order.customer_phone,
+                    func.count(Order.id).label("order_count"),
+                    func.coalesce(func.sum(Order.final_amount), 0).label("total_amount"),
+                    func.max(Order.order_time).label("last_order_time"),
+                )
+                .where(
+                    Order.store_id == store_id,
+                    Order.customer_phone.isnot(None),
+                    Order.status.in_([OrderStatus.COMPLETED, OrderStatus.SERVED]),
+                )
+                .group_by(Order.customer_phone)
+            )
 
             rows = (await session.execute(stmt)).all()
 
@@ -767,10 +735,7 @@ class MarketingAgentService:
             "store_id": store_id,
             "total_customers": total,
             "segments": segments,
-            "segments_pct": {
-                k: round(v / total * 100, 1) if total > 0 else 0.0
-                for k, v in segments.items()
-            },
+            "segments_pct": {k: round(v / total * 100, 1) if total > 0 else 0.0 for k, v in segments.items()},
             "computed_at": now.isoformat(),
         }
 
@@ -831,17 +796,21 @@ class MarketingAgentService:
             if churn_risk < risk_threshold:
                 continue
 
-            result.append({
-                "customer_phone": row.customer_phone,
-                "customer_name": row.customer_name or "未知",
-                "order_count": int(row.order_count or 0),
-                "total_amount_yuan": total_amount_yuan,
-                "last_order_date": row.last_order_time.strftime("%Y-%m-%d") if row.last_order_time else None,
-                "days_since_last_order": days_since,
-                "churn_risk": churn_risk,
-                "segment": CustomerSegment.LOST.value if churn_risk >= _churn_risk_critical else CustomerSegment.AT_RISK.value,
-                "recommended_action": "重新激活营销" if churn_risk >= _churn_risk_critical else "发送挽回优惠券",
-            })
+            result.append(
+                {
+                    "customer_phone": row.customer_phone,
+                    "customer_name": row.customer_name or "未知",
+                    "order_count": int(row.order_count or 0),
+                    "total_amount_yuan": total_amount_yuan,
+                    "last_order_date": row.last_order_time.strftime("%Y-%m-%d") if row.last_order_time else None,
+                    "days_since_last_order": days_since,
+                    "churn_risk": churn_risk,
+                    "segment": (
+                        CustomerSegment.LOST.value if churn_risk >= _churn_risk_critical else CustomerSegment.AT_RISK.value
+                    ),
+                    "recommended_action": "重新激活营销" if churn_risk >= _churn_risk_critical else "发送挽回优惠券",
+                }
+            )
 
         result.sort(key=lambda x: x["churn_risk"], reverse=True)
         return result[:limit]
@@ -877,6 +846,7 @@ class MarketingAgentService:
         try:
             import redis.asyncio as aioredis
             from src.services.frequency_cap_engine import FrequencyCapEngine
+
             _redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
             _redis = aioredis.from_url(_redis_url, decode_responses=True)
             freq_engine = FrequencyCapEngine(_redis)
@@ -886,6 +856,7 @@ class MarketingAgentService:
         if not dry_run:
             try:
                 from src.services.wechat_work_message_service import WeChatWorkMessageService
+
                 wechat = WeChatWorkMessageService()
             except Exception as e:
                 logger.warning("wechat_service_init_failed: %s", str(e))
@@ -931,7 +902,11 @@ class MarketingAgentService:
 
         logger.info(
             "batch_churn_recovery_done: store=%s sent=%d skipped=%d errors=%d dry_run=%s",
-            store_id, sent, skipped_freq_cap, errors, dry_run,
+            store_id,
+            sent,
+            skipped_freq_cap,
+            errors,
+            dry_run,
         )
         return {
             "store_id": store_id,
@@ -956,6 +931,7 @@ class MarketingAgentService:
         同时返回按 campaign_type 细分的子汇总，供前端饼图/柱图使用。
         """
         from src.models.marketing_campaign import MarketingCampaign as MCModel
+
         cutoff = datetime.now() - timedelta(days=days)
 
         async with get_db_session() as session:
@@ -1013,8 +989,8 @@ class MarketingAgentService:
         活动归因打点：累加触达/转化/营收/成本到 marketing_campaigns 记录。
         供 POS 订单关联营销活动时调用。
         """
-        from src.models.marketing_campaign import MarketingCampaign as MCModel
         from sqlalchemy import update
+        from src.models.marketing_campaign import MarketingCampaign as MCModel
 
         async with get_db_session() as session:
             stmt = (
@@ -1035,19 +1011,21 @@ class MarketingAgentService:
         """获取营销统计"""
         try:
             from src.models.marketing_campaign import MarketingCampaign
+
             async with get_db_session() as session:
                 result = await session.execute(
                     select(
                         func.count(MarketingCampaign.id),
-                        func.sum(
-                            func.cast(MarketingCampaign.status == "active", func.Integer)
-                        ),
+                        func.sum(func.cast(MarketingCampaign.status == "active", func.Integer)),
                         func.coalesce(func.sum(MarketingCampaign.reach_count), 0),
                         func.coalesce(func.sum(MarketingCampaign.conversion_count), 0),
-                        func.coalesce(func.avg(
-                            (MarketingCampaign.revenue_generated - MarketingCampaign.actual_cost)
-                            / func.nullif(MarketingCampaign.actual_cost, 0)
-                        ), 0.0),
+                        func.coalesce(
+                            func.avg(
+                                (MarketingCampaign.revenue_generated - MarketingCampaign.actual_cost)
+                                / func.nullif(MarketingCampaign.actual_cost, 0)
+                            ),
+                            0.0,
+                        ),
                     )
                 )
                 row = result.one()

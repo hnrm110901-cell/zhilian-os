@@ -2,15 +2,17 @@
 Member API
 奥琦韦会员系统API端点
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import Optional, List
-from pydantic import BaseModel, Field
-from datetime import date
-import structlog
 
-from ..services.member_service import member_service
+from datetime import date
+from typing import List, Optional
+
+import structlog
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
+
 from ..core.dependencies import get_current_active_user
 from ..models.user import User
+from ..services.member_service import member_service
 
 logger = structlog.get_logger()
 
@@ -124,9 +126,7 @@ async def query_member(
     需要权限: member:read
     """
     try:
-        member = await member_service.query_member(
-            card_no=card_no, mobile=mobile, openid=openid
-        )
+        member = await member_service.query_member(card_no=card_no, mobile=mobile, openid=openid)
         return member
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

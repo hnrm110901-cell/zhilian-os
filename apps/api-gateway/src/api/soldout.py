@@ -8,10 +8,10 @@
   GET  /api/v1/soldout/list           当前沽清列表
   GET  /api/v1/soldout/available      可售菜品列表
 """
-from pydantic import BaseModel
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
 
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_db
 from src.core.dependencies import require_role
 from src.models.user import User, UserRole
@@ -21,6 +21,7 @@ router = APIRouter(prefix="/api/v1/soldout", tags=["soldout"])
 
 
 # ---------- Schemas ----------
+
 
 class SoldoutRequest(BaseModel):
     store_id: str
@@ -41,6 +42,7 @@ class BatchSoldoutRequest(BaseModel):
 
 # ---------- Endpoints ----------
 
+
 @router.post("/trigger")
 async def trigger_soldout(
     req: SoldoutRequest,
@@ -52,7 +54,7 @@ async def trigger_soldout(
     result = await svc.soldout_dish(
         dish_id=req.dish_id,
         reason=req.reason,
-        operator=current_user.username if hasattr(current_user, 'username') else str(current_user.id),
+        operator=current_user.username if hasattr(current_user, "username") else str(current_user.id),
     )
     if not result.get("success"):
         raise HTTPException(status_code=400, detail=result.get("error", "沽清失败"))
@@ -70,7 +72,7 @@ async def restore_dish(
     svc = SoldoutService(db, req.store_id)
     result = await svc.restore_dish(
         dish_id=req.dish_id,
-        operator=current_user.username if hasattr(current_user, 'username') else str(current_user.id),
+        operator=current_user.username if hasattr(current_user, "username") else str(current_user.id),
     )
     if not result.get("success"):
         raise HTTPException(status_code=400, detail=result.get("error", "恢复上架失败"))
@@ -91,7 +93,7 @@ async def batch_soldout(
     result = await svc.batch_soldout(
         dish_ids=req.dish_ids,
         reason=req.reason,
-        operator=current_user.username if hasattr(current_user, 'username') else str(current_user.id),
+        operator=current_user.username if hasattr(current_user, "username") else str(current_user.id),
     )
     await db.commit()
     return result

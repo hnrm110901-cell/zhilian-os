@@ -2,13 +2,15 @@
 客户360画像API
 Customer 360 Profile API
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import Optional
-import structlog
 
-from ..services.customer360_service import customer360_service
+from typing import Optional
+
+import structlog
+from fastapi import APIRouter, Depends, HTTPException, Query
+
 from ..core.dependencies import get_current_user
 from ..models.user import User
+from ..services.customer360_service import customer360_service
 from ..utils.pii import mask_phone
 
 router = APIRouter(prefix="/api/v1/customer360", tags=["Customer360"])
@@ -152,9 +154,9 @@ async def search_customers(
         if not current_user.is_super_admin and current_user.store_id:
             store_id = current_user.store_id
 
+        from sqlalchemy import func, or_, select
         from src.core.database import get_db_session
         from src.models.order import Order, OrderStatus
-        from sqlalchemy import select, func, or_
 
         async with get_db_session() as session:
             conditions = [
@@ -167,19 +169,22 @@ async def search_customers(
                 conditions.append(Order.store_id == store_id)
 
             from sqlalchemy import and_
-            rows = (await session.execute(
-                select(
-                    Order.customer_phone,
-                    Order.customer_name,
-                    func.count(Order.id).label("order_count"),
-                    func.sum(Order.final_amount).label("total_spend"),
-                    func.max(Order.order_time).label("last_visit"),
+
+            rows = (
+                await session.execute(
+                    select(
+                        Order.customer_phone,
+                        Order.customer_name,
+                        func.count(Order.id).label("order_count"),
+                        func.sum(Order.final_amount).label("total_spend"),
+                        func.max(Order.order_time).label("last_visit"),
+                    )
+                    .where(and_(*conditions))
+                    .group_by(Order.customer_phone, Order.customer_name)
+                    .order_by(func.max(Order.order_time).desc())
+                    .limit(limit)
                 )
-                .where(and_(*conditions))
-                .group_by(Order.customer_phone, Order.customer_name)
-                .order_by(func.max(Order.order_time).desc())
-                .limit(limit)
-            )).all()
+            ).all()
 
         results = [
             {

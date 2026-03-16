@@ -6,15 +6,16 @@
   GET  /suggestions  — 供应商优化建议
   GET  /saving       — 总节省潜力
 """
-from datetime import date
-from fastapi import APIRouter, Query
 
+from datetime import date
+
+from fastapi import APIRouter, Query
 from src.services.price_benchmark_network import (
     PriceDataPoint,
-    generate_price_report,
     aggregate_price_benchmark,
-    generate_supplier_suggestions,
     compute_total_saving_potential,
+    generate_price_report,
+    generate_supplier_suggestions,
 )
 
 router = APIRouter(prefix="/api/v1/price-benchmark", tags=["price-benchmark"])
@@ -23,6 +24,7 @@ router = APIRouter(prefix="/api/v1/price-benchmark", tags=["price-benchmark"])
 def _demo_pool() -> list[PriceDataPoint]:
     """演示全网匿名价格池（生产环境替换为真实多租户聚合）"""
     import random
+
     random.seed(42)
     items = [
         ("鲈鱼", "seafood", "kg", 1800),
@@ -35,10 +37,16 @@ def _demo_pool() -> list[PriceDataPoint]:
     for name, cat, unit, base in items:
         for i in range(12):
             cost = base + random.randint(-300, 500)
-            pool.append(PriceDataPoint(
-                ingredient_name=name, category=cat, city="上海",
-                unit=unit, unit_cost_fen=cost, purchase_date="2026-03",
-            ))
+            pool.append(
+                PriceDataPoint(
+                    ingredient_name=name,
+                    category=cat,
+                    city="上海",
+                    unit=unit,
+                    unit_cost_fen=cost,
+                    purchase_date="2026-03",
+                )
+            )
     return pool
 
 

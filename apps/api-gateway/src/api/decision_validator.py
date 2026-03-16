@@ -6,16 +6,15 @@ Phase 3: 稳定性加固期 (Stability Reinforcement Period)
 Provides REST API for dual validation of AI decisions
 """
 
-from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
-from src.services.decision_validator import DecisionValidator, ValidationResult
-from src.core.database import get_db
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from src.core.database import get_db
+from src.services.decision_validator import DecisionValidator, ValidationResult
 
 router = APIRouter(prefix="/api/v1/validator", tags=["decision_validator"])
 
@@ -23,6 +22,7 @@ router = APIRouter(prefix="/api/v1/validator", tags=["decision_validator"])
 # Request/Response Models
 class DecisionTypeEnum(str, Enum):
     """Decision type enum"""
+
     INVENTORY_PURCHASE = "inventory_purchase"
     PRICE_ADJUSTMENT = "price_adjustment"
     STAFF_SCHEDULE = "staff_schedule"
@@ -35,6 +35,7 @@ class DecisionTypeEnum(str, Enum):
 
 class ValidateDecisionRequest(BaseModel):
     """Validate decision request"""
+
     store_id: str
     decision_type: DecisionTypeEnum
     ai_suggestion: Dict[str, Any]
@@ -43,6 +44,7 @@ class ValidateDecisionRequest(BaseModel):
 
 class ValidationResultEnum(str, Enum):
     """Validation result enum"""
+
     APPROVED = "approved"
     REJECTED = "rejected"
     WARNING = "warning"
@@ -50,10 +52,7 @@ class ValidationResultEnum(str, Enum):
 
 # API Endpoints
 @router.post("/validate")
-async def validate_decision(
-    request: ValidateDecisionRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def validate_decision(request: ValidateDecisionRequest, db: AsyncSession = Depends(get_db)):
     """
     Validate AI decision using dual validation
     使用双重验证验证AI决策
@@ -75,15 +74,8 @@ async def validate_decision(
     """
     try:
         validator = DecisionValidator()
-        context = {
-            "store_id": request.store_id,
-            "decision_type": request.decision_type.value,
-            **(request.context or {})
-        }
-        validation_result = await validator.validate_decision(
-            decision=request.ai_suggestion,
-            context=context
-        )
+        context = {"store_id": request.store_id, "decision_type": request.decision_type.value, **(request.context or {})}
+        validation_result = await validator.validate_decision(decision=request.ai_suggestion, context=context)
 
         return {
             "success": True,
@@ -91,21 +83,22 @@ async def validate_decision(
             "decision_type": request.decision_type.value,
             "validation": {
                 "result": validation_result["result"],
-                "confidence": 1.0 if not validation_result["critical_failures"] else max(0.0, 1.0 - len(validation_result["critical_failures"]) * 0.2),
+                "confidence": (
+                    1.0
+                    if not validation_result["critical_failures"]
+                    else max(0.0, 1.0 - len(validation_result["critical_failures"]) * 0.2)
+                ),
                 "violations": [f["reason"] for f in validation_result["critical_failures"]],
                 "recommendations": [w["reason"] for w in validation_result["warnings"]],
-                "validated_at": validation_result["timestamp"]
-            }
+                "validated_at": validation_result["timestamp"],
+            },
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/validate/batch")
-async def validate_batch_decisions(
-    requests: List[ValidateDecisionRequest],
-    db: AsyncSession = Depends(get_db)
-):
+async def validate_batch_decisions(requests: List[ValidateDecisionRequest], db: AsyncSession = Depends(get_db)):
     """
     Validate multiple AI decisions in batch
     批量验证多个AI决策
@@ -117,23 +110,22 @@ async def validate_batch_decisions(
         results = []
 
         for req in requests:
-            context = {
-                "store_id": req.store_id,
-                "decision_type": req.decision_type.value,
-                **(req.context or {})
-            }
-            validation_result = await validator.validate_decision(
-                decision=req.ai_suggestion,
-                context=context
-            )
+            context = {"store_id": req.store_id, "decision_type": req.decision_type.value, **(req.context or {})}
+            validation_result = await validator.validate_decision(decision=req.ai_suggestion, context=context)
 
-            results.append({
-                "store_id": req.store_id,
-                "decision_type": req.decision_type.value,
-                "result": validation_result["result"],
-                "confidence": 1.0 if not validation_result["critical_failures"] else max(0.0, 1.0 - len(validation_result["critical_failures"]) * 0.2),
-                "violations": [f["reason"] for f in validation_result["critical_failures"]]
-            })
+            results.append(
+                {
+                    "store_id": req.store_id,
+                    "decision_type": req.decision_type.value,
+                    "result": validation_result["result"],
+                    "confidence": (
+                        1.0
+                        if not validation_result["critical_failures"]
+                        else max(0.0, 1.0 - len(validation_result["critical_failures"]) * 0.2)
+                    ),
+                    "violations": [f["reason"] for f in validation_result["critical_failures"]],
+                }
+            )
 
         # Summary statistics
         approved = sum(1 for r in results if r["result"] == "approved")
@@ -143,12 +135,8 @@ async def validate_batch_decisions(
         return {
             "success": True,
             "total": len(results),
-            "summary": {
-                "approved": approved,
-                "rejected": rejected,
-                "warnings": warnings
-            },
-            "results": results
+            "summary": {"approved": approved, "rejected": rejected, "warnings": warnings},
+            "results": results,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -167,27 +155,15 @@ async def get_validation_rules(db: AsyncSession = Depends(get_db)):
         rules_info = []
 
         for rule in validator.rules.values():
-            rules_info.append({
-                "name": rule.name,
-                "description": getattr(rule, "description", "No description available")
-            })
+            rules_info.append({"name": rule.name, "description": getattr(rule, "description", "No description available")})
 
-        return {
-            "success": True,
-            "total_rules": len(rules_info),
-            "rules": rules_info
-        }
+        return {"success": True, "total_rules": len(rules_info), "rules": rules_info}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/anomaly/detect")
-async def detect_anomaly(
-    store_id: str,
-    metric_name: str,
-    current_value: float,
-    db: AsyncSession = Depends(get_db)
-):
+async def detect_anomaly(store_id: str, metric_name: str, current_value: float, db: AsyncSession = Depends(get_db)):
     """
     Detect anomaly in metric value
     检测指标值异常
@@ -204,7 +180,7 @@ async def detect_anomaly(
             "metric_name": metric_name,
             "current_value": current_value,
             "is_anomaly": is_anomaly,
-            "threshold": "3σ (99.7% confidence)"
+            "threshold": "3σ (99.7% confidence)",
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

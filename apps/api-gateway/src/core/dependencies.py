@@ -1,18 +1,20 @@
 """
 FastAPI dependencies for authentication and authorization
 """
-from typing import Optional, List
-from types import SimpleNamespace
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 
-from .security import decode_access_token
+from types import SimpleNamespace
+from typing import List, Optional
+
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..models.user import User, UserRole
 from .config import settings
 from .database import get_db
-from .permissions import Permission, has_permission, has_any_permission
-from ..models.user import User, UserRole
+from .permissions import Permission, has_any_permission, has_permission
+from .security import decode_access_token
 
 # HTTP Bearer token scheme
 security = HTTPBearer()

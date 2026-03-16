@@ -2,15 +2,17 @@
 Store API endpoints
 门店管理API接口
 """
+
+from typing import List, Optional
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import Optional, List
 from pydantic import BaseModel, ConfigDict
 
-from ..models.user import User, UserRole
-from ..models.store import Store, StoreStatus
 from ..core.dependencies import get_current_active_user, require_role
+from ..models.store import Store, StoreStatus
+from ..models.user import User, UserRole
 from ..services.store_service import store_service
-import structlog
 
 logger = structlog.get_logger()
 router = APIRouter()

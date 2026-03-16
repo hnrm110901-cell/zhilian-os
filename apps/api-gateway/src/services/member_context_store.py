@@ -15,8 +15,8 @@ TTL：25 小时（稍大于 24h RFM 刷新周期，防止 stale data）
 
 from __future__ import annotations
 
-import json
 import inspect
+import json
 import os
 from typing import Any, Dict, Optional
 
@@ -32,7 +32,9 @@ async def _maybe_await(value):
         return await value
     return value
 
+
 # ── Redis key 构造（纯函数）────────────────────────────────────────────────────
+
 
 def make_context_key(store_id: str, customer_id: str) -> str:
     """
@@ -67,6 +69,7 @@ async def get_context_store() -> Optional["MemberContextStore"]:
 
     try:
         import redis.asyncio as aioredis
+
         client = await aioredis.from_url(
             url,
             encoding="utf-8",
@@ -88,6 +91,7 @@ def reset_context_store() -> None:
 
 
 # ── 核心服务类 ────────────────────────────────────────────────────────────────
+
 
 class MemberContextStore:
     """
@@ -141,11 +145,13 @@ class MemberContextStore:
         if not self._redis:
             return
         try:
-            await _maybe_await(self._redis.setex(
-                make_context_key(store_id, customer_id),
-                ttl,
-                json.dumps(data, ensure_ascii=False, default=str),
-            ))
+            await _maybe_await(
+                self._redis.setex(
+                    make_context_key(store_id, customer_id),
+                    ttl,
+                    json.dumps(data, ensure_ascii=False, default=str),
+                )
+            )
         except Exception as exc:
             logger.debug(
                 "member_context_store.set_failed",
@@ -197,7 +203,7 @@ class MemberContextStore:
                     await _maybe_await(self._redis.delete(key))
                     deleted += 1
             else:
-                for key in (keys_iter or []):
+                for key in keys_iter or []:
                     await _maybe_await(self._redis.delete(key))
                     deleted += 1
             logger.info(

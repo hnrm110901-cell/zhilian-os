@@ -2,10 +2,12 @@
 竞争分析数据模型
 存储竞品门店信息和价格记录，支持市场份额分析和竞品对比
 """
-import uuid
+
 import enum
+import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Boolean, Text, JSON, ForeignKey, Integer, Numeric, Date, Index
+
+from sqlalchemy import JSON, Boolean, Column, Date, ForeignKey, Index, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -26,14 +28,14 @@ class CompetitorStore(Base, TimestampMixin):
     our_store_id = Column(String(50), ForeignKey("stores.id"), nullable=False, index=True)
 
     # 竞品信息
-    name = Column(String(100), nullable=False)           # 竞品名称
-    brand = Column(String(100), nullable=True)           # 品牌
-    cuisine_type = Column(String(50), nullable=True)     # 菜系类型
-    address = Column(String(200), nullable=True)         # 地址
-    distance_meters = Column(Integer, nullable=True)     # 距离（米）
+    name = Column(String(100), nullable=False)  # 竞品名称
+    brand = Column(String(100), nullable=True)  # 品牌
+    cuisine_type = Column(String(50), nullable=True)  # 菜系类型
+    address = Column(String(200), nullable=True)  # 地址
+    distance_meters = Column(Integer, nullable=True)  # 距离（米）
     avg_price_per_person = Column(Numeric(10, 2), nullable=True)  # 人均消费
-    rating = Column(Numeric(3, 1), nullable=True)        # 评分（0-5）
-    monthly_customers = Column(Integer, nullable=True)   # 月均客流量（估算）
+    rating = Column(Numeric(3, 1), nullable=True)  # 评分（0-5）
+    monthly_customers = Column(Integer, nullable=True)  # 月均客流量（估算）
     is_active = Column(Boolean, default=True, nullable=False)
     notes = Column(Text, nullable=True)
 
@@ -41,9 +43,7 @@ class CompetitorStore(Base, TimestampMixin):
     our_store = relationship("Store")
     price_records = relationship("CompetitorPrice", back_populates="competitor", cascade="all, delete-orphan")
 
-    __table_args__ = (
-        Index("idx_competitor_our_store", "our_store_id"),
-    )
+    __table_args__ = (Index("idx_competitor_our_store", "our_store_id"),)
 
     def to_dict(self):
         return {
@@ -77,10 +77,10 @@ class CompetitorPrice(Base, TimestampMixin):
     competitor_id = Column(UUID(as_uuid=True), ForeignKey("competitor_stores.id"), nullable=False, index=True)
 
     # 菜品信息
-    dish_name = Column(String(100), nullable=False)      # 菜品名称
-    category = Column(String(50), nullable=True)         # 分类
-    price = Column(Numeric(10, 2), nullable=False)       # 价格
-    record_date = Column(Date, nullable=False)           # 记录日期
+    dish_name = Column(String(100), nullable=False)  # 菜品名称
+    category = Column(String(50), nullable=True)  # 分类
+    price = Column(Numeric(10, 2), nullable=False)  # 价格
+    record_date = Column(Date, nullable=False)  # 记录日期
 
     # 对应我方菜品（可选，用于直接对比）
     our_dish_id = Column(UUID(as_uuid=True), ForeignKey("dishes.id"), nullable=True)

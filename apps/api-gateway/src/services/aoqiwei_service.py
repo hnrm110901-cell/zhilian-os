@@ -2,6 +2,7 @@
 奥琦玮供应链服务层
 封装供应链开放平台的核心业务操作
 """
+
 from typing import Any, Dict, List, Optional
 
 import structlog
@@ -30,13 +31,16 @@ class AoqiweiService:
         """懒加载适配器"""
         if self._adapter is None:
             from packages.api_adapters.aoqiwei.src.adapter import AoqiweiAdapter
-            self._adapter = AoqiweiAdapter({
-                "base_url": self.base_url,
-                "app_key": self.app_key,
-                "app_secret": self.app_secret,
-                "timeout": self.timeout,
-                "retry_times": self.retry_times,
-            })
+
+            self._adapter = AoqiweiAdapter(
+                {
+                    "base_url": self.base_url,
+                    "app_key": self.app_key,
+                    "app_secret": self.app_secret,
+                    "timeout": self.timeout,
+                    "retry_times": self.retry_times,
+                }
+            )
         return self._adapter
 
     async def health_check(self) -> Dict[str, Any]:
@@ -135,16 +139,16 @@ class AoqiweiService:
         logger.info("aoqiwei_stock_local_fallback", shop_code=shop_code, count=len(rows))
         return [
             {
-                "good_code":    r.id,
-                "good_name":    r.name,
-                "category":     r.category,
-                "unit":         r.unit,
-                "stock_qty":    r.current_quantity,
-                "min_qty":      r.min_quantity,
+                "good_code": r.id,
+                "good_name": r.name,
+                "category": r.category,
+                "unit": r.unit,
+                "stock_qty": r.current_quantity,
+                "min_qty": r.min_quantity,
                 "unit_cost_fen": r.unit_cost,
-                "status":       r.status,
-                "shop_code":    r.store_id,
-                "data_source":  "local_inventory",
+                "status": r.status,
+                "shop_code": r.store_id,
+                "data_source": "local_inventory",
             }
             for r in rows
         ]
@@ -199,13 +203,13 @@ class AoqiweiService:
         logger.info("aoqiwei_goods_local_fallback", good_code=good_code, good_name=good_name, count=len(rows))
         items = [
             {
-                "good_code":     r.id,
-                "good_name":     r.name,
-                "category":      r.category,
-                "unit":          r.unit,
+                "good_code": r.id,
+                "good_name": r.name,
+                "category": r.category,
+                "unit": r.unit,
                 "unit_cost_fen": r.unit_cost,
                 "supplier_name": r.supplier_name,
-                "data_source":   "local_inventory",
+                "data_source": "local_inventory",
             }
             for r in rows
         ]
@@ -240,9 +244,7 @@ class AoqiweiService:
         """查询配送出库单。未配置时降级查询本地 inventory_transactions 出库记录。"""
         if not self.is_configured():
             if db is not None:
-                return await self._get_dispatch_out_local(
-                    start_date=start_date, end_date=end_date, shop_code=shop_code, db=db
-                )
+                return await self._get_dispatch_out_local(start_date=start_date, end_date=end_date, shop_code=shop_code, db=db)
             return []
         return await self._get_adapter().query_delivery_dispatch_out(start_date, end_date, shop_code)
 
@@ -285,12 +287,12 @@ class AoqiweiService:
         logger.info("aoqiwei_dispatch_out_local_fallback", shop_code=shop_code, count=len(rows))
         return [
             {
-                "order_id":    str(r.id),
-                "shop_code":   r.store_id,
-                "good_code":   r.item_id,
-                "good_name":   r.name,
-                "qty":         abs(r.quantity),
-                "cost_fen":    r.total_cost,
+                "order_id": str(r.id),
+                "shop_code": r.store_id,
+                "good_code": r.item_id,
+                "good_name": r.name,
+                "qty": abs(r.quantity),
+                "cost_fen": r.total_cost,
                 "dispatch_time": r.transaction_time.isoformat() if r.transaction_time else None,
                 "reference_id": r.reference_id,
                 "data_source": "local_inventory",

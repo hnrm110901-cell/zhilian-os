@@ -16,6 +16,7 @@
   moderate — 2.0 < |Z| ≤ 3.0 或 20% < |deviation| ≤ 30%
   severe   — |Z| > 3.0 或 |deviation| > 30%
 """
+
 from __future__ import annotations
 
 import math
@@ -32,39 +33,40 @@ logger = structlog.get_logger()
 # ── 常量 ─────────────────────────────────────────────────────────────────────
 
 HISTORY_PERIODS = 6
-MIN_HISTORY     = 3    # 计算 Z-score 至少需要 3 期
+MIN_HISTORY = 3  # 计算 Z-score 至少需要 3 期
 
 # Z-score 阈值
-Z_MILD     = 1.5
+Z_MILD = 1.5
 Z_MODERATE = 2.0
-Z_SEVERE   = 3.0
+Z_SEVERE = 3.0
 
 # 预测偏差阈值（绝对值 %）
-DEV_MILD     = 10.0
+DEV_MILD = 10.0
 DEV_MODERATE = 20.0
-DEV_SEVERE   = 30.0
+DEV_SEVERE = 30.0
 
 METRICS = ("revenue", "food_cost_rate", "profit_margin", "health_score")
 
 METRIC_LABELS = {
-    "revenue":        "月净收入",
+    "revenue": "月净收入",
     "food_cost_rate": "食材成本率",
-    "profit_margin":  "利润率",
-    "health_score":   "财务健康评分",
+    "profit_margin": "利润率",
+    "health_score": "财务健康评分",
 }
 
 METRIC_UNITS = {
-    "revenue":        "¥",
+    "revenue": "¥",
     "food_cost_rate": "%",
-    "profit_margin":  "%",
-    "health_score":   "分",
+    "profit_margin": "%",
+    "health_score": "分",
 }
 
 # 成本率和健康评分方向：偏高/偏低的"好坏"语义不同
-LOWER_IS_BETTER = {"food_cost_rate"}   # 成本率越低越好
+LOWER_IS_BETTER = {"food_cost_rate"}  # 成本率越低越好
 
 
 # ── 内部工具 ──────────────────────────────────────────────────────────────────
+
 
 def _safe_float(val) -> Optional[float]:
     if val is None:
@@ -96,11 +98,12 @@ def _prev_periods(target_period: str, n: int) -> List[str]:
 # 纯函数层
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def compute_mean_std(values: List[float]) -> Tuple[float, float]:
     """返回 (mean, std)。n < 2 时 std = 0。"""
     if not values:
         return (0.0, 0.0)
-    n    = len(values)
+    n = len(values)
     mean = sum(values) / n
     if n < 2:
         return (mean, 0.0)
@@ -191,22 +194,22 @@ def generate_anomaly_description(
         return ""
 
     label = METRIC_LABELS.get(metric, metric)
-    unit  = METRIC_UNITS.get(metric, "")
+    unit = METRIC_UNITS.get(metric, "")
 
     # 方向描述
     if deviation_pct > 0:
         dir_word = "偏高" if metric in LOWER_IS_BETTER else "偏高"
-        concern  = "需关注" if metric in LOWER_IS_BETTER else "表现良好"
+        concern = "需关注" if metric in LOWER_IS_BETTER else "表现良好"
     else:
         dir_word = "偏低"
-        concern  = "表现良好" if metric in LOWER_IS_BETTER else "需关注"
+        concern = "表现良好" if metric in LOWER_IS_BETTER else "需关注"
 
     # 数值展示
     if unit == "¥":
-        actual_str   = f"¥{actual:,.0f}"
+        actual_str = f"¥{actual:,.0f}"
         expected_str = f"¥{expected:,.0f}"
     else:
-        actual_str   = f"{actual:.1f}{unit}"
+        actual_str = f"{actual:.1f}{unit}"
         expected_str = f"{expected:.1f}{unit}"
 
     severity_label = {"mild": "轻微", "moderate": "明显", "severe": "严重"}.get(severity, "")
@@ -246,6 +249,7 @@ def compute_yuan_impact(
 # ══════════════════════════════════════════════════════════════════════════════
 # DB 函数层
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 async def _upsert_anomaly(
     db: AsyncSession,
@@ -288,10 +292,16 @@ async def _upsert_anomaly(
                 updated_at        = EXCLUDED.updated_at
         """),
         {
-            "sid": store_id, "period": period, "metric": metric,
-            "actual": round(actual, 4), "expected": round(expected, 4),
-            "dev": round(deviation_pct, 2), "z": round(z_score, 3),
-            "anom": is_anomaly, "sev": severity, "method": method,
+            "sid": store_id,
+            "period": period,
+            "metric": metric,
+            "actual": round(actual, 4),
+            "expected": round(expected, 4),
+            "dev": round(deviation_pct, 2),
+            "z": round(z_score, 3),
+            "anom": is_anomaly,
+            "sev": severity,
+            "method": method,
             "desc": description,
             "impact": round(yuan_impact, 2) if yuan_impact is not None else None,
             "now": now,
@@ -320,7 +330,7 @@ async def _fetch_metric_history(
                 result.append((r[0], _to_float(r[1])))
             elif metric == "food_cost_rate":
                 rev = _to_float(r[1])
-                fc  = _to_float(r[2])
+                fc = _to_float(r[2])
                 result.append((r[0], fc / rev * 100 if rev > 0 else 0.0))
             else:  # profit_margin
                 result.append((r[0], _to_float(r[3])))
@@ -368,16 +378,16 @@ async def detect_metric_anomaly(
     对单个 metric 执行双引擎检测，upsert 结果，返回检测摘要。
     """
     hist_periods = _prev_periods(period, HISTORY_PERIODS)
-    history      = await _fetch_metric_history(db, store_id, hist_periods, metric)
-    hist_values  = [v for _, v in history]
+    history = await _fetch_metric_history(db, store_id, hist_periods, metric)
+    hist_values = [v for _, v in history]
 
     # --- 引擎1：Z-score ---
-    severity_z  = "normal"
-    z_score     = 0.0
-    expected_z  = 0.0
+    severity_z = "normal"
+    z_score = 0.0
+    expected_z = 0.0
     if len(hist_values) >= MIN_HISTORY:
         mean, std = compute_mean_std(hist_values)
-        z_score   = compute_z_score(actual_value, mean, std)
+        z_score = compute_z_score(actual_value, mean, std)
         severity_z = classify_severity_z(z_score)
         expected_z = mean
     else:
@@ -386,13 +396,13 @@ async def detect_metric_anomaly(
 
     # --- 引擎2：预测偏差 ---
     severity_dev = "normal"
-    deviation    = 0.0
+    deviation = 0.0
     expected_dev: Optional[float] = await _get_forecast_expected(db, store_id, period, metric)
-    method       = "z_score"
+    method = "z_score"
     if expected_dev is not None:
-        deviation    = compute_deviation_pct(actual_value, expected_dev)
+        deviation = compute_deviation_pct(actual_value, expected_dev)
         severity_dev = classify_severity_deviation(deviation)
-        method       = "forecast_deviation"
+        method = "forecast_deviation"
 
     # --- 合并：取较严重者 ---
     final_severity = merge_severity(severity_z, severity_dev)
@@ -401,30 +411,45 @@ async def detect_metric_anomaly(
         deviation = compute_deviation_pct(actual_value, expected_z)
 
     is_anom = final_severity != "normal"
-    impact  = compute_yuan_impact(metric, actual_value, expected_final, revenue_for_impact)
-    desc    = generate_anomaly_description(
-        metric, actual_value, expected_final, deviation,
-        z_score, final_severity, impact,
+    impact = compute_yuan_impact(metric, actual_value, expected_final, revenue_for_impact)
+    desc = generate_anomaly_description(
+        metric,
+        actual_value,
+        expected_final,
+        deviation,
+        z_score,
+        final_severity,
+        impact,
     )
 
     await _upsert_anomaly(
-        db, store_id, period, metric,
-        actual_value, expected_final, deviation, z_score,
-        is_anom, final_severity, method, desc, impact,
+        db,
+        store_id,
+        period,
+        metric,
+        actual_value,
+        expected_final,
+        deviation,
+        z_score,
+        is_anom,
+        final_severity,
+        method,
+        desc,
+        impact,
     )
 
     return {
-        "metric":          metric,
-        "actual_value":    actual_value,
-        "expected_value":  expected_final,
-        "deviation_pct":   round(deviation, 2),
-        "z_score":         round(z_score, 3),
-        "is_anomaly":      is_anom,
-        "severity":        final_severity,
+        "metric": metric,
+        "actual_value": actual_value,
+        "expected_value": expected_final,
+        "deviation_pct": round(deviation, 2),
+        "z_score": round(z_score, 3),
+        "is_anomaly": is_anom,
+        "severity": final_severity,
         "detection_method": method,
-        "description":     desc,
-        "yuan_impact":     round(impact, 2) if impact is not None else None,
-        "label":           METRIC_LABELS.get(metric, metric),
+        "description": desc,
+        "yuan_impact": round(impact, 2) if impact is not None else None,
+        "label": METRIC_LABELS.get(metric, metric),
     }
 
 
@@ -461,14 +486,14 @@ async def detect_store_anomalies(
 
     if profit_row:
         revenue = _to_float(profit_row[0])
-        fc      = _to_float(profit_row[1])
-        pm      = _to_float(profit_row[2])
-        fcr     = fc / revenue * 100 if revenue > 0 else 0.0
+        fc = _to_float(profit_row[1])
+        pm = _to_float(profit_row[2])
+        fcr = fc / revenue * 100 if revenue > 0 else 0.0
 
         for metric, value in [
-            ("revenue",        revenue),
+            ("revenue", revenue),
             ("food_cost_rate", fcr),
-            ("profit_margin",  pm),
+            ("profit_margin", pm),
         ]:
             try:
                 r = await detect_metric_anomaly(db, store_id, period, metric, value, revenue)
@@ -479,8 +504,12 @@ async def detect_store_anomalies(
     if health_row:
         try:
             r = await detect_metric_anomaly(
-                db, store_id, period, "health_score",
-                _to_float(health_row[0]), revenue,
+                db,
+                store_id,
+                period,
+                "health_score",
+                _to_float(health_row[0]),
+                revenue,
             )
             results.append(r)
         except Exception as exc:
@@ -494,13 +523,13 @@ async def detect_store_anomalies(
         severity_counts[r["severity"]] = severity_counts.get(r["severity"], 0) + 1
 
     return {
-        "store_id":        store_id,
-        "period":          period,
+        "store_id": store_id,
+        "period": period,
         "metrics_checked": len(results),
-        "anomaly_count":   len(anomalies),
+        "anomaly_count": len(anomalies),
         "severity_counts": severity_counts,
-        "anomalies":       anomalies,
-        "all_results":     results,
+        "anomalies": anomalies,
+        "all_results": results,
     }
 
 
@@ -539,18 +568,18 @@ async def get_anomaly_records(
         )
     return [
         {
-            "metric":         r[0],
-            "period":         r[1],
-            "actual_value":   _safe_float(r[2]),
+            "metric": r[0],
+            "period": r[1],
+            "actual_value": _safe_float(r[2]),
             "expected_value": _safe_float(r[3]),
-            "deviation_pct":  _safe_float(r[4]),
-            "z_score":        _safe_float(r[5]),
-            "severity":       r[6],
-            "description":    r[7],
-            "yuan_impact":    _safe_float(r[8]),
-            "resolved":       r[9],
-            "detected_at":    r[10].isoformat() if r[10] else None,
-            "label":          METRIC_LABELS.get(r[0], r[0]),
+            "deviation_pct": _safe_float(r[4]),
+            "z_score": _safe_float(r[5]),
+            "severity": r[6],
+            "description": r[7],
+            "yuan_impact": _safe_float(r[8]),
+            "resolved": r[9],
+            "detected_at": r[10].isoformat() if r[10] else None,
+            "label": METRIC_LABELS.get(r[0], r[0]),
         }
         for r in rows.fetchall()
     ]
@@ -605,10 +634,7 @@ async def get_anomaly_trend(
             by_period[p] = {"severe": 0, "moderate": 0, "mild": 0}
         by_period[p][sev] = cnt
 
-    return [
-        {"period": p, **counts}
-        for p, counts in sorted(by_period.items())
-    ]
+    return [{"period": p, **counts} for p, counts in sorted(by_period.items())]
 
 
 async def get_brand_anomaly_summary(
@@ -630,26 +656,30 @@ async def get_brand_anomaly_summary(
 
     by_store: Dict[str, List[Dict]] = {}
     total_yuan_impact = 0.0
-    severity_counts   = {"severe": 0, "moderate": 0, "mild": 0}
+    severity_counts = {"severe": 0, "moderate": 0, "mild": 0}
 
     for r in rows:
         sid, metric, sev, _, desc, impact = r[0], r[1], r[2], r[3], r[4], r[5]
         if sid not in by_store:
             by_store[sid] = []
-        by_store[sid].append({
-            "metric": metric, "severity": sev,
-            "description": desc, "yuan_impact": _safe_float(impact),
-        })
+        by_store[sid].append(
+            {
+                "metric": metric,
+                "severity": sev,
+                "description": desc,
+                "yuan_impact": _safe_float(impact),
+            }
+        )
         severity_counts[sev] = severity_counts.get(sev, 0) + 1
         if impact is not None:
             total_yuan_impact += abs(_to_float(impact))
 
     return {
-        "brand_id":          brand_id,
-        "period":            period,
-        "total_anomalies":   len(rows),
-        "affected_stores":   len(by_store),
-        "severity_counts":   severity_counts,
+        "brand_id": brand_id,
+        "period": period,
+        "total_anomalies": len(rows),
+        "affected_stores": len(by_store),
+        "severity_counts": severity_counts,
         "total_yuan_impact": round(total_yuan_impact, 2),
-        "by_store":          [{"store_id": s, "anomalies": a} for s, a in by_store.items()],
+        "by_store": [{"store_id": s, "anomalies": a} for s, a in by_store.items()],
     }

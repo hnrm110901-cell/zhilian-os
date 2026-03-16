@@ -8,20 +8,20 @@
 评级标准：
   A+ >= 95, A >= 85, B >= 70, C >= 55, D >= 40, F < 40
 """
+
 from __future__ import annotations
 
-from typing import Optional, List, Dict, Any, Tuple
-from datetime import date, datetime, timedelta
 import uuid
+from datetime import date, datetime, timedelta
+from typing import Any, Dict, List, Optional, Tuple
+
 import structlog
-
-from sqlalchemy import select, func, and_, or_, update, delete
+from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.models.compliance_engine import ComplianceScore, ComplianceAlert
-from src.models.health_certificate import HealthCertificate
-from src.models.food_safety import FoodTraceRecord, FoodSafetyInspection
 from src.models.compliance import ComplianceLicense, LicenseStatus
+from src.models.compliance_engine import ComplianceAlert, ComplianceScore
+from src.models.food_safety import FoodSafetyInspection, FoodTraceRecord
+from src.models.health_certificate import HealthCertificate
 
 logger = structlog.get_logger()
 
@@ -86,10 +86,7 @@ class ComplianceEngineService:
         certs = cert_result.scalars().all()
 
         if certs:
-            valid_count = sum(
-                1 for c in certs
-                if c.expiry_date and c.expiry_date >= today
-            )
+            valid_count = sum(1 for c in certs if c.expiry_date and c.expiry_date >= today)
             health_cert_score = round(valid_count / len(certs) * 100)
         else:
             health_cert_score = 100  # 无员工需要健康证时满分
@@ -144,22 +141,24 @@ class ComplianceEngineService:
         licenses = lic_result.scalars().all()
 
         if licenses:
-            valid_lic = sum(
-                1 for lic in licenses
-                if lic.expiry_date and lic.expiry_date >= today
-            )
+            valid_lic = sum(1 for lic in licenses if lic.expiry_date and lic.expiry_date >= today)
             license_score = round(valid_lic / len(licenses) * 100)
         else:
             license_score = 100
 
         # 4) 卫生检查维度：最近一次日检/周检得分
-        hygiene_q = select(FoodSafetyInspection).where(
-            and_(
-                FoodSafetyInspection.brand_id == brand_id,
-                FoodSafetyInspection.store_id == store_id,
-                FoodSafetyInspection.inspection_type.in_(["daily", "weekly"]),
+        hygiene_q = (
+            select(FoodSafetyInspection)
+            .where(
+                and_(
+                    FoodSafetyInspection.brand_id == brand_id,
+                    FoodSafetyInspection.store_id == store_id,
+                    FoodSafetyInspection.inspection_type.in_(["daily", "weekly"]),
+                )
             )
-        ).order_by(FoodSafetyInspection.inspection_date.desc()).limit(5)
+            .order_by(FoodSafetyInspection.inspection_date.desc())
+            .limit(5)
+        )
         hygiene_result = await db.execute(hygiene_q)
         hygiene_inspections = hygiene_result.scalars().all()
 
@@ -189,12 +188,14 @@ class ComplianceEngineService:
         for dim_type, dim_name, dim_score in dimension_checks:
             if dim_score < 70:
                 severity = "critical" if dim_score < 40 else "high" if dim_score < 55 else "medium"
-                risk_items.append({
-                    "type": dim_type,
-                    "description": f"{dim_name}评分 {dim_score} 分，低于合规标准（70分）",
-                    "severity": severity,
-                    "deadline": (today + timedelta(days=7)).isoformat(),
-                })
+                risk_items.append(
+                    {
+                        "type": dim_type,
+                        "description": f"{dim_name}评分 {dim_score} 分，低于合规标准（70分）",
+                        "severity": severity,
+                        "deadline": (today + timedelta(days=7)).isoformat(),
+                    }
+                )
 
         # 7) Upsert
         existing_q = select(ComplianceScore).where(
@@ -234,8 +235,10 @@ class ComplianceEngineService:
         await db.flush()
         logger.info(
             "compliance_score_computed",
-            brand_id=brand_id, store_id=store_id,
-            overall=overall_score, grade=grade,
+            brand_id=brand_id,
+            store_id=store_id,
+            overall=overall_score,
+            grade=grade,
         )
         return record
 
@@ -248,21 +251,15 @@ class ComplianceEngineService:
         # 收集所有涉及的 store_id
         store_ids = set()
 
-        cert_q = select(HealthCertificate.store_id).where(
-            HealthCertificate.brand_id == brand_id
-        ).distinct()
+        cert_q = select(HealthCertificate.store_id).where(HealthCertificate.brand_id == brand_id).distinct()
         result = await db.execute(cert_q)
         store_ids.update(r[0] for r in result.all())
 
-        insp_q = select(FoodSafetyInspection.store_id).where(
-            FoodSafetyInspection.brand_id == brand_id
-        ).distinct()
+        insp_q = select(FoodSafetyInspection.store_id).where(FoodSafetyInspection.brand_id == brand_id).distinct()
         result = await db.execute(insp_q)
         store_ids.update(r[0] for r in result.all())
 
-        trace_q = select(FoodTraceRecord.store_id).where(
-            FoodTraceRecord.brand_id == brand_id
-        ).distinct()
+        trace_q = select(FoodTraceRecord.store_id).where(FoodTraceRecord.brand_id == brand_id).distinct()
         result = await db.execute(trace_q)
         store_ids.update(r[0] for r in result.all())
 
@@ -270,7 +267,10 @@ class ComplianceEngineService:
         scores = []
         for sid in store_ids:
             score = await ComplianceEngineService.compute_store_score(
-                db, brand_id, sid, today,
+                db,
+                brand_id,
+                sid,
+                today,
             )
             scores.append(score)
 
@@ -318,9 +318,7 @@ class ComplianceEngineService:
                 continue
 
             title = (
-                f"健康证已过期：{cert.employee_name}"
-                if is_expired
-                else f"健康证将在 {days} 天后过期：{cert.employee_name}"
+                f"健康证已过期：{cert.employee_name}" if is_expired else f"健康证将在 {days} 天后过期：{cert.employee_name}"
             )
             alert = ComplianceAlert(
                 id=uuid.uuid4(),
@@ -537,13 +535,17 @@ class ComplianceEngineService:
             .subquery()
         )
 
-        q = select(ComplianceScore).join(
-            latest_q,
-            and_(
-                ComplianceScore.store_id == latest_q.c.store_id,
-                ComplianceScore.score_date == latest_q.c.max_date,
-            ),
-        ).where(ComplianceScore.brand_id == brand_id)
+        q = (
+            select(ComplianceScore)
+            .join(
+                latest_q,
+                and_(
+                    ComplianceScore.store_id == latest_q.c.store_id,
+                    ComplianceScore.score_date == latest_q.c.max_date,
+                ),
+            )
+            .where(ComplianceScore.brand_id == brand_id)
+        )
 
         if grade:
             q = q.where(ComplianceScore.grade == grade)
@@ -591,9 +593,7 @@ class ComplianceEngineService:
         total = count_result.scalar() or 0
 
         # 按严重程度排序：critical > high > medium > low
-        severity_order = func.array_position(
-            ["critical", "high", "medium", "low"], ComplianceAlert.severity
-        )
+        severity_order = func.array_position(["critical", "high", "medium", "low"], ComplianceAlert.severity)
         q = q.order_by(severity_order, ComplianceAlert.created_at.desc())
         q = q.offset((page - 1) * page_size).limit(page_size)
 
@@ -638,13 +638,17 @@ class ComplianceEngineService:
             .group_by(ComplianceScore.store_id)
             .subquery()
         )
-        scores_q = select(ComplianceScore).join(
-            latest_q,
-            and_(
-                ComplianceScore.store_id == latest_q.c.store_id,
-                ComplianceScore.score_date == latest_q.c.max_date,
-            ),
-        ).where(ComplianceScore.brand_id == brand_id)
+        scores_q = (
+            select(ComplianceScore)
+            .join(
+                latest_q,
+                and_(
+                    ComplianceScore.store_id == latest_q.c.store_id,
+                    ComplianceScore.score_date == latest_q.c.max_date,
+                ),
+            )
+            .where(ComplianceScore.brand_id == brand_id)
+        )
 
         scores_result = await db.execute(scores_q)
         scores = scores_result.scalars().all()
@@ -674,21 +678,27 @@ class ComplianceEngineService:
             )
             day_result = await db.execute(day_q)
             day_avg = day_result.scalar()
-            trend.append({
-                "date": d.isoformat(),
-                "avg_score": round(day_avg) if day_avg else None,
-            })
+            trend.append(
+                {
+                    "date": d.isoformat(),
+                    "avg_score": round(day_avg) if day_avg else None,
+                }
+            )
 
         # 告警统计
-        alert_q = select(
-            ComplianceAlert.severity,
-            func.count().label("cnt"),
-        ).where(
-            and_(
-                ComplianceAlert.brand_id == brand_id,
-                ComplianceAlert.is_resolved == False,
+        alert_q = (
+            select(
+                ComplianceAlert.severity,
+                func.count().label("cnt"),
             )
-        ).group_by(ComplianceAlert.severity)
+            .where(
+                and_(
+                    ComplianceAlert.brand_id == brand_id,
+                    ComplianceAlert.is_resolved == False,
+                )
+            )
+            .group_by(ComplianceAlert.severity)
+        )
         alert_result = await db.execute(alert_q)
         alert_counts = {r[0]: r[1] for r in alert_result.all()}
 

@@ -28,6 +28,7 @@ logger = structlog.get_logger()
 
 # ── 内部 helpers ──────────────────────────────────────────────────────────────
 
+
 async def _maybe_await(value):
     if inspect.isawaitable(value):
         return await value
@@ -58,6 +59,7 @@ async def _rows(db: AsyncSession, sql: str, params: dict) -> list:
 
 # ── 自有流量（Owned Audience）─────────────────────────────────────────────────
 
+
 async def get_owned_audience(store_id: str, db: AsyncSession) -> Dict[str, Any]:
     """
     自有流量核心指标：
@@ -70,40 +72,57 @@ async def get_owned_audience(store_id: str, db: AsyncSession) -> Dict[str, Any]:
     today = datetime.date.today()
     month_start = today.replace(day=1)
 
-    total = await _scalar(db, """
+    total = await _scalar(
+        db,
+        """
         SELECT COUNT(*) FROM private_domain_members
         WHERE store_id = :store_id
-    """, {"store_id": store_id})
+    """,
+        {"store_id": store_id},
+    )
 
-    active = await _scalar(db, """
+    active = await _scalar(
+        db,
+        """
         SELECT COUNT(*) FROM private_domain_members
         WHERE store_id = :store_id AND recency_days <= 30
-    """, {"store_id": store_id})
+    """,
+        {"store_id": store_id},
+    )
 
-    connected = await _scalar(db, """
+    connected = await _scalar(
+        db,
+        """
         SELECT COUNT(*) FROM private_domain_members
         WHERE store_id = :store_id AND wechat_openid IS NOT NULL
-    """, {"store_id": store_id})
+    """,
+        {"store_id": store_id},
+    )
 
-    new_this_month = await _scalar(db, """
+    new_this_month = await _scalar(
+        db,
+        """
         SELECT COUNT(*) FROM private_domain_members
         WHERE store_id = :store_id AND created_at::date >= :month_start
-    """, {"store_id": store_id, "month_start": month_start.isoformat()})
+    """,
+        {"store_id": store_id, "month_start": month_start.isoformat()},
+    )
 
     active_rate = round(active / total, 3) if total > 0 else 0.0
     connect_rate = round(connected / total, 3) if total > 0 else 0.0
 
     return {
-        "total_members":     int(total),
-        "active_members":    int(active),
-        "active_rate":       active_rate,
-        "wxwork_connected":  int(connected),
-        "connect_rate":      connect_rate,
-        "new_this_month":    int(new_this_month),
+        "total_members": int(total),
+        "active_members": int(active),
+        "active_rate": active_rate,
+        "wxwork_connected": int(connected),
+        "connect_rate": connect_rate,
+        "new_this_month": int(new_this_month),
     }
 
 
 # ── 客户价值（Customer Value）─────────────────────────────────────────────────
+
 
 async def get_customer_value(store_id: str, db: AsyncSession) -> Dict[str, Any]:
     """
@@ -116,15 +135,21 @@ async def get_customer_value(store_id: str, db: AsyncSession) -> Dict[str, Any]:
     since_30d = (datetime.date.today() - datetime.timedelta(days=30)).isoformat()
 
     # 复购率：近30天有订单的客户中 frequency>1 的比例
-    total_buyers_30d = await _scalar(db, """
+    total_buyers_30d = await _scalar(
+        db,
+        """
         SELECT COUNT(DISTINCT o.customer_id)
         FROM orders o
         WHERE o.store_id = :store_id
           AND o.created_at::date >= :since
           AND o.customer_id IS NOT NULL
-    """, {"store_id": store_id, "since": since_30d})
+    """,
+        {"store_id": store_id, "since": since_30d},
+    )
 
-    repeat_buyers_30d = await _scalar(db, """
+    repeat_buyers_30d = await _scalar(
+        db,
+        """
         SELECT COUNT(DISTINCT o.customer_id)
         FROM orders o
         JOIN private_domain_members m
@@ -133,40 +158,58 @@ async def get_customer_value(store_id: str, db: AsyncSession) -> Dict[str, Any]:
           AND o.created_at::date >= :since
           AND o.customer_id IS NOT NULL
           AND m.frequency > 1
-    """, {"store_id": store_id, "since": since_30d})
+    """,
+        {"store_id": store_id, "since": since_30d},
+    )
 
     # 平均 LTV（分 → 元）
-    avg_ltv_fen = await _scalar(db, """
+    avg_ltv_fen = await _scalar(
+        db,
+        """
         SELECT AVG(monetary) FROM private_domain_members
         WHERE store_id = :store_id AND monetary > 0
-    """, {"store_id": store_id}, default=0)
+    """,
+        {"store_id": store_id},
+        default=0,
+    )
 
     # 近30天平均客单价（分 → 元）
-    avg_aov_fen = await _scalar(db, """
+    avg_aov_fen = await _scalar(
+        db,
+        """
         SELECT AVG(total_amount)
         FROM orders
         WHERE store_id = :store_id
           AND created_at::date >= :since
           AND total_amount > 0
-    """, {"store_id": store_id, "since": since_30d}, default=0)
+    """,
+        {"store_id": store_id, "since": since_30d},
+        default=0,
+    )
 
     # 人均累计订单数
-    avg_freq = await _scalar(db, """
+    avg_freq = await _scalar(
+        db,
+        """
         SELECT AVG(frequency::float) FROM private_domain_members
         WHERE store_id = :store_id AND frequency > 0
-    """, {"store_id": store_id}, default=0)
+    """,
+        {"store_id": store_id},
+        default=0,
+    )
 
     repeat_rate = round(repeat_buyers_30d / total_buyers_30d, 3) if total_buyers_30d > 0 else 0.0
 
     return {
-        "repeat_rate_30d":       repeat_rate,
-        "avg_ltv_yuan":          round(float(avg_ltv_fen) / 100, 2),
-        "avg_order_value_yuan":  round(float(avg_aov_fen) / 100, 2),
+        "repeat_rate_30d": repeat_rate,
+        "avg_ltv_yuan": round(float(avg_ltv_fen) / 100, 2),
+        "avg_order_value_yuan": round(float(avg_aov_fen) / 100, 2),
         "avg_orders_per_member": round(float(avg_freq), 1),
     }
 
 
 # ── 旅程健康（Journey Health / Referral Power）────────────────────────────────
+
 
 async def get_journey_health(store_id: str, db: AsyncSession) -> Dict[str, Any]:
     """
@@ -181,52 +224,78 @@ async def get_journey_health(store_id: str, db: AsyncSession) -> Dict[str, Any]:
     since_90d = (datetime.date.today() - datetime.timedelta(days=90)).isoformat()
     since_30d = (datetime.date.today() - datetime.timedelta(days=30)).isoformat()
 
-    running = await _scalar(db, """
+    running = await _scalar(
+        db,
+        """
         SELECT COUNT(*) FROM private_domain_journeys
         WHERE store_id = :store_id AND status = 'running'
-    """, {"store_id": store_id})
+    """,
+        {"store_id": store_id},
+    )
 
-    completed = await _scalar(db, """
+    completed = await _scalar(
+        db,
+        """
         SELECT COUNT(*) FROM private_domain_journeys
         WHERE store_id = :store_id AND status = 'completed'
           AND started_at::date >= :since
-    """, {"store_id": store_id, "since": since_90d})
+    """,
+        {"store_id": store_id, "since": since_90d},
+    )
 
-    total_90d = await _scalar(db, """
+    total_90d = await _scalar(
+        db,
+        """
         SELECT COUNT(*) FROM private_domain_journeys
         WHERE store_id = :store_id AND started_at::date >= :since
-    """, {"store_id": store_id, "since": since_90d})
+    """,
+        {"store_id": store_id, "since": since_90d},
+    )
 
-    bad_review = await _scalar(db, """
+    bad_review = await _scalar(
+        db,
+        """
         SELECT COUNT(*) FROM private_domain_signals
         WHERE store_id = :store_id
           AND signal_type = 'bad_review'
           AND triggered_at::date >= :since
-    """, {"store_id": store_id, "since": since_30d})
+    """,
+        {"store_id": store_id, "since": since_30d},
+    )
 
-    churn_risk = await _scalar(db, """
+    churn_risk = await _scalar(
+        db,
+        """
         SELECT COUNT(*) FROM private_domain_members
         WHERE store_id = :store_id AND risk_score >= 0.6
-    """, {"store_id": store_id})
+    """,
+        {"store_id": store_id},
+    )
 
     completion_rate = round(completed / total_90d, 3) if total_90d > 0 else 0.0
 
     return {
-        "running_journeys":   int(running),
+        "running_journeys": int(running),
         "completed_journeys": int(completed),
         "total_journeys_90d": int(total_90d),
-        "completion_rate":    completion_rate,
+        "completion_rate": completion_rate,
         "bad_review_signals": int(bad_review),
-        "churn_risk_count":   int(churn_risk),
+        "churn_risk_count": int(churn_risk),
     }
 
 
 # ── 生命周期漏斗（Lifecycle Funnel）──────────────────────────────────────────
 
 _LIFECYCLE_STATES = [
-    "lead", "registered", "first_order_pending",
-    "repeat", "high_frequency", "vip",
-    "at_risk", "dormant", "lost",
+    "lead",
+    "registered",
+    "first_order_pending",
+    "repeat",
+    "high_frequency",
+    "vip",
+    "at_risk",
+    "dormant",
+    "lost",
 ]
 
 
@@ -238,13 +307,17 @@ async def get_lifecycle_funnel(store_id: str, db: AsyncSession) -> Dict[str, int
       否则 → repeat
     """
     # 已有 lifecycle_state 的分布
-    rows = await _rows(db, """
+    rows = await _rows(
+        db,
+        """
         SELECT COALESCE(lifecycle_state, '_unknown') AS state,
                COUNT(*)::int AS cnt
         FROM private_domain_members
         WHERE store_id = :store_id
         GROUP BY lifecycle_state
-    """, {"store_id": store_id})
+    """,
+        {"store_id": store_id},
+    )
 
     funnel: Dict[str, int] = {s: 0 for s in _LIFECYCLE_STATES}
     unknown_count = 0
@@ -257,12 +330,16 @@ async def get_lifecycle_funnel(store_id: str, db: AsyncSession) -> Dict[str, int
 
     # 将 unknown 按 frequency=0 分配到 first_order_pending，其余到 repeat
     if unknown_count > 0:
-        fop = await _scalar(db, """
+        fop = await _scalar(
+            db,
+            """
             SELECT COUNT(*) FROM private_domain_members
             WHERE store_id = :store_id
               AND lifecycle_state IS NULL
               AND frequency = 0
-        """, {"store_id": store_id})
+        """,
+            {"store_id": store_id},
+        )
         funnel["first_order_pending"] += int(fop)
         funnel["repeat"] += max(0, unknown_count - int(fop))
 
@@ -270,6 +347,7 @@ async def get_lifecycle_funnel(store_id: str, db: AsyncSession) -> Dict[str, int
 
 
 # ── 对外聚合接口 ──────────────────────────────────────────────────────────────
+
 
 async def get_full_metrics(store_id: str, db: AsyncSession) -> Dict[str, Any]:
     """
@@ -287,16 +365,16 @@ async def get_full_metrics(store_id: str, db: AsyncSession) -> Dict[str, Any]:
     """
     # 并发查询（SQLAlchemy async session 不支持真正的并发，
     # 但顺序执行在同一连接上已足够快）
-    audience  = await get_owned_audience(store_id, db)
-    cvalue    = await get_customer_value(store_id, db)
-    journeys  = await get_journey_health(store_id, db)
-    funnel    = await get_lifecycle_funnel(store_id, db)
+    audience = await get_owned_audience(store_id, db)
+    cvalue = await get_customer_value(store_id, db)
+    journeys = await get_journey_health(store_id, db)
+    funnel = await get_lifecycle_funnel(store_id, db)
 
     return {
-        "store_id":         store_id,
-        "as_of":            datetime.datetime.utcnow().isoformat(),
-        "owned_audience":   audience,
-        "customer_value":   cvalue,
-        "journey_health":   journeys,
+        "store_id": store_id,
+        "as_of": datetime.datetime.utcnow().isoformat(),
+        "owned_audience": audience,
+        "customer_value": cvalue,
+        "journey_health": journeys,
         "lifecycle_funnel": funnel,
     }

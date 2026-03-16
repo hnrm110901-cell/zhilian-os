@@ -2,16 +2,16 @@
 EO执行引擎服务 — Phase P3 (宴小猪能力)
 EO单管理 · AI自动生成 · 演职人员调度 · 履约追踪 · 厅位展示
 """
+
 import uuid
-from datetime import datetime, date
-from typing import Optional, List, Dict, Any
+from datetime import date, datetime
+from typing import Any, Dict, List, Optional
 
-from sqlalchemy import select, func, update, and_
-from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
-
+from sqlalchemy import and_, func, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.banquet_event_order import BanquetEventOrder, BEOStatus
-from src.models.event_staff import EventStaff, StaffRole, StaffConfirmStatus
+from src.models.event_staff import EventStaff, StaffConfirmStatus, StaffRole
 from src.models.hall_showcase import HallShowcase
 
 logger = structlog.get_logger()
@@ -48,20 +48,18 @@ class EventOrderService:
         return [self._eo_to_dict(r) for r in rows]
 
     async def get_event_order(
-        self, session: AsyncSession, eo_id: str,
+        self,
+        session: AsyncSession,
+        eo_id: str,
     ) -> Optional[Dict[str, Any]]:
         """获取 EO 单详情（含演职人员列表）"""
-        result = await session.execute(
-            select(BanquetEventOrder).where(BanquetEventOrder.id == eo_id)
-        )
+        result = await session.execute(select(BanquetEventOrder).where(BanquetEventOrder.id == eo_id))
         eo = result.scalar_one_or_none()
         if not eo:
             return None
 
         # 获取关联演职人员
-        staff_result = await session.execute(
-            select(EventStaff).where(EventStaff.event_order_id == str(eo.id))
-        )
+        staff_result = await session.execute(select(EventStaff).where(EventStaff.event_order_id == str(eo.id)))
         staff_list = [self._staff_to_dict(s) for s in staff_result.scalars().all()]
 
         d = self._eo_to_dict(eo)
@@ -148,9 +146,7 @@ class EventOrderService:
         approved_by: str,
     ) -> Dict[str, Any]:
         """店长确认 EO 单"""
-        result = await session.execute(
-            select(BanquetEventOrder).where(BanquetEventOrder.id == eo_id)
-        )
+        result = await session.execute(select(BanquetEventOrder).where(BanquetEventOrder.id == eo_id))
         eo = result.scalar_one_or_none()
         if not eo:
             raise ValueError("EO单不存在")
@@ -170,9 +166,7 @@ class EventOrderService:
         new_status: str,
     ) -> Dict[str, Any]:
         """更新 EO 状态（executed/archived/cancelled）"""
-        result = await session.execute(
-            select(BanquetEventOrder).where(BanquetEventOrder.id == eo_id)
-        )
+        result = await session.execute(select(BanquetEventOrder).where(BanquetEventOrder.id == eo_id))
         eo = result.scalar_one_or_none()
         if not eo:
             raise ValueError("EO单不存在")
@@ -192,9 +186,7 @@ class EventOrderService:
         notes: str = "",
     ) -> Dict[str, Any]:
         """更新履约节点打卡（布场/迎宾/开席/结束/撤场）"""
-        result = await session.execute(
-            select(BanquetEventOrder).where(BanquetEventOrder.id == eo_id)
-        )
+        result = await session.execute(select(BanquetEventOrder).where(BanquetEventOrder.id == eo_id))
         eo = result.scalar_one_or_none()
         if not eo:
             raise ValueError("EO单不存在")
@@ -214,12 +206,12 @@ class EventOrderService:
     # ── 演职人员调度 ──
 
     async def list_staff(
-        self, session: AsyncSession, event_order_id: str,
+        self,
+        session: AsyncSession,
+        event_order_id: str,
     ) -> List[Dict[str, Any]]:
         """获取 EO 关联的演职人员列表"""
-        result = await session.execute(
-            select(EventStaff).where(EventStaff.event_order_id == event_order_id)
-        )
+        result = await session.execute(select(EventStaff).where(EventStaff.event_order_id == event_order_id))
         return [self._staff_to_dict(s) for s in result.scalars().all()]
 
     async def assign_staff(
@@ -257,9 +249,7 @@ class EventOrderService:
         status: str,
     ) -> Dict[str, Any]:
         """更新人员确认状态"""
-        result = await session.execute(
-            select(EventStaff).where(EventStaff.id == staff_id)
-        )
+        result = await session.execute(select(EventStaff).where(EventStaff.id == staff_id))
         staff = result.scalar_one_or_none()
         if not staff:
             raise ValueError("人员记录不存在")
@@ -273,24 +263,28 @@ class EventOrderService:
     # ── 宴会厅展示 ──
 
     async def list_halls(
-        self, session: AsyncSession, store_id: str,
+        self,
+        session: AsyncSession,
+        store_id: str,
     ) -> List[Dict[str, Any]]:
         """获取门店宴会厅展示列表"""
         result = await session.execute(
-            select(HallShowcase).where(
+            select(HallShowcase)
+            .where(
                 HallShowcase.store_id == store_id,
                 HallShowcase.is_active == True,
-            ).order_by(HallShowcase.sort_order)
+            )
+            .order_by(HallShowcase.sort_order)
         )
         return [self._hall_to_dict(h) for h in result.scalars().all()]
 
     async def get_hall(
-        self, session: AsyncSession, hall_id: str,
+        self,
+        session: AsyncSession,
+        hall_id: str,
     ) -> Optional[Dict[str, Any]]:
         """获取厅位详情"""
-        result = await session.execute(
-            select(HallShowcase).where(HallShowcase.id == hall_id)
-        )
+        result = await session.execute(select(HallShowcase).where(HallShowcase.id == hall_id))
         hall = result.scalar_one_or_none()
         return self._hall_to_dict(hall) if hall else None
 
@@ -318,9 +312,7 @@ class EventOrderService:
         **kwargs,
     ) -> Dict[str, Any]:
         """更新宴会厅展示"""
-        result = await session.execute(
-            select(HallShowcase).where(HallShowcase.id == hall_id)
-        )
+        result = await session.execute(select(HallShowcase).where(HallShowcase.id == hall_id))
         hall = result.scalar_one_or_none()
         if not hall:
             raise ValueError("厅位不存在")

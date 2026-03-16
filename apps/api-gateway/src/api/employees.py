@@ -2,25 +2,27 @@
 Employee Management API
 员工管理API
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
-from datetime import date, datetime
+
 import json
 import uuid
+from datetime import date, datetime
+from typing import Any, Dict, List, Optional
+
 import structlog
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user, require_role
 from ..models.employee import Employee
-from ..models.schedule import Shift, Schedule
+from ..models.schedule import Schedule, Shift
 from ..models.store import Store
-from ..models.task import Task, TaskStatus, TaskPriority
+from ..models.task import Task, TaskPriority, TaskStatus
 from ..models.user import User, UserRole
 from ..repositories import EmployeeRepository
 from ..services.wechat_service import wechat_service
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -71,12 +73,22 @@ async def list_employees(
 ):
     """获取门店员工列表"""
     employees = await EmployeeRepository.get_by_store(session, store_id)
-    return [EmployeeResponse(
-        id=e.id, store_id=e.store_id, name=e.name, phone=e.phone,
-        email=e.email, position=e.position, skills=e.skills or [],
-        hire_date=e.hire_date, is_active=e.is_active,
-        performance_score=e.performance_score, preferences=e.preferences or {}
-    ) for e in employees]
+    return [
+        EmployeeResponse(
+            id=e.id,
+            store_id=e.store_id,
+            name=e.name,
+            phone=e.phone,
+            email=e.email,
+            position=e.position,
+            skills=e.skills or [],
+            hire_date=e.hire_date,
+            is_active=e.is_active,
+            performance_score=e.performance_score,
+            preferences=e.preferences or {},
+        )
+        for e in employees
+    ]
 
 
 @router.get("/employees/{employee_id}", response_model=EmployeeResponse)
@@ -90,10 +102,17 @@ async def get_employee(
     if not emp:
         raise HTTPException(status_code=404, detail="员工不存在")
     return EmployeeResponse(
-        id=emp.id, store_id=emp.store_id, name=emp.name, phone=emp.phone,
-        email=emp.email, position=emp.position, skills=emp.skills or [],
-        hire_date=emp.hire_date, is_active=emp.is_active,
-        performance_score=emp.performance_score, preferences=emp.preferences or {}
+        id=emp.id,
+        store_id=emp.store_id,
+        name=emp.name,
+        phone=emp.phone,
+        email=emp.email,
+        position=emp.position,
+        skills=emp.skills or [],
+        hire_date=emp.hire_date,
+        is_active=emp.is_active,
+        performance_score=emp.performance_score,
+        preferences=emp.preferences or {},
     )
 
 
@@ -105,19 +124,32 @@ async def create_employee(
 ):
     """创建员工"""
     emp = Employee(
-        id=req.id, store_id=req.store_id, name=req.name, phone=req.phone,
-        email=req.email, position=req.position, skills=req.skills or [],
-        hire_date=req.hire_date, preferences=req.preferences or {},
+        id=req.id,
+        store_id=req.store_id,
+        name=req.name,
+        phone=req.phone,
+        email=req.email,
+        position=req.position,
+        skills=req.skills or [],
+        hire_date=req.hire_date,
+        preferences=req.preferences or {},
     )
     session.add(emp)
     await session.commit()
     await session.refresh(emp)
     logger.info("employee_created", employee_id=emp.id, store_id=emp.store_id)
     return EmployeeResponse(
-        id=emp.id, store_id=emp.store_id, name=emp.name, phone=emp.phone,
-        email=emp.email, position=emp.position, skills=emp.skills or [],
-        hire_date=emp.hire_date, is_active=emp.is_active,
-        performance_score=emp.performance_score, preferences=emp.preferences or {}
+        id=emp.id,
+        store_id=emp.store_id,
+        name=emp.name,
+        phone=emp.phone,
+        email=emp.email,
+        position=emp.position,
+        skills=emp.skills or [],
+        hire_date=emp.hire_date,
+        is_active=emp.is_active,
+        performance_score=emp.performance_score,
+        preferences=emp.preferences or {},
     )
 
 
@@ -137,19 +169,26 @@ async def update_employee(
     await session.commit()
     await session.refresh(emp)
     return EmployeeResponse(
-        id=emp.id, store_id=emp.store_id, name=emp.name, phone=emp.phone,
-        email=emp.email, position=emp.position, skills=emp.skills or [],
-        hire_date=emp.hire_date, is_active=emp.is_active,
-        performance_score=emp.performance_score, preferences=emp.preferences or {}
+        id=emp.id,
+        store_id=emp.store_id,
+        name=emp.name,
+        phone=emp.phone,
+        email=emp.email,
+        position=emp.position,
+        skills=emp.skills or [],
+        hire_date=emp.hire_date,
+        is_active=emp.is_active,
+        performance_score=emp.performance_score,
+        preferences=emp.preferences or {},
     )
 
 
 class RecordPerformanceRequest(BaseModel):
     period: str  # e.g. "2026-02" or "2026-W08"
-    attendance_rate: Optional[float] = None   # 出勤率 0-100
+    attendance_rate: Optional[float] = None  # 出勤率 0-100
     customer_rating: Optional[float] = None  # 顾客评分 1-5
-    efficiency_score: Optional[float] = None # 效率评分 0-100
-    sales_amount: Optional[float] = None     # 销售额（元）
+    efficiency_score: Optional[float] = None  # 效率评分 0-100
+    sales_amount: Optional[float] = None  # 销售额（元）
     notes: Optional[str] = None
 
 
@@ -362,12 +401,7 @@ async def approve_shift_swap_request(
     await session.refresh(task)
 
     decision = "通过" if req.approved else "驳回"
-    notify_message = (
-        f"【换班审批结果】\n"
-        f"申请单号: {task.id}\n"
-        f"审批结果: {decision}\n"
-        f"备注: {req.comment or '-'}"
-    )
+    notify_message = f"【换班审批结果】\n" f"申请单号: {task.id}\n" f"审批结果: {decision}\n" f"备注: {req.comment or '-'}"
     try:
         await wechat_service.send_text_message(content=notify_message, touser=str(from_employee_id))
         await wechat_service.send_text_message(content=notify_message, touser=str(to_employee_id))
@@ -537,7 +571,6 @@ async def delete_employee_preferences(
         "employee_id": emp.id,
         "preferences": emp.preferences or {},
     }
-
 
 
 async def deactivate_employee(

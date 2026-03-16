@@ -2,18 +2,20 @@
 Store Service
 门店管理服务
 """
-from typing import List, Optional, Dict
-from sqlalchemy import select, and_, or_, func
-from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime, timedelta
-import os
 
+import os
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional
+
+import structlog
+from sqlalchemy import and_, func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..core.database import get_db_session
 from ..models.store import Store, StoreStatus
 from ..models.user import User
-from ..core.database import get_db_session
-from ..services.pos_service import pos_service
 from ..services.member_service import member_service
-import structlog
+from ..services.pos_service import pos_service
 
 logger = structlog.get_logger()
 
@@ -273,11 +275,13 @@ class StoreService:
         for store_id in store_ids:
             store = await self.get_store(store_id)
             if store:
-                comparison["stores"].append({
-                    "id": store.id,
-                    "name": store.name,
-                    "region": store.region,
-                })
+                comparison["stores"].append(
+                    {
+                        "id": store.id,
+                        "name": store.name,
+                        "region": store.region,
+                    }
+                )
 
                 # 获取门店统计数据
                 stats = await self.get_store_stats(store_id)
@@ -329,7 +333,9 @@ class StoreService:
 
         return regional_summary
 
-    async def get_performance_ranking(self, metric: str = "revenue", limit: int = int(os.getenv("STORE_RANKING_LIMIT", "10"))) -> List[Dict]:
+    async def get_performance_ranking(
+        self, metric: str = "revenue", limit: int = int(os.getenv("STORE_RANKING_LIMIT", "10"))
+    ) -> List[Dict]:
         """获取门店业绩排名"""
         stores = await self.get_stores(is_active=True, limit=int(os.getenv("STORE_RANKING_LIMIT", "1000")))
 
@@ -347,14 +353,16 @@ class StoreService:
             elif metric == "monthly_revenue":
                 performance_value = stats.get("monthly_revenue", 0)
 
-            store_performance.append({
-                "store_id": store.id,
-                "store_name": store.name,
-                "region": store.region,
-                "city": store.city,
-                "metric": metric,
-                "value": performance_value,
-            })
+            store_performance.append(
+                {
+                    "store_id": store.id,
+                    "store_name": store.name,
+                    "region": store.region,
+                    "city": store.city,
+                    "metric": metric,
+                    "value": performance_value,
+                }
+            )
 
         # 按业绩排序
         store_performance.sort(key=lambda x: x["value"], reverse=True)

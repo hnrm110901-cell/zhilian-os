@@ -2,14 +2,14 @@
 饿了么集成 API 路由
 提供 Webhook 回调、订单管理、菜单同步、门店管理、配送追踪等端点
 """
+
 from datetime import datetime
 from typing import Any, Dict, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import select, func, desc
-
+from sqlalchemy import desc, func, select
 from src.core.database import get_db_session
 from src.core.dependencies import require_role
 from src.models.user import UserRole
@@ -22,8 +22,10 @@ router = APIRouter(prefix="/api/v1/eleme", tags=["eleme"])
 
 # ── Pydantic 请求模型 ────────────────────────────────────────────
 
+
 class SyncOrdersRequest(BaseModel):
     """手动同步订单请求"""
+
     brand_id: str
     store_id: Optional[str] = None
     start_time: Optional[str] = None
@@ -32,33 +34,39 @@ class SyncOrdersRequest(BaseModel):
 
 class CancelRequest(BaseModel):
     """取消订单请求"""
+
     reason_code: int = 1
     reason: str = "商家取消"
 
 
 class UpdateStockRequest(BaseModel):
     """更新库存请求"""
+
     stock: int = Field(..., ge=0, description="库存数量")
 
 
 class ToggleFoodRequest(BaseModel):
     """上下架请求"""
+
     on_sale: bool
 
 
 class ShopStatusRequest(BaseModel):
     """门店状态切换请求"""
+
     status: int = Field(..., ge=0, le=1, description="1=营业中, 0=休息中")
     shop_id: Optional[str] = None
 
 
 class SyncMenuRequest(BaseModel):
     """手动同步菜单请求"""
+
     brand_id: str
     store_id: Optional[str] = None
 
 
 # ── Webhook 端点（无需鉴权，靠签名验证） ─────────────────────────
+
 
 @router.post("/webhook")
 async def receive_webhook(request: Request):
@@ -91,6 +99,7 @@ async def receive_webhook(request: Request):
 
 # ── 订单端点 ──────────────────────────────────────────────────────
 
+
 @router.post("/orders/sync")
 async def sync_orders(
     body: SyncOrdersRequest,
@@ -122,9 +131,7 @@ async def list_orders(
     from src.models.order import Order
 
     async with get_db_session() as session:
-        query = select(Order).where(
-            Order.sales_channel == "eleme"
-        )
+        query = select(Order).where(Order.sales_channel == "eleme")
 
         if store_id:
             query = query.where(Order.store_id == store_id)
@@ -134,6 +141,7 @@ async def list_orders(
             try:
                 dt = datetime.fromisoformat(date)
                 from datetime import timedelta
+
                 query = query.where(
                     Order.order_time >= dt,
                     Order.order_time < dt + timedelta(days=1),
@@ -153,18 +161,20 @@ async def list_orders(
         orders = []
         for o in rows:
             meta = o.order_metadata or {}
-            orders.append({
-                "id": str(o.id),
-                "store_id": o.store_id,
-                "status": o.status,
-                "total_amount": o.total_amount,
-                "discount_amount": o.discount_amount,
-                "final_amount": o.final_amount,
-                "order_time": o.order_time.isoformat() if o.order_time else None,
-                "notes": o.notes,
-                "items_count": meta.get("items_count", 0),
-                "metadata": meta,
-            })
+            orders.append(
+                {
+                    "id": str(o.id),
+                    "store_id": o.store_id,
+                    "status": o.status,
+                    "total_amount": o.total_amount,
+                    "discount_amount": o.discount_amount,
+                    "final_amount": o.final_amount,
+                    "order_time": o.order_time.isoformat() if o.order_time else None,
+                    "notes": o.notes,
+                    "items_count": meta.get("items_count", 0),
+                    "metadata": meta,
+                }
+            )
 
     return {
         "total": total,
@@ -188,9 +198,7 @@ async def confirm_order(
         from src.models.order import Order
 
         async with get_db_session() as session:
-            row = await session.execute(
-                select(Order).where(Order.id == f"ELEME_{order_id}")
-            )
+            row = await session.execute(select(Order).where(Order.id == f"ELEME_{order_id}"))
             order = row.scalar_one_or_none()
             if order:
                 order.status = "confirmed"
@@ -211,16 +219,12 @@ async def cancel_order(
 ):
     """取消饿了么订单"""
     try:
-        result = await eleme_service.cancel_order(
-            brand_id, order_id, body.reason_code, body.reason
-        )
+        result = await eleme_service.cancel_order(brand_id, order_id, body.reason_code, body.reason)
 
         from src.models.order import Order
 
         async with get_db_session() as session:
-            row = await session.execute(
-                select(Order).where(Order.id == f"ELEME_{order_id}")
-            )
+            row = await session.execute(select(Order).where(Order.id == f"ELEME_{order_id}"))
             order = row.scalar_one_or_none()
             if order:
                 order.status = "cancelled"
@@ -233,6 +237,7 @@ async def cancel_order(
 
 
 # ── 菜单端点 ──────────────────────────────────────────────────────
+
 
 @router.get("/menu")
 async def get_menu(
@@ -283,6 +288,7 @@ async def toggle_food(
 
 # ── 门店端点 ──────────────────────────────────────────────────────
 
+
 @router.get("/shop")
 async def get_shop(
     brand_id: str = Query(..., description="品牌ID"),
@@ -306,9 +312,7 @@ async def toggle_shop_status(
 ):
     """切换门店营业状态"""
     try:
-        result = await eleme_service.toggle_shop_status(
-            brand_id, body.status, body.shop_id
-        )
+        result = await eleme_service.toggle_shop_status(brand_id, body.status, body.shop_id)
         return {"success": True, "status": body.status, "result": result}
     except Exception as e:
         logger.error("饿了么门店状态切换失败", error=str(e))
@@ -316,6 +320,7 @@ async def toggle_shop_status(
 
 
 # ── 配送端点 ──────────────────────────────────────────────────────
+
 
 @router.get("/delivery/{order_id}")
 async def get_delivery_status(

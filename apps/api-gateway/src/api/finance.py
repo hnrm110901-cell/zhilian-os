@@ -1,26 +1,29 @@
 """
 财务管理API
 """
-from typing import Optional
+
 from datetime import date, datetime, timedelta
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, func
-
 from src.core.database import get_db
 from src.core.dependencies import get_current_active_user, require_permission
+from src.core.neural_symbolic_guardrails import AIProposal, GuardrailResult, guardrails
 from src.services.finance_service import get_finance_service
 from src.services.report_export_service import report_export_service
-from src.core.neural_symbolic_guardrails import guardrails, AIProposal, GuardrailResult
+
 try:
     from src.services.pdf_report_service import pdf_report_service
+
     PDF_AVAILABLE = True
 except ImportError:
     pdf_report_service = None
     PDF_AVAILABLE = False
-from src.models import User, FinancialTransaction
+from src.models import FinancialTransaction, User
 
 router = APIRouter()
 
@@ -175,57 +178,39 @@ async def export_report(
     """
     try:
         from datetime import datetime
+
         start_datetime = datetime.combine(start_date, datetime.min.time())
         end_datetime = datetime.combine(end_date, datetime.max.time())
 
         if format == "csv":
             content = await report_export_service.export_to_csv(
-                report_type=report_type,
-                start_date=start_datetime,
-                end_date=end_datetime,
-                store_id=store_id,
-                db=db
+                report_type=report_type, start_date=start_datetime, end_date=end_datetime, store_id=store_id, db=db
             )
 
             # 生成文件名
             filename = f"{report_type}_{start_date}_{end_date}.csv"
 
             return Response(
-                content=content,
-                media_type="text/csv",
-                headers={
-                    "Content-Disposition": f"attachment; filename={filename}"
-                }
+                content=content, media_type="text/csv", headers={"Content-Disposition": f"attachment; filename={filename}"}
             )
         elif format == "pdf":
             # Check if PDF is available
             if not PDF_AVAILABLE:
-                raise HTTPException(
-                    status_code=501,
-                    detail="PDF导出功能不可用，请安装reportlab库"
-                )
+                raise HTTPException(status_code=501, detail="PDF导出功能不可用，请安装reportlab库")
 
             # 获取报表数据
             service = get_finance_service(db)
 
             if report_type == "income_statement":
                 data = await service.generate_income_statement(
-                    store_id=str(store_id) if store_id else "STORE001",
-                    start_date=start_date,
-                    end_date=end_date
+                    store_id=str(store_id) if store_id else "STORE001", start_date=start_date, end_date=end_date
                 )
-                content = pdf_report_service.generate_income_statement_pdf(
-                    data, start_datetime, end_datetime
-                )
+                content = pdf_report_service.generate_income_statement_pdf(data, start_datetime, end_datetime)
             elif report_type == "cash_flow":
                 data = await service.generate_cash_flow(
-                    store_id=str(store_id) if store_id else "STORE001",
-                    start_date=start_date,
-                    end_date=end_date
+                    store_id=str(store_id) if store_id else "STORE001", start_date=start_date, end_date=end_date
                 )
-                content = pdf_report_service.generate_cash_flow_pdf(
-                    data, start_datetime, end_datetime
-                )
+                content = pdf_report_service.generate_cash_flow_pdf(data, start_datetime, end_datetime)
             else:
                 raise HTTPException(status_code=400, detail=f"PDF格式不支持报表类型: {report_type}")
 
@@ -235,23 +220,17 @@ async def export_report(
             return Response(
                 content=content,
                 media_type="application/pdf",
-                headers={
-                    "Content-Disposition": f"attachment; filename={filename}"
-                }
+                headers={"Content-Disposition": f"attachment; filename={filename}"},
             )
         elif format == "xlsx":
             content = await report_export_service.export_to_xlsx(
-                report_type=report_type,
-                start_date=start_datetime,
-                end_date=end_datetime,
-                store_id=store_id,
-                db=db
+                report_type=report_type, start_date=start_datetime, end_date=end_datetime, store_id=store_id, db=db
             )
             filename = f"{report_type}_{start_date}_{end_date}.xlsx"
             return Response(
                 content=content,
                 media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                headers={"Content-Disposition": f"attachment; filename={filename}"}
+                headers={"Content-Disposition": f"attachment; filename={filename}"},
             )
         else:
             raise HTTPException(status_code=400, detail=f"不支持的导出格式: {format}")
@@ -263,6 +242,7 @@ async def export_report(
 
 
 # ==================== 退款校验 ====================
+
 
 class RefundRequest(BaseModel):
     order_id: str = Field(..., description="订单ID")
@@ -317,37 +297,45 @@ async def validate_refund(
     today = datetime.utcnow().date()
     yesterday_dt = datetime.utcnow() - timedelta(hours=24)
 
-    daily_revenue = (await db.execute(
-        select(func.sum(FinancialTransaction.amount)).where(
-            and_(
-                FinancialTransaction.store_id == req.store_id,
-                FinancialTransaction.transaction_date == today,
-                FinancialTransaction.transaction_type == "income",
+    daily_revenue = (
+        await db.execute(
+            select(func.sum(FinancialTransaction.amount)).where(
+                and_(
+                    FinancialTransaction.store_id == req.store_id,
+                    FinancialTransaction.transaction_date == today,
+                    FinancialTransaction.transaction_type == "income",
+                )
             )
         )
-    )).scalar() or 0
+    ).scalar() or 0
 
-    daily_refund_total = (await db.execute(
-        select(func.sum(FinancialTransaction.amount)).where(
-            and_(
-                FinancialTransaction.store_id == req.store_id,
-                FinancialTransaction.transaction_date == today,
-                FinancialTransaction.category == "refund",
+    daily_refund_total = (
+        await db.execute(
+            select(func.sum(FinancialTransaction.amount)).where(
+                and_(
+                    FinancialTransaction.store_id == req.store_id,
+                    FinancialTransaction.transaction_date == today,
+                    FinancialTransaction.category == "refund",
+                )
             )
         )
-    )).scalar() or 0
+    ).scalar() or 0
 
     # 顾客24h退款次数：统计当日该门店退款流水中 reference_id 匹配顾客的记录
-    customer_refund_count_24h = (await db.execute(
-        select(func.count()).select_from(FinancialTransaction).where(
-            and_(
-                FinancialTransaction.store_id == req.store_id,
-                FinancialTransaction.category == "refund",
-                FinancialTransaction.reference_id == req.customer_id,
-                FinancialTransaction.transaction_date >= yesterday_dt.date(),
+    customer_refund_count_24h = (
+        await db.execute(
+            select(func.count())
+            .select_from(FinancialTransaction)
+            .where(
+                and_(
+                    FinancialTransaction.store_id == req.store_id,
+                    FinancialTransaction.category == "refund",
+                    FinancialTransaction.reference_id == req.customer_id,
+                    FinancialTransaction.transaction_date >= yesterday_dt.date(),
+                )
             )
         )
-    )).scalar() or 0
+    ).scalar() or 0
 
     context = {
         "original_order_amount": req.original_order_amount,
@@ -359,8 +347,7 @@ async def validate_refund(
     result: GuardrailResult = guardrails.validate_proposal(proposal, context)
 
     violations_out = [
-        {"rule_id": v.rule_id, "rule_name": v.rule_name,
-         "severity": v.severity, "recommendation": v.recommendation}
+        {"rule_id": v.rule_id, "rule_name": v.rule_name, "severity": v.severity, "recommendation": v.recommendation}
         for v in result.violations
     ]
 

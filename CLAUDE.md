@@ -114,6 +114,9 @@ apps/api-gateway/CONTEXT.md  ← Level 2 API层上下文
 packages/agents/CONTEXT.md   ← Level 2 Agent层上下文
 tasks/todo.md                ← 当前任务清单
 tasks/lessons.md             ← 经验教训（每次开始先读！）
+CODEX.md                     ← Codex/Claude 共识协议（开始前必读）
+docs/collaboration-workflow.md        ← 多工具分支/部署协作规则
+docs/agent-collaboration-standard.md  ← Claude/Codex/CLI 并发协同标准
 ```
 
 ---
@@ -167,4 +170,3 @@ const resp = await apiClient.get('/api/v1/bff/sm/...');
 | BFF 端点角色前缀 | 小写2字母 | `sm`, `chef`, `floor`, `hq` |
 | 页面路径 | 角色前缀/页面 | `pages/sm/Home.tsx` |
 | Layout 文件 | `{Role}Layout.tsx` | `StoreManagerLayout.tsx` |
-

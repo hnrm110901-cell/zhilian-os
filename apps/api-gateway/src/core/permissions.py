@@ -2,17 +2,20 @@
 权限管理模块
 定义角色权限和访问控制规则
 """
-from typing import List, Set, Dict
+
 from enum import Enum
+from typing import Dict, List, Set
+
+import structlog
 
 from ..models.user import UserRole
-import structlog
 
 logger = structlog.get_logger()
 
 
 class Permission(str, Enum):
     """系统权限枚举"""
+
     # Agent访问权限
     AGENT_SCHEDULE_READ = "agent:schedule:read"
     AGENT_SCHEDULE_WRITE = "agent:schedule:write"
@@ -77,7 +80,6 @@ class Permission(str, Enum):
 ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
     # 系统管理员 - 拥有所有权限
     UserRole.ADMIN: set(Permission),
-
     # 店长 - 拥有门店所有运营权限
     UserRole.STORE_MANAGER: {
         Permission.AGENT_SCHEDULE_READ,
@@ -112,7 +114,6 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
         Permission.AUDIT_READ,
         Permission.FCT_READ,
     },
-
     # 店长助理 - 协助店长管理
     UserRole.ASSISTANT_MANAGER: {
         Permission.AGENT_SCHEDULE_READ,
@@ -138,7 +139,6 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
         Permission.STORE_READ,
         Permission.FCT_READ,
     },
-
     # 楼面经理 - 前厅运营管理
     UserRole.FLOOR_MANAGER: {
         Permission.AGENT_SCHEDULE_READ,
@@ -155,7 +155,6 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
         Permission.VOICE_NOTIFICATION,
         Permission.USER_READ,
     },
-
     # 客户经理 - 客户关系和预订管理
     UserRole.CUSTOMER_MANAGER: {
         Permission.AGENT_ORDER_READ,
@@ -165,7 +164,6 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
         Permission.AGENT_RESERVATION_WRITE,
         Permission.AGENT_DECISION_READ,
     },
-
     # 领班 - 前厅基层管理
     UserRole.TEAM_LEADER: {
         Permission.AGENT_SCHEDULE_READ,
@@ -177,7 +175,6 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
         Permission.VOICE_DEVICE_READ,
         Permission.VOICE_COMMAND,
     },
-
     # 服务员 - 基础服务操作
     UserRole.WAITER: {
         Permission.AGENT_ORDER_READ,
@@ -187,7 +184,6 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
         Permission.VOICE_DEVICE_READ,
         Permission.VOICE_COMMAND,
     },
-
     # 厨师长 - 后厨全面管理
     UserRole.HEAD_CHEF: {
         Permission.AGENT_SCHEDULE_READ,
@@ -203,7 +199,6 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
         Permission.VOICE_NOTIFICATION,
         Permission.USER_READ,
     },
-
     # 档口负责人 - 档口运营管理
     UserRole.STATION_MANAGER: {
         Permission.AGENT_SCHEDULE_READ,
@@ -213,7 +208,6 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
         Permission.VOICE_DEVICE_READ,
         Permission.VOICE_COMMAND,
     },
-
     # 厨师 - 基础后厨操作
     UserRole.CHEF: {
         Permission.AGENT_ORDER_READ,
@@ -221,7 +215,6 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
         Permission.VOICE_DEVICE_READ,
         Permission.VOICE_COMMAND,
     },
-
     # 库管 - 库存管理
     UserRole.WAREHOUSE_MANAGER: {
         Permission.AGENT_INVENTORY_READ,
@@ -229,7 +222,6 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
         Permission.AGENT_DECISION_READ,
         Permission.STORE_READ,
     },
-
     # 财务 - 财务数据访问
     UserRole.FINANCE: {
         Permission.AGENT_ORDER_READ,
@@ -241,7 +233,6 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
         Permission.SYSTEM_LOGS,
         Permission.AUDIT_READ,
     },
-
     # 采购 - 采购和库存
     UserRole.PROCUREMENT: {
         Permission.AGENT_INVENTORY_READ,

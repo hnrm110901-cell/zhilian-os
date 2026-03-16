@@ -7,13 +7,13 @@ CDP Monitor API — 消费者数据平台监控
   POST /monitor/full-backfill       — 触发全量回填管道（同步）
   POST /monitor/full-backfill/async — 触发全量回填管道（异步Celery）
 """
+
 import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.core.dependencies import get_current_user
 
@@ -30,6 +30,7 @@ async def get_cdp_dashboard(
 ):
     """CDP综合仪表盘（填充率+消费者统计+RFM分布+偏差率+KPI达标）"""
     from src.services.cdp_monitor_service import cdp_monitor_service
+
     return await cdp_monitor_service.get_dashboard(db, store_id=store_id)
 
 
@@ -41,6 +42,7 @@ async def get_rfm_distribution(
 ):
     """RFM等级分布（S1-S5各等级人数和占比）"""
     from src.services.cdp_monitor_service import cdp_monitor_service
+
     return await cdp_monitor_service.get_rfm_distribution(db, store_id=store_id)
 
 
@@ -62,8 +64,11 @@ async def run_full_backfill(
     返回：各步骤结果 + 最终KPI达标状态
     """
     from src.services.cdp_monitor_service import cdp_monitor_service
+
     return await cdp_monitor_service.run_full_backfill(
-        db, store_id=req.store_id, batch_size=req.batch_size,
+        db,
+        store_id=req.store_id,
+        batch_size=req.batch_size,
     )
 
 
@@ -78,6 +83,7 @@ async def trigger_async_backfill(
     适用于大数据量场景，不阻塞请求
     """
     from src.core.celery_app import celery_app
+
     task = celery_app.send_task(
         "src.core.celery_tasks.cdp_full_backfill",
         kwargs={"store_id": req.store_id, "batch_size": req.batch_size},

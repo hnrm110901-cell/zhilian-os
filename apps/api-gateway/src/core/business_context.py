@@ -24,6 +24,7 @@ BusinessContext — 跨模块上下文流动基础设施
     # 从 AgentMessage 提取
     ctx3 = BusinessContext.from_agent_message(msg)
 """
+
 from __future__ import annotations
 
 import json
@@ -46,20 +47,18 @@ class BusinessContext:
 
     # WHO
     store_id: str = ""
-    actor_id: Optional[str] = None       # user 或 agent id
-    actor_role: Optional[str] = None     # "store_manager" | "agent:schedule"
-    customer_id: Optional[str] = None    # consumer_id
+    actor_id: Optional[str] = None  # user 或 agent id
+    actor_role: Optional[str] = None  # "store_manager" | "agent:schedule"
+    customer_id: Optional[str] = None  # consumer_id
 
     # WHY
-    trigger: str = ""                    # "reservation.arrived" | "order.completed"
+    trigger: str = ""  # "reservation.arrived" | "order.completed"
     source_event_id: Optional[str] = None
     parent_context_id: Optional[str] = None
 
     # HOW（追踪）
     trace_id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    created_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     decision_log_id: Optional[str] = None
 
     # HISTORY（累积）
@@ -170,6 +169,7 @@ async def get_business_context_store() -> Optional["BusinessContextStore"]:
 
     try:
         import redis.asyncio as aioredis
+
         client = await aioredis.from_url(
             url,
             encoding="utf-8",

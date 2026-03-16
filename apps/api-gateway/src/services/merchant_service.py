@@ -1,17 +1,17 @@
 """
 商户开通服务 — 一站式创建集团+品牌+管理员账号 + 完整 CRUD
 """
+
 import uuid
-from typing import Optional
 from datetime import datetime
+from typing import Optional
 
-from sqlalchemy import select, func, or_
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.models.organization import Group, Brand
-from src.models.user import User, UserRole
-from src.models.store import Store
 from src.core.security import get_password_hash
+from src.models.organization import Brand, Group
+from src.models.store import Store
+from src.models.user import User, UserRole
 
 
 async def onboard_merchant(
@@ -90,17 +90,11 @@ async def onboard_merchant(
 async def get_merchant_stats(session: AsyncSession) -> dict:
     """平台级商户统计"""
     total_brands = (await session.execute(select(func.count(Brand.brand_id)))).scalar() or 0
-    active_brands = (await session.execute(
-        select(func.count(Brand.brand_id)).where(Brand.status == "active")
-    )).scalar() or 0
+    active_brands = (await session.execute(select(func.count(Brand.brand_id)).where(Brand.status == "active"))).scalar() or 0
     total_stores = (await session.execute(select(func.count(Store.id)))).scalar() or 0
-    active_stores = (await session.execute(
-        select(func.count(Store.id)).where(Store.status == "active")
-    )).scalar() or 0
+    active_stores = (await session.execute(select(func.count(Store.id)).where(Store.status == "active"))).scalar() or 0
     total_users = (await session.execute(select(func.count(User.id)))).scalar() or 0
-    active_users = (await session.execute(
-        select(func.count(User.id)).where(User.is_active.is_(True))
-    )).scalar() or 0
+    active_users = (await session.execute(select(func.count(User.id)).where(User.is_active.is_(True)))).scalar() or 0
     total_groups = (await session.execute(select(func.count(Group.group_id)))).scalar() or 0
 
     return {
@@ -123,36 +117,23 @@ async def list_merchants(
     cuisine_type: Optional[str] = None,
 ) -> list[dict]:
     """品牌列表 + 集团名 + 门店数 + 用户数（支持搜索/筛选）"""
-    store_count_sq = (
-        select(func.count(Store.id))
-        .where(Store.brand_id == Brand.brand_id)
-        .correlate(Brand)
-        .scalar_subquery()
-    )
-    user_count_sq = (
-        select(func.count(User.id))
-        .where(User.brand_id == Brand.brand_id)
-        .correlate(Brand)
-        .scalar_subquery()
-    )
+    store_count_sq = select(func.count(Store.id)).where(Store.brand_id == Brand.brand_id).correlate(Brand).scalar_subquery()
+    user_count_sq = select(func.count(User.id)).where(User.brand_id == Brand.brand_id).correlate(Brand).scalar_subquery()
 
-    stmt = (
-        select(
-            Brand.brand_id,
-            Brand.brand_name,
-            Brand.cuisine_type,
-            Brand.status,
-            Brand.avg_ticket_yuan,
-            Brand.created_at,
-            Group.group_id,
-            Group.group_name,
-            Group.contact_person,
-            Group.contact_phone,
-            store_count_sq.label("store_count"),
-            user_count_sq.label("user_count"),
-        )
-        .join(Group, Group.group_id == Brand.group_id)
-    )
+    stmt = select(
+        Brand.brand_id,
+        Brand.brand_name,
+        Brand.cuisine_type,
+        Brand.status,
+        Brand.avg_ticket_yuan,
+        Brand.created_at,
+        Group.group_id,
+        Group.group_name,
+        Group.contact_person,
+        Group.contact_phone,
+        store_count_sq.label("store_count"),
+        user_count_sq.label("user_count"),
+    ).join(Group, Group.group_id == Brand.group_id)
 
     if keyword:
         like_pat = f"%{keyword}%"
@@ -193,11 +174,7 @@ async def list_merchants(
 
 async def get_merchant_detail(session: AsyncSession, brand_id: str) -> Optional[dict]:
     """品牌详情 + 门店列表 + 用户列表"""
-    stmt = (
-        select(Brand, Group)
-        .join(Group, Group.group_id == Brand.group_id)
-        .where(Brand.brand_id == brand_id)
-    )
+    stmt = select(Brand, Group).join(Group, Group.group_id == Brand.group_id).where(Brand.brand_id == brand_id)
     result = await session.execute(stmt)
     row = result.first()
     if not row:
@@ -205,9 +182,7 @@ async def get_merchant_detail(session: AsyncSession, brand_id: str) -> Optional[
 
     brand, group = row
 
-    stores_result = await session.execute(
-        select(Store).where(Store.brand_id == brand_id)
-    )
+    stores_result = await session.execute(select(Store).where(Store.brand_id == brand_id))
     stores = [
         {
             "id": s.id,
@@ -223,9 +198,7 @@ async def get_merchant_detail(session: AsyncSession, brand_id: str) -> Optional[
         for s in stores_result.scalars().all()
     ]
 
-    users_result = await session.execute(
-        select(User).where(User.brand_id == brand_id)
-    )
+    users_result = await session.execute(select(User).where(User.brand_id == brand_id))
     users = [
         {
             "id": str(u.id),
@@ -273,17 +246,21 @@ async def update_merchant(
     **kwargs,
 ) -> Optional[dict]:
     """更新品牌配置"""
-    result = await session.execute(
-        select(Brand).where(Brand.brand_id == brand_id)
-    )
+    result = await session.execute(select(Brand).where(Brand.brand_id == brand_id))
     brand = result.scalar_one_or_none()
     if not brand:
         return None
 
     allowed_fields = {
-        "brand_name", "cuisine_type", "avg_ticket_yuan",
-        "target_food_cost_pct", "target_labor_cost_pct",
-        "target_rent_cost_pct", "target_waste_pct", "status", "logo_url",
+        "brand_name",
+        "cuisine_type",
+        "avg_ticket_yuan",
+        "target_food_cost_pct",
+        "target_labor_cost_pct",
+        "target_rent_cost_pct",
+        "target_waste_pct",
+        "status",
+        "logo_url",
     }
     for key, value in kwargs.items():
         if key in allowed_fields and value is not None:
@@ -299,16 +276,19 @@ async def update_group(
     **kwargs,
 ) -> Optional[dict]:
     """更新集团信息"""
-    result = await session.execute(
-        select(Group).where(Group.group_id == group_id)
-    )
+    result = await session.execute(select(Group).where(Group.group_id == group_id))
     group = result.scalar_one_or_none()
     if not group:
         return None
 
     allowed_fields = {
-        "group_name", "legal_entity", "unified_social_credit_code",
-        "industry_type", "contact_person", "contact_phone", "address",
+        "group_name",
+        "legal_entity",
+        "unified_social_credit_code",
+        "industry_type",
+        "contact_person",
+        "contact_phone",
+        "address",
     }
     for key, value in kwargs.items():
         if key in allowed_fields and value is not None:
@@ -320,9 +300,7 @@ async def update_group(
 
 async def toggle_merchant_status(session: AsyncSession, brand_id: str) -> Optional[dict]:
     """切换商户启用/停用状态"""
-    result = await session.execute(
-        select(Brand).where(Brand.brand_id == brand_id)
-    )
+    result = await session.execute(select(Brand).where(Brand.brand_id == brand_id))
     brand = result.scalar_one_or_none()
     if not brand:
         return None
@@ -335,9 +313,7 @@ async def toggle_merchant_status(session: AsyncSession, brand_id: str) -> Option
 
 async def toggle_user_status(session: AsyncSession, user_id: str) -> Optional[dict]:
     """切换用户启用/禁用状态"""
-    result = await session.execute(
-        select(User).where(User.id == user_id)
-    )
+    result = await session.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
         return None
@@ -349,9 +325,7 @@ async def toggle_user_status(session: AsyncSession, user_id: str) -> Optional[di
 
 async def remove_store(session: AsyncSession, store_id: str) -> Optional[dict]:
     """删除门店"""
-    result = await session.execute(
-        select(Store).where(Store.id == store_id)
-    )
+    result = await session.execute(select(Store).where(Store.id == store_id))
     store = result.scalar_one_or_none()
     if not store:
         return None
@@ -364,9 +338,7 @@ async def remove_store(session: AsyncSession, store_id: str) -> Optional[dict]:
 
 async def remove_user(session: AsyncSession, user_id: str) -> Optional[dict]:
     """删除用户"""
-    result = await session.execute(
-        select(User).where(User.id == user_id)
-    )
+    result = await session.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
         return None

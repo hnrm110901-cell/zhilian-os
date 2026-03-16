@@ -5,12 +5,14 @@ GET /channel-analytics/conversion — 转化率
 GET /channel-analytics/cancellation — 退订率
 POST /channel-analytics/record — 记录渠道
 """
+
+from datetime import date, datetime
+from typing import Any, Dict, List, Optional
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
-from datetime import date, datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-import structlog
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
@@ -22,6 +24,7 @@ router = APIRouter()
 
 
 # ── Request / Response Models ──
+
 
 class RecordChannelRequest(BaseModel):
     reservation_id: str
@@ -35,6 +38,7 @@ class RecordChannelRequest(BaseModel):
 
 
 # ── Routes ──
+
 
 @router.post("/channel-analytics/record", status_code=201)
 async def record_channel(
@@ -111,6 +115,7 @@ async def get_cancellation_analysis(
 
 # ── P0 补齐：渠道统计聚合看板 ────────────────────────────────────
 
+
 @router.get("/channel-analytics/summary")
 async def get_channel_summary(
     store_id: str = Query(..., description="门店ID"),
@@ -126,16 +131,22 @@ async def get_channel_summary(
     管理层看板一屏展示所需全部数据。
     """
     stats = await channel_analytics_service.get_channel_stats(
-        session=session, store_id=store_id,
-        start_date=start_date, end_date=end_date,
+        session=session,
+        store_id=store_id,
+        start_date=start_date,
+        end_date=end_date,
     )
     conversion = await channel_analytics_service.get_channel_conversion(
-        session=session, store_id=store_id,
-        start_date=start_date, end_date=end_date,
+        session=session,
+        store_id=store_id,
+        start_date=start_date,
+        end_date=end_date,
     )
     cancellation = await channel_analytics_service.get_cancellation_analysis(
-        session=session, store_id=store_id,
-        start_date=start_date, end_date=end_date,
+        session=session,
+        store_id=store_id,
+        start_date=start_date,
+        end_date=end_date,
     )
 
     # 合并转化率到渠道数据
@@ -144,11 +155,13 @@ async def get_channel_summary(
     for ch in stats.get("channels", []):
         ch_name = ch["channel"]
         conv_data = conv_map.get(ch_name, {})
-        enriched_channels.append({
-            **ch,
-            "completed": conv_data.get("completed", 0),
-            "conversion_rate": conv_data.get("conversion_rate", 0),
-        })
+        enriched_channels.append(
+            {
+                **ch,
+                "completed": conv_data.get("completed", 0),
+                "conversion_rate": conv_data.get("conversion_rate", 0),
+            }
+        )
 
     total_commission = sum(ch.get("total_commission", 0) for ch in enriched_channels)
 

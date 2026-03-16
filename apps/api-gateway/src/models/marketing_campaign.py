@@ -1,15 +1,18 @@
 """
 营销活动模型
 """
-from sqlalchemy import Column, String, Integer, Float, DateTime, JSON, Date, Text, Numeric
-from sqlalchemy.sql import func
+
 import uuid
+
+from sqlalchemy import JSON, Column, Date, DateTime, Float, Integer, Numeric, String, Text
+from sqlalchemy.sql import func
 
 from .base import Base
 
 
 class MarketingCampaign(Base):
     """营销活动表"""
+
     __tablename__ = "marketing_campaigns"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))

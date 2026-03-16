@@ -2,16 +2,18 @@
 总部跨店看板 API
 HQ Cross-Store Dashboard
 """
-from fastapi import APIRouter, Depends, HTTPException
-from typing import Optional, List, Dict, Any
+
 from datetime import date, datetime, timedelta
+from typing import Any, Dict, List, Optional
+
 import structlog
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import and_, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.dependencies import get_current_active_user, get_db
-from ..services.food_cost_service import FoodCostService
 from ..models.user import User
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_
+from ..services.food_cost_service import FoodCostService
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -30,8 +32,8 @@ async def get_hq_dashboard(
     - 库存预警门店列表
     - 营收排名
     """
-    from ..models.store import Store
     from ..models.decision_log import DecisionLog, DecisionStatus
+    from ..models.store import Store
 
     if target_date is None:
         target_date = date.today() - timedelta(days=1)
@@ -64,6 +66,7 @@ async def get_hq_dashboard(
 
             try:
                 from ..services.redis_cache_service import RedisCacheService
+
                 redis_svc = RedisCacheService()
                 await redis_svc.initialize()
                 cache_key = f"daily_hub:{store.id}:{target_date.isoformat()}"

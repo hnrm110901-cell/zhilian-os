@@ -9,34 +9,18 @@ Consolidated API endpoints for:
 - Internationalization
 """
 
-from fastapi import APIRouter, HTTPException, Depends, Header
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
-from src.services.open_api_platform import (
-    OpenAPIPlatform,
-    DeveloperTier,
-    PluginCategory,
-    PluginStatus
-)
-from src.services.industry_solutions import (
-    IndustrySolutionsService,
-    IndustryType,
-    TemplateType
-)
-from src.services.supply_chain_integration import (
-    SupplyChainIntegration,
-)
-from src.services.internationalization import (
-    InternationalizationService,
-    Language,
-    Currency
-)
-from src.core.database import get_db
+from fastapi import APIRouter, Depends, Header, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from src.core.database import get_db
+from src.services.industry_solutions import IndustrySolutionsService, IndustryType, TemplateType
+from src.services.internationalization import Currency, InternationalizationService, Language
+from src.services.open_api_platform import DeveloperTier, OpenAPIPlatform, PluginCategory, PluginStatus
+from src.services.supply_chain_integration import SupplyChainIntegration
 
 # ==================== Open API Platform ====================
 platform_router = APIRouter(prefix="/api/v1/platform", tags=["open_platform"])
@@ -76,18 +60,12 @@ class SubmitPluginRequest(BaseModel):
 
 
 @platform_router.post("/developer/register")
-async def register_developer(
-    request: RegisterDeveloperRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def register_developer(request: RegisterDeveloperRequest, db: AsyncSession = Depends(get_db)):
     """Register new developer"""
     try:
         platform = OpenAPIPlatform(db)
         developer = platform.register_developer(
-            name=request.name,
-            email=request.email,
-            company=request.company,
-            tier=DeveloperTier(request.tier.value)
+            name=request.name, email=request.email, company=request.company, tier=DeveloperTier(request.tier.value)
         )
 
         return {
@@ -95,17 +73,14 @@ async def register_developer(
             "developer_id": developer.developer_id,
             "api_key": developer.api_key,
             "api_secret": developer.api_secret,
-            "rate_limit": developer.rate_limit
+            "rate_limit": developer.rate_limit,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @platform_router.post("/plugin/submit")
-async def submit_plugin(
-    request: SubmitPluginRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def submit_plugin(request: SubmitPluginRequest, db: AsyncSession = Depends(get_db)):
     """Submit plugin for review"""
     try:
         platform = OpenAPIPlatform(db)
@@ -116,14 +91,14 @@ async def submit_plugin(
             category=PluginCategory(request.category.value),
             version=request.version,
             price=request.price,
-            webhook_url=request.webhook_url
+            webhook_url=request.webhook_url,
         )
 
         return {
             "success": True,
             "plugin_id": plugin.plugin_id,
             "status": plugin.status.value,
-            "revenue_share": plugin.revenue_share
+            "revenue_share": plugin.revenue_share,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -131,9 +106,7 @@ async def submit_plugin(
 
 @platform_router.get("/marketplace")
 async def get_marketplace_plugins(
-    category: Optional[PluginCategoryEnum] = None,
-    sort_by: str = "installs",
-    db: AsyncSession = Depends(get_db)
+    category: Optional[PluginCategoryEnum] = None, sort_by: str = "installs", db: AsyncSession = Depends(get_db)
 ):
     """Get marketplace plugins"""
     try:
@@ -152,10 +125,10 @@ async def get_marketplace_plugins(
                     "category": p.category.value,
                     "price": p.price,
                     "installs": p.installs,
-                    "rating": p.rating
+                    "rating": p.rating,
                 }
                 for p in plugins
-            ]
+            ],
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -177,10 +150,7 @@ class IndustryTypeEnum(str, Enum):
 
 
 @industry_router.get("/solution/{industry_type}")
-async def get_industry_solution(
-    industry_type: IndustryTypeEnum,
-    db: AsyncSession = Depends(get_db)
-):
+async def get_industry_solution(industry_type: IndustryTypeEnum, db: AsyncSession = Depends(get_db)):
     """Get industry solution"""
     try:
         service = IndustrySolutionsService(db)
@@ -198,8 +168,8 @@ async def get_industry_solution(
                 "description": solution.description,
                 "templates_count": len(solution.templates),
                 "best_practices_count": len(solution.best_practices),
-                "kpi_benchmarks": solution.kpi_benchmarks
-            }
+                "kpi_benchmarks": solution.kpi_benchmarks,
+            },
         }
     except HTTPException:
         raise
@@ -208,23 +178,13 @@ async def get_industry_solution(
 
 
 @industry_router.post("/apply")
-async def apply_industry_solution(
-    store_id: str,
-    industry_type: IndustryTypeEnum,
-    db: AsyncSession = Depends(get_db)
-):
+async def apply_industry_solution(store_id: str, industry_type: IndustryTypeEnum, db: AsyncSession = Depends(get_db)):
     """Apply industry solution to store"""
     try:
         service = IndustrySolutionsService(db)
-        result = service.apply_solution(
-            store_id=store_id,
-            industry_type=IndustryType(industry_type.value)
-        )
+        result = service.apply_solution(store_id=store_id, industry_type=IndustryType(industry_type.value))
 
-        return {
-            "success": True,
-            **result
-        }
+        return {"success": True, **result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -270,10 +230,7 @@ class UpdateOrderStatusRequest(BaseModel):
 
 
 @supply_chain_router.get("/suppliers")
-async def list_suppliers(
-    category: Optional[str] = None,
-    db: AsyncSession = Depends(get_db)
-):
+async def list_suppliers(category: Optional[str] = None, db: AsyncSession = Depends(get_db)):
     """获取供应商列表"""
     try:
         service = SupplyChainIntegration(db)
@@ -282,10 +239,15 @@ async def list_suppliers(
             "success": True,
             "suppliers": [
                 {
-                    "id": s.id, "name": s.name, "code": s.code,
-                    "category": s.category, "contact_person": s.contact_person,
-                    "phone": s.phone, "rating": s.rating,
-                    "payment_terms": s.payment_terms, "delivery_time": s.delivery_time,
+                    "id": s.id,
+                    "name": s.name,
+                    "code": s.code,
+                    "category": s.category,
+                    "contact_person": s.contact_person,
+                    "phone": s.phone,
+                    "rating": s.rating,
+                    "payment_terms": s.payment_terms,
+                    "delivery_time": s.delivery_time,
                     "status": s.status,
                 }
                 for s in suppliers
@@ -296,10 +258,7 @@ async def list_suppliers(
 
 
 @supply_chain_router.post("/suppliers")
-async def register_supplier(
-    request: RegisterSupplierRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def register_supplier(request: RegisterSupplierRequest, db: AsyncSession = Depends(get_db)):
     """注册供应商"""
     try:
         service = SupplyChainIntegration(db)
@@ -344,8 +303,9 @@ async def update_supplier(
     db: AsyncSession = Depends(get_db),
 ):
     """更新供应商信息"""
-    from src.models.supply_chain import Supplier
     from sqlalchemy import select
+    from src.models.supply_chain import Supplier
+
     try:
         result = await db.execute(select(Supplier).where(Supplier.id == supplier_id))
         supplier = result.scalar_one_or_none()
@@ -368,8 +328,9 @@ async def deactivate_supplier(
     db: AsyncSession = Depends(get_db),
 ):
     """停用供应商（软删除）"""
-    from src.models.supply_chain import Supplier
     from sqlalchemy import select
+    from src.models.supply_chain import Supplier
+
     try:
         result = await db.execute(select(Supplier).where(Supplier.id == supplier_id))
         supplier = result.scalar_one_or_none()
@@ -391,8 +352,9 @@ async def evaluate_supplier(
     db: AsyncSession = Depends(get_db),
 ):
     """评价供应商，更新综合评分"""
-    from src.models.supply_chain import Supplier
     from sqlalchemy import select
+    from src.models.supply_chain import Supplier
+
     try:
         result = await db.execute(select(Supplier).where(Supplier.id == supplier_id))
         supplier = result.scalar_one_or_none()
@@ -433,10 +395,7 @@ async def get_supplier_performance_api(
 
 
 @supply_chain_router.post("/quotes/request")
-async def request_quotes(
-    request: RequestQuotesRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def request_quotes(request: RequestQuotesRequest, db: AsyncSession = Depends(get_db)):
     """向供应商询价"""
     try:
         service = SupplyChainIntegration(db)
@@ -452,10 +411,7 @@ async def request_quotes(
 
 
 @supply_chain_router.post("/quotes/compare")
-async def compare_quotes(
-    request: CompareQuotesRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def compare_quotes(request: CompareQuotesRequest, db: AsyncSession = Depends(get_db)):
     """比较报价"""
     try:
         service = SupplyChainIntegration(db)
@@ -466,10 +422,7 @@ async def compare_quotes(
 
 
 @supply_chain_router.post("/orders")
-async def create_order(
-    request: CreateOrderRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def create_order(request: CreateOrderRequest, db: AsyncSession = Depends(get_db)):
     """创建采购订单"""
     try:
         service = SupplyChainIntegration(db)
@@ -491,7 +444,7 @@ async def list_orders(
     store_id: Optional[str] = None,
     supplier_id: Optional[str] = None,
     status: Optional[str] = None,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """查询采购订单"""
     try:
@@ -501,9 +454,12 @@ async def list_orders(
             "success": True,
             "orders": [
                 {
-                    "id": o.id, "order_number": o.order_number,
-                    "supplier_id": o.supplier_id, "store_id": o.store_id,
-                    "status": o.status, "total_amount": o.total_amount / 100,
+                    "id": o.id,
+                    "order_number": o.order_number,
+                    "supplier_id": o.supplier_id,
+                    "store_id": o.store_id,
+                    "status": o.status,
+                    "total_amount": o.total_amount / 100,
                     "expected_delivery": o.expected_delivery.isoformat() if o.expected_delivery else None,
                     "created_at": o.created_at.isoformat(),
                 }
@@ -515,11 +471,7 @@ async def list_orders(
 
 
 @supply_chain_router.patch("/orders/{order_id}/status")
-async def update_order_status(
-    order_id: str,
-    request: UpdateOrderStatusRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def update_order_status(order_id: str, request: UpdateOrderStatusRequest, db: AsyncSession = Depends(get_db)):
     """更新订单状态"""
     try:
         service = SupplyChainIntegration(db)
@@ -564,10 +516,7 @@ async def get_supported_languages(db: AsyncSession = Depends(get_db)):
         service = InternationalizationService(db)
         languages = service.get_supported_languages()
 
-        return {
-            "success": True,
-            "languages": languages
-        }
+        return {"success": True, "languages": languages}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -579,28 +528,20 @@ async def get_supported_currencies(db: AsyncSession = Depends(get_db)):
         service = InternationalizationService(db)
         currencies = service.get_supported_currencies()
 
-        return {
-            "success": True,
-            "currencies": currencies
-        }
+        return {"success": True, "currencies": currencies}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @i18n_router.post("/currency/convert")
 async def convert_currency(
-    amount: float,
-    from_currency: CurrencyEnum,
-    to_currency: CurrencyEnum,
-    db: AsyncSession = Depends(get_db)
+    amount: float, from_currency: CurrencyEnum, to_currency: CurrencyEnum, db: AsyncSession = Depends(get_db)
 ):
     """Convert currency"""
     try:
         service = InternationalizationService(db)
         converted = service.convert_currency(
-            amount=amount,
-            from_currency=Currency(from_currency.value),
-            to_currency=Currency(to_currency.value)
+            amount=amount, from_currency=Currency(from_currency.value), to_currency=Currency(to_currency.value)
         )
 
         return {
@@ -608,7 +549,7 @@ async def convert_currency(
             "original_amount": amount,
             "original_currency": from_currency.value,
             "converted_amount": converted,
-            "converted_currency": to_currency.value
+            "converted_currency": to_currency.value,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

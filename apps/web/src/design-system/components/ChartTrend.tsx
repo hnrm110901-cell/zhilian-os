@@ -92,7 +92,7 @@ export default function ChartTrend({
       values.forEach((v, i) => {
         const x = xPos(i);
         const y = yPos(v);
-        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        if (i === 0) { ctx.moveTo(x, y); } else { ctx.lineTo(x, y); }
       });
       ctx.stroke();
 
@@ -111,7 +111,7 @@ export default function ChartTrend({
     data.forEach(({ value }, i) => {
       const x = xPos(i);
       const y = yPos(value);
-      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      if (i === 0) { ctx.moveTo(x, y); } else { ctx.lineTo(x, y); }
     });
     ctx.lineTo(xPos(data.length - 1), pad.top + chartH);
     ctx.lineTo(xPos(0), pad.top + chartH);

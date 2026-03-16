@@ -114,10 +114,7 @@ class TurnoverPredictionService:
             "employee_id": employee.id,
             "store_id": employee.store_id,
             "risk_score_90d": risk_score,
-            "major_risk_factors": [
-                {"name": name, "score": score}
-                for name, score in major_factors
-            ],
+            "major_risk_factors": [{"name": name, "score": score} for name, score in major_factors],
             "replacement_cost_yuan": replacement_cost,
             "alert_sent": alert_sent,
         }

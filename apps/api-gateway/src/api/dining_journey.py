@@ -3,20 +3,23 @@
 
 覆盖消费者从预订→到店→用餐→离店→售后的完整生命周期端点。
 """
+
+from datetime import date, time
+from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
-from datetime import date, time
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
 from ..models.user import User
-from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 
 
 # ── Request / Response Models ─────────────────────────────────────
+
 
 class TableRecommendRequest(BaseModel):
     store_id: str
@@ -49,6 +52,7 @@ class ReviewRequest(BaseModel):
 
 # ── Phase 1: 等位 → 预订转换 ──────────────────────────────────────
 
+
 @router.post("/dining-journey/queue-to-reservation")
 async def queue_to_reservation(
     req: QueueToReservationRequest,
@@ -60,7 +64,9 @@ async def queue_to_reservation(
 
     try:
         reservation = await convert_queue_to_reservation(
-            session, req.queue_id, req.table_number,
+            session,
+            req.queue_id,
+            req.table_number,
         )
         await session.commit()
         return {
@@ -75,6 +81,7 @@ async def queue_to_reservation(
 
 # ── Phase 2: 智能桌台推荐 ────────────────────────────────────────
 
+
 @router.post("/dining-journey/recommend-table")
 async def recommend_table(
     req: TableRecommendRequest,
@@ -85,8 +92,12 @@ async def recommend_table(
     from ..services.dining_journey_service import recommend_table as _recommend
 
     candidates = await _recommend(
-        session, req.store_id, req.party_size,
-        req.reservation_date, req.reservation_time, req.preference,
+        session,
+        req.store_id,
+        req.party_size,
+        req.reservation_date,
+        req.reservation_time,
+        req.preference,
     )
     return {
         "store_id": req.store_id,
@@ -97,6 +108,7 @@ async def recommend_table(
 
 
 # ── Phase 2: 到店前推送 ──────────────────────────────────────────
+
 
 @router.get("/dining-journey/pre-arrival/{store_id}")
 async def get_pre_arrival_list(
@@ -148,6 +160,7 @@ async def batch_send_reminders(
 
 # ── Phase 3: 老客识别 ────────────────────────────────────────────
 
+
 @router.get("/dining-journey/customer-recognition")
 async def recognize_customer(
     phone: str = Query(..., description="客户手机号"),
@@ -183,6 +196,7 @@ async def scan_birthdays(
 
 # ── Phase 4: 巡台检查 ────────────────────────────────────────────
 
+
 @router.get("/dining-journey/patrol/checklist")
 async def get_patrol_checklist(
     current_user: User = Depends(get_current_active_user),
@@ -203,13 +217,19 @@ async def submit_patrol(
     from ..services.dining_journey_service import create_patrol_record
 
     result = await create_patrol_record(
-        session, req.store_id, req.table_number, req.patrol_by,
-        req.checklist_results, req.issues, req.reservation_id,
+        session,
+        req.store_id,
+        req.table_number,
+        req.patrol_by,
+        req.checklist_results,
+        req.issues,
+        req.reservation_id,
     )
     return result
 
 
 # ── Phase 5: 满意度调查 ──────────────────────────────────────────
+
 
 @router.post("/dining-journey/satisfaction/{reservation_id}")
 async def trigger_satisfaction(
@@ -228,6 +248,7 @@ async def trigger_satisfaction(
 
 # ── Phase 6: 评价管理 + 售后 ─────────────────────────────────────
 
+
 @router.post("/dining-journey/review")
 async def process_review(
     req: ReviewRequest,
@@ -238,8 +259,11 @@ async def process_review(
     from ..services.dining_journey_service import process_post_dining_review
 
     result = await process_post_dining_review(
-        session, req.reservation_id, req.review_source,
-        req.review_text, req.platform_rating,
+        session,
+        req.reservation_id,
+        req.review_source,
+        req.review_text,
+        req.platform_rating,
     )
     return result
 

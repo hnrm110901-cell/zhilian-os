@@ -17,6 +17,7 @@ Redis 键结构
   edge:bootstrap_token_index         →  ZSet，score=创建时间戳，member=token_hash
     （用于列举、清理过期条目）
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -43,14 +44,14 @@ _TOKEN_BYTES = 32
 
 @dataclass
 class BootstrapTokenMeta:
-    token_hash: str          # SHA-256(token)，作为 Redis key 后缀
-    token_prefix: str        # Token 前 8 位，用于展示（不回传完整 token）
-    created_by: str          # 发放人 user_id 或 username
-    created_at: float        # Unix 时间戳
-    expires_at: float        # Unix 时间戳（= created_at + ttl）
+    token_hash: str  # SHA-256(token)，作为 Redis key 后缀
+    token_prefix: str  # Token 前 8 位，用于展示（不回传完整 token）
+    created_by: str  # 发放人 user_id 或 username
+    created_at: float  # Unix 时间戳
+    expires_at: float  # Unix 时间戳（= created_at + ttl）
     store_id: Optional[str]  # 限制适用门店（None=不限制）
-    note: str                # 备注（如："尝在一起接入 2026-03-14"）
-    active: bool             # False=已吊销
+    note: str  # 备注（如："尝在一起接入 2026-03-14"）
+    active: bool  # False=已吊销
 
 
 def _token_redis_key(token_hash: str) -> str:
@@ -214,5 +215,6 @@ def get_edge_bootstrap_token_service() -> EdgeBootstrapTokenService:
     global _instance
     if _instance is None:
         from src.core.redis import get_redis_client  # 延迟导入，避免循环
+
         _instance = EdgeBootstrapTokenService(get_redis_client())
     return _instance

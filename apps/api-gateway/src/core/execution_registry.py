@@ -3,20 +3,24 @@ ARCH-004: 指令注册表
 
 定义所有可执行指令的元数据：权限级别、金额熔断阈值、路由方式。
 """
+
 from enum import Enum
-from typing import Optional, List
+from typing import List, Optional
+
 from pydantic import BaseModel
 
 
 class ExecutionLevel(str, Enum):
     """执行路由级别"""
-    NOTIFY = "notify"    # 仅通知，无需审批，自动执行
+
+    NOTIFY = "notify"  # 仅通知，无需审批，自动执行
     APPROVE = "approve"  # 需要上级审批后执行
-    AUTO = "auto"        # 自动执行，无需审批（低风险操作）
+    AUTO = "auto"  # 自动执行，无需审批（低风险操作）
 
 
 class CommandDef(BaseModel):
     """指令定义"""
+
     command_type: str
     display_name: str
     level: ExecutionLevel
@@ -35,7 +39,7 @@ COMMAND_REGISTRY: dict[str, CommandDef] = {
         command_type="discount_apply",
         display_name="折扣申请",
         level=ExecutionLevel.APPROVE,
-        amount_circuit_breaker=500.0,   # 超过500元必须审批
+        amount_circuit_breaker=500.0,  # 超过500元必须审批
         allowed_roles=["store_manager", "assistant_manager"],
         approver_roles=["store_manager", "admin", "super_admin"],
         description="申请订单折扣，需要店长审批",
@@ -88,7 +92,5 @@ COMMAND_REGISTRY: dict[str, CommandDef] = {
 def get_command_def(command_type: str) -> CommandDef:
     """获取指令定义，不存在则抛出异常"""
     if command_type not in COMMAND_REGISTRY:
-        raise ValueError(
-            f"未知指令类型: '{command_type}'。已注册指令: {list(COMMAND_REGISTRY.keys())}"
-        )
+        raise ValueError(f"未知指令类型: '{command_type}'。已注册指令: {list(COMMAND_REGISTRY.keys())}")
     return COMMAND_REGISTRY[command_type]

@@ -2,13 +2,15 @@
 企业微信推送触发管理API
 WeChat Push Trigger Management API
 """
-from fastapi import APIRouter, Depends, HTTPException, Body
-from typing import Optional, Dict, Any
-import structlog
 
-from ..services.wechat_trigger_service import wechat_trigger_service, send_wechat_push_task
+from typing import Any, Dict, Optional
+
+import structlog
+from fastapi import APIRouter, Body, Depends, HTTPException
+
 from ..core.dependencies import get_current_user
 from ..models.user import User
+from ..services.wechat_trigger_service import send_wechat_push_task, wechat_trigger_service
 
 router = APIRouter(prefix="/api/v1/wechat/triggers", tags=["WeChat Triggers"])
 logger = structlog.get_logger()
@@ -160,9 +162,9 @@ async def get_trigger_stats(
     返回各类事件的触发次数、成功率等统计信息
     """
     try:
+        from sqlalchemy import func, select
         from src.core.database import get_db_session
         from src.models.notification import Notification
-        from sqlalchemy import select, func
 
         async with get_db_session() as session:
             # 统计企微相关通知

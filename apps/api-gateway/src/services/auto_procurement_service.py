@@ -2,17 +2,17 @@
 智能采购服务
 自动检测库存低于阈值的食材，生成采购建议，支持审批/跳过/自动下单
 """
+
 import uuid
-from datetime import datetime, date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
 
-from sqlalchemy import select, func, and_, extract, update, delete
+from sqlalchemy import and_, delete, extract, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.models.auto_procurement import ProcurementRule, ProcurementExecution
+from src.models.auto_procurement import ProcurementExecution, ProcurementRule
 from src.models.inventory import InventoryItem
-from src.models.supplier_b2b import B2BPurchaseOrder, B2BPurchaseItem
+from src.models.supplier_b2b import B2BPurchaseItem, B2BPurchaseOrder
 
 
 class AutoProcurementService:
@@ -37,13 +37,9 @@ class AutoProcurementService:
         ]
         if store_id:
             # 匹配指定门店或全局规则（store_id=null）
-            conditions.append(
-                (ProcurementRule.store_id == store_id) | (ProcurementRule.store_id.is_(None))
-            )
+            conditions.append((ProcurementRule.store_id == store_id) | (ProcurementRule.store_id.is_(None)))
 
-        result = await db.execute(
-            select(ProcurementRule).where(and_(*conditions))
-        )
+        result = await db.execute(select(ProcurementRule).where(and_(*conditions)))
         rules = result.scalars().all()
 
         if not rules:
@@ -138,9 +134,7 @@ class AutoProcurementService:
             ProcurementExecution.status == "suggested",
         )
 
-        count_result = await db.execute(
-            select(func.count(ProcurementExecution.id)).where(where_clause)
-        )
+        count_result = await db.execute(select(func.count(ProcurementExecution.id)).where(where_clause))
         total = count_result.scalar_one()
 
         offset = (page - 1) * page_size
@@ -158,9 +152,7 @@ class AutoProcurementService:
         for ex in executions:
             item = ex.to_dict()
             if ex.rule_id:
-                rule_result = await db.execute(
-                    select(ProcurementRule).where(ProcurementRule.id == ex.rule_id)
-                )
+                rule_result = await db.execute(select(ProcurementRule).where(ProcurementRule.id == ex.rule_id))
                 rule = rule_result.scalar_one_or_none()
                 if rule:
                     item["supplier_name"] = rule.supplier_name
@@ -178,13 +170,9 @@ class AutoProcurementService:
             "page_size": page_size,
         }
 
-    async def approve_suggestion(
-        self, db: AsyncSession, execution_id: str
-    ) -> Dict[str, Any]:
+    async def approve_suggestion(self, db: AsyncSession, execution_id: str) -> Dict[str, Any]:
         """审批建议 -> 生成B2B采购单"""
-        result = await db.execute(
-            select(ProcurementExecution).where(ProcurementExecution.id == execution_id)
-        )
+        result = await db.execute(select(ProcurementExecution).where(ProcurementExecution.id == execution_id))
         execution = result.scalar_one_or_none()
         if not execution:
             raise ValueError("采购建议不存在")
@@ -194,9 +182,7 @@ class AutoProcurementService:
         # 查找关联规则获取供应商信息
         rule = None
         if execution.rule_id:
-            rule_result = await db.execute(
-                select(ProcurementRule).where(ProcurementRule.id == execution.rule_id)
-            )
+            rule_result = await db.execute(select(ProcurementRule).where(ProcurementRule.id == execution.rule_id))
             rule = rule_result.scalar_one_or_none()
 
         if not rule:
@@ -247,13 +233,9 @@ class AutoProcurementService:
         result_dict["total_amount_fen"] = amount_fen
         return result_dict
 
-    async def skip_suggestion(
-        self, db: AsyncSession, execution_id: str, reason: Optional[str] = None
-    ) -> Dict[str, Any]:
+    async def skip_suggestion(self, db: AsyncSession, execution_id: str, reason: Optional[str] = None) -> Dict[str, Any]:
         """跳过采购建议"""
-        result = await db.execute(
-            select(ProcurementExecution).where(ProcurementExecution.id == execution_id)
-        )
+        result = await db.execute(select(ProcurementExecution).where(ProcurementExecution.id == execution_id))
         execution = result.scalar_one_or_none()
         if not execution:
             raise ValueError("采购建议不存在")
@@ -268,9 +250,7 @@ class AutoProcurementService:
 
     # ── 规则管理 ───────────────────────────────────────────────────────────────
 
-    async def create_rule(
-        self, db: AsyncSession, data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def create_rule(self, db: AsyncSession, data: Dict[str, Any]) -> Dict[str, Any]:
         """创建采购规则"""
         rule = ProcurementRule(
             id=uuid.uuid4(),
@@ -301,9 +281,7 @@ class AutoProcurementService:
         """分页查询采购规则"""
         where_clause = ProcurementRule.brand_id == brand_id
 
-        count_result = await db.execute(
-            select(func.count(ProcurementRule.id)).where(where_clause)
-        )
+        count_result = await db.execute(select(func.count(ProcurementRule.id)).where(where_clause))
         total = count_result.scalar_one()
 
         offset = (page - 1) * page_size
@@ -323,20 +301,22 @@ class AutoProcurementService:
             "page_size": page_size,
         }
 
-    async def update_rule(
-        self, db: AsyncSession, rule_id: str, data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def update_rule(self, db: AsyncSession, rule_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """更新采购规则"""
-        result = await db.execute(
-            select(ProcurementRule).where(ProcurementRule.id == rule_id)
-        )
+        result = await db.execute(select(ProcurementRule).where(ProcurementRule.id == rule_id))
         rule = result.scalar_one_or_none()
         if not rule:
             raise ValueError("规则不存在")
 
         updatable = [
-            "ingredient_id", "ingredient_name", "supplier_id", "supplier_name",
-            "unit", "lead_days", "is_enabled", "store_id",
+            "ingredient_id",
+            "ingredient_name",
+            "supplier_id",
+            "supplier_name",
+            "unit",
+            "lead_days",
+            "is_enabled",
+            "store_id",
         ]
         for field in updatable:
             if field in data:
@@ -354,9 +334,7 @@ class AutoProcurementService:
 
     async def delete_rule(self, db: AsyncSession, rule_id: str) -> bool:
         """删除采购规则"""
-        result = await db.execute(
-            select(ProcurementRule).where(ProcurementRule.id == rule_id)
-        )
+        result = await db.execute(select(ProcurementRule).where(ProcurementRule.id == rule_id))
         rule = result.scalar_one_or_none()
         if not rule:
             raise ValueError("规则不存在")
@@ -385,9 +363,7 @@ class AutoProcurementService:
 
         where_clause = and_(*conditions)
 
-        count_result = await db.execute(
-            select(func.count(ProcurementExecution.id)).where(where_clause)
-        )
+        count_result = await db.execute(select(func.count(ProcurementExecution.id)).where(where_clause))
         total = count_result.scalar_one()
 
         offset = (page - 1) * page_size
@@ -441,9 +417,7 @@ class AutoProcurementService:
             extract("year", ProcurementExecution.executed_at) == now.year,
             extract("month", ProcurementExecution.executed_at) == now.month,
         )
-        ordered_result = await db.execute(
-            select(func.count(ProcurementExecution.id)).where(month_conditions)
-        )
+        ordered_result = await db.execute(select(func.count(ProcurementExecution.id)).where(month_conditions))
         monthly_ordered = ordered_result.scalar_one()
 
         # 本月跳过数（节省参考）
@@ -474,8 +448,7 @@ class AutoProcurementService:
         prefix = f"AP-{today}-"
 
         result = await db.execute(
-            select(func.max(B2BPurchaseOrder.order_number))
-            .where(B2BPurchaseOrder.order_number.like(f"{prefix}%"))
+            select(func.max(B2BPurchaseOrder.order_number)).where(B2BPurchaseOrder.order_number.like(f"{prefix}%"))
         )
         max_number = result.scalar_one_or_none()
 

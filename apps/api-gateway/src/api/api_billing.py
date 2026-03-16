@@ -21,6 +21,7 @@ Endpoints:
   pro:      200,000 次免费 + 超量 0.30 元/千次
   enterprise: 1,000,000 次免费 + 超量 0.15 元/千次
 """
+
 from __future__ import annotations
 
 import json
@@ -45,36 +46,37 @@ router = APIRouter(prefix="/api/v1/billing", tags=["api_billing"])
 
 # Free quota per month (calls)
 FREE_QUOTA_MAP: Dict[str, int] = {
-    "free":       5_000,
-    "basic":     50_000,
-    "pro":      200_000,
+    "free": 5_000,
+    "basic": 50_000,
+    "pro": 200_000,
     "enterprise": 1_000_000,
 }
 
 # Price per 1000 overage calls in 分 (0 = free tier, no charge)
 PRICE_PER_1K_FEN: Dict[str, int] = {
-    "free":       0,
-    "basic":     50,    # ¥0.50 / 千次
-    "pro":       30,    # ¥0.30 / 千次
-    "enterprise": 15,   # ¥0.15 / 千次
+    "free": 0,
+    "basic": 50,  # ¥0.50 / 千次
+    "pro": 30,  # ¥0.30 / 千次
+    "enterprise": 15,  # ¥0.15 / 千次
 }
 
-PERIOD_RE = re.compile(r'^\d{4}-(?:0[1-9]|1[0-2])$')
+PERIOD_RE = re.compile(r"^\d{4}-(?:0[1-9]|1[0-2])$")
 
 VALID_CYCLE_TRANSITIONS: Dict[str, set] = {
-    "draft":      {"finalized"},
-    "finalized":  {"invoiced"},
-    "invoiced":   set(),
+    "draft": {"finalized"},
+    "finalized": {"invoiced"},
+    "invoiced": set(),
 }
 
 VALID_INVOICE_TRANSITIONS: Dict[str, set] = {
     "unpaid": {"paid", "void"},
-    "paid":   set(),
-    "void":   set(),
+    "paid": set(),
+    "void": set(),
 }
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def _row(row) -> Dict[str, Any]:
     return dict(row._mapping)
@@ -95,10 +97,10 @@ def compute_billing(total_calls: int, tier: str) -> Dict[str, Any]:
     price_per_1k = PRICE_PER_1K_FEN.get(tier, 0)
     amount_fen = (overage * price_per_1k) // 1000
     return {
-        "free_quota":    free_quota,
+        "free_quota": free_quota,
         "overage_calls": overage,
-        "amount_fen":    amount_fen,
-        "amount_yuan":   round(amount_fen / 100, 2),
+        "amount_fen": amount_fen,
+        "amount_yuan": round(amount_fen / 100, 2),
     }
 
 
@@ -118,20 +120,23 @@ def build_line_items(tier: str, total_calls: int, billing: Dict[str, Any]) -> Li
         }
     ]
     if billing["overage_calls"] > 0:
-        items.append({
-            "description": f"超量 API 调用（{tier} 套餐 ¥{PRICE_PER_1K_FEN.get(tier,0)/100:.2f}/千次）",
-            "quantity": billing["overage_calls"],
-            "unit_price_yuan": round(PRICE_PER_1K_FEN.get(tier, 0) / 100 / 1000, 6),
-            "amount_yuan": billing["amount_yuan"],
-        })
+        items.append(
+            {
+                "description": f"超量 API 调用（{tier} 套餐 ¥{PRICE_PER_1K_FEN.get(tier,0)/100:.2f}/千次）",
+                "quantity": billing["overage_calls"],
+                "unit_price_yuan": round(PRICE_PER_1K_FEN.get(tier, 0) / 100 / 1000, 6),
+                "amount_yuan": billing["amount_yuan"],
+            }
+        )
     return items
 
 
 # ── Request schemas ───────────────────────────────────────────────────────────
 
+
 class ComputeCycleRequest(BaseModel):
     developer_id: str
-    period:       str     # 'YYYY-MM'
+    period: str  # 'YYYY-MM'
 
 
 class AdminSummaryRequest(BaseModel):
@@ -140,10 +145,11 @@ class AdminSummaryRequest(BaseModel):
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
+
 @router.post("/cycles/compute", status_code=200)
 async def compute_billing_cycle(
     req: ComputeCycleRequest,
-    db:  AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """
     计算（或重新计算）某月的 API 账单。
@@ -163,10 +169,7 @@ async def compute_billing_cycle(
 
     # Check existing cycle — cannot recompute if finalized/invoiced
     existing_row = await db.execute(
-        text(
-            "SELECT * FROM api_billing_cycles "
-            "WHERE developer_id = :did AND period = :p"
-        ),
+        text("SELECT * FROM api_billing_cycles " "WHERE developer_id = :did AND period = :p"),
         {"did": req.developer_id, "p": req.period},
     )
     existing = existing_row.fetchone()
@@ -179,9 +182,7 @@ async def compute_billing_cycle(
     # Count API calls for the period from api_usage_logs
     count_row = await db.execute(
         text(
-            "SELECT COUNT(*) AS cnt FROM api_usage_logs "
-            "WHERE developer_id = :did "
-            "AND TO_CHAR(called_at, 'YYYY-MM') = :p"
+            "SELECT COUNT(*) AS cnt FROM api_usage_logs " "WHERE developer_id = :did " "AND TO_CHAR(called_at, 'YYYY-MM') = :p"
         ),
         {"did": req.developer_id, "p": req.period},
     )
@@ -244,29 +245,26 @@ async def compute_billing_cycle(
     await db.commit()
 
     return {
-        "cycle_id":      cycle_id,
-        "developer_id":  req.developer_id,
-        "period":        req.period,
-        "tier":          tier,
-        "total_calls":   total_calls,
+        "cycle_id": cycle_id,
+        "developer_id": req.developer_id,
+        "period": req.period,
+        "tier": tier,
+        "total_calls": total_calls,
         "billable_calls": billable_calls,
         **billing,
-        "status":        "draft",
-        "line_items":    build_line_items(tier, billable_calls, billing),
+        "status": "draft",
+        "line_items": build_line_items(tier, billable_calls, billing),
     }
 
 
 @router.get("/cycles")
 async def list_billing_cycles(
     developer_id: str = Query(...),
-    db:           AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """列出开发者所有账单周期。"""
     rows = await db.execute(
-        text(
-            "SELECT * FROM api_billing_cycles "
-            "WHERE developer_id = :did ORDER BY period DESC"
-        ),
+        text("SELECT * FROM api_billing_cycles " "WHERE developer_id = :did ORDER BY period DESC"),
         {"did": developer_id},
     )
     cycles = [_row(r) for r in rows.fetchall()]
@@ -276,9 +274,9 @@ async def list_billing_cycles(
 
 @router.get("/cycles/{cycle_id}")
 async def get_billing_cycle(
-    cycle_id:    str,
+    cycle_id: str,
     developer_id: str = Query(...),
-    db:          AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """账单详情，含分级计费明细。"""
     row = await db.execute(
@@ -295,10 +293,10 @@ async def get_billing_cycle(
     data = _row(cycle)
     tier = data.pop("tier", "free")
     billing = {
-        "free_quota":    data["free_quota"],
+        "free_quota": data["free_quota"],
         "overage_calls": data["overage_calls"],
-        "amount_fen":    data["amount_fen"],
-        "amount_yuan":   float(data["amount_yuan"]),
+        "amount_fen": data["amount_fen"],
+        "amount_yuan": float(data["amount_yuan"]),
     }
     data["line_items"] = build_line_items(tier, data["billable_calls"], billing)
     data["tier"] = tier
@@ -307,16 +305,13 @@ async def get_billing_cycle(
 
 @router.post("/cycles/{cycle_id}/finalize")
 async def finalize_billing_cycle(
-    cycle_id:    str,
+    cycle_id: str,
     developer_id: str = Query(...),
-    db:          AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """锁定账单（draft → finalized），不可再修改计费数据。"""
     row = await db.execute(
-        text(
-            "SELECT * FROM api_billing_cycles "
-            "WHERE id = :id AND developer_id = :did"
-        ),
+        text("SELECT * FROM api_billing_cycles " "WHERE id = :id AND developer_id = :did"),
         {"id": cycle_id, "did": developer_id},
     )
     cycle = row.fetchone()
@@ -324,15 +319,11 @@ async def finalize_billing_cycle(
         raise HTTPException(status_code=404, detail="账单不存在")
     current = _row(cycle)["status"]
     if "finalized" not in VALID_CYCLE_TRANSITIONS.get(current, set()):
-        raise HTTPException(
-            status_code=409, detail=f"当前状态 {current} 不可 finalize"
-        )
+        raise HTTPException(status_code=409, detail=f"当前状态 {current} 不可 finalize")
 
     await db.execute(
         text(
-            "UPDATE api_billing_cycles "
-            "SET status = 'finalized', finalized_at = NOW(), updated_at = NOW() "
-            "WHERE id = :id"
+            "UPDATE api_billing_cycles " "SET status = 'finalized', finalized_at = NOW(), updated_at = NOW() " "WHERE id = :id"
         ),
         {"id": cycle_id},
     )
@@ -342,9 +333,9 @@ async def finalize_billing_cycle(
 
 @router.post("/cycles/{cycle_id}/invoice")
 async def generate_invoice(
-    cycle_id:    str,
+    cycle_id: str,
     developer_id: str = Query(...),
-    db:          AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """
     生成发票（finalized → invoiced）。
@@ -380,10 +371,10 @@ async def generate_invoice(
         return _row(inv)
 
     billing = {
-        "free_quota":    data["free_quota"],
+        "free_quota": data["free_quota"],
         "overage_calls": data["overage_calls"],
-        "amount_fen":    data["amount_fen"],
-        "amount_yuan":   float(data["amount_yuan"]),
+        "amount_fen": data["amount_fen"],
+        "amount_yuan": float(data["amount_yuan"]),
     }
     line_items = build_line_items(tier, data["billable_calls"], billing)
 
@@ -408,32 +399,29 @@ async def generate_invoice(
     )
     # Mark cycle as invoiced
     await db.execute(
-        text(
-            "UPDATE api_billing_cycles "
-            "SET status = 'invoiced', updated_at = NOW() WHERE id = :id"
-        ),
+        text("UPDATE api_billing_cycles " "SET status = 'invoiced', updated_at = NOW() WHERE id = :id"),
         {"id": cycle_id},
     )
     await db.commit()
 
     return {
-        "invoice_id":  inv_id,
-        "cycle_id":    cycle_id,
+        "invoice_id": inv_id,
+        "cycle_id": cycle_id,
         "developer_id": developer_id,
-        "period":      data["period"],
-        "invoice_no":  inv_no,
+        "period": data["period"],
+        "invoice_no": inv_no,
         "amount_yuan": float(data["amount_yuan"]),
-        "line_items":  line_items,
-        "status":      "unpaid",
+        "line_items": line_items,
+        "status": "unpaid",
     }
 
 
 @router.get("/invoices")
 async def list_invoices(
     developer_id: Optional[str] = Query(None),
-    period:       Optional[str] = Query(None),
-    status:       Optional[str] = Query(None),
-    db:           AsyncSession = Depends(get_db),
+    period: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """发票列表（支持多维过滤）。"""
     conditions = ["1=1"]
@@ -450,10 +438,7 @@ async def list_invoices(
         params["st"] = status
 
     rows = await db.execute(
-        text(
-            f"SELECT * FROM api_invoices WHERE {' AND '.join(conditions)} "
-            "ORDER BY issued_at DESC"
-        ),
+        text(f"SELECT * FROM api_invoices WHERE {' AND '.join(conditions)} " "ORDER BY issued_at DESC"),
         params,
     )
     invoices = []
@@ -472,7 +457,7 @@ async def list_invoices(
 @router.get("/invoices/{invoice_id}")
 async def get_invoice(
     invoice_id: str,
-    db:         AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     row = await db.execute(
         text("SELECT * FROM api_invoices WHERE id = :id"),
@@ -494,7 +479,7 @@ async def get_invoice(
 @router.post("/invoices/{invoice_id}/pay")
 async def mark_invoice_paid(
     invoice_id: str,
-    db:         AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """标记发票已付款（unpaid → paid）。"""
     row = await db.execute(
@@ -506,14 +491,9 @@ async def mark_invoice_paid(
         raise HTTPException(status_code=404, detail="发票不存在")
     current = _row(inv)["status"]
     if "paid" not in VALID_INVOICE_TRANSITIONS.get(current, set()):
-        raise HTTPException(
-            status_code=409, detail=f"当前状态 {current} 不可标记已付"
-        )
+        raise HTTPException(status_code=409, detail=f"当前状态 {current} 不可标记已付")
     await db.execute(
-        text(
-            "UPDATE api_invoices "
-            "SET status = 'paid', paid_at = NOW() WHERE id = :id"
-        ),
+        text("UPDATE api_invoices " "SET status = 'paid', paid_at = NOW() WHERE id = :id"),
         {"id": invoice_id},
     )
     await db.commit()
@@ -523,7 +503,7 @@ async def mark_invoice_paid(
 @router.get("/admin/summary")
 async def get_admin_billing_summary(
     months: int = Query(6, ge=1, le=24),
-    db:     AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """
     管理端计费汇总：
@@ -544,25 +524,24 @@ async def get_admin_billing_summary(
     )
     monthly = []
     for r in rows.fetchall():
-        monthly.append({
-            "period":       r.period,
-            "total_yuan":   float(r.total_yuan or 0),
-            "dev_count":    r.dev_count,
-            "total_calls":  r.total_calls or 0,
-        })
+        monthly.append(
+            {
+                "period": r.period,
+                "total_yuan": float(r.total_yuan or 0),
+                "dev_count": r.dev_count,
+                "total_calls": r.total_calls or 0,
+            }
+        )
 
     # Invoice status breakdown
     inv_rows = await db.execute(
-        text(
-            "SELECT status, COUNT(*) AS cnt, SUM(amount_yuan) AS total_yuan "
-            "FROM api_invoices GROUP BY status"
-        ),
+        text("SELECT status, COUNT(*) AS cnt, SUM(amount_yuan) AS total_yuan " "FROM api_invoices GROUP BY status"),
         {},
     )
     invoice_summary: Dict[str, Any] = {}
     for r in inv_rows.fetchall():
         invoice_summary[r.status] = {
-            "count":      r.cnt,
+            "count": r.cnt,
             "total_yuan": float(r.total_yuan or 0),
         }
 
@@ -572,5 +551,5 @@ async def get_admin_billing_summary(
         "monthly_revenue": monthly,
         "invoice_summary": invoice_summary,
         "outstanding_yuan": unpaid_yuan,
-        "months_shown":    months,
+        "months_shown": months,
     }

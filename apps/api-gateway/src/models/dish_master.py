@@ -8,19 +8,9 @@ StoreMenu   — 门店层价格覆盖（继承链：集团→品牌→门店）
 
 import uuid
 
-from sqlalchemy import (
-    Boolean,
-    Column,
-    ForeignKey,
-    Index,
-    Integer,
-    String,
-    Text,
-    UniqueConstraint,
-)
+from sqlalchemy import Boolean, Column, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.orm import relationship
-
 from src.models.base import Base, TimestampMixin
 
 
@@ -36,20 +26,18 @@ class DishMaster(Base, TimestampMixin):
     __tablename__ = "dish_master"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    sku_code = Column(String(50), unique=True, nullable=False)          # 集团唯一SKU编码
-    canonical_name = Column(String(200), nullable=False)                # 标准菜品名
-    category_name = Column(String(100), nullable=False)                 # 分类名称
-    floor_price = Column(Integer, nullable=False, default=0)            # 最低售价保护（分）
-    allergens = Column(ARRAY(String), nullable=False, server_default='{}')
-    brand_id = Column(String(50), nullable=True, index=True)            # null=全品牌通用
+    sku_code = Column(String(50), unique=True, nullable=False)  # 集团唯一SKU编码
+    canonical_name = Column(String(200), nullable=False)  # 标准菜品名
+    category_name = Column(String(100), nullable=False)  # 分类名称
+    floor_price = Column(Integer, nullable=False, default=0)  # 最低售价保护（分）
+    allergens = Column(ARRAY(String), nullable=False, server_default="{}")
+    brand_id = Column(String(50), nullable=True, index=True)  # null=全品牌通用
     is_active = Column(Boolean, nullable=False, default=True)
     description = Column(Text, nullable=True)
 
     # 关联
-    brand_menus = relationship("BrandMenu", back_populates="dish_master",
-                               cascade="all, delete-orphan")
-    store_menus = relationship("StoreMenu", back_populates="dish_master",
-                               cascade="all, delete-orphan")
+    brand_menus = relationship("BrandMenu", back_populates="dish_master", cascade="all, delete-orphan")
+    store_menus = relationship("StoreMenu", back_populates="dish_master", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index("idx_dish_master_sku_code", "sku_code"),
@@ -78,7 +66,7 @@ class BrandMenu(Base, TimestampMixin):
         nullable=False,
         index=True,
     )
-    price_fen = Column(Integer, nullable=True)           # null=继承主档
+    price_fen = Column(Integer, nullable=True)  # null=继承主档
     is_available = Column(Boolean, nullable=False, default=True)
     notes = Column(Text, nullable=True)
 
@@ -112,7 +100,7 @@ class StoreMenu(Base, TimestampMixin):
         nullable=False,
         index=True,
     )
-    price_fen = Column(Integer, nullable=True)           # null=继承品牌层
+    price_fen = Column(Integer, nullable=True)  # null=继承品牌层
     is_available = Column(Boolean, nullable=False, default=True)
 
     # 关联

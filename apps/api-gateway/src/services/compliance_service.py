@@ -8,16 +8,16 @@ Compliance Service
 - 扫描即将到期/已过期证照
 - 触发 compliance.* 事件到神经系统
 """
+
 import uuid
 from datetime import date, datetime, timedelta
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
-from sqlalchemy import select, and_
-from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
-
+from sqlalchemy import and_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_db_session
-from src.models.compliance import ComplianceLicense, LicenseType, LicenseStatus
+from src.models.compliance import ComplianceLicense, LicenseStatus, LicenseType
 
 logger = structlog.get_logger()
 
@@ -103,9 +103,7 @@ class ComplianceService:
     ) -> Optional[Dict[str, Any]]:
         """更新证照信息"""
         async with get_db_session() as session:
-            result = await session.execute(
-                select(ComplianceLicense).where(ComplianceLicense.id == license_id)
-            )
+            result = await session.execute(select(ComplianceLicense).where(ComplianceLicense.id == license_id))
             license_obj = result.scalar_one_or_none()
             if not license_obj:
                 return None
@@ -115,9 +113,7 @@ class ComplianceService:
                     setattr(license_obj, key, value)
 
             # 重新计算状态
-            license_obj.status = _compute_status(
-                license_obj.expiry_date, license_obj.remind_days_before
-            )
+            license_obj.status = _compute_status(license_obj.expiry_date, license_obj.remind_days_before)
             await session.commit()
             await session.refresh(license_obj)
             return license_obj.to_dict()
@@ -125,9 +121,7 @@ class ComplianceService:
     async def delete_license(self, license_id: str) -> bool:
         """删除证照记录"""
         async with get_db_session() as session:
-            result = await session.execute(
-                select(ComplianceLicense).where(ComplianceLicense.id == license_id)
-            )
+            result = await session.execute(select(ComplianceLicense).where(ComplianceLicense.id == license_id))
             license_obj = result.scalar_one_or_none()
             if not license_obj:
                 return False
@@ -155,9 +149,7 @@ class ComplianceService:
                 filters.append(ComplianceLicense.store_id == store_id)
 
             result = await session.execute(
-                select(ComplianceLicense)
-                .where(and_(*filters))
-                .order_by(ComplianceLicense.expiry_date.asc())
+                select(ComplianceLicense).where(and_(*filters)).order_by(ComplianceLicense.expiry_date.asc())
             )
             licenses = result.scalars().all()
 

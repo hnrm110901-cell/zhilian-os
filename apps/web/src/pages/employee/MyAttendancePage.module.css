@@ -1,0 +1,190 @@
+/* ── MyAttendancePage ─────────────────────────────── */
+
+.page {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 100vh;
+  background: #f5f5f5;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #333;
+  margin: 0;
+}
+
+.monthSelect {
+  padding: 6px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #333;
+  background: #fff;
+  min-height: 44px;
+}
+
+.loading {
+  text-align: center;
+  padding: 48px;
+  color: #999;
+}
+
+/* ── Stats ────────────────────────────────────────── */
+
+.statsCard {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px 8px;
+}
+
+.statItem { text-align: center; }
+
+.statNum {
+  font-size: 22px;
+  font-weight: 700;
+  color: #333;
+}
+
+.statGreen { color: #27AE60; }
+.statWarn  { color: #F2994A; }
+.statDanger { color: #EB5757; }
+.statBlue  { color: #2D9CDB; }
+
+.statLabel {
+  font-size: 11px;
+  color: #999;
+  margin-top: 2px;
+}
+
+/* ── Calendar ─────────────────────────────────────── */
+
+.calendarCard {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.weekHeader {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 8px;
+}
+
+.weekDay {
+  text-align: center;
+  font-size: 12px;
+  color: #999;
+  padding: 4px 0;
+}
+
+.calendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.calendarCell {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  gap: 3px;
+  min-height: 44px;
+}
+
+.calendarCell.hasDay {
+  cursor: pointer;
+}
+
+.calendarCell.hasDay:active {
+  background: #f5f5f5;
+}
+
+.dayNum {
+  font-size: 13px;
+  color: #333;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+/* ── Legend ────────────────────────────────────────── */
+
+.legend {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.legendDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.legendLabel {
+  font-size: 11px;
+  color: #999;
+}
+
+/* ── Detail Card ──────────────────────────────────── */
+
+.detailCard {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.cardTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 12px;
+}
+
+.detailRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.detailRow:last-child { border-bottom: none; }
+
+.detailLabel {
+  font-size: 13px;
+  color: #999;
+}
+
+.detailValue {
+  font-size: 13px;
+  color: #333;
+  font-weight: 500;
+}

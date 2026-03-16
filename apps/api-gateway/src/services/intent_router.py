@@ -7,8 +7,10 @@ IntentRouter 负责：
 3. 执行对应 Handler
 4. 更新 ConversationContext
 """
+
 import re
 from typing import Any, Callable, Dict, Optional
+
 import structlog
 
 from ..models.conversation import ConversationContext, ConversationTurn
@@ -22,6 +24,7 @@ HandlerFn = Callable[[str, str, ConversationContext, Optional[Any]], Any]
 
 
 # ==================== 内置 Handler 实现 ====================
+
 
 class QueryRevenueHandler:
     """查询今日营收：SUM(final_amount) for completed orders today"""
@@ -43,17 +46,16 @@ class QueryRevenueHandler:
 
         try:
             from datetime import date
-            from sqlalchemy import select, func
+
+            from sqlalchemy import func, select
+
             from ..models.order import Order, OrderStatus
 
             today = date.today()
-            stmt = (
-                select(func.coalesce(func.sum(Order.final_amount), 0))
-                .where(
-                    Order.store_id == store_id,
-                    func.date(Order.order_time) == today,
-                    Order.status.in_([OrderStatus.COMPLETED, OrderStatus.SERVED]),
-                )
+            stmt = select(func.coalesce(func.sum(Order.final_amount), 0)).where(
+                Order.store_id == store_id,
+                func.date(Order.order_time) == today,
+                Order.status.in_([OrderStatus.COMPLETED, OrderStatus.SERVED]),
             )
             result = await db.execute(stmt)
             total_fen = int(result.scalar() or 0)
@@ -81,9 +83,9 @@ class ApplyDiscountHandler:
 
     _PATTERNS = [
         # "打九折" / "打9折" → compute discount from rate
-        (re.compile(r'打(\d+(?:\.\d+)?)折'), "rate"),
+        (re.compile(r"打(\d+(?:\.\d+)?)折"), "rate"),
         # "减20元" / "优惠20元" / "减免20元"
-        (re.compile(r'(?:减|优惠|减免|打折|抹掉)(\d+(?:\.\d+)?)元'), "yuan"),
+        (re.compile(r"(?:减|优惠|减免|打折|抹掉)(\d+(?:\.\d+)?)元"), "yuan"),
     ]
 
     def _parse_amount_fen(self, text: str) -> Optional[int]:
@@ -129,6 +131,7 @@ class ApplyDiscountHandler:
 
         try:
             from ..core.trusted_executor import TrustedExecutor
+
             executor = TrustedExecutor(db_session=db)
             result = await executor.execute(
                 command_type="discount_apply",
@@ -180,29 +183,23 @@ class QueryQueueHandler:
             }
 
         try:
-            from sqlalchemy import select, func
+            from sqlalchemy import func, select
+
             from ..models.queue import Queue, QueueStatus
 
-            stmt = (
-                select(
-                    func.count(Queue.queue_id).label("waiting_tables"),
-                    func.coalesce(func.sum(Queue.party_size), 0).label("waiting_people"),
-                )
-                .where(
-                    Queue.store_id == store_id,
-                    Queue.status == QueueStatus.WAITING,
-                )
+            stmt = select(
+                func.count(Queue.queue_id).label("waiting_tables"),
+                func.coalesce(func.sum(Queue.party_size), 0).label("waiting_people"),
+            ).where(
+                Queue.store_id == store_id,
+                Queue.status == QueueStatus.WAITING,
             )
             result = await db.execute(stmt)
             row = result.one()
             tables = int(row.waiting_tables or 0)
             people = int(row.waiting_people or 0)
 
-            msg = (
-                "当前没有客人在排队等候"
-                if tables == 0
-                else f"当前有 {tables} 桌、共 {people} 人在排队等候"
-            )
+            msg = "当前没有客人在排队等候" if tables == 0 else f"当前有 {tables} 桌、共 {people} 人在排队等候"
             return {
                 "intent": "query_queue",
                 "message": msg,
@@ -239,6 +236,7 @@ class InventoryQueryHandler:
 
         try:
             from sqlalchemy import select
+
             from ..models.inventory import InventoryItem, InventoryStatus
 
             stmt = (
@@ -250,11 +248,13 @@ class InventoryQueryHandler:
                 )
                 .where(
                     InventoryItem.store_id == store_id,
-                    InventoryItem.status.in_([
-                        InventoryStatus.LOW,
-                        InventoryStatus.CRITICAL,
-                        InventoryStatus.OUT_OF_STOCK,
-                    ]),
+                    InventoryItem.status.in_(
+                        [
+                            InventoryStatus.LOW,
+                            InventoryStatus.CRITICAL,
+                            InventoryStatus.OUT_OF_STOCK,
+                        ]
+                    ),
                 )
                 .order_by(InventoryItem.status)
                 .limit(5)
@@ -265,10 +265,7 @@ class InventoryQueryHandler:
             if not rows:
                 msg = "当前所有食材库存充足"
             else:
-                items = "、".join(
-                    f"{r.name}（{r.current_quantity:.1f}{r.unit or ''}）"
-                    for r in rows
-                )
+                items = "、".join(f"{r.name}（{r.current_quantity:.1f}{r.unit or ''}）" for r in rows)
                 msg = f"以下食材库存不足：{items}"
 
             return {
@@ -319,6 +316,7 @@ class CallSupportHandler:
         # 尝试企微通知（失败不阻断主流程）
         try:
             from ..services.wechat_service import wechat_service
+
             await wechat_service.send_templated_message(
                 template="anomaly_alert",
                 data={

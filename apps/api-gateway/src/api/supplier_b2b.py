@@ -2,10 +2,11 @@
 供应商B2B采购单 API
 前缀: /api/v1/supplier-b2b
 """
-from fastapi import APIRouter, Depends, HTTPException, Query, Body
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional, List, Dict, Any
 
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_db
 from src.core.dependencies import require_role
 from src.models.user import User, UserRole
@@ -50,9 +51,7 @@ async def list_orders(
 ):
     """分页查询采购单列表"""
     try:
-        result = await supplier_b2b_service.list_orders(
-            db, brand_id, page, page_size, status, supplier_id
-        )
+        result = await supplier_b2b_service.list_orders(db, brand_id, page, page_size, status, supplier_id)
         return {"success": True, "data": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"查询采购单失败: {str(e)}")

@@ -7,17 +7,8 @@ SalesChannelConfig — 渠道级成本参数（佣金率、配送费、包材费
 
 import uuid
 
-from sqlalchemy import (
-    Boolean,
-    Column,
-    Index,
-    Numeric,
-    Integer,
-    String,
-    UniqueConstraint,
-)
+from sqlalchemy import Boolean, Column, Index, Integer, Numeric, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
-
 from src.models.base import Base, TimestampMixin
 
 
@@ -32,13 +23,11 @@ class SalesChannelConfig(Base, TimestampMixin):
     __tablename__ = "sales_channel_configs"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    brand_id = Column(String(50), nullable=True, index=True)            # null=全集团默认
-    channel = Column(String(30), nullable=False, index=True)            # SalesChannel.value
-    platform_commission_pct = Column(
-        Numeric(6, 4), nullable=False, default=0
-    )                                                                    # 0.1800 = 18%
-    delivery_cost_fen = Column(Integer, nullable=False, default=0)      # 配送费（分）
-    packaging_cost_fen = Column(Integer, nullable=False, default=0)     # 包材费（分）
+    brand_id = Column(String(50), nullable=True, index=True)  # null=全集团默认
+    channel = Column(String(30), nullable=False, index=True)  # SalesChannel.value
+    platform_commission_pct = Column(Numeric(6, 4), nullable=False, default=0)  # 0.1800 = 18%
+    delivery_cost_fen = Column(Integer, nullable=False, default=0)  # 配送费（分）
+    packaging_cost_fen = Column(Integer, nullable=False, default=0)  # 包材费（分）
     is_active = Column(Boolean, nullable=False, default=True)
 
     __table_args__ = (

@@ -4,7 +4,6 @@ Tests for Task Scheduler
 """
 import pytest
 import asyncio
-from datetime import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from src.services.scheduler import TaskScheduler, scheduler, get_scheduler
@@ -17,8 +16,13 @@ class TestTaskScheduler:
         """测试初始化"""
         sched = TaskScheduler()
         assert sched.running is False
-        assert sched.backup_time == time(hour=2, minute=0)
         assert sched.task is None
+        assert sched._last_run == {
+            "revenue_anomaly": None,
+            "daily_report": None,
+            "inventory_alert": None,
+            "reconciliation": None,
+        }
 
     @pytest.mark.asyncio
     async def test_start(self):
@@ -68,33 +72,6 @@ class TestTaskScheduler:
         # Should not raise error
         await sched.stop()
         assert sched.running is False
-
-    @pytest.mark.asyncio
-    @patch('src.services.scheduler.get_backup_service')
-    async def test_execute_backup_success(self, mock_get_backup):
-        """测试执行备份成功"""
-        sched = TaskScheduler()
-
-        mock_backup_service = MagicMock()
-        mock_backup_service.create_backup = AsyncMock(return_value={"success": True})
-        mock_get_backup.return_value = mock_backup_service
-
-        await sched._execute_backup()
-
-        mock_backup_service.create_backup.assert_called_once_with(backup_type="scheduled")
-
-    @pytest.mark.asyncio
-    @patch('src.services.scheduler.get_backup_service')
-    async def test_execute_backup_failure(self, mock_get_backup):
-        """测试执行备份失败"""
-        sched = TaskScheduler()
-
-        mock_backup_service = MagicMock()
-        mock_backup_service.create_backup = AsyncMock(side_effect=Exception("Backup failed"))
-        mock_get_backup.return_value = mock_backup_service
-
-        # Should not raise exception
-        await sched._execute_backup()
 
     def test_get_scheduler(self):
         """测试获取调度器实例"""

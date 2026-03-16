@@ -14,14 +14,15 @@ KitchenVisionInterface Protocol — 为 2027Q3 厨房视觉系统预留标准接
 - Protocol 约束实现方必须满足的方法签名
 - Roadmap(2027Q3) 注释标明后续实现计划
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import List, Optional, Protocol, runtime_checkable
 
-
 # ==================== 数据类 ====================
+
 
 @dataclass
 class DishOutputRecord:
@@ -30,14 +31,15 @@ class DishOutputRecord:
 
     由厨房摄像头系统识别并记录，每次出品操作触发一条记录。
     """
+
     record_id: str
     dish_id: str
     dish_name: str
-    station_id: str                 # 操作台/档口ID
-    chef_id: Optional[str]          # 厨师ID（可选，取决于识别精度）
-    output_count: int               # 出品份数
-    recorded_at: datetime           # 记录时间（摄像头时间戳）
-    confidence: float               # 识别置信度（0.0-1.0）
+    station_id: str  # 操作台/档口ID
+    chef_id: Optional[str]  # 厨师ID（可选，取决于识别精度）
+    output_count: int  # 出品份数
+    recorded_at: datetime  # 记录时间（摄像头时间戳）
+    confidence: float  # 识别置信度（0.0-1.0）
     image_path: Optional[str] = None  # 图像存储路径（可选）
 
 
@@ -48,20 +50,22 @@ class CookTimeStats:
 
     按菜品/档口/时段统计烹饪时间，用于效率分析和预警。
     """
+
     sku_id: str
     dish_name: str
     station_id: str
-    avg_cook_time_seconds: float    # 平均烹饪时间（秒）
-    min_cook_time_seconds: float    # 最短烹饪时间
-    max_cook_time_seconds: float    # 最长烹饪时间
-    p95_cook_time_seconds: float    # 95分位数烹饪时间（用于 SLA 设定）
-    sample_count: int               # 样本数量
-    period_start: datetime          # 统计周期开始
-    period_end: datetime            # 统计周期结束
-    slow_count: int = 0             # 超时出品次数（>平均值 * 1.5）
+    avg_cook_time_seconds: float  # 平均烹饪时间（秒）
+    min_cook_time_seconds: float  # 最短烹饪时间
+    max_cook_time_seconds: float  # 最长烹饪时间
+    p95_cook_time_seconds: float  # 95分位数烹饪时间（用于 SLA 设定）
+    sample_count: int  # 样本数量
+    period_start: datetime  # 统计周期开始
+    period_end: datetime  # 统计周期结束
+    slow_count: int = 0  # 超时出品次数（>平均值 * 1.5）
 
 
 # ==================== Protocol ====================
+
 
 @runtime_checkable
 class KitchenVisionInterface(Protocol):
@@ -138,6 +142,7 @@ class KitchenVisionInterface(Protocol):
 
 # ==================== 占位实现（返回空数据）====================
 
+
 class KitchenVisionStub:
     """
     KitchenVisionInterface 占位实现
@@ -177,6 +182,4 @@ class KitchenVisionStub:
 # 全局占位实例（供其他模块导入使用）
 kitchen_vision: KitchenVisionInterface = KitchenVisionStub()
 
-assert isinstance(kitchen_vision, KitchenVisionInterface), (
-    "KitchenVisionStub 必须满足 KitchenVisionInterface Protocol"
-)
+assert isinstance(kitchen_vision, KitchenVisionInterface), "KitchenVisionStub 必须满足 KitchenVisionInterface Protocol"

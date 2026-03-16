@@ -24,22 +24,22 @@ router = APIRouter()
 
 _LEVEL_LABEL: dict = {
     "excellent": "优秀",
-    "good":      "良好",
-    "warning":   "需关注",
-    "critical":  "危险",
+    "good": "良好",
+    "warning": "需关注",
+    "critical": "危险",
 }
 _LEVEL_COLOR: dict = {
     "excellent": "green",
-    "good":      "blue",
-    "warning":   "orange",
-    "critical":  "red",
+    "good": "blue",
+    "warning": "orange",
+    "critical": "red",
 }
 _DIM_LABEL: dict = {
     "revenue_completion": "营收完成率",
-    "table_turnover":     "翻台率",
-    "cost_rate":          "成本率",
-    "complaint_rate":     "客诉率",
-    "staff_efficiency":   "人效",
+    "table_turnover": "翻台率",
+    "cost_rate": "成本率",
+    "complaint_rate": "客诉率",
+    "staff_efficiency": "人效",
 }
 
 
@@ -120,17 +120,17 @@ async def get_stores_health(
 
         # 汇总
         summary = {
-            "total":     len(scored),
+            "total": len(scored),
             "excellent": sum(1 for x in scored if x.get("level") == "excellent"),
-            "good":      sum(1 for x in scored if x.get("level") == "good"),
-            "warning":   sum(1 for x in scored if x.get("level") == "warning"),
-            "critical":  sum(1 for x in scored if x.get("level") == "critical"),
+            "good": sum(1 for x in scored if x.get("level") == "good"),
+            "warning": sum(1 for x in scored if x.get("level") == "warning"),
+            "critical": sum(1 for x in scored if x.get("level") == "critical"),
         }
 
         return {
             "target_date": target_date.isoformat(),
-            "stores":      scored,
-            "summary":     summary,
+            "stores": scored,
+            "summary": summary,
         }
 
     except Exception as exc:

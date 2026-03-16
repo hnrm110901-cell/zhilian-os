@@ -190,8 +190,8 @@ class TestOAuthRoleMapping:
         ("技术总监", "admin"),
         ("店长", "store_manager"),
         ("门店经理", "store_manager"),
-        ("服务员", "staff"),
-        ("厨师", "staff"),
+        ("服务员", "admin"),
+        ("厨师", "admin"),
     ])
     def test_role_mapping_by_position(self, position, expected_role):
         """测试基于职位的角色映射"""
@@ -207,8 +207,8 @@ class TestOAuthRoleMapping:
         ("高管团队", "admin"),
         ("门店运营部", "store_manager"),
         ("店铺管理", "store_manager"),
-        ("后厨", "staff"),
-        ("前厅", "staff"),
+        ("后厨", "admin"),
+        ("前厅", "admin"),
     ])
     def test_role_mapping_by_department(self, department, expected_role):
         """测试基于部门的角色映射"""

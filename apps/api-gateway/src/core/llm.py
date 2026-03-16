@@ -8,6 +8,7 @@ Anthropic 客户端已升级为完整 Tool Use 支持：
   - generate_with_tools()       : Tool Use agentic loop（核心）
   - generate_stream()           : 流式输出
 """
+
 from __future__ import annotations
 
 import json
@@ -25,6 +26,7 @@ logger = structlog.get_logger()
 # ─────────────────────────────────────────────────────────────────────────────
 # 枚举
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class LLMProvider(str):
     OPENAI = "openai"
@@ -57,6 +59,7 @@ class LLMModel(str):
 # ─────────────────────────────────────────────────────────────────────────────
 # 基类
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class BaseLLMClient(ABC):
     """LLM客户端基类"""
@@ -134,6 +137,7 @@ class BaseLLMClient(ABC):
 # OpenAI / DeepSeek 客户端（兼容 OpenAI SDK）
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class OpenAIClient(BaseLLMClient):
     """OpenAI 及 DeepSeek（OpenAI 兼容）客户端"""
 
@@ -151,6 +155,7 @@ class OpenAIClient(BaseLLMClient):
         if self._client is None:
             try:
                 from openai import AsyncOpenAI
+
                 self._client = AsyncOpenAI(
                     api_key=self.api_key or os.getenv("OPENAI_API_KEY"),
                     base_url=self.base_url,
@@ -206,6 +211,7 @@ class OpenAIClient(BaseLLMClient):
 # Anthropic 客户端 — 完整 Tool Use 实现
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class AnthropicClient(BaseLLMClient):
     """
     Anthropic Claude 客户端
@@ -229,13 +235,12 @@ class AnthropicClient(BaseLLMClient):
         if self._client is None:
             try:
                 from anthropic import AsyncAnthropic
+
                 self._client = AsyncAnthropic(
                     api_key=self.api_key or os.getenv("ANTHROPIC_API_KEY"),
                 )
             except ImportError:
-                raise ImportError(
-                    "Anthropic package not installed. Run: pip install anthropic"
-                )
+                raise ImportError("Anthropic package not installed. Run: pip install anthropic")
         return self._client
 
     async def generate(
@@ -280,9 +285,7 @@ class AnthropicClient(BaseLLMClient):
 
             response = await client.messages.create(**api_kwargs)
             # 取第一个 text block
-            content = next(
-                (b.text for b in response.content if b.type == "text"), ""
-            )
+            content = next((b.text for b in response.content if b.type == "text"), "")
             logger.info(
                 "anthropic_generation_completed",
                 model=self.model,
@@ -361,25 +364,23 @@ class AnthropicClient(BaseLLMClient):
             total_output_tokens += response.usage.output_tokens
 
             # 记录本轮推理
-            text_in_turn = " ".join(
-                b.text for b in response.content if b.type == "text"
+            text_in_turn = " ".join(b.text for b in response.content if b.type == "text")
+            reasoning_trace.append(
+                {
+                    "iteration": iteration + 1,
+                    "stop_reason": response.stop_reason,
+                    "text": text_in_turn,
+                    "tool_uses": [{"name": b.name, "input": b.input} for b in response.content if b.type == "tool_use"],
+                }
             )
-            reasoning_trace.append({
-                "iteration": iteration + 1,
-                "stop_reason": response.stop_reason,
-                "text": text_in_turn,
-                "tool_uses": [
-                    {"name": b.name, "input": b.input}
-                    for b in response.content
-                    if b.type == "tool_use"
-                ],
-            })
 
             # 将 assistant 回复追加到对话历史
-            conversation.append({
-                "role": "assistant",
-                "content": response.content,
-            })
+            conversation.append(
+                {
+                    "role": "assistant",
+                    "content": response.content,
+                }
+            )
 
             # ── 终止条件 ──────────────────────────────────────────────────────
             if response.stop_reason == "end_turn":
@@ -423,11 +424,7 @@ class AnthropicClient(BaseLLMClient):
                     try:
                         result = await tool_executor(tool_name, tool_input)
                         # 确保结果可序列化为字符串
-                        result_str = (
-                            json.dumps(result, ensure_ascii=False)
-                            if not isinstance(result, str)
-                            else result
-                        )
+                        result_str = json.dumps(result, ensure_ascii=False) if not isinstance(result, str) else result
                         is_error = False
                     except Exception as exc:
                         result_str = f"工具执行失败: {exc}"
@@ -438,25 +435,31 @@ class AnthropicClient(BaseLLMClient):
                             error=str(exc),
                         )
 
-                    tool_calls_log.append({
-                        "name": tool_name,
-                        "input": tool_input,
-                        "result": result_str,
-                        "is_error": is_error,
-                    })
+                    tool_calls_log.append(
+                        {
+                            "name": tool_name,
+                            "input": tool_input,
+                            "result": result_str,
+                            "is_error": is_error,
+                        }
+                    )
 
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": tool_use_id,
-                        "content": result_str,
-                        "is_error": is_error,
-                    })
+                    tool_results.append(
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": tool_use_id,
+                            "content": result_str,
+                            "is_error": is_error,
+                        }
+                    )
 
                 # 将工具结果作为 user 消息回传
-                conversation.append({
-                    "role": "user",
-                    "content": tool_results,
-                })
+                conversation.append(
+                    {
+                        "role": "user",
+                        "content": tool_results,
+                    }
+                )
                 continue  # 进入下一轮
 
             # 其他 stop_reason（max_tokens 等）直接退出
@@ -468,11 +471,7 @@ class AnthropicClient(BaseLLMClient):
             break
 
         # 超出最大迭代次数
-        final_text = " ".join(
-            b.text
-            for b in (response.content if "response" in dir() else [])
-            if b.type == "text"
-        )
+        final_text = " ".join(b.text for b in (response.content if "response" in dir() else []) if b.type == "text")
         logger.warning(
             "claude_tool_use_max_iterations_reached",
             max_iterations=max_iterations,
@@ -527,6 +526,7 @@ class AnthropicClient(BaseLLMClient):
 # ─────────────────────────────────────────────────────────────────────────────
 # 工厂 & 全局单例
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class LLMFactory:
     """LLM 工厂类"""

@@ -18,7 +18,6 @@ from typing import Any, Dict, List, Optional
 import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.models.schedule import Schedule, Shift
 from src.repositories import EmployeeRepository, ScheduleRepository
 from src.services.schedule_conflict_service import detect_schedule_conflicts
@@ -84,9 +83,8 @@ def build_schedule_anomalies(
     hours_by_employee: Dict[str, float] = {}
     for shift in shifts:
         employee_id = str(shift["employee_id"])
-        hours_by_employee[employee_id] = (
-            hours_by_employee.get(employee_id, 0.0)
-            + calculate_shift_hours(shift["start_time"], shift["end_time"])
+        hours_by_employee[employee_id] = hours_by_employee.get(employee_id, 0.0) + calculate_shift_hours(
+            shift["start_time"], shift["end_time"]
         )
 
     for employee_id, hours in hours_by_employee.items():
@@ -355,8 +353,7 @@ class WorkforceAutoScheduleService:
     ) -> Optional[float]:
         period = schedule_date.strftime("%Y-%m")
         result = await db.execute(
-            text(
-                """
+            text("""
                 SELECT daily_budget_yuan, max_labor_cost_yuan
                 FROM store_labor_budgets
                 WHERE store_id = :sid
@@ -364,8 +361,7 @@ class WorkforceAutoScheduleService:
                   AND is_active = TRUE
                 ORDER BY updated_at DESC
                 LIMIT 1
-                """
-            ),
+                """),
             {"sid": store_id, "period": period},
         )
         row = result.fetchone()

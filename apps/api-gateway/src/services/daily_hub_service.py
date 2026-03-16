@@ -20,13 +20,12 @@ from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import structlog
-
+from src.services.auspicious_date_service import AuspiciousDateService
+from src.services.banquet_planning_engine import BANQUET_CIRCUIT_THRESHOLD, banquet_planning_engine
+from src.services.external_factors_adapter import ExternalFactorsAdapter
+from src.services.forecast_features import ChineseHolidays, WeatherImpact
 from src.services.redis_cache_service import redis_cache
 from src.services.weather_adapter import weather_adapter
-from src.services.forecast_features import ChineseHolidays, WeatherImpact
-from src.services.auspicious_date_service import AuspiciousDateService
-from src.services.banquet_planning_engine import banquet_planning_engine, BANQUET_CIRCUIT_THRESHOLD
-from src.services.external_factors_adapter import ExternalFactorsAdapter
 
 logger = structlog.get_logger()
 
@@ -45,10 +44,10 @@ class DailyHubService:
 
     async def generate_battle_board(
         self,
-        store_id:    str,
-        target_date: Optional[date]    = None,
-        db:          Optional[Any]     = None,
-        refresh:     bool              = False,
+        store_id: str,
+        target_date: Optional[date] = None,
+        db: Optional[Any] = None,
+        refresh: bool = False,
     ) -> Dict[str, Any]:
         """
         生成/获取备战板（幂等，优先读缓存）。
@@ -65,7 +64,7 @@ class DailyHubService:
         if target_date is None:
             target_date = date.today() + timedelta(days=1)
 
-        key    = _cache_key(store_id, target_date)
+        key = _cache_key(store_id, target_date)
         if not refresh:
             cached = await redis_cache.get(key)
             if cached:
@@ -77,12 +76,12 @@ class DailyHubService:
 
     async def approve_battle_board(
         self,
-        store_id:      str,
-        target_date:   date,
-        approver_id:   str,
-        adjustments:   Optional[Dict[str, Any]] = None,
-        notify_wechat: bool                     = True,
-        db:            Optional[Any]            = None,
+        store_id: str,
+        target_date: date,
+        approver_id: str,
+        adjustments: Optional[Dict[str, Any]] = None,
+        notify_wechat: bool = True,
+        db: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """
         一键审批备战板：更新状态 → 写回 Redis → 发送企微通知（可选）。
@@ -90,14 +89,14 @@ class DailyHubService:
         Args:
             notify_wechat: True = 通过 L5 WeChat FSM 推送企微通知
         """
-        key   = _cache_key(store_id, target_date)
+        key = _cache_key(store_id, target_date)
         board = await redis_cache.get(key)
         if not board:
             board = await self._build_board(store_id, target_date, db=db)
 
         board["approval_status"] = "adjusted" if adjustments else "approved"
-        board["approved_by"]     = approver_id
-        board["approved_at"]     = datetime.now().isoformat()
+        board["approved_by"] = approver_id
+        board["approved_at"] = datetime.now().isoformat()
         if adjustments:
             board["adjustments"] = adjustments
 
@@ -117,42 +116,43 @@ class DailyHubService:
 
     async def get_status(
         self,
-        store_id:    str,
+        store_id: str,
         target_date: date,
-        db:          Optional[Any] = None,
+        db: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """轻量查询：审批状态 + 工作流当前阶段（不触发完整聚合）。"""
-        key    = _cache_key(store_id, target_date)
-        board  = await redis_cache.get(key)
+        key = _cache_key(store_id, target_date)
+        board = await redis_cache.get(key)
 
-        has_workflow  = False
-        wf_phase      = None
+        has_workflow = False
+        wf_phase = None
         if db:
             try:
                 from src.services.workflow_engine import WorkflowEngine
+
                 engine = WorkflowEngine(db)
                 wf = await engine.get_workflow_by_date(store_id, target_date)
                 if wf:
                     has_workflow = True
-                    wf_phase     = wf.current_phase
+                    wf_phase = wf.current_phase
             except Exception as e:
                 logger.warning("工作流状态查询失败（非致命）", error=str(e))
 
         return {
-            "store_id":        store_id,
-            "target_date":     target_date.isoformat(),
+            "store_id": store_id,
+            "target_date": target_date.isoformat(),
             "approval_status": board.get("approval_status", "not_generated") if board else "not_generated",
-            "approved_by":     board.get("approved_by")  if board else None,
-            "approved_at":     board.get("approved_at")  if board else None,
-            "has_workflow":    has_workflow,
-            "workflow_phase":  wf_phase,
+            "approved_by": board.get("approved_by") if board else None,
+            "approved_at": board.get("approved_at") if board else None,
+            "has_workflow": has_workflow,
+            "workflow_phase": wf_phase,
         }
 
     async def get_workflow_phases(
         self,
-        store_id:    str,
+        store_id: str,
         target_date: date,
-        db:          Any,
+        db: Any,
     ) -> Dict[str, Any]:
         """
         获取与备战板关联的工作流 6 阶段状态（含倒计时和最新版本）。
@@ -160,34 +160,36 @@ class DailyHubService:
         若工作流尚未启动，返回 {workflow: null, message: "..."}。
         """
         try:
-            from src.services.workflow_engine import WorkflowEngine
             from src.services.timing_service import TimingService
+            from src.services.workflow_engine import WorkflowEngine
 
             engine = WorkflowEngine(db)
-            wf     = await engine.get_workflow_by_date(store_id, target_date)
+            wf = await engine.get_workflow_by_date(store_id, target_date)
             if not wf:
                 return {"workflow": None, "message": "工作流尚未启动，请先调用 POST /workflow/stores/{store_id}/start"}
 
-            timing    = TimingService(db)
-            phases    = await engine.get_all_phases(wf.id)
+            timing = TimingService(db)
+            phases = await engine.get_all_phases(wf.id)
             countdown = await timing.get_workflow_countdown(wf.id)
 
             result = []
             for phase, cd in zip(phases, countdown):
                 latest = await engine.get_latest_version(phase.id)
-                result.append({
-                    **cd,
-                    "phase_id":          str(phase.id),
-                    "latest_version":    latest.version_number if latest else 0,
-                    "latest_mode":       latest.generation_mode if latest else None,
-                    "latest_confidence": latest.confidence if latest else None,
-                })
+                result.append(
+                    {
+                        **cd,
+                        "phase_id": str(phase.id),
+                        "latest_version": latest.version_number if latest else 0,
+                        "latest_mode": latest.generation_mode if latest else None,
+                        "latest_confidence": latest.confidence if latest else None,
+                    }
+                )
 
             return {
-                "workflow_id":     str(wf.id),
+                "workflow_id": str(wf.id),
                 "workflow_status": wf.status,
-                "current_phase":   wf.current_phase,
-                "phases":          result,
+                "current_phase": wf.current_phase,
+                "phases": result,
             }
         except Exception as e:
             logger.warning("获取工作流阶段失败", store_id=store_id, error=str(e))
@@ -195,25 +197,26 @@ class DailyHubService:
 
     async def get_platform_summary(self, db: Optional[Any] = None) -> Dict[str, Any]:
         """全平台今日备战板审批进度统计（大屏）。"""
-        today       = date.today()
+        today = date.today()
         target_date = today + timedelta(days=1)
 
         store_ids: List[str] = []
         if db:
             try:
-                from src.models.store import Store
                 from sqlalchemy import select
-                rows      = (await db.execute(select(Store.id).where(Store.is_active == True))).all()  # noqa: E712
+                from src.models.store import Store
+
+                rows = (await db.execute(select(Store.id).where(Store.is_active == True))).all()  # noqa: E712
                 store_ids = [str(r[0]) for r in rows]
             except Exception as e:
                 logger.warning("获取门店列表失败", error=str(e))
 
-        approved      = 0
-        pending       = 0
+        approved = 0
+        pending = 0
         not_generated = 0
 
         for sid in store_ids:
-            key   = _cache_key(sid, target_date)
+            key = _cache_key(sid, target_date)
             board = await redis_cache.get(key)
             if not board:
                 not_generated += 1
@@ -224,33 +227,33 @@ class DailyHubService:
 
         total = len(store_ids)
         return {
-            "date":            today.isoformat(),
-            "target_date":     target_date.isoformat(),
-            "total_stores":    total,
-            "approved":        approved,
-            "pending":         pending,
-            "not_generated":   not_generated,
-            "approval_rate":   round(approved / total * 100, 1) if total else 0,
+            "date": today.isoformat(),
+            "target_date": target_date.isoformat(),
+            "total_stores": total,
+            "approved": approved,
+            "pending": pending,
+            "not_generated": not_generated,
+            "approval_rate": round(approved / total * 100, 1) if total else 0,
         }
 
     # ── Private: build board ──────────────────────────────────────────────────
 
     async def _build_board(
         self,
-        store_id:    str,
+        store_id: str,
         target_date: date,
-        db:          Optional[Any] = None,
+        db: Optional[Any] = None,
     ) -> Dict[str, Any]:
         yesterday = target_date - timedelta(days=1)
 
         yesterday_review = await self._get_yesterday_review(store_id, yesterday, db=db)
-        weather_factors  = await self._get_weather_factors(target_date)
-        banquet_track    = await self._get_banquet_variables(store_id, target_date, db=db)
-        regular_track    = await self._compute_regular_forecast(store_id, target_date, weather_factors)
+        weather_factors = await self._get_weather_factors(target_date)
+        banquet_track = await self._get_banquet_variables(store_id, target_date, db=db)
+        regular_track = await self._compute_regular_forecast(store_id, target_date, weather_factors)
         total_predicted, total_lower, total_upper = self._merge_tracks(banquet_track, regular_track)
 
         purchase_order = await self._build_purchase_order(store_id)
-        staffing_plan  = await self._get_staffing_plan(store_id, target_date)
+        staffing_plan = await self._get_staffing_plan(store_id, target_date)
 
         # 真实菜品成本（MenuProfitEngine）
         profit_summary = await self._compute_profit_summary(store_id, db=db)
@@ -260,9 +263,9 @@ class DailyHubService:
         for addon in circuit_breaker_addons:
             purchase_order = purchase_order + addon.get("procurement_addon", [])
 
-        data_sources   = {
+        data_sources = {
             "purchase_order": "agent:inventory",
-            "staffing_plan":  "agent:schedule",
+            "staffing_plan": "agent:schedule",
         }
         workflow_phases = None
 
@@ -277,35 +280,35 @@ class DailyHubService:
                 staffing_plan = sync["staffing_plan_override"]
 
         return {
-            "store_id":         store_id,
-            "target_date":      target_date.isoformat(),
-            "generated_at":     datetime.now().isoformat(),
-            "approval_status":  "pending",
+            "store_id": store_id,
+            "target_date": target_date.isoformat(),
+            "generated_at": datetime.now().isoformat(),
+            "approval_status": "pending",
             "yesterday_review": yesterday_review,
             "tomorrow_forecast": {
-                "weather":                weather_factors.get("weather"),
-                "holiday":                weather_factors.get("holiday"),
-                "auspicious":             weather_factors.get("auspicious"),
-                "banquet_track":          banquet_track,
-                "regular_track":          regular_track,
+                "weather": weather_factors.get("weather"),
+                "holiday": weather_factors.get("holiday"),
+                "auspicious": weather_factors.get("auspicious"),
+                "banquet_track": banquet_track,
+                "regular_track": regular_track,
                 "total_predicted_revenue": total_predicted,
-                "total_lower":            total_lower,
-                "total_upper":            total_upper,
-                "gross_margin_pct":       profit_summary.get("avg_gross_margin_pct"),
+                "total_lower": total_lower,
+                "total_upper": total_upper,
+                "gross_margin_pct": profit_summary.get("avg_gross_margin_pct"),
             },
-            "purchase_order":   purchase_order,
-            "staffing_plan":    staffing_plan,
-            "workflow_phases":  workflow_phases,
-            "data_sources":     data_sources,
+            "purchase_order": purchase_order,
+            "staffing_plan": staffing_plan,
+            "workflow_phases": workflow_phases,
+            "data_sources": data_sources,
         }
 
     # ── Private: workflow sync ────────────────────────────────────────────────
 
     async def _sync_from_workflow(
         self,
-        store_id:    str,
+        store_id: str,
         target_date: date,
-        db:          Any,
+        db: Any,
     ) -> Dict[str, Any]:
         """
         从工作流引擎同步锁定阶段的 DecisionVersion 内容。
@@ -314,35 +317,37 @@ class DailyHubService:
         将 DecisionVersion.content 转换为 Daily Hub 格式并覆盖对应模块。
         """
         try:
-            from src.services.workflow_engine import WorkflowEngine
-            from src.services.timing_service import TimingService
             from src.models.workflow import PhaseStatus
+            from src.services.timing_service import TimingService
+            from src.services.workflow_engine import WorkflowEngine
 
             engine = WorkflowEngine(db)
-            wf     = await engine.get_workflow_by_date(store_id, target_date)
+            wf = await engine.get_workflow_by_date(store_id, target_date)
             if not wf:
                 return {"phases": None, "data_sources": {}}
 
-            timing    = TimingService(db)
-            phases    = await engine.get_all_phases(wf.id)
+            timing = TimingService(db)
+            phases = await engine.get_all_phases(wf.id)
             countdown = await timing.get_workflow_countdown(wf.id)
 
-            phase_info:        List[Dict] = []
-            data_sources:      Dict[str, str] = {}
+            phase_info: List[Dict] = []
+            data_sources: Dict[str, str] = {}
             purchase_override: Optional[List[Dict]] = None
-            staffing_override: Optional[Dict]       = None
+            staffing_override: Optional[Dict] = None
 
             for phase, cd in zip(phases, countdown):
                 latest = await engine.get_latest_version(phase.id)
-                phase_info.append({
-                    "phase_name":     phase.phase_name,
-                    "phase_order":    phase.phase_order,
-                    "status":         phase.status,
-                    "deadline":       cd.get("deadline"),
-                    "countdown":      cd.get("countdown"),
-                    "latest_version": latest.version_number if latest else 0,
-                    "is_overdue":     cd.get("is_overdue", False),
-                })
+                phase_info.append(
+                    {
+                        "phase_name": phase.phase_name,
+                        "phase_order": phase.phase_order,
+                        "status": phase.status,
+                        "deadline": cd.get("deadline"),
+                        "countdown": cd.get("countdown"),
+                        "latest_version": latest.version_number if latest else 0,
+                        "is_overdue": cd.get("is_overdue", False),
+                    }
+                )
 
                 # 仅在 LOCKED 时覆盖
                 if phase.status != PhaseStatus.LOCKED.value:
@@ -355,34 +360,30 @@ class DailyHubService:
                     if items:
                         purchase_override = [
                             {
-                                "item_name":            i.get("ingredient"),
-                                "current_stock":        None,
+                                "item_name": i.get("ingredient"),
+                                "current_stock": None,
                                 "recommended_quantity": i.get("qty"),
-                                "alert_level":          i.get("urgency", "normal"),
-                                "supplier_name":        None,
+                                "alert_level": i.get("urgency", "normal"),
+                                "supplier_name": None,
                             }
                             for i in items
                         ]
-                        data_sources["purchase_order"] = (
-                            f"workflow:procurement:v{latest.version_number}"
-                        )
+                        data_sources["purchase_order"] = f"workflow:procurement:v{latest.version_number}"
 
                 elif phase.phase_name == "scheduling":
                     shifts = latest.content.get("shifts", [])
                     if shifts:
                         staffing_override = {
-                            "shifts":      shifts,
+                            "shifts": shifts,
                             "total_staff": latest.content.get("total_staff", 0),
                         }
-                        data_sources["staffing_plan"] = (
-                            f"workflow:scheduling:v{latest.version_number}"
-                        )
+                        data_sources["staffing_plan"] = f"workflow:scheduling:v{latest.version_number}"
 
             return {
-                "phases":                 phase_info,
-                "data_sources":           data_sources,
+                "phases": phase_info,
+                "data_sources": data_sources,
                 "purchase_order_override": purchase_override,
-                "staffing_plan_override":  staffing_override,
+                "staffing_plan_override": staffing_override,
             }
 
         except Exception as e:
@@ -391,17 +392,13 @@ class DailyHubService:
 
     # ── Private: individual modules ───────────────────────────────────────────
 
-    async def _get_yesterday_review(
-        self, store_id: str, report_date: date, db: Optional[Any] = None
-    ) -> Dict[str, Any]:
+    async def _get_yesterday_review(self, store_id: str, report_date: date, db: Optional[Any] = None) -> Dict[str, Any]:
         try:
             from src.services.daily_report_service import daily_report_service
 
-            report = await daily_report_service.generate_daily_report(
-                store_id=store_id, report_date=report_date
-            )
-            alerts       = list(report.alerts or [])
-            food_cost    = None
+            report = await daily_report_service.generate_daily_report(store_id=store_id, report_date=report_date)
+            alerts = list(report.alerts or [])
+            food_cost = None
             health_score = getattr(report, "health_score", None)
 
             # ── 门店健康指数（StoreHealthService，需要 DB）───────────────────
@@ -409,9 +406,7 @@ class DailyHubService:
                 try:
                     from src.services.store_health_service import StoreHealthService
 
-                    score_result = await StoreHealthService.get_store_score(
-                        store_id=store_id, target_date=report_date, db=db
-                    )
+                    score_result = await StoreHealthService.get_store_score(store_id=store_id, target_date=report_date, db=db)
                     health_score = score_result.get("score")
                 except Exception as e:
                     logger.warning("StoreHealthService 评分失败（非致命）", store_id=store_id, error=str(e))
@@ -428,42 +423,40 @@ class DailyHubService:
                         db=db,
                     )
                     food_cost = {
-                        "actual_pct":      fc["actual_cost_pct"],
+                        "actual_pct": fc["actual_cost_pct"],
                         "theoretical_pct": fc["theoretical_pct"],
-                        "variance_pct":    fc["variance_pct"],
+                        "variance_pct": fc["variance_pct"],
                         "variance_status": fc["variance_status"],
                         "top_ingredients": fc["top_ingredients"],
                     }
                     if fc["variance_status"] == "critical":
                         alerts.append(
-                            f"🔴 食材成本严重超标：实际成本率 {fc['actual_cost_pct']}%"
-                            f"（差异 +{fc['variance_pct']}%）"
+                            f"🔴 食材成本严重超标：实际成本率 {fc['actual_cost_pct']}%" f"（差异 +{fc['variance_pct']}%）"
                         )
                     elif fc["variance_status"] == "warning":
                         alerts.append(
-                            f"🟡 食材成本偏高：实际成本率 {fc['actual_cost_pct']}%"
-                            f"（差异 +{fc['variance_pct']}%）"
+                            f"🟡 食材成本偏高：实际成本率 {fc['actual_cost_pct']}%" f"（差异 +{fc['variance_pct']}%）"
                         )
                 except Exception as e:
                     logger.warning("食材成本分析失败（非致命）", store_id=store_id, error=str(e))
 
             return {
                 "total_revenue": report.total_revenue,
-                "order_count":   report.order_count,
-                "health_score":  health_score,
-                "highlights":    report.highlights or [],
-                "alerts":        alerts,
-                "food_cost":     food_cost,
+                "order_count": report.order_count,
+                "health_score": health_score,
+                "highlights": report.highlights or [],
+                "alerts": alerts,
+                "food_cost": food_cost,
             }
         except Exception as e:
             logger.warning("获取昨日复盘失败，使用空数据", error=str(e))
             return {
                 "total_revenue": 0,
-                "order_count":   0,
-                "health_score":  None,
-                "highlights":    [],
-                "alerts":        [],
-                "food_cost":     None,
+                "order_count": 0,
+                "health_score": None,
+                "highlights": [],
+                "alerts": [],
+                "food_cost": None,
             }
 
     async def _get_weather_factors(
@@ -486,8 +479,8 @@ class DailyHubService:
             )
             result = await adapter.get_factors(target_date, strategy="smart")
             return {
-                "weather":    result.weather,
-                "holiday":    result.holiday,
+                "weather": result.weather,
+                "holiday": result.holiday,
                 "auspicious": result.auspicious,
                 "composite_factor": result.composite_factor,
             }
@@ -495,9 +488,7 @@ class DailyHubService:
             logger.warning("ExternalFactorsAdapter 失败，降级为空因子", error=str(e))
             return {"weather": None, "holiday": None, "auspicious": None, "composite_factor": 1.0}
 
-    async def _get_banquet_variables(
-        self, store_id: str, target_date: date, db: Optional[Any] = None
-    ) -> Dict[str, Any]:
+    async def _get_banquet_variables(self, store_id: str, target_date: date, db: Optional[Any] = None) -> Dict[str, Any]:
         """
         获取明日宴会数据（确定性收入轨道）。
 
@@ -508,15 +499,15 @@ class DailyHubService:
         生成 BEO 单 + 采购加成 + 排班加成，写入 banquet["circuit_breaker"] 字段。
         若 db 已传入，自动将 BEO 持久化到数据库（版本化，非致命）。
         """
-        banquets:              List[Dict[str, Any]] = []
-        deterministic_revenue: float                = 0
-        circuit_breaker_addons: List[Dict[str, Any]] = []   # 熔断宴会的 BEO / 加成汇总
+        banquets: List[Dict[str, Any]] = []
+        deterministic_revenue: float = 0
+        circuit_breaker_addons: List[Dict[str, Any]] = []  # 熔断宴会的 BEO / 加成汇总
 
         try:
-            from src.services.reservation_service import ReservationService
             from src.models.reservation import ReservationStatus, ReservationType
+            from src.services.reservation_service import ReservationService
 
-            svc          = ReservationService(store_id=store_id)
+            svc = ReservationService(store_id=store_id)
             reservations = await svc.get_reservations(
                 reservation_date=target_date.isoformat(),
                 status=ReservationStatus.CONFIRMED.value,
@@ -525,15 +516,13 @@ class DailyHubService:
             for r in reservations:
                 if r.get("reservation_type") != ReservationType.BANQUET.value:
                     continue
-                budget = r.get("estimated_budget") or (
-                    (r.get("party_size") or 0) * BANQUET_AVG_SPEND_PER_HEAD
-                )
+                budget = r.get("estimated_budget") or ((r.get("party_size") or 0) * BANQUET_AVG_SPEND_PER_HEAD)
                 deterministic_revenue += budget
 
                 banquet_entry = {
-                    "reservation_id":   r.get("reservation_id"),
-                    "customer_name":    r.get("customer_name"),
-                    "party_size":       r.get("party_size"),
+                    "reservation_id": r.get("reservation_id"),
+                    "customer_name": r.get("customer_name"),
+                    "party_size": r.get("party_size"),
                     "estimated_budget": budget,
                     "reservation_time": r.get("reservation_time"),
                 }
@@ -548,24 +537,24 @@ class DailyHubService:
                     # 持久化 BEO（若 db 可用）
                     db_beo_id = cb.beo.get("beo_id") if cb.beo else None
                     if db and cb.beo:
-                        saved = await banquet_planning_engine.save_beo(
-                            beo=cb.beo, banquet=r, db=db, operator="daily_hub"
-                        )
+                        saved = await banquet_planning_engine.save_beo(beo=cb.beo, banquet=r, db=db, operator="daily_hub")
                         if saved:
                             db_beo_id = str(saved.id)
 
                     banquet_entry["circuit_breaker"] = {
-                        "triggered":    True,
-                        "beo_id":       db_beo_id,
-                        "addon_staff":  cb.staffing_addon.get("total_addon_staff", 0),
-                        "addon_items":  len(cb.procurement_addon),
+                        "triggered": True,
+                        "beo_id": db_beo_id,
+                        "addon_staff": cb.staffing_addon.get("total_addon_staff", 0),
+                        "addon_items": len(cb.procurement_addon),
                     }
-                    circuit_breaker_addons.append({
-                        "reservation_id":    r.get("reservation_id"),
-                        "procurement_addon": cb.procurement_addon,
-                        "staffing_addon":    cb.staffing_addon,
-                        "beo":               cb.beo,
-                    })
+                    circuit_breaker_addons.append(
+                        {
+                            "reservation_id": r.get("reservation_id"),
+                            "procurement_addon": cb.procurement_addon,
+                            "staffing_addon": cb.staffing_addon,
+                            "beo": cb.beo,
+                        }
+                    )
 
                 banquets.append(banquet_entry)
 
@@ -573,8 +562,8 @@ class DailyHubService:
             logger.warning("获取宴会变量失败", error=str(e))
 
         result = {
-            "active":                len(banquets) > 0,
-            "banquets":              banquets,
+            "active": len(banquets) > 0,
+            "banquets": banquets,
             "deterministic_revenue": deterministic_revenue,
         }
         if circuit_breaker_addons:
@@ -584,35 +573,33 @@ class DailyHubService:
 
     async def _compute_regular_forecast(
         self,
-        store_id:       str,
-        target_date:    date,
+        store_id: str,
+        target_date: date,
         weather_factors: Dict[str, Any],
     ) -> Dict[str, Any]:
         """散客 + 外卖的概率性收入预测（天气已注入）。"""
         try:
             from src.services.enhanced_forecast_service import EnhancedForecastService
 
-            svc          = EnhancedForecastService(store_id=store_id)
+            svc = EnhancedForecastService(store_id=store_id)
             weather_input = None
             if weather_factors.get("weather"):
-                w             = weather_factors["weather"]
+                w = weather_factors["weather"]
                 weather_input = {"temperature": w["temperature"], "weather": w["condition"]}
 
-            result = await svc.forecast_sales(
-                target_date=target_date, weather_forecast=weather_input
-            )
+            result = await svc.forecast_sales(target_date=target_date, weather_forecast=weather_input)
             ci = result.get("confidence_interval", {})
             return {
-                "predicted_revenue":   result.get("predicted_sales", 0),
+                "predicted_revenue": result.get("predicted_sales", 0),
                 "confidence_interval": ci,
-                "confidence_level":    "95%",
+                "confidence_level": "95%",
             }
         except Exception as e:
             logger.warning("散客预测失败，使用零值", error=str(e))
             return {
-                "predicted_revenue":   0,
+                "predicted_revenue": 0,
                 "confidence_interval": {"lower": 0, "upper": 0},
-                "confidence_level":    "N/A",
+                "confidence_level": "N/A",
             }
 
     def _merge_tracks(
@@ -623,11 +610,11 @@ class DailyHubService:
         """合并宴会（确定性）+ 散客（概率）双轨收入。"""
         banquet_rev = banquet_track.get("deterministic_revenue", 0)
         regular_rev = regular_track.get("predicted_revenue", 0)
-        ci          = regular_track.get("confidence_interval", {})
-        lower       = ci.get("lower", 0)
-        upper       = ci.get("upper", 0)
+        ci = regular_track.get("confidence_interval", {})
+        lower = ci.get("lower", 0)
+        upper = ci.get("upper", 0)
 
-        total       = banquet_rev + regular_rev
+        total = banquet_rev + regular_rev
         total_lower = banquet_rev + lower
         total_upper = banquet_rev + upper
         return round(total, 2), round(total_lower, 2), round(total_upper, 2)
@@ -637,15 +624,15 @@ class DailyHubService:
         try:
             from src.services.inventory_service import InventoryService
 
-            svc    = InventoryService(store_id=store_id)
+            svc = InventoryService(store_id=store_id)
             alerts = await svc.generate_restock_alerts()
             return [
                 {
-                    "item_name":            a.get("item_name"),
-                    "current_stock":        a.get("current_stock"),
+                    "item_name": a.get("item_name"),
+                    "current_stock": a.get("current_stock"),
                     "recommended_quantity": a.get("recommended_quantity"),
-                    "alert_level":          a.get("alert_level"),
-                    "supplier_name":        a.get("supplier_name"),
+                    "alert_level": a.get("alert_level"),
+                    "supplier_name": a.get("supplier_name"),
                 }
                 for a in alerts
             ]
@@ -653,14 +640,12 @@ class DailyHubService:
             logger.warning("获取采购清单失败", error=str(e))
             return []
 
-    async def _get_staffing_plan(
-        self, store_id: str, target_date: date
-    ) -> Dict[str, Any]:
+    async def _get_staffing_plan(self, store_id: str, target_date: date) -> Dict[str, Any]:
         """从 ScheduleService 获取排班计划（工作流未锁定时使用）。"""
         try:
             from src.services.schedule_service import ScheduleService
 
-            svc      = ScheduleService(store_id=store_id)
+            svc = ScheduleService(store_id=store_id)
             schedule = await svc.get_schedule_by_date(target_date.isoformat())
             if not schedule:
                 return {"shifts": [], "total_staff": 0}
@@ -701,15 +686,15 @@ class DailyHubService:
             avg_margin = round(sum(margins) / len(margins), 4)
 
             profitable = sum(1 for r in results if r.label == "赚钱")
-            marginal   = sum(1 for r in results if r.label == "勉强")
-            losing     = sum(1 for r in results if r.label == "亏钱")
+            marginal = sum(1 for r in results if r.label == "勉强")
+            losing = sum(1 for r in results if r.label == "亏钱")
 
             return {
                 "avg_gross_margin_pct": avg_margin,
-                "profitable_count":     profitable,
-                "marginal_count":       marginal,
-                "losing_count":         losing,
-                "data_source":          "menu_profit_engine",
+                "profitable_count": profitable,
+                "marginal_count": marginal,
+                "losing_count": losing,
+                "data_source": "menu_profit_engine",
             }
         except Exception as e:
             logger.warning("MenuProfitEngine 毛利摘要失败，降级为空", store_id=store_id, error=str(e))
@@ -719,27 +704,23 @@ class DailyHubService:
 
     async def _notify_approval(
         self,
-        store_id:    str,
+        store_id: str,
         target_date: date,
-        board:       Dict[str, Any],
+        board: Dict[str, Any],
         approver_id: str,
     ) -> None:
         """
         审批后通过 L5 WeChat FSM 推送企微通知（非致命）。
         """
         try:
-            from src.services.wechat_action_fsm import get_wechat_fsm, ActionCategory, ActionPriority
+            from src.services.wechat_action_fsm import ActionCategory, ActionPriority, get_wechat_fsm
 
-            fsm      = get_wechat_fsm()
+            fsm = get_wechat_fsm()
             receiver = os.getenv("WECHAT_DEFAULT_RECEIVER", "store_manager")
 
-            purchase_count  = len(board.get("purchase_order", []))
-            total_revenue   = (
-                board.get("tomorrow_forecast", {}).get("total_predicted_revenue", 0)
-            )
-            has_banquet     = board.get("tomorrow_forecast", {}).get(
-                "banquet_track", {}
-            ).get("active", False)
+            purchase_count = len(board.get("purchase_order", []))
+            total_revenue = board.get("tomorrow_forecast", {}).get("total_predicted_revenue", 0)
+            has_banquet = board.get("tomorrow_forecast", {}).get("banquet_track", {}).get("active", False)
 
             banquet_note = ""
             if has_banquet:

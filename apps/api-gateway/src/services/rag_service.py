@@ -7,17 +7,19 @@ Week 2核心功能：
 - 格式化上下文注入LLM
 - 生成增强的AI决策
 """
+
 import asyncio
 import os
-from typing import List, Dict, Any, Optional
-import structlog
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
-from .vector_db_service import vector_db_service
-from .domain_vector_service import domain_vector_service, LEGACY_COLLECTION_MAP
+import structlog
+
 from ..core.llm import get_llm_client
+from .domain_vector_service import LEGACY_COLLECTION_MAP, domain_vector_service
 from .query_optimizer import query_optimizer
-from .rag_signal_router import classify_query, QuerySignal, route_numerical_query
+from .rag_signal_router import QuerySignal, classify_query, route_numerical_query
+from .vector_db_service import vector_db_service
 
 logger = structlog.get_logger()
 
@@ -46,11 +48,7 @@ class RAGService:
             raise
 
     async def search_relevant_context(
-        self,
-        query: str,
-        store_id: str,
-        collection: str = "events",
-        top_k: int = int(os.getenv("RAG_TOP_K", "5"))
+        self, query: str, store_id: str, collection: str = "events", top_k: int = int(os.getenv("RAG_TOP_K", "5"))
     ) -> List[Dict[str, Any]]:
         """
         检索相关上下文
@@ -77,12 +75,7 @@ class RAGService:
 
             # ── 2. 并行多查询检索 ─────────────────────────────────────────────
             if len(queries) > 1:
-                tasks = [
-                    domain_vector_service.search(
-                        domain=domain, store_id=store_id, query=q, top_k=top_k
-                    )
-                    for q in queries
-                ]
+                tasks = [domain_vector_service.search(domain=domain, store_id=store_id, query=q, top_k=top_k) for q in queries]
                 multi_results = await asyncio.gather(*tasks, return_exceptions=True)
 
                 # ── 3. 合并去重：相同 payload text 保留最高 score ──────────────
@@ -106,13 +99,9 @@ class RAGService:
 
                 # 降级：合并结果为空时回退单查询
                 if not results:
-                    results = await domain_vector_service.search(
-                        domain=domain, store_id=store_id, query=query, top_k=top_k
-                    )
+                    results = await domain_vector_service.search(domain=domain, store_id=store_id, query=query, top_k=top_k)
             else:
-                results = await domain_vector_service.search(
-                    domain=domain, store_id=store_id, query=queries[0], top_k=top_k
-                )
+                results = await domain_vector_service.search(domain=domain, store_id=store_id, query=queries[0], top_k=top_k)
 
             # ── 4. 全局降级：领域索引无数据时回退旧全局索引 ──────────────────
             if not results:
@@ -138,9 +127,7 @@ class RAGService:
             return []
 
     def format_context(
-        self,
-        results: List[Dict[str, Any]],
-        max_length: int = int(os.getenv("RAG_MAX_CONTEXT_LENGTH", "2000"))
+        self, results: List[Dict[str, Any]], max_length: int = int(os.getenv("RAG_MAX_CONTEXT_LENGTH", "2000"))
     ) -> str:
         """
         格式化检索结果为上下文文本
@@ -175,11 +162,7 @@ class RAGService:
 
         context = "\n".join(context_parts)
 
-        logger.debug(
-            "格式化上下文",
-            records_count=len(context_parts),
-            context_length=len(context)
-        )
+        logger.debug("格式化上下文", records_count=len(context_parts), context_length=len(context))
 
         return context
 
@@ -189,7 +172,7 @@ class RAGService:
         store_id: str,
         collection: str = "events",
         top_k: int = int(os.getenv("RAG_TOP_K", "5")),
-        system_prompt: Optional[str] = None
+        system_prompt: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         使用RAG进行增强分析
@@ -229,8 +212,10 @@ class RAGService:
                     # PostgreSQL 查询失败，降级到向量检索
                     route_label = "numerical_fallback_semantic"
                     relevant_context = await self.search_relevant_context(
-                        query=query, store_id=store_id,
-                        collection=collection, top_k=top_k,
+                        query=query,
+                        store_id=store_id,
+                        collection=collection,
+                        top_k=top_k,
                     )
                     context_text = self.format_context(relevant_context)
                     context_detail = None
@@ -238,8 +223,10 @@ class RAGService:
             else:
                 # --- 语义类：走 Qdrant 向量检索 ---
                 relevant_context = await self.search_relevant_context(
-                    query=query, store_id=store_id,
-                    collection=collection, top_k=top_k,
+                    query=query,
+                    store_id=store_id,
+                    collection=collection,
+                    top_k=top_k,
                 )
                 context_text = self.format_context(relevant_context)
                 context_detail = None
@@ -285,12 +272,7 @@ class RAGService:
                 "timestamp": datetime.now().isoformat(),
             }
 
-    def _build_enhanced_prompt(
-        self,
-        query: str,
-        context: str,
-        system_prompt: Optional[str] = None
-    ) -> str:
+    def _build_enhanced_prompt(self, query: str, context: str, system_prompt: Optional[str] = None) -> str:
         """
         构建增强提示
 
@@ -327,10 +309,7 @@ class RAGService:
         return enhanced_prompt
 
     async def get_similar_cases(
-        self,
-        query: str,
-        store_id: str,
-        top_k: int = int(os.getenv("RAG_TOP_K_SHORT", "3"))
+        self, query: str, store_id: str, top_k: int = int(os.getenv("RAG_TOP_K_SHORT", "3"))
     ) -> List[Dict[str, Any]]:
         """
         获取相似案例
@@ -346,22 +325,19 @@ class RAGService:
             相似案例列表
         """
         try:
-            results = await self.search_relevant_context(
-                query=query,
-                store_id=store_id,
-                collection="events",
-                top_k=top_k
-            )
+            results = await self.search_relevant_context(query=query, store_id=store_id, collection="events", top_k=top_k)
 
             # 格式化为用户友好的格式
             cases = []
             for result in results:
-                cases.append({
-                    "text": result.get("text", ""),
-                    "score": result.get("score", 0.0),
-                    "timestamp": result.get("created_at", ""),
-                    "type": result.get("event_type", "unknown")
-                })
+                cases.append(
+                    {
+                        "text": result.get("text", ""),
+                        "score": result.get("score", 0.0),
+                        "timestamp": result.get("created_at", ""),
+                        "type": result.get("event_type", "unknown"),
+                    }
+                )
 
             return cases
 

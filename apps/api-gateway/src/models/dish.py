@@ -2,12 +2,12 @@
 菜品主档模型
 餐饮ERP的核心实体，连接菜单、库存、成本、销售四个维度
 """
-from sqlalchemy import Column, String, Numeric, Integer, Boolean, Text, ForeignKey, Index
-from sqlalchemy.dialects.postgresql import UUID, ARRAY, JSON
 
-from sqlalchemy.orm import relationship
 import uuid
 
+from sqlalchemy import Boolean, Column, ForeignKey, Index, Integer, Numeric, String, Text
+from sqlalchemy.dialects.postgresql import ARRAY, JSON, UUID
+from sqlalchemy.orm import relationship
 from src.models.base import Base, TimestampMixin
 
 
@@ -15,6 +15,7 @@ class DishCategory(Base, TimestampMixin):
     """
     菜品分类表
     """
+
     __tablename__ = "dish_categories"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -44,6 +45,7 @@ class Dish(Base, TimestampMixin):
     菜品主档表
     餐饮ERP的核心实体
     """
+
     __tablename__ = "dishes"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -139,6 +141,7 @@ class DishIngredient(Base, TimestampMixin):
     菜品-食材关联表
     记录每道菜需要哪些食材以及用量
     """
+
     __tablename__ = "dish_ingredients"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

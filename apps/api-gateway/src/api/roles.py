@@ -5,10 +5,11 @@ GET  /api/v1/roles/{role}/permissions — 某角色的权限列表
 GET  /api/v1/roles/matrix       — 完整权限矩阵（管理后台用）
 GET  /api/v1/roles/permissions  — 所有可用权限枚举
 """
+
 from fastapi import APIRouter, Depends
 
 from ..core.dependencies import get_current_active_user, require_role
-from ..core.permission_matrix import get_matrix, get_all_permissions, ROLE_LABELS
+from ..core.permission_matrix import ROLE_LABELS, get_all_permissions, get_matrix
 from ..core.permissions import get_user_permissions
 from ..models.user import User, UserRole
 
@@ -20,10 +21,7 @@ async def list_roles(
     _current_user: User = Depends(get_current_active_user),
 ):
     """返回所有角色列表（含标签）"""
-    return [
-        {"value": role.value, "label": ROLE_LABELS.get(role, role.value)}
-        for role in UserRole
-    ]
+    return [{"value": role.value, "label": ROLE_LABELS.get(role, role.value)} for role in UserRole]
 
 
 @router.get("/matrix")

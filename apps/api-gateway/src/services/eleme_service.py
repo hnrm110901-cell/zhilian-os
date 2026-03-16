@@ -2,6 +2,7 @@
 饿了么集成服务
 负责订单同步、菜单同步、门店管理、配送追踪、Webhook 事件处理等业务逻辑
 """
+
 import os
 import sys
 from datetime import datetime, timedelta
@@ -44,9 +45,7 @@ class ElemeService:
             return self._adapters[brand_id]
 
         app_key = os.getenv(f"ELEME_APP_KEY_{brand_id}", os.getenv("ELEME_APP_KEY"))
-        app_secret = os.getenv(
-            f"ELEME_APP_SECRET_{brand_id}", os.getenv("ELEME_APP_SECRET")
-        )
+        app_secret = os.getenv(f"ELEME_APP_SECRET_{brand_id}", os.getenv("ELEME_APP_SECRET"))
         sandbox = os.getenv("ELEME_SANDBOX", "false").lower() == "true"
 
         if not app_key or not app_secret:
@@ -54,11 +53,13 @@ class ElemeService:
 
         from eleme.src.adapter import ElemeAdapter
 
-        adapter = ElemeAdapter({
-            "app_key": app_key,
-            "app_secret": app_secret,
-            "sandbox": sandbox,
-        })
+        adapter = ElemeAdapter(
+            {
+                "app_key": app_key,
+                "app_secret": app_secret,
+                "sandbox": sandbox,
+            }
+        )
         self._adapters[brand_id] = adapter
         return adapter
 
@@ -90,9 +91,7 @@ class ElemeService:
         if not start_time or not end_time:
             today = datetime.utcnow().date()
             start_time = datetime(today.year, today.month, today.day).isoformat()
-            end_time = (
-                datetime(today.year, today.month, today.day) + timedelta(days=1)
-            ).isoformat()
+            end_time = (datetime(today.year, today.month, today.day) + timedelta(days=1)).isoformat()
 
         synced = 0
         skipped = 0
@@ -114,30 +113,20 @@ class ElemeService:
 
                 for raw_order in orders:
                     try:
-                        order_id = str(
-                            raw_order.get(
-                                "order_id", raw_order.get("eleme_order_id", "")
-                            )
-                        )
+                        order_id = str(raw_order.get("order_id", raw_order.get("eleme_order_id", "")))
                         if not order_id:
                             errors += 1
                             continue
 
                         from src.models.order import Order
 
-                        existing = await session.execute(
-                            select(Order).where(
-                                Order.id == f"ELEME_{order_id}"
-                            )
-                        )
+                        existing = await session.execute(select(Order).where(Order.id == f"ELEME_{order_id}"))
                         if existing.scalar_one_or_none():
                             skipped += 1
                             continue
 
                         # 转换为标准 OrderSchema
-                        effective_store_id = store_id or str(
-                            raw_order.get("shop_id", "")
-                        )
+                        effective_store_id = store_id or str(raw_order.get("shop_id", ""))
                         std_order = adapter.to_order(
                             raw_order,
                             store_id=effective_store_id,
@@ -206,9 +195,7 @@ class ElemeService:
         logger.info("饿了么确认订单", order_id=order_id)
         return result
 
-    async def cancel_order(
-        self, brand_id: str, order_id: str, reason_code: int, reason: str
-    ) -> Dict[str, Any]:
+    async def cancel_order(self, brand_id: str, order_id: str, reason_code: int, reason: str) -> Dict[str, Any]:
         """取消订单"""
         adapter = self.get_adapter(brand_id)
         result = await adapter.cancel_order(order_id, reason_code, reason)
@@ -248,18 +235,14 @@ class ElemeService:
         logger.info("饿了么菜单同步完成", brand_id=brand_id, total=len(all_foods))
         return {"foods": all_foods, "total": len(all_foods)}
 
-    async def update_stock(
-        self, brand_id: str, food_id: str, stock: int
-    ) -> Dict[str, Any]:
+    async def update_stock(self, brand_id: str, food_id: str, stock: int) -> Dict[str, Any]:
         """更新商品库存"""
         adapter = self.get_adapter(brand_id)
         result = await adapter.update_food_stock(food_id, stock)
         logger.info("饿了么更新库存", food_id=food_id, stock=stock)
         return result
 
-    async def toggle_food(
-        self, brand_id: str, food_id: str, on_sale: bool
-    ) -> Dict[str, Any]:
+    async def toggle_food(self, brand_id: str, food_id: str, on_sale: bool) -> Dict[str, Any]:
         """上架/下架商品"""
         adapter = self.get_adapter(brand_id)
         if on_sale:
@@ -271,16 +254,12 @@ class ElemeService:
 
     # ── 门店管理 ──────────────────────────────────────────────────
 
-    async def get_shop_info(
-        self, brand_id: str, shop_id: Optional[str] = None
-    ) -> Dict[str, Any]:
+    async def get_shop_info(self, brand_id: str, shop_id: Optional[str] = None) -> Dict[str, Any]:
         """获取门店信息"""
         adapter = self.get_adapter(brand_id)
         return await adapter.get_shop_info(shop_id)
 
-    async def toggle_shop_status(
-        self, brand_id: str, status: int, shop_id: Optional[str] = None
-    ) -> Dict[str, Any]:
+    async def toggle_shop_status(self, brand_id: str, status: int, shop_id: Optional[str] = None) -> Dict[str, Any]:
         """切换门店营业状态（1=营业中, 0=休息中）"""
         adapter = self.get_adapter(brand_id)
         result = await adapter.update_shop_status(status, shop_id)
@@ -289,9 +268,7 @@ class ElemeService:
 
     # ── 配送追踪 ──────────────────────────────────────────────────
 
-    async def get_delivery_status(
-        self, brand_id: str, order_id: str
-    ) -> Dict[str, Any]:
+    async def get_delivery_status(self, brand_id: str, order_id: str) -> Dict[str, Any]:
         """查询配送状态"""
         adapter = self.get_adapter(brand_id)
         return await adapter.query_delivery_status(order_id)
@@ -322,9 +299,7 @@ class ElemeService:
             from eleme.src.webhook import ElemeWebhookHandler
 
             handler = ElemeWebhookHandler(app_secret)
-            if not handler.verify_signature(
-                payload.decode("utf-8"), signature, timestamp
-            ):
+            if not handler.verify_signature(payload.decode("utf-8"), signature, timestamp):
                 raise ValueError("签名验证失败")
 
         return {"verified": True}
@@ -359,9 +334,7 @@ class ElemeService:
             logger.warning("未知饿了么事件类型", event_type=event_type)
             return {"handled": False, "reason": f"unknown event type: {event_type}"}
 
-    async def _handle_order_created(
-        self, session: AsyncSession, data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def _handle_order_created(self, session: AsyncSession, data: Dict[str, Any]) -> Dict[str, Any]:
         """处理新订单事件"""
         order_id = str(data.get("order_id", ""))
         if not order_id:
@@ -369,9 +342,7 @@ class ElemeService:
 
         from src.models.order import Order
 
-        existing = await session.execute(
-            select(Order).where(Order.id == f"ELEME_{order_id}")
-        )
+        existing = await session.execute(select(Order).where(Order.id == f"ELEME_{order_id}"))
         if existing.scalar_one_or_none():
             return {"handled": True, "action": "skipped", "order_id": order_id}
 
@@ -403,9 +374,7 @@ class ElemeService:
         order_id = str(data.get("order_id", ""))
         from src.models.order import Order
 
-        result = await session.execute(
-            select(Order).where(Order.id == f"ELEME_{order_id}")
-        )
+        result = await session.execute(select(Order).where(Order.id == f"ELEME_{order_id}"))
         order = result.scalar_one_or_none()
         if not order:
             logger.warning("饿了么订单不存在，跳过状态更新", order_id=order_id)
@@ -422,16 +391,12 @@ class ElemeService:
         logger.info("饿了么订单状态更新", order_id=order_id, status=new_status)
         return {"handled": True, "action": "status_updated", "order_id": order_id}
 
-    async def _handle_delivery_update(
-        self, session: AsyncSession, data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def _handle_delivery_update(self, session: AsyncSession, data: Dict[str, Any]) -> Dict[str, Any]:
         """处理配送状态变更"""
         order_id = str(data.get("order_id", ""))
         from src.models.order import Order
 
-        result = await session.execute(
-            select(Order).where(Order.id == f"ELEME_{order_id}")
-        )
+        result = await session.execute(select(Order).where(Order.id == f"ELEME_{order_id}"))
         order = result.scalar_one_or_none()
         if order and order.order_metadata:
             metadata = dict(order.order_metadata)

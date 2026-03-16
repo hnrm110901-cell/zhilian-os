@@ -5,12 +5,11 @@ Unified Brain API — 每日1决策
   GET  /today        — 今日最重要的1个决策
   GET  /push-preview — 推送预览文案
 """
-from datetime import date
-from fastapi import APIRouter, Query
 
-from src.services.unified_brain import (
-    BrainInput, pick_top_decision, format_push_message,
-)
+from datetime import date
+
+from fastapi import APIRouter, Query
+from src.services.unified_brain import BrainInput, format_push_message, pick_top_decision
 
 router = APIRouter(prefix="/api/v1/brain", tags=["unified-brain"])
 

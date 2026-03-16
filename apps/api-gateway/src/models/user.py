@@ -1,16 +1,19 @@
 """
 User Model
 """
-from sqlalchemy import Column, String, Boolean, Enum
-from sqlalchemy.dialects.postgresql import UUID
-import uuid
+
 import enum
+import uuid
+
+from sqlalchemy import Boolean, Column, Enum, String
+from sqlalchemy.dialects.postgresql import UUID
 
 from .base import Base, TimestampMixin
 
 
 class UserRole(str, enum.Enum):
     """User roles - 基于实际餐饮岗位"""
+
     # 系统管理员
     ADMIN = "admin"
 
@@ -51,6 +54,7 @@ class User(Base, TimestampMixin):
     brand_id = Column(String(50), index=True)  # Associated brand (multi-brand isolation)
     phone = Column(String(20), unique=True, nullable=True, index=True)  # 手机号，用于短信验证码登录
     wechat_user_id = Column(String(100), index=True)  # WeChat Work user ID for push notifications
+    dingtalk_user_id = Column(String(100), index=True)  # DingTalk user ID
 
     def __repr__(self):
         return f"<User(username='{self.username}', role='{self.role}')>"

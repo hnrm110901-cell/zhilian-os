@@ -2,18 +2,17 @@
 时序预测备货建议（P1）：结合 90 天历史预测、图谱 BOM、损耗缓冲，输出食材级备货建议。
 与 L2 本体（BOM/Ingredient）、L3 损耗推理联动。
 """
+
 from __future__ import annotations
 
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.models.order import Order, OrderItem
 from src.ontology import get_ontology_repository
 from src.services.prophet_forecast_service import prophet_forecast_service
-
 
 # 默认每单约几份菜（用于将订单量转为菜品份数）
 DEFAULT_SERVINGS_PER_ORDER = float(__import__("os").getenv("REPLENISH_SERVINGS_PER_ORDER", "2.5"))
@@ -144,12 +143,14 @@ async def get_replenish_suggestion(
     suggestions: List[Dict[str, Any]] = []
     for ing_id, data in ing_need.items():
         qty = data["qty"] * waste_buffer
-        suggestions.append({
-            "ingredient_id": ing_id,
-            "unit": data["unit"],
-            "suggested_qty": round(qty, 2),
-            "source": "forecast+bom+waste_buffer",
-        })
+        suggestions.append(
+            {
+                "ingredient_id": ing_id,
+                "unit": data["unit"],
+                "suggested_qty": round(qty, 2),
+                "source": "forecast+bom+waste_buffer",
+            }
+        )
 
     return {
         "store_id": store_id,

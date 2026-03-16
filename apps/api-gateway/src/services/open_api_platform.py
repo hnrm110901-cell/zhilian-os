@@ -6,15 +6,16 @@ Phase 5: 生态扩展期 (Ecosystem Expansion Period)
 Enables third-party developers to build on top of Zhilian OS
 """
 
+import json
+import logging
 import os
-from typing import Dict, List, Optional, Any, Set
+import secrets
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Set
+
 from sqlalchemy.ext.asyncio import AsyncSession
-import secrets
-import logging
-import json
 
 logger = logging.getLogger(__name__)
 import hashlib
@@ -23,6 +24,7 @@ import hmac
 
 class DeveloperTier(Enum):
     """Developer tier enum"""
+
     FREE = "free"  # 免费版
     BASIC = "basic"  # 基础版
     PRO = "pro"  # 专业版
@@ -31,6 +33,7 @@ class DeveloperTier(Enum):
 
 class PluginCategory(Enum):
     """Plugin category enum"""
+
     ANALYTICS = "analytics"  # 数据分析
     MARKETING = "marketing"  # 营销工具
     OPERATIONS = "operations"  # 运营管理
@@ -41,6 +44,7 @@ class PluginCategory(Enum):
 
 class PluginStatus(Enum):
     """Plugin status enum"""
+
     DRAFT = "draft"  # 草稿
     PENDING_REVIEW = "pending_review"  # 待审核
     APPROVED = "approved"  # 已批准
@@ -52,6 +56,7 @@ class PluginStatus(Enum):
 @dataclass
 class Developer:
     """Third-party developer"""
+
     developer_id: str
     name: str
     email: str
@@ -67,6 +72,7 @@ class Developer:
 @dataclass
 class Plugin:
     """Third-party plugin"""
+
     plugin_id: str
     developer_id: str
     name: str
@@ -86,6 +92,7 @@ class Plugin:
 @dataclass
 class APIUsage:
     """API usage record"""
+
     developer_id: str
     endpoint: str
     method: str
@@ -127,11 +134,7 @@ class OpenAPIPlatform:
         self.rate_limit_tracker: Dict[str, List[datetime]] = {}
 
     def register_developer(
-        self,
-        name: str,
-        email: str,
-        company: Optional[str] = None,
-        tier: DeveloperTier = DeveloperTier.FREE
+        self, name: str, email: str, company: Optional[str] = None, tier: DeveloperTier = DeveloperTier.FREE
     ) -> Developer:
         """
         Register a new developer
@@ -155,7 +158,7 @@ class OpenAPIPlatform:
             DeveloperTier.FREE: 60,  # 60 req/min
             DeveloperTier.BASIC: 300,  # 300 req/min
             DeveloperTier.PRO: 1000,  # 1000 req/min
-            DeveloperTier.ENTERPRISE: 5000  # 5000 req/min
+            DeveloperTier.ENTERPRISE: 5000,  # 5000 req/min
         }
 
         developer = Developer(
@@ -168,20 +171,14 @@ class OpenAPIPlatform:
             api_secret=api_secret,
             rate_limit=rate_limits[tier],
             created_at=datetime.utcnow(),
-            verified=False
+            verified=False,
         )
 
         self.developers[developer_id] = developer
 
         return developer
 
-    def authenticate_request(
-        self,
-        api_key: str,
-        signature: str,
-        timestamp: str,
-        request_body: str
-    ) -> Optional[Developer]:
+    def authenticate_request(self, api_key: str, signature: str, timestamp: str, request_body: str) -> Optional[Developer]:
         """
         Authenticate API request
         验证API请求
@@ -210,7 +207,9 @@ class OpenAPIPlatform:
         # Verify timestamp (prevent replay attacks)
         try:
             request_time = datetime.fromisoformat(timestamp)
-            if abs((datetime.utcnow() - request_time).total_seconds()) > int(os.getenv("OPENAPI_REPLAY_WINDOW_SECONDS", "300")):
+            if abs((datetime.utcnow() - request_time).total_seconds()) > int(
+                os.getenv("OPENAPI_REPLAY_WINDOW_SECONDS", "300")
+            ):
                 # Request older than 5 minutes
                 return None
         except ValueError:
@@ -218,21 +217,14 @@ class OpenAPIPlatform:
 
         # Verify signature
         message = f"{timestamp}:{request_body}"
-        expected_signature = hmac.new(
-            developer.api_secret.encode(),
-            message.encode(),
-            hashlib.sha256
-        ).hexdigest()
+        expected_signature = hmac.new(developer.api_secret.encode(), message.encode(), hashlib.sha256).hexdigest()
 
         if not hmac.compare_digest(signature, expected_signature):
             return None
 
         return developer
 
-    def check_rate_limit(
-        self,
-        developer_id: str
-    ) -> bool:
+    def check_rate_limit(self, developer_id: str) -> bool:
         """
         Check if developer has exceeded rate limit
         检查开发者是否超过速率限制
@@ -254,10 +246,7 @@ class OpenAPIPlatform:
         if developer_id not in self.rate_limit_tracker:
             self.rate_limit_tracker[developer_id] = []
 
-        recent_requests = [
-            ts for ts in self.rate_limit_tracker[developer_id]
-            if ts > one_minute_ago
-        ]
+        recent_requests = [ts for ts in self.rate_limit_tracker[developer_id] if ts > one_minute_ago]
 
         # Update tracker
         self.rate_limit_tracker[developer_id] = recent_requests
@@ -278,7 +267,7 @@ class OpenAPIPlatform:
         category: PluginCategory,
         version: str,
         price: float,
-        webhook_url: Optional[str] = None
+        webhook_url: Optional[str] = None,
     ) -> Plugin:
         """
         Submit plugin for review
@@ -307,7 +296,7 @@ class OpenAPIPlatform:
             DeveloperTier.FREE: 0.7,  # 70% to developer
             DeveloperTier.BASIC: 0.75,  # 75% to developer
             DeveloperTier.PRO: 0.80,  # 80% to developer
-            DeveloperTier.ENTERPRISE: 0.85  # 85% to developer
+            DeveloperTier.ENTERPRISE: 0.85,  # 85% to developer
         }
 
         plugin = Plugin(
@@ -324,19 +313,14 @@ class OpenAPIPlatform:
             rating=0.0,
             webhook_url=webhook_url,
             created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
+            updated_at=datetime.utcnow(),
         )
 
         self.plugins[plugin_id] = plugin
 
         return plugin
 
-    def review_plugin(
-        self,
-        plugin_id: str,
-        approved: bool,
-        reason: Optional[str] = None
-    ) -> Plugin:
+    def review_plugin(self, plugin_id: str, approved: bool, reason: Optional[str] = None) -> Plugin:
         """
         Review plugin submission
         审核插件提交
@@ -362,10 +346,7 @@ class OpenAPIPlatform:
 
         return plugin
 
-    def publish_plugin(
-        self,
-        plugin_id: str
-    ) -> Plugin:
+    def publish_plugin(self, plugin_id: str) -> Plugin:
         """
         Publish approved plugin to marketplace
         发布已批准的插件到市场
@@ -388,11 +369,7 @@ class OpenAPIPlatform:
 
         return plugin
 
-    def install_plugin(
-        self,
-        plugin_id: str,
-        store_id: str
-    ) -> Dict[str, Any]:
+    def install_plugin(self, plugin_id: str, store_id: str) -> Dict[str, Any]:
         """
         Install plugin for a store
         为门店安装插件
@@ -422,22 +399,18 @@ class OpenAPIPlatform:
                     "event": "plugin_installed",
                     "plugin_id": plugin_id,
                     "store_id": store_id,
-                    "timestamp": datetime.utcnow().isoformat()
-                }
+                    "timestamp": datetime.utcnow().isoformat(),
+                },
             )
 
         return {
             "plugin_id": plugin_id,
             "store_id": store_id,
             "installed_at": datetime.utcnow().isoformat(),
-            "monthly_price": plugin.price
+            "monthly_price": plugin.price,
         }
 
-    def rate_plugin(
-        self,
-        plugin_id: str,
-        rating: float
-    ) -> Plugin:
+    def rate_plugin(self, plugin_id: str, rating: float) -> Plugin:
         """
         Rate a plugin
         为插件评分
@@ -466,11 +439,7 @@ class OpenAPIPlatform:
 
         return plugin
 
-    def get_marketplace_plugins(
-        self,
-        category: Optional[PluginCategory] = None,
-        sort_by: str = "installs"
-    ) -> List[Plugin]:
+    def get_marketplace_plugins(self, category: Optional[PluginCategory] = None, sort_by: str = "installs") -> List[Plugin]:
         """
         Get plugins from marketplace
         获取市场插件
@@ -483,17 +452,11 @@ class OpenAPIPlatform:
             List of published plugins
         """
         # Filter published plugins
-        published_plugins = [
-            p for p in self.plugins.values()
-            if p.status == PluginStatus.PUBLISHED
-        ]
+        published_plugins = [p for p in self.plugins.values() if p.status == PluginStatus.PUBLISHED]
 
         # Filter by category if specified
         if category:
-            published_plugins = [
-                p for p in published_plugins
-                if p.category == category
-            ]
+            published_plugins = [p for p in published_plugins if p.category == category]
 
         # Sort
         if sort_by == "installs":
@@ -505,12 +468,7 @@ class OpenAPIPlatform:
 
         return published_plugins
 
-    def calculate_revenue(
-        self,
-        plugin_id: str,
-        period_start: datetime,
-        period_end: datetime
-    ) -> Dict[str, float]:
+    def calculate_revenue(self, plugin_id: str, period_start: datetime, period_end: datetime) -> Dict[str, float]:
         """
         Calculate revenue for plugin
         计算插件收入
@@ -541,15 +499,10 @@ class OpenAPIPlatform:
             "platform_revenue": platform_revenue,
             "installs": plugin.installs,
             "price": plugin.price,
-            "revenue_share": plugin.revenue_share
+            "revenue_share": plugin.revenue_share,
         }
 
-    def get_developer_analytics(
-        self,
-        developer_id: str,
-        start_date: datetime,
-        end_date: datetime
-    ) -> Dict[str, Any]:
+    def get_developer_analytics(self, developer_id: str, start_date: datetime, end_date: datetime) -> Dict[str, Any]:
         """
         Get analytics for developer
         获取开发者分析数据
@@ -567,10 +520,7 @@ class OpenAPIPlatform:
             raise ValueError("Developer not found")
 
         # Get developer's plugins
-        developer_plugins = [
-            p for p in self.plugins.values()
-            if p.developer_id == developer_id
-        ]
+        developer_plugins = [p for p in self.plugins.values() if p.developer_id == developer_id]
 
         # Calculate metrics
         total_installs = sum(p.installs for p in developer_plugins)
@@ -578,48 +528,38 @@ class OpenAPIPlatform:
 
         # Calculate total revenue
         total_revenue = sum(
-            self.calculate_revenue(p.plugin_id, start_date, end_date)["developer_revenue"]
-            for p in developer_plugins
+            self.calculate_revenue(p.plugin_id, start_date, end_date)["developer_revenue"] for p in developer_plugins
         )
 
         # Get API usage
         api_calls = [
-            usage for usage in self.api_usage
-            if usage.developer_id == developer_id
-            and start_date <= usage.timestamp <= end_date
+            usage
+            for usage in self.api_usage
+            if usage.developer_id == developer_id and start_date <= usage.timestamp <= end_date
         ]
 
         return {
             "developer_id": developer_id,
-            "period": {
-                "start": start_date.isoformat(),
-                "end": end_date.isoformat()
-            },
+            "period": {"start": start_date.isoformat(), "end": end_date.isoformat()},
             "plugins": {
                 "total": len(developer_plugins),
                 "published": len([p for p in developer_plugins if p.status == PluginStatus.PUBLISHED]),
                 "total_installs": total_installs,
-                "avg_rating": avg_rating
+                "avg_rating": avg_rating,
             },
-            "revenue": {
-                "total": total_revenue,
-                "currency": "CNY"
-            },
+            "revenue": {"total": total_revenue, "currency": "CNY"},
             "api_usage": {
                 "total_calls": len(api_calls),
                 "avg_response_time_ms": sum(u.response_time_ms for u in api_calls) / len(api_calls) if api_calls else 0,
-                "error_rate": len([u for u in api_calls if u.status_code >= 400]) / len(api_calls) if api_calls else 0
-            }
+                "error_rate": len([u for u in api_calls if u.status_code >= 400]) / len(api_calls) if api_calls else 0,
+            },
         }
 
-    def _trigger_webhook(
-        self,
-        webhook_url: str,
-        payload: Dict[str, Any]
-    ):
+    def _trigger_webhook(self, webhook_url: str, payload: Dict[str, Any]):
         """Trigger webhook via HTTP POST (fire-and-forget)"""
         try:
             import urllib.request
+
             data = json.dumps(payload).encode("utf-8")
             req = urllib.request.Request(
                 webhook_url,
@@ -639,7 +579,7 @@ class OpenAPIPlatform:
         method: str,
         response_time_ms: int,
         status_code: int,
-        error: Optional[str] = None
+        error: Optional[str] = None,
     ):
         """Log API usage"""
         usage = APIUsage(
@@ -649,6 +589,6 @@ class OpenAPIPlatform:
             timestamp=datetime.utcnow(),
             response_time_ms=response_time_ms,
             status_code=status_code,
-            error=error
+            error=error,
         )
         self.api_usage.append(usage)

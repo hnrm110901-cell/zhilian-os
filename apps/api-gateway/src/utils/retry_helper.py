@@ -33,12 +33,14 @@ logger = structlog.get_logger()
 # 配置
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _default_retry_exceptions() -> Tuple[Type[Exception], ...]:
     """收集所有可用的网络/API异常类型（动态导入，避免强依赖）"""
     exceptions: list[Type[Exception]] = [ConnectionError, TimeoutError, OSError]
 
     try:
         import httpx
+
         exceptions += [
             httpx.TimeoutException,
             httpx.ConnectError,
@@ -50,6 +52,7 @@ def _default_retry_exceptions() -> Tuple[Type[Exception], ...]:
 
     try:
         import openai
+
         exceptions += [
             openai.RateLimitError,
             openai.APIConnectionError,
@@ -61,6 +64,7 @@ def _default_retry_exceptions() -> Tuple[Type[Exception], ...]:
 
     try:
         import anthropic
+
         exceptions += [
             anthropic.RateLimitError,
             anthropic.APIConnectionError,
@@ -76,13 +80,12 @@ def _default_retry_exceptions() -> Tuple[Type[Exception], ...]:
 @dataclass
 class RetryConfig:
     """重试配置"""
+
     max_retries: int = 3
-    initial_delay: float = 1.0       # 首次等待秒数
-    backoff_factor: float = 2.0      # 每次翻倍：1s → 2s → 4s
-    max_delay: float = 60.0          # 单次等待上限
-    retry_on_exceptions: Tuple[Type[Exception], ...] = field(
-        default_factory=_default_retry_exceptions
-    )
+    initial_delay: float = 1.0  # 首次等待秒数
+    backoff_factor: float = 2.0  # 每次翻倍：1s → 2s → 4s
+    max_delay: float = 60.0  # 单次等待上限
+    retry_on_exceptions: Tuple[Type[Exception], ...] = field(default_factory=_default_retry_exceptions)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -91,9 +94,9 @@ class RetryConfig:
 
 LLM_RETRY_CONFIG = RetryConfig(
     max_retries=4,
-    initial_delay=30.0,     # LLM 速率限制通常需要等 30s+
+    initial_delay=30.0,  # LLM 速率限制通常需要等 30s+
     backoff_factor=2.0,
-    max_delay=300.0,        # 最长单次等 5 分钟
+    max_delay=300.0,  # 最长单次等 5 分钟
 )
 
 WECHAT_RETRY_CONFIG = RetryConfig(
@@ -122,14 +125,16 @@ DB_RETRY_CONFIG = RetryConfig(
 # 内部辅助
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _calc_delay(config: RetryConfig, attempt: int) -> float:
     """计算第 attempt 次失败后的等待时间（指数退避）"""
-    return min(config.initial_delay * (config.backoff_factor ** attempt), config.max_delay)
+    return min(config.initial_delay * (config.backoff_factor**attempt), config.max_delay)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 异步装饰器（主要）
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def async_retry(config: Optional[RetryConfig] = None):
     """
@@ -188,6 +193,7 @@ def async_retry(config: Optional[RetryConfig] = None):
                 raise last_exc
 
         return wrapper
+
     return decorator
 
 
@@ -246,12 +252,14 @@ def async_graceful_retry(
             return default_return
 
         return wrapper
+
     return decorator
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 同步装饰器（供非 async 场景使用）
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def sync_retry(config: Optional[RetryConfig] = None):
     """同步版重试装饰器，参数与 async_retry 相同。"""
@@ -297,6 +305,7 @@ def sync_retry(config: Optional[RetryConfig] = None):
                 raise last_exc
 
         return wrapper
+
     return decorator
 
 
@@ -336,4 +345,5 @@ def sync_graceful_retry(
             return default_return
 
         return wrapper
+
     return decorator

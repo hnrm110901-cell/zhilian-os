@@ -20,6 +20,7 @@ Phase 6 — 离店后：线上评价管理/企业售后
   - BirthdayReminderService → 生日扫描
   - FloorPlan → 桌台推荐
 """
+
 from __future__ import annotations
 
 import os
@@ -29,9 +30,8 @@ from typing import Any, Dict, List, Optional
 import structlog
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.models.reservation import Reservation, ReservationStatus, ReservationType
 from src.models.queue import Queue, QueueStatus
+from src.models.reservation import Reservation, ReservationStatus, ReservationType
 
 logger = structlog.get_logger()
 
@@ -39,6 +39,7 @@ logger = structlog.get_logger()
 # ══════════════════════════════════════════════════════════════════
 # Phase 1: 多渠道 → CDP 自动关联
 # ══════════════════════════════════════════════════════════════════
+
 
 async def link_consumer_to_reservation(
     session: AsyncSession,
@@ -54,6 +55,7 @@ async def link_consumer_to_reservation(
 
     try:
         from src.services.identity_resolution_service import identity_resolution_service
+
         consumer_id = await identity_resolution_service.resolve(
             phone=reservation.customer_phone,
             display_name=reservation.customer_name,
@@ -82,6 +84,7 @@ async def link_consumer_to_queue(
 
     try:
         from src.services.identity_resolution_service import identity_resolution_service
+
         consumer_id = await identity_resolution_service.resolve(
             phone=queue.customer_phone,
             display_name=queue.customer_name,
@@ -107,9 +110,7 @@ async def convert_queue_to_reservation(
     """
     import uuid
 
-    result = await session.execute(
-        select(Queue).where(Queue.queue_id == queue_id)
-    )
+    result = await session.execute(select(Queue).where(Queue.queue_id == queue_id))
     queue = result.scalar_one_or_none()
     if not queue:
         raise ValueError(f"等位记录不存在: {queue_id}")
@@ -120,10 +121,7 @@ async def convert_queue_to_reservation(
     now = datetime.now()
     reservation_id = f"RES_{today.strftime('%Y%m%d')}_{str(uuid.uuid4())[:8].upper()}"
 
-    target_status = (
-        ReservationStatus.SEATED if queue.status == QueueStatus.SEATED
-        else ReservationStatus.ARRIVED
-    )
+    target_status = ReservationStatus.SEATED if queue.status == QueueStatus.SEATED else ReservationStatus.ARRIVED
 
     reservation = Reservation(
         id=reservation_id,
@@ -156,6 +154,7 @@ async def convert_queue_to_reservation(
 # ══════════════════════════════════════════════════════════════════
 # Phase 2: 到店前 — 千人千面推送 + 智能桌台推荐
 # ══════════════════════════════════════════════════════════════════
+
 
 async def recommend_table(
     session: AsyncSession,
@@ -194,12 +193,14 @@ async def recommend_table(
             Reservation.reservation_date == reservation_date,
             Reservation.reservation_time >= time_start,
             Reservation.reservation_time <= time_end,
-            Reservation.status.in_([
-                ReservationStatus.PENDING,
-                ReservationStatus.CONFIRMED,
-                ReservationStatus.ARRIVED,
-                ReservationStatus.SEATED,
-            ]),
+            Reservation.status.in_(
+                [
+                    ReservationStatus.PENDING,
+                    ReservationStatus.CONFIRMED,
+                    ReservationStatus.ARRIVED,
+                    ReservationStatus.SEATED,
+                ]
+            ),
             Reservation.table_number != None,  # noqa: E711
         )
     )
@@ -229,16 +230,18 @@ async def recommend_table(
         # 包厢加分（高端餐厅偏好）
         type_bonus = 0.2 if "包厢" in table_type or "VIP" in table_type else 0.0
 
-        candidates.append({
-            "table_number": t.table_number,
-            "table_type": table_type,
-            "min_capacity": min_cap,
-            "max_capacity": max_cap,
-            "floor": t.floor or 1,
-            "area_name": t.area_name or "",
-            "score": round(capacity_fit + type_bonus, 2),
-            "reason": _table_reason(table_type, min_cap, max_cap, party_size),
-        })
+        candidates.append(
+            {
+                "table_number": t.table_number,
+                "table_type": table_type,
+                "min_capacity": min_cap,
+                "max_capacity": max_cap,
+                "floor": t.floor or 1,
+                "area_name": t.area_name or "",
+                "score": round(capacity_fit + type_bonus, 2),
+                "reason": _table_reason(table_type, min_cap, max_cap, party_size),
+            }
+        )
 
     # 按评分降序
     candidates.sort(key=lambda x: x["score"], reverse=True)
@@ -263,9 +266,7 @@ async def generate_pre_arrival_push(
     T-1天 或 T-4小时触发。
     内容：确认信息 + 个性化菜品推荐 + 消费场景（生日/商务/家庭）。
     """
-    result = await session.execute(
-        select(Reservation).where(Reservation.id == reservation_id)
-    )
+    result = await session.execute(select(Reservation).where(Reservation.id == reservation_id))
     reservation = result.scalar_one_or_none()
     if not reservation:
         return {"error": "预订不存在"}
@@ -293,33 +294,43 @@ async def generate_pre_arrival_push(
     if profile.get("tags"):
         tags = profile["tags"]
         if "海鲜爱好者" in tags or "高频" in tags:
-            recommendations.append({
-                "type": "favorite_dish",
-                "message": "您上次点的招牌菜深受好评，本次为您预留食材",
-            })
+            recommendations.append(
+                {
+                    "type": "favorite_dish",
+                    "message": "您上次点的招牌菜深受好评，本次为您预留食材",
+                }
+            )
         if "宴会客户" in tags:
-            recommendations.append({
-                "type": "upgrade",
-                "message": "VIP客户专享：包厢免费升级",
-            })
+            recommendations.append(
+                {
+                    "type": "upgrade",
+                    "message": "VIP客户专享：包厢免费升级",
+                }
+            )
 
     if scene["type"] == "birthday":
-        recommendations.append({
-            "type": "birthday_surprise",
-            "message": "生日快乐！我们已为您准备了一份小惊喜",
-        })
+        recommendations.append(
+            {
+                "type": "birthday_surprise",
+                "message": "生日快乐！我们已为您准备了一份小惊喜",
+            }
+        )
     elif scene["type"] == "business":
-        recommendations.append({
-            "type": "business_menu",
-            "message": "商务宴请推荐：精选商务套餐，含发票服务",
-        })
+        recommendations.append(
+            {
+                "type": "business_menu",
+                "message": "商务宴请推荐：精选商务套餐，含发票服务",
+            }
+        )
 
     # 老客户历史偏好
     if profile.get("total_order_count", 0) >= 3:
-        recommendations.append({
-            "type": "reorder",
-            "message": f"根据您{profile.get('total_order_count', 0)}次消费记录，为您推荐心水菜品",
-        })
+        recommendations.append(
+            {
+                "type": "reorder",
+                "message": f"根据您{profile.get('total_order_count', 0)}次消费记录，为您推荐心水菜品",
+            }
+        )
 
     content["recommendations"] = recommendations
 
@@ -342,17 +353,23 @@ async def get_pre_arrival_reservations(
     now = datetime.now()
     target_time = now + timedelta(hours=hours_ahead)
 
-    stmt = select(Reservation).where(
-        and_(
-            Reservation.store_id == store_id,
-            Reservation.status.in_([
-                ReservationStatus.PENDING,
-                ReservationStatus.CONFIRMED,
-            ]),
-            Reservation.reservation_date >= now.date(),
-            Reservation.reservation_date <= target_time.date(),
+    stmt = (
+        select(Reservation)
+        .where(
+            and_(
+                Reservation.store_id == store_id,
+                Reservation.status.in_(
+                    [
+                        ReservationStatus.PENDING,
+                        ReservationStatus.CONFIRMED,
+                    ]
+                ),
+                Reservation.reservation_date >= now.date(),
+                Reservation.reservation_date <= target_time.date(),
+            )
         )
-    ).order_by(Reservation.reservation_date, Reservation.reservation_time)
+        .order_by(Reservation.reservation_date, Reservation.reservation_time)
+    )
 
     result = await session.execute(stmt)
     reservations = result.scalars().all()
@@ -365,18 +382,20 @@ async def get_pre_arrival_reservations(
         if hours_until < 0 or hours_until > hours_ahead:
             continue
 
-        upcoming.append({
-            "reservation_id": r.id,
-            "customer_name": r.customer_name,
-            "customer_phone": r.customer_phone,
-            "consumer_id": str(r.consumer_id) if r.consumer_id else None,
-            "reservation_date": r.reservation_date.isoformat(),
-            "reservation_time": r.reservation_time.strftime("%H:%M"),
-            "party_size": r.party_size,
-            "status": r.status.value,
-            "hours_until": round(hours_until, 1),
-            "needs_confirmation": r.status == ReservationStatus.PENDING,
-        })
+        upcoming.append(
+            {
+                "reservation_id": r.id,
+                "customer_name": r.customer_name,
+                "customer_phone": r.customer_phone,
+                "consumer_id": str(r.consumer_id) if r.consumer_id else None,
+                "reservation_date": r.reservation_date.isoformat(),
+                "reservation_time": r.reservation_time.strftime("%H:%M"),
+                "party_size": r.party_size,
+                "status": r.status.value,
+                "hours_until": round(hours_until, 1),
+                "needs_confirmation": r.status == ReservationStatus.PENDING,
+            }
+        )
 
     return upcoming
 
@@ -426,6 +445,7 @@ async def send_pre_arrival_reminders(
 # Phase 3: 老客识别 — 点单偏好 + 生日场景 + 标签自动化
 # ══════════════════════════════════════════════════════════════════
 
+
 async def recognize_returning_customer(
     session: AsyncSession,
     customer_phone: str,
@@ -439,12 +459,17 @@ async def recognize_returning_customer(
     profile = await _get_consumer_profile(None, customer_phone)
 
     # 历史预订
-    res_stmt = select(Reservation).where(
-        and_(
-            Reservation.customer_phone == customer_phone,
-            Reservation.status == ReservationStatus.COMPLETED,
+    res_stmt = (
+        select(Reservation)
+        .where(
+            and_(
+                Reservation.customer_phone == customer_phone,
+                Reservation.status == ReservationStatus.COMPLETED,
+            )
         )
-    ).order_by(Reservation.reservation_date.desc()).limit(10)
+        .order_by(Reservation.reservation_date.desc())
+        .limit(10)
+    )
     res_result = await session.execute(res_stmt)
     past_reservations = res_result.scalars().all()
 
@@ -483,23 +508,29 @@ async def recognize_returning_customer(
     # 推荐动作
     actions = []
     if birthday_info and birthday_info.get("is_upcoming"):
-        actions.append({
-            "action": "birthday_surprise",
-            "message": f"客户生日在{birthday_info['days_until']}天后，建议赠送生日蛋糕",
-            "priority": "high",
-        })
+        actions.append(
+            {
+                "action": "birthday_surprise",
+                "message": f"客户生日在{birthday_info['days_until']}天后，建议赠送生日蛋糕",
+                "priority": "high",
+            }
+        )
     if total_visits >= 5 and "VIP" not in (profile.get("tags") or []):
-        actions.append({
-            "action": "vip_upgrade",
-            "message": f"已消费{total_visits}次（¥{result['lifetime_spend_yuan']}），建议升级VIP",
-            "priority": "medium",
-        })
+        actions.append(
+            {
+                "action": "vip_upgrade",
+                "message": f"已消费{total_visits}次（¥{result['lifetime_spend_yuan']}），建议升级VIP",
+                "priority": "medium",
+            }
+        )
     if profile.get("rfm_level") in ("S4", "S5"):
-        actions.append({
-            "action": "reactivation",
-            "message": "客户处于流失风险，建议发送唤醒优惠券",
-            "priority": "high",
-        })
+        actions.append(
+            {
+                "action": "reactivation",
+                "message": "客户处于流失风险，建议发送唤醒优惠券",
+                "priority": "high",
+            }
+        )
 
     result["recommended_actions"] = actions
     return result
@@ -518,12 +549,14 @@ async def trigger_birthday_journey(
     triggered = []
     try:
         from src.services.birthday_reminder_service import BirthdayReminderService
+
         birthday_svc = BirthdayReminderService()
         events = await birthday_svc.scan_upcoming_events(session, store_id, horizon_days)
 
         for event in events:
             try:
                 from src.services.journey_orchestrator import JourneyOrchestrator
+
                 orchestrator = JourneyOrchestrator()
                 result = await orchestrator.trigger(
                     customer_id=event["customer_id"],
@@ -531,20 +564,23 @@ async def trigger_birthday_journey(
                     journey_id="birthday_greeting",
                     db=session,
                 )
-                triggered.append({
-                    "customer_id": event["customer_id"],
-                    "event_type": event.get("event_type", "birthday"),
-                    "days_until": event.get("days_until", 0),
-                    "journey_triggered": True,
-                })
+                triggered.append(
+                    {
+                        "customer_id": event["customer_id"],
+                        "event_type": event.get("event_type", "birthday"),
+                        "days_until": event.get("days_until", 0),
+                        "journey_triggered": True,
+                    }
+                )
             except Exception as e:
-                logger.warning("birthday_journey_trigger_failed",
-                             customer_id=event.get("customer_id"), error=str(e))
-                triggered.append({
-                    "customer_id": event.get("customer_id"),
-                    "journey_triggered": False,
-                    "error": str(e),
-                })
+                logger.warning("birthday_journey_trigger_failed", customer_id=event.get("customer_id"), error=str(e))
+                triggered.append(
+                    {
+                        "customer_id": event.get("customer_id"),
+                        "journey_triggered": False,
+                        "error": str(e),
+                    }
+                )
     except Exception as e:
         logger.warning("birthday_scan_failed", error=str(e))
 
@@ -557,16 +593,31 @@ async def trigger_birthday_journey(
 
 # 巡台检查项（5大维度）
 PATROL_CHECKLIST = [
-    {"id": "food_quality", "name": "菜品质量", "category": "菜品",
-     "items": ["菜品温度适宜", "摆盘整洁", "份量达标", "口味正常"]},
-    {"id": "service_speed", "name": "服务响应", "category": "服务",
-     "items": ["上菜时间合理", "服务员响应及时", "主动加水/换骨碟"]},
-    {"id": "environment", "name": "环境卫生", "category": "环境",
-     "items": ["桌面整洁", "地面干净", "空调温度适宜", "灯光/音乐适当"]},
-    {"id": "customer_mood", "name": "客户情绪", "category": "客户",
-     "items": ["客户表情满意", "无投诉/不满", "用餐节奏正常"]},
-    {"id": "special_needs", "name": "特殊需求", "category": "需求",
-     "items": ["忌口已落实", "儿童椅/加位已安排", "生日/宴会布置到位"]},
+    {
+        "id": "food_quality",
+        "name": "菜品质量",
+        "category": "菜品",
+        "items": ["菜品温度适宜", "摆盘整洁", "份量达标", "口味正常"],
+    },
+    {
+        "id": "service_speed",
+        "name": "服务响应",
+        "category": "服务",
+        "items": ["上菜时间合理", "服务员响应及时", "主动加水/换骨碟"],
+    },
+    {
+        "id": "environment",
+        "name": "环境卫生",
+        "category": "环境",
+        "items": ["桌面整洁", "地面干净", "空调温度适宜", "灯光/音乐适当"],
+    },
+    {"id": "customer_mood", "name": "客户情绪", "category": "客户", "items": ["客户表情满意", "无投诉/不满", "用餐节奏正常"]},
+    {
+        "id": "special_needs",
+        "name": "特殊需求",
+        "category": "需求",
+        "items": ["忌口已落实", "儿童椅/加位已安排", "生日/宴会布置到位"],
+    },
 ]
 
 
@@ -610,6 +661,7 @@ async def create_patrol_record(
 
     try:
         from src.services.neural_system import NeuralSystemOrchestrator
+
         orchestrator = NeuralSystemOrchestrator()
         await orchestrator.emit_event(
             event_type="quality.patrol_completed",
@@ -652,28 +704,34 @@ def _generate_learning_suggestions(
 
     for category, score in scores.items():
         if score < 70:
-            suggestions.append({
-                "category": category,
-                "score": score,
-                "suggestion": _LEARNING_MAP.get(category, "请关注该项服务标准"),
-                "priority": "high" if score < 50 else "medium",
-            })
+            suggestions.append(
+                {
+                    "category": category,
+                    "score": score,
+                    "suggestion": _LEARNING_MAP.get(category, "请关注该项服务标准"),
+                    "priority": "high" if score < 50 else "medium",
+                }
+            )
 
     # 从问题中提取学习点
     for issue in issues:
         issue_type = issue.get("type", "")
         if issue_type == "菜品":
-            suggestions.append({
-                "category": "kitchen_knowledge",
-                "suggestion": f"菜品问题：{issue.get('description', '')}，建议回顾出品标准",
-                "priority": issue.get("severity", "medium"),
-            })
+            suggestions.append(
+                {
+                    "category": "kitchen_knowledge",
+                    "suggestion": f"菜品问题：{issue.get('description', '')}，建议回顾出品标准",
+                    "priority": issue.get("severity", "medium"),
+                }
+            )
         elif issue_type == "服务":
-            suggestions.append({
-                "category": "service_training",
-                "suggestion": f"服务问题：{issue.get('description', '')}，建议加强服务培训",
-                "priority": issue.get("severity", "medium"),
-            })
+            suggestions.append(
+                {
+                    "category": "service_training",
+                    "suggestion": f"服务问题：{issue.get('description', '')}，建议加强服务培训",
+                    "priority": issue.get("severity", "medium"),
+                }
+            )
 
     return suggestions
 
@@ -691,6 +749,7 @@ _LEARNING_MAP = {
 # Phase 5: 离店前 — 满意度调查 + 营销触达
 # ══════════════════════════════════════════════════════════════════
 
+
 async def trigger_satisfaction_survey(
     session: AsyncSession,
     reservation_id: str,
@@ -701,9 +760,7 @@ async def trigger_satisfaction_survey(
     在 SEATED → COMPLETED 转换时自动调用。
     推送微信满意度问卷 + 收集NPS评分。
     """
-    result = await session.execute(
-        select(Reservation).where(Reservation.id == reservation_id)
-    )
+    result = await session.execute(select(Reservation).where(Reservation.id == reservation_id))
     reservation = result.scalar_one_or_none()
     if not reservation:
         return {"error": "预订不存在"}
@@ -732,21 +789,27 @@ async def trigger_satisfaction_survey(
     total_visits = profile.get("total_order_count", 0)
 
     if rfm_level in ("S1", "S2"):
-        marketing.append({
-            "type": "vip_reward",
-            "message": f"感谢您第{total_visits + 1}次光临！VIP客户专享：下次用餐赠送精美甜品",
-        })
+        marketing.append(
+            {
+                "type": "vip_reward",
+                "message": f"感谢您第{total_visits + 1}次光临！VIP客户专享：下次用餐赠送精美甜品",
+            }
+        )
     elif rfm_level == "S3":
-        marketing.append({
-            "type": "next_visit_coupon",
-            "message": "感谢用餐！赠送您一张满200减30优惠券，期待再次光临",
-            "coupon": "next_visit_30",
-        })
+        marketing.append(
+            {
+                "type": "next_visit_coupon",
+                "message": "感谢用餐！赠送您一张满200减30优惠券，期待再次光临",
+                "coupon": "next_visit_30",
+            }
+        )
     else:
-        marketing.append({
-            "type": "review_incentive",
-            "message": "写好评送小菜一份，下次到店出示即可",
-        })
+        marketing.append(
+            {
+                "type": "review_incentive",
+                "message": "写好评送小菜一份，下次到店出示即可",
+            }
+        )
 
     survey["marketing"] = marketing
 
@@ -769,6 +832,7 @@ async def trigger_satisfaction_survey(
 # Phase 6: 离店后 — 评价管理 + 企业售后
 # ══════════════════════════════════════════════════════════════════
 
+
 async def process_post_dining_review(
     session: AsyncSession,
     reservation_id: str,
@@ -781,9 +845,7 @@ async def process_post_dining_review(
 
     流程：评价接收 → 情感分析 → 自动分类 → 触发售后动作。
     """
-    result = await session.execute(
-        select(Reservation).where(Reservation.id == reservation_id)
-    )
+    result = await session.execute(select(Reservation).where(Reservation.id == reservation_id))
     reservation = result.scalar_one_or_none()
 
     # 情感分析
@@ -804,16 +866,19 @@ async def process_post_dining_review(
     # 自动售后动作
     actions = []
     if sentiment["sentiment"] == "negative":
-        actions.append({
-            "action": "review_repair",
-            "message": f"差评预警：{sentiment.get('key_points', ['请关注'])[0]}",
-            "priority": "critical",
-            "auto_response": _generate_review_response(sentiment, "negative"),
-        })
+        actions.append(
+            {
+                "action": "review_repair",
+                "message": f"差评预警：{sentiment.get('key_points', ['请关注'])[0]}",
+                "priority": "critical",
+                "auto_response": _generate_review_response(sentiment, "negative"),
+            }
+        )
         # 触发差评修复旅程
         if reservation and reservation.consumer_id:
             try:
                 from src.services.journey_orchestrator import JourneyOrchestrator
+
                 orchestrator = JourneyOrchestrator()
                 await orchestrator.trigger(
                     customer_id=str(reservation.consumer_id),
@@ -826,17 +891,20 @@ async def process_post_dining_review(
                 logger.warning("repair_journey_failed", error=str(e))
 
     elif sentiment["sentiment"] == "positive":
-        actions.append({
-            "action": "thank_and_promote",
-            "message": "好评！可请客户转发至朋友圈获得小福利",
-            "auto_response": _generate_review_response(sentiment, "positive"),
-        })
+        actions.append(
+            {
+                "action": "thank_and_promote",
+                "message": "好评！可请客户转发至朋友圈获得小福利",
+                "auto_response": _generate_review_response(sentiment, "positive"),
+            }
+        )
 
     review_record["actions"] = actions
 
     # 发送神经事件
     try:
         from src.services.neural_system import NeuralSystemOrchestrator
+
         orchestrator = NeuralSystemOrchestrator()
         await orchestrator.emit_event(
             event_type="crm.review_received",
@@ -897,23 +965,30 @@ async def get_post_dining_summary(
 
     # 需要跟进的客户（no-show + 取消的）
     followup_needed = []
-    followup_stmt = select(Reservation).where(
-        and_(
-            Reservation.store_id == store_id,
-            Reservation.status.in_([ReservationStatus.NO_SHOW, ReservationStatus.CANCELLED]),
-            Reservation.reservation_date >= since,
+    followup_stmt = (
+        select(Reservation)
+        .where(
+            and_(
+                Reservation.store_id == store_id,
+                Reservation.status.in_([ReservationStatus.NO_SHOW, ReservationStatus.CANCELLED]),
+                Reservation.reservation_date >= since,
+            )
         )
-    ).order_by(Reservation.reservation_date.desc()).limit(20)
+        .order_by(Reservation.reservation_date.desc())
+        .limit(20)
+    )
     followup_result = await session.execute(followup_stmt)
     for r in followup_result.scalars().all():
-        followup_needed.append({
-            "reservation_id": r.id,
-            "customer_name": r.customer_name,
-            "customer_phone": r.customer_phone,
-            "status": r.status.value,
-            "date": r.reservation_date.isoformat(),
-            "followup_type": "no_show_recovery" if r.status == ReservationStatus.NO_SHOW else "cancellation_inquiry",
-        })
+        followup_needed.append(
+            {
+                "reservation_id": r.id,
+                "customer_name": r.customer_name,
+                "customer_phone": r.customer_phone,
+                "status": r.status.value,
+                "date": r.reservation_date.isoformat(),
+                "followup_type": "no_show_recovery" if r.status == ReservationStatus.NO_SHOW else "cancellation_inquiry",
+            }
+        )
 
     return {
         "store_id": store_id,
@@ -931,6 +1006,7 @@ async def get_post_dining_summary(
 # 内部辅助函数
 # ══════════════════════════════════════════════════════════════════
 
+
 async def _get_consumer_profile(
     consumer_id: Optional[Any],
     phone: Optional[str] = None,
@@ -938,13 +1014,13 @@ async def _get_consumer_profile(
     """获取消费者画像（CDP）。"""
     try:
         from src.services.identity_resolution_service import identity_resolution_service
+
         if consumer_id:
-            from src.models.consumer_identity import ConsumerIdentity
             from src.core.database import get_db_session
+            from src.models.consumer_identity import ConsumerIdentity
+
             async with get_db_session() as session:
-                result = await session.execute(
-                    select(ConsumerIdentity).where(ConsumerIdentity.id == consumer_id)
-                )
+                result = await session.execute(select(ConsumerIdentity).where(ConsumerIdentity.id == consumer_id))
                 consumer = result.scalar_one_or_none()
                 if consumer:
                     return {
@@ -978,9 +1054,21 @@ async def _get_consumer_profile(
 
 def _calc_rfm_level(recency: Optional[int], frequency: Optional[int], monetary: Optional[int]) -> str:
     """简化RFM等级计算。"""
-    r = 5 if (recency or 999) <= 7 else 4 if (recency or 999) <= 14 else 3 if (recency or 999) <= 30 else 2 if (recency or 999) <= 60 else 1
-    f = 5 if (frequency or 0) >= 20 else 4 if (frequency or 0) >= 10 else 3 if (frequency or 0) >= 5 else 2 if (frequency or 0) >= 2 else 1
-    m = 5 if (monetary or 0) >= 500000 else 4 if (monetary or 0) >= 200000 else 3 if (monetary or 0) >= 80000 else 2 if (monetary or 0) >= 20000 else 1
+    r = (
+        5
+        if (recency or 999) <= 7
+        else 4 if (recency or 999) <= 14 else 3 if (recency or 999) <= 30 else 2 if (recency or 999) <= 60 else 1
+    )
+    f = (
+        5
+        if (frequency or 0) >= 20
+        else 4 if (frequency or 0) >= 10 else 3 if (frequency or 0) >= 5 else 2 if (frequency or 0) >= 2 else 1
+    )
+    m = (
+        5
+        if (monetary or 0) >= 500000
+        else 4 if (monetary or 0) >= 200000 else 3 if (monetary or 0) >= 80000 else 2 if (monetary or 0) >= 20000 else 1
+    )
     total = r + f + m
     if total >= 13:
         return "S1"
@@ -1140,6 +1228,7 @@ async def _send_push(
     """发送推送（企微/短信），失败不阻塞。"""
     try:
         from src.services.wechat_trigger_service import wechat_trigger_service
+
         if hasattr(wechat_trigger_service, "trigger"):
             await wechat_trigger_service.trigger(
                 f"reservation.{push_type}",
@@ -1164,6 +1253,7 @@ async def _notify_critical_issue(
         return
     try:
         from src.services.wechat_trigger_service import wechat_trigger_service
+
         descriptions = "; ".join(i.get("description", "") for i in critical)
         await wechat_trigger_service.trigger(
             "quality.critical_issue",
@@ -1180,7 +1270,8 @@ async def _notify_critical_issue(
 async def _analyze_sentiment(text: str) -> Dict[str, Any]:
     """评价情感分析（调用现有服务或降级）。"""
     try:
-        from src.services.customer_sentiment_service import CustomerSentimentService, CustomerReview
+        from src.services.customer_sentiment_service import CustomerReview, CustomerSentimentService
+
         svc = CustomerSentimentService()
         review = CustomerReview(text=text, source="internal")
         results = await svc.analyze_batch([review])
@@ -1218,7 +1309,4 @@ def _generate_review_response(sentiment: Dict[str, Any], polarity: str) -> str:
             f"我们已第一时间安排改进。店长将在24小时内与您联系，"
             f"诚邀您再次光临，为您提供更好的服务。"
         )
-    return (
-        "感谢您的好评与认可！您的满意是我们最大的动力。"
-        "期待再次为您服务，祝您生活愉快！"
-    )
+    return "感谢您的好评与认可！您的满意是我们最大的动力。" "期待再次为您服务，祝您生活愉快！"

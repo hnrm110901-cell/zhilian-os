@@ -6,13 +6,13 @@ CDP宪法：
 2. consumer_id 不可修改，只能 merge()
 3. 所有渠道消费行为必须归因到 consumer_id
 """
-from sqlalchemy import (
-    Column, String, Integer, Float, DateTime, Date, Boolean, JSON, Index, Text,
-)
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
+
 import uuid
 from datetime import datetime
+
+from sqlalchemy import JSON, Boolean, Column, Date, DateTime, Float, Index, Integer, String, Text
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
 
 from .base import Base, TimestampMixin
 
@@ -24,6 +24,7 @@ class ConsumerIdentity(Base, TimestampMixin):
     每个自然人对应一条记录。primary_phone 为业务键（中国餐饮场景手机号最可靠）。
     consumer_id（UUID）是全系统唯一标识，不可修改，仅在 merge 时标记 merged_into。
     """
+
     __tablename__ = "consumer_identities"
 
     # 全局唯一ID — 不可修改，只能 merge

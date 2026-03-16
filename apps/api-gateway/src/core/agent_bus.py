@@ -33,6 +33,7 @@ Agent 间通信协议 — AgentBus
   P2 = 5   (normal,   常规决策建议)
   P3 = 3   (low,      日常巡检 / 统计)
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -51,16 +52,18 @@ logger = structlog.get_logger()
 # 优先级常量
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class MessagePriority(IntEnum):
-    P0 = 10   # critical — 运维故障、食安违规
-    P1 = 7    # high     — 营收异常、库存短缺
-    P2 = 5    # normal   — 常规决策、排班建议
-    P3 = 3    # low      — 日常巡检、统计任务
+    P0 = 10  # critical — 运维故障、食安违规
+    P1 = 7  # high     — 营收异常、库存短缺
+    P2 = 5  # normal   — 常规决策、排班建议
+    P3 = 3  # low      — 日常巡检、统计任务
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 消息信封
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @dataclass
 class AgentMessage:
@@ -80,6 +83,7 @@ class AgentMessage:
       reply_to    — 本消息是对哪个 msg_id 的回复（用于响应链路追踪）
       created_at  — ISO 8601 UTC 时间戳
     """
+
     from_agent: str
     to_agent: str
     action: str
@@ -90,9 +94,7 @@ class AgentMessage:
     msg_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     trace_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     reply_to: Optional[str] = None
-    created_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     context: Optional[Dict[str, Any]] = None  # BusinessContext 序列化数据
 
     def enrich_payload(self) -> Dict[str, Any]:
@@ -118,6 +120,7 @@ class AgentReply:
       msg_id          — 本响应的唯一 ID
       created_at      — ISO 8601 UTC 时间戳
     """
+
     request_id: str
     from_agent: str
     success: bool
@@ -126,16 +129,12 @@ class AgentReply:
     execution_time: float = 0.0
     trace_id: str = ""
     msg_id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    created_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def unwrap(self) -> Any:
         """成功时返回 data，失败时抛出 RuntimeError。"""
         if not self.success:
-            raise RuntimeError(
-                f"AgentReply error from {self.from_agent}: {self.error}"
-            )
+            raise RuntimeError(f"AgentReply error from {self.from_agent}: {self.error}")
         return self.data
 
 
@@ -144,10 +143,10 @@ class AgentReply:
 # ─────────────────────────────────────────────────────────────────────────────
 
 _DEFAULT_TIMEOUT: Dict[int, int] = {
-    MessagePriority.P0: 10,   # P0 故障：10 秒内必须得到响应
-    MessagePriority.P1: 20,   # P1 告警：20 秒
-    MessagePriority.P2: 30,   # P2 常规：30 秒
-    MessagePriority.P3: 60,   # P3 低优：60 秒
+    MessagePriority.P0: 10,  # P0 故障：10 秒内必须得到响应
+    MessagePriority.P1: 20,  # P1 告警：20 秒
+    MessagePriority.P2: 30,  # P2 常规：30 秒
+    MessagePriority.P3: 60,  # P3 低优：60 秒
 }
 
 
@@ -166,6 +165,7 @@ def _resolve_timeout(msg: AgentMessage) -> int:
 # Agent 工厂注册表
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _default_agent_factories() -> Dict[str, Callable]:
     """
     返回默认 Agent 工厂函数字典。
@@ -173,33 +173,37 @@ def _default_agent_factories() -> Dict[str, Callable]:
     工厂函数采用懒加载（每次调用创建新实例），避免循环导入和共享状态。
     新增 Agent 只需在此注册，无需修改 AgentBus 核心逻辑。
     """
+
     def _make(module_path: str, class_name: str):
         def factory():
             import importlib
+
             mod = importlib.import_module(module_path)
             return getattr(mod, class_name)()
+
         return factory
 
     _base = "src.agents"
     return {
-        "schedule":    _make(f"{_base}.schedule_agent",    "ScheduleAgent"),
-        "order":       _make(f"{_base}.order_agent",       "OrderAgent"),
-        "inventory":   _make(f"{_base}.inventory_agent",   "InventoryAgent"),
-        "service":     _make(f"{_base}.service_agent",     "ServiceAgent"),
-        "training":    _make(f"{_base}.training_agent",    "TrainingAgent"),
-        "decision":    _make(f"{_base}.decision_agent",    "DecisionAgent"),
+        "schedule": _make(f"{_base}.schedule_agent", "ScheduleAgent"),
+        "order": _make(f"{_base}.order_agent", "OrderAgent"),
+        "inventory": _make(f"{_base}.inventory_agent", "InventoryAgent"),
+        "service": _make(f"{_base}.service_agent", "ServiceAgent"),
+        "training": _make(f"{_base}.training_agent", "TrainingAgent"),
+        "decision": _make(f"{_base}.decision_agent", "DecisionAgent"),
         "reservation": _make(f"{_base}.reservation_agent", "ReservationAgent"),
-        "ops":         _make(f"{_base}.ops_agent",         "OpsAgent"),
+        "ops": _make(f"{_base}.ops_agent", "OpsAgent"),
         "performance": _make(f"{_base}.performance_agent", "PerformanceAgent"),
-        "quality":     _make(f"{_base}.quality_agent",     "QualityAgent"),
-        "kpi":         _make(f"{_base}.kpi_agent",         "KpiAgent"),
-        "fct":         _make(f"{_base}.fct_agent",         "FctAgent"),
+        "quality": _make(f"{_base}.quality_agent", "QualityAgent"),
+        "kpi": _make(f"{_base}.kpi_agent", "KpiAgent"),
+        "fct": _make(f"{_base}.fct_agent", "FctAgent"),
     }
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # AgentBus — 单例消息总线
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class AgentBus:
     """
@@ -244,10 +248,7 @@ class AgentBus:
     def _make_agent(self, agent_type: str):
         factory = self._factories.get(agent_type)
         if factory is None:
-            raise KeyError(
-                f"AgentBus: 未知 Agent 类型 '{agent_type}'。"
-                f"已注册: {self.registered_agents()}"
-            )
+            raise KeyError(f"AgentBus: 未知 Agent 类型 '{agent_type}'。" f"已注册: {self.registered_agents()}")
         return factory()
 
     # ── 核心通信方法 ──────────────────────────────────────────────────────────
@@ -280,6 +281,7 @@ class AgentBus:
         if msg.context:
             try:
                 from src.core.business_context import BusinessContext
+
                 ctx = BusinessContext.from_dict(msg.context)
                 ctx.add_breadcrumb(f"agent_bus:{msg.from_agent}->{msg.to_agent}:{msg.action}")
                 msg.context = ctx.to_dict()
@@ -355,7 +357,7 @@ class AgentBus:
                     store_id=msg.store_id,
                     priority=msg.priority,
                     timeout_s=msg.timeout_s,
-                    trace_id=msg.trace_id,   # 共用 trace_id
+                    trace_id=msg.trace_id,  # 共用 trace_id
                 )
             )
             for target in to_agents
@@ -374,6 +376,7 @@ class AgentBus:
         """基于 SkillRegistry 按业务意图发现跨 Agent 的技能。"""
         try:
             from src.core.skill_registry import SkillRegistry
+
             return SkillRegistry.get().query(intent=intent)
         except Exception:
             return []
@@ -387,6 +390,7 @@ class AgentBus:
         queue = "high_priority" if msg.priority >= MessagePriority.P1 else "default"
         try:
             from .celery_tasks import celery_app
+
             celery_app.send_task(
                 "src.core.celery_tasks.dispatch_agent_message",
                 kwargs={
@@ -417,6 +421,7 @@ class AgentBus:
 # ─────────────────────────────────────────────────────────────────────────────
 # BusAwareMixin — 让 Agent 子类方便地调用总线
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class BusAwareMixin:
     """

@@ -269,7 +269,8 @@ class TestGetMemberProfile:
         db.execute.side_effect = Exception("DB error")
 
         orch = JourneyOrchestrator()
-        profile = await orch._get_member_profile("C001", "S001", db)
+        with patch("src.services.member_context_store.get_context_store", new_callable=AsyncMock, return_value=None):
+            profile = await orch._get_member_profile("C001", "S001", db)
 
         assert profile is None
 

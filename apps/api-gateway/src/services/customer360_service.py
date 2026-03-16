@@ -4,18 +4,20 @@ Customer 360 Profile Service
 
 聚合所有客户触点数据，生成统一的客户视图和时间线
 """
-from typing import Dict, Any, List, Optional
-from datetime import datetime, timedelta
-from sqlalchemy import select, and_, or_, func, desc
-from sqlalchemy.ext.asyncio import AsyncSession
-import structlog
-import os
 
+import os
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
+
+import structlog
+from sqlalchemy import and_, desc, func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..core.database import get_db_session
+from ..models.audit_log import AuditLog
+from ..models.integration import MemberSync, POSTransaction, ReservationSync
 from ..models.order import Order
 from ..models.reservation import Reservation
-from ..models.integration import MemberSync, POSTransaction, ReservationSync
-from ..models.audit_log import AuditLog
-from ..core.database import get_db_session
 
 logger = structlog.get_logger()
 
@@ -50,14 +52,10 @@ class Customer360Service:
                 )
 
                 # 1. 获取会员基础信息
-                member_info = await self._get_member_info(
-                    session, customer_identifier, identifier_type, store_id
-                )
+                member_info = await self._get_member_info(session, customer_identifier, identifier_type, store_id)
 
                 # 2. 获取订单历史
-                order_history = await self._get_order_history(
-                    session, customer_identifier, identifier_type, store_id
-                )
+                order_history = await self._get_order_history(session, customer_identifier, identifier_type, store_id)
 
                 # 3. 获取预订记录
                 reservation_history = await self._get_reservation_history(
@@ -65,14 +63,10 @@ class Customer360Service:
                 )
 
                 # 4. 获取POS交易记录
-                pos_transactions = await self._get_pos_transactions(
-                    session, customer_identifier, identifier_type, store_id
-                )
+                pos_transactions = await self._get_pos_transactions(session, customer_identifier, identifier_type, store_id)
 
                 # 5. 获取活动日志
-                activity_logs = await self._get_activity_logs(
-                    session, customer_identifier, identifier_type, store_id
-                )
+                activity_logs = await self._get_activity_logs(session, customer_identifier, identifier_type, store_id)
 
                 # 6. 生成客户时间线
                 timeline = await self._generate_timeline(
@@ -83,9 +77,7 @@ class Customer360Service:
                 )
 
                 # 7. 计算客户价值指标
-                customer_value = await self._calculate_customer_value(
-                    order_history, pos_transactions
-                )
+                customer_value = await self._calculate_customer_value(order_history, pos_transactions)
 
                 # 8. 生成客户标签
                 customer_tags = await self._generate_customer_tags(
@@ -277,17 +269,19 @@ class Customer360Service:
             sync_reservations = sync_result.scalars().all()
 
             for sync_res in sync_reservations:
-                reservation_list.append({
-                    "reservation_id": sync_res.external_reservation_id,
-                    "customer_name": sync_res.customer_name,
-                    "customer_phone": sync_res.customer_phone,
-                    "party_size": sync_res.party_size,
-                    "reservation_date": sync_res.reservation_date.isoformat(),
-                    "status": sync_res.status,
-                    "source": sync_res.source,
-                    "channel": sync_res.channel,
-                    "synced_at": sync_res.synced_at.isoformat() if sync_res.synced_at else None,
-                })
+                reservation_list.append(
+                    {
+                        "reservation_id": sync_res.external_reservation_id,
+                        "customer_name": sync_res.customer_name,
+                        "customer_phone": sync_res.customer_phone,
+                        "party_size": sync_res.party_size,
+                        "reservation_date": sync_res.reservation_date.isoformat(),
+                        "status": sync_res.status,
+                        "source": sync_res.source,
+                        "channel": sync_res.channel,
+                        "synced_at": sync_res.synced_at.isoformat() if sync_res.synced_at else None,
+                    }
+                )
 
             # 按时间排序
             reservation_list.sort(key=lambda x: x.get("reservation_date", ""), reverse=True)
@@ -311,13 +305,9 @@ class Customer360Service:
 
             # POS交易主要通过手机号关联
             if identifier_type == "phone":
-                query = query.where(
-                    POSTransaction.customer_info["phone"].astext == identifier
-                )
+                query = query.where(POSTransaction.customer_info["phone"].astext == identifier)
             elif identifier_type == "member_id":
-                query = query.where(
-                    POSTransaction.customer_info["member_id"].astext == identifier
-                )
+                query = query.where(POSTransaction.customer_info["member_id"].astext == identifier)
 
             if store_id:
                 query = query.where(POSTransaction.store_id == store_id)
@@ -395,36 +385,42 @@ class Customer360Service:
 
         # 添加订单事件
         for order in orders:
-            timeline.append({
-                "event_type": "order",
-                "event_time": order["order_time"],
-                "title": f"订单 {order['order_number']}",
-                "description": f"{order['order_type']} - ¥{order['total']}",
-                "status": order["status"],
-                "data": order,
-            })
+            timeline.append(
+                {
+                    "event_type": "order",
+                    "event_time": order["order_time"],
+                    "title": f"订单 {order['order_number']}",
+                    "description": f"{order['order_type']} - ¥{order['total']}",
+                    "status": order["status"],
+                    "data": order,
+                }
+            )
 
         # 添加预订事件
         for reservation in reservations:
-            timeline.append({
-                "event_type": "reservation",
-                "event_time": reservation["reservation_date"],
-                "title": f"预订 - {reservation['party_size']}人",
-                "description": f"状态: {reservation['status']}",
-                "status": reservation["status"],
-                "data": reservation,
-            })
+            timeline.append(
+                {
+                    "event_type": "reservation",
+                    "event_time": reservation["reservation_date"],
+                    "title": f"预订 - {reservation['party_size']}人",
+                    "description": f"状态: {reservation['status']}",
+                    "status": reservation["status"],
+                    "data": reservation,
+                }
+            )
 
         # 添加POS交易事件
         for transaction in pos_transactions:
-            timeline.append({
-                "event_type": "pos_transaction",
-                "event_time": transaction["transaction_time"],
-                "title": f"POS交易 - ¥{transaction['total_amount']}",
-                "description": f"{transaction['payment_method']}",
-                "status": transaction["status"],
-                "data": transaction,
-            })
+            timeline.append(
+                {
+                    "event_type": "pos_transaction",
+                    "event_time": transaction["transaction_time"],
+                    "title": f"POS交易 - ¥{transaction['total_amount']}",
+                    "description": f"{transaction['payment_method']}",
+                    "status": transaction["status"],
+                    "data": transaction,
+                }
+            )
 
         # 按时间倒序排序
         timeline.sort(key=lambda x: x["event_time"], reverse=True)
@@ -476,7 +472,9 @@ class Customer360Service:
             if last_order_time:
                 days_since_last_order = (datetime.now() - datetime.fromisoformat(last_order_time)).days
                 recency_score = max(0, 100 - days_since_last_order)  # 越近越高
-                frequency_score = min(100, order_frequency * float(os.getenv("RFM360_FREQUENCY_MULTIPLIER", "10")))  # 频率越高越好
+                frequency_score = min(
+                    100, order_frequency * float(os.getenv("RFM360_FREQUENCY_MULTIPLIER", "10"))
+                )  # 频率越高越好
                 monetary_score = min(100, total_spent / float(os.getenv("RFM360_MONETARY_DIVISOR", "100")))  # 金额越高越好
                 rfm_score = (recency_score + frequency_score + monetary_score) / 3
 

@@ -2,19 +2,20 @@
 Daily Report Service
 营业日报服务
 """
-from typing import Dict, Any, Optional, List
-from datetime import datetime, date, timedelta
-from sqlalchemy import select, and_, func, or_
-import structlog
+
 import os
 import uuid
+from datetime import date, datetime, timedelta
+from typing import Any, Dict, List, Optional
 
+import structlog
+from sqlalchemy import and_, func, or_, select
 from src.core.database import get_db_session
 from src.models.daily_report import DailyReport
-from src.models.order import Order
-from src.models.task import Task, TaskStatus
 from src.models.inventory import InventoryItem
+from src.models.order import Order
 from src.models.store import Store
+from src.models.task import Task, TaskStatus
 
 logger = structlog.get_logger()
 
@@ -22,11 +23,7 @@ logger = structlog.get_logger()
 class DailyReportService:
     """营业日报服务"""
 
-    async def generate_daily_report(
-        self,
-        store_id: str,
-        report_date: Optional[date] = None
-    ) -> DailyReport:
+    async def generate_daily_report(self, store_id: str, report_date: Optional[date] = None) -> DailyReport:
         """
         生成营业日报
 
@@ -42,61 +39,40 @@ class DailyReportService:
                 # 默认生成昨天的日报
                 report_date = date.today() - timedelta(days=1)
 
-            logger.info(
-                "开始生成营业日报",
-                store_id=store_id,
-                report_date=str(report_date)
-            )
+            logger.info("开始生成营业日报", store_id=store_id, report_date=str(report_date))
 
             async with get_db_session() as session:
                 # 检查是否已存在该日期的日报
-                existing_report = await self._get_existing_report(
-                    session, store_id, report_date
-                )
+                existing_report = await self._get_existing_report(session, store_id, report_date)
 
                 if existing_report:
-                    logger.info(
-                        "日报已存在，更新数据",
-                        store_id=store_id,
-                        report_date=str(report_date)
-                    )
+                    logger.info("日报已存在，更新数据", store_id=store_id, report_date=str(report_date))
                     report = existing_report
                 else:
-                    report = DailyReport(
-                        store_id=store_id,
-                        report_date=report_date
-                    )
+                    report = DailyReport(store_id=store_id, report_date=report_date)
                     session.add(report)
 
                 # 1. 聚合营收数据
-                revenue_data = await self._aggregate_revenue_data(
-                    session, store_id, report_date
-                )
+                revenue_data = await self._aggregate_revenue_data(session, store_id, report_date)
                 report.total_revenue = revenue_data["total_revenue"]
                 report.order_count = revenue_data["order_count"]
                 report.customer_count = revenue_data["customer_count"]
                 report.avg_order_value = revenue_data["avg_order_value"]
 
                 # 2. 计算环比数据
-                comparison_data = await self._calculate_comparison(
-                    session, store_id, report_date
-                )
+                comparison_data = await self._calculate_comparison(session, store_id, report_date)
                 report.revenue_change_rate = comparison_data["revenue_change_rate"]
                 report.order_change_rate = comparison_data["order_change_rate"]
                 report.customer_change_rate = comparison_data["customer_change_rate"]
 
                 # 3. 聚合运营数据
-                operation_data = await self._aggregate_operation_data(
-                    session, store_id, report_date
-                )
+                operation_data = await self._aggregate_operation_data(session, store_id, report_date)
                 report.inventory_alert_count = operation_data["inventory_alert_count"]
                 report.task_completion_rate = operation_data["task_completion_rate"]
                 report.service_issue_count = operation_data["service_issue_count"]
 
                 # 4. 聚合详细数据
-                detail_data = await self._aggregate_detail_data(
-                    session, store_id, report_date
-                )
+                detail_data = await self._aggregate_detail_data(session, store_id, report_date)
                 report.top_dishes = detail_data["top_dishes"]
                 report.peak_hours = detail_data["peak_hours"]
                 report.payment_methods = detail_data["payment_methods"]
@@ -109,12 +85,7 @@ class DailyReportService:
                 await session.commit()
                 await session.refresh(report)
 
-                logger.info(
-                    "营业日报生成成功",
-                    store_id=store_id,
-                    report_date=str(report_date),
-                    report_id=str(report.id)
-                )
+                logger.info("营业日报生成成功", store_id=store_id, report_date=str(report_date), report_id=str(report.id))
 
                 return report
 
@@ -124,33 +95,18 @@ class DailyReportService:
                 store_id=store_id,
                 report_date=str(report_date) if report_date else None,
                 error=str(e),
-                exc_info=e
+                exc_info=e,
             )
             raise
 
-    async def _get_existing_report(
-        self,
-        session,
-        store_id: str,
-        report_date: date
-    ) -> Optional[DailyReport]:
+    async def _get_existing_report(self, session, store_id: str, report_date: date) -> Optional[DailyReport]:
         """获取已存在的日报"""
         result = await session.execute(
-            select(DailyReport).where(
-                and_(
-                    DailyReport.store_id == store_id,
-                    DailyReport.report_date == report_date
-                )
-            )
+            select(DailyReport).where(and_(DailyReport.store_id == store_id, DailyReport.report_date == report_date))
         )
         return result.scalar_one_or_none()
 
-    async def _aggregate_revenue_data(
-        self,
-        session,
-        store_id: str,
-        report_date: date
-    ) -> Dict[str, int]:
+    async def _aggregate_revenue_data(self, session, store_id: str, report_date: date) -> Dict[str, int]:
         """聚合营收数据"""
         try:
             # 查询当天的订单数据
@@ -161,13 +117,13 @@ class DailyReportService:
                 select(
                     func.count(Order.id).label("order_count"),
                     func.sum(Order.total_amount).label("total_revenue"),
-                    func.count(func.distinct(Order.customer_id)).label("customer_count")
+                    func.count(func.distinct(Order.customer_id)).label("customer_count"),
                 ).where(
                     and_(
                         Order.store_id == store_id,
                         Order.created_at >= start_datetime,
                         Order.created_at <= end_datetime,
-                        Order.status != "cancelled"
+                        Order.status != "cancelled",
                     )
                 )
             )
@@ -183,80 +139,56 @@ class DailyReportService:
                 "total_revenue": total_revenue,
                 "order_count": order_count,
                 "customer_count": customer_count,
-                "avg_order_value": avg_order_value
+                "avg_order_value": avg_order_value,
             }
 
         except Exception as e:
             logger.error("聚合营收数据失败", error=str(e))
-            return {
-                "total_revenue": 0,
-                "order_count": 0,
-                "customer_count": 0,
-                "avg_order_value": 0
-            }
+            return {"total_revenue": 0, "order_count": 0, "customer_count": 0, "avg_order_value": 0}
 
-    async def _calculate_comparison(
-        self,
-        session,
-        store_id: str,
-        report_date: date
-    ) -> Dict[str, float]:
+    async def _calculate_comparison(self, session, store_id: str, report_date: date) -> Dict[str, float]:
         """计算环比数据"""
         try:
             # 获取前一天的日报
             previous_date = report_date - timedelta(days=1)
-            previous_report = await self._get_existing_report(
-                session, store_id, previous_date
-            )
+            previous_report = await self._get_existing_report(session, store_id, previous_date)
 
             if not previous_report or previous_report.total_revenue == 0:
-                return {
-                    "revenue_change_rate": 0.0,
-                    "order_change_rate": 0.0,
-                    "customer_change_rate": 0.0
-                }
+                return {"revenue_change_rate": 0.0, "order_change_rate": 0.0, "customer_change_rate": 0.0}
 
             # 获取当天数据
-            current_data = await self._aggregate_revenue_data(
-                session, store_id, report_date
-            )
+            current_data = await self._aggregate_revenue_data(session, store_id, report_date)
 
             # 计算环比
             revenue_change = (
-                (current_data["total_revenue"] - previous_report.total_revenue) /
-                previous_report.total_revenue * 100
-            ) if previous_report.total_revenue > 0 else 0.0
+                ((current_data["total_revenue"] - previous_report.total_revenue) / previous_report.total_revenue * 100)
+                if previous_report.total_revenue > 0
+                else 0.0
+            )
 
             order_change = (
-                (current_data["order_count"] - previous_report.order_count) /
-                previous_report.order_count * 100
-            ) if previous_report.order_count > 0 else 0.0
+                ((current_data["order_count"] - previous_report.order_count) / previous_report.order_count * 100)
+                if previous_report.order_count > 0
+                else 0.0
+            )
 
             customer_change = (
-                (current_data["customer_count"] - previous_report.customer_count) /
-                previous_report.customer_count * 100
-            ) if previous_report.customer_count > 0 else 0.0
+                ((current_data["customer_count"] - previous_report.customer_count) / previous_report.customer_count * 100)
+                if previous_report.customer_count > 0
+                else 0.0
+            )
 
             return {
                 "revenue_change_rate": round(revenue_change, 2),
                 "order_change_rate": round(order_change, 2),
-                "customer_change_rate": round(customer_change, 2)
+                "customer_change_rate": round(customer_change, 2),
             }
 
         except Exception as e:
             logger.error("计算环比数据失败", error=str(e))
-            return {
-                "revenue_change_rate": 0.0,
-                "order_change_rate": 0.0,
-                "customer_change_rate": 0.0
-            }
+            return {"revenue_change_rate": 0.0, "order_change_rate": 0.0, "customer_change_rate": 0.0}
 
-    async def _aggregate_operation_data(
-        self,
-        session,
-        store_id: str,
-        report_date: date
-    ) -> Dict[str, Any]:
+    async def _aggregate_operation_data(self, session, store_id: str, report_date: date) -> Dict[str, Any]:
         """聚合运营数据"""
         try:
             start_datetime = datetime.combine(report_date, datetime.min.time())
@@ -265,10 +197,7 @@ class DailyReportService:
             # 1. 库存预警数
             inventory_result = await session.execute(
                 select(func.count(InventoryItem.id)).where(
-                    and_(
-                        InventoryItem.store_id == store_id,
-                        InventoryItem.quantity <= InventoryItem.min_quantity
-                    )
+                    and_(InventoryItem.store_id == store_id, InventoryItem.quantity <= InventoryItem.min_quantity)
                 )
             )
             inventory_alert_count = inventory_result.scalar() or 0
@@ -277,27 +206,24 @@ class DailyReportService:
             task_result = await session.execute(
                 select(
                     func.count(Task.id).label("total"),
-                    func.sum(
-                        func.case((Task.status == TaskStatus.COMPLETED, 1), else_=0)
-                    ).label("completed")
+                    func.sum(func.case((Task.status == TaskStatus.COMPLETED, 1), else_=0)).label("completed"),
                 ).where(
                     and_(
                         Task.store_id == store_id,
                         Task.created_at >= start_datetime,
                         Task.created_at <= end_datetime,
-                        Task.is_deleted == "false"
+                        Task.is_deleted == "false",
                     )
                 )
             )
             task_row = task_result.first()
             total_tasks = task_row.total or 0
             completed_tasks = task_row.completed or 0
-            task_completion_rate = (
-                (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0.0
-            )
+            task_completion_rate = (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0.0
 
             # 3. 服务问题数（从Notification表查询高优先级或错误类型通知）
             from src.models.notification import Notification, NotificationPriority, NotificationType
+
             notif_result = await session.execute(
                 select(func.count(Notification.id)).where(
                     and_(
@@ -306,11 +232,8 @@ class DailyReportService:
                         Notification.created_at <= end_datetime,
                         or_(
                             Notification.type == NotificationType.ERROR,
-                            Notification.priority.in_([
-                                NotificationPriority.HIGH,
-                                NotificationPriority.URGENT
-                            ])
-                        )
+                            Notification.priority.in_([NotificationPriority.HIGH, NotificationPriority.URGENT]),
+                        ),
                     )
                 )
             )
@@ -319,26 +242,17 @@ class DailyReportService:
             return {
                 "inventory_alert_count": inventory_alert_count,
                 "task_completion_rate": round(task_completion_rate, 2),
-                "service_issue_count": service_issue_count
+                "service_issue_count": service_issue_count,
             }
 
         except Exception as e:
             logger.error("聚合运营数据失败", error=str(e))
-            return {
-                "inventory_alert_count": 0,
-                "task_completion_rate": 0.0,
-                "service_issue_count": 0
-            }
+            return {"inventory_alert_count": 0, "task_completion_rate": 0.0, "service_issue_count": 0}
 
-    async def _aggregate_detail_data(
-        self,
-        session,
-        store_id: str,
-        report_date: date
-    ) -> Dict[str, Any]:
+    async def _aggregate_detail_data(self, session, store_id: str, report_date: date) -> Dict[str, Any]:
         """聚合详细数据：热销菜品、高峰时段"""
-        from src.models.order import OrderItem, OrderStatus
         from sqlalchemy import extract
+        from src.models.order import OrderItem, OrderStatus
 
         # 热销菜品 Top5
         top_dishes_result = await session.execute(
@@ -358,8 +272,7 @@ class DailyReportService:
             .limit(5)
         )
         top_dishes = [
-            {"name": row.item_name, "quantity": int(row.qty), "revenue": int(row.revenue)}
-            for row in top_dishes_result.all()
+            {"name": row.item_name, "quantity": int(row.qty), "revenue": int(row.revenue)} for row in top_dishes_result.all()
         ]
 
         # 高峰时段（按小时统计订单数）
@@ -377,16 +290,9 @@ class DailyReportService:
             .order_by(func.count(Order.id).desc())
             .limit(3)
         )
-        peak_hours = [
-            {"hour": int(row.hour), "order_count": int(row.order_count)}
-            for row in peak_hours_result.all()
-        ]
+        peak_hours = [{"hour": int(row.hour), "order_count": int(row.order_count)} for row in peak_hours_result.all()]
 
-        return {
-            "top_dishes": top_dishes,
-            "peak_hours": peak_hours,
-            "payment_methods": {}
-        }
+        return {"top_dishes": top_dishes, "peak_hours": peak_hours, "payment_methods": {}}
 
     def _generate_summary(self, report: DailyReport) -> str:
         """生成报告摘要"""
@@ -436,11 +342,7 @@ class DailyReportService:
 
         return alerts
 
-    async def get_report(
-        self,
-        store_id: str,
-        report_date: date
-    ) -> Optional[DailyReport]:
+    async def get_report(self, store_id: str, report_date: date) -> Optional[DailyReport]:
         """获取指定日期的日报"""
         try:
             async with get_db_session() as session:
@@ -453,9 +355,7 @@ class DailyReportService:
         """标记日报为已推送"""
         try:
             async with get_db_session() as session:
-                result = await session.execute(
-                    select(DailyReport).where(DailyReport.id == report_id)
-                )
+                result = await session.execute(select(DailyReport).where(DailyReport.id == report_id))
                 report = result.scalar_one_or_none()
 
                 if report:

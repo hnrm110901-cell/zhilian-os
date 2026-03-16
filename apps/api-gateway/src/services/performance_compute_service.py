@@ -14,6 +14,7 @@ P2 绩效计算服务
 Achievement rate 计算：value / target（target 来自 DEFAULT_ROLE_CONFIG target_value 字段；
 无 target 时 achievement_rate=None）。
 """
+
 from __future__ import annotations
 
 import calendar
@@ -25,32 +26,30 @@ import structlog
 from sqlalchemy import and_, func, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.models.employee import Employee
 from src.models.employee_metric import EmployeeMetricRecord
 from src.models.order import Order, OrderItem
-from src.models.waste_event import WasteEvent
 from src.models.store import Store
+from src.models.waste_event import WasteEvent
 
 logger = structlog.get_logger()
 
 # 默认指标目标值（可后续迁移到数据库配置表）
 DEFAULT_TARGETS: Dict[str, float] = {
-    "revenue":          300_000_00,  # 分：300,000 元
-    "profit":           0.55,        # 毛利率 55%
-    "labor_efficiency": 5_000_00,    # 分：5,000 元/人
-    "waste_rate":       0.05,        # 损耗率 5%
-    "avg_per_table":    15_000,      # 分：150 元/桌
-    "order_count":      300,         # 单/月
-    "avg_serve_time":   15.0,        # 分钟（越低越好，特殊处理）
+    "revenue": 300_000_00,  # 分：300,000 元
+    "profit": 0.55,  # 毛利率 55%
+    "labor_efficiency": 5_000_00,  # 分：5,000 元/人
+    "waste_rate": 0.05,  # 损耗率 5%
+    "avg_per_table": 15_000,  # 分：150 元/桌
+    "order_count": 300,  # 单/月
+    "avg_serve_time": 15.0,  # 分钟（越低越好，特殊处理）
 }
 
 # 出餐时效越低越好：达成率 = target / value（反向）
 LOWER_IS_BETTER = {"avg_serve_time", "waste_rate"}
 
 
-def _achievement(value: Optional[float], target: Optional[float],
-                 metric_id: str) -> Optional[float]:
+def _achievement(value: Optional[float], target: Optional[float], metric_id: str) -> Optional[float]:
     """计算达成率，最高不超过 2.0，避免除零。"""
     if value is None or target is None or target == 0:
         return None
@@ -77,18 +76,12 @@ class PerformanceComputeService:
             写入（新增 + 更新）的记录条数。
         """
         period_start = date(year, month, 1)
-        period_end   = date(year, month, calendar.monthrange(year, month)[1])
+        period_end = date(year, month, calendar.monthrange(year, month)[1])
 
         rows: List[dict] = []
-        rows += await PerformanceComputeService._compute_store_metrics(
-            session, store_id, period_start, period_end
-        )
-        rows += await PerformanceComputeService._compute_waiter_metrics(
-            session, store_id, period_start, period_end
-        )
-        rows += await PerformanceComputeService._compute_kitchen_metrics(
-            session, store_id, period_start, period_end
-        )
+        rows += await PerformanceComputeService._compute_store_metrics(session, store_id, period_start, period_end)
+        rows += await PerformanceComputeService._compute_waiter_metrics(session, store_id, period_start, period_end)
+        rows += await PerformanceComputeService._compute_kitchen_metrics(session, store_id, period_start, period_end)
 
         if not rows:
             return 0
@@ -98,17 +91,16 @@ class PerformanceComputeService:
         stmt = stmt.on_conflict_do_update(
             constraint="uq_emp_metric_period",
             set_={
-                "value":            stmt.excluded.value,
-                "target":           stmt.excluded.target,
+                "value": stmt.excluded.value,
+                "target": stmt.excluded.target,
                 "achievement_rate": stmt.excluded.achievement_rate,
-                "data_source":      stmt.excluded.data_source,
-                "updated_at":       datetime.utcnow(),
+                "data_source": stmt.excluded.data_source,
+                "updated_at": datetime.utcnow(),
             },
         )
         await session.execute(stmt)
         await session.flush()
-        logger.info("performance_compute_written", store_id=store_id,
-                    year=year, month=month, rows=len(rows))
+        logger.info("performance_compute_written", store_id=store_id, year=year, month=month, rows=len(rows))
         return len(rows)
 
     # ── 店长指标 ──────────────────────────────────────────────────────────────
@@ -176,15 +168,11 @@ class PerformanceComputeService:
 
         # 在职员工数
         emp_count_res = await session.execute(
-            select(func.count(Employee.id)).where(
-                and_(Employee.store_id == store_id, Employee.is_active.is_(True))
-            )
+            select(func.count(Employee.id)).where(and_(Employee.store_id == store_id, Employee.is_active.is_(True)))
         )
         emp_count = emp_count_res.scalar() or 1
 
-        labor_efficiency = (
-            float(monthly_revenue) / float(emp_count) if emp_count > 0 else None
-        )
+        labor_efficiency = float(monthly_revenue) / float(emp_count) if emp_count > 0 else None
 
         # 损耗率
         waste_res = await session.execute(
@@ -200,30 +188,33 @@ class PerformanceComputeService:
         waste_rate = waste_res.scalar()  # float or None
 
         metric_values = {
-            "revenue":          float(monthly_revenue) if monthly_revenue else None,
-            "profit":           float(gross_margin_pct) if gross_margin_pct is not None else None,
+            "revenue": float(monthly_revenue) if monthly_revenue else None,
+            "profit": float(gross_margin_pct) if gross_margin_pct is not None else None,
             "labor_efficiency": labor_efficiency,
-            "waste_rate":       float(waste_rate) if waste_rate is not None else None,
+            "waste_rate": float(waste_rate) if waste_rate is not None else None,
         }
 
         rows = []
         for manager in managers:
             for metric_id, value in metric_values.items():
                 target = DEFAULT_TARGETS.get(metric_id)
-                rows.append({
-                    "employee_id":      manager.id,
-                    "store_id":         store_id,
-                    "metric_id":        metric_id,
-                    "period_start":     period_start,
-                    "period_end":       period_end,
-                    "value":            Decimal(str(value)) if value is not None else None,
-                    "target":           Decimal(str(target)) if target is not None else None,
-                    "achievement_rate": (
-                        Decimal(str(_achievement(value, target, metric_id)))
-                        if value is not None and target is not None else None
-                    ),
-                    "data_source": "orders,order_items,waste_events",
-                })
+                rows.append(
+                    {
+                        "employee_id": manager.id,
+                        "store_id": store_id,
+                        "metric_id": metric_id,
+                        "period_start": period_start,
+                        "period_end": period_end,
+                        "value": Decimal(str(value)) if value is not None else None,
+                        "target": Decimal(str(target)) if target is not None else None,
+                        "achievement_rate": (
+                            Decimal(str(_achievement(value, target, metric_id)))
+                            if value is not None and target is not None
+                            else None
+                        ),
+                        "data_source": "orders,order_items,waste_events",
+                    }
+                )
         return rows
 
     # ── 服务员指标 ────────────────────────────────────────────────────────────
@@ -245,7 +236,8 @@ class PerformanceComputeService:
                 Order.waiter_id,
                 func.avg(Order.final_amount).label("avg_per_table"),
                 func.count(Order.id).label("order_count"),
-            ).where(
+            )
+            .where(
                 and_(
                     Order.store_id == store_id,
                     Order.status == "completed",
@@ -253,7 +245,8 @@ class PerformanceComputeService:
                     func.date(Order.order_time) >= period_start,
                     func.date(Order.order_time) <= period_end,
                 )
-            ).group_by(Order.waiter_id)
+            )
+            .group_by(Order.waiter_id)
         )
         waiter_stats = res.all()
 
@@ -261,23 +254,26 @@ class PerformanceComputeService:
         for waiter_id, avg_amount, cnt in waiter_stats:
             for metric_id, value in [
                 ("avg_per_table", float(avg_amount) if avg_amount is not None else None),
-                ("order_count",   float(cnt) if cnt is not None else None),
+                ("order_count", float(cnt) if cnt is not None else None),
             ]:
                 target = DEFAULT_TARGETS.get(metric_id)
-                rows.append({
-                    "employee_id":      waiter_id,
-                    "store_id":         store_id,
-                    "metric_id":        metric_id,
-                    "period_start":     period_start,
-                    "period_end":       period_end,
-                    "value":            Decimal(str(value)) if value is not None else None,
-                    "target":           Decimal(str(target)) if target is not None else None,
-                    "achievement_rate": (
-                        Decimal(str(_achievement(value, target, metric_id)))
-                        if value is not None and target is not None else None
-                    ),
-                    "data_source": "orders",
-                })
+                rows.append(
+                    {
+                        "employee_id": waiter_id,
+                        "store_id": store_id,
+                        "metric_id": metric_id,
+                        "period_start": period_start,
+                        "period_end": period_end,
+                        "value": Decimal(str(value)) if value is not None else None,
+                        "target": Decimal(str(target)) if target is not None else None,
+                        "achievement_rate": (
+                            Decimal(str(_achievement(value, target, metric_id)))
+                            if value is not None and target is not None
+                            else None
+                        ),
+                        "data_source": "orders",
+                    }
+                )
         return rows
 
     # ── 后厨指标 ──────────────────────────────────────────────────────────────
@@ -309,11 +305,7 @@ class PerformanceComputeService:
 
         # 出餐时效（仅限已完成且有 confirmed_at 的订单）
         serve_res = await session.execute(
-            select(
-                func.avg(
-                    func.extract("epoch", Order.completed_at - Order.confirmed_at) / 60.0
-                )
-            ).where(
+            select(func.avg(func.extract("epoch", Order.completed_at - Order.confirmed_at) / 60.0)).where(
                 and_(
                     Order.store_id == store_id,
                     Order.status == "completed",
@@ -341,25 +333,28 @@ class PerformanceComputeService:
 
         metric_values = {
             "avg_serve_time": float(avg_serve_time) if avg_serve_time is not None else None,
-            "waste_rate":     float(waste_rate)     if waste_rate is not None else None,
+            "waste_rate": float(waste_rate) if waste_rate is not None else None,
         }
 
         rows = []
         for staff in kitchen_staff:
             for metric_id, value in metric_values.items():
                 target = DEFAULT_TARGETS.get(metric_id)
-                rows.append({
-                    "employee_id":      staff.id,
-                    "store_id":         store_id,
-                    "metric_id":        metric_id,
-                    "period_start":     period_start,
-                    "period_end":       period_end,
-                    "value":            Decimal(str(value)) if value is not None else None,
-                    "target":           Decimal(str(target)) if target is not None else None,
-                    "achievement_rate": (
-                        Decimal(str(_achievement(value, target, metric_id)))
-                        if value is not None and target is not None else None
-                    ),
-                    "data_source": "orders,waste_events",
-                })
+                rows.append(
+                    {
+                        "employee_id": staff.id,
+                        "store_id": store_id,
+                        "metric_id": metric_id,
+                        "period_start": period_start,
+                        "period_end": period_end,
+                        "value": Decimal(str(value)) if value is not None else None,
+                        "target": Decimal(str(target)) if target is not None else None,
+                        "achievement_rate": (
+                            Decimal(str(_achievement(value, target, metric_id)))
+                            if value is not None and target is not None
+                            else None
+                        ),
+                        "data_source": "orders,waste_events",
+                    }
+                )
         return rows

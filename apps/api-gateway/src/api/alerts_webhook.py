@@ -260,12 +260,7 @@ async def _handle_alert_payload(
             lines.append(f"- ... and {extra} more alerts")
 
         title = f"AlertManager {channel} [{severity.upper()}]"
-        message = (
-            f"status={status}\n"
-            f"alerts={len(deduped_alerts)}\n"
-            f"suppressed={suppressed}\n\n"
-            + "\n".join(lines)
-        )
+        message = f"status={status}\n" f"alerts={len(deduped_alerts)}\n" f"suppressed={suppressed}\n\n" + "\n".join(lines)
         send_result = await wechat_alert_service.send_system_alert(
             alert_type=f"alertmanager_{channel}",
             title=title,

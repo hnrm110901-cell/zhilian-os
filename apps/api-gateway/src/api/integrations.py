@@ -2,22 +2,20 @@
 Integration API endpoints
 外部系统集成API接口
 """
-from fastapi import APIRouter, Depends, HTTPException, Body
-from typing import List, Optional, Dict, Any
-from pydantic import BaseModel
-from datetime import datetime
 
-from ..models.user import User, UserRole
-from ..models.integration import (
-    IntegrationType,
-    IntegrationStatus,
-    SyncStatus,
-)
-from ..core.dependencies import get_current_active_user, require_role
-from ..core.database import get_db
-from ..services.integration_service import integration_service
-from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 import structlog
+from fastapi import APIRouter, Body, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..core.database import get_db
+from ..core.dependencies import get_current_active_user, require_role
+from ..models.integration import IntegrationStatus, IntegrationType, SyncStatus
+from ..models.user import User, UserRole
+from ..services.integration_service import integration_service
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -26,6 +24,7 @@ router = APIRouter()
 # Request/Response Models
 class CreateSystemRequest(BaseModel):
     """创建外部系统请求"""
+
     name: str
     type: IntegrationType
     provider: str
@@ -43,6 +42,7 @@ class CreateSystemRequest(BaseModel):
 
 class UpdateSystemRequest(BaseModel):
     """更新外部系统请求"""
+
     name: Optional[str] = None
     status: Optional[IntegrationStatus] = None
     config: Optional[Dict[str, Any]] = None
@@ -56,6 +56,7 @@ class UpdateSystemRequest(BaseModel):
 
 class POSTransactionRequest(BaseModel):
     """POS交易请求"""
+
     transaction_id: str
     order_number: Optional[str] = None
     type: str = "sale"
@@ -71,6 +72,7 @@ class POSTransactionRequest(BaseModel):
 
 class SupplierOrderRequest(BaseModel):
     """供应商订单请求"""
+
     order_number: str
     supplier_id: Optional[str] = None
     supplier_name: Optional[str] = None
@@ -88,6 +90,7 @@ class SupplierOrderRequest(BaseModel):
 
 class MemberSyncRequest(BaseModel):
     """会员同步请求"""
+
     member_id: str
     external_id: Optional[str] = None
     phone: Optional[str] = None
@@ -289,11 +292,13 @@ async def get_pos_transactions(
 async def create_supplier_order(
     system_id: str,
     request: SupplierOrderRequest,
-    current_user: User = Depends(require_role(
-        UserRole.ADMIN,
-        UserRole.STORE_MANAGER,
-        UserRole.WAREHOUSE_MANAGER,
-    )),
+    current_user: User = Depends(
+        require_role(
+            UserRole.ADMIN,
+            UserRole.STORE_MANAGER,
+            UserRole.WAREHOUSE_MANAGER,
+        )
+    ),
     session: AsyncSession = Depends(get_db),
 ):
     """
@@ -346,11 +351,13 @@ async def get_supplier_orders(
 async def sync_member_data(
     system_id: str,
     request: MemberSyncRequest,
-    current_user: User = Depends(require_role(
-        UserRole.ADMIN,
-        UserRole.STORE_MANAGER,
-        UserRole.CUSTOMER_MANAGER,
-    )),
+    current_user: User = Depends(
+        require_role(
+            UserRole.ADMIN,
+            UserRole.STORE_MANAGER,
+            UserRole.CUSTOMER_MANAGER,
+        )
+    ),
     session: AsyncSession = Depends(get_db),
 ):
     """
@@ -401,11 +408,12 @@ async def pos_webhook(
         logger.info("处理订单创建事件", order_id=payload.get("order_id"))
         # 可以触发Neural System事件
         from ..services.neural_system import neural_system
+
         await neural_system.emit_event(
             event_type="order.created",
             event_source=f"pos_system_{system_id}",
             data=payload,
-            store_id=payload.get("store_id", "default")
+            store_id=payload.get("store_id", "default"),
         )
     elif event_type == "order.updated":
         # 处理订单更新事件
@@ -442,15 +450,11 @@ async def supplier_webhook(
     status = payload.get("status")
 
     if order_id and status:
-        logger.info(
-            "更新订单状态",
-            order_id=order_id,
-            status=status,
-            system_id=system_id
-        )
+        logger.info("更新订单状态", order_id=order_id, status=status, system_id=system_id)
 
         # 触发订单状态更新事件
         from ..services.neural_system import neural_system
+
         await neural_system.emit_event(
             event_type="order.status_updated",
             event_source=f"supplier_system_{system_id}",
@@ -461,26 +465,19 @@ async def supplier_webhook(
                 "delivery_time": payload.get("delivery_time"),
                 "tracking_number": payload.get("tracking_number"),
             },
-            store_id=payload.get("store_id", "default")
+            store_id=payload.get("store_id", "default"),
         )
 
-        return {
-            "success": True,
-            "message": "订单状态已更新",
-            "order_id": order_id,
-            "status": status
-        }
+        return {"success": True, "message": "订单状态已更新", "order_id": order_id, "status": status}
     else:
         logger.warning("Webhook数据缺少必要字段", payload=payload)
-        return {
-            "success": False,
-            "message": "缺少order_id或status字段"
-        }
+        return {"success": False, "message": "缺少order_id或status字段"}
 
 
 # Reservation Integration Endpoints
 class ReservationSyncRequest(BaseModel):
     """预订同步请求"""
+
     reservation_id: str
     external_id: Optional[str] = None
     reservation_number: Optional[str] = None
@@ -507,11 +504,13 @@ class ReservationSyncRequest(BaseModel):
 async def sync_reservation(
     system_id: str,
     request: ReservationSyncRequest,
-    current_user: User = Depends(require_role(
-        UserRole.ADMIN,
-        UserRole.STORE_MANAGER,
-        UserRole.CUSTOMER_MANAGER,
-    )),
+    current_user: User = Depends(
+        require_role(
+            UserRole.ADMIN,
+            UserRole.STORE_MANAGER,
+            UserRole.CUSTOMER_MANAGER,
+        )
+    ),
     session: AsyncSession = Depends(get_db),
 ):
     """
@@ -574,11 +573,13 @@ async def update_reservation_status(
     status: str,
     arrival_time: Optional[str] = None,
     table_number: Optional[str] = None,
-    current_user: User = Depends(require_role(
-        UserRole.ADMIN,
-        UserRole.STORE_MANAGER,
-        UserRole.FLOOR_MANAGER,
-    )),
+    current_user: User = Depends(
+        require_role(
+            UserRole.ADMIN,
+            UserRole.STORE_MANAGER,
+            UserRole.FLOOR_MANAGER,
+        )
+    ),
     session: AsyncSession = Depends(get_db),
 ):
     """

@@ -6,16 +6,15 @@ Phase 3: 稳定性加固期 (Stability Reinforcement Period)
 Provides REST API for edge computing and offline mode management
 """
 
-from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
-from src.services.edge_node_service import EdgeNodeService, OperationMode
-from src.core.database import get_db
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from src.core.database import get_db
+from src.services.edge_node_service import EdgeNodeService, OperationMode
 
 router = APIRouter(prefix="/api/v1/edge", tags=["edge_node"])
 
@@ -23,6 +22,7 @@ router = APIRouter(prefix="/api/v1/edge", tags=["edge_node"])
 # Request/Response Models
 class ModeEnum(str, Enum):
     """Operation mode enum"""
+
     ONLINE = "online"
     OFFLINE = "offline"
     HYBRID = "hybrid"
@@ -30,12 +30,14 @@ class ModeEnum(str, Enum):
 
 class SetModeRequest(BaseModel):
     """Set operation mode request"""
+
     mode: ModeEnum
     store_id: str
 
 
 class NetworkStatusRequest(BaseModel):
     """Update network status request"""
+
     store_id: str
     is_connected: bool
     latency_ms: Optional[int] = None
@@ -43,6 +45,7 @@ class NetworkStatusRequest(BaseModel):
 
 class OfflineOperationRequest(BaseModel):
     """Execute offline operation request"""
+
     store_id: str
     operation_type: str
     data: Dict[str, Any]
@@ -50,15 +53,13 @@ class OfflineOperationRequest(BaseModel):
 
 class SyncRequest(BaseModel):
     """Sync offline data request"""
+
     store_id: str
 
 
 # API Endpoints
 @router.post("/mode/set")
-async def set_operation_mode(
-    request: SetModeRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def set_operation_mode(request: SetModeRequest, db: AsyncSession = Depends(get_db)):
     """
     Set edge node operation mode
     设置边缘节点运行模式
@@ -76,17 +77,14 @@ async def set_operation_mode(
             "success": True,
             "message": f"Operation mode set to {request.mode.value}",
             "store_id": request.store_id,
-            "mode": request.mode.value
+            "mode": request.mode.value,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/network/status")
-async def update_network_status(
-    request: NetworkStatusRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def update_network_status(request: NetworkStatusRequest, db: AsyncSession = Depends(get_db)):
     """
     Update network status for edge node
     更新边缘节点网络状态
@@ -95,28 +93,21 @@ async def update_network_status(
     """
     try:
         edge_service = EdgeNodeService()
-        edge_service.update_network_status(
-            request.store_id,
-            request.is_connected,
-            request.latency_ms
-        )
+        edge_service.update_network_status(request.store_id, request.is_connected, request.latency_ms)
 
         return {
             "success": True,
             "message": "Network status updated",
             "store_id": request.store_id,
             "is_connected": request.is_connected,
-            "latency_ms": request.latency_ms
+            "latency_ms": request.latency_ms,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/mode/{store_id}")
-async def get_operation_mode(
-    store_id: str,
-    db: AsyncSession = Depends(get_db)
-):
+async def get_operation_mode(store_id: str, db: AsyncSession = Depends(get_db)):
     """
     Get current operation mode for edge node
     获取边缘节点当前运行模式
@@ -125,20 +116,13 @@ async def get_operation_mode(
         edge_service = EdgeNodeService()
         mode = edge_service.get_current_mode(store_id)
 
-        return {
-            "success": True,
-            "store_id": store_id,
-            "mode": mode.value
-        }
+        return {"success": True, "store_id": store_id, "mode": mode.value}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/offline/execute")
-async def execute_offline_operation(
-    request: OfflineOperationRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def execute_offline_operation(request: OfflineOperationRequest, db: AsyncSession = Depends(get_db)):
     """
     Execute operation using offline rules engine
     使用离线规则引擎执行操作
@@ -151,27 +135,15 @@ async def execute_offline_operation(
     """
     try:
         edge_service = EdgeNodeService()
-        result = edge_service.execute_offline(
-            request.store_id,
-            request.operation_type,
-            request.data
-        )
+        result = edge_service.execute_offline(request.store_id, request.operation_type, request.data)
 
-        return {
-            "success": True,
-            "store_id": request.store_id,
-            "operation_type": request.operation_type,
-            "result": result
-        }
+        return {"success": True, "store_id": request.store_id, "operation_type": request.operation_type, "result": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/sync")
-async def sync_offline_data(
-    request: SyncRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def sync_offline_data(request: SyncRequest, db: AsyncSession = Depends(get_db)):
     """
     Sync offline operations to cloud
     同步离线操作到云端
@@ -186,17 +158,14 @@ async def sync_offline_data(
             "success": True,
             "store_id": request.store_id,
             "synced_operations": synced_count,
-            "message": f"Successfully synced {synced_count} operations"
+            "message": f"Successfully synced {synced_count} operations",
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/cache/{store_id}")
-async def get_cache_status(
-    store_id: str,
-    db: AsyncSession = Depends(get_db)
-):
+async def get_cache_status(store_id: str, db: AsyncSession = Depends(get_db)):
     """
     Get cache status for edge node
     获取边缘节点缓存状态
@@ -211,7 +180,7 @@ async def get_cache_status(
             "store_id": store_id,
             "cache_size": len(cache_data),
             "pending_sync": len(sync_queue),
-            "cache_keys": list(cache_data.keys())
+            "cache_keys": list(cache_data.keys()),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

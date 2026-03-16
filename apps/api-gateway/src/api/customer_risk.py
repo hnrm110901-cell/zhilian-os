@@ -2,12 +2,14 @@
 客户风控 API — Phase P1
 客户归属管理 + 离职交接 + 流失预警
 """
+
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
-from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-import structlog
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
@@ -19,6 +21,7 @@ router = APIRouter()
 
 
 # ── Request Models ──
+
 
 class AssignCustomerRequest(BaseModel):
     store_id: str
@@ -39,6 +42,7 @@ class ResolveAlertRequest(BaseModel):
 
 
 # ── 客户归属 Routes ──
+
 
 @router.post("/customer-ownership/assign", status_code=201)
 async def assign_customer(
@@ -108,6 +112,7 @@ async def get_employee_customer_stats(
 
 
 # ── 流失预警 Routes ──
+
 
 @router.post("/customer-risk/scan")
 async def scan_risk_customers(

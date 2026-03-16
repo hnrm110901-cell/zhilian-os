@@ -2,12 +2,15 @@
 Multi-Channel Notification Configuration
 多渠道通知配置管理
 """
-from pydantic_settings import BaseSettings, SettingsConfigDict
+
 from typing import Optional
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class EmailConfig(BaseSettings):
     """邮件配置"""
+
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
     SMTP_USER: str = "noreply@example.com"
@@ -21,6 +24,7 @@ class EmailConfig(BaseSettings):
 
 class SMSConfig(BaseSettings):
     """短信配置"""
+
     # 阿里云短信
     ALIYUN_ACCESS_KEY_ID: str = ""
     ALIYUN_ACCESS_KEY_SECRET: str = ""
@@ -41,6 +45,7 @@ class SMSConfig(BaseSettings):
 
 class WeChatConfig(BaseSettings):
     """微信配置"""
+
     # 企业微信
     WECHAT_CORP_ID: str = ""
     WECHAT_CORP_SECRET: str = ""
@@ -58,6 +63,7 @@ class WeChatConfig(BaseSettings):
 
 class FeishuConfig(BaseSettings):
     """飞书配置"""
+
     FEISHU_APP_ID: str = ""
     FEISHU_APP_SECRET: str = ""
     FEISHU_WEBHOOK_URL: Optional[str] = None
@@ -67,6 +73,7 @@ class FeishuConfig(BaseSettings):
 
 class PushConfig(BaseSettings):
     """推送配置"""
+
     # 极光推送
     JPUSH_APP_KEY: str = ""
     JPUSH_MASTER_SECRET: str = ""
@@ -83,6 +90,7 @@ class PushConfig(BaseSettings):
 
 class NotificationConfig(BaseSettings):
     """通知配置"""
+
     # 启用的通知渠道
     ENABLED_CHANNELS: str = "email,sms,wechat,system"
 

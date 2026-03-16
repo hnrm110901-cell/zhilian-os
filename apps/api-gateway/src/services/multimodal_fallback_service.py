@@ -16,36 +16,40 @@ Multimodal Graceful Fallback Service
 5. 企微/飞书强推送（Final）
 """
 
-from typing import Dict, List, Optional, Any
-from enum import Enum
-from datetime import datetime
-from pydantic import BaseModel
 import asyncio
 import logging
 import os
+from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
 
 class MessagePriority(str, Enum):
     """消息优先级"""
+
     CRITICAL = "critical"  # 严重：多通道并发
-    HIGH = "high"          # 高：快速降级
-    MEDIUM = "medium"      # 中：正常降级
-    LOW = "low"            # 低：单通道即可
+    HIGH = "high"  # 高：快速降级
+    MEDIUM = "medium"  # 中：正常降级
+    LOW = "low"  # 低：单通道即可
 
 
 class DeliveryChannel(str, Enum):
     """投递通道"""
-    VOICE = "voice"                    # 语音（骨传导耳机）
-    SMARTWATCH = "smartwatch"          # 智能手表震动
-    POS_POPUP = "pos_popup"            # POS弹窗
-    KDS_SCREEN = "kds_screen"          # 后厨KDS大屏
-    ENTERPRISE_IM = "enterprise_im"    # 企微/飞书
+
+    VOICE = "voice"  # 语音（骨传导耳机）
+    SMARTWATCH = "smartwatch"  # 智能手表震动
+    POS_POPUP = "pos_popup"  # POS弹窗
+    KDS_SCREEN = "kds_screen"  # 后厨KDS大屏
+    ENTERPRISE_IM = "enterprise_im"  # 企微/飞书
 
 
 class DeliveryStatus(str, Enum):
     """投递状态"""
+
     SUCCESS = "success"
     FAILED = "failed"
     TIMEOUT = "timeout"
@@ -54,19 +58,21 @@ class DeliveryStatus(str, Enum):
 
 class EnvironmentCondition(BaseModel):
     """环境条件"""
-    noise_level_db: float              # 噪音水平（分贝）
-    asr_failure_count: int             # ASR连续失败次数
-    user_location: str                 # 用户位置（前厅/后厨）
-    peak_hour: bool                    # 是否高峰期
-    network_quality: str               # 网络质量（good/fair/poor）
+
+    noise_level_db: float  # 噪音水平（分贝）
+    asr_failure_count: int  # ASR连续失败次数
+    user_location: str  # 用户位置（前厅/后厨）
+    peak_hour: bool  # 是否高峰期
+    network_quality: str  # 网络质量（good/fair/poor）
 
 
 class Message(BaseModel):
     """消息"""
+
     message_id: str
     content: str
     priority: MessagePriority
-    category: str                      # 催菜/缺货/预警/通知
+    category: str  # 催菜/缺货/预警/通知
     target_user: str
     created_at: datetime
     expires_at: Optional[datetime]
@@ -74,6 +80,7 @@ class Message(BaseModel):
 
 class DeliveryResult(BaseModel):
     """投递结果"""
+
     message_id: str
     channel: DeliveryChannel
     status: DeliveryStatus
@@ -86,15 +93,11 @@ class MultimodalFallbackService:
     """多模态优雅降级服务"""
 
     def __init__(self):
-        self.asr_failure_threshold = int(os.getenv("MULTIMODAL_ASR_FAILURE_THRESHOLD", "2"))      # ASR失败阈值
-        self.noise_threshold_db = float(os.getenv("MULTIMODAL_NOISE_THRESHOLD_DB", "85.0"))        # 噪音阈值
-        self.response_timeout_ms = int(os.getenv("MULTIMODAL_RESPONSE_TIMEOUT_MS", "3000"))        # 响应超时（毫秒）
+        self.asr_failure_threshold = int(os.getenv("MULTIMODAL_ASR_FAILURE_THRESHOLD", "2"))  # ASR失败阈值
+        self.noise_threshold_db = float(os.getenv("MULTIMODAL_NOISE_THRESHOLD_DB", "85.0"))  # 噪音阈值
+        self.response_timeout_ms = int(os.getenv("MULTIMODAL_RESPONSE_TIMEOUT_MS", "3000"))  # 响应超时（毫秒）
 
-    async def deliver_message(
-        self,
-        message: Message,
-        environment: EnvironmentCondition
-    ) -> List[DeliveryResult]:
+    async def deliver_message(self, message: Message, environment: EnvironmentCondition) -> List[DeliveryResult]:
         """
         投递消息（自动选择最佳通道）
 
@@ -112,11 +115,7 @@ class MultimodalFallbackService:
         # 单通道降级链路
         return await self._deliver_with_fallback(message, environment)
 
-    def _requires_multi_channel(
-        self,
-        message: Message,
-        environment: EnvironmentCondition
-    ) -> bool:
+    def _requires_multi_channel(self, message: Message, environment: EnvironmentCondition) -> bool:
         """判断是否需要多通道并发"""
         # 严重优先级消息
         if message.priority == MessagePriority.CRITICAL:
@@ -132,24 +131,15 @@ class MultimodalFallbackService:
 
         return False
 
-    async def _deliver_multi_channel(
-        self,
-        message: Message,
-        environment: EnvironmentCondition
-    ) -> List[DeliveryResult]:
+    async def _deliver_multi_channel(self, message: Message, environment: EnvironmentCondition) -> List[DeliveryResult]:
         """多通道并发投递"""
-        logger.info(
-            f"Multi-channel delivery for message {message.message_id}"
-        )
+        logger.info(f"Multi-channel delivery for message {message.message_id}")
 
         # 选择所有可用通道
         channels = self._select_channels_for_multi_delivery(environment)
 
         # 并发投递
-        tasks = [
-            self._deliver_to_channel(message, channel, environment)
-            for channel in channels
-        ]
+        tasks = [self._deliver_to_channel(message, channel, environment) for channel in channels]
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -158,28 +148,24 @@ class MultimodalFallbackService:
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 logger.error(f"Channel {channels[i]} delivery failed: {result}")
-                delivery_results.append(DeliveryResult(
-                    message_id=message.message_id,
-                    channel=channels[i],
-                    status=DeliveryStatus.FAILED,
-                    delivered_at=None,
-                    response_time_ms=None,
-                    error_message=str(result)
-                ))
+                delivery_results.append(
+                    DeliveryResult(
+                        message_id=message.message_id,
+                        channel=channels[i],
+                        status=DeliveryStatus.FAILED,
+                        delivered_at=None,
+                        response_time_ms=None,
+                        error_message=str(result),
+                    )
+                )
             else:
                 delivery_results.append(result)
 
         return delivery_results
 
-    async def _deliver_with_fallback(
-        self,
-        message: Message,
-        environment: EnvironmentCondition
-    ) -> List[DeliveryResult]:
+    async def _deliver_with_fallback(self, message: Message, environment: EnvironmentCondition) -> List[DeliveryResult]:
         """单通道降级链路投递"""
-        logger.info(
-            f"Fallback delivery for message {message.message_id}"
-        )
+        logger.info(f"Fallback delivery for message {message.message_id}")
 
         # 获取降级链路
         fallback_chain = self._get_fallback_chain(environment)
@@ -188,34 +174,24 @@ class MultimodalFallbackService:
 
         for channel in fallback_chain:
             # 尝试投递
-            result = await self._deliver_to_channel(
-                message, channel, environment
-            )
+            result = await self._deliver_to_channel(message, channel, environment)
             results.append(result)
 
             # 如果成功，停止降级
             if result.status == DeliveryStatus.SUCCESS:
-                logger.info(
-                    f"Message {message.message_id} delivered via {channel}"
-                )
+                logger.info(f"Message {message.message_id} delivered via {channel}")
                 break
 
             # 如果失败，继续下一个通道
-            logger.warning(
-                f"Channel {channel} failed, falling back to next channel"
-            )
+            logger.warning(f"Channel {channel} failed, falling back to next channel")
 
         return results
 
-    def _get_fallback_chain(
-        self,
-        environment: EnvironmentCondition
-    ) -> List[DeliveryChannel]:
+    def _get_fallback_chain(self, environment: EnvironmentCondition) -> List[DeliveryChannel]:
         """获取降级链路"""
         # 判断是否应该跳过语音
         skip_voice = (
-            environment.noise_level_db > self.noise_threshold_db or
-            environment.asr_failure_count >= self.asr_failure_threshold
+            environment.noise_level_db > self.noise_threshold_db or environment.asr_failure_count >= self.asr_failure_threshold
         )
 
         if skip_voice:
@@ -229,7 +205,7 @@ class MultimodalFallbackService:
                 DeliveryChannel.SMARTWATCH,
                 DeliveryChannel.POS_POPUP,
                 DeliveryChannel.KDS_SCREEN,
-                DeliveryChannel.ENTERPRISE_IM
+                DeliveryChannel.ENTERPRISE_IM,
             ]
 
         # 正常降级链路（从语音开始）
@@ -239,7 +215,7 @@ class MultimodalFallbackService:
                 DeliveryChannel.VOICE,
                 DeliveryChannel.KDS_SCREEN,
                 DeliveryChannel.SMARTWATCH,
-                DeliveryChannel.ENTERPRISE_IM
+                DeliveryChannel.ENTERPRISE_IM,
             ]
         else:
             # 前厅：优先POS弹窗
@@ -247,13 +223,10 @@ class MultimodalFallbackService:
                 DeliveryChannel.VOICE,
                 DeliveryChannel.SMARTWATCH,
                 DeliveryChannel.POS_POPUP,
-                DeliveryChannel.ENTERPRISE_IM
+                DeliveryChannel.ENTERPRISE_IM,
             ]
 
-    def _select_channels_for_multi_delivery(
-        self,
-        environment: EnvironmentCondition
-    ) -> List[DeliveryChannel]:
+    def _select_channels_for_multi_delivery(self, environment: EnvironmentCondition) -> List[DeliveryChannel]:
         """选择多通道投递的通道列表"""
         channels = []
 
@@ -274,10 +247,7 @@ class MultimodalFallbackService:
         return channels
 
     async def _deliver_to_channel(
-        self,
-        message: Message,
-        channel: DeliveryChannel,
-        environment: EnvironmentCondition
+        self, message: Message, channel: DeliveryChannel, environment: EnvironmentCondition
     ) -> DeliveryResult:
         """投递到指定通道"""
         start_time = datetime.now()
@@ -296,9 +266,7 @@ class MultimodalFallbackService:
             else:
                 success = False
 
-            response_time = int(
-                (datetime.now() - start_time).total_seconds() * 1000
-            )
+            response_time = int((datetime.now() - start_time).total_seconds() * 1000)
 
             return DeliveryResult(
                 message_id=message.message_id,
@@ -306,7 +274,7 @@ class MultimodalFallbackService:
                 status=DeliveryStatus.SUCCESS if success else DeliveryStatus.FAILED,
                 delivered_at=datetime.now() if success else None,
                 response_time_ms=response_time,
-                error_message=None if success else "Delivery failed"
+                error_message=None if success else "Delivery failed",
             )
 
         except asyncio.TimeoutError:
@@ -316,7 +284,7 @@ class MultimodalFallbackService:
                 status=DeliveryStatus.TIMEOUT,
                 delivered_at=None,
                 response_time_ms=self.response_timeout_ms,
-                error_message="Delivery timeout"
+                error_message="Delivery timeout",
             )
         except Exception as e:
             logger.error(f"Channel {channel} delivery error: {e}")
@@ -326,14 +294,10 @@ class MultimodalFallbackService:
                 status=DeliveryStatus.FAILED,
                 delivered_at=None,
                 response_time_ms=None,
-                error_message=str(e)
+                error_message=str(e),
             )
 
-    async def _deliver_via_voice(
-        self,
-        message: Message,
-        environment: EnvironmentCondition
-    ) -> bool:
+    async def _deliver_via_voice(self, message: Message, environment: EnvironmentCondition) -> bool:
         """通过语音投递"""
         # 检查环境是否适合语音
         if environment.noise_level_db > self.noise_threshold_db:
@@ -343,9 +307,9 @@ class MultimodalFallbackService:
         # 调用语音服务
         try:
             from ..services.voice_service import voice_service
+
             await asyncio.wait_for(
-                voice_service.speak(message.content, message.target_user),
-                timeout=self.response_timeout_ms / 1000
+                voice_service.speak(message.content, message.target_user), timeout=self.response_timeout_ms / 1000
             )
             return True
         except Exception as e:
@@ -356,7 +320,8 @@ class MultimodalFallbackService:
         """通过智能手表投递（保存到通知队列，由手表端轮询）"""
         try:
             from src.core.database import get_db_session
-            from src.models.notification import Notification, NotificationType, NotificationPriority
+            from src.models.notification import Notification, NotificationPriority, NotificationType
+
             async with get_db_session() as session:
                 notif = Notification(
                     title="手表通知",
@@ -377,7 +342,8 @@ class MultimodalFallbackService:
         """通过POS弹窗投递（保存到通知队列，由POS端轮询）"""
         try:
             from src.core.database import get_db_session
-            from src.models.notification import Notification, NotificationType, NotificationPriority
+            from src.models.notification import Notification, NotificationPriority, NotificationType
+
             async with get_db_session() as session:
                 notif = Notification(
                     title="POS弹窗通知",
@@ -398,7 +364,8 @@ class MultimodalFallbackService:
         """通过KDS大屏投递（保存到通知队列，由KDS端轮询）"""
         try:
             from src.core.database import get_db_session
-            from src.models.notification import Notification, NotificationType, NotificationPriority
+            from src.models.notification import Notification, NotificationPriority, NotificationType
+
             async with get_db_session() as session:
                 notif = Notification(
                     title="KDS大屏通知",
@@ -419,22 +386,16 @@ class MultimodalFallbackService:
         """通过企微/飞书投递"""
         try:
             from ..services.enterprise_service import enterprise_service
+
             await asyncio.wait_for(
-                enterprise_service.send_message(
-                    message.target_user,
-                    message.content
-                ),
-                timeout=self.response_timeout_ms / 1000
+                enterprise_service.send_message(message.target_user, message.content), timeout=self.response_timeout_ms / 1000
             )
             return True
         except Exception as e:
             logger.error(f"Enterprise IM delivery failed: {e}")
             return False
 
-    async def monitor_environment(
-        self,
-        user_id: str
-    ) -> EnvironmentCondition:
+    async def monitor_environment(self, user_id: str) -> EnvironmentCondition:
         """
         监控环境条件
 
@@ -447,14 +408,17 @@ class MultimodalFallbackService:
         # 从业务系统判断是否高峰期（11-14点 或 17-21点）
         # ASR失败次数从 Notification 表查询最近记录
         current_hour = datetime.now().hour
-        peak_hour = (int(os.getenv("PEAK_LUNCH_START", "11")) <= current_hour <= int(os.getenv("PEAK_LUNCH_END", "14"))) or (int(os.getenv("PEAK_DINNER_START", "17")) <= current_hour <= int(os.getenv("PEAK_DINNER_END", "21")))
+        peak_hour = (int(os.getenv("PEAK_LUNCH_START", "11")) <= current_hour <= int(os.getenv("PEAK_LUNCH_END", "14"))) or (
+            int(os.getenv("PEAK_DINNER_START", "17")) <= current_hour <= int(os.getenv("PEAK_DINNER_END", "21"))
+        )
 
         asr_failure_count = 0
         try:
+            from datetime import timedelta
+
+            from sqlalchemy import func, select
             from src.core.database import get_db_session
             from src.models.notification import Notification
-            from sqlalchemy import select, func
-            from datetime import timedelta
 
             cutoff = datetime.now() - timedelta(minutes=int(os.getenv("MULTIMODAL_STATS_WINDOW_MINUTES", "30")))
             async with get_db_session() as session:
@@ -469,25 +433,28 @@ class MultimodalFallbackService:
             logger.warning("asr_stats_query_failed", error=str(e))
 
         return EnvironmentCondition(
-            noise_level_db=float(os.getenv("MULTIMODAL_NOISE_PEAK_DB", "75.0")) if peak_hour else float(os.getenv("MULTIMODAL_NOISE_NORMAL_DB", "55.0")),
+            noise_level_db=(
+                float(os.getenv("MULTIMODAL_NOISE_PEAK_DB", "75.0"))
+                if peak_hour
+                else float(os.getenv("MULTIMODAL_NOISE_NORMAL_DB", "55.0"))
+            ),
             asr_failure_count=asr_failure_count,
             user_location="front",
             peak_hour=peak_hour,
-            network_quality="good"
+            network_quality="good",
         )
 
     def get_delivery_statistics(
-        self,
-        time_range_hours: int = int(os.getenv("MULTIMODAL_DELIVERY_STATS_HOURS", "24"))
+        self, time_range_hours: int = int(os.getenv("MULTIMODAL_DELIVERY_STATS_HOURS", "24"))
     ) -> Dict[str, Any]:
         """获取投递统计（从 Notification 表聚合）"""
         import asyncio
         from datetime import timedelta
 
         async def _query():
+            from sqlalchemy import func, select
             from src.core.database import get_db_session
             from src.models.notification import Notification
-            from sqlalchemy import select, func
 
             cutoff = datetime.now() - timedelta(hours=time_range_hours)
             async with get_db_session() as session:
@@ -526,11 +493,23 @@ class MultimodalFallbackService:
             loop = asyncio.get_event_loop()
             if loop.is_running():
                 future = asyncio.ensure_future(_query())
-                return {"total_messages": 0, "by_channel": {}, "by_priority": {}, "success_rate": 0.0, "average_response_time_ms": 0}
+                return {
+                    "total_messages": 0,
+                    "by_channel": {},
+                    "by_priority": {},
+                    "success_rate": 0.0,
+                    "average_response_time_ms": 0,
+                }
             return loop.run_until_complete(_query())
         except Exception as e:
             logger.warning(f"获取投递统计失败: {e}")
-            return {"total_messages": 0, "by_channel": {}, "by_priority": {}, "success_rate": 0.0, "average_response_time_ms": 0}
+            return {
+                "total_messages": 0,
+                "by_channel": {},
+                "by_priority": {},
+                "success_rate": 0.0,
+                "average_response_time_ms": 0,
+            }
 
 
 # 全局实例

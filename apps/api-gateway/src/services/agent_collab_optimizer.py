@@ -9,6 +9,7 @@ AgentCollaborationOptimizer — 多Agent协同总线
 4. 全局优化建议列表（去重/重排/打包/抑制）
 5. 返回经过协同的最终建议集合
 """
+
 import uuid
 from dataclasses import dataclass, field
 from typing import Optional
@@ -20,16 +21,16 @@ from typing import Optional
 AGENT_PRIORITY: dict[str, int] = {
     # P0 — 收入+成本双向高影响
     "business_intel": 100,
-    "ops_flow":       95,
-    "people":         90,
+    "ops_flow": 95,
+    "people": 90,
     # P1 — 增长引擎
-    "marketing":      80,
-    "banquet":        75,
-    "dish_rd":        70,
-    "supplier":       65,
+    "marketing": 80,
+    "banquet": 75,
+    "dish_rd": 70,
+    "supplier": 65,
     # 底座层
-    "compliance":     60,
-    "fct":            55,
+    "compliance": 60,
+    "fct": 55,
     "private_domain": 50,
 }
 
@@ -39,17 +40,17 @@ AGENT_PRIORITY: dict[str, int] = {
 
 KNOWN_CONFLICT_PAIRS: list[tuple[str, str, str, str]] = [
     # OpsFlowAgent 紧急补货 vs SupplierAgent 切换供应商
-    ("ops_flow",       "supplier",       "补货",   "切换供应商"),
+    ("ops_flow", "supplier", "补货", "切换供应商"),
     # BusinessIntelAgent 促销折扣 vs FctAgent 现金流约束
-    ("business_intel", "fct",            "折扣",   "现金流"),
+    ("business_intel", "fct", "折扣", "现金流"),
     # MarketingAgent 高频推送 vs 企业微信频控
-    ("marketing",      "ops_flow",       "发券",   "推送"),
+    ("marketing", "ops_flow", "发券", "推送"),
     # PeopleAgent 排班削减 vs OpsFlowAgent 高峰预警
-    ("people",         "ops_flow",       "减少排班", "高峰"),
+    ("people", "ops_flow", "减少排班", "高峰"),
     # DishRdAgent 推新品 vs SupplierAgent 供应风险
-    ("dish_rd",        "supplier",       "新品上市", "供应风险"),
+    ("dish_rd", "supplier", "新品上市", "供应风险"),
     # BanquetAgent 宴会日满场 vs OpsFlowAgent 库存不足
-    ("banquet",        "ops_flow",       "宴会满场", "库存不足"),
+    ("banquet", "ops_flow", "宴会满场", "库存不足"),
 ]
 
 
@@ -57,63 +58,69 @@ KNOWN_CONFLICT_PAIRS: list[tuple[str, str, str, str]] = [
 # 数据结构
 # ──────────────────────────────────────────────
 
+
 @dataclass
 class AgentRecommendation:
     """单条 Agent 建议（传入协同总线的格式）"""
-    id:                    str
-    agent_name:            str
-    store_id:              str
-    recommendation_type:   str
-    recommendation_text:   str
-    expected_impact_yuan:  float = 0.0
-    confidence_score:      float = 0.5
-    priority_override:     Optional[int] = None  # 允许 Agent 自定义优先级
+
+    id: str
+    agent_name: str
+    store_id: str
+    recommendation_type: str
+    recommendation_text: str
+    expected_impact_yuan: float = 0.0
+    confidence_score: float = 0.5
+    priority_override: Optional[int] = None  # 允许 Agent 自定义优先级
 
 
 @dataclass
 class ConflictRecord:
     """检测到的冲突"""
-    conflict_id:        str
-    agent_a:            str
-    agent_b:            str
-    rec_a_id:           str
-    rec_b_id:           str
-    conflict_type:      str
-    severity:           str
-    description:        str
-    winning_agent:      Optional[str] = None
+
+    conflict_id: str
+    agent_a: str
+    agent_b: str
+    rec_a_id: str
+    rec_b_id: str
+    conflict_type: str
+    severity: str
+    description: str
+    winning_agent: Optional[str] = None
     arbitration_method: str = "priority_wins"
-    impact_yuan_saved:  float = 0.0
+    impact_yuan_saved: float = 0.0
 
 
 @dataclass
 class OptimizationAction:
     """单次优化操作"""
-    action:      str      # dedup/reorder/bundle/suppress
-    rec_ids:     list[str] = field(default_factory=list)
-    reason:      str = ""
+
+    action: str  # dedup/reorder/bundle/suppress
+    rec_ids: list[str] = field(default_factory=list)
+    reason: str = ""
 
 
 @dataclass
 class CollabResult:
     """协同总线输出结果"""
+
     optimized_recommendations: list[AgentRecommendation]
-    conflicts:                 list[ConflictRecord]
-    optimization_actions:      list[OptimizationAction]
-    input_count:               int
-    output_count:              int
-    conflicts_detected:        int
-    dedup_count:               int
-    suppressed_count:          int
-    bundled_count:             int
-    total_impact_yuan_before:  float
-    total_impact_yuan_after:   float
-    ai_insight:                str
+    conflicts: list[ConflictRecord]
+    optimization_actions: list[OptimizationAction]
+    input_count: int
+    output_count: int
+    conflicts_detected: int
+    dedup_count: int
+    suppressed_count: int
+    bundled_count: int
+    total_impact_yuan_before: float
+    total_impact_yuan_after: float
+    ai_insight: str
 
 
 # ──────────────────────────────────────────────
 # 纯函数
 # ──────────────────────────────────────────────
+
 
 def get_agent_priority(agent_name: str, override: Optional[int] = None) -> int:
     """获取 Agent 优先级（越大越优先）"""
@@ -133,14 +140,16 @@ def classify_conflict_severity(impact_a: float, impact_b: float) -> str:
 
 
 def detect_keyword_conflict(
-    agent_a: str, text_a: str,
-    agent_b: str, text_b: str,
+    agent_a: str,
+    text_a: str,
+    agent_b: str,
+    text_b: str,
 ) -> Optional[tuple[str, str]]:
     """
     检测两条建议之间是否存在已知关键词冲突
     返回 (conflict_type, description) 或 None
     """
-    for (aa, ab, kw_a, kw_b) in KNOWN_CONFLICT_PAIRS:
+    for aa, ab, kw_a, kw_b in KNOWN_CONFLICT_PAIRS:
         if agent_a == aa and agent_b == ab:
             if kw_a in text_a and kw_b in text_b:
                 return ("resource_contention", f"{agent_a}建议「{kw_a}」与{agent_b}建议「{kw_b}」存在冲突")
@@ -150,7 +159,7 @@ def detect_keyword_conflict(
 
     # 通用检测：相同store+相反动作
     contra_pairs = [("增加", "减少"), ("买入", "卖出"), ("促销", "提价"), ("扩张", "收缩")]
-    for (pos, neg) in contra_pairs:
+    for pos, neg in contra_pairs:
         if pos in text_a and neg in text_b:
             return ("contradictory_action", f"{agent_a}建议{pos}，{agent_b}建议{neg}，动作互相矛盾")
         if neg in text_a and pos in text_b:
@@ -161,8 +170,12 @@ def detect_keyword_conflict(
 
 def arbitrate_conflict(
     conflict_type: str,
-    agent_a: str, priority_a: int, impact_a: float,
-    agent_b: str, priority_b: int, impact_b: float,
+    agent_a: str,
+    priority_a: int,
+    impact_a: float,
+    agent_b: str,
+    priority_b: int,
+    impact_b: float,
 ) -> tuple[Optional[str], str]:
     """
     仲裁冲突，返回 (winning_agent, arbitration_method)
@@ -202,8 +215,8 @@ def is_duplicate(rec_a: AgentRecommendation, rec_b: AgentRecommendation) -> bool
     if not ta or not tb:
         return False
     # 字符2-gram
-    bigrams_a = {ta[i:i+2] for i in range(len(ta) - 1)}
-    bigrams_b = {tb[i:i+2] for i in range(len(tb) - 1)}
+    bigrams_a = {ta[i : i + 2] for i in range(len(ta) - 1)}
+    bigrams_b = {tb[i : i + 2] for i in range(len(tb) - 1)}
     if not bigrams_a or not bigrams_b:
         return False
     jaccard = len(bigrams_a & bigrams_b) / len(bigrams_a | bigrams_b)
@@ -231,9 +244,11 @@ def build_ai_insight(
     lines = []
     if conflicts:
         high_conflicts = [c for c in conflicts if c.severity == "high"]
-        lines.append(f"检测到 {len(conflicts)} 个跨Agent冲突"
-                     + (f"（其中 {len(high_conflicts)} 个高风险）" if high_conflicts else "")
-                     + "，已完成自动仲裁。")
+        lines.append(
+            f"检测到 {len(conflicts)} 个跨Agent冲突"
+            + (f"（其中 {len(high_conflicts)} 个高风险）" if high_conflicts else "")
+            + "，已完成自动仲裁。"
+        )
     removed = input_count - output_count
     if removed > 0:
         lines.append(f"全局优化去除 {removed} 条冗余/低价值建议，推送噪音降低 {removed/max(input_count,1)*100:.0f}%。")
@@ -250,6 +265,7 @@ def build_ai_insight(
 # ──────────────────────────────────────────────
 # 核心服务类
 # ──────────────────────────────────────────────
+
 
 class AgentCollabOptimizer:
     """
@@ -291,8 +307,9 @@ class AgentCollabOptimizer:
                 ra, rb = recs[i], recs[j]
                 if ra.store_id != rb.store_id:
                     continue
-                detection = detect_keyword_conflict(ra.agent_name, ra.recommendation_text,
-                                                    rb.agent_name, rb.recommendation_text)
+                detection = detect_keyword_conflict(
+                    ra.agent_name, ra.recommendation_text, rb.agent_name, rb.recommendation_text
+                )
                 if detection is None:
                     continue
                 conflict_type, description = detection
@@ -301,33 +318,39 @@ class AgentCollabOptimizer:
                 severity = classify_conflict_severity(ra.expected_impact_yuan, rb.expected_impact_yuan)
                 winner, method = arbitrate_conflict(
                     conflict_type,
-                    ra.agent_name, pa, ra.expected_impact_yuan,
-                    rb.agent_name, pb, rb.expected_impact_yuan,
+                    ra.agent_name,
+                    pa,
+                    ra.expected_impact_yuan,
+                    rb.agent_name,
+                    pb,
+                    rb.expected_impact_yuan,
                 )
                 impact_saved = min(abs(ra.expected_impact_yuan), abs(rb.expected_impact_yuan))
                 cf = ConflictRecord(
-                    conflict_id        = str(uuid.uuid4()),
-                    agent_a            = ra.agent_name,
-                    agent_b            = rb.agent_name,
-                    rec_a_id           = ra.id,
-                    rec_b_id           = rb.id,
-                    conflict_type      = conflict_type,
-                    severity           = severity,
-                    description        = description,
-                    winning_agent      = winner,
-                    arbitration_method = method,
-                    impact_yuan_saved  = impact_saved,
+                    conflict_id=str(uuid.uuid4()),
+                    agent_a=ra.agent_name,
+                    agent_b=rb.agent_name,
+                    rec_a_id=ra.id,
+                    rec_b_id=rb.id,
+                    conflict_type=conflict_type,
+                    severity=severity,
+                    description=description,
+                    winning_agent=winner,
+                    arbitration_method=method,
+                    impact_yuan_saved=impact_saved,
                 )
                 conflicts.append(cf)
                 # 失败方建议被抑制
                 loser_id = rb.id if winner == ra.agent_name else ra.id
                 if loser_id and winner is not None:
                     suppressed_ids.add(loser_id)
-                    actions.append(OptimizationAction(
-                        action  = "suppress",
-                        rec_ids = [loser_id],
-                        reason  = f"冲突仲裁：{winner} 胜出，{description}",
-                    ))
+                    actions.append(
+                        OptimizationAction(
+                            action="suppress",
+                            rec_ids=[loser_id],
+                            reason=f"冲突仲裁：{winner} 胜出，{description}",
+                        )
+                    )
 
         # Step 2: 去重
         seen_texts: list[AgentRecommendation] = []
@@ -341,18 +364,22 @@ class AgentCollabOptimizer:
                     dedup_ids.add(dup.id)
                     seen_texts = [s for s in seen_texts if s.id != dup.id]
                     seen_texts.append(rec)
-                    actions.append(OptimizationAction(
-                        action  = "dedup",
-                        rec_ids = [dup.id, rec.id],
-                        reason  = f"去重：{rec.agent_name} 建议与 {dup.agent_name} 实质相同，保留高影响版本",
-                    ))
+                    actions.append(
+                        OptimizationAction(
+                            action="dedup",
+                            rec_ids=[dup.id, rec.id],
+                            reason=f"去重：{rec.agent_name} 建议与 {dup.agent_name} 实质相同，保留高影响版本",
+                        )
+                    )
                 else:
                     dedup_ids.add(rec.id)
-                    actions.append(OptimizationAction(
-                        action  = "dedup",
-                        rec_ids = [rec.id, dup.id],
-                        reason  = f"去重：{rec.agent_name} 建议与 {dup.agent_name} 实质相同，保留高影响版本",
-                    ))
+                    actions.append(
+                        OptimizationAction(
+                            action="dedup",
+                            rec_ids=[rec.id, dup.id],
+                            reason=f"去重：{rec.agent_name} 建议与 {dup.agent_name} 实质相同，保留高影响版本",
+                        )
+                    )
             else:
                 seen_texts.append(rec)
 
@@ -360,11 +387,13 @@ class AgentCollabOptimizer:
         for rec in seen_texts:
             if should_suppress(rec, suppress_threshold_yuan):
                 suppressed_ids.add(rec.id)
-                actions.append(OptimizationAction(
-                    action  = "suppress",
-                    rec_ids = [rec.id],
-                    reason  = f"抑制：¥影响{rec.expected_impact_yuan:.0f} < 阈值{suppress_threshold_yuan:.0f}，且置信度{rec.confidence_score:.2f}偏低",
-                ))
+                actions.append(
+                    OptimizationAction(
+                        action="suppress",
+                        rec_ids=[rec.id],
+                        reason=f"抑制：¥影响{rec.expected_impact_yuan:.0f} < 阈值{suppress_threshold_yuan:.0f}，且置信度{rec.confidence_score:.2f}偏低",
+                    )
+                )
 
         # Step 4: 最终过滤 + 重排序（¥影响 × 置信度降序）
         excluded = suppressed_ids | dedup_ids
@@ -376,23 +405,26 @@ class AgentCollabOptimizer:
 
         total_impact_after = compute_global_impact(final_recs)
         ai_insight = build_ai_insight(
-            input_count, len(final_recs), conflicts,
-            total_impact_before, total_impact_after,
+            input_count,
+            len(final_recs),
+            conflicts,
+            total_impact_before,
+            total_impact_after,
         )
 
         return CollabResult(
-            optimized_recommendations = final_recs,
-            conflicts                 = conflicts,
-            optimization_actions      = actions,
-            input_count               = input_count,
-            output_count              = len(final_recs),
-            conflicts_detected        = len(conflicts),
-            dedup_count               = len(dedup_ids),
-            suppressed_count          = len(suppressed_ids),
-            bundled_count             = bundled_count,
-            total_impact_yuan_before  = total_impact_before,
-            total_impact_yuan_after   = total_impact_after,
-            ai_insight                = ai_insight,
+            optimized_recommendations=final_recs,
+            conflicts=conflicts,
+            optimization_actions=actions,
+            input_count=input_count,
+            output_count=len(final_recs),
+            conflicts_detected=len(conflicts),
+            dedup_count=len(dedup_ids),
+            suppressed_count=len(suppressed_ids),
+            bundled_count=bundled_count,
+            total_impact_yuan_before=total_impact_before,
+            total_impact_yuan_after=total_impact_after,
+            ai_insight=ai_insight,
         )
 
     def detect_conflicts_only(

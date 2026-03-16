@@ -6,15 +6,14 @@ Prefix: /api/v1/fin-anomaly
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.services.financial_anomaly_service import (
+    METRICS,
     detect_store_anomalies,
     get_anomaly_records,
-    resolve_anomaly,
     get_anomaly_trend,
     get_brand_anomaly_summary,
-    METRICS,
+    resolve_anomaly,
 )
 
 router = APIRouter(prefix="/api/v1/fin-anomaly", tags=["financial_anomaly"])
@@ -23,6 +22,7 @@ router = APIRouter(prefix="/api/v1/fin-anomaly", tags=["financial_anomaly"])
 # ---------------------------------------------------------------------------
 # 检测
 # ---------------------------------------------------------------------------
+
 
 @router.post("/detect/{store_id}")
 async def detect_anomalies(
@@ -38,6 +38,7 @@ async def detect_anomalies(
 # ---------------------------------------------------------------------------
 # 查询
 # ---------------------------------------------------------------------------
+
 
 @router.get("/{store_id}")
 async def list_anomalies(
@@ -77,6 +78,7 @@ async def brand_summary(
 # 操作
 # ---------------------------------------------------------------------------
 
+
 @router.post("/resolve/{store_id}")
 async def resolve(
     store_id: str,
@@ -96,6 +98,7 @@ async def resolve(
 # ---------------------------------------------------------------------------
 # 元数据
 # ---------------------------------------------------------------------------
+
 
 @router.get("/meta/metrics")
 async def meta_metrics():

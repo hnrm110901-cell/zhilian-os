@@ -38,8 +38,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.dependencies import get_current_active_user, get_db
 from ..models.edge_hub import (
-    AlertStatus, BindingStatus, DeviceStatus, EdgeAlert, EdgeDevice, EdgeHub,
-    HeadsetBinding, HubStatus,
+    AlertStatus,
+    BindingStatus,
+    DeviceStatus,
+    EdgeAlert,
+    EdgeDevice,
+    EdgeHub,
+    HeadsetBinding,
+    HubStatus,
 )
 from ..models.user import User
 
@@ -49,88 +55,90 @@ router = APIRouter(prefix="/api/v1/edge-hub", tags=["edge_hub"])
 
 # ── 请求 / 响应模型 ────────────────────────────────────────────────────────────
 
+
 class BindingCreate(BaseModel):
-    device_id:   str
-    position:    str
+    device_id: str
+    position: str
     employee_id: Optional[str] = None
-    channel:     Optional[int] = None
+    channel: Optional[int] = None
 
 
 class HeartbeatPayload(BaseModel):
-    status:          Optional[str]   = None   # "online" | "degraded" | "upgrading"
-    runtime_version: Optional[str]   = None
-    ip_address:      Optional[str]   = None
-    cpu_pct:         Optional[float] = None
-    mem_pct:         Optional[float] = None
-    disk_pct:        Optional[float] = None
-    devices: Optional[List[Dict[str, Any]]] = None   # [{device_code, status, firmware_ver}]
+    status: Optional[str] = None  # "online" | "degraded" | "upgrading"
+    runtime_version: Optional[str] = None
+    ip_address: Optional[str] = None
+    cpu_pct: Optional[float] = None
+    mem_pct: Optional[float] = None
+    disk_pct: Optional[float] = None
+    devices: Optional[List[Dict[str, Any]]] = None  # [{device_code, status, firmware_ver}]
 
 
 class BindingUpdate(BaseModel):
-    position:    Optional[str] = None
+    position: Optional[str] = None
     employee_id: Optional[str] = None
-    channel:     Optional[int] = None
-    status:      Optional[str] = None
+    channel: Optional[int] = None
+    status: Optional[str] = None
 
 
 # ── 内部辅助 ──────────────────────────────────────────────────────────────────
 
+
 def _hub_row(h: EdgeHub) -> Dict[str, Any]:
     return {
-        "id":             h.id,
-        "storeId":        h.store_id,
-        "hubCode":        h.hub_code,
-        "name":           h.name,
-        "status":         h.status,
+        "id": h.id,
+        "storeId": h.store_id,
+        "hubCode": h.hub_code,
+        "name": h.name,
+        "status": h.status,
         "runtimeVersion": h.runtime_version,
-        "ipAddress":      h.ip_address,
-        "lastHeartbeat":  h.last_heartbeat.isoformat() if h.last_heartbeat else None,
-        "cpuPct":         h.cpu_pct,
-        "memPct":         h.mem_pct,
-        "diskPct":        h.disk_pct,
+        "ipAddress": h.ip_address,
+        "lastHeartbeat": h.last_heartbeat.isoformat() if h.last_heartbeat else None,
+        "cpuPct": h.cpu_pct,
+        "memPct": h.mem_pct,
+        "diskPct": h.disk_pct,
     }
 
 
 def _device_row(d: EdgeDevice) -> Dict[str, Any]:
     return {
-        "id":          d.id,
-        "hubId":       d.hub_id,
-        "storeId":     d.store_id,
-        "deviceCode":  d.device_code,
-        "deviceType":  d.device_type,
-        "name":        d.name,
-        "status":      d.status,
-        "lastSeen":    d.last_seen.isoformat() if d.last_seen else None,
+        "id": d.id,
+        "hubId": d.hub_id,
+        "storeId": d.store_id,
+        "deviceCode": d.device_code,
+        "deviceType": d.device_type,
+        "name": d.name,
+        "status": d.status,
+        "lastSeen": d.last_seen.isoformat() if d.last_seen else None,
         "firmwareVer": d.firmware_ver,
     }
 
 
 def _alert_row(a: EdgeAlert) -> Dict[str, Any]:
     return {
-        "id":         a.id,
-        "storeId":    a.store_id,
-        "hubId":      a.hub_id,
-        "deviceId":   a.device_id,
-        "level":      a.level,
-        "alertType":  a.alert_type,
-        "message":    a.message,
-        "status":     a.status,
+        "id": a.id,
+        "storeId": a.store_id,
+        "hubId": a.hub_id,
+        "deviceId": a.device_id,
+        "level": a.level,
+        "alertType": a.alert_type,
+        "message": a.message,
+        "status": a.status,
         "resolvedAt": a.resolved_at.isoformat() if a.resolved_at else None,
-        "createdAt":  a.created_at.isoformat() if a.created_at else None,
+        "createdAt": a.created_at.isoformat() if a.created_at else None,
     }
 
 
 def _binding_row(b: HeadsetBinding, device: Optional[EdgeDevice] = None) -> Dict[str, Any]:
     row: Dict[str, Any] = {
-        "id":         b.id,
-        "storeId":    b.store_id,
-        "deviceId":   b.device_id,
-        "position":   b.position,
+        "id": b.id,
+        "storeId": b.store_id,
+        "deviceId": b.device_id,
+        "position": b.position,
         "employeeId": b.employee_id,
-        "channel":    b.channel,
-        "status":     b.status,
-        "boundAt":    b.bound_at.isoformat() if b.bound_at else None,
-        "unboundAt":  b.unbound_at.isoformat() if b.unbound_at else None,
+        "channel": b.channel,
+        "status": b.status,
+        "boundAt": b.bound_at.isoformat() if b.bound_at else None,
+        "unboundAt": b.unbound_at.isoformat() if b.unbound_at else None,
     }
     if device:
         row["deviceCode"] = device.device_code
@@ -141,6 +149,7 @@ def _binding_row(b: HeadsetBinding, device: Optional[EdgeDevice] = None) -> Dict
 
 # ── Dashboard 接口 ─────────────────────────────────────────────────────────────
 
+
 @router.get("/dashboard/summary")
 async def dashboard_summary(
     dateRange: str = Query("today"),
@@ -149,29 +158,15 @@ async def dashboard_summary(
 ) -> Dict[str, Any]:
     """总览指标卡"""
     total_hubs = (await db.execute(select(func.count(EdgeHub.id)))).scalar_one()
-    online_hubs = (
-        await db.execute(
-            select(func.count(EdgeHub.id)).where(EdgeHub.status == HubStatus.ONLINE)
-        )
-    ).scalar_one()
+    online_hubs = (await db.execute(select(func.count(EdgeHub.id)).where(EdgeHub.status == HubStatus.ONLINE))).scalar_one()
     total_devices = (await db.execute(select(func.count(EdgeDevice.id)))).scalar_one()
     online_devices = (
-        await db.execute(
-            select(func.count(EdgeDevice.id)).where(EdgeDevice.status == DeviceStatus.ONLINE)
-        )
+        await db.execute(select(func.count(EdgeDevice.id)).where(EdgeDevice.status == DeviceStatus.ONLINE))
     ).scalar_one()
 
     since = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-    today_alerts = (
-        await db.execute(
-            select(func.count(EdgeAlert.id)).where(EdgeAlert.created_at >= since)
-        )
-    ).scalar_one()
-    open_alerts = (
-        await db.execute(
-            select(func.count(EdgeAlert.id)).where(EdgeAlert.status == AlertStatus.OPEN)
-        )
-    ).scalar_one()
+    today_alerts = (await db.execute(select(func.count(EdgeAlert.id)).where(EdgeAlert.created_at >= since))).scalar_one()
+    open_alerts = (await db.execute(select(func.count(EdgeAlert.id)).where(EdgeAlert.status == AlertStatus.OPEN))).scalar_one()
     p1_alerts = (
         await db.execute(
             select(func.count(EdgeAlert.id)).where(
@@ -190,17 +185,17 @@ async def dashboard_summary(
         "data": {
             "refreshedAt": datetime.utcnow().isoformat() + "Z",
             "cards": {
-                "totalHubCount":    total_hubs,
-                "onlineHubCount":   online_hubs,
-                "hubOnlineRate":    hub_online_rate,
-                "hubStatusLevel":   "normal" if hub_online_rate >= 95 else "warning" if hub_online_rate >= 80 else "critical",
-                "totalDeviceCount":  total_devices,
+                "totalHubCount": total_hubs,
+                "onlineHubCount": online_hubs,
+                "hubOnlineRate": hub_online_rate,
+                "hubStatusLevel": "normal" if hub_online_rate >= 95 else "warning" if hub_online_rate >= 80 else "critical",
+                "totalDeviceCount": total_devices,
                 "onlineDeviceCount": online_devices,
-                "deviceOnlineRate":  device_online_rate,
+                "deviceOnlineRate": device_online_rate,
                 "deviceStatusLevel": "normal" if device_online_rate >= 90 else "warning",
-                "todayAlertCount":  today_alerts,
+                "todayAlertCount": today_alerts,
                 "todayP1AlertCount": p1_alerts,
-                "openAlertCount":   open_alerts,
+                "openAlertCount": open_alerts,
             },
         },
     }
@@ -232,11 +227,7 @@ async def dashboard_risk_stores(
     ).all()
 
     total = (
-        await db.execute(
-            select(func.count(func.distinct(EdgeAlert.store_id))).where(
-                EdgeAlert.status == AlertStatus.OPEN
-            )
-        )
+        await db.execute(select(func.count(func.distinct(EdgeAlert.store_id))).where(EdgeAlert.status == AlertStatus.OPEN))
     ).scalar_one()
 
     items = []
@@ -250,14 +241,16 @@ async def dashboard_risk_stores(
             )
         ).scalar_one_or_none()
 
-        items.append({
-            "storeId":         store_id,
-            "storeName":       store_id,
-            "edgeHubId":       hub.id if hub else None,
-            "runtimeStatus":   hub.status if hub else "offline",
-            "alertCount":      alert_count,
-            "lastHeartbeatAt": hub.last_heartbeat.isoformat() if hub and hub.last_heartbeat else None,
-        })
+        items.append(
+            {
+                "storeId": store_id,
+                "storeName": store_id,
+                "edgeHubId": hub.id if hub else None,
+                "runtimeStatus": hub.status if hub else "offline",
+                "alertCount": alert_count,
+                "lastHeartbeatAt": hub.last_heartbeat.isoformat() if hub and hub.last_heartbeat else None,
+            }
+        )
 
     return {
         "code": 0,
@@ -281,13 +274,14 @@ async def dashboard_recent_alerts(
     """今日告警列表"""
     since = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     alerts = (
-        await db.execute(
-            select(EdgeAlert)
-            .where(EdgeAlert.created_at >= since)
-            .order_by(EdgeAlert.created_at.desc())
-            .limit(limit)
+        (
+            await db.execute(
+                select(EdgeAlert).where(EdgeAlert.created_at >= since).order_by(EdgeAlert.created_at.desc()).limit(limit)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     return {
         "code": 0,
@@ -298,6 +292,7 @@ async def dashboard_recent_alerts(
 
 # ── 门店边缘详情 ───────────────────────────────────────────────────────────────
 
+
 @router.get("/stores/{store_id}")
 async def store_edge_detail(
     store_id: str,
@@ -305,9 +300,7 @@ async def store_edge_detail(
     _: User = Depends(get_current_active_user),
 ) -> Dict[str, Any]:
     """门店边缘主机概要"""
-    hubs = (
-        await db.execute(select(EdgeHub).where(EdgeHub.store_id == store_id, EdgeHub.is_active == True))
-    ).scalars().all()
+    hubs = (await db.execute(select(EdgeHub).where(EdgeHub.store_id == store_id, EdgeHub.is_active == True))).scalars().all()
 
     if not hubs:
         raise HTTPException(status_code=404, detail="store edge hub not found")
@@ -358,16 +351,16 @@ async def store_alerts(
 
     total = (await db.execute(select(func.count()).select_from(q.subquery()))).scalar_one()
     offset = (page - 1) * pageSize
-    alerts = (
-        await db.execute(q.order_by(EdgeAlert.created_at.desc()).offset(offset).limit(pageSize))
-    ).scalars().all()
+    alerts = (await db.execute(q.order_by(EdgeAlert.created_at.desc()).offset(offset).limit(pageSize))).scalars().all()
 
     return {
         "code": 0,
         "message": "ok",
         "data": {"list": [_alert_row(a) for a in alerts]},
         "meta": {
-            "page": page, "pageSize": pageSize, "total": total,
+            "page": page,
+            "pageSize": pageSize,
+            "total": total,
             "hasMore": offset + pageSize < total,
         },
     }
@@ -376,6 +369,7 @@ async def store_alerts(
 # ── 全局节点列表 ───────────────────────────────────────────────────────────────
 
 # ── 全局节点列表 ───────────────────────────────────────────────────────────────
+
 
 @router.get("/nodes/{hub_id}")
 async def get_node_detail(
@@ -389,22 +383,19 @@ async def get_node_detail(
         raise HTTPException(status_code=404, detail="hub not found")
 
     devices = (
-        await db.execute(
-            select(EdgeDevice).where(EdgeDevice.hub_id == hub_id).order_by(EdgeDevice.device_type)
-        )
-    ).scalars().all()
+        (await db.execute(select(EdgeDevice).where(EdgeDevice.hub_id == hub_id).order_by(EdgeDevice.device_type)))
+        .scalars()
+        .all()
+    )
 
     recent_alerts = (
-        await db.execute(
-            select(EdgeAlert)
-            .where(EdgeAlert.hub_id == hub_id)
-            .order_by(EdgeAlert.created_at.desc())
-            .limit(10)
-        )
-    ).scalars().all()
+        (await db.execute(select(EdgeAlert).where(EdgeAlert.hub_id == hub_id).order_by(EdgeAlert.created_at.desc()).limit(10)))
+        .scalars()
+        .all()
+    )
 
     row = _hub_row(hub)
-    row["devices"]      = [_device_row(d) for d in devices]
+    row["devices"] = [_device_row(d) for d in devices]
     row["recentAlerts"] = [_alert_row(a) for a in recent_alerts]
     return {"code": 0, "message": "ok", "data": row}
 
@@ -424,15 +415,15 @@ async def list_nodes(
         q = q.where(EdgeHub.status == status)
     if keyword:
         like = f"%{keyword}%"
-        q = q.where(
-            (EdgeHub.hub_code.ilike(like)) | (EdgeHub.name.ilike(like)) | (EdgeHub.store_id.ilike(like))
-        )
+        q = q.where((EdgeHub.hub_code.ilike(like)) | (EdgeHub.name.ilike(like)) | (EdgeHub.store_id.ilike(like)))
 
     total = (await db.execute(select(func.count()).select_from(q.subquery()))).scalar_one()
     offset = (page - 1) * pageSize
     hubs = (
-        await db.execute(q.order_by(EdgeHub.last_heartbeat.desc().nullslast()).offset(offset).limit(pageSize))
-    ).scalars().all()
+        (await db.execute(q.order_by(EdgeHub.last_heartbeat.desc().nullslast()).offset(offset).limit(pageSize)))
+        .scalars()
+        .all()
+    )
 
     # 按节点批量查询设备数和未解决告警数
     hub_ids = [h.id for h in hubs]
@@ -460,7 +451,7 @@ async def list_nodes(
     items = []
     for h in hubs:
         row = _hub_row(h)
-        row["deviceCount"]  = device_counts.get(h.id, 0)
+        row["deviceCount"] = device_counts.get(h.id, 0)
         row["openAlertCount"] = alert_counts.get(h.id, 0)
         items.append(row)
 
@@ -469,13 +460,16 @@ async def list_nodes(
         "message": "ok",
         "data": {"nodes": items},
         "meta": {
-            "page": page, "pageSize": pageSize, "total": total,
+            "page": page,
+            "pageSize": pageSize,
+            "total": total,
             "hasMore": offset + pageSize < total,
         },
     }
 
 
 # ── 全局告警管理 ───────────────────────────────────────────────────────────────
+
 
 @router.get("/alerts")
 async def list_all_alerts(
@@ -501,16 +495,16 @@ async def list_all_alerts(
 
     total = (await db.execute(select(func.count()).select_from(q.subquery()))).scalar_one()
     offset = (page - 1) * pageSize
-    alerts = (
-        await db.execute(q.order_by(EdgeAlert.created_at.desc()).offset(offset).limit(pageSize))
-    ).scalars().all()
+    alerts = (await db.execute(q.order_by(EdgeAlert.created_at.desc()).offset(offset).limit(pageSize))).scalars().all()
 
     return {
         "code": 0,
         "message": "ok",
         "data": {"list": [_alert_row(a) for a in alerts]},
         "meta": {
-            "page": page, "pageSize": pageSize, "total": total,
+            "page": page,
+            "pageSize": pageSize,
+            "total": total,
             "hasMore": offset + pageSize < total,
         },
     }
@@ -534,20 +528,24 @@ async def bulk_alert_action(
         return {"code": 0, "message": "no alerts", "data": {"affected": 0}}
 
     target_status = AlertStatus.RESOLVED if body.action == "resolve" else AlertStatus.IGNORED
-    now       = datetime.utcnow()
+    now = datetime.utcnow()
     resolved_by = str(getattr(current_user, "username", current_user.id))
 
     alerts = (
-        await db.execute(
-            select(EdgeAlert).where(
-                EdgeAlert.id.in_(body.alert_ids),
-                EdgeAlert.status == AlertStatus.OPEN,
+        (
+            await db.execute(
+                select(EdgeAlert).where(
+                    EdgeAlert.id.in_(body.alert_ids),
+                    EdgeAlert.status == AlertStatus.OPEN,
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     for alert in alerts:
-        alert.status      = target_status
+        alert.status = target_status
         alert.resolved_at = now
         alert.resolved_by = resolved_by
 
@@ -651,9 +649,9 @@ _HUB_SECRET = os.getenv("EDGE_HUB_SECRET", "")
 
 @router.post("/nodes/{hub_id}/heartbeat")
 async def receive_heartbeat(
-    hub_id:  str,
-    body:    HeartbeatPayload,
-    db:      AsyncSession = Depends(get_db),
+    hub_id: str,
+    body: HeartbeatPayload,
+    db: AsyncSession = Depends(get_db),
     x_hub_secret: Optional[str] = Header(None, alias="X-Hub-Secret"),
 ) -> Dict[str, Any]:
     """
@@ -677,7 +675,7 @@ async def receive_heartbeat(
     if body.status is not None:
         hub.status = body.status
     elif hub.status != HubStatus.ONLINE:
-        hub.status = HubStatus.ONLINE   # implicitly online if sending heartbeat
+        hub.status = HubStatus.ONLINE  # implicitly online if sending heartbeat
 
     if body.runtime_version is not None:
         hub.runtime_version = body.runtime_version
@@ -694,14 +692,14 @@ async def receive_heartbeat(
     device_results: List[Dict[str, Any]] = []
     if body.devices:
         for d in body.devices:
-            code   = d.get("device_code")
+            code = d.get("device_code")
             status = d.get("status")
             fw_ver = d.get("firmware_ver")
             if not code:
                 continue
-            device = (await db.execute(
-                select(EdgeDevice).where(EdgeDevice.hub_id == hub.id, EdgeDevice.device_code == code)
-            )).scalar_one_or_none()
+            device = (
+                await db.execute(select(EdgeDevice).where(EdgeDevice.hub_id == hub.id, EdgeDevice.device_code == code))
+            ).scalar_one_or_none()
             if device:
                 if status:
                     device.status = status
@@ -714,16 +712,18 @@ async def receive_heartbeat(
 
     logger.debug(
         "edge_hub.heartbeat_received",
-        hub_id=hub_id, hub_code=hub.hub_code, status=hub.status,
+        hub_id=hub_id,
+        hub_code=hub.hub_code,
+        status=hub.status,
     )
 
     return {
-        "code":    0,
+        "code": 0,
         "message": "ok",
         "data": {
-            "hubId":        hub.id,
-            "receivedAt":   now.isoformat() + "Z",
-            "status":       hub.status,
+            "hubId": hub.id,
+            "receivedAt": now.isoformat() + "Z",
+            "status": hub.status,
             "devicesUpdated": len(device_results),
         },
     }
@@ -739,14 +739,15 @@ async def node_metrics(
     """节点资源趋势（近 N 小时，每小时一个采样点）
     当前版本基于最新快照生成演示数据；真实场景由边缘主机定时上报存储。
     """
-    import random, math
+    import math
+    import random
 
     hub = (await db.execute(select(EdgeHub).where(EdgeHub.id == hub_id))).scalar_one_or_none()
     if not hub:
         raise HTTPException(status_code=404, detail="hub not found")
 
-    base_cpu  = hub.cpu_pct  if hub.cpu_pct  is not None else 40.0
-    base_mem  = hub.mem_pct  if hub.mem_pct  is not None else 55.0
+    base_cpu = hub.cpu_pct if hub.cpu_pct is not None else 40.0
+    base_mem = hub.mem_pct if hub.mem_pct is not None else 55.0
     base_disk = hub.disk_pct if hub.disk_pct is not None else 30.0
 
     now = datetime.utcnow()
@@ -755,16 +756,18 @@ async def node_metrics(
         ts = now - timedelta(hours=i)
         # 用正弦波 + 少量随机扰动模拟波动
         phase = (i / hours) * 2 * math.pi
-        cpu   = round(min(100, max(0, base_cpu  + 10 * math.sin(phase)     + random.uniform(-3, 3))), 1)
-        mem   = round(min(100, max(0, base_mem  + 5  * math.sin(phase + 1) + random.uniform(-2, 2))), 1)
-        disk  = round(min(100, max(0, base_disk + 2  * math.sin(phase + 2) + random.uniform(-1, 1))), 1)
-        points.append({
-            "time":    ts.strftime("%Y-%m-%dT%H:00:00Z"),
-            "timeLabel": ts.strftime("%m-%d %H:%M"),
-            "cpuPct":  cpu,
-            "memPct":  mem,
-            "diskPct": disk,
-        })
+        cpu = round(min(100, max(0, base_cpu + 10 * math.sin(phase) + random.uniform(-3, 3))), 1)
+        mem = round(min(100, max(0, base_mem + 5 * math.sin(phase + 1) + random.uniform(-2, 2))), 1)
+        disk = round(min(100, max(0, base_disk + 2 * math.sin(phase + 2) + random.uniform(-1, 1))), 1)
+        points.append(
+            {
+                "time": ts.strftime("%Y-%m-%dT%H:00:00Z"),
+                "timeLabel": ts.strftime("%m-%d %H:%M"),
+                "cpuPct": cpu,
+                "memPct": mem,
+                "diskPct": disk,
+            }
+        )
 
     return {
         "code": 0,
@@ -779,6 +782,7 @@ async def node_metrics(
 
 # ── 耳机绑定管理 ───────────────────────────────────────────────────────────────
 
+
 @router.get("/bindings/{store_id}")
 async def list_bindings(
     store_id: str,
@@ -787,29 +791,21 @@ async def list_bindings(
 ) -> Dict[str, Any]:
     """门店耳机绑定列表"""
     bindings = (
-        await db.execute(
-            select(HeadsetBinding)
-            .where(HeadsetBinding.store_id == store_id)
-            .order_by(HeadsetBinding.position)
-        )
-    ).scalars().all()
+        (await db.execute(select(HeadsetBinding).where(HeadsetBinding.store_id == store_id).order_by(HeadsetBinding.position)))
+        .scalars()
+        .all()
+    )
 
     device_ids = list({b.device_id for b in bindings})
     devices_map: Dict[str, EdgeDevice] = {}
     if device_ids:
-        devs = (
-            await db.execute(select(EdgeDevice).where(EdgeDevice.id.in_(device_ids)))
-        ).scalars().all()
+        devs = (await db.execute(select(EdgeDevice).where(EdgeDevice.id.in_(device_ids)))).scalars().all()
         devices_map = {d.id: d for d in devs}
 
     return {
         "code": 0,
         "message": "ok",
-        "data": {
-            "bindings": [
-                _binding_row(b, devices_map.get(b.device_id)) for b in bindings
-            ]
-        },
+        "data": {"bindings": [_binding_row(b, devices_map.get(b.device_id)) for b in bindings]},
     }
 
 

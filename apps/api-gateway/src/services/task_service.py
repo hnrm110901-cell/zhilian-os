@@ -2,16 +2,17 @@
 Task Service
 任务管理服务
 """
-import os
-from typing import List, Optional, Dict, Any
-from datetime import datetime
-from sqlalchemy import select, and_, or_
-from sqlalchemy.ext.asyncio import AsyncSession
-import structlog
-import uuid
 
+import os
+import uuid
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+import structlog
+from sqlalchemy import and_, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_db_session
-from src.models.task import Task, TaskStatus, TaskPriority
+from src.models.task import Task, TaskPriority, TaskStatus
 from src.models.user import User
 from src.services.neural_system import neural_system
 
@@ -30,7 +31,7 @@ class TaskService:
         assignee_id: Optional[uuid.UUID] = None,
         category: Optional[str] = None,
         priority: TaskPriority = TaskPriority.NORMAL,
-        due_at: Optional[datetime] = None
+        due_at: Optional[datetime] = None,
     ) -> Task:
         """
         创建任务
@@ -59,7 +60,7 @@ class TaskService:
                     category=category,
                     priority=priority,
                     due_at=due_at,
-                    status=TaskStatus.PENDING
+                    status=TaskStatus.PENDING,
                 )
 
                 session.add(task)
@@ -71,7 +72,7 @@ class TaskService:
                     task_id=str(task.id),
                     title=title,
                     creator_id=str(creator_id),
-                    assignee_id=str(assignee_id) if assignee_id else None
+                    assignee_id=str(assignee_id) if assignee_id else None,
                 )
 
                 # 触发任务创建事件，发送企微通知
@@ -86,9 +87,9 @@ class TaskService:
                             "creator_id": str(creator_id),
                             "store_id": store_id,
                             "priority": priority.value,
-                            "due_at": due_at.isoformat() if due_at else None
+                            "due_at": due_at.isoformat() if due_at else None,
                         },
-                        store_id=store_id
+                        store_id=store_id,
                     )
 
                 return task
@@ -97,12 +98,7 @@ class TaskService:
             logger.error("创建任务失败", error=str(e), exc_info=e)
             raise
 
-    async def assign_task(
-        self,
-        task_id: uuid.UUID,
-        assignee_id: uuid.UUID,
-        current_user_id: uuid.UUID
-    ) -> Task:
+    async def assign_task(self, task_id: uuid.UUID, assignee_id: uuid.UUID, current_user_id: uuid.UUID) -> Task:
         """
         指派任务
 
@@ -117,12 +113,7 @@ class TaskService:
         try:
             async with get_db_session() as session:
                 # 查询任务
-                result = await session.execute(
-                    select(Task).where(
-                        Task.id == task_id,
-                        Task.is_deleted == "false"
-                    )
-                )
+                result = await session.execute(select(Task).where(Task.id == task_id, Task.is_deleted == "false"))
                 task = result.scalar_one_or_none()
 
                 if not task:
@@ -136,10 +127,7 @@ class TaskService:
                 await session.refresh(task)
 
                 logger.info(
-                    "任务指派成功",
-                    task_id=str(task_id),
-                    assignee_id=str(assignee_id),
-                    operator_id=str(current_user_id)
+                    "任务指派成功", task_id=str(task_id), assignee_id=str(assignee_id), operator_id=str(current_user_id)
                 )
 
                 return task
@@ -149,11 +137,7 @@ class TaskService:
             raise
 
     async def complete_task(
-        self,
-        task_id: uuid.UUID,
-        user_id: uuid.UUID,
-        result: Optional[str] = None,
-        attachments: Optional[str] = None
+        self, task_id: uuid.UUID, user_id: uuid.UUID, result: Optional[str] = None, attachments: Optional[str] = None
     ) -> Task:
         """
         完成任务
@@ -170,12 +154,7 @@ class TaskService:
         try:
             async with get_db_session() as session:
                 # 查询任务
-                result_query = await session.execute(
-                    select(Task).where(
-                        Task.id == task_id,
-                        Task.is_deleted == "false"
-                    )
-                )
+                result_query = await session.execute(select(Task).where(Task.id == task_id, Task.is_deleted == "false"))
                 task = result_query.scalar_one_or_none()
 
                 if not task:
@@ -184,10 +163,7 @@ class TaskService:
                 # 验证是否是指派人
                 if task.assignee_id and task.assignee_id != user_id:
                     logger.warning(
-                        "非指派人尝试完成任务",
-                        task_id=str(task_id),
-                        assignee_id=str(task.assignee_id),
-                        user_id=str(user_id)
+                        "非指派人尝试完成任务", task_id=str(task_id), assignee_id=str(task.assignee_id), user_id=str(user_id)
                     )
 
                 # 更新任务状态
@@ -201,11 +177,7 @@ class TaskService:
                 await session.commit()
                 await session.refresh(task)
 
-                logger.info(
-                    "任务完成",
-                    task_id=str(task_id),
-                    user_id=str(user_id)
-                )
+                logger.info("任务完成", task_id=str(task_id), user_id=str(user_id))
 
                 return task
 
@@ -221,7 +193,7 @@ class TaskService:
         status: Optional[TaskStatus] = None,
         category: Optional[str] = None,
         page: int = 1,
-        page_size: int = 20
+        page_size: int = 20,
     ) -> Dict[str, Any]:
         """
         查询任务列表
@@ -261,13 +233,7 @@ class TaskService:
 
                 # 分页查询
                 offset = (page - 1) * page_size
-                query = (
-                    select(Task)
-                    .where(and_(*conditions))
-                    .order_by(Task.created_at.desc())
-                    .offset(offset)
-                    .limit(page_size)
-                )
+                query = select(Task).where(and_(*conditions)).order_by(Task.created_at.desc()).offset(offset).limit(page_size)
 
                 result = await session.execute(query)
                 tasks = result.scalars().all()
@@ -277,7 +243,7 @@ class TaskService:
                     "total": total,
                     "page": page,
                     "page_size": page_size,
-                    "total_pages": (total + page_size - 1) // page_size
+                    "total_pages": (total + page_size - 1) // page_size,
                 }
 
         except Exception as e:
@@ -296,24 +262,14 @@ class TaskService:
         """
         try:
             async with get_db_session() as session:
-                result = await session.execute(
-                    select(Task).where(
-                        Task.id == task_id,
-                        Task.is_deleted == "false"
-                    )
-                )
+                result = await session.execute(select(Task).where(Task.id == task_id, Task.is_deleted == "false"))
                 return result.scalar_one_or_none()
 
         except Exception as e:
             logger.error("获取任务失败", task_id=str(task_id), error=str(e), exc_info=e)
             raise
 
-    async def update_task_status(
-        self,
-        task_id: uuid.UUID,
-        status: TaskStatus,
-        user_id: uuid.UUID
-    ) -> Task:
+    async def update_task_status(self, task_id: uuid.UUID, status: TaskStatus, user_id: uuid.UUID) -> Task:
         """
         更新任务状态
 
@@ -327,12 +283,7 @@ class TaskService:
         """
         try:
             async with get_db_session() as session:
-                result = await session.execute(
-                    select(Task).where(
-                        Task.id == task_id,
-                        Task.is_deleted == "false"
-                    )
-                )
+                result = await session.execute(select(Task).where(Task.id == task_id, Task.is_deleted == "false"))
                 task = result.scalar_one_or_none()
 
                 if not task:
@@ -349,12 +300,7 @@ class TaskService:
                 await session.commit()
                 await session.refresh(task)
 
-                logger.info(
-                    "任务状态更新",
-                    task_id=str(task_id),
-                    status=status.value,
-                    user_id=str(user_id)
-                )
+                logger.info("任务状态更新", task_id=str(task_id), status=status.value, user_id=str(user_id))
 
                 return task
 
@@ -375,12 +321,7 @@ class TaskService:
         """
         try:
             async with get_db_session() as session:
-                result = await session.execute(
-                    select(Task).where(
-                        Task.id == task_id,
-                        Task.is_deleted == "false"
-                    )
-                )
+                result = await session.execute(select(Task).where(Task.id == task_id, Task.is_deleted == "false"))
                 task = result.scalar_one_or_none()
 
                 if not task:
@@ -392,11 +333,7 @@ class TaskService:
 
                 await session.commit()
 
-                logger.info(
-                    "任务删除",
-                    task_id=str(task_id),
-                    user_id=str(user_id)
-                )
+                logger.info("任务删除", task_id=str(task_id), user_id=str(user_id))
 
                 return True
 

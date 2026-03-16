@@ -85,28 +85,30 @@ def upgrade() -> None:
     op.create_index(op.f('ix_fct_tax_invoices_invoice_no'), 'fct_tax_invoices', ['invoice_no'], unique=False)
     op.create_index(op.f('ix_fct_tax_invoices_tenant_id'), 'fct_tax_invoices', ['tenant_id'], unique=False)
 
-    op.create_table(
-        'fct_tax_declarations',
-        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column('tenant_id', sa.String(64), nullable=False),
-        sa.Column('entity_id', sa.String(64), nullable=False),
-        sa.Column('tax_type', sa.String(32), nullable=False),
-        sa.Column('period', sa.String(16), nullable=False),
-        sa.Column('declared_at', sa.String(32), nullable=True),
-        sa.Column('status', sa.String(20), nullable=True),
-        sa.Column('extra', sa.JSON(), nullable=True),
-        sa.Column('created_at', sa.DateTime(), nullable=False),
-        sa.Column('updated_at', sa.DateTime(), nullable=False),
-        sa.PrimaryKeyConstraint('id'),
-    )
-    op.create_index(op.f('ix_fct_tax_declarations_entity_id'), 'fct_tax_declarations', ['entity_id'], unique=False)
-    op.create_index(op.f('ix_fct_tax_declarations_tenant_id'), 'fct_tax_declarations', ['tenant_id'], unique=False)
+    # fct_tax_declarations 可能已由 z44_fct_advanced 在并行分支中创建
+    op.execute(sa.text("""
+        DO $$ BEGIN
+            CREATE TABLE fct_tax_declarations (
+                id UUID NOT NULL PRIMARY KEY,
+                tenant_id VARCHAR(64) NOT NULL,
+                entity_id VARCHAR(64) NOT NULL,
+                tax_type VARCHAR(32) NOT NULL,
+                period VARCHAR(16) NOT NULL,
+                declared_at VARCHAR(32),
+                status VARCHAR(20),
+                extra JSON,
+                created_at TIMESTAMP NOT NULL,
+                updated_at TIMESTAMP NOT NULL
+            );
+            CREATE INDEX ix_fct_tax_declarations_entity_id ON fct_tax_declarations (entity_id);
+            CREATE INDEX ix_fct_tax_declarations_tenant_id ON fct_tax_declarations (tenant_id);
+        EXCEPTION WHEN duplicate_table THEN NULL;
+        END $$
+    """))
 
 
 def downgrade() -> None:
-    op.drop_index(op.f('ix_fct_tax_declarations_tenant_id'), table_name='fct_tax_declarations')
-    op.drop_index(op.f('ix_fct_tax_declarations_entity_id'), table_name='fct_tax_declarations')
-    op.drop_table('fct_tax_declarations')
+    op.execute("DROP TABLE IF EXISTS fct_tax_declarations CASCADE")
 
     op.drop_index(op.f('ix_fct_tax_invoices_tenant_id'), table_name='fct_tax_invoices')
     op.drop_index(op.f('ix_fct_tax_invoices_invoice_no'), table_name='fct_tax_invoices')

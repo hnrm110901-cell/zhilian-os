@@ -2,18 +2,19 @@
 Service Quality Service - 服务质量数据库服务
 处理服务质量监控的数据库操作
 """
-import structlog
-import os
-from typing import Dict, Any, List, Optional
-from datetime import datetime, timedelta
-from sqlalchemy import select, func, and_, or_
-from sqlalchemy.orm import selectinload
-import uuid
 
+import os
+import uuid
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
+
+import structlog
+from sqlalchemy import and_, func, or_, select
+from sqlalchemy.orm import selectinload
 from src.core.database import get_db_session
+from src.models.employee import Employee
 from src.models.kpi import KPI, KPIRecord
 from src.models.order import Order, OrderStatus
-from src.models.employee import Employee
 
 logger = structlog.get_logger()
 
@@ -32,9 +33,7 @@ class ServiceQualityService:
         logger.info("ServiceQualityService初始化", store_id=store_id)
 
     async def get_service_quality_metrics(
-        self,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None
+        self, start_date: Optional[str] = None, end_date: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         获取服务质量指标
@@ -68,7 +67,7 @@ class ServiceQualityService:
                         KPI.category == "customer",
                         KPI.name.like("%满意度%"),
                         KPIRecord.record_date >= start_dt.date(),
-                        KPIRecord.record_date <= end_dt.date()
+                        KPIRecord.record_date <= end_dt.date(),
                     )
                 )
             )
@@ -84,15 +83,8 @@ class ServiceQualityService:
                 satisfaction_trend = "stable"
 
             # 查询订单数据以计算服务指标
-            orders_stmt = (
-                select(Order)
-                .where(
-                    and_(
-                        Order.store_id == self.store_id,
-                        Order.order_time >= start_dt,
-                        Order.order_time <= end_dt
-                    )
-                )
+            orders_stmt = select(Order).where(
+                and_(Order.store_id == self.store_id, Order.order_time >= start_dt, Order.order_time <= end_dt)
             )
             orders_result = await session.execute(orders_stmt)
             orders = orders_result.scalars().all()
@@ -118,9 +110,8 @@ class ServiceQualityService:
             ideal_service_time = int(os.getenv("SERVICE_IDEAL_TIME_MINUTES", "30"))
             try:
                 from src.models.store import Store
-                store_result = await session.execute(
-                    select(Store.config).where(Store.id == self.store_id)
-                )
+
+                store_result = await session.execute(select(Store.config).where(Store.id == self.store_id))
                 store_cfg = store_result.scalar_one_or_none() or {}
                 ideal_service_time = int(store_cfg.get("ideal_service_time_minutes", 30))
             except Exception as e:
@@ -134,14 +125,11 @@ class ServiceQualityService:
             )
 
             return {
-                "period": {
-                    "start_date": start_dt.isoformat(),
-                    "end_date": end_dt.isoformat()
-                },
+                "period": {"start_date": start_dt.isoformat(), "end_date": end_dt.isoformat()},
                 "satisfaction": {
                     "average_rating": round(avg_satisfaction, 2),
                     "trend": satisfaction_trend,
-                    "records_count": len(satisfaction_records)
+                    "records_count": len(satisfaction_records),
                 },
                 "service_metrics": {
                     "total_orders": total_orders,
@@ -149,17 +137,14 @@ class ServiceQualityService:
                     "cancelled_orders": cancelled_orders,
                     "completion_rate": round(completion_rate, 2),
                     "cancellation_rate": round(cancellation_rate, 2),
-                    "average_service_time_minutes": round(avg_service_time, 2)
+                    "average_service_time_minutes": round(avg_service_time, 2),
                 },
                 "quality_score": round(quality_score, 2),
-                "status": self._get_quality_status(quality_score)
+                "status": self._get_quality_status(quality_score),
             }
 
     async def get_staff_performance(
-        self,
-        staff_id: Optional[str] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None
+        self, staff_id: Optional[str] = None, start_date: Optional[str] = None, end_date: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         获取员工服务表现
@@ -229,28 +214,21 @@ class ServiceQualityService:
                     "staff_id": employee.id,
                     "staff_name": employee.name,
                     "position": employee.position,
-                    "period": {
-                        "start_date": start_dt.isoformat(),
-                        "end_date": end_dt.isoformat()
-                    },
+                    "period": {"start_date": start_dt.isoformat(), "end_date": end_dt.isoformat()},
                     "metrics": {
                         "total_services": per_employee_orders,
                         "customer_rating": round(min(5.0, 3.0 + avg_achievement * 2), 1) if avg_achievement else 4.5,
                         "service_speed": min(100, int(avg_achievement * 100)) if avg_achievement else 85,
                         "accuracy": min(100, int(avg_achievement * 105)) if avg_achievement else 95,
                     },
-                    "performance_score": performance_score
+                    "performance_score": performance_score,
                 }
                 performance_list.append(performance)
 
             return performance_list
 
     async def record_service_quality(
-        self,
-        metric_name: str,
-        value: float,
-        record_date: Optional[str] = None,
-        **kwargs
+        self, metric_name: str, value: float, record_date: Optional[str] = None, **kwargs
     ) -> Dict[str, Any]:
         """
         记录服务质量指标
@@ -281,10 +259,14 @@ class ServiceQualityService:
                         description=f"Service quality metric: {metric_name}",
                         unit=kwargs.get("unit", "score"),
                         target_value=kwargs.get("target_value", float(os.getenv("SERVICE_KPI_DEFAULT_TARGET", "90.0"))),
-                        warning_threshold=kwargs.get("warning_threshold", float(os.getenv("SERVICE_KPI_DEFAULT_WARNING", "80.0"))),
-                        critical_threshold=kwargs.get("critical_threshold", float(os.getenv("SERVICE_KPI_DEFAULT_CRITICAL", "70.0"))),
+                        warning_threshold=kwargs.get(
+                            "warning_threshold", float(os.getenv("SERVICE_KPI_DEFAULT_WARNING", "80.0"))
+                        ),
+                        critical_threshold=kwargs.get(
+                            "critical_threshold", float(os.getenv("SERVICE_KPI_DEFAULT_CRITICAL", "70.0"))
+                        ),
                         calculation_method="average",
-                        is_active="true"
+                        is_active="true",
                     )
                     session.add(kpi)
                     await session.flush()
@@ -303,7 +285,7 @@ class ServiceQualityService:
                     target_value=kpi.target_value,
                     achievement_rate=(value / kpi.target_value * 100) if kpi.target_value else 0,
                     status=self._get_kpi_status(value, kpi),
-                    kpi_metadata=kwargs.get("metadata", {})
+                    kpi_metadata=kwargs.get("metadata", {}),
                 )
 
                 session.add(kpi_record)
@@ -311,23 +293,14 @@ class ServiceQualityService:
 
                 logger.info("服务质量指标记录成功", metric_name=metric_name, value=value)
 
-                return {
-                    "kpi_id": kpi_id,
-                    "record_date": record_dt.isoformat(),
-                    "value": value,
-                    "status": kpi_record.status
-                }
+                return {"kpi_id": kpi_id, "record_date": record_dt.isoformat(), "value": value, "status": kpi_record.status}
 
             except Exception as e:
                 await session.rollback()
                 logger.error("记录服务质量指标失败", error=str(e))
                 raise
 
-    async def get_service_report(
-        self,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None
-    ) -> Dict[str, Any]:
+    async def get_service_report(self, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict[str, Any]:
         """
         获取服务质量报告
 
@@ -342,10 +315,7 @@ class ServiceQualityService:
         quality_metrics = await self.get_service_quality_metrics(start_date, end_date)
 
         # 获取员工表现
-        staff_performance = await self.get_staff_performance(
-            start_date=start_date,
-            end_date=end_date
-        )
+        staff_performance = await self.get_staff_performance(start_date=start_date, end_date=end_date)
 
         # 生成改进建议
         improvements = self._generate_improvements(quality_metrics)
@@ -359,8 +329,8 @@ class ServiceQualityService:
             "summary": {
                 "overall_score": quality_metrics["quality_score"],
                 "status": quality_metrics["status"],
-                "key_findings": self._generate_key_findings(quality_metrics)
-            }
+                "key_findings": self._generate_key_findings(quality_metrics),
+            },
         }
 
     def _calculate_trend(self, values: List[float]) -> str:
@@ -422,14 +392,16 @@ class ServiceQualityService:
         if avg_service_time <= ideal_service_time:
             service_time_score = 100
         else:
-            service_time_score = max(0, 100 - (avg_service_time - ideal_service_time) * float(os.getenv("SERVICE_TIME_SCORE_DEDUCT_FACTOR", "2")))
+            service_time_score = max(
+                0, 100 - (avg_service_time - ideal_service_time) * float(os.getenv("SERVICE_TIME_SCORE_DEDUCT_FACTOR", "2"))
+            )
 
         # 计算加权总分
         total_score = (
-            satisfaction_score * satisfaction_weight +
-            completion_score * completion_weight +
-            cancellation_score * cancellation_weight +
-            service_time_score * service_time_weight
+            satisfaction_score * satisfaction_weight
+            + completion_score * completion_weight
+            + cancellation_score * cancellation_weight
+            + service_time_score * service_time_weight
         )
 
         return total_score
@@ -464,30 +436,36 @@ class ServiceQualityService:
         # 基于指标生成建议
         satisfaction = quality_metrics["satisfaction"]["average_rating"]
         if satisfaction < float(os.getenv("SERVICE_SATISFACTION_THRESHOLD", "80")):
-            improvements.append({
-                "category": "customer_satisfaction",
-                "priority": "high",
-                "issue": "客户满意度低于标准",
-                "recommendation": "加强员工培训，提升服务质量"
-            })
+            improvements.append(
+                {
+                    "category": "customer_satisfaction",
+                    "priority": "high",
+                    "issue": "客户满意度低于标准",
+                    "recommendation": "加强员工培训，提升服务质量",
+                }
+            )
 
         cancellation_rate = quality_metrics["service_metrics"]["cancellation_rate"]
         if cancellation_rate > float(os.getenv("SERVICE_CANCEL_RATE_THRESHOLD", "5")):
-            improvements.append({
-                "category": "order_cancellation",
-                "priority": "medium",
-                "issue": "订单取消率偏高",
-                "recommendation": "分析取消原因，优化订单流程"
-            })
+            improvements.append(
+                {
+                    "category": "order_cancellation",
+                    "priority": "medium",
+                    "issue": "订单取消率偏高",
+                    "recommendation": "分析取消原因，优化订单流程",
+                }
+            )
 
         avg_service_time = quality_metrics["service_metrics"]["average_service_time_minutes"]
         if avg_service_time > float(os.getenv("SERVICE_TIME_THRESHOLD_MINUTES", "45")):
-            improvements.append({
-                "category": "service_efficiency",
-                "priority": "medium",
-                "issue": "平均服务时间过长",
-                "recommendation": "优化厨房流程，提高出餐速度"
-            })
+            improvements.append(
+                {
+                    "category": "service_efficiency",
+                    "priority": "medium",
+                    "issue": "平均服务时间过长",
+                    "recommendation": "优化厨房流程，提高出餐速度",
+                }
+            )
 
         return improvements
 

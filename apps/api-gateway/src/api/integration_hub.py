@@ -2,15 +2,17 @@
 Integration Hub API
 集成中心 API — 查看所有外部集成的健康状态和同步统计
 """
+
+from typing import Optional
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-import structlog
 
-from ..models.user import User, UserRole
-from ..core.dependencies import require_role
 from ..core.database import get_db
+from ..core.dependencies import require_role
+from ..models.user import User, UserRole
 from ..services.integration_hub_service import integration_hub_service
 
 logger = structlog.get_logger()
@@ -19,19 +21,23 @@ router = APIRouter(prefix="/api/v1/integration-hub", tags=["集成中心"])
 
 # ── 请求模型 ──────────────────────────────────────────────────────────────────
 
+
 class SyncEventRequest(BaseModel):
     """同步事件请求"""
+
     success: bool
     error_msg: Optional[str] = None
 
 
 class UpdateStatusRequest(BaseModel):
     """状态更新请求"""
+
     status: str
     error_msg: Optional[str] = None
 
 
 # ── 端点 ──────────────────────────────────────────────────────────────────────
+
 
 @router.get("/")
 async def get_all_statuses(
@@ -80,7 +86,10 @@ async def record_sync_event(
     """记录同步事件（供其他服务内部调用）"""
     try:
         result = await integration_hub_service.record_sync(
-            db, key, success=request.success, error_msg=request.error_msg,
+            db,
+            key,
+            success=request.success,
+            error_msg=request.error_msg,
         )
         return result
     except ValueError as e:

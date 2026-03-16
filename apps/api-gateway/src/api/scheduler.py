@@ -4,10 +4,11 @@ Scheduler API - 定时任务管理API
 Provides manual trigger endpoints for Celery Beat tasks so ops can
 fire them on-demand without waiting for the next scheduled run.
 """
-from fastapi import APIRouter, Depends, HTTPException
-from typing import Optional
-from pydantic import BaseModel
 
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from src.core.dependencies import get_current_user
 from src.models.user import User
 
@@ -25,7 +26,7 @@ ALLOWED_TASKS = {
 
 
 class TriggerRequest(BaseModel):
-    store_id: Optional[str] = None   # None = all stores
+    store_id: Optional[str] = None  # None = all stores
     report_date: Optional[str] = None  # YYYY-MM-DD, for daily report tasks
 
 
@@ -48,10 +49,7 @@ async def trigger_task(
     store_id为空时对所有门店执行。
     """
     if task_name not in ALLOWED_TASKS:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Unknown task '{task_name}'. Allowed: {list(ALLOWED_TASKS)}"
-        )
+        raise HTTPException(status_code=404, detail=f"Unknown task '{task_name}'. Allowed: {list(ALLOWED_TASKS)}")
 
     from src.core.celery_app import celery_app
 
@@ -87,8 +85,8 @@ async def get_task_status(
 
     返回 PENDING / STARTED / SUCCESS / FAILURE / RETRY
     """
-    from src.core.celery_app import celery_app
     from celery.result import AsyncResult
+    from src.core.celery_app import celery_app
 
     result = AsyncResult(task_id, app=celery_app)
 

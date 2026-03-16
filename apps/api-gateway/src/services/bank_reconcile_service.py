@@ -1,14 +1,14 @@
 """银行流水对账服务 — 导入/对账/分类/匹配/统计"""
+
 import csv
 import io
 import uuid
 from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import select, func, and_, case
+from sqlalchemy import and_, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.models.bank_reconciliation import BankStatement, BankReconciliationBatch
+from src.models.bank_reconciliation import BankReconciliationBatch, BankStatement
 
 
 class BankReconcileService:
@@ -41,9 +41,7 @@ class BankReconcileService:
         for idx, row in enumerate(rows, start=2):
             try:
                 # 灵活字段映射：支持多种CSV列名
-                txn_date_str = (
-                    row.get("交易日期") or row.get("transaction_date") or row.get("日期") or ""
-                ).strip()
+                txn_date_str = (row.get("交易日期") or row.get("transaction_date") or row.get("日期") or "").strip()
                 if not txn_date_str:
                     errors.append(f"第{idx}行: 缺少交易日期")
                     continue
@@ -53,16 +51,12 @@ class BankReconcileService:
                 txn_date = date.fromisoformat(txn_date_str[:10])
 
                 # 金额（元→分）
-                amount_str = (
-                    row.get("金额") or row.get("amount") or row.get("交易金额") or "0"
-                ).strip().replace(",", "")
+                amount_str = (row.get("金额") or row.get("amount") or row.get("交易金额") or "0").strip().replace(",", "")
                 amount_yuan = abs(float(amount_str))
                 amount_fen = round(amount_yuan * 100)
 
                 # 交易类型
-                txn_type_raw = (
-                    row.get("交易类型") or row.get("type") or row.get("收支") or ""
-                ).strip().lower()
+                txn_type_raw = (row.get("交易类型") or row.get("type") or row.get("收支") or "").strip().lower()
                 if txn_type_raw in ("收入", "credit", "贷", "存入"):
                     txn_type = "credit"
                 elif txn_type_raw in ("支出", "debit", "借", "取出", "转出"):
@@ -73,20 +67,12 @@ class BankReconcileService:
                     txn_type = "credit" if raw_val >= 0 else "debit"
 
                 # 账号（脱敏：只取后4位）
-                account_raw = (
-                    row.get("账号") or row.get("account") or row.get("卡号") or "****"
-                ).strip()
+                account_raw = (row.get("账号") or row.get("account") or row.get("卡号") or "****").strip()
                 account_number = account_raw[-4:] if len(account_raw) >= 4 else account_raw
 
-                counterparty = (
-                    row.get("对方户名") or row.get("counterparty") or row.get("对方") or None
-                )
-                reference = (
-                    row.get("流水号") or row.get("reference") or row.get("交易流水号") or None
-                )
-                desc = (
-                    row.get("摘要") or row.get("description") or row.get("备注") or None
-                )
+                counterparty = row.get("对方户名") or row.get("counterparty") or row.get("对方") or None
+                reference = row.get("流水号") or row.get("reference") or row.get("交易流水号") or None
+                desc = row.get("摘要") or row.get("description") or row.get("备注") or None
 
                 stmt = BankStatement(
                     brand_id=brand_id,
@@ -261,9 +247,7 @@ class BankReconcileService:
     @staticmethod
     async def get_batch_detail(db: AsyncSession, batch_id: str) -> Optional[dict]:
         """获取批次详情 + 关联的流水"""
-        q = select(BankReconciliationBatch).where(
-            BankReconciliationBatch.id == batch_id
-        )
+        q = select(BankReconciliationBatch).where(BankReconciliationBatch.id == batch_id)
         result = await db.execute(q)
         batch = result.scalar_one_or_none()
         if not batch:
@@ -298,9 +282,7 @@ class BankReconcileService:
                 "unmatched_count": batch.unmatched_count,
                 "diff_yuan": batch.diff_fen / 100,
             },
-            "statements": [
-                BankReconcileService._stmt_to_dict(s) for s in statements
-            ],
+            "statements": [BankReconcileService._stmt_to_dict(s) for s in statements],
             "statement_count": len(statements),
         }
 
@@ -352,9 +334,7 @@ class BankReconcileService:
     # ── 手动分类 ────────────────────────────────────────────────────────────
 
     @staticmethod
-    async def categorize_statement(
-        db: AsyncSession, statement_id: str, category: str
-    ) -> Optional[dict]:
+    async def categorize_statement(db: AsyncSession, statement_id: str, category: str) -> Optional[dict]:
         """手动设置流水分类"""
         q = select(BankStatement).where(BankStatement.id == statement_id)
         result = await db.execute(q)
@@ -369,9 +349,7 @@ class BankReconcileService:
     # ── 手动匹配 ────────────────────────────────────────────────────────────
 
     @staticmethod
-    async def match_statement(
-        db: AsyncSession, statement_id: str, order_id: str
-    ) -> Optional[dict]:
+    async def match_statement(db: AsyncSession, statement_id: str, order_id: str) -> Optional[dict]:
         """手动将流水与内部单据匹配"""
         q = select(BankStatement).where(BankStatement.id == statement_id)
         result = await db.execute(q)

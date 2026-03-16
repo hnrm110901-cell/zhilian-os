@@ -31,17 +31,16 @@ from typing import Any, Dict, List, Optional, Tuple
 import structlog
 from sqlalchemy import and_, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.models.decision_log import DecisionLog, DecisionStatus
 
 logger = structlog.get_logger()
 
 # 4 个推送时间点定义：name → (start_hour_min, end_hour_min exclusive)
 PUSH_VARIANTS: List[Dict[str, Any]] = [
-    {"id": "A", "label": "晨推",  "time": "08:00", "window_start": (8,  0),  "window_end": (12, 0)},
-    {"id": "B", "label": "午推",  "time": "12:00", "window_start": (12, 0),  "window_end": (17, 30)},
-    {"id": "C", "label": "战前",  "time": "17:30", "window_start": (17, 30), "window_end": (20, 30)},
-    {"id": "D", "label": "晚推",  "time": "20:30", "window_start": (20, 30), "window_end": (32, 0)},  # 32:00 = 次日 08:00
+    {"id": "A", "label": "晨推", "time": "08:00", "window_start": (8, 0), "window_end": (12, 0)},
+    {"id": "B", "label": "午推", "time": "12:00", "window_start": (12, 0), "window_end": (17, 30)},
+    {"id": "C", "label": "战前", "time": "17:30", "window_start": (17, 30), "window_end": (20, 30)},
+    {"id": "D", "label": "晚推", "time": "20:30", "window_start": (20, 30), "window_end": (32, 0)},  # 32:00 = 次日 08:00
 ]
 
 _Z_90 = 1.6449  # 单侧 90% 置信区间 z 值（等价于双侧 80% CI）
@@ -70,7 +69,7 @@ def _wilson_lower(successes: int, total: int, z: float = _Z_90) -> float:
     p = successes / total
     z2 = z * z
     n = total
-    center = (p + z2 / (2 * n))
+    center = p + z2 / (2 * n)
     margin = z * math.sqrt((p * (1 - p) + z2 / (4 * n)) / n)
     lower = (center - margin) / (1 + z2 / n)
     return round(max(0.0, lower), 4)
@@ -103,12 +102,12 @@ class DecisionPushABTestService:
             }
         """
         today = date.today()
-        _end   = end_date   or today
+        _end = end_date or today
         _start = start_date or (_end - timedelta(days=lookback_days))
 
         filters = [
             DecisionLog.created_at >= datetime.combine(_start, datetime.min.time()),
-            DecisionLog.created_at <= datetime.combine(_end,   datetime.max.time()),
+            DecisionLog.created_at <= datetime.combine(_end, datetime.max.time()),
         ]
         if store_id:
             filters.append(DecisionLog.store_id == store_id)
@@ -120,23 +119,19 @@ class DecisionPushABTestService:
                     DecisionLog.created_at,
                     DecisionLog.approved_at,
                     DecisionLog.decision_status,
-                )
-                .where(and_(*filters))
+                ).where(and_(*filters))
             )
         ).all()
 
         # 归因到各 Variant
         buckets: Dict[str, Dict[str, Any]] = {
-            v["id"]: {"total": 0, "approved": 0, "response_minutes": []}
-            for v in PUSH_VARIANTS
+            v["id"]: {"total": 0, "approved": 0, "response_minutes": []} for v in PUSH_VARIANTS
         }
         for row in rows:
             vid = _assign_variant(row.created_at)
             b = buckets[vid]
             b["total"] += 1
-            if row.decision_status in (
-                DecisionStatus.APPROVED, DecisionStatus.EXECUTED
-            ):
+            if row.decision_status in (DecisionStatus.APPROVED, DecisionStatus.EXECUTED):
                 b["approved"] += 1
                 if row.approved_at:
                     delta_min = (row.approved_at - row.created_at).total_seconds() / 60
@@ -147,25 +142,27 @@ class DecisionPushABTestService:
         variant_stats: List[Dict[str, Any]] = []
         for v in PUSH_VARIANTS:
             b = buckets[v["id"]]
-            total    = b["total"]
+            total = b["total"]
             approved = b["approved"]
             adoption = round(approved / total, 4) if total else 0.0
             resp_mins = b["response_minutes"]
-            avg_resp  = round(sum(resp_mins) / len(resp_mins), 1) if resp_mins else None
-            wilson    = _wilson_lower(approved, total)
+            avg_resp = round(sum(resp_mins) / len(resp_mins), 1) if resp_mins else None
+            wilson = _wilson_lower(approved, total)
 
-            variant_stats.append({
-                "id":              v["id"],
-                "label":           v["label"],
-                "push_time":       v["time"],
-                "total":           total,
-                "approved":        approved,
-                "adoption_rate":   adoption,
-                "adoption_pct":    round(adoption * 100, 1),
-                "avg_response_minutes": avg_resp,
-                "wilson_lower":    wilson,
-                "sufficient_data": total >= 10,  # 样本量 ≥ 10 才视为数据可信
-            })
+            variant_stats.append(
+                {
+                    "id": v["id"],
+                    "label": v["label"],
+                    "push_time": v["time"],
+                    "total": total,
+                    "approved": approved,
+                    "adoption_rate": adoption,
+                    "adoption_pct": round(adoption * 100, 1),
+                    "avg_response_minutes": avg_resp,
+                    "wilson_lower": wilson,
+                    "sufficient_data": total >= 10,  # 样本量 ≥ 10 才视为数据可信
+                }
+            )
 
         # 选出 winner：Wilson Score 最高且有足够数据的 Variant
         eligible = [s for s in variant_stats if s["sufficient_data"]]
@@ -179,21 +176,20 @@ class DecisionPushABTestService:
                 f"当前最优推送时间点为【{winner['label']} {winner['push_time']}】，"
                 f"采纳率 {winner['adoption_pct']}%，"
                 f"统计置信度评分 {winner['wilson_lower']:.3f}。"
-                + (f" 平均响应时长 {winner['avg_response_minutes']:.0f} 分钟。"
-                   if winner['avg_response_minutes'] else "")
+                + (f" 平均响应时长 {winner['avg_response_minutes']:.0f} 分钟。" if winner["avg_response_minutes"] else "")
             )
         else:
             recommendation = "暂无显著最优时间点"
 
         return {
-            "period":           f"{_start.isoformat()} ~ {_end.isoformat()}",
-            "store_id":         store_id or "all",
-            "total_decisions":  len(rows),
-            "variants":         variant_stats,
-            "winner_id":        winner["id"]    if winner else None,
-            "winner_label":     winner["label"] if winner else None,
-            "recommendation":   recommendation,
-            "generated_at":     datetime.utcnow().isoformat(),
+            "period": f"{_start.isoformat()} ~ {_end.isoformat()}",
+            "store_id": store_id or "all",
+            "total_decisions": len(rows),
+            "variants": variant_stats,
+            "winner_id": winner["id"] if winner else None,
+            "winner_label": winner["label"] if winner else None,
+            "recommendation": recommendation,
+            "generated_at": datetime.utcnow().isoformat(),
         }
 
     @staticmethod
@@ -208,9 +204,7 @@ class DecisionPushABTestService:
         results = {}
         for sid in store_ids:
             try:
-                r = await DecisionPushABTestService.analyze(
-                    session=session, store_id=sid, lookback_days=lookback_days
-                )
+                r = await DecisionPushABTestService.analyze(session=session, store_id=sid, lookback_days=lookback_days)
                 results[sid] = r
             except Exception as exc:
                 logger.warning("ab_test_store_failed", store_id=sid, error=str(exc))
@@ -225,13 +219,15 @@ class DecisionPushABTestService:
         global_variants = []
         for v in PUSH_VARIANTS:
             rates = variant_agg[v["id"]]
-            global_variants.append({
-                "id":            v["id"],
-                "label":         v["label"],
-                "push_time":     v["time"],
-                "store_count":   len(rates),
-                "avg_adoption_pct": round(sum(rates) / len(rates) * 100, 1) if rates else None,
-            })
+            global_variants.append(
+                {
+                    "id": v["id"],
+                    "label": v["label"],
+                    "push_time": v["time"],
+                    "store_count": len(rates),
+                    "avg_adoption_pct": round(sum(rates) / len(rates) * 100, 1) if rates else None,
+                }
+            )
 
         best = max(
             (g for g in global_variants if g["store_count"] > 0),
@@ -241,12 +237,12 @@ class DecisionPushABTestService:
 
         return {
             "lookback_days": lookback_days,
-            "store_count":   len(results),
+            "store_count": len(results),
             "global_variants": global_variants,
-            "global_winner_id":    best["id"]    if best else None,
+            "global_winner_id": best["id"] if best else None,
             "global_winner_label": best["label"] if best else None,
-            "store_results":  results,
-            "generated_at":   datetime.utcnow().isoformat(),
+            "store_results": results,
+            "generated_at": datetime.utcnow().isoformat(),
         }
 
 

@@ -3,18 +3,21 @@
 实现AI决策的双规校验，防止AI幻觉导致的业务灾难
 结合AI的直觉判断和规则引擎的逻辑校验
 """
+
 import os
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Any
-import structlog
 from datetime import datetime
 from enum import Enum
+from typing import Any, Dict, List, Optional
+
+import structlog
 
 logger = structlog.get_logger()
 
 
 class ValidationResult(str, Enum):
     """校验结果"""
+
     APPROVED = "approved"  # 通过
     REJECTED = "rejected"  # 拒绝
     WARNING = "warning"  # 警告（需人工审核）
@@ -59,7 +62,7 @@ class BudgetCheckRule(ValidationRule):
                     "passed": False,
                     "rule": self.rule_name,
                     "reason": f"决策成本{decision_cost}元超出可用预算{available_budget}元",
-                    "severity": "critical"
+                    "severity": "critical",
                 }
 
             if decision_cost > available_budget * budget_threshold:
@@ -67,24 +70,14 @@ class BudgetCheckRule(ValidationRule):
                     "passed": True,
                     "rule": self.rule_name,
                     "reason": f"决策成本{decision_cost}元接近预算上限（{budget_threshold*100}%）",
-                    "severity": "warning"
+                    "severity": "warning",
                 }
 
-            return {
-                "passed": True,
-                "rule": self.rule_name,
-                "reason": "预算检查通过",
-                "severity": "info"
-            }
+            return {"passed": True, "rule": self.rule_name, "reason": "预算检查通过", "severity": "info"}
 
         except Exception as e:
             logger.error("budget_check_failed", error=str(e))
-            return {
-                "passed": False,
-                "rule": self.rule_name,
-                "reason": f"预算检查失败: {str(e)}",
-                "severity": "error"
-            }
+            return {"passed": False, "rule": self.rule_name, "reason": f"预算检查失败: {str(e)}", "severity": "error"}
 
 
 class InventoryCapacityRule(ValidationRule):
@@ -97,24 +90,14 @@ class InventoryCapacityRule(ValidationRule):
         """检查库存容量是否足够"""
         try:
             if decision.get("action") != "purchase":
-                return {
-                    "passed": True,
-                    "rule": self.rule_name,
-                    "reason": "非采购决策，跳过库存容量检查",
-                    "severity": "info"
-                }
+                return {"passed": True, "rule": self.rule_name, "reason": "非采购决策，跳过库存容量检查", "severity": "info"}
 
             purchase_quantity = decision.get("quantity", 0)
             current_inventory = context.get("current_inventory", 0)
             max_capacity = context.get("max_capacity", 0)
 
             if max_capacity == 0:
-                return {
-                    "passed": True,
-                    "rule": self.rule_name,
-                    "reason": "未设置库存容量上限",
-                    "severity": "warning"
-                }
+                return {"passed": True, "rule": self.rule_name, "reason": "未设置库存容量上限", "severity": "warning"}
 
             total_after_purchase = current_inventory + purchase_quantity
 
@@ -123,7 +106,7 @@ class InventoryCapacityRule(ValidationRule):
                     "passed": False,
                     "rule": self.rule_name,
                     "reason": f"采购后库存{total_after_purchase}超出容量上限{max_capacity}",
-                    "severity": "critical"
+                    "severity": "critical",
                 }
 
             if total_after_purchase > max_capacity * 0.9:
@@ -131,24 +114,14 @@ class InventoryCapacityRule(ValidationRule):
                     "passed": True,
                     "rule": self.rule_name,
                     "reason": f"采购后库存{total_after_purchase}接近容量上限（90%）",
-                    "severity": "warning"
+                    "severity": "warning",
                 }
 
-            return {
-                "passed": True,
-                "rule": self.rule_name,
-                "reason": "库存容量检查通过",
-                "severity": "info"
-            }
+            return {"passed": True, "rule": self.rule_name, "reason": "库存容量检查通过", "severity": "info"}
 
         except Exception as e:
             logger.error("inventory_capacity_check_failed", error=str(e))
-            return {
-                "passed": False,
-                "rule": self.rule_name,
-                "reason": f"库存容量检查失败: {str(e)}",
-                "severity": "error"
-            }
+            return {"passed": False, "rule": self.rule_name, "reason": f"库存容量检查失败: {str(e)}", "severity": "error"}
 
 
 class HistoricalConsumptionRule(ValidationRule):
@@ -161,24 +134,14 @@ class HistoricalConsumptionRule(ValidationRule):
         """检查决策是否符合历史消耗模式"""
         try:
             if decision.get("action") != "purchase":
-                return {
-                    "passed": True,
-                    "rule": self.rule_name,
-                    "reason": "非采购决策，跳过历史消耗检查",
-                    "severity": "info"
-                }
+                return {"passed": True, "rule": self.rule_name, "reason": "非采购决策，跳过历史消耗检查", "severity": "info"}
 
             purchase_quantity = decision.get("quantity", 0)
             avg_daily_consumption = context.get("avg_daily_consumption", 0)
             days_to_cover = context.get("days_to_cover", 7)  # 默认覆盖7天
 
             if avg_daily_consumption == 0:
-                return {
-                    "passed": True,
-                    "rule": self.rule_name,
-                    "reason": "无历史消耗数据",
-                    "severity": "warning"
-                }
+                return {"passed": True, "rule": self.rule_name, "reason": "无历史消耗数据", "severity": "warning"}
 
             expected_quantity = avg_daily_consumption * days_to_cover
             deviation = abs(purchase_quantity - expected_quantity) / expected_quantity if expected_quantity > 0 else 0
@@ -189,7 +152,7 @@ class HistoricalConsumptionRule(ValidationRule):
                     "passed": False,
                     "rule": self.rule_name,
                     "reason": f"采购量{purchase_quantity}与历史消耗偏差{deviation*100:.1f}%，超出3σ范围",
-                    "severity": "critical"
+                    "severity": "critical",
                 }
 
             # 偏差超过2σ（95%置信区间）给出警告
@@ -198,24 +161,19 @@ class HistoricalConsumptionRule(ValidationRule):
                     "passed": True,
                     "rule": self.rule_name,
                     "reason": f"采购量{purchase_quantity}与历史消耗偏差{deviation*100:.1f}%，超出2σ范围",
-                    "severity": "warning"
+                    "severity": "warning",
                 }
 
             return {
                 "passed": True,
                 "rule": self.rule_name,
                 "reason": f"采购量{purchase_quantity}符合历史消耗模式（偏差{deviation*100:.1f}%）",
-                "severity": "info"
+                "severity": "info",
             }
 
         except Exception as e:
             logger.error("historical_consumption_check_failed", error=str(e))
-            return {
-                "passed": False,
-                "rule": self.rule_name,
-                "reason": f"历史消耗检查失败: {str(e)}",
-                "severity": "error"
-            }
+            return {"passed": False, "rule": self.rule_name, "reason": f"历史消耗检查失败: {str(e)}", "severity": "error"}
 
 
 class SupplierAvailabilityRule(ValidationRule):
@@ -228,47 +186,27 @@ class SupplierAvailabilityRule(ValidationRule):
         """检查供应商是否可用"""
         try:
             if decision.get("action") != "purchase":
-                return {
-                    "passed": True,
-                    "rule": self.rule_name,
-                    "reason": "非采购决策，跳过供应商检查",
-                    "severity": "info"
-                }
+                return {"passed": True, "rule": self.rule_name, "reason": "非采购决策，跳过供应商检查", "severity": "info"}
 
             supplier_id = decision.get("supplier_id")
             available_suppliers = context.get("available_suppliers", [])
 
             if not supplier_id:
-                return {
-                    "passed": False,
-                    "rule": self.rule_name,
-                    "reason": "未指定供应商",
-                    "severity": "critical"
-                }
+                return {"passed": False, "rule": self.rule_name, "reason": "未指定供应商", "severity": "critical"}
 
             if supplier_id not in available_suppliers:
                 return {
                     "passed": False,
                     "rule": self.rule_name,
                     "reason": f"供应商{supplier_id}不可用",
-                    "severity": "critical"
+                    "severity": "critical",
                 }
 
-            return {
-                "passed": True,
-                "rule": self.rule_name,
-                "reason": "供应商可用性检查通过",
-                "severity": "info"
-            }
+            return {"passed": True, "rule": self.rule_name, "reason": "供应商可用性检查通过", "severity": "info"}
 
         except Exception as e:
             logger.error("supplier_availability_check_failed", error=str(e))
-            return {
-                "passed": False,
-                "rule": self.rule_name,
-                "reason": f"供应商可用性检查失败: {str(e)}",
-                "severity": "error"
-            }
+            return {"passed": False, "rule": self.rule_name, "reason": f"供应商可用性检查失败: {str(e)}", "severity": "error"}
 
 
 class ProfitMarginRule(ValidationRule):
@@ -281,24 +219,14 @@ class ProfitMarginRule(ValidationRule):
         """检查决策是否会导致利润率过低"""
         try:
             if decision.get("action") not in ["pricing", "discount"]:
-                return {
-                    "passed": True,
-                    "rule": self.rule_name,
-                    "reason": "非定价决策，跳过利润率检查",
-                    "severity": "info"
-                }
+                return {"passed": True, "rule": self.rule_name, "reason": "非定价决策，跳过利润率检查", "severity": "info"}
 
             new_price = decision.get("price", 0)
             cost = context.get("cost", 0)
             min_profit_margin = context.get("min_profit_margin", 0.2)  # 默认最低20%利润率
 
             if cost == 0:
-                return {
-                    "passed": True,
-                    "rule": self.rule_name,
-                    "reason": "无成本数据",
-                    "severity": "warning"
-                }
+                return {"passed": True, "rule": self.rule_name, "reason": "无成本数据", "severity": "warning"}
 
             profit_margin = (new_price - cost) / new_price if new_price > 0 else 0
 
@@ -307,7 +235,7 @@ class ProfitMarginRule(ValidationRule):
                     "passed": False,
                     "rule": self.rule_name,
                     "reason": f"定价{new_price}元低于成本{cost}元，利润率为负",
-                    "severity": "critical"
+                    "severity": "critical",
                 }
 
             if profit_margin < min_profit_margin:
@@ -315,7 +243,7 @@ class ProfitMarginRule(ValidationRule):
                     "passed": False,
                     "rule": self.rule_name,
                     "reason": f"利润率{profit_margin*100:.1f}%低于最低要求{min_profit_margin*100:.1f}%",
-                    "severity": "critical"
+                    "severity": "critical",
                 }
 
             if profit_margin < min_profit_margin * float(os.getenv("DECISION_PROFIT_WARNING_FACTOR", "1.2")):
@@ -323,24 +251,19 @@ class ProfitMarginRule(ValidationRule):
                     "passed": True,
                     "rule": self.rule_name,
                     "reason": f"利润率{profit_margin*100:.1f}%接近最低要求",
-                    "severity": "warning"
+                    "severity": "warning",
                 }
 
             return {
                 "passed": True,
                 "rule": self.rule_name,
                 "reason": f"利润率{profit_margin*100:.1f}%符合要求",
-                "severity": "info"
+                "severity": "info",
             }
 
         except Exception as e:
             logger.error("profit_margin_check_failed", error=str(e))
-            return {
-                "passed": False,
-                "rule": self.rule_name,
-                "reason": f"利润率检查失败: {str(e)}",
-                "severity": "error"
-            }
+            return {"passed": False, "rule": self.rule_name, "reason": f"利润率检查失败: {str(e)}", "severity": "error"}
 
 
 class DecisionValidator:
@@ -352,7 +275,7 @@ class DecisionValidator:
             "inventory_capacity": InventoryCapacityRule(),
             "historical_consumption": HistoricalConsumptionRule(),
             "supplier_availability": SupplierAvailabilityRule(),
-            "profit_margin": ProfitMarginRule()
+            "profit_margin": ProfitMarginRule(),
         }
 
     def add_rule(self, rule: ValidationRule):
@@ -360,10 +283,7 @@ class DecisionValidator:
         self.rules[rule.rule_id] = rule
 
     async def validate_decision(
-        self,
-        decision: Dict[str, Any],
-        context: Dict[str, Any],
-        rules_to_apply: Optional[List[str]] = None
+        self, decision: Dict[str, Any], context: Dict[str, Any], rules_to_apply: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """
         校验AI决策
@@ -422,7 +342,7 @@ class DecisionValidator:
                 "critical_failures": critical_failures,
                 "warnings": warnings,
                 "rules_applied": len(validation_results),
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
             }
 
         except Exception as e:
@@ -434,14 +354,10 @@ class DecisionValidator:
                 "critical_failures": [{"reason": str(e), "severity": "error"}],
                 "warnings": [],
                 "rules_applied": 0,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
             }
 
-    async def validate_purchase_decision(
-        self,
-        ai_suggestion: Dict[str, Any],
-        context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def validate_purchase_decision(self, ai_suggestion: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """
         校验采购决策
 
@@ -452,20 +368,11 @@ class DecisionValidator:
         Returns:
             Dict: 校验结果
         """
-        rules_to_apply = [
-            "budget_check",
-            "inventory_capacity",
-            "historical_consumption",
-            "supplier_availability"
-        ]
+        rules_to_apply = ["budget_check", "inventory_capacity", "historical_consumption", "supplier_availability"]
 
         return await self.validate_decision(ai_suggestion, context, rules_to_apply)
 
-    async def validate_pricing_decision(
-        self,
-        ai_suggestion: Dict[str, Any],
-        context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def validate_pricing_decision(self, ai_suggestion: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """
         校验定价决策
 
@@ -476,16 +383,12 @@ class DecisionValidator:
         Returns:
             Dict: 校验结果
         """
-        rules_to_apply = [
-            "profit_margin"
-        ]
+        rules_to_apply = ["profit_margin"]
 
         return await self.validate_decision(ai_suggestion, context, rules_to_apply)
 
     async def detect_anomaly_decision(
-        self,
-        decision: Dict[str, Any],
-        historical_decisions: List[Dict[str, Any]]
+        self, decision: Dict[str, Any], historical_decisions: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
         """
         检测离群决策
@@ -499,33 +402,21 @@ class DecisionValidator:
         """
         try:
             if not historical_decisions:
-                return {
-                    "is_anomaly": False,
-                    "reason": "无历史决策数据",
-                    "confidence": 0.0
-                }
+                return {"is_anomaly": False, "reason": "无历史决策数据", "confidence": 0.0}
 
             # 简化实现：检查决策值是否偏离历史平均值超过3σ
             decision_value = decision.get("value", 0)
             historical_values = [d.get("value", 0) for d in historical_decisions]
 
             if not historical_values:
-                return {
-                    "is_anomaly": False,
-                    "reason": "无有效历史数据",
-                    "confidence": 0.0
-                }
+                return {"is_anomaly": False, "reason": "无有效历史数据", "confidence": 0.0}
 
             mean = sum(historical_values) / len(historical_values)
             variance = sum((x - mean) ** 2 for x in historical_values) / len(historical_values)
-            std_dev = variance ** 0.5
+            std_dev = variance**0.5
 
             if std_dev == 0:
-                return {
-                    "is_anomaly": False,
-                    "reason": "历史数据无变化",
-                    "confidence": 0.0
-                }
+                return {"is_anomaly": False, "reason": "历史数据无变化", "confidence": 0.0}
 
             z_score = abs((decision_value - mean) / std_dev)
 
@@ -534,23 +425,19 @@ class DecisionValidator:
                     "is_anomaly": True,
                     "reason": f"决策值{decision_value}偏离历史平均值{mean:.2f}超过3σ（z-score={z_score:.2f}）",
                     "confidence": min(z_score / 5.0, 1.0),
-                    "z_score": z_score
+                    "z_score": z_score,
                 }
 
             return {
                 "is_anomaly": False,
                 "reason": f"决策值{decision_value}在正常范围内（z-score={z_score:.2f}）",
                 "confidence": 0.0,
-                "z_score": z_score
+                "z_score": z_score,
             }
 
         except Exception as e:
             logger.error("detect_anomaly_decision_failed", error=str(e))
-            return {
-                "is_anomaly": False,
-                "reason": f"异常检测失败: {str(e)}",
-                "confidence": 0.0
-            }
+            return {"is_anomaly": False, "reason": f"异常检测失败: {str(e)}", "confidence": 0.0}
 
 
 # 全局实例

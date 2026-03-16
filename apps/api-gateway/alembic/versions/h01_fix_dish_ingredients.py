@@ -55,4 +55,4 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_table('dish_ingredients')
+    op.execute('DROP TABLE IF EXISTS dish_ingredients CASCADE')

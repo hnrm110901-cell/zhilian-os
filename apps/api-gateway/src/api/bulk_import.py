@@ -2,16 +2,16 @@
 批量导入 API — Excel 导入订单 / 库存 / 员工
 支持 .xlsx / .xls，返回逐行导入结果
 """
+
 import io
 import uuid
-from datetime import datetime, date
+from datetime import date, datetime
 from typing import Any, Dict, List
 
 import pandas as pd
 import structlog
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
-
 from src.core.database import get_db_session
 from src.core.dependencies import get_current_user
 from src.models.employee import Employee
@@ -28,6 +28,7 @@ MAX_ROWS = 5000
 
 # ── 工具 ──────────────────────────────────────────────────────
 
+
 def _read_excel(file_bytes: bytes) -> pd.DataFrame:
     try:
         return pd.read_excel(io.BytesIO(file_bytes), dtype=str).fillna("")
@@ -40,6 +41,7 @@ def _result(ok: int, fail: int, errors: List[str]) -> Dict[str, Any]:
 
 
 # ── 员工导入 ──────────────────────────────────────────────────
+
 
 @router.post("/employees/{store_id}")
 async def import_employees(
@@ -73,6 +75,7 @@ async def import_employees(
                 is_active = str(row.get("是否在职", "1")).strip() not in ("0", "false", "否", "离职")
 
                 from sqlalchemy import select
+
                 existing = await session.execute(select(Employee).where(Employee.id == emp_id))
                 emp = existing.scalar_one_or_none()
 
@@ -84,16 +87,18 @@ async def import_employees(
                     emp.hire_date = hire_date or emp.hire_date
                     emp.is_active = is_active
                 else:
-                    session.add(Employee(
-                        id=emp_id,
-                        store_id=store_id,
-                        name=name,
-                        phone=row.get("手机", "").strip() or None,
-                        email=row.get("邮箱", "").strip() or None,
-                        position=position,
-                        hire_date=hire_date,
-                        is_active=is_active,
-                    ))
+                    session.add(
+                        Employee(
+                            id=emp_id,
+                            store_id=store_id,
+                            name=name,
+                            phone=row.get("手机", "").strip() or None,
+                            email=row.get("邮箱", "").strip() or None,
+                            position=position,
+                            hire_date=hire_date,
+                            is_active=is_active,
+                        )
+                    )
                 ok += 1
             except Exception as e:
                 fail += 1
@@ -106,6 +111,7 @@ async def import_employees(
 
 
 # ── 库存导入 ──────────────────────────────────────────────────
+
 
 @router.post("/inventory/{store_id}")
 async def import_inventory(
@@ -152,9 +158,8 @@ async def import_inventory(
                     status = InventoryStatus.NORMAL
 
                 from sqlalchemy import select
-                existing = await session.execute(
-                    select(InventoryItem).where(InventoryItem.id == item_id)
-                )
+
+                existing = await session.execute(select(InventoryItem).where(InventoryItem.id == item_id))
                 item = existing.scalar_one_or_none()
 
                 if item:
@@ -169,20 +174,22 @@ async def import_inventory(
                     item.supplier_name = row.get("供应商", "").strip() or item.supplier_name
                     item.supplier_contact = row.get("供应商联系方式", "").strip() or item.supplier_contact
                 else:
-                    session.add(InventoryItem(
-                        id=item_id,
-                        store_id=store_id,
-                        name=name,
-                        category=row.get("分类", "").strip() or None,
-                        unit=row.get("单位", "").strip() or None,
-                        current_quantity=current_qty,
-                        min_quantity=min_qty,
-                        max_quantity=max_qty,
-                        unit_cost=unit_cost,
-                        status=status,
-                        supplier_name=row.get("供应商", "").strip() or None,
-                        supplier_contact=row.get("供应商联系方式", "").strip() or None,
-                    ))
+                    session.add(
+                        InventoryItem(
+                            id=item_id,
+                            store_id=store_id,
+                            name=name,
+                            category=row.get("分类", "").strip() or None,
+                            unit=row.get("单位", "").strip() or None,
+                            current_quantity=current_qty,
+                            min_quantity=min_qty,
+                            max_quantity=max_qty,
+                            unit_cost=unit_cost,
+                            status=status,
+                            supplier_name=row.get("供应商", "").strip() or None,
+                            supplier_contact=row.get("供应商联系方式", "").strip() or None,
+                        )
+                    )
                 ok += 1
             except Exception as e:
                 fail += 1
@@ -195,6 +202,7 @@ async def import_inventory(
 
 
 # ── 订单导入 ──────────────────────────────────────────────────
+
 
 @router.post("/orders/{store_id}")
 async def import_orders(
@@ -216,6 +224,7 @@ async def import_orders(
 
     async with get_db_session() as session:
         from sqlalchemy import select
+
         for idx, row in df.iterrows():
             lineno = idx + 2
             try:
@@ -230,11 +239,7 @@ async def import_orders(
                 discount_amount = int(float(discount_str) * 100) if discount_str else 0
 
                 order_time_str = row.get("下单时间", "").strip()
-                order_time = (
-                    datetime.fromisoformat(order_time_str)
-                    if order_time_str
-                    else datetime.utcnow()
-                )
+                order_time = datetime.fromisoformat(order_time_str) if order_time_str else datetime.utcnow()
 
                 status_raw = row.get("状态", "completed").strip().lower()
                 valid_statuses = {s.value for s in OrderStatus}
@@ -249,21 +254,23 @@ async def import_orders(
                     ok += 1
                     continue  # 幂等跳过
 
-                session.add(Order(
-                    id=order_id,
-                    store_id=store_id,
-                    table_number=row.get("桌号", "").strip() or None,
-                    customer_name=row.get("客户姓名", "").strip() or None,
-                    customer_phone=row.get("客户手机", "").strip() or None,
-                    status=status,
-                    total_amount=total_amount,
-                    discount_amount=discount_amount,
-                    final_amount=final_amount,
-                    order_time=order_time,
-                    completed_at=order_time if status == OrderStatus.COMPLETED.value else None,
-                    notes=row.get("备注", "").strip() or None,
-                    order_metadata={"source": "excel_import"},
-                ))
+                session.add(
+                    Order(
+                        id=order_id,
+                        store_id=store_id,
+                        table_number=row.get("桌号", "").strip() or None,
+                        customer_name=row.get("客户姓名", "").strip() or None,
+                        customer_phone=row.get("客户手机", "").strip() or None,
+                        status=status,
+                        total_amount=total_amount,
+                        discount_amount=discount_amount,
+                        final_amount=final_amount,
+                        order_time=order_time,
+                        completed_at=order_time if status == OrderStatus.COMPLETED.value else None,
+                        notes=row.get("备注", "").strip() or None,
+                        order_metadata={"source": "excel_import"},
+                    )
+                )
                 ok += 1
             except Exception as e:
                 fail += 1
@@ -283,11 +290,33 @@ TEMPLATES = {
         "sample": [["EMP001", "张三", "13800138000", "zhangsan@example.com", "服务员", "2024-01-01", "1"]],
     },
     "inventory": {
-        "columns": ["物料ID", "名称", "分类", "单位", "当前库存", "最低库存", "最高库存", "单价(元)", "供应商", "供应商联系方式"],
+        "columns": [
+            "物料ID",
+            "名称",
+            "分类",
+            "单位",
+            "当前库存",
+            "最低库存",
+            "最高库存",
+            "单价(元)",
+            "供应商",
+            "供应商联系方式",
+        ],
         "sample": [["INV001", "五花肉", "肉类", "kg", "50", "20", "100", "35.5", "XX供应商", "13900139000"]],
     },
     "orders": {
-        "columns": ["订单ID", "桌号", "客户姓名", "客户手机", "状态", "总金额(元)", "优惠金额(元)", "实付金额(元)", "下单时间", "备注"],
+        "columns": [
+            "订单ID",
+            "桌号",
+            "客户姓名",
+            "客户手机",
+            "状态",
+            "总金额(元)",
+            "优惠金额(元)",
+            "实付金额(元)",
+            "下单时间",
+            "备注",
+        ],
         "sample": [["", "A01", "李四", "13700137000", "completed", "288.00", "0", "288.00", "2024-01-15 12:30:00", ""]],
     },
 }

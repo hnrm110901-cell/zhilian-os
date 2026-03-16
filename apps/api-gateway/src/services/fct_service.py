@@ -18,8 +18,8 @@ FCTService — 业财税资金一体化服务
 
 from __future__ import annotations
 
-import os
 import inspect
+import os
 import re
 from calendar import monthrange
 from datetime import date, datetime, timedelta
@@ -30,35 +30,34 @@ import structlog
 from sqlalchemy import and_, case, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-
-from src.models.finance import FinancialTransaction, Budget, Invoice
-from src.models.reconciliation import ReconciliationRecord, ReconciliationStatus
 from src.models.fct import (
-    FCTTaxRecord,
-    FCTCashFlowItem,
+    FCTApprovalRecord,
     FCTBudgetControl,
+    FCTCashFlowItem,
     FCTPettyCash,
     FCTPettyCashRecord,
-    FCTApprovalRecord,
+    FCTTaxRecord,
     TaxpayerType,
     Voucher,
     VoucherLine,
 )
+from src.models.finance import Budget, FinancialTransaction, Invoice
+from src.models.reconciliation import ReconciliationRecord, ReconciliationStatus
 from src.models.store import Store
 
 logger = structlog.get_logger()
 
 # ── 可调税率参数 ───────────────────────────────────────────────────────────────
-VAT_RATE_GENERAL  = float(os.getenv("VAT_RATE_GENERAL",  "0.06"))
-VAT_RATE_SMALL    = float(os.getenv("VAT_RATE_SMALL",    "0.03"))
-CIT_RATE_GENERAL  = float(os.getenv("CIT_RATE_GENERAL",  "0.25"))
-CIT_RATE_MICRO    = float(os.getenv("CIT_RATE_MICRO",    "0.20"))
-PROFIT_MARGIN     = float(os.getenv("PROFIT_MARGIN",     "0.12"))
-FOOD_COST_RATIO   = float(os.getenv("FOOD_COST_RATIO",   "0.35"))
+VAT_RATE_GENERAL = float(os.getenv("VAT_RATE_GENERAL", "0.06"))
+VAT_RATE_SMALL = float(os.getenv("VAT_RATE_SMALL", "0.03"))
+CIT_RATE_GENERAL = float(os.getenv("CIT_RATE_GENERAL", "0.25"))
+CIT_RATE_MICRO = float(os.getenv("CIT_RATE_MICRO", "0.20"))
+PROFIT_MARGIN = float(os.getenv("PROFIT_MARGIN", "0.12"))
+FOOD_COST_RATIO = float(os.getenv("FOOD_COST_RATIO", "0.35"))
 # 附加税 = VAT × (城建 7% + 教育附加 3% + 地方教育 2%)
 VAT_SURCHARGE_RATE = 0.12
 # 资金预警线：累计余额低于 N 天平均日营业额时预警
-CASH_ALERT_DAYS   = int(os.getenv("CASH_ALERT_DAYS", "7"))
+CASH_ALERT_DAYS = int(os.getenv("CASH_ALERT_DAYS", "7"))
 
 
 class FCTService:
@@ -82,8 +81,8 @@ class FCTService:
     async def get_monthly_reconciliation(
         self,
         store_id: str,
-        year:     int,
-        month:    int,
+        year: int,
+        month: int,
     ) -> Dict[str, Any]:
         """
         月度业财对账汇总报告。
@@ -99,26 +98,26 @@ class FCTService:
             月度汇总 dict，包含 summary + daily_details + anomaly_days
         """
         days_in_month = monthrange(year, month)[1]
-        start_date    = date(year, month, 1)
-        end_date      = date(year, month, days_in_month)
+        start_date = date(year, month, 1)
+        end_date = date(year, month, days_in_month)
 
         stmt = (
             select(ReconciliationRecord)
             .where(
                 and_(
-                    ReconciliationRecord.store_id             == store_id,
-                    ReconciliationRecord.reconciliation_date  >= start_date,
-                    ReconciliationRecord.reconciliation_date  <= end_date,
+                    ReconciliationRecord.store_id == store_id,
+                    ReconciliationRecord.reconciliation_date >= start_date,
+                    ReconciliationRecord.reconciliation_date <= end_date,
                 )
             )
             .order_by(ReconciliationRecord.reconciliation_date)
         )
         records = (await self.db.execute(stmt)).scalars().all()
 
-        pos_total     = sum(r.pos_total_amount     for r in records)
-        actual_total  = sum(r.actual_total_amount  for r in records)
-        variance      = actual_total - pos_total
-        variance_pct  = round(variance / pos_total * 100, 2) if pos_total else 0.0
+        pos_total = sum(r.pos_total_amount for r in records)
+        actual_total = sum(r.actual_total_amount for r in records)
+        variance = actual_total - pos_total
+        variance_pct = round(variance / pos_total * 100, 2) if pos_total else 0.0
 
         status_counts: Dict[str, int] = {}
         for r in records:
@@ -126,15 +125,15 @@ class FCTService:
 
         anomaly_days = [
             {
-                "date":              r.reconciliation_date.isoformat(),
-                "pos_amount":        r.pos_total_amount,
-                "pos_amount_yuan":   self._y(r.pos_total_amount),
-                "actual_amount":     r.actual_total_amount,
+                "date": r.reconciliation_date.isoformat(),
+                "pos_amount": r.pos_total_amount,
+                "pos_amount_yuan": self._y(r.pos_total_amount),
+                "actual_amount": r.actual_total_amount,
                 "actual_amount_yuan": self._y(r.actual_total_amount),
-                "diff_amount":       r.diff_amount,
-                "diff_amount_yuan":  self._y(r.diff_amount),
-                "diff_ratio":        r.diff_ratio,
-                "status":            r.status,
+                "diff_amount": r.diff_amount,
+                "diff_amount_yuan": self._y(r.diff_amount),
+                "diff_ratio": r.diff_ratio,
+                "status": r.status,
             }
             for r in records
             if abs(r.diff_ratio or 0) > 1.0
@@ -142,54 +141,56 @@ class FCTService:
 
         daily_details = [
             {
-                "date":              r.reconciliation_date.isoformat(),
-                "pos_amount":        r.pos_total_amount,
-                "pos_amount_yuan":   self._y(r.pos_total_amount),
-                "actual_amount":     r.actual_total_amount,
+                "date": r.reconciliation_date.isoformat(),
+                "pos_amount": r.pos_total_amount,
+                "pos_amount_yuan": self._y(r.pos_total_amount),
+                "actual_amount": r.actual_total_amount,
                 "actual_amount_yuan": self._y(r.actual_total_amount),
-                "diff_amount":       r.diff_amount,
-                "diff_amount_yuan":  self._y(r.diff_amount),
-                "diff_ratio":        r.diff_ratio,
-                "status":            r.status,
+                "diff_amount": r.diff_amount,
+                "diff_amount_yuan": self._y(r.diff_amount),
+                "diff_ratio": r.diff_ratio,
+                "status": r.status,
             }
             for r in records
         ]
 
         logger.info(
             "月度业财对账汇总完成",
-            store_id=store_id, year=year, month=month,
-            days=len(records), anomaly_days=len(anomaly_days),
+            store_id=store_id,
+            year=year,
+            month=month,
+            days=len(records),
+            anomaly_days=len(anomaly_days),
         )
 
         return {
-            "store_id":         store_id,
-            "period":           f"{year}-{month:02d}",
-            "reconciled_days":  len(records),
+            "store_id": store_id,
+            "period": f"{year}-{month:02d}",
+            "reconciled_days": len(records),
             "summary": {
-                "pos_total":           pos_total,
-                "pos_total_yuan":      self._y(pos_total),
-                "finance_total":       actual_total,
-                "finance_total_yuan":  self._y(actual_total),
-                "variance":            variance,
-                "variance_yuan":       self._y(variance),
-                "variance_pct":        variance_pct,
-                "health":              "normal" if abs(variance_pct) <= 1.0 else
-                                       "warning" if abs(variance_pct) <= 3.0 else "critical",
+                "pos_total": pos_total,
+                "pos_total_yuan": self._y(pos_total),
+                "finance_total": actual_total,
+                "finance_total_yuan": self._y(actual_total),
+                "variance": variance,
+                "variance_yuan": self._y(variance),
+                "variance_pct": variance_pct,
+                "health": "normal" if abs(variance_pct) <= 1.0 else "warning" if abs(variance_pct) <= 3.0 else "critical",
             },
             "status_breakdown": status_counts,
-            "anomaly_days":     anomaly_days,
-            "daily_details":    daily_details,
+            "anomaly_days": anomaly_days,
+            "daily_details": daily_details,
         }
 
     # ── 2. 税务测算 ────────────────────────────────────────────────────────────
 
     async def estimate_monthly_tax(
         self,
-        store_id:      str,
-        year:          int,
-        month:         int,
+        store_id: str,
+        year: int,
+        month: int,
         taxpayer_type: str = "general",
-        save:          bool = False,
+        save: bool = False,
     ) -> Dict[str, Any]:
         """
         月度税务测算。
@@ -213,104 +214,117 @@ class FCTService:
             税务测算结果 dict
         """
         days_in_month = monthrange(year, month)[1]
-        start_date    = date(year, month, 1)
-        end_date      = date(year, month, days_in_month)
+        start_date = date(year, month, 1)
+        end_date = date(year, month, days_in_month)
 
         # 查询月度收入（分）
-        income_stmt = (
-            select(func.sum(FinancialTransaction.amount))
-            .where(
-                and_(
-                    FinancialTransaction.store_id          == store_id,
-                    FinancialTransaction.transaction_type  == "income",
-                    FinancialTransaction.transaction_date  >= start_date,
-                    FinancialTransaction.transaction_date  <= end_date,
-                )
+        income_stmt = select(func.sum(FinancialTransaction.amount)).where(
+            and_(
+                FinancialTransaction.store_id == store_id,
+                FinancialTransaction.transaction_type == "income",
+                FinancialTransaction.transaction_date >= start_date,
+                FinancialTransaction.transaction_date <= end_date,
             )
         )
         gross_rev = (await self.db.execute(income_stmt)).scalar() or 0
 
         # 查询食材采购成本（用于进项税测算）
-        cost_stmt = (
-            select(func.sum(FinancialTransaction.amount))
-            .where(
-                and_(
-                    FinancialTransaction.store_id          == store_id,
-                    FinancialTransaction.transaction_type  == "expense",
-                    FinancialTransaction.category          == "food_cost",
-                    FinancialTransaction.transaction_date  >= start_date,
-                    FinancialTransaction.transaction_date  <= end_date,
-                )
+        cost_stmt = select(func.sum(FinancialTransaction.amount)).where(
+            and_(
+                FinancialTransaction.store_id == store_id,
+                FinancialTransaction.transaction_type == "expense",
+                FinancialTransaction.category == "food_cost",
+                FinancialTransaction.transaction_date >= start_date,
+                FinancialTransaction.transaction_date <= end_date,
             )
         )
         food_cost = (await self.db.execute(cost_stmt)).scalar() or 0
 
         # 税率
-        tp       = TaxpayerType(taxpayer_type) if taxpayer_type in TaxpayerType._value2member_map_ else TaxpayerType.GENERAL
+        tp = TaxpayerType(taxpayer_type) if taxpayer_type in TaxpayerType._value2member_map_ else TaxpayerType.GENERAL
         vat_rate = VAT_RATE_GENERAL if tp == TaxpayerType.GENERAL else VAT_RATE_SMALL
-        cit_rate = CIT_RATE_MICRO   if tp == TaxpayerType.MICRO    else CIT_RATE_GENERAL
+        cit_rate = CIT_RATE_MICRO if tp == TaxpayerType.MICRO else CIT_RATE_GENERAL
 
         # 税额计算
-        output_vat      = int(gross_rev / (1 + vat_rate) * vat_rate)
-        input_vat       = int(food_cost * vat_rate)
-        net_vat         = max(0, output_vat - input_vat)
-        vat_surcharge   = int(net_vat * VAT_SURCHARGE_RATE)
-        est_profit      = int(gross_rev * PROFIT_MARGIN)
-        cit_amount      = int(est_profit * cit_rate)
-        total_tax       = net_vat + vat_surcharge + cit_amount
+        output_vat = int(gross_rev / (1 + vat_rate) * vat_rate)
+        input_vat = int(food_cost * vat_rate)
+        net_vat = max(0, output_vat - input_vat)
+        vat_surcharge = int(net_vat * VAT_SURCHARGE_RATE)
+        est_profit = int(gross_rev * PROFIT_MARGIN)
+        cit_amount = int(est_profit * cit_rate)
+        total_tax = net_vat + vat_surcharge + cit_amount
 
         result = {
-            "store_id":      store_id,
-            "period":        f"{year}-{month:02d}",
+            "store_id": store_id,
+            "period": f"{year}-{month:02d}",
             "taxpayer_type": tp.value,
             "revenue": {
-                "gross_revenue":      gross_rev,
+                "gross_revenue": gross_rev,
                 "gross_revenue_yuan": self._y(gross_rev),
-                "food_cost":          food_cost,
-                "food_cost_yuan":     self._y(food_cost),
+                "food_cost": food_cost,
+                "food_cost_yuan": self._y(food_cost),
             },
             "vat": {
-                "rate":                  vat_rate,
-                "output_vat":            output_vat,
-                "output_vat_yuan":       self._y(output_vat),
-                "input_vat":             input_vat,
-                "input_vat_yuan":        self._y(input_vat),
-                "net_vat":               net_vat,
-                "net_vat_yuan":          self._y(net_vat),
-                "surcharge":             vat_surcharge,
-                "surcharge_yuan":        self._y(vat_surcharge),
-                "total_vat_burden":      net_vat + vat_surcharge,
+                "rate": vat_rate,
+                "output_vat": output_vat,
+                "output_vat_yuan": self._y(output_vat),
+                "input_vat": input_vat,
+                "input_vat_yuan": self._y(input_vat),
+                "net_vat": net_vat,
+                "net_vat_yuan": self._y(net_vat),
+                "surcharge": vat_surcharge,
+                "surcharge_yuan": self._y(vat_surcharge),
+                "total_vat_burden": net_vat + vat_surcharge,
                 "total_vat_burden_yuan": self._y(net_vat + vat_surcharge),
             },
             "cit": {
-                "rate":                      cit_rate,
-                "estimated_profit":          est_profit,
-                "estimated_profit_yuan":     self._y(est_profit),
-                "cit_amount":                cit_amount,
-                "cit_amount_yuan":           self._y(cit_amount),
-                "profit_margin_assumption":  PROFIT_MARGIN,
+                "rate": cit_rate,
+                "estimated_profit": est_profit,
+                "estimated_profit_yuan": self._y(est_profit),
+                "cit_amount": cit_amount,
+                "cit_amount_yuan": self._y(cit_amount),
+                "profit_margin_assumption": PROFIT_MARGIN,
             },
-            "total_tax":      total_tax,
+            "total_tax": total_tax,
             "total_tax_yuan": self._y(total_tax),
             "effective_rate": round(total_tax / gross_rev * 100, 2) if gross_rev else 0.0,
-            "disclaimer":    "本测算基于历史数据估算，实际纳税以税务机关认定为准",
+            "disclaimer": "本测算基于历史数据估算，实际纳税以税务机关认定为准",
         }
 
         if save:
-            await self._save_tax_record(store_id, year, month, tp, gross_rev, food_cost,
-                                         vat_rate, output_vat, input_vat, net_vat, vat_surcharge,
-                                         cit_rate, est_profit, cit_amount, total_tax)
+            await self._save_tax_record(
+                store_id,
+                year,
+                month,
+                tp,
+                gross_rev,
+                food_cost,
+                vat_rate,
+                output_vat,
+                input_vat,
+                net_vat,
+                vat_surcharge,
+                cit_rate,
+                est_profit,
+                cit_amount,
+                total_tax,
+            )
 
-        logger.info("月度税务测算完成", store_id=store_id, period=f"{year}-{month:02d}",
-                    total_tax=total_tax, effective_rate=result["effective_rate"])
+        logger.info(
+            "月度税务测算完成",
+            store_id=store_id,
+            period=f"{year}-{month:02d}",
+            total_tax=total_tax,
+            effective_rate=result["effective_rate"],
+        )
         return result
 
     # ── 3. 资金流预测 ──────────────────────────────────────────────────────────
 
     async def forecast_cash_flow(
         self,
-        store_id:         str,
-        days:             int = 30,
+        store_id: str,
+        days: int = 30,
         starting_balance: int = 0,
     ) -> Dict[str, Any]:
         """
@@ -332,116 +346,115 @@ class FCTService:
         """
         # 1. 历史日均进流（过去 30 天）
         hist_start = date.today() - timedelta(days=30)
-        hist_stmt  = (
+        hist_stmt = (
             select(
                 FinancialTransaction.transaction_date,
                 func.sum(FinancialTransaction.amount).label("daily_total"),
             )
             .where(
                 and_(
-                    FinancialTransaction.store_id         == store_id,
+                    FinancialTransaction.store_id == store_id,
                     FinancialTransaction.transaction_type == "income",
                     FinancialTransaction.transaction_date >= hist_start,
                 )
             )
             .group_by(FinancialTransaction.transaction_date)
         )
-        hist_rows   = (await self.db.execute(hist_stmt)).all()
+        hist_rows = (await self.db.execute(hist_stmt)).all()
         daily_totals = [r.daily_total for r in hist_rows if r.daily_total]
         avg_daily_inflow = int(sum(daily_totals) / len(daily_totals)) if daily_totals else 50000_00  # fallback 5万
 
         # 2. 月度固定成本（从 Budget 获取，或使用默认值）
-        budget_stmt = (
-            select(Budget)
-            .where(
-                and_(
-                    Budget.store_id == store_id,
-                    Budget.year     == date.today().year,
-                    Budget.month    == date.today().month,
-                )
+        budget_stmt = select(Budget).where(
+            and_(
+                Budget.store_id == store_id,
+                Budget.year == date.today().year,
+                Budget.month == date.today().month,
             )
         )
-        budgets   = (await self.db.execute(budget_stmt)).scalars().all()
-        bmap      = {b.category: b.budgeted_amount for b in budgets}
+        budgets = (await self.db.execute(budget_stmt)).scalars().all()
+        bmap = {b.category: b.budgeted_amount for b in budgets}
 
-        monthly_rent   = bmap.get("rent",        300000_00)   # fallback 30万
-        monthly_labor  = bmap.get("labor_cost",  500000_00)   # fallback 50万
-        monthly_util   = bmap.get("utilities",    50000_00)   # fallback 5万
+        monthly_rent = bmap.get("rent", 300000_00)  # fallback 30万
+        monthly_labor = bmap.get("labor_cost", 500000_00)  # fallback 50万
+        monthly_util = bmap.get("utilities", 50000_00)  # fallback 5万
 
-        daily_rent    = monthly_rent  // 30
-        daily_labor   = monthly_labor // 30
-        daily_util    = monthly_util  // 30
-        daily_food    = int(avg_daily_inflow * FOOD_COST_RATIO)
+        daily_rent = monthly_rent // 30
+        daily_labor = monthly_labor // 30
+        daily_util = monthly_util // 30
+        daily_food = int(avg_daily_inflow * FOOD_COST_RATIO)
 
         # 3. 逐日预测
         alert_threshold = avg_daily_inflow * CASH_ALERT_DAYS
-        balance         = starting_balance
-        daily_forecast  = []
-        alerts          = []
+        balance = starting_balance
+        daily_forecast = []
+        alerts = []
 
         for i in range(days):
-            d          = date.today() + timedelta(days=i)
+            d = date.today() + timedelta(days=i)
             # 周末流量 ×1.2
-            flow_mult  = 1.2 if d.weekday() in (5, 6) else 1.0
-            inflow     = int(avg_daily_inflow * flow_mult)
-            food_out   = int(daily_food * flow_mult)
-            total_out  = food_out + daily_labor + daily_rent + daily_util
-            net        = inflow - total_out
-            balance   += net
+            flow_mult = 1.2 if d.weekday() in (5, 6) else 1.0
+            inflow = int(avg_daily_inflow * flow_mult)
+            food_out = int(daily_food * flow_mult)
+            total_out = food_out + daily_labor + daily_rent + daily_util
+            net = inflow - total_out
+            balance += net
 
             is_alert = balance < alert_threshold
             if is_alert:
                 msg = f"{d.isoformat()} 累计余额 ¥{balance/100:.0f} 低于预警线 ¥{alert_threshold/100:.0f}"
                 alerts.append({"date": d.isoformat(), "balance": balance, "balance_yuan": self._y(balance), "message": msg})
 
-            daily_forecast.append({
-                "date":                    d.isoformat(),
-                "weekday":                 ["周一","周二","周三","周四","周五","周六","周日"][d.weekday()],
-                "inflow":                  inflow,
-                "inflow_yuan":             self._y(inflow),
-                "outflow":                 total_out,
-                "outflow_yuan":            self._y(total_out),
-                "outflow_breakdown": {
-                    "food_cost":       food_out,
-                    "food_cost_yuan":  self._y(food_out),
-                    "labor":           daily_labor,
-                    "labor_yuan":      self._y(daily_labor),
-                    "rent":            daily_rent,
-                    "rent_yuan":       self._y(daily_rent),
-                    "utilities":       daily_util,
-                    "utilities_yuan":  self._y(daily_util),
-                },
-                "net_flow":                net,
-                "net_flow_yuan":           self._y(net),
-                "cumulative_balance":      balance,
-                "cumulative_balance_yuan": self._y(balance),
-                "is_alert":                is_alert,
-                "confidence":              0.85 if i < 7 else 0.70 if i < 14 else 0.55,
-            })
+            daily_forecast.append(
+                {
+                    "date": d.isoformat(),
+                    "weekday": ["周一", "周二", "周三", "周四", "周五", "周六", "周日"][d.weekday()],
+                    "inflow": inflow,
+                    "inflow_yuan": self._y(inflow),
+                    "outflow": total_out,
+                    "outflow_yuan": self._y(total_out),
+                    "outflow_breakdown": {
+                        "food_cost": food_out,
+                        "food_cost_yuan": self._y(food_out),
+                        "labor": daily_labor,
+                        "labor_yuan": self._y(daily_labor),
+                        "rent": daily_rent,
+                        "rent_yuan": self._y(daily_rent),
+                        "utilities": daily_util,
+                        "utilities_yuan": self._y(daily_util),
+                    },
+                    "net_flow": net,
+                    "net_flow_yuan": self._y(net),
+                    "cumulative_balance": balance,
+                    "cumulative_balance_yuan": self._y(balance),
+                    "is_alert": is_alert,
+                    "confidence": 0.85 if i < 7 else 0.70 if i < 14 else 0.55,
+                }
+            )
 
-        total_inflow  = sum(d["inflow"]   for d in daily_forecast)
-        total_outflow = sum(d["outflow"]  for d in daily_forecast)
+        total_inflow = sum(d["inflow"] for d in daily_forecast)
+        total_outflow = sum(d["outflow"] for d in daily_forecast)
 
         return {
-            "store_id":           store_id,
-            "forecast_days":      days,
-            "starting_balance":   starting_balance,
+            "store_id": store_id,
+            "forecast_days": days,
+            "starting_balance": starting_balance,
             "starting_balance_yuan": self._y(starting_balance),
-            "avg_daily_inflow":   avg_daily_inflow,
+            "avg_daily_inflow": avg_daily_inflow,
             "avg_daily_inflow_yuan": self._y(avg_daily_inflow),
             "summary": {
-                "total_inflow":         total_inflow,
-                "total_inflow_yuan":    self._y(total_inflow),
-                "total_outflow":        total_outflow,
-                "total_outflow_yuan":   self._y(total_outflow),
-                "net_flow":             total_inflow - total_outflow,
-                "net_flow_yuan":        self._y(total_inflow - total_outflow),
-                "ending_balance":       balance,
-                "ending_balance_yuan":  self._y(balance),
-                "alert_count":          len(alerts),
+                "total_inflow": total_inflow,
+                "total_inflow_yuan": self._y(total_inflow),
+                "total_outflow": total_outflow,
+                "total_outflow_yuan": self._y(total_outflow),
+                "net_flow": total_inflow - total_outflow,
+                "net_flow_yuan": self._y(total_inflow - total_outflow),
+                "ending_balance": balance,
+                "ending_balance_yuan": self._y(balance),
+                "alert_count": len(alerts),
             },
-            "alerts":            alerts[:5],   # 最多返回 5 条预警
-            "daily_forecast":    daily_forecast,
+            "alerts": alerts[:5],  # 最多返回 5 条预警
+            "daily_forecast": daily_forecast,
             "note": "预测基于历史均值，仅供参考；实际资金流以财务记账为准",
         }
 
@@ -450,8 +463,8 @@ class FCTService:
     async def get_budget_execution(
         self,
         store_id: str,
-        year:     int,
-        month:    int,
+        year: int,
+        month: int,
     ) -> Dict[str, Any]:
         """
         月度预算执行率分析。
@@ -465,22 +478,19 @@ class FCTService:
             {categories: [...], overall: {...}, alerts: [...]}
         """
         days_in_month = monthrange(year, month)[1]
-        start_date    = date(year, month, 1)
-        end_date      = date(year, month, days_in_month)
+        start_date = date(year, month, 1)
+        end_date = date(year, month, days_in_month)
 
         # 预算数据
-        budget_stmt = (
-            select(Budget)
-            .where(
-                and_(
-                    Budget.store_id == store_id,
-                    Budget.year     == year,
-                    Budget.month    == month,
-                )
+        budget_stmt = select(Budget).where(
+            and_(
+                Budget.store_id == store_id,
+                Budget.year == year,
+                Budget.month == month,
             )
         )
         budgets = (await self.db.execute(budget_stmt)).scalars().all()
-        bmap    = {b.category: b.budgeted_amount for b in budgets}
+        bmap = {b.category: b.budgeted_amount for b in budgets}
 
         # 实际数据（按科目聚合）
         actual_stmt = (
@@ -491,7 +501,7 @@ class FCTService:
             )
             .where(
                 and_(
-                    FinancialTransaction.store_id         == store_id,
+                    FinancialTransaction.store_id == store_id,
                     FinancialTransaction.transaction_date >= start_date,
                     FinancialTransaction.transaction_date <= end_date,
                 )
@@ -499,7 +509,7 @@ class FCTService:
             .group_by(FinancialTransaction.category, FinancialTransaction.transaction_type)
         )
         actual_rows = (await self.db.execute(actual_stmt)).all()
-        actual_map  = {(r.category, r.transaction_type): r.total for r in actual_rows}
+        actual_map = {(r.category, r.transaction_type): r.total for r in actual_rows}
 
         # 收入端
         revenue_budget = bmap.get("revenue", 0)
@@ -507,11 +517,11 @@ class FCTService:
 
         # 支出科目
         cost_categories = [
-            ("food_cost",    "expense", "食材成本"),
-            ("labor_cost",   "expense", "人工成本"),
-            ("rent",         "expense", "房租"),
-            ("utilities",    "expense", "水电费"),
-            ("marketing",    "expense", "营销费用"),
+            ("food_cost", "expense", "食材成本"),
+            ("labor_cost", "expense", "人工成本"),
+            ("rent", "expense", "房租"),
+            ("utilities", "expense", "水电费"),
+            ("marketing", "expense", "营销费用"),
         ]
 
         categories = []
@@ -521,64 +531,66 @@ class FCTService:
 
         for cat, txn_type, label in cost_categories:
             budgeted = bmap.get(cat, 0)
-            actual   = actual_map.get((cat, txn_type), 0)
-            diff     = actual - budgeted
+            actual = actual_map.get((cat, txn_type), 0)
+            diff = actual - budgeted
             exec_rate = round(actual / budgeted * 100, 1) if budgeted else None
 
             budget_total_expense += budgeted
             actual_total_expense += actual
 
             row = {
-                "category":        cat,
-                "label":           label,
-                "budgeted":        budgeted,
-                "budgeted_yuan":   self._y(budgeted),
-                "actual":          actual,
-                "actual_yuan":     self._y(actual),
-                "variance":        diff,
-                "variance_yuan":   self._y(diff),
-                "exec_rate":       exec_rate,
+                "category": cat,
+                "label": label,
+                "budgeted": budgeted,
+                "budgeted_yuan": self._y(budgeted),
+                "actual": actual,
+                "actual_yuan": self._y(actual),
+                "variance": diff,
+                "variance_yuan": self._y(diff),
+                "exec_rate": exec_rate,
                 "status": (
-                    "over"   if exec_rate and exec_rate >= 110 else
-                    "under"  if exec_rate and exec_rate < 80  else
-                    "normal" if exec_rate else "no_budget"
+                    "over"
+                    if exec_rate and exec_rate >= 110
+                    else "under" if exec_rate and exec_rate < 80 else "normal" if exec_rate else "no_budget"
                 ),
             }
             categories.append(row)
 
             if exec_rate and exec_rate >= 110:
-                alerts.append({
-                    "category": cat,
-                    "label":    label,
-                    "message":  f"{label}超预算 {exec_rate - 100:.1f}%，实际 ¥{actual/100:.0f} vs 预算 ¥{budgeted/100:.0f}",
-                    "severity": "high" if exec_rate > 130 else "medium",
-                })
+                alerts.append(
+                    {
+                        "category": cat,
+                        "label": label,
+                        "message": f"{label}超预算 {exec_rate - 100:.1f}%，实际 ¥{actual/100:.0f} vs 预算 ¥{budgeted/100:.0f}",
+                        "severity": "high" if exec_rate > 130 else "medium",
+                    }
+                )
 
         # 利润率
-        gross_profit  = revenue_actual - actual_total_expense
+        gross_profit = revenue_actual - actual_total_expense
         profit_margin = round(gross_profit / revenue_actual * 100, 1) if revenue_actual else 0.0
 
         return {
             "store_id": store_id,
-            "period":   f"{year}-{month:02d}",
+            "period": f"{year}-{month:02d}",
             "revenue": {
-                "budgeted":       revenue_budget,
-                "budgeted_yuan":  self._y(revenue_budget),
-                "actual":         revenue_actual,
-                "actual_yuan":    self._y(revenue_actual),
-                "variance":       revenue_actual - revenue_budget,
-                "variance_yuan":  self._y(revenue_actual - revenue_budget),
+                "budgeted": revenue_budget,
+                "budgeted_yuan": self._y(revenue_budget),
+                "actual": revenue_actual,
+                "actual_yuan": self._y(revenue_actual),
+                "variance": revenue_actual - revenue_budget,
+                "variance_yuan": self._y(revenue_actual - revenue_budget),
                 "exec_rate": round(revenue_actual / revenue_budget * 100, 1) if revenue_budget else None,
             },
-            "categories":   categories,
+            "categories": categories,
             "overall": {
-                "total_expense_budgeted":      budget_total_expense,
+                "total_expense_budgeted": budget_total_expense,
                 "total_expense_budgeted_yuan": self._y(budget_total_expense),
-                "total_expense_actual":        actual_total_expense,
-                "total_expense_actual_yuan":   self._y(actual_total_expense),
-                "gross_profit":                gross_profit,
-                "gross_profit_yuan":           self._y(gross_profit),
-                "profit_margin_pct":           profit_margin,
+                "total_expense_actual": actual_total_expense,
+                "total_expense_actual_yuan": self._y(actual_total_expense),
+                "gross_profit": gross_profit,
+                "gross_profit_yuan": self._y(gross_profit),
+                "profit_margin_pct": profit_margin,
             },
             "alerts": alerts,
         }
@@ -600,18 +612,15 @@ class FCTService:
 
         # 对账健康度：最近 7 天差异天数
         recon_start = today - timedelta(days=7)
-        recon_stmt  = (
-            select(ReconciliationRecord)
-            .where(
-                and_(
-                    ReconciliationRecord.store_id            == store_id,
-                    ReconciliationRecord.reconciliation_date >= recon_start,
-                )
+        recon_stmt = select(ReconciliationRecord).where(
+            and_(
+                ReconciliationRecord.store_id == store_id,
+                ReconciliationRecord.reconciliation_date >= recon_start,
             )
         )
-        recon_rows   = (await self.db.execute(recon_stmt)).scalars().all()
+        recon_rows = (await self.db.execute(recon_stmt)).scalars().all()
         _recon_total = len(recon_rows)
-        _recon_bad   = sum(1 for r in recon_rows if r.status == ReconciliationStatus.MISMATCHED)
+        _recon_bad = sum(1 for r in recon_rows if r.status == ReconciliationStatus.MISMATCHED)
 
         # 资金流摘要（7 天）
         cf_result = await self.forecast_cash_flow(store_id, days=7)
@@ -619,40 +628,40 @@ class FCTService:
 
         # 当月税务估算摘要（快速，不入库）
         try:
-            tax_result  = await self.estimate_monthly_tax(store_id, year, month)
+            tax_result = await self.estimate_monthly_tax(store_id, year, month)
             tax_summary = {
-                "total_tax":     tax_result["total_tax"],
+                "total_tax": tax_result["total_tax"],
                 "effective_rate": tax_result["effective_rate"],
-                "period":        tax_result["period"],
+                "period": tax_result["period"],
             }
         except Exception:
             tax_summary = {"total_tax": 0, "effective_rate": 0.0, "period": f"{year}-{month:02d}"}
 
         # 当月预算执行率（简化：只看整体利润率）
         try:
-            bex_result  = await self.get_budget_execution(store_id, year, month)
+            bex_result = await self.get_budget_execution(store_id, year, month)
             bex_summary = {
-                "profit_margin_pct":  bex_result["overall"]["profit_margin_pct"],
-                "alert_count":        len(bex_result["alerts"]),
+                "profit_margin_pct": bex_result["overall"]["profit_margin_pct"],
+                "alert_count": len(bex_result["alerts"]),
             }
         except Exception:
             bex_summary = {"profit_margin_pct": 0.0, "alert_count": 0}
 
         return {
-            "store_id":   store_id,
-            "as_of":      today.isoformat(),
-            "cash_flow":  {
-                "next_7d_net":         cf_summary["net_flow"],
-                "next_7d_net_yuan":    self._y(cf_summary["net_flow"]),
-                "ending_balance":      cf_summary["ending_balance"],
+            "store_id": store_id,
+            "as_of": today.isoformat(),
+            "cash_flow": {
+                "next_7d_net": cf_summary["net_flow"],
+                "next_7d_net_yuan": self._y(cf_summary["net_flow"]),
+                "ending_balance": cf_summary["ending_balance"],
                 "ending_balance_yuan": self._y(cf_summary["ending_balance"]),
-                "alert_count":         cf_summary["alert_count"],
+                "alert_count": cf_summary["alert_count"],
             },
-            "tax":        {
+            "tax": {
                 **tax_summary,
                 "total_tax_yuan": self._y(tax_summary["total_tax"]),
             },
-            "budget":     bex_summary,
+            "budget": bex_summary,
             "health_score": self._calc_health_score(cf_summary, bex_summary),
         }
 
@@ -691,32 +700,45 @@ class FCTService:
     @staticmethod
     def _gen_voucher_no(biz_date: date) -> str:
         import random
+
         return f"MV-{biz_date.strftime('%Y%m%d')}-{random.randint(100000, 999999)}"
 
     async def _save_tax_record(
         self,
-        store_id, year, month, tp,
-        gross_rev, food_cost, vat_rate, output_vat, input_vat, net_vat, vat_surcharge,
-        cit_rate, est_profit, cit_amount, total_tax,
+        store_id,
+        year,
+        month,
+        tp,
+        gross_rev,
+        food_cost,
+        vat_rate,
+        output_vat,
+        input_vat,
+        net_vat,
+        vat_surcharge,
+        cit_rate,
+        est_profit,
+        cit_amount,
+        total_tax,
     ) -> None:
         """持久化税务测算记录。"""
         rec = FCTTaxRecord(
-            store_id        = store_id,
-            year            = year,
-            month           = month,
-            period_label    = f"{year}-{month:02d}",
-            taxpayer_type   = tp,
-            gross_revenue   = gross_rev,
-            total_taxable   = gross_rev,
-            vat_rate        = vat_rate,
-            vat_amount      = output_vat,
-            deductible_input = input_vat,
-            net_vat         = net_vat,
-            vat_surcharge   = vat_surcharge,
-            cit_rate        = cit_rate,
-            estimated_profit = est_profit,
-            cit_amount      = cit_amount,
-            total_tax       = total_tax,
+            store_id=store_id,
+            year=year,
+            month=month,
+            period_label=f"{year}-{month:02d}",
+            taxpayer_type=tp,
+            gross_revenue=gross_rev,
+            total_taxable=gross_rev,
+            vat_rate=vat_rate,
+            vat_amount=output_vat,
+            deductible_input=input_vat,
+            net_vat=net_vat,
+            vat_surcharge=vat_surcharge,
+            cit_rate=cit_rate,
+            estimated_profit=est_profit,
+            cit_amount=cit_amount,
+            total_tax=total_tax,
         )
         self.db.add(rec)
         try:
@@ -757,16 +779,16 @@ class FCTService:
 # ── 会计凭证常量（科目编码，符合中国企业会计准则 / 金蝶·用友）────────────────
 from decimal import Decimal
 
-DEFAULT_ACCOUNT_SALES       = "6001"    # 主营业务收入
-DEFAULT_ACCOUNT_TAX_PAYABLE = "2221"    # 应交税费-应交增值税（销项）
-DEFAULT_ACCOUNT_BANK        = "1002"    # 银行存款
-DEFAULT_ACCOUNT_CASH        = "1001"    # 库存现金
-DEFAULT_ACCOUNT_INVENTORY   = "1405"    # 库存商品
-DEFAULT_ACCOUNT_TAX_INPUT   = "2221_01" # 应交税费-进项税额
-DEFAULT_ACCOUNT_PAYABLE     = "2202"    # 应付账款
-DEFAULT_ACCOUNT_ADJUSTMENT  = "1009"    # 待处理财产损溢（差额调整用）
+DEFAULT_ACCOUNT_SALES = "6001"  # 主营业务收入
+DEFAULT_ACCOUNT_TAX_PAYABLE = "2221"  # 应交税费-应交增值税（销项）
+DEFAULT_ACCOUNT_BANK = "1002"  # 银行存款
+DEFAULT_ACCOUNT_CASH = "1001"  # 库存现金
+DEFAULT_ACCOUNT_INVENTORY = "1405"  # 库存商品
+DEFAULT_ACCOUNT_TAX_INPUT = "2221_01"  # 应交税费-进项税额
+DEFAULT_ACCOUNT_PAYABLE = "2202"  # 应付账款
+DEFAULT_ACCOUNT_ADJUSTMENT = "1009"  # 待处理财产损溢（差额调整用）
 
-VOUCHER_BALANCE_TOLERANCE   = Decimal("0.01")   # 借贷差额允许尾差 0.01 元
+VOUCHER_BALANCE_TOLERANCE = Decimal("0.01")  # 借贷差额允许尾差 0.01 元
 
 
 class FctService:
@@ -821,8 +843,8 @@ class FctService:
         from src.models.fct import Voucher, VoucherLine
 
         event_type = raw.get("event_type", "")
-        event_id   = raw.get("event_id", "")
-        payload    = raw.get("payload", {})
+        event_id = raw.get("event_id", "")
+        payload = raw.get("payload", {})
 
         if event_type == "store_daily_settlement":
             return await self._ingest_store_daily_settlement(session, event_id, payload)
@@ -834,15 +856,11 @@ class FctService:
 
     async def get_voucher_by_id(self, session, voucher_id: str):
         """按 UUID 查询凭证（含分录行）。"""
-        from src.models.fct import Voucher
         from sqlalchemy import select as sa_select
         from sqlalchemy.orm import selectinload
+        from src.models.fct import Voucher
 
-        stmt = (
-            sa_select(Voucher)
-            .options(selectinload(Voucher.lines))
-            .where(Voucher.id == voucher_id)
-        )
+        stmt = sa_select(Voucher).options(selectinload(Voucher.lines)).where(Voucher.id == voucher_id)
         result = await session.execute(stmt)
         return result.scalars().first()
 
@@ -856,24 +874,24 @@ class FctService:
         if not biz_date_str:
             raise ValueError("store_daily_settlement requires biz_date in payload")
 
-        biz_date     = date.fromisoformat(biz_date_str)
-        store_id     = payload.get("store_id", "")
+        biz_date = date.fromisoformat(biz_date_str)
+        store_id = payload.get("store_id", "")
         # 金额均以 分 传入，转元后按 Decimal 运算
-        total_sales  = Decimal(str(payload.get("total_sales", 0))) / 100
-        sales_tax    = Decimal(str(payload.get("total_sales_tax", 0))) / 100
-        discounts    = Decimal(str(payload.get("discounts", 0))) / 100
-        revenue      = total_sales - sales_tax - discounts
+        total_sales = Decimal(str(payload.get("total_sales", 0))) / 100
+        sales_tax = Decimal(str(payload.get("total_sales_tax", 0))) / 100
+        discounts = Decimal(str(payload.get("discounts", 0))) / 100
+        revenue = total_sales - sales_tax - discounts
 
         voucher = Voucher(
-            voucher_no  = f"DS-{store_id}-{biz_date_str}",
-            store_id    = store_id,
-            event_type  = "store_daily_settlement",
-            event_id    = event_id,
-            biz_date    = biz_date,
-            description = f"门店日结 {biz_date_str}",
+            voucher_no=f"DS-{store_id}-{biz_date_str}",
+            store_id=store_id,
+            event_type="store_daily_settlement",
+            event_id=event_id,
+            biz_date=biz_date,
+            description=f"门店日结 {biz_date_str}",
         )
         session.add(voucher)
-        await session.flush()   # 获取 voucher.id
+        await session.flush()  # 获取 voucher.id
 
         line_no = 1
         payment_breakdown = payload.get("payment_breakdown", [])
@@ -882,36 +900,42 @@ class FctService:
             # 按支付渠道分别借记
             debit_total = Decimal(0)
             for pm in payment_breakdown:
-                amt    = Decimal(str(pm.get("amount", 0))) / 100
+                amt = Decimal(str(pm.get("amount", 0))) / 100
                 method = pm.get("method", "cash").lower()
-                acc    = DEFAULT_ACCOUNT_CASH if method == "cash" else DEFAULT_ACCOUNT_BANK
-                session.add(VoucherLine(
-                    voucher_id   = voucher.id,
-                    line_no      = line_no,
-                    account_code = acc,
-                    debit        = amt,
-                    summary      = f"{method} 收款",
-                ))
+                acc = DEFAULT_ACCOUNT_CASH if method == "cash" else DEFAULT_ACCOUNT_BANK
+                session.add(
+                    VoucherLine(
+                        voucher_id=voucher.id,
+                        line_no=line_no,
+                        account_code=acc,
+                        debit=amt,
+                        summary=f"{method} 收款",
+                    )
+                )
                 debit_total += amt
                 line_no += 1
 
             # 贷：收入 + 税
-            session.add(VoucherLine(
-                voucher_id   = voucher.id,
-                line_no      = line_no,
-                account_code = DEFAULT_ACCOUNT_SALES,
-                credit       = revenue,
-                summary      = "主营业务收入",
-            ))
+            session.add(
+                VoucherLine(
+                    voucher_id=voucher.id,
+                    line_no=line_no,
+                    account_code=DEFAULT_ACCOUNT_SALES,
+                    credit=revenue,
+                    summary="主营业务收入",
+                )
+            )
             line_no += 1
             if sales_tax > 0:
-                session.add(VoucherLine(
-                    voucher_id   = voucher.id,
-                    line_no      = line_no,
-                    account_code = DEFAULT_ACCOUNT_TAX_PAYABLE,
-                    credit       = sales_tax,
-                    summary      = "应交增值税（销项）",
-                ))
+                session.add(
+                    VoucherLine(
+                        voucher_id=voucher.id,
+                        line_no=line_no,
+                        account_code=DEFAULT_ACCOUNT_TAX_PAYABLE,
+                        credit=sales_tax,
+                        summary="应交增值税（销项）",
+                    )
+                )
                 line_no += 1
 
             credit_total = revenue + sales_tax
@@ -919,45 +943,55 @@ class FctService:
             if abs(diff) > VOUCHER_BALANCE_TOLERANCE:
                 # 差额调整行使凭证平衡
                 if diff > 0:
-                    session.add(VoucherLine(
-                        voucher_id   = voucher.id,
-                        line_no      = line_no,
-                        account_code = DEFAULT_ACCOUNT_ADJUSTMENT,
-                        credit       = diff,
-                        summary      = "差额调整",
-                    ))
+                    session.add(
+                        VoucherLine(
+                            voucher_id=voucher.id,
+                            line_no=line_no,
+                            account_code=DEFAULT_ACCOUNT_ADJUSTMENT,
+                            credit=diff,
+                            summary="差额调整",
+                        )
+                    )
                 else:
-                    session.add(VoucherLine(
-                        voucher_id   = voucher.id,
-                        line_no      = line_no,
-                        account_code = DEFAULT_ACCOUNT_ADJUSTMENT,
-                        debit        = abs(diff),
-                        summary      = "差额调整",
-                    ))
+                    session.add(
+                        VoucherLine(
+                            voucher_id=voucher.id,
+                            line_no=line_no,
+                            account_code=DEFAULT_ACCOUNT_ADJUSTMENT,
+                            debit=abs(diff),
+                            summary="差额调整",
+                        )
+                    )
 
         else:
             # 无分渠道时：借银行存款 = 含税总收入
-            session.add(VoucherLine(
-                voucher_id   = voucher.id,
-                line_no      = 1,
-                account_code = DEFAULT_ACCOUNT_BANK,
-                debit        = total_sales,
-                summary      = "银行存款",
-            ))
-            session.add(VoucherLine(
-                voucher_id   = voucher.id,
-                line_no      = 2,
-                account_code = DEFAULT_ACCOUNT_SALES,
-                credit       = revenue,
-                summary      = "主营业务收入",
-            ))
-            session.add(VoucherLine(
-                voucher_id   = voucher.id,
-                line_no      = 3,
-                account_code = DEFAULT_ACCOUNT_TAX_PAYABLE,
-                credit       = sales_tax,
-                summary      = "应交增值税（销项）",
-            ))
+            session.add(
+                VoucherLine(
+                    voucher_id=voucher.id,
+                    line_no=1,
+                    account_code=DEFAULT_ACCOUNT_BANK,
+                    debit=total_sales,
+                    summary="银行存款",
+                )
+            )
+            session.add(
+                VoucherLine(
+                    voucher_id=voucher.id,
+                    line_no=2,
+                    account_code=DEFAULT_ACCOUNT_SALES,
+                    credit=revenue,
+                    summary="主营业务收入",
+                )
+            )
+            session.add(
+                VoucherLine(
+                    voucher_id=voucher.id,
+                    line_no=3,
+                    account_code=DEFAULT_ACCOUNT_TAX_PAYABLE,
+                    credit=sales_tax,
+                    summary="应交增值税（销项）",
+                )
+            )
 
         return voucher
 
@@ -971,55 +1005,61 @@ class FctService:
         if not biz_date_str:
             raise ValueError("purchase_receipt requires biz_date in payload")
 
-        biz_date    = date.fromisoformat(biz_date_str)
-        store_id    = payload.get("store_id", "")
+        biz_date = date.fromisoformat(biz_date_str)
+        store_id = payload.get("store_id", "")
         supplier_id = payload.get("supplier_id", "")
-        total_fen   = Decimal(str(payload.get("total", 0)))
-        tax_fen     = Decimal(str(payload.get("tax", 0)))
-        net_fen     = total_fen - tax_fen
+        total_fen = Decimal(str(payload.get("total", 0)))
+        tax_fen = Decimal(str(payload.get("tax", 0)))
+        net_fen = total_fen - tax_fen
 
         # 转元
-        total   = total_fen / 100
-        tax     = tax_fen / 100
-        net     = net_fen / 100
+        total = total_fen / 100
+        tax = tax_fen / 100
+        net = net_fen / 100
 
         voucher = Voucher(
-            voucher_no  = f"PR-{store_id}-{event_id}",
-            store_id    = store_id,
-            event_type  = "purchase_receipt",
-            event_id    = event_id,
-            biz_date    = biz_date,
-            description = f"采购入库 供应商 {supplier_id}",
+            voucher_no=f"PR-{store_id}-{event_id}",
+            store_id=store_id,
+            event_type="purchase_receipt",
+            event_id=event_id,
+            biz_date=biz_date,
+            description=f"采购入库 供应商 {supplier_id}",
         )
         session.add(voucher)
         await session.flush()
 
         # 借：库存商品（不含税金额）
-        session.add(VoucherLine(
-            voucher_id   = voucher.id,
-            line_no      = 1,
-            account_code = DEFAULT_ACCOUNT_INVENTORY,
-            debit        = net,
-            summary      = "库存商品",
-        ))
+        session.add(
+            VoucherLine(
+                voucher_id=voucher.id,
+                line_no=1,
+                account_code=DEFAULT_ACCOUNT_INVENTORY,
+                debit=net,
+                summary="库存商品",
+            )
+        )
         # 借：进项税额
         if tax > 0:
-            session.add(VoucherLine(
-                voucher_id   = voucher.id,
-                line_no      = 2,
-                account_code = DEFAULT_ACCOUNT_TAX_INPUT,
-                debit        = tax,
-                summary      = "应交增值税（进项）",
-            ))
+            session.add(
+                VoucherLine(
+                    voucher_id=voucher.id,
+                    line_no=2,
+                    account_code=DEFAULT_ACCOUNT_TAX_INPUT,
+                    debit=tax,
+                    summary="应交增值税（进项）",
+                )
+            )
         # 贷：应付账款
-        session.add(VoucherLine(
-            voucher_id   = voucher.id,
-            line_no      = 3,
-            account_code = DEFAULT_ACCOUNT_PAYABLE,
-            credit       = total,
-            auxiliary    = {"supplier_id": supplier_id},
-            summary      = f"应付账款-{supplier_id}",
-        ))
+        session.add(
+            VoucherLine(
+                voucher_id=voucher.id,
+                line_no=3,
+                account_code=DEFAULT_ACCOUNT_PAYABLE,
+                credit=total,
+                auxiliary={"supplier_id": supplier_id},
+                summary=f"应付账款-{supplier_id}",
+            )
+        )
 
         return voucher
 
@@ -1030,17 +1070,17 @@ class FctService:
         from src.models.fct import Voucher
 
         biz_date_str = payload.get("biz_date") or date.today().isoformat()
-        biz_date     = date.fromisoformat(biz_date_str)
-        store_id     = payload.get("store_id", "")
+        biz_date = date.fromisoformat(biz_date_str)
+        store_id = payload.get("store_id", "")
 
         voucher = Voucher(
-            voucher_no  = f"GEN-{event_id}",
-            store_id    = store_id,
-            event_type  = event_type,
-            event_id    = event_id,
-            biz_date    = biz_date,
-            status      = "draft",
-            description = f"未知事件 {event_type}",
+            voucher_no=f"GEN-{event_id}",
+            store_id=store_id,
+            event_type=event_type,
+            event_id=event_id,
+            biz_date=biz_date,
+            status="draft",
+            description=f"未知事件 {event_type}",
         )
         session.add(voucher)
         await session.flush()
@@ -1049,8 +1089,19 @@ class FctService:
 
 class _VoucherStub:
     """轻量级凭证占位对象（避免 _voucher_to_response 抛 AttributeError）。"""
-    __slots__ = ("id", "voucher_no", "tenant_id", "entity_id", "biz_date",
-                 "event_type", "event_id", "status", "description", "lines")
+
+    __slots__ = (
+        "id",
+        "voucher_no",
+        "tenant_id",
+        "entity_id",
+        "biz_date",
+        "event_type",
+        "event_id",
+        "status",
+        "description",
+        "lines",
+    )
 
     def __init__(self, **kw):
         for k, v in kw.items():
@@ -1281,6 +1332,7 @@ class StandaloneFCTService:
     @staticmethod
     def _gen_voucher_no(biz_date: date) -> str:
         import random
+
         return f"MV-{biz_date.strftime('%Y%m%d')}-{random.randint(100000, 999999)}"
 
     async def get_vouchers(
@@ -1312,14 +1364,8 @@ class StandaloneFCTService:
             "limit": limit,
         }
 
-    async def get_voucher_by_id(
-        self, session: AsyncSession, voucher_id: str
-    ) -> Optional[Any]:
-        stmt = (
-            select(Voucher)
-            .options(selectinload(Voucher.lines))
-            .where(Voucher.id == voucher_id)
-        )
+    async def get_voucher_by_id(self, session: AsyncSession, voucher_id: str) -> Optional[Any]:
+        stmt = select(Voucher).options(selectinload(Voucher.lines)).where(Voucher.id == voucher_id)
         v = (await session.execute(stmt)).scalar_one_or_none()
         if not v:
             return None
@@ -1338,7 +1384,7 @@ class StandaloneFCTService:
         budget_occupy: Optional[bool] = None,
     ) -> Dict[str, Any]:
         # 借贷校验
-        debit_total  = sum(float(l.get("debit")  or 0) for l in lines)
+        debit_total = sum(float(l.get("debit") or 0) for l in lines)
         credit_total = sum(float(l.get("credit") or 0) for l in lines)
         if abs(debit_total - credit_total) > 0.01:
             raise ValueError(f"借贷不平衡：借方 {debit_total} ≠ 贷方 {credit_total}")
@@ -1381,16 +1427,18 @@ class StandaloneFCTService:
         )
         session.add(voucher)
         for i, line_data in enumerate(lines, 1):
-            session.add(VoucherLine(
-                id=uuid4(),
-                voucher_id=voucher.id,
-                line_no=i,
-                account_code=line_data.get("account_code", ""),
-                account_name=line_data.get("account_name"),
-                debit=line_data.get("debit"),
-                credit=line_data.get("credit"),
-                summary=line_data.get("summary"),
-            ))
+            session.add(
+                VoucherLine(
+                    id=uuid4(),
+                    voucher_id=voucher.id,
+                    line_no=i,
+                    account_code=line_data.get("account_code", ""),
+                    account_name=line_data.get("account_name"),
+                    debit=line_data.get("debit"),
+                    credit=line_data.get("credit"),
+                    summary=line_data.get("summary"),
+                )
+            )
         await session.flush()
         await session.refresh(voucher)
         if use_budget_occupy:
@@ -1466,9 +1514,7 @@ class StandaloneFCTService:
                 )
             use_budget_check = policy["enforce_check"] if budget_check is None else bool(budget_check)
             use_budget_occupy = policy["auto_occupy"] if budget_occupy is None else bool(budget_occupy)
-            amount_stmt = select(func.sum(func.coalesce(VoucherLine.debit, 0))).where(
-                VoucherLine.voucher_id == voucher.id
-            )
+            amount_stmt = select(func.sum(func.coalesce(VoucherLine.debit, 0))).where(VoucherLine.voucher_id == voucher.id)
             voucher_amount = float((await session.execute(amount_stmt)).scalar() or 0)
             if use_budget_check and voucher_amount > 0:
                 check = await self.check_budget(
@@ -1520,9 +1566,7 @@ class StandaloneFCTService:
             "success": True,
         }
 
-    async def void_voucher(
-        self, session: AsyncSession, voucher_id: str
-    ) -> Dict[str, Any]:
+    async def void_voucher(self, session: AsyncSession, voucher_id: str) -> Dict[str, Any]:
         stmt = select(Voucher).where(Voucher.id == voucher_id)
         voucher = (await session.execute(stmt)).scalar_one_or_none()
         if not voucher:
@@ -1551,11 +1595,7 @@ class StandaloneFCTService:
         voucher_id: str,
         biz_date: Optional[date] = None,
     ) -> Dict[str, Any]:
-        stmt = (
-            select(Voucher)
-            .where(Voucher.id == voucher_id)
-            .options(selectinload(Voucher.lines))
-        )
+        stmt = select(Voucher).where(Voucher.id == voucher_id).options(selectinload(Voucher.lines))
         original = (await session.execute(stmt)).scalar_one_or_none()
         if not original:
             raise ValueError("原凭证不存在")
@@ -1685,9 +1725,7 @@ class StandaloneFCTService:
             items.append({"period_key": period_key, "status": status})
         return {"items": items, "total": len(items)}
 
-    async def close_period(
-        self, session: AsyncSession, tenant_id: str, period_key: str
-    ) -> Dict[str, Any]:
+    async def close_period(self, session: AsyncSession, tenant_id: str, period_key: str) -> Dict[str, Any]:
         if not self.PERIOD_KEY_RE.match(period_key):
             raise ValueError("period_key 格式应为 YYYY-MM")
         periods = await self.list_periods(session, tenant_id=tenant_id)
@@ -1728,9 +1766,7 @@ class StandaloneFCTService:
         self._period_status_overrides[(tenant_id, period_key)] = "closed"
         return {"tenant_id": tenant_id, "period_key": period_key, "status": "closed"}
 
-    async def reopen_period(
-        self, session: AsyncSession, tenant_id: str, period_key: str
-    ) -> Dict[str, Any]:
+    async def reopen_period(self, session: AsyncSession, tenant_id: str, period_key: str) -> Dict[str, Any]:
         if not self.PERIOD_KEY_RE.match(period_key):
             raise ValueError("period_key 格式应为 YYYY-MM")
         periods = await self.list_periods(session, tenant_id=tenant_id)
@@ -1955,11 +1991,7 @@ class StandaloneFCTService:
                 filters.append(FinancialTransaction.transaction_date >= start_date)
             if end_date:
                 filters.append(FinancialTransaction.transaction_date <= end_date)
-            stmt = (
-                select(FinancialTransaction)
-                .where(and_(*filters) if filters else True)
-                .offset(skip).limit(limit)
-            )
+            stmt = select(FinancialTransaction).where(and_(*filters) if filters else True).offset(skip).limit(limit)
             rows = (await session.execute(stmt)).scalars().all()
             items = [
                 {
@@ -2278,9 +2310,7 @@ class StandaloneFCTService:
         await session.flush()
         return {"invoice_id": invoice_id, "voucher_id": voucher_id, "success": True}
 
-    async def list_invoices_by_voucher(
-        self, session: AsyncSession, voucher_id: str
-    ) -> Dict[str, Any]:
+    async def list_invoices_by_voucher(self, session: AsyncSession, voucher_id: str) -> Dict[str, Any]:
         stmt = select(Invoice).order_by(Invoice.invoice_date.desc(), Invoice.created_at.desc())
         rows = (await session.execute(stmt)).scalars().all()
         invoices: List[Dict[str, Any]] = []
@@ -2301,9 +2331,7 @@ class StandaloneFCTService:
                 )
         return {"voucher_id": voucher_id, "invoices": invoices}
 
-    async def verify_invoice(
-        self, session: AsyncSession, invoice_id: str
-    ) -> Dict[str, Any]:
+    async def verify_invoice(self, session: AsyncSession, invoice_id: str) -> Dict[str, Any]:
         """
         发票验真：数据库查询 + 本地格式校验 + 外部税局 API 接入（可选）。
 
@@ -2464,7 +2492,7 @@ class StandaloneFCTService:
                 )
 
         total = len(expanded)
-        items = expanded[skip: skip + limit]
+        items = expanded[skip : skip + limit]
         return {"items": items, "total": total, "skip": skip, "limit": limit}
 
     async def get_tax_declaration_draft(
@@ -2481,6 +2509,7 @@ class StandaloneFCTService:
                 raise ValueError("period 格式应为 YYYYMM")
             year, month = int(period[:4]), int(period[4:6])
             from calendar import monthrange
+
             days = monthrange(year, month)[1]
             start_d = date(year, month, 1)
             end_d = date(year, month, days)
@@ -2492,14 +2521,13 @@ class StandaloneFCTService:
             if entity_id:
                 filters.append(FinancialTransaction.store_id == entity_id)
 
-            income_stmt = (
-                select(func.sum(FinancialTransaction.amount))
-                .where(and_(*filters, FinancialTransaction.transaction_type == "income"))
+            income_stmt = select(func.sum(FinancialTransaction.amount)).where(
+                and_(*filters, FinancialTransaction.transaction_type == "income")
             )
-            cost_stmt = (
-                select(func.sum(FinancialTransaction.amount))
-                .where(and_(*filters, FinancialTransaction.transaction_type == "expense",
-                             FinancialTransaction.category == "food_cost"))
+            cost_stmt = select(func.sum(FinancialTransaction.amount)).where(
+                and_(
+                    *filters, FinancialTransaction.transaction_type == "expense", FinancialTransaction.category == "food_cost"
+                )
             )
             gross_rev = (await session.execute(income_stmt)).scalar() or 0
             food_cost = (await session.execute(cost_stmt)).scalar() or 0
@@ -2529,9 +2557,7 @@ class StandaloneFCTService:
 
     # ── 预算管理 ──────────────────────────────────────────────────────────────
 
-    async def upsert_budget(
-        self, session: AsyncSession, **kwargs
-    ) -> Dict[str, Any]:
+    async def upsert_budget(self, session: AsyncSession, **kwargs) -> Dict[str, Any]:
         tenant_id = kwargs.get("tenant_id")
         entity_id = kwargs.get("entity_id") or ""
         period = str(kwargs.get("period") or "")
@@ -2573,9 +2599,7 @@ class StandaloneFCTService:
             "month": month,
         }
 
-    async def upsert_budget_control(
-        self, session: AsyncSession, **kwargs
-    ) -> Dict[str, Any]:
+    async def upsert_budget_control(self, session: AsyncSession, **kwargs) -> Dict[str, Any]:
         tenant_id = str(kwargs.get("tenant_id") or "")
         entity_id = str(kwargs.get("entity_id") or "")
         budget_type = str(kwargs.get("budget_type") or "period")
@@ -2810,10 +2834,7 @@ class StandaloneFCTService:
     ) -> Dict[str, Any]:
         # 映射到 Budget 模型（month=0 表示年度计划）
         store_id = entity_id or tenant_id
-        normalized_targets = {
-            str(category): int(float(amount))
-            for category, amount in (targets or {}).items()
-        }
+        normalized_targets = {str(category): int(float(amount)) for category, amount in (targets or {}).items()}
         if normalized_targets:
             stmt = select(Budget).where(
                 and_(
@@ -3080,13 +3101,7 @@ class StandaloneFCTService:
 
         total_stmt = select(func.count(FCTPettyCash.id)).where(and_(*filters))
         total = int((await session.execute(total_stmt)).scalar() or 0)
-        stmt = (
-            select(FCTPettyCash)
-            .where(and_(*filters))
-            .order_by(FCTPettyCash.updated_at.desc())
-            .offset(skip)
-            .limit(limit)
-        )
+        stmt = select(FCTPettyCash).where(and_(*filters)).order_by(FCTPettyCash.updated_at.desc()).offset(skip).limit(limit)
         rows = (await session.execute(stmt)).scalars().all()
         items = [
             {
@@ -3117,9 +3132,7 @@ class StandaloneFCTService:
         parsed_id = self._parse_uuid_or_none(petty_cash_id)
         if not parsed_id:
             raise ValueError("petty_cash_id 无效")
-        petty_cash = (
-            await session.execute(select(FCTPettyCash).where(FCTPettyCash.id == parsed_id))
-        ).scalar_one_or_none()
+        petty_cash = (await session.execute(select(FCTPettyCash).where(FCTPettyCash.id == parsed_id))).scalar_one_or_none()
         if not petty_cash:
             raise ValueError("备用金主档不存在")
 
@@ -3351,13 +3364,13 @@ class StandaloneFCTService:
 
         result: Dict[str, Any] = {
             "approval_id": str(row.id),
-            "ref_type":    row.ref_type,
-            "ref_id":      row.ref_id,
-            "step":        int(row.step or 1),
-            "status":      new_status_l,
+            "ref_type": row.ref_type,
+            "ref_id": row.ref_id,
+            "step": int(row.step or 1),
+            "status": new_status_l,
             "approved_at": row.approved_at,
             "approved_by": row.approved_by,
-            "success":     True,
+            "success": True,
         }
 
         # 凭证联动：approved → voucher draft→approved
@@ -3366,19 +3379,6 @@ class StandaloneFCTService:
             result["voucher_sync"] = sync
 
         return result
-        if ref_type in {"voucher", "fct_voucher"}:
-            stmt = select(Voucher).where(Voucher.id == ref_id)
-            voucher = (await session.execute(stmt)).scalar_one_or_none()
-            if voucher:
-                v_status = (voucher.status or "").lower()
-                approval_status = "approved" if v_status in {"approved", "posted", "reversed"} else "pending"
-                records.append({
-                    "step": 1,
-                    "status": approval_status,
-                    "ref_status": v_status,
-                    "extra": {"voucher_no": voucher.voucher_no},
-                })
-        return {"tenant_id": tenant_id, "ref_type": ref_type, "ref_id": ref_id, "records": records}
 
     # ── 报表 ──────────────────────────────────────────────────────────────────
 
@@ -3400,18 +3400,18 @@ class StandaloneFCTService:
                 filters.append(FinancialTransaction.transaction_date <= end_date)
 
             inc_stmt = (
-                select(func.sum(FinancialTransaction.amount))
-                .where(and_(*filters, FinancialTransaction.transaction_type == "income"))
-                if filters else
-                select(func.sum(FinancialTransaction.amount))
-                .where(FinancialTransaction.transaction_type == "income")
+                select(func.sum(FinancialTransaction.amount)).where(
+                    and_(*filters, FinancialTransaction.transaction_type == "income")
+                )
+                if filters
+                else select(func.sum(FinancialTransaction.amount)).where(FinancialTransaction.transaction_type == "income")
             )
             exp_stmt = (
-                select(func.sum(FinancialTransaction.amount))
-                .where(and_(*filters, FinancialTransaction.transaction_type == "expense"))
-                if filters else
-                select(func.sum(FinancialTransaction.amount))
-                .where(FinancialTransaction.transaction_type == "expense")
+                select(func.sum(FinancialTransaction.amount)).where(
+                    and_(*filters, FinancialTransaction.transaction_type == "expense")
+                )
+                if filters
+                else select(func.sum(FinancialTransaction.amount)).where(FinancialTransaction.transaction_type == "expense")
             )
             income = (await session.execute(inc_stmt)).scalar() or 0
             expense = (await session.execute(exp_stmt)).scalar() or 0
@@ -3481,12 +3481,14 @@ class StandaloneFCTService:
             period_str = period_dt.strftime("%Y-%m-%d") if gran == "day" else period_dt.strftime("%Y-%m")
             rev = int(row[1] or 0)
             exp = int(row[2] or 0)
-            data.append({
-                "period": period_str,
-                "revenue_yuan": self._y(rev),
-                "expense_yuan": self._y(exp),
-                "net_yuan": self._y(rev - exp),
-            })
+            data.append(
+                {
+                    "period": period_str,
+                    "revenue_yuan": self._y(rev),
+                    "expense_yuan": self._y(exp),
+                    "net_yuan": self._y(rev - exp),
+                }
+            )
         return {
             "report_type": "trend",
             "tenant_id": tenant_id,
@@ -3523,12 +3525,14 @@ class StandaloneFCTService:
         for row in rows:
             rev = int(row[1] or 0)
             exp = int(row[2] or 0)
-            data.append({
-                "entity_id": row[0],
-                "revenue_yuan": self._y(rev),
-                "expense_yuan": self._y(exp),
-                "net_yuan": self._y(rev - exp),
-            })
+            data.append(
+                {
+                    "entity_id": row[0],
+                    "revenue_yuan": self._y(rev),
+                    "expense_yuan": self._y(exp),
+                    "net_yuan": self._y(rev - exp),
+                }
+            )
         return {"report_type": "by_entity", "tenant_id": tenant_id, "data": data}
 
     async def get_report_by_region(
@@ -3661,15 +3665,17 @@ class StandaloneFCTService:
             net = income - expense
             total_income += income
             total_expense += expense
-            by_entity.append({
-                "entity_id": row[0],
-                "income": income,
-                "income_yuan": self._y(income),
-                "expense": expense,
-                "expense_yuan": self._y(expense),
-                "net": net,
-                "net_yuan": self._y(net),
-            })
+            by_entity.append(
+                {
+                    "entity_id": row[0],
+                    "income": income,
+                    "income_yuan": self._y(income),
+                    "expense": expense,
+                    "expense_yuan": self._y(expense),
+                    "net": net,
+                    "net_yuan": self._y(net),
+                }
+            )
 
         total_net = total_income - total_expense
         result: Dict[str, Any] = {
@@ -3690,11 +3696,18 @@ class StandaloneFCTService:
             result["by_entity"] = by_entity
         return result
 
-    KNOWN_REPORT_TYPES = frozenset({
-        "period_summary", "aggregate", "trend",
-        "by_entity", "by_region", "comparison",
-        "plan_vs_actual", "consolidated",
-    })
+    KNOWN_REPORT_TYPES = frozenset(
+        {
+            "period_summary",
+            "aggregate",
+            "trend",
+            "by_entity",
+            "by_region",
+            "comparison",
+            "plan_vs_actual",
+            "consolidated",
+        }
+    )
 
     def get_supported_report_types(self) -> List[str]:
         """返回所有已支持的报表类型列表（升序）。"""

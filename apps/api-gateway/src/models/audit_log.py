@@ -2,10 +2,12 @@
 审计日志模型
 记录系统中的所有重要操作
 """
-from sqlalchemy import Column, String, DateTime, JSON, Integer, Text, Index
-from sqlalchemy.sql import func
-from datetime import datetime
+
 import uuid
+from datetime import datetime
+
+from sqlalchemy import JSON, Column, DateTime, Index, Integer, String, Text
+from sqlalchemy.sql import func
 
 from .base import Base
 
@@ -52,12 +54,12 @@ class AuditLog(Base):
 
     # 索引
     __table_args__ = (
-        Index('idx_user_id', 'user_id'),
-        Index('idx_action', 'action'),
-        Index('idx_resource_type', 'resource_type'),
-        Index('idx_created_at', 'created_at'),
-        Index('idx_store_id', 'store_id'),
-        Index('idx_status', 'status'),
+        Index("idx_user_id", "user_id"),
+        Index("idx_action", "action"),
+        Index("idx_resource_type", "resource_type"),
+        Index("idx_created_at", "created_at"),
+        Index("idx_store_id", "store_id"),
+        Index("idx_status", "status"),
     )
 
     def to_dict(self):

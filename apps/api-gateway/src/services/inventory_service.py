@@ -2,16 +2,17 @@
 Inventory Service - 库存管理数据库服务
 处理库存的数据库操作
 """
-import structlog
-import os
-from typing import Dict, Any, List, Optional
-from datetime import datetime, timedelta
-from sqlalchemy import select, func, and_, or_, desc
-from sqlalchemy.orm import selectinload
-import uuid
 
+import os
+import uuid
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
+
+import structlog
+from sqlalchemy import and_, desc, func, or_, select
+from sqlalchemy.orm import selectinload
 from src.core.database import get_db_session
-from src.models.inventory import InventoryItem, InventoryTransaction, InventoryStatus, TransactionType
+from src.models.inventory import InventoryItem, InventoryStatus, InventoryTransaction, TransactionType
 
 logger = structlog.get_logger()
 
@@ -33,11 +34,7 @@ class InventoryService:
         }
         logger.info("InventoryService初始化", store_id=store_id)
 
-    async def monitor_inventory(
-        self,
-        category: Optional[str] = None,
-        status: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+    async def monitor_inventory(self, category: Optional[str] = None, status: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         监控库存状态
 
@@ -49,10 +46,7 @@ class InventoryService:
             库存项目列表
         """
         async with get_db_session() as session:
-            stmt = (
-                select(InventoryItem)
-                .where(InventoryItem.store_id == self.store_id)
-            )
+            stmt = select(InventoryItem).where(InventoryItem.store_id == self.store_id)
 
             if category:
                 stmt = stmt.where(InventoryItem.category == category)
@@ -78,11 +72,7 @@ class InventoryService:
             库存项目信息
         """
         async with get_db_session() as session:
-            stmt = (
-                select(InventoryItem)
-                .options(selectinload(InventoryItem.transactions))
-                .where(InventoryItem.id == item_id)
-            )
+            stmt = select(InventoryItem).options(selectinload(InventoryItem.transactions)).where(InventoryItem.id == item_id)
             result = await session.execute(stmt)
             item = result.scalar_one_or_none()
 
@@ -91,10 +81,7 @@ class InventoryService:
 
             return self._item_to_dict(item, include_transactions=True)
 
-    async def generate_restock_alerts(
-        self,
-        category: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+    async def generate_restock_alerts(self, category: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         生成补货提醒
 
@@ -105,17 +92,14 @@ class InventoryService:
             补货提醒列表
         """
         async with get_db_session() as session:
-            stmt = (
-                select(InventoryItem)
-                .where(
-                    and_(
-                        InventoryItem.store_id == self.store_id,
-                        or_(
-                            InventoryItem.status == InventoryStatus.LOW,
-                            InventoryItem.status == InventoryStatus.CRITICAL,
-                            InventoryItem.status == InventoryStatus.OUT_OF_STOCK
-                        )
-                    )
+            stmt = select(InventoryItem).where(
+                and_(
+                    InventoryItem.store_id == self.store_id,
+                    or_(
+                        InventoryItem.status == InventoryStatus.LOW,
+                        InventoryItem.status == InventoryStatus.CRITICAL,
+                        InventoryItem.status == InventoryStatus.OUT_OF_STOCK,
+                    ),
                 )
             )
 
@@ -132,14 +116,11 @@ class InventoryService:
                 item_ids = [item.id for item in items]
                 thirty_days_ago = datetime.now() - timedelta(days=int(os.getenv("INVENTORY_HISTORY_DAYS", "30")))
 
-                trans_stmt = (
-                    select(InventoryTransaction)
-                    .where(
-                        and_(
-                            InventoryTransaction.item_id.in_(item_ids),
-                            InventoryTransaction.transaction_type == TransactionType.USAGE,
-                            InventoryTransaction.transaction_time >= thirty_days_ago
-                        )
+                trans_stmt = select(InventoryTransaction).where(
+                    and_(
+                        InventoryTransaction.item_id.in_(item_ids),
+                        InventoryTransaction.transaction_type == TransactionType.USAGE,
+                        InventoryTransaction.transaction_time >= thirty_days_ago,
                     )
                 )
                 trans_result = await session.execute(trans_stmt)
@@ -159,9 +140,7 @@ class InventoryService:
 
                 # 预测缺货日期 - 使用预加载的交易数据
                 item_transactions = transactions_by_item.get(item.id, [])
-                estimated_stockout_date = self._estimate_stockout_date_from_transactions(
-                    item, item_transactions
-                )
+                estimated_stockout_date = self._estimate_stockout_date_from_transactions(item, item_transactions)
 
                 alert = {
                     "alert_id": f"ALERT_{item.id}_{datetime.now().strftime('%Y%m%d%H%M%S')}",
@@ -176,7 +155,7 @@ class InventoryService:
                     "estimated_stockout_date": estimated_stockout_date,
                     "supplier_name": item.supplier_name,
                     "supplier_contact": item.supplier_contact,
-                    "created_at": datetime.now().isoformat()
+                    "created_at": datetime.now().isoformat(),
                 }
                 alerts.append(alert)
 
@@ -190,7 +169,7 @@ class InventoryService:
         unit_cost: Optional[int] = None,
         reference_id: Optional[str] = None,
         notes: Optional[str] = None,
-        performed_by: Optional[str] = None
+        performed_by: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         记录库存交易
@@ -240,18 +219,13 @@ class InventoryService:
                     reference_id=reference_id,
                     notes=notes,
                     performed_by=performed_by,
-                    transaction_time=datetime.utcnow()
+                    transaction_time=datetime.utcnow(),
                 )
 
                 session.add(transaction)
                 await session.commit()
 
-                logger.info(
-                    "库存交易记录成功",
-                    item_id=item_id,
-                    type=transaction_type,
-                    quantity=quantity
-                )
+                logger.info("库存交易记录成功", item_id=item_id, type=transaction_type, quantity=quantity)
 
                 return {
                     "transaction_id": str(transaction.id),
@@ -262,7 +236,7 @@ class InventoryService:
                     "quantity_before": quantity_before,
                     "quantity_after": quantity_after,
                     "status": item.status.value,
-                    "transaction_time": transaction.transaction_time.isoformat()
+                    "transaction_time": transaction.transaction_time.isoformat(),
                 }
 
             except Exception as e:
@@ -271,9 +245,7 @@ class InventoryService:
                 raise
 
     async def get_inventory_statistics(
-        self,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None
+        self, start_date: Optional[str] = None, end_date: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         获取库存统计
@@ -292,37 +264,23 @@ class InventoryService:
             items = items_result.scalars().all()
 
             # 统计库存状态
-            status_counts = {
-                "normal": 0,
-                "low": 0,
-                "critical": 0,
-                "out_of_stock": 0
-            }
+            status_counts = {"normal": 0, "low": 0, "critical": 0, "out_of_stock": 0}
             for item in items:
                 status_counts[item.status.value] = status_counts.get(item.status.value, 0) + 1
 
             # 计算库存总值
-            total_value = sum(
-                (item.current_quantity * (item.unit_cost or 0))
-                for item in items
-            ) / 100  # Convert cents to yuan
+            total_value = sum((item.current_quantity * (item.unit_cost or 0)) for item in items) / 100  # Convert cents to yuan
 
             # 查询交易记录
-            transactions_stmt = select(InventoryTransaction).where(
-                InventoryTransaction.store_id == self.store_id
-            )
+            transactions_stmt = select(InventoryTransaction).where(InventoryTransaction.store_id == self.store_id)
 
             if start_date:
                 start_dt = datetime.fromisoformat(start_date)
-                transactions_stmt = transactions_stmt.where(
-                    InventoryTransaction.transaction_time >= start_dt
-                )
+                transactions_stmt = transactions_stmt.where(InventoryTransaction.transaction_time >= start_dt)
 
             if end_date:
                 end_dt = datetime.fromisoformat(end_date)
-                transactions_stmt = transactions_stmt.where(
-                    InventoryTransaction.transaction_time <= end_dt
-                )
+                transactions_stmt = transactions_stmt.where(InventoryTransaction.transaction_time <= end_dt)
 
             transactions_result = await session.execute(transactions_stmt)
             transactions = transactions_result.scalars().all()
@@ -338,14 +296,10 @@ class InventoryService:
                 "total_value": round(total_value, 2),
                 "status_breakdown": status_counts,
                 "transaction_counts": transaction_counts,
-                "alerts_count": status_counts["low"] + status_counts["critical"] + status_counts["out_of_stock"]
+                "alerts_count": status_counts["low"] + status_counts["critical"] + status_counts["out_of_stock"],
             }
 
-    async def get_inventory_report(
-        self,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None
-    ) -> Dict[str, Any]:
+    async def get_inventory_report(self, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict[str, Any]:
         """
         获取库存报告
 
@@ -371,25 +325,15 @@ class InventoryService:
             "inventory_summary": {
                 "total_items": statistics["total_items"],
                 "total_value": statistics["total_value"],
-                "status_breakdown": statistics["status_breakdown"]
+                "status_breakdown": statistics["status_breakdown"],
             },
             "restock_alerts": restock_alerts,
-            "critical_items": [
-                item for item in inventory_items
-                if item["status"] in ["critical", "out_of_stock"]
-            ],
-            "low_stock_items": [
-                item for item in inventory_items
-                if item["status"] == "low"
-            ],
-            "recommendations": self._generate_recommendations(inventory_items, restock_alerts)
+            "critical_items": [item for item in inventory_items if item["status"] in ["critical", "out_of_stock"]],
+            "low_stock_items": [item for item in inventory_items if item["status"] == "low"],
+            "recommendations": self._generate_recommendations(inventory_items, restock_alerts),
         }
 
-    def _item_to_dict(
-        self,
-        item: InventoryItem,
-        include_transactions: bool = False
-    ) -> Dict[str, Any]:
+    def _item_to_dict(self, item: InventoryItem, include_transactions: bool = False) -> Dict[str, Any]:
         """
         将库存项目对象转换为字典
 
@@ -412,7 +356,7 @@ class InventoryService:
             "status": item.status.value,
             "supplier_name": item.supplier_name,
             "supplier_contact": item.supplier_contact,
-            "stock_value": (item.current_quantity * (item.unit_cost or 0)) / 100
+            "stock_value": (item.current_quantity * (item.unit_cost or 0)) / 100,
         }
 
         if include_transactions and hasattr(item, "transactions") and item.transactions:
@@ -423,7 +367,7 @@ class InventoryService:
                     "quantity": trans.quantity,
                     "quantity_before": trans.quantity_before,
                     "quantity_after": trans.quantity_after,
-                    "transaction_time": trans.transaction_time.isoformat() if trans.transaction_time else None
+                    "transaction_time": trans.transaction_time.isoformat() if trans.transaction_time else None,
                 }
                 for trans in sorted(item.transactions, key=lambda t: t.transaction_time, reverse=True)[:10]
             ]
@@ -450,22 +394,15 @@ class InventoryService:
             restock_multiplier = float(os.getenv("INVENTORY_RESTOCK_MULTIPLIER", "2"))
             return item.min_quantity * restock_multiplier - item.current_quantity
 
-    async def _estimate_stockout_date(
-        self,
-        session,
-        item: InventoryItem
-    ) -> Optional[str]:
+    async def _estimate_stockout_date(self, session, item: InventoryItem) -> Optional[str]:
         """预测缺货日期 - 已弃用，使用 _estimate_stockout_date_from_transactions"""
         # 查询最近30天的消耗记录
         thirty_days_ago = datetime.now() - timedelta(days=int(os.getenv("INVENTORY_HISTORY_DAYS", "30")))
-        stmt = (
-            select(InventoryTransaction)
-            .where(
-                and_(
-                    InventoryTransaction.item_id == item.id,
-                    InventoryTransaction.transaction_type == TransactionType.USAGE,
-                    InventoryTransaction.transaction_time >= thirty_days_ago
-                )
+        stmt = select(InventoryTransaction).where(
+            and_(
+                InventoryTransaction.item_id == item.id,
+                InventoryTransaction.transaction_type == TransactionType.USAGE,
+                InventoryTransaction.transaction_time >= thirty_days_ago,
             )
         )
         result = await session.execute(stmt)
@@ -474,9 +411,7 @@ class InventoryService:
         return self._estimate_stockout_date_from_transactions(item, transactions)
 
     def _estimate_stockout_date_from_transactions(
-        self,
-        item: InventoryItem,
-        transactions: List[InventoryTransaction]
+        self, item: InventoryItem, transactions: List[InventoryTransaction]
     ) -> Optional[str]:
         """从交易记录预测缺货日期 - 优化版本，避免N+1查询"""
         if not transactions:
@@ -509,9 +444,7 @@ class InventoryService:
             return "info"
 
     def _generate_recommendations(
-        self,
-        inventory_items: List[Dict[str, Any]],
-        restock_alerts: List[Dict[str, Any]]
+        self, inventory_items: List[Dict[str, Any]], restock_alerts: List[Dict[str, Any]]
     ) -> List[str]:
         """生成建议"""
         recommendations = []

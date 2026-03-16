@@ -1,10 +1,27 @@
 # CODEX.md — 屯象OS 多端协同开发规范（Claude Code ↔ Codex 共识协议）
 
-> **版本**: v2.0 | **生效日期**: 2026-03-15 | **维护人**: 微了一
+> **版本**: v2.1 | **生效日期**: 2026-03-15 | **维护人**: 微了一
 >
 > 本文件是 Claude Code 与 Codex 之间的**绑定协议**。
 > 任何 AI 工具在本仓库工作前，必须完整阅读本文件。
 > 冲突时以本文件为准，CLAUDE.md 为补充。
+
+---
+
+## ⚠️ 强制约束（开始任何开发前必读）
+
+**开始任何开发前先读完本文件。** 涉及以下目录的改动，必须按第 8 章《防冲突协议》执行：
+
+- `apps/api-gateway/src/api/` — API 路由（Claude Code 所有权）
+- `apps/api-gateway/src/core/` — 核心模块（Claude Code 所有权）
+- `apps/api-gateway/src/models/` — 数据模型（Claude Code 所有权）
+- `apps/api-gateway/src/services/` — 业务服务（Claude Code 所有权）
+- `apps/api-gateway/scripts/` — 后端脚本（Claude Code 所有权）
+- `apps/web/src/pages/` — 页面组件（Codex 优先，但需遵循模板规范）
+- `apps/web/src/layouts/` — 布局组件（Claude Code 所有权，Codex 只读）
+- `apps/web/src/App.tsx` — 路由配置（Claude Code 所有权，Codex 只读）
+
+**违反防冲突协议的改动将被拒绝。** 不确定时，在 PR 描述中标注 `[NEED-REVIEW]` 请求 Claude Code 审查。
 
 ---
 

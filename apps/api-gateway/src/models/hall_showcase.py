@@ -2,15 +2,13 @@
 宴会厅实景展示模型 — Phase P3 (宴小猪能力)
 面向客户的厅位展示：照片、VR、参数、价格
 """
+
 from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import (
-    Boolean, Column, Integer, Numeric, String, Text,
-)
-from sqlalchemy.dialects.postgresql import UUID, JSONB
-
+from sqlalchemy import Boolean, Column, Integer, Numeric, String, Text
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from src.models.base import Base, TimestampMixin
 
 

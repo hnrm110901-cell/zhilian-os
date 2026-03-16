@@ -2,9 +2,11 @@
 行业基线数据服务
 为新客户提供行业标准数据，解决AI冷启动问题
 """
-from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta
+
 import os
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
+
 import structlog
 
 logger = structlog.get_logger()
@@ -139,9 +141,7 @@ class IndustryBaselineData:
     }
 
     @classmethod
-    def get_traffic_baseline(
-        cls, restaurant_type: str, day_type: str, meal_period: str
-    ) -> Optional[Dict[str, float]]:
+    def get_traffic_baseline(cls, restaurant_type: str, day_type: str, meal_period: str) -> Optional[Dict[str, float]]:
         """
         获取客流量基线数据
 
@@ -165,9 +165,7 @@ class IndustryBaselineData:
             return None
 
     @classmethod
-    def get_revenue_baseline(
-        cls, restaurant_type: str, day_type: str
-    ) -> Optional[Dict[str, float]]:
+    def get_revenue_baseline(cls, restaurant_type: str, day_type: str) -> Optional[Dict[str, float]]:
         """获取销售额基线数据"""
         try:
             return cls.REVENUE_BASELINE[restaurant_type][day_type]
@@ -180,16 +178,12 @@ class IndustryBaselineData:
             return None
 
     @classmethod
-    def get_average_spend_baseline(
-        cls, restaurant_type: str
-    ) -> Optional[Dict[str, float]]:
+    def get_average_spend_baseline(cls, restaurant_type: str) -> Optional[Dict[str, float]]:
         """获取客单价基线数据"""
         try:
             return cls.AVERAGE_SPEND_BASELINE[restaurant_type]
         except KeyError:
-            logger.warning(
-                "Average spend baseline not found", restaurant_type=restaurant_type
-            )
+            logger.warning("Average spend baseline not found", restaurant_type=restaurant_type)
             return None
 
     @classmethod
@@ -238,29 +232,23 @@ class BaselineDataService:
         Returns:
             包含数据充足性评估的字典
         """
-        from sqlalchemy import select, func
+        from sqlalchemy import func, select
         from src.core.database import get_db_session
-        from src.models.order import Order
         from src.models.daily_report import DailyReport
         from src.models.inventory import InventoryItem
+        from src.models.order import Order
 
         async with get_db_session() as session:
-            orders_result = await session.execute(
-                select(func.count(Order.id)).where(Order.store_id == self.store_id)
-            )
+            orders_result = await session.execute(select(func.count(Order.id)).where(Order.store_id == self.store_id))
             orders_count = int(orders_result.scalar() or 0)
 
             days_result = await session.execute(
-                select(func.count(func.distinct(DailyReport.report_date))).where(
-                    DailyReport.store_id == self.store_id
-                )
+                select(func.count(func.distinct(DailyReport.report_date))).where(DailyReport.store_id == self.store_id)
             )
             days_of_data = int(days_result.scalar() or 0)
 
             inventory_result = await session.execute(
-                select(func.count(InventoryItem.id)).where(
-                    InventoryItem.store_id == self.store_id
-                )
+                select(func.count(InventoryItem.id)).where(InventoryItem.store_id == self.store_id)
             )
             inventory_records = int(inventory_result.scalar() or 0)
 
@@ -293,9 +281,7 @@ class BaselineDataService:
         sufficiency = await self.check_data_sufficiency()
         return not sufficiency["is_sufficient"]
 
-    def get_baseline_recommendation(
-        self, query_type: str, context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def get_baseline_recommendation(self, query_type: str, context: Dict[str, Any]) -> Dict[str, Any]:
         """
         基于行业基线数据生成建议
 
@@ -326,9 +312,7 @@ class BaselineDataService:
 
         return recommendation
 
-    def _generate_recommendation(
-        self, query_type: str, baseline_data: Dict[str, Any], context: Dict[str, Any]
-    ) -> str:
+    def _generate_recommendation(self, query_type: str, baseline_data: Dict[str, Any], context: Dict[str, Any]) -> str:
         """
         根据查询类型和基线数据生成具体建议
 
@@ -351,9 +335,7 @@ class BaselineDataService:
         else:
             return "根据行业数据，建议您持续关注关键运营指标，并与行业平均水平进行对比。"
 
-    def _generate_traffic_recommendation(
-        self, baseline_data: Dict[str, Any], context: Dict[str, Any]
-    ) -> str:
+    def _generate_traffic_recommendation(self, baseline_data: Dict[str, Any], context: Dict[str, Any]) -> str:
         """生成客流预测建议"""
         day_type = context.get("day_type", "工作日")
         meal_period = context.get("meal_period", "午餐")
@@ -372,9 +354,7 @@ class BaselineDataService:
 
         return "暂无相关时段的行业数据。"
 
-    def _generate_inventory_recommendation(
-        self, baseline_data: Dict[str, Any], context: Dict[str, Any]
-    ) -> str:
+    def _generate_inventory_recommendation(self, baseline_data: Dict[str, Any], context: Dict[str, Any]) -> str:
         """生成库存规划建议"""
         turnover_data = baseline_data.get("inventory_turnover", {})
 
@@ -385,9 +365,7 @@ class BaselineDataService:
 
         return "根据行业标准，" + "；".join(recommendations) + "。"
 
-    def _generate_staff_recommendation(
-        self, baseline_data: Dict[str, Any], context: Dict[str, Any]
-    ) -> str:
+    def _generate_staff_recommendation(self, baseline_data: Dict[str, Any], context: Dict[str, Any]) -> str:
         """生成人员配置建议"""
         staff_data = baseline_data.get("staff", {})
         area = context.get("area", int(os.getenv("BASELINE_AREA_UNIT", "100")))  # 默认100平米
@@ -395,14 +373,9 @@ class BaselineDataService:
         front_staff = staff_data.get("前厅", {}).get("平均", 0) * (area / int(os.getenv("BASELINE_AREA_UNIT", "100")))
         kitchen_staff = staff_data.get("后厨", {}).get("平均", 0) * (area / int(os.getenv("BASELINE_AREA_UNIT", "100")))
 
-        return (
-            f"根据您的餐厅面积（{area}平米），建议配置前厅人员{front_staff:.0f}人，"
-            f"后厨人员{kitchen_staff:.0f}人。"
-        )
+        return f"根据您的餐厅面积（{area}平米），建议配置前厅人员{front_staff:.0f}人，" f"后厨人员{kitchen_staff:.0f}人。"
 
-    def _generate_cost_recommendation(
-        self, baseline_data: Dict[str, Any], context: Dict[str, Any]
-    ) -> str:
+    def _generate_cost_recommendation(self, baseline_data: Dict[str, Any], context: Dict[str, Any]) -> str:
         """生成成本分析建议"""
         labor_cost = baseline_data.get("labor_cost", {}).get("平均", 0)
         food_cost = baseline_data.get("food_cost", {}).get("平均", 0)

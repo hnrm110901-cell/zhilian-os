@@ -6,21 +6,23 @@ Phase 4: 智能优化期 (Intelligence Optimization Period)
 Coordinates decisions across multiple agents and resolves conflicts
 """
 
-from typing import Dict, List, Optional, Any, Set
+import os
+from collections import deque
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from dataclasses import dataclass, field
-from collections import deque
-from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Any, Dict, List, Optional, Set
+
 import numpy as np
-import os
 import structlog
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
 
 
 class AgentType(Enum):
     """Agent type enum"""
+
     SCHEDULE = "schedule"  # 排班Agent
     ORDER = "order"  # 订单Agent
     INVENTORY = "inventory"  # 库存Agent
@@ -33,6 +35,7 @@ class AgentType(Enum):
 
 class ConflictType(Enum):
     """Conflict type enum"""
+
     RESOURCE = "resource"  # 资源冲突
     PRIORITY = "priority"  # 优先级冲突
     CONSTRAINT = "constraint"  # 约束冲突
@@ -41,6 +44,7 @@ class ConflictType(Enum):
 
 class ResolutionStrategy(Enum):
     """Conflict resolution strategy"""
+
     PRIORITY_BASED = "priority_based"  # 基于优先级
     NEGOTIATION = "negotiation"  # 协商
     OPTIMIZATION = "optimization"  # 全局优化
@@ -50,6 +54,7 @@ class ResolutionStrategy(Enum):
 @dataclass
 class AgentDecision:
     """Agent decision"""
+
     agent_type: AgentType
     decision_id: str
     action: str
@@ -63,6 +68,7 @@ class AgentDecision:
 @dataclass
 class Conflict:
     """Decision conflict"""
+
     conflict_id: str
     conflict_type: ConflictType
     involved_agents: List[AgentType]
@@ -75,6 +81,7 @@ class Conflict:
 @dataclass
 class Resolution:
     """Conflict resolution"""
+
     conflict_id: str
     strategy: ResolutionStrategy
     approved_decisions: List[str]
@@ -106,9 +113,7 @@ class AgentCollaborationOptimizer:
     def __init__(self, db: AsyncSession):
         self.db = db
         # Pending decisions from agents
-        self.pending_decisions: Dict[AgentType, List[AgentDecision]] = {
-            agent_type: [] for agent_type in AgentType
-        }
+        self.pending_decisions: Dict[AgentType, List[AgentDecision]] = {agent_type: [] for agent_type in AgentType}
         # Detected conflicts
         self.conflicts: List[Conflict] = []
         # Resolution history
@@ -127,11 +132,7 @@ class AgentCollaborationOptimizer:
         # Agent execution dependency DAG
         self.dag = AgentDependencyGraph()
 
-    def submit_decision(
-        self,
-        agent_type: AgentType,
-        decision: AgentDecision
-    ) -> Dict[str, Any]:
+    def submit_decision(self, agent_type: AgentType, decision: AgentDecision) -> Dict[str, Any]:
         """
         Submit a decision from an agent
         提交Agent决策
@@ -153,7 +154,7 @@ class AgentCollaborationOptimizer:
             "agent_type": agent_type.value,
             "decision_id": decision.decision_id,
             "conflicts_detected": len(conflicts),
-            "status": "pending_review" if conflicts else "approved"
+            "status": "pending_review" if conflicts else "approved",
         }
 
     def register_dependency(
@@ -184,11 +185,7 @@ class AgentCollaborationOptimizer:
         )
         return report
 
-    def coordinate_decisions(
-        self,
-        store_id: str,
-        time_window: Optional[int] = 3600  # seconds
-    ) -> Dict[str, Any]:
+    def coordinate_decisions(self, store_id: str, time_window: Optional[int] = 3600) -> Dict[str, Any]:  # seconds
         """
         Coordinate all pending decisions
         协调所有待处理决策
@@ -213,11 +210,7 @@ class AgentCollaborationOptimizer:
             all_decisions.extend(decisions)
 
         if not all_decisions:
-            return {
-                "success": True,
-                "message": "No pending decisions to coordinate",
-                "decisions": []
-            }
+            return {"success": True, "message": "No pending decisions to coordinate", "decisions": []}
 
         # Guard: reject coordination if DAG has a cycle
         dag_report = self.dag.validate()
@@ -242,9 +235,7 @@ class AgentCollaborationOptimizer:
         resolutions = self._resolve_all_conflicts()
 
         # Optimize resource allocation
-        optimized_plan = self._optimize_resource_allocation(
-            all_decisions, resolutions
-        )
+        optimized_plan = self._optimize_resource_allocation(all_decisions, resolutions)
 
         # Clear pending decisions
         for agent_type in self.pending_decisions:
@@ -258,14 +249,10 @@ class AgentCollaborationOptimizer:
             "conflicts_resolved": len(resolutions),
             "approved_decisions": len(optimized_plan["approved"]),
             "rejected_decisions": len(optimized_plan["rejected"]),
-            "plan": optimized_plan
+            "plan": optimized_plan,
         }
 
-    def resolve_conflict(
-        self,
-        conflict_id: str,
-        strategy: Optional[ResolutionStrategy] = None
-    ) -> Resolution:
+    def resolve_conflict(self, conflict_id: str, strategy: Optional[ResolutionStrategy] = None) -> Resolution:
         """
         Resolve a specific conflict
         解决特定冲突
@@ -278,10 +265,7 @@ class AgentCollaborationOptimizer:
             Resolution details
         """
         # Find conflict
-        conflict = next(
-            (c for c in self.conflicts if c.conflict_id == conflict_id),
-            None
-        )
+        conflict = next((c for c in self.conflicts if c.conflict_id == conflict_id), None)
 
         if not conflict:
             raise ValueError(f"Conflict {conflict_id} not found")
@@ -308,10 +292,7 @@ class AgentCollaborationOptimizer:
 
         return resolution
 
-    def get_collaboration_status(
-        self,
-        store_id: str
-    ) -> Dict[str, Any]:
+    def get_collaboration_status(self, store_id: str) -> Dict[str, Any]:
         """
         Get agent collaboration status
         获取Agent协同状态
@@ -319,14 +300,10 @@ class AgentCollaborationOptimizer:
         Returns:
             Status information including pending decisions and conflicts
         """
-        total_pending = sum(
-            len(decisions) for decisions in self.pending_decisions.values()
-        )
+        total_pending = sum(len(decisions) for decisions in self.pending_decisions.values())
 
         pending_by_agent = {
-            agent_type.value: len(decisions)
-            for agent_type, decisions in self.pending_decisions.items()
-            if decisions
+            agent_type.value: len(decisions) for agent_type, decisions in self.pending_decisions.items() if decisions
         }
 
         return {
@@ -335,15 +312,10 @@ class AgentCollaborationOptimizer:
             "pending_by_agent": pending_by_agent,
             "active_conflicts": len(self.conflicts),
             "resolved_conflicts": len(self.resolutions),
-            "coordination_efficiency": self._calculate_efficiency()
+            "coordination_efficiency": self._calculate_efficiency(),
         }
 
-    def get_agent_performance(
-        self,
-        agent_type: AgentType,
-        start_date: datetime,
-        end_date: datetime
-    ) -> Dict[str, Any]:
+    def get_agent_performance(self, agent_type: AgentType, start_date: datetime, end_date: datetime) -> Dict[str, Any]:
         """
         Get agent performance metrics
         获取Agent性能指标
@@ -357,10 +329,7 @@ class AgentCollaborationOptimizer:
         # Simplified implementation
         return {
             "agent_type": agent_type.value,
-            "period": {
-                "start": start_date.isoformat(),
-                "end": end_date.isoformat()
-            },
+            "period": {"start": start_date.isoformat(), "end": end_date.isoformat()},
             "metrics": {
                 "decisions_submitted": 100,
                 "decisions_approved": 85,
@@ -368,16 +337,13 @@ class AgentCollaborationOptimizer:
                 "conflicts_involved": 15,
                 "conflict_rate": 0.15,
                 "avg_benefit_realization": 0.92,
-                "resource_utilization": 0.78
-            }
+                "resource_utilization": 0.78,
+            },
         }
 
     # Helper methods for conflict detection and resolution
 
-    def _detect_conflicts(
-        self,
-        new_decision: AgentDecision
-    ) -> List[Conflict]:
+    def _detect_conflicts(self, new_decision: AgentDecision) -> List[Conflict]:
         """Detect conflicts with a new decision"""
         conflicts = []
 
@@ -390,30 +356,20 @@ class AgentCollaborationOptimizer:
 
         return conflicts
 
-    def _detect_all_conflicts(
-        self,
-        decisions: List[AgentDecision]
-    ):
+    def _detect_all_conflicts(self, decisions: List[AgentDecision]):
         """Detect all conflicts among decisions"""
         self.conflicts = []
 
         for i, decision1 in enumerate(decisions):
-            for decision2 in decisions[i+1:]:
+            for decision2 in decisions[i + 1 :]:
                 conflict = self._check_conflict(decision1, decision2)
                 if conflict:
                     self.conflicts.append(conflict)
 
-    def _check_conflict(
-        self,
-        decision1: AgentDecision,
-        decision2: AgentDecision
-    ) -> Optional[Conflict]:
+    def _check_conflict(self, decision1: AgentDecision, decision2: AgentDecision) -> Optional[Conflict]:
         """Check if two decisions conflict"""
         # Resource conflict
-        resource_conflict = self._check_resource_conflict(
-            decision1.resources_required,
-            decision2.resources_required
-        )
+        resource_conflict = self._check_resource_conflict(decision1.resources_required, decision2.resources_required)
 
         if resource_conflict:
             conflict_id = f"conflict_{decision1.decision_id}_{decision2.decision_id}"
@@ -424,13 +380,11 @@ class AgentCollaborationOptimizer:
                 involved_decisions=[decision1.decision_id, decision2.decision_id],
                 description=f"Resource conflict between {decision1.agent_type.value} and {decision2.agent_type.value}",
                 severity=float(os.getenv("AGENT_CONFLICT_RESOURCE_SEVERITY", "0.7")),
-                detected_at=datetime.utcnow()
+                detected_at=datetime.utcnow(),
             )
 
         # Constraint conflict
-        constraint_conflict = self._check_constraint_conflict(
-            decision1, decision2
-        )
+        constraint_conflict = self._check_constraint_conflict(decision1, decision2)
 
         if constraint_conflict:
             conflict_id = f"conflict_{decision1.decision_id}_{decision2.decision_id}"
@@ -441,16 +395,12 @@ class AgentCollaborationOptimizer:
                 involved_decisions=[decision1.decision_id, decision2.decision_id],
                 description=f"Constraint conflict between {decision1.agent_type.value} and {decision2.agent_type.value}",
                 severity=float(os.getenv("AGENT_CONFLICT_CONSTRAINT_SEVERITY", "0.5")),
-                detected_at=datetime.utcnow()
+                detected_at=datetime.utcnow(),
             )
 
         return None
 
-    def _check_resource_conflict(
-        self,
-        resources1: Dict[str, float],
-        resources2: Dict[str, float]
-    ) -> bool:
+    def _check_resource_conflict(self, resources1: Dict[str, float], resources2: Dict[str, float]) -> bool:
         """Check if resources conflict"""
         # Check for overlapping resource requirements
         common_resources = set(resources1.keys()) & set(resources2.keys())
@@ -462,11 +412,7 @@ class AgentCollaborationOptimizer:
 
         return False
 
-    def _check_constraint_conflict(
-        self,
-        decision1: AgentDecision,
-        decision2: AgentDecision
-    ) -> bool:
+    def _check_constraint_conflict(self, decision1: AgentDecision, decision2: AgentDecision) -> bool:
         """Check if constraints conflict"""
         # Simplified: check if constraints are incompatible
         return False
@@ -481,10 +427,7 @@ class AgentCollaborationOptimizer:
 
         return resolutions
 
-    def _select_resolution_strategy(
-        self,
-        conflict: Conflict
-    ) -> ResolutionStrategy:
+    def _select_resolution_strategy(self, conflict: Conflict) -> ResolutionStrategy:
         """Select appropriate resolution strategy"""
         if conflict.severity > 0.8:
             return ResolutionStrategy.ESCALATION
@@ -495,19 +438,13 @@ class AgentCollaborationOptimizer:
         else:
             return ResolutionStrategy.NEGOTIATION
 
-    def _priority_based_resolution(
-        self,
-        conflict: Conflict
-    ) -> Resolution:
+    def _priority_based_resolution(self, conflict: Conflict) -> Resolution:
         """Resolve conflict based on agent priorities"""
         # Get decisions involved
         decisions = self._get_decisions_by_ids(conflict.involved_decisions)
 
         # Sort by agent priority
-        decisions.sort(
-            key=lambda d: self.agent_priorities.get(d.agent_type, 0),
-            reverse=True
-        )
+        decisions.sort(key=lambda d: self.agent_priorities.get(d.agent_type, 0), reverse=True)
 
         # Approve highest priority, reject others
         approved = [decisions[0].decision_id]
@@ -520,13 +457,10 @@ class AgentCollaborationOptimizer:
             rejected_decisions=rejected,
             modifications={},
             reason=f"Approved {decisions[0].agent_type.value} decision based on priority",
-            resolved_at=datetime.utcnow()
+            resolved_at=datetime.utcnow(),
         )
 
-    def _negotiation_resolution(
-        self,
-        conflict: Conflict
-    ) -> Resolution:
+    def _negotiation_resolution(self, conflict: Conflict) -> Resolution:
         """Resolve conflict through negotiation"""
         # Simplified: split resources proportionally
         decisions = self._get_decisions_by_ids(conflict.involved_decisions)
@@ -535,9 +469,7 @@ class AgentCollaborationOptimizer:
         for decision in decisions:
             # Reduce resource requirements by 50%
             modifications[decision.decision_id] = {
-                "resources_required": {
-                    k: v * 0.5 for k, v in decision.resources_required.items()
-                }
+                "resources_required": {k: v * 0.5 for k, v in decision.resources_required.items()}
             }
 
         return Resolution(
@@ -547,13 +479,10 @@ class AgentCollaborationOptimizer:
             rejected_decisions=[],
             modifications=modifications,
             reason="Negotiated resource sharing between agents",
-            resolved_at=datetime.utcnow()
+            resolved_at=datetime.utcnow(),
         )
 
-    def _optimization_resolution(
-        self,
-        conflict: Conflict
-    ) -> Resolution:
+    def _optimization_resolution(self, conflict: Conflict) -> Resolution:
         """Resolve conflict through global optimization"""
         decisions = self._get_decisions_by_ids(conflict.involved_decisions)
 
@@ -562,10 +491,7 @@ class AgentCollaborationOptimizer:
 
         # Select decisions that maximize benefit within constraints
         # Simplified: greedy selection by benefit/resource ratio
-        decisions.sort(
-            key=lambda d: d.expected_benefit / max(sum(d.resources_required.values()), 0.1),
-            reverse=True
-        )
+        decisions.sort(key=lambda d: d.expected_benefit / max(sum(d.resources_required.values()), 0.1), reverse=True)
 
         approved = [decisions[0].decision_id]
         rejected = [d.decision_id for d in decisions[1:]]
@@ -577,13 +503,10 @@ class AgentCollaborationOptimizer:
             rejected_decisions=rejected,
             modifications={},
             reason=f"Optimized for maximum benefit: {decisions[0].expected_benefit}",
-            resolved_at=datetime.utcnow()
+            resolved_at=datetime.utcnow(),
         )
 
-    def _escalation_resolution(
-        self,
-        conflict: Conflict
-    ) -> Resolution:
+    def _escalation_resolution(self, conflict: Conflict) -> Resolution:
         """Escalate conflict to human decision"""
         return Resolution(
             conflict_id=conflict.conflict_id,
@@ -592,14 +515,10 @@ class AgentCollaborationOptimizer:
             rejected_decisions=[],
             modifications={},
             reason="Conflict severity too high, escalated to human review",
-            resolved_at=datetime.utcnow()
+            resolved_at=datetime.utcnow(),
         )
 
-    def _optimize_resource_allocation(
-        self,
-        decisions: List[AgentDecision],
-        resolutions: List[Resolution]
-    ) -> Dict[str, Any]:
+    def _optimize_resource_allocation(self, decisions: List[AgentDecision], resolutions: List[Resolution]) -> Dict[str, Any]:
         """Optimize resource allocation across decisions"""
         approved = []
         rejected = []
@@ -617,16 +536,10 @@ class AgentCollaborationOptimizer:
         return {
             "approved": approved,
             "rejected": rejected,
-            "total_benefit": sum(
-                d.expected_benefit for d in decisions
-                if d.decision_id in approved
-            )
+            "total_benefit": sum(d.expected_benefit for d in decisions if d.decision_id in approved),
         }
 
-    def _get_decisions_by_ids(
-        self,
-        decision_ids: List[str]
-    ) -> List[AgentDecision]:
+    def _get_decisions_by_ids(self, decision_ids: List[str]) -> List[AgentDecision]:
         """Get decisions by IDs"""
         decisions = []
         for agent_type, agent_decisions in self.pending_decisions.items():
@@ -652,6 +565,7 @@ class AgentCollaborationOptimizer:
 # Agent 执行依赖 DAG + 环检测
 # ---------------------------------------------------------------------------
 
+
 class AgentDependencyGraph:
     """
     Agent 执行依赖有向无环图（DAG）
@@ -671,9 +585,7 @@ class AgentDependencyGraph:
 
     def __init__(self) -> None:
         # _deps[agent] = set of agents that must execute BEFORE agent
-        self._deps: Dict[AgentType, Set[AgentType]] = {
-            a: set() for a in AgentType
-        }
+        self._deps: Dict[AgentType, Set[AgentType]] = {a: set() for a in AgentType}
 
     # ------------------------------------------------------------------
     # Public API
@@ -697,10 +609,7 @@ class AgentDependencyGraph:
             # 回滚
             self._deps[agent].discard(depends_on)
             cycle_str = " → ".join(a.value for a in cycle)
-            raise ValueError(
-                f"Adding dependency {agent.value} → {depends_on.value} "
-                f"would create a cycle: {cycle_str}"
-            )
+            raise ValueError(f"Adding dependency {agent.value} → {depends_on.value} " f"would create a cycle: {cycle_str}")
 
         logger.debug(
             "agent_dependency_added",
@@ -764,9 +673,7 @@ class AgentDependencyGraph:
             raise ValueError(f"Agent dependency cycle detected: {cycle_str}")
 
         # in_degree[agent] = 该 agent 还有多少未满足的前置依赖
-        in_degree: Dict[AgentType, int] = {
-            a: len(self._deps[a]) for a in AgentType
-        }
+        in_degree: Dict[AgentType, int] = {a: len(self._deps[a]) for a in AgentType}
         # reverse[dep] = 依赖 dep 的 agent 集合
         reverse: Dict[AgentType, Set[AgentType]] = {a: set() for a in AgentType}
         for agent in AgentType:
@@ -797,9 +704,7 @@ class AgentDependencyGraph:
         }
         if not cycle:
             try:
-                report["execution_order"] = [
-                    a.value for a in self.topological_order()
-                ]
+                report["execution_order"] = [a.value for a in self.topological_order()]
             except ValueError as exc:
                 logger.warning("dag_topological_sort_failed", error=str(exc))
                 report["execution_order"] = None

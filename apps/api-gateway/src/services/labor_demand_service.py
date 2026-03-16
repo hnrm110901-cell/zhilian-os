@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import math
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, List, Optional
 
 import structlog
 from sqlalchemy import text
@@ -90,8 +90,8 @@ _CN_HOLIDAY_WEIGHTS: Dict[str, tuple] = {
 # 餐段客流基准（行业参考：一家 40-60 座中档餐厅午/晚高峰）
 _PERIOD_BASE_CUSTOMERS = {
     "morning": 25,
-    "lunch":   55,
-    "dinner":  70,
+    "lunch": 55,
+    "dinner": 70,
     "all_day": 120,
 }
 
@@ -101,14 +101,15 @@ _DOW_FACTOR = {0: 0.85, 1: 0.88, 2: 0.90, 3: 0.92, 4: 1.05, 5: 1.25, 6: 1.20}
 # 岗位换算规则 per meal_period：(customers_per_staff, min_headcount)
 _POSITION_RATIOS: Dict[str, Dict[str, tuple]] = {
     "morning": {"waiter": (15, 2), "chef": (18, 1), "cashier": (40, 1), "manager": (999, 1)},
-    "lunch":   {"waiter": (18, 2), "chef": (22, 1), "cashier": (45, 1), "manager": (999, 1)},
-    "dinner":  {"waiter": (15, 2), "chef": (20, 1), "cashier": (40, 1), "manager": (999, 1)},
+    "lunch": {"waiter": (18, 2), "chef": (22, 1), "cashier": (45, 1), "manager": (999, 1)},
+    "dinner": {"waiter": (15, 2), "chef": (20, 1), "cashier": (40, 1), "manager": (999, 1)},
     "all_day": {"waiter": (25, 3), "chef": (28, 2), "cashier": (55, 1), "manager": (999, 1)},
 }
 _MANAGER_HIGH_THRESHOLD = 80  # 超过此客流时经理配 2 人
 
 
 # ─── 服务类 ────────────────────────────────────────────────────────────────────
+
 
 class LaborDemandService:
     """人力需求预测服务（全静态方法）"""
@@ -148,17 +149,13 @@ class LaborDemandService:
         history_days = await LaborDemandService._get_history_days(store_id, db)
 
         if history_days < 14:
-            result = await LaborDemandService._rule_based(
-                store_id, forecast_date, meal_period, weather_score
-            )
+            result = await LaborDemandService._rule_based(store_id, forecast_date, meal_period, weather_score)
         elif history_days < 56:
             result = await LaborDemandService._statistical(
                 store_id, forecast_date, meal_period, weather_score, db, history_days
             )
         else:
-            result = await LaborDemandService._weighted_historical(
-                store_id, forecast_date, meal_period, weather_score, db
-            )
+            result = await LaborDemandService._weighted_historical(store_id, forecast_date, meal_period, weather_score, db)
 
         log.info(
             "labor_demand.forecast_done",
@@ -197,15 +194,23 @@ class LaborDemandService:
         )
         reason_2 = "历史数据不足，暂无同类日参考，建议以经验值为主"
         reason_3 = (
-            f"节假日权重 {holiday_weight:.2f}（{holiday_label}），"
-            f"天气系数 {weather_score:.2f}，最终预测 {predicted} 人"
+            f"节假日权重 {holiday_weight:.2f}（{holiday_label}），" f"天气系数 {weather_score:.2f}，最终预测 {predicted} 人"
         )
 
         return _build_result(
-            store_id, forecast_date, meal_period,
-            predicted, confidence, weather_score, holiday_weight, None,
-            reason_1, reason_2, reason_3,
-            basis="rule_based", model_version="v1.0-rule",
+            store_id,
+            forecast_date,
+            meal_period,
+            predicted,
+            confidence,
+            weather_score,
+            holiday_weight,
+            None,
+            reason_1,
+            reason_2,
+            reason_3,
+            basis="rule_based",
+            model_version="v1.0-rule",
         )
 
     @staticmethod
@@ -219,9 +224,7 @@ class LaborDemandService:
     ) -> dict:
         """统计预测（14-56天历史）：近4-8周同星期/餐段加权平均"""
         if db is None:
-            return await LaborDemandService._rule_based(
-                store_id, forecast_date, meal_period, weather_score
-            )
+            return await LaborDemandService._rule_based(store_id, forecast_date, meal_period, weather_score)
 
         try:
             lookback_weeks = 4 if history_days < 28 else 8
@@ -245,28 +248,24 @@ class LaborDemandService:
                     ORDER BY order_date
                 """),
                 {
-                    "sid":      store_id,
-                    "start":    start_lookback,
-                    "end":      forecast_date,
-                    "dow":      _pg_dow(dow),
+                    "sid": store_id,
+                    "start": start_lookback,
+                    "end": forecast_date,
+                    "dow": _pg_dow(dow),
                     "ph_start": period_start_h,
-                    "ph_end":   period_end_h,
+                    "ph_end": period_end_h,
                 },
             )
             rows = rows_result.fetchall()
 
             if not rows:
-                return await LaborDemandService._rule_based(
-                    store_id, forecast_date, meal_period, weather_score
-                )
+                return await LaborDemandService._rule_based(store_id, forecast_date, meal_period, weather_score)
 
             # 加权平均（最新周权重最高）
             n = len(rows)
             weights = list(range(1, n + 1))
             total_w = sum(weights)
-            hist_avg = sum(
-                int(r.customer_count) * w for r, w in zip(rows, weights)
-            ) / total_w
+            hist_avg = sum(int(r.customer_count) * w for r, w in zip(rows, weights)) / total_w
             hist_avg_int = round(hist_avg)
 
             holiday_weight, holiday_label = _get_holiday_info(forecast_date)
@@ -305,10 +304,7 @@ class LaborDemandService:
             confidence = 0.68 if history_days < 28 else 0.75
 
             weekday_cn = _weekday_cn(dow)
-            reason_1 = (
-                f"近 {lookback_weeks} 周{weekday_cn}同餐段均值 {hist_avg_int} 人"
-                f"（共 {n} 个样本，加权平均）"
-            )
+            reason_1 = f"近 {lookback_weeks} 周{weekday_cn}同餐段均值 {hist_avg_int} 人" f"（共 {n} 个样本，加权平均）"
             reason_2 = (
                 f"历史最高 {max(int(r.customer_count) for r in rows)} 人，"
                 f"最低 {min(int(r.customer_count) for r in rows)} 人，"
@@ -321,20 +317,28 @@ class LaborDemandService:
             )
 
             return _build_result(
-                store_id, forecast_date, meal_period,
-                predicted, confidence, weather_score, holiday_weight, hist_avg_int,
-                reason_1, reason_2, reason_3,
-                basis="statistical", model_version="v1.0-stat",
+                store_id,
+                forecast_date,
+                meal_period,
+                predicted,
+                confidence,
+                weather_score,
+                holiday_weight,
+                hist_avg_int,
+                reason_1,
+                reason_2,
+                reason_3,
+                basis="statistical",
+                model_version="v1.0-stat",
             )
 
         except Exception as exc:
             logger.warning(
                 "labor_demand.statistical_failed",
-                store_id=store_id, error=str(exc),
+                store_id=store_id,
+                error=str(exc),
             )
-            return await LaborDemandService._rule_based(
-                store_id, forecast_date, meal_period, weather_score
-            )
+            return await LaborDemandService._rule_based(store_id, forecast_date, meal_period, weather_score)
 
     @staticmethod
     async def _weighted_historical(
@@ -350,9 +354,7 @@ class LaborDemandService:
         同时参考同店同月份历史均值做修正。
         """
         if db is None:
-            return await LaborDemandService._rule_based(
-                store_id, forecast_date, meal_period, weather_score
-            )
+            return await LaborDemandService._rule_based(store_id, forecast_date, meal_period, weather_score)
 
         try:
             start_lookback = forecast_date - timedelta(weeks=12)
@@ -376,20 +378,18 @@ class LaborDemandService:
                     ORDER BY order_date
                 """),
                 {
-                    "sid":      store_id,
-                    "start":    start_lookback,
-                    "end":      forecast_date,
-                    "dow":      _pg_dow(dow),
+                    "sid": store_id,
+                    "start": start_lookback,
+                    "end": forecast_date,
+                    "dow": _pg_dow(dow),
                     "ph_start": period_start_h,
-                    "ph_end":   period_end_h,
+                    "ph_end": period_end_h,
                 },
             )
             rows = rows_result.fetchall()
 
             if not rows:
-                return await LaborDemandService._statistical(
-                    store_id, forecast_date, meal_period, weather_score, db, 60
-                )
+                return await LaborDemandService._statistical(store_id, forecast_date, meal_period, weather_score, db, 60)
 
             # 同月份历史均值（跨年同月，提升季节性感知）
             same_month_result = await db.execute(
@@ -407,11 +407,11 @@ class LaborDemandService:
                     ) sub
                 """),
                 {
-                    "sid":      store_id,
-                    "month":    forecast_date.month,
+                    "sid": store_id,
+                    "month": forecast_date.month,
                     "ph_start": period_start_h,
-                    "ph_end":   period_end_h,
-                    "end":      forecast_date,
+                    "ph_end": period_end_h,
+                    "end": forecast_date,
                 },
             )
             monthly_avg = float(same_month_result.scalar() or 0)
@@ -419,9 +419,7 @@ class LaborDemandService:
             n = len(rows)
             weights = list(range(1, n + 1))
             total_w = sum(weights)
-            hist_avg = sum(
-                int(r.customer_count) * w for r, w in zip(rows, weights)
-            ) / total_w
+            hist_avg = sum(int(r.customer_count) * w for r, w in zip(rows, weights)) / total_w
 
             # 混合：70% 近期加权 + 30% 月份均值（如果月均有效）
             blended = hist_avg
@@ -465,14 +463,8 @@ class LaborDemandService:
 
             weekday_cn = _weekday_cn(dow)
             hist_avg_int = round(hist_avg)
-            reason_1 = (
-                f"近12周{weekday_cn}同餐段加权均值 {hist_avg_int} 人"
-                f"（{n} 个样本，权重从旧到新递增）"
-            )
-            reason_2 = (
-                f"同月份历史客流均值 {round(monthly_avg)} 人，"
-                f"混合修正后基准 {round(blended)} 人"
-            )
+            reason_1 = f"近12周{weekday_cn}同餐段加权均值 {hist_avg_int} 人" f"（{n} 个样本，权重从旧到新递增）"
+            reason_2 = f"同月份历史客流均值 {round(monthly_avg)} 人，" f"混合修正后基准 {round(blended)} 人"
             reason_3 = (
                 f"节假日权重 {holiday_weight:.2f}（{holiday_label}），"
                 f"天气系数 {weather_score:.2f}，短期动量×{momentum:.2f}，"
@@ -480,20 +472,28 @@ class LaborDemandService:
             )
 
             return _build_result(
-                store_id, forecast_date, meal_period,
-                predicted, confidence, weather_score, holiday_weight, hist_avg_int,
-                reason_1, reason_2, reason_3,
-                basis="weighted", model_version="v1.1-weighted-micro",
+                store_id,
+                forecast_date,
+                meal_period,
+                predicted,
+                confidence,
+                weather_score,
+                holiday_weight,
+                hist_avg_int,
+                reason_1,
+                reason_2,
+                reason_3,
+                basis="weighted",
+                model_version="v1.1-weighted-micro",
             )
 
         except Exception as exc:
             logger.warning(
                 "labor_demand.weighted_failed",
-                store_id=store_id, error=str(exc),
+                store_id=store_id,
+                error=str(exc),
             )
-            return await LaborDemandService._statistical(
-                store_id, forecast_date, meal_period, weather_score, db, 60
-            )
+            return await LaborDemandService._statistical(store_id, forecast_date, meal_period, weather_score, db, 60)
 
     # ── 批量预测（一次预测全天所有餐段） ───────────────────────────────────────
 
@@ -516,20 +516,22 @@ class LaborDemandService:
 
         for period in periods:
             r = await LaborDemandService.forecast(
-                store_id, forecast_date, period, db,
-                save=save, weather_score=weather_score,
+                store_id,
+                forecast_date,
+                period,
+                db,
+                save=save,
+                weather_score=weather_score,
             )
             results[period] = r
             total_headcount += r["total_headcount_needed"]
 
         return {
-            "store_id":       store_id,
-            "forecast_date":  forecast_date.isoformat(),
-            "weather_score":  weather_score,
-            "periods":        results,
-            "daily_peak_headcount": max(
-                r["total_headcount_needed"] for r in results.values()
-            ),
+            "store_id": store_id,
+            "forecast_date": forecast_date.isoformat(),
+            "weather_score": weather_score,
+            "periods": results,
+            "daily_peak_headcount": max(r["total_headcount_needed"] for r in results.values()),
             "daily_total_headcount_slots": total_headcount,
         }
 
@@ -556,7 +558,8 @@ class LaborDemandService:
         except Exception as exc:
             logger.warning(
                 "labor_demand.get_history_days_failed",
-                store_id=store_id, error=str(exc),
+                store_id=store_id,
+                error=str(exc),
             )
             return 0
 
@@ -596,18 +599,18 @@ class LaborDemandService:
                         updated_at               = NOW()
                 """),
                 {
-                    "store_id":              result["store_id"],
-                    "forecast_date":         result["forecast_date"],
-                    "meal_period":           result["meal_period"],
-                    "predicted_customers":   result["predicted_customer_count"],
+                    "store_id": result["store_id"],
+                    "forecast_date": result["forecast_date"],
+                    "meal_period": result["meal_period"],
+                    "predicted_customers": result["predicted_customer_count"],
                     "predicted_revenue_yuan": result.get("predicted_revenue_yuan"),
-                    "confidence":            result["confidence_score"],
-                    "position_req":          _dict_to_json_str(result["position_requirements"]),
-                    "total_headcount":       result["total_headcount_needed"],
-                    "holiday_weight":        result["factor_holiday_weight"],
-                    "weather_score":         result["factor_weather_score"],
-                    "hist_avg":              result["factor_historical_avg"],
-                    "model_version":         result["model_version"],
+                    "confidence": result["confidence_score"],
+                    "position_req": _dict_to_json_str(result["position_requirements"]),
+                    "total_headcount": result["total_headcount_needed"],
+                    "holiday_weight": result["factor_holiday_weight"],
+                    "weather_score": result["factor_weather_score"],
+                    "hist_avg": result["factor_historical_avg"],
+                    "model_version": result["model_version"],
                 },
             )
             await db.commit()
@@ -615,12 +618,14 @@ class LaborDemandService:
             await db.rollback()
             logger.error(
                 "labor_demand.upsert_failed",
-                store_id=result["store_id"], error=str(exc),
+                store_id=result["store_id"],
+                error=str(exc),
             )
             raise
 
 
 # ─── 纯函数工具（可单元测试） ──────────────────────────────────────────────────
+
 
 def compute_position_requirements(
     predicted_customers: int,
@@ -702,6 +707,7 @@ def apply_micro_event_adjustment(base_prediction: float, momentum_factor: float,
 
 # ─── 私有工具函数 ──────────────────────────────────────────────────────────────
 
+
 def _get_holiday_info(target_date: date) -> tuple:
     key = target_date.strftime("%Y-%m-%d")
     if key in _CN_HOLIDAY_WEIGHTS:
@@ -714,10 +720,10 @@ def _get_holiday_info(target_date: date) -> tuple:
 def _period_hours(meal_period: str) -> tuple:
     """返回餐段的 (start_hour, end_hour) 整数对"""
     mapping = {
-        "morning": (6,  11),
-        "lunch":   (11, 15),
-        "dinner":  (17, 22),
-        "all_day": (6,  23),
+        "morning": (6, 11),
+        "lunch": (11, 15),
+        "dinner": (17, 22),
+        "all_day": (6, 23),
     }
     return mapping.get(meal_period, (6, 23))
 
@@ -734,6 +740,7 @@ def _weekday_cn(python_dow: int) -> str:
 
 def _dict_to_json_str(d: dict) -> str:
     import json
+
     return json.dumps(d, ensure_ascii=False)
 
 
@@ -758,19 +765,19 @@ def _build_result(
     total_headcount = sum(positions.values())
 
     return {
-        "store_id":               store_id,
-        "forecast_date":          forecast_date.isoformat(),
-        "meal_period":            meal_period,
+        "store_id": store_id,
+        "forecast_date": forecast_date.isoformat(),
+        "meal_period": meal_period,
         "predicted_customer_count": predicted_customers,
-        "predicted_revenue_yuan": None,          # 由上层业务按客单价填充
-        "confidence_score":       round(confidence, 3),
-        "position_requirements":  positions,
+        "predicted_revenue_yuan": None,  # 由上层业务按客单价填充
+        "confidence_score": round(confidence, 3),
+        "position_requirements": positions,
         "total_headcount_needed": total_headcount,
-        "factor_holiday_weight":  round(holiday_weight, 3),
-        "factor_weather_score":   round(weather_score, 3),
-        "factor_historical_avg":  hist_avg,
-        "model_version":          model_version,
-        "basis":                  basis,
+        "factor_holiday_weight": round(holiday_weight, 3),
+        "factor_weather_score": round(weather_score, 3),
+        "factor_historical_avg": hist_avg,
+        "model_version": model_version,
+        "basis": basis,
         # 3条推理链（直接供 StaffingAdvice.reason_1/2/3 使用）
         "reason_1": reason_1,
         "reason_2": reason_2,

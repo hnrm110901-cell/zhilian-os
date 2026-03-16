@@ -2,16 +2,17 @@
 Schedule Service - 排班管理数据库服务
 处理排班的数据库操作
 """
-import structlog
-from typing import Dict, Any, List, Optional
-from datetime import datetime, timedelta, time
-from sqlalchemy import select, func, and_, or_, delete
-from sqlalchemy.orm import selectinload
-import uuid
 
+import uuid
+from datetime import datetime, time, timedelta
+from typing import Any, Dict, List, Optional
+
+import structlog
+from sqlalchemy import and_, delete, func, or_, select
+from sqlalchemy.orm import selectinload
 from src.core.database import get_db_session
-from src.models.schedule import Schedule, Shift
 from src.models.employee import Employee
+from src.models.schedule import Schedule, Shift
 
 logger = structlog.get_logger()
 
@@ -29,12 +30,7 @@ class ScheduleService:
         self.store_id = store_id
         logger.info("ScheduleService初始化", store_id=store_id)
 
-    async def create_schedule(
-        self,
-        schedule_date: str,
-        shifts: List[Dict[str, Any]],
-        **kwargs
-    ) -> Dict[str, Any]:
+    async def create_schedule(self, schedule_date: str, shifts: List[Dict[str, Any]], **kwargs) -> Dict[str, Any]:
         """
         创建排班
 
@@ -50,14 +46,8 @@ class ScheduleService:
             try:
                 # 检查是否已存在该日期的排班
                 date_obj = datetime.fromisoformat(schedule_date).date()
-                existing_stmt = (
-                    select(Schedule)
-                    .where(
-                        and_(
-                            Schedule.store_id == self.store_id,
-                            Schedule.schedule_date == date_obj
-                        )
-                    )
+                existing_stmt = select(Schedule).where(
+                    and_(Schedule.store_id == self.store_id, Schedule.schedule_date == date_obj)
                 )
                 existing_result = await session.execute(existing_stmt)
                 existing_schedule = existing_result.scalar_one_or_none()
@@ -74,7 +64,7 @@ class ScheduleService:
                         schedule_date=date_obj,
                         total_employees=str(len(shifts)),
                         is_published=kwargs.get("is_published", False),
-                        published_by=kwargs.get("published_by")
+                        published_by=kwargs.get("published_by"),
                     )
                     session.add(schedule)
                     await session.flush()
@@ -90,7 +80,7 @@ class ScheduleService:
                         end_time=datetime.fromisoformat(shift_data["end_time"]).time(),
                         position=shift_data.get("position"),
                         is_confirmed=shift_data.get("is_confirmed", False),
-                        notes=shift_data.get("notes")
+                        notes=shift_data.get("notes"),
                     )
                     session.add(shift)
 
@@ -116,11 +106,7 @@ class ScheduleService:
                 logger.error("创建排班失败", error=str(e))
                 raise
 
-    async def get_schedule(
-        self,
-        start_date: str,
-        end_date: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+    async def get_schedule(self, start_date: str, end_date: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         获取排班
 
@@ -137,12 +123,7 @@ class ScheduleService:
             stmt = (
                 select(Schedule)
                 .options(selectinload(Schedule.shifts))
-                .where(
-                    and_(
-                        Schedule.store_id == self.store_id,
-                        Schedule.schedule_date >= start_dt
-                    )
-                )
+                .where(and_(Schedule.store_id == self.store_id, Schedule.schedule_date >= start_dt))
             )
 
             if end_date:
@@ -156,10 +137,7 @@ class ScheduleService:
 
             return [self._schedule_to_dict(schedule) for schedule in schedules]
 
-    async def get_schedule_by_date(
-        self,
-        schedule_date: str
-    ) -> Optional[Dict[str, Any]]:
+    async def get_schedule_by_date(self, schedule_date: str) -> Optional[Dict[str, Any]]:
         """
         获取指定日期的排班
 
@@ -175,12 +153,7 @@ class ScheduleService:
             stmt = (
                 select(Schedule)
                 .options(selectinload(Schedule.shifts))
-                .where(
-                    and_(
-                        Schedule.store_id == self.store_id,
-                        Schedule.schedule_date == date_obj
-                    )
-                )
+                .where(and_(Schedule.store_id == self.store_id, Schedule.schedule_date == date_obj))
             )
 
             result = await session.execute(stmt)
@@ -191,11 +164,7 @@ class ScheduleService:
 
             return self._schedule_to_dict(schedule)
 
-    async def update_schedule(
-        self,
-        schedule_id: str,
-        **kwargs
-    ) -> Dict[str, Any]:
+    async def update_schedule(self, schedule_id: str, **kwargs) -> Dict[str, Any]:
         """
         更新排班
 
@@ -208,11 +177,7 @@ class ScheduleService:
         """
         async with get_db_session() as session:
             try:
-                stmt = (
-                    select(Schedule)
-                    .options(selectinload(Schedule.shifts))
-                    .where(Schedule.id == uuid.UUID(schedule_id))
-                )
+                stmt = select(Schedule).options(selectinload(Schedule.shifts)).where(Schedule.id == uuid.UUID(schedule_id))
                 result = await session.execute(stmt)
                 schedule = result.scalar_one_or_none()
 
@@ -236,10 +201,7 @@ class ScheduleService:
                 logger.error("更新排班失败", error=str(e))
                 raise
 
-    async def delete_schedule(
-        self,
-        schedule_id: str
-    ) -> Dict[str, Any]:
+    async def delete_schedule(self, schedule_id: str) -> Dict[str, Any]:
         """
         删除排班
 
@@ -263,10 +225,7 @@ class ScheduleService:
 
                 logger.info("排班删除成功", schedule_id=schedule_id)
 
-                return {
-                    "schedule_id": schedule_id,
-                    "deleted": True
-                }
+                return {"schedule_id": schedule_id, "deleted": True}
 
             except Exception as e:
                 await session.rollback()
@@ -274,10 +233,7 @@ class ScheduleService:
                 raise
 
     async def get_employee_schedules(
-        self,
-        employee_id: str,
-        start_date: str,
-        end_date: Optional[str] = None
+        self, employee_id: str, start_date: str, end_date: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         获取员工的排班
@@ -300,7 +256,7 @@ class ScheduleService:
                     and_(
                         Shift.employee_id == employee_id,
                         Schedule.store_id == self.store_id,
-                        Schedule.schedule_date >= start_dt
+                        Schedule.schedule_date >= start_dt,
                     )
                 )
             )
@@ -317,31 +273,26 @@ class ScheduleService:
             # 获取关联的schedule信息
             employee_schedules = []
             for shift in shifts:
-                schedule_stmt = (
-                    select(Schedule)
-                    .where(Schedule.id == shift.schedule_id)
-                )
+                schedule_stmt = select(Schedule).where(Schedule.id == shift.schedule_id)
                 schedule_result = await session.execute(schedule_stmt)
                 schedule = schedule_result.scalar_one()
 
-                employee_schedules.append({
-                    "schedule_date": schedule.schedule_date.isoformat(),
-                    "shift_id": str(shift.id),
-                    "shift_type": shift.shift_type,
-                    "start_time": shift.start_time.isoformat(),
-                    "end_time": shift.end_time.isoformat(),
-                    "position": shift.position,
-                    "is_confirmed": shift.is_confirmed,
-                    "notes": shift.notes
-                })
+                employee_schedules.append(
+                    {
+                        "schedule_date": schedule.schedule_date.isoformat(),
+                        "shift_id": str(shift.id),
+                        "shift_type": shift.shift_type,
+                        "start_time": shift.start_time.isoformat(),
+                        "end_time": shift.end_time.isoformat(),
+                        "position": shift.position,
+                        "is_confirmed": shift.is_confirmed,
+                        "notes": shift.notes,
+                    }
+                )
 
             return employee_schedules
 
-    async def get_schedule_statistics(
-        self,
-        start_date: str,
-        end_date: str
-    ) -> Dict[str, Any]:
+    async def get_schedule_statistics(self, start_date: str, end_date: str) -> Dict[str, Any]:
         """
         获取排班统计
 
@@ -364,7 +315,7 @@ class ScheduleService:
                     and_(
                         Schedule.store_id == self.store_id,
                         Schedule.schedule_date >= start_dt,
-                        Schedule.schedule_date <= end_dt
+                        Schedule.schedule_date <= end_dt,
                     )
                 )
             )
@@ -399,16 +350,15 @@ class ScheduleService:
                     employee_hours[shift.employee_id] += hours
 
             return {
-                "period": {
-                    "start_date": start_date,
-                    "end_date": end_date
-                },
+                "period": {"start_date": start_date, "end_date": end_date},
                 "total_schedules": total_schedules,
                 "published_schedules": published_schedules,
                 "total_shifts": total_shifts,
                 "shift_type_breakdown": shift_type_counts,
                 "employee_count": len(employee_hours),
-                "average_hours_per_employee": round(sum(employee_hours.values()) / len(employee_hours), 2) if employee_hours else 0
+                "average_hours_per_employee": (
+                    round(sum(employee_hours.values()) / len(employee_hours), 2) if employee_hours else 0
+                ),
             }
 
     def _schedule_to_dict(self, schedule: Schedule) -> Dict[str, Any]:
@@ -428,7 +378,7 @@ class ScheduleService:
             "total_employees": schedule.total_employees,
             "total_hours": schedule.total_hours,
             "is_published": schedule.is_published,
-            "published_by": schedule.published_by
+            "published_by": schedule.published_by,
         }
 
         # 添加班次信息
@@ -443,7 +393,7 @@ class ScheduleService:
                     "position": shift.position,
                     "is_confirmed": shift.is_confirmed,
                     "is_completed": shift.is_completed,
-                    "notes": shift.notes
+                    "notes": shift.notes,
                 }
                 for shift in schedule.shifts
             ]

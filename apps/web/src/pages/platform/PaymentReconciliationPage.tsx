@@ -380,9 +380,7 @@ const PaymentReconciliationPage: React.FC = () => {
       key: 'status',
       title: '状态',
       render: (_v, row) => (
-        <ZBadge type={STATUS_TYPE[row.status] || 'default'}>
-          {STATUS_LABEL[row.status] || row.status}
-        </ZBadge>
+        <ZBadge type={STATUS_TYPE[row.status] || 'default'} text={STATUS_LABEL[row.status] || row.status} />
       ),
       width: 80,
     },
@@ -453,9 +451,7 @@ const PaymentReconciliationPage: React.FC = () => {
       render: (_v, row) => {
         if (row.resolved) {
           return (
-            <ZBadge type="success">
-              {`已处理${row.resolved_by ? ` (${row.resolved_by})` : ''}`}
-            </ZBadge>
+            <ZBadge type="success" text={`已处理${row.resolved_by ? ` (${row.resolved_by})` : ''}`} />
           );
         }
         return (
