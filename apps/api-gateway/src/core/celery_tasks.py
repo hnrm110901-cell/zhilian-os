@@ -5371,7 +5371,6 @@ def evaluate_decision_effects(self) -> Dict[str, Any]:
         raise self.retry(exc=exc)
 
 
-<<<<<<< Updated upstream
 # ── 奥琦玮供应链：每日库存 + 采购单拉取 ──────────────────────────────────────
 
 @celery_app.task(
@@ -6055,4 +6054,3 @@ def check_approval_timeouts(self) -> Dict[str, Any]:
     except Exception as exc:
         logger.warning("approval_timeout_check.failed", error=str(exc))
         return {"error": str(exc)}
->>>>>>> Stashed changes

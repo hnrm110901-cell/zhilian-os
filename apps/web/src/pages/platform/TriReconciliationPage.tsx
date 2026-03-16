@@ -410,7 +410,7 @@ function TriReconciliationPage() {
       key: 'actions',
       width: 80,
       render: (id: string) => (
-        <ZButton size="small" variant="ghost" onClick={() => openDetail(id)}>
+        <ZButton size="sm" variant="ghost" onClick={() => openDetail(id)}>
           详情
         </ZButton>
       ),
@@ -532,7 +532,7 @@ function TriReconciliationPage() {
           <option value="resolved">已解决</option>
         </select>
         <div className={styles.toolbarRight}>
-          <ZButton size="small" variant="ghost" onClick={() => { setFilterDate(getToday()); setFilterLevel(''); setFilterStatus(''); setPage(1); }}>
+          <ZButton size="sm" variant="ghost" onClick={() => { setFilterDate(getToday()); setFilterLevel(''); setFilterStatus(''); setPage(1); }}>
             重置
           </ZButton>
         </div>
@@ -557,10 +557,10 @@ function TriReconciliationPage() {
                 共 {total} 条，第 {page}/{Math.ceil(total / pageSize) || 1} 页
               </span>
               <div style={{ display: 'flex', gap: 8 }}>
-                <ZButton size="small" variant="ghost" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+                <ZButton size="sm" variant="ghost" disabled={page <= 1} onClick={() => setPage(page - 1)}>
                   上一页
                 </ZButton>
-                <ZButton size="small" variant="ghost" disabled={page * pageSize >= total} onClick={() => setPage(page + 1)}>
+                <ZButton size="sm" variant="ghost" disabled={page * pageSize >= total} onClick={() => setPage(page + 1)}>
                   下一页
                 </ZButton>
               </div>
@@ -580,7 +580,7 @@ function TriReconciliationPage() {
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
             <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>对账记录详情</h3>
-            <ZButton size="small" variant="ghost" onClick={() => setDrawerOpen(false)}>关闭</ZButton>
+            <ZButton size="sm" variant="ghost" onClick={() => setDrawerOpen(false)}>关闭</ZButton>
           </div>
 
           {detailLoading ? (
