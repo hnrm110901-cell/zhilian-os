@@ -647,7 +647,7 @@ const ElemePage: React.FC = () => {
                   loading={menuLoading}
                   size="middle"
                   pagination={{ pageSize: 20, showTotal: (t) => `共 ${t} 个` }}
-                  locale={{ emptyText: <Empty description="点击"加载菜单"从饿了么获取" /> }}
+                  locale={{ emptyText: <Empty description={'点击"加载菜单"从饿了么获取'} /> }}
                 />
               </div>
             ),

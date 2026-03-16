@@ -448,6 +448,7 @@ function BuildingStep({ storeId, onNext }: { storeId: string; onNext: () => void
   const [error, setError]               = useState('');
   const [started, setStarted]           = useState(false);
   const pollRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const pollFnRef = useRef<() => void>();
 
   const poll = useCallback(async () => {
     try {
@@ -458,10 +459,12 @@ function BuildingStep({ storeId, onNext }: { storeId: string; onNext: () => void
       if (data.status === 'completed') {
         clearTimeout(pollRef.current);
       } else if (data.status === 'in_progress') {
-        pollRef.current = setTimeout(poll, 3000);
+        pollRef.current = setTimeout(() => pollFnRef.current?.(), 3000);
       }
     } catch { /* ignore */ }
   }, [storeId]);
+
+  useEffect(() => { pollFnRef.current = poll; }, [poll]);
 
   useEffect(() => {
     const start = async () => {

@@ -253,8 +253,12 @@ const EmployeeRosterPage: React.FC = () => {
               <DetailRow label="健康证到期" value={
                 selectedEmp.health_cert_expiry ? (
                   <span style={{
-                    color: new Date(selectedEmp.health_cert_expiry) < new Date() ? '#EB5757'
-                      : new Date(selectedEmp.health_cert_expiry) < new Date(Date.now() + 30 * 86400000) ? '#F2994A' : '#27AE60'
+                    color: (() => {
+                      const expiry = new Date(selectedEmp.health_cert_expiry);
+                      const now = new Date();
+                      const in30d = new Date(now.getTime() + 30 * 86400000);
+                      return expiry < now ? '#EB5757' : expiry < in30d ? '#F2994A' : '#27AE60';
+                    })()
                   }}>
                     {selectedEmp.health_cert_expiry}
                   </span>
