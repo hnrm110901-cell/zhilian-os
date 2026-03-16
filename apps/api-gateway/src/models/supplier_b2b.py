@@ -2,15 +2,13 @@
 供应商B2B采购单模型
 B2BPurchaseOrder（采购单）+ B2BPurchaseItem（采购单明细）
 """
+
 import uuid
-from datetime import datetime, date
-from sqlalchemy import (
-    Column, String, Integer, Text, Date, DateTime,
-    ForeignKey, Index, Numeric,
-)
+from datetime import date, datetime
+
+from sqlalchemy import Column, Date, DateTime, ForeignKey, Index, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-
 from src.models.base import Base
 from src.models.mixins import TimestampMixin
 

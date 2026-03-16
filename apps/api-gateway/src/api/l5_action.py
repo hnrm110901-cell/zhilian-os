@@ -26,7 +26,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.core.dependencies import get_current_user
 from src.models.action_plan import ActionPlan
@@ -38,6 +37,7 @@ router = APIRouter(prefix="/api/v1/l5", tags=["l5_action"])
 
 
 # ── Pydantic Schemas ──────────────────────────────────────────────────────────
+
 
 class ExecuteIn(BaseModel):
     report_id: Optional[str] = Field(
@@ -63,14 +63,9 @@ class OutcomeIn(BaseModel):
     outcome_note: Optional[str] = Field(None, description="补充说明")
     kpi_delta: Optional[Dict[str, Any]] = Field(
         None,
-        description=(
-            "KPI 改善量，格式: "
-            "{waste_rate: {before: 0.15, after: 0.11, delta: -0.04}}"
-        ),
+        description=("KPI 改善量，格式: " "{waste_rate: {before: 0.15, after: 0.11, delta: -0.04}}"),
     )
-    followup_report_id: Optional[str] = Field(
-        None, description="行动后跟进诊断报告 ID"
-    )
+    followup_report_id: Optional[str] = Field(None, description="行动后跟进诊断报告 ID")
 
 
 class BatchDispatchIn(BaseModel):
@@ -80,6 +75,7 @@ class BatchDispatchIn(BaseModel):
 
 # ── 从推理报告触发行动 ────────────────────────────────────────────────────────
 
+
 @router.post(
     "/stores/{store_id}/execute",
     summary="从推理报告触发 L5 行动派发",
@@ -87,9 +83,9 @@ class BatchDispatchIn(BaseModel):
 )
 async def execute_from_report(
     store_id: str,
-    body:     ExecuteIn,
-    db:       AsyncSession = Depends(get_db),
-    _:        User         = Depends(get_current_user),
+    body: ExecuteIn,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """
     针对指定推理报告（或门店最新 P1/P2 报告）立即派发行动：
@@ -103,13 +99,14 @@ async def execute_from_report(
     """
     report = await _resolve_report(store_id, body.report_id, body.dimension, db)
 
-    svc  = ActionDispatchService(db)
+    svc = ActionDispatchService(db)
     plan = await svc.dispatch_from_report(report)
     await db.commit()
     return _plan_to_dict(plan)
 
 
 # ── 门店批量派发未处理 P1/P2 ─────────────────────────────────────────────────
+
 
 @router.post(
     "/stores/{store_id}/dispatch-pending",
@@ -118,20 +115,19 @@ async def execute_from_report(
 )
 async def dispatch_store_pending(
     store_id: str,
-    body:     DispatchPendingIn = DispatchPendingIn(),
-    db:       AsyncSession      = Depends(get_db),
-    _:        User              = Depends(get_current_user),
+    body: DispatchPendingIn = DispatchPendingIn(),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """扫描并派发门店近 N 天内所有尚未生成行动计划的 P1/P2 报告。"""
-    svc   = ActionDispatchService(db)
-    stats = await svc.dispatch_pending_alerts(
-        store_id=store_id, days_back=body.days_back
-    )
+    svc = ActionDispatchService(db)
+    stats = await svc.dispatch_pending_alerts(store_id=store_id, days_back=body.days_back)
     await db.commit()
     return {"store_id": store_id, **stats}
 
 
 # ── 行动计划列表 ──────────────────────────────────────────────────────────────
+
 
 @router.get(
     "/stores/{store_id}/action-plans",
@@ -139,23 +135,22 @@ async def dispatch_store_pending(
     response_model=List[dict],
 )
 async def list_store_action_plans(
-    store_id:  str,
-    days:      int          = Query(30, ge=1, le=365),
-    severity:  Optional[str] = Query(None, pattern="^(P1|P2|P3)$"),
-    outcome:   Optional[str] = Query(None),
-    limit:     int          = Query(50, ge=1, le=200),
-    db:        AsyncSession = Depends(get_db),
-    _:         User         = Depends(get_current_user),
+    store_id: str,
+    days: int = Query(30, ge=1, le=365),
+    severity: Optional[str] = Query(None, pattern="^(P1|P2|P3)$"),
+    outcome: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """查询门店行动计划历史，支持严重程度和结果过滤。"""
-    svc   = ActionDispatchService(db)
-    plans = await svc.list_plans(
-        store_id=store_id, days=days, severity=severity, outcome=outcome, limit=limit
-    )
+    svc = ActionDispatchService(db)
+    plans = await svc.list_plans(store_id=store_id, days=days, severity=severity, outcome=outcome, limit=limit)
     return [_plan_to_dict(p) for p in plans]
 
 
 # ── 行动计划详情 ──────────────────────────────────────────────────────────────
+
 
 @router.get(
     "/action-plans/{plan_id}",
@@ -163,8 +158,8 @@ async def list_store_action_plans(
 )
 async def get_action_plan(
     plan_id: str,
-    db:      AsyncSession = Depends(get_db),
-    _:       User         = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """获取单条行动计划完整详情（含 WeChat action_id、task_id、kpi_delta）。"""
     try:
@@ -184,15 +179,16 @@ async def get_action_plan(
 
 # ── 记录行动结果（反馈闭环） ──────────────────────────────────────────────────
 
+
 @router.patch(
     "/action-plans/{plan_id}/outcome",
     summary="记录行动结果（L4→L5→L4 反馈闭环）",
 )
 async def record_outcome(
     plan_id: str,
-    body:    OutcomeIn,
-    db:      AsyncSession = Depends(get_db),
-    _:       User         = Depends(get_current_user),
+    body: OutcomeIn,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """
     记录行动执行结果，完成 Human-in-the-Loop 闭环并量化改善效果。
@@ -224,7 +220,7 @@ async def record_outcome(
         except ValueError:
             pass
 
-    svc  = ActionDispatchService(db)
+    svc = ActionDispatchService(db)
     plan = await svc.record_outcome(
         plan_id=pid,
         outcome=body.outcome,
@@ -238,24 +234,25 @@ async def record_outcome(
 
     await db.commit()
     return {
-        "plan_id":     plan_id,
-        "outcome":     plan.outcome,
+        "plan_id": plan_id,
+        "outcome": plan.outcome,
         "resolved_by": plan.resolved_by,
         "resolved_at": plan.resolved_at.isoformat() if plan.resolved_at else None,
-        "kpi_delta":   plan.kpi_delta,
+        "kpi_delta": plan.kpi_delta,
     }
 
 
 # ── 全平台派发统计 ────────────────────────────────────────────────────────────
+
 
 @router.get(
     "/reports/platform-stats",
     summary="全平台行动派发统计（大屏）",
 )
 async def get_platform_stats(
-    days: int          = Query(7, ge=1, le=30),
-    db:   AsyncSession = Depends(get_db),
-    _:    User         = Depends(get_current_user),
+    days: int = Query(7, ge=1, le=30),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """
     返回全平台近 N 天行动派发统计：
@@ -265,16 +262,17 @@ async def get_platform_stats(
     - severity_dist: {P1, P2, P3} 计数
     - resolution_rate: 已解决 / 总计（%）
     """
-    svc   = ActionDispatchService(db)
+    svc = ActionDispatchService(db)
     stats = await svc.get_platform_stats(days=days)
 
-    total    = stats.get("total_plans", 0)
+    total = stats.get("total_plans", 0)
     resolved = stats.get("outcome_dist", {}).get("resolved", 0)
     stats["resolution_rate"] = round(resolved / total * 100, 1) if total else 0.0
     return stats
 
 
 # ── 触发 Celery 批量派发 ──────────────────────────────────────────────────────
+
 
 @router.post(
     "/scan/dispatch",
@@ -283,7 +281,7 @@ async def get_platform_stats(
 )
 async def trigger_batch_dispatch(
     body: BatchDispatchIn = BatchDispatchIn(),
-    _:    User            = Depends(get_current_user),
+    _: User = Depends(get_current_user),
 ):
     """
     触发 Celery `nightly_action_dispatch` 任务（全平台 P1/P2 行动批量派发）。
@@ -295,13 +293,14 @@ async def trigger_batch_dispatch(
     """
     try:
         from src.core.celery_tasks import nightly_action_dispatch
+
         task = nightly_action_dispatch.delay(
             store_ids=body.store_ids,
             days_back=body.days_back,
         )
         return {
-            "status":    "accepted",
-            "task_id":   task.id,
+            "status": "accepted",
+            "task_id": task.id,
             "store_ids": body.store_ids,
             "days_back": body.days_back,
         }
@@ -314,11 +313,12 @@ async def trigger_batch_dispatch(
 
 # ── 内部工具函数 ──────────────────────────────────────────────────────────────
 
+
 async def _resolve_report(
-    store_id:   str,
-    report_id:  Optional[str],
-    dimension:  Optional[str],
-    db:         AsyncSession,
+    store_id: str,
+    report_id: Optional[str],
+    dimension: Optional[str],
+    db: AsyncSession,
 ) -> ReasoningReport:
     """解析目标推理报告（按 ID 或维度最新）"""
     if report_id:
@@ -329,9 +329,9 @@ async def _resolve_report(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="report_id 格式错误",
             )
-        stmt   = select(ReasoningReport).where(
+        stmt = select(ReasoningReport).where(
             and_(
-                ReasoningReport.id       == rid,
+                ReasoningReport.id == rid,
                 ReasoningReport.store_id == store_id,
             )
         )
@@ -348,7 +348,7 @@ async def _resolve_report(
             select(ReasoningReport)
             .where(
                 and_(
-                    ReasoningReport.store_id  == store_id,
+                    ReasoningReport.store_id == store_id,
                     ReasoningReport.dimension == dimension,
                     ReasoningReport.severity.in_(["P1", "P2", "P3"]),
                 )
@@ -372,30 +372,32 @@ async def _resolve_report(
 
 def _plan_to_dict(plan: ActionPlan, full: bool = False) -> dict:
     base = {
-        "plan_id":           str(plan.id),
+        "plan_id": str(plan.id),
         "reasoning_report_id": str(plan.reasoning_report_id),
-        "store_id":          plan.store_id,
-        "report_date":       plan.report_date.isoformat() if plan.report_date else None,
-        "dimension":         plan.dimension,
-        "severity":          plan.severity,
-        "root_cause":        plan.root_cause,
-        "confidence":        plan.confidence,
-        "dispatch_status":   plan.dispatch_status,
-        "dispatched_at":     plan.dispatched_at.isoformat() if plan.dispatched_at else None,
+        "store_id": plan.store_id,
+        "report_date": plan.report_date.isoformat() if plan.report_date else None,
+        "dimension": plan.dimension,
+        "severity": plan.severity,
+        "root_cause": plan.root_cause,
+        "confidence": plan.confidence,
+        "dispatch_status": plan.dispatch_status,
+        "dispatched_at": plan.dispatched_at.isoformat() if plan.dispatched_at else None,
         "dispatched_actions": plan.dispatched_actions,
-        "outcome":           plan.outcome,
-        "resolved_at":       plan.resolved_at.isoformat() if plan.resolved_at else None,
-        "resolved_by":       plan.resolved_by,
-        "created_at":        plan.created_at.isoformat() if plan.created_at else None,
+        "outcome": plan.outcome,
+        "resolved_at": plan.resolved_at.isoformat() if plan.resolved_at else None,
+        "resolved_by": plan.resolved_by,
+        "created_at": plan.created_at.isoformat() if plan.created_at else None,
     }
     if full:
-        base.update({
-            "wechat_action_id":   plan.wechat_action_id,
-            "task_id":            str(plan.task_id) if plan.task_id else None,
-            "decision_log_id":    str(plan.decision_log_id) if plan.decision_log_id else None,
-            "notification_ids":   plan.notification_ids,
-            "outcome_note":       plan.outcome_note,
-            "followup_report_id": str(plan.followup_report_id) if plan.followup_report_id else None,
-            "kpi_delta":          plan.kpi_delta,
-        })
+        base.update(
+            {
+                "wechat_action_id": plan.wechat_action_id,
+                "task_id": str(plan.task_id) if plan.task_id else None,
+                "decision_log_id": str(plan.decision_log_id) if plan.decision_log_id else None,
+                "notification_ids": plan.notification_ids,
+                "outcome_note": plan.outcome_note,
+                "followup_report_id": str(plan.followup_report_id) if plan.followup_report_id else None,
+                "kpi_delta": plan.kpi_delta,
+            }
+        )
     return base

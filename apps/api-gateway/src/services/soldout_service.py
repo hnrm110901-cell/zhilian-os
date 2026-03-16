@@ -3,15 +3,15 @@
 
 厨师长一键触发 → POS + 美团 + 小程序同步下架
 """
+
 import uuid
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.models.dish import Dish
 
 import structlog
+from sqlalchemy import select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+from src.models.dish import Dish
 
 logger = structlog.get_logger()
 
@@ -140,15 +140,17 @@ class SoldoutService:
         for d in dishes:
             if keyword and keyword.lower() not in (d.name or "").lower():
                 continue
-            items.append({
-                "dish_id": str(d.id),
-                "dish_name": d.name,
-                "dish_code": d.code,
-                "category_id": str(d.category_id) if d.category_id else None,
-                "price_yuan": float(d.price) if d.price else 0,
-                "kitchen_station": d.kitchen_station,
-                "tags": d.tags or [],
-            })
+            items.append(
+                {
+                    "dish_id": str(d.id),
+                    "dish_name": d.name,
+                    "dish_code": d.code,
+                    "category_id": str(d.category_id) if d.category_id else None,
+                    "price_yuan": float(d.price) if d.price else 0,
+                    "kitchen_station": d.kitchen_station,
+                    "tags": d.tags or [],
+                }
+            )
         return items
 
     async def batch_soldout(

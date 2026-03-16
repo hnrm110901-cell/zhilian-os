@@ -4,11 +4,11 @@ ServiceAgent - 客户服务质量智能体
 负责：客户反馈管理、服务质量监控、投诉处理、满意度分析。
 委托给 ServiceQualityService 执行真实 DB 查询。
 """
+
 import time
 from typing import Any, Dict, List
 
 import structlog
-
 from src.core.base_agent import AgentResponse, BaseAgent
 
 logger = structlog.get_logger()
@@ -45,6 +45,7 @@ class ServiceAgent(BaseAgent):
 
         try:
             from src.services.service_service import ServiceQualityService
+
             svc = ServiceQualityService(store_id=store_id)
 
             if action == "get_service_quality_metrics":

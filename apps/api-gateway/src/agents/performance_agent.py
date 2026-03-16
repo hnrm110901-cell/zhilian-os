@@ -7,15 +7,17 @@ PerformanceAgent - 连锁餐饮绩效与提成智能体 (屯象OS 绩效方案)
 - 提成计算与规则追溯
 - 绩效报表与自然语言查询
 """
+
 import re
 import time
 from datetime import date, timedelta
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
+
 import structlog
 
-from .llm_agent import LLMEnhancedAgent
 from ..core.base_agent import AgentResponse
-from ..core.monitoring import error_monitor, ErrorSeverity, ErrorCategory
+from ..core.monitoring import ErrorCategory, ErrorSeverity, error_monitor
+from .llm_agent import LLMEnhancedAgent
 
 logger = structlog.get_logger()
 
@@ -94,144 +96,144 @@ DEFAULT_ROLE_CONFIG = {
 COMMISSION_RULE_CONFIG: Dict[str, List[Dict[str, Any]]] = {
     "store_manager": [
         {
-            "name":      "月度目标达成奖",
-            "type":      "achievement_bonus",
-            "metric":    "revenue",
+            "name": "月度目标达成奖",
+            "type": "achievement_bonus",
+            "metric": "revenue",
             "threshold": 0.80,
-            "fixed_fen": 200_000,        # ¥2,000
-            "desc":      "revenue 达成率 ≥ 80% → 固定奖金 ¥2,000",
+            "fixed_fen": 200_000,  # ¥2,000
+            "desc": "revenue 达成率 ≥ 80% → 固定奖金 ¥2,000",
         },
         {
-            "name":          "超额提成 1-3%",
-            "type":          "excess_commission",
-            "metric":        "revenue",
-            "base_rate":     0.01,        # 超额比例 0% 时取 1%
-            "max_rate":      0.03,        # 超额比例 ≥ 30% 时取 3%
+            "name": "超额提成 1-3%",
+            "type": "excess_commission",
+            "metric": "revenue",
+            "base_rate": 0.01,  # 超额比例 0% 时取 1%
+            "max_rate": 0.03,  # 超额比例 ≥ 30% 时取 3%
             "max_excess_rate": 0.30,
-            "desc":          "超额营收 × 1–3%（超额幅度 0%→1%，30%→3%，线性插值）",
+            "desc": "超额营收 × 1–3%（超额幅度 0%→1%，30%→3%，线性插值）",
         },
         {
-            "name":  "季度综合排名奖",
-            "type":  "cross_store",
+            "name": "季度综合排名奖",
+            "type": "cross_store",
             "metric": None,
-            "desc":  "跨门店季度综合排名奖，需汇总后计算，当前返回 None",
+            "desc": "跨门店季度综合排名奖，需汇总后计算，当前返回 None",
         },
     ],
     "shift_manager": [
         {
-            "name":      "时段业绩达标奖",
-            "type":      "achievement_bonus",
-            "metric":    "period_revenue",
+            "name": "时段业绩达标奖",
+            "type": "achievement_bonus",
+            "metric": "period_revenue",
             "threshold": 0.90,
-            "fixed_fen": 50_000,         # ¥500
-            "desc":      "period_revenue 达成率 ≥ 90% → 固定奖金 ¥500",
+            "fixed_fen": 50_000,  # ¥500
+            "desc": "period_revenue 达成率 ≥ 90% → 固定奖金 ¥500",
         },
         {
-            "name":      "客诉零事故奖",
-            "type":      "achievement_bonus",
-            "metric":    "complaint",
-            "threshold": 1.00,           # 达成率 ≥ 1.0 意味着客诉数 ≤ 目标（越低越好）
-            "fixed_fen": 30_000,         # ¥300
-            "desc":      "complaint 达成率 ≥ 1.0（无客诉）→ 固定奖金 ¥300",
+            "name": "客诉零事故奖",
+            "type": "achievement_bonus",
+            "metric": "complaint",
+            "threshold": 1.00,  # 达成率 ≥ 1.0 意味着客诉数 ≤ 目标（越低越好）
+            "fixed_fen": 30_000,  # ¥300
+            "desc": "complaint 达成率 ≥ 1.0（无客诉）→ 固定奖金 ¥300",
         },
         {
-            "name":            "月度绩效系数",
-            "type":            "score_coefficient",
-            "metric":          "ALL",
+            "name": "月度绩效系数",
+            "type": "score_coefficient",
+            "metric": "ALL",
             "base_salary_fen": 500_000,  # 假设基础工资 ¥5,000（分）
-            "coeff_scale":     0.20,     # 奖励 = 基础工资 × total_score × 20%
-            "desc":            "绩效系数奖 = ¥5,000 × total_score × 20%",
+            "coeff_scale": 0.20,  # 奖励 = 基础工资 × total_score × 20%
+            "desc": "绩效系数奖 = ¥5,000 × total_score × 20%",
         },
     ],
     "waiter": [
         {
-            "name":   "桌均提成",
-            "type":   "excess_linear",
+            "name": "桌均提成",
+            "type": "excess_linear",
             "metric": "avg_per_table",
-            "rate":   0.005,             # 超额均消部分的 0.5%（分计算）
-            "desc":   "桌均消费超出目标部分 × 0.5%",
+            "rate": 0.005,  # 超额均消部分的 0.5%（分计算）
+            "desc": "桌均消费超出目标部分 × 0.5%",
         },
         {
-            "name":         "加单提成",
-            "type":         "rate_on_count",
-            "metric":       "add_order_rate",
+            "name": "加单提成",
+            "type": "rate_on_count",
+            "metric": "add_order_rate",
             "count_metric": "order_count",
-            "per_unit_fen": 1_00,        # ¥1/次加单
-            "desc":         "加单率 × 订单数 × ¥1/次",
+            "per_unit_fen": 1_00,  # ¥1/次加单
+            "desc": "加单率 × 订单数 × ¥1/次",
         },
         {
-            "name":      "好评奖",
-            "type":      "achievement_bonus",
-            "metric":    "good_review_rate",
+            "name": "好评奖",
+            "type": "achievement_bonus",
+            "metric": "good_review_rate",
             "threshold": 0.80,
-            "fixed_fen": 10_000,         # ¥100
-            "desc":      "好评率达成率 ≥ 80% → 固定奖金 ¥100",
+            "fixed_fen": 10_000,  # ¥100
+            "desc": "好评率达成率 ≥ 80% → 固定奖金 ¥100",
         },
     ],
     "cashier": [
         {
-            "name":         "会员开卡提成(元/张)",
-            "type":         "count_commission",
-            "metric":       "member_card",
-            "per_unit_fen": 5_00,        # ¥5/张
-            "desc":         "开卡数 × ¥5/张",
+            "name": "会员开卡提成(元/张)",
+            "type": "count_commission",
+            "metric": "member_card",
+            "per_unit_fen": 5_00,  # ¥5/张
+            "desc": "开卡数 × ¥5/张",
         },
         {
-            "name":   "储值/卡券销售提成(%)",
-            "type":   "rate_on_value",
+            "name": "储值/卡券销售提成(%)",
+            "type": "rate_on_value",
             "metric": "stored_value",
-            "rate":   0.01,              # 1%
-            "desc":   "储值销售额 × 1%",
+            "rate": 0.01,  # 1%
+            "desc": "储值销售额 × 1%",
         },
     ],
     "kitchen": [
         {
-            "name":         "出餐量奖",
-            "type":         "count_commission",
-            "metric":       "order_count",   # 复用 waiter 计算的 order_count
-            "per_unit_fen": 50,              # ¥0.5/单
-            "desc":         "出餐量（订单数）× ¥0.5/单",
+            "name": "出餐量奖",
+            "type": "count_commission",
+            "metric": "order_count",  # 复用 waiter 计算的 order_count
+            "per_unit_fen": 50,  # ¥0.5/单
+            "desc": "出餐量（订单数）× ¥0.5/单",
         },
         {
-            "name":      "退菜率低于阈值奖",
-            "type":      "below_threshold",
-            "metric":    "return_rate",
+            "name": "退菜率低于阈值奖",
+            "type": "below_threshold",
+            "metric": "return_rate",
             "threshold": 0.02,
-            "fixed_fen": 20_000,         # ¥200
-            "desc":      "退菜率 < 2% → 固定奖金 ¥200",
+            "fixed_fen": 20_000,  # ¥200
+            "desc": "退菜率 < 2% → 固定奖金 ¥200",
         },
         {
-            "name":        "损耗节约奖",
-            "type":        "saving_bonus",
-            "metric":      "waste_rate",
-            "base_target": 0.05,         # 与 DEFAULT_TARGETS['waste_rate'] 一致
-            "coeff_fen":   50_000,       # 每节省 1% 奖励 ¥500（分）
-            "desc":        "（目标损耗率 5% - 实际损耗率）× ¥500/1%",
+            "name": "损耗节约奖",
+            "type": "saving_bonus",
+            "metric": "waste_rate",
+            "base_target": 0.05,  # 与 DEFAULT_TARGETS['waste_rate'] 一致
+            "coeff_fen": 50_000,  # 每节省 1% 奖励 ¥500（分）
+            "desc": "（目标损耗率 5% - 实际损耗率）× ¥500/1%",
         },
     ],
     "delivery": [
         {
-            "name":   "单量提成(元/单或阶梯)",
-            "type":   "tiered_count",
+            "name": "单量提成(元/单或阶梯)",
+            "type": "tiered_count",
             "metric": "order_count",
-            "tiers":  [(100, 1_00), (300, 1_50), (9999, 2_00)],  # (上限单量, 分/单)
-            "desc":   "≤100 单 ¥1/单，101–300 单 ¥1.5/单，>300 单 ¥2/单",
+            "tiers": [(100, 1_00), (300, 1_50), (9999, 2_00)],  # (上限单量, 分/单)
+            "desc": "≤100 单 ¥1/单，101–300 单 ¥1.5/单，>300 单 ¥2/单",
         },
         {
-            "name":      "准时奖",
-            "type":      "achievement_bonus",
-            "metric":    "on_time_rate",
+            "name": "准时奖",
+            "type": "achievement_bonus",
+            "metric": "on_time_rate",
             "threshold": 0.95,
-            "fixed_fen": 20_000,         # ¥200
-            "desc":      "准时率达成率 ≥ 95% → 固定奖金 ¥200",
+            "fixed_fen": 20_000,  # ¥200
+            "desc": "准时率达成率 ≥ 95% → 固定奖金 ¥200",
         },
         {
-            "name":         "差评扣减",
-            "type":         "penalty_on_rate",
-            "metric":       "bad_review_rate",
+            "name": "差评扣减",
+            "type": "penalty_on_rate",
+            "metric": "bad_review_rate",
             "count_metric": "order_count",
-            "per_unit_fen": -1_000,      # -¥10/条差评
-            "desc":         "差评数（差评率 × 订单数）× -¥10/条",
+            "per_unit_fen": -1_000,  # -¥10/条差评
+            "desc": "差评数（差评率 × 订单数）× -¥10/条",
         },
     ],
 }
@@ -255,9 +257,9 @@ def _compute_rule_amount(
         amount_fen: None 表示无数据无法计算；负数表示扣减
         red_line_deduction_fen: 仅 penalty 类型时有值
     """
-    rtype     = rule["type"]
+    rtype = rule["type"]
     metric_id = rule.get("metric")
-    m         = metric_map.get(metric_id) if metric_id and metric_id != "ALL" else None
+    m = metric_map.get(metric_id) if metric_id and metric_id != "ALL" else None
 
     # ── 跨店计算，当前无法本地计算 ──────────────────────────────────────
     if rtype == "cross_store":
@@ -280,46 +282,43 @@ def _compute_rule_amount(
         actual, target = m["value"], m["target"]
         if actual <= target or target <= 0:
             return 0, f"实际 ¥{actual/100:.0f} ≤ 目标 ¥{target/100:.0f} → 无超额 ¥0", None
-        excess       = actual - target
-        excess_rate  = excess / target
-        max_ex       = rule["max_excess_rate"]
-        comm_rate    = min(
+        excess = actual - target
+        excess_rate = excess / target
+        max_ex = rule["max_excess_rate"]
+        comm_rate = min(
             rule["base_rate"] + (rule["max_rate"] - rule["base_rate"]) * excess_rate / max_ex,
             rule["max_rate"],
         )
         amt = int(excess * comm_rate)
-        return amt, (
-            f"超额 ¥{excess/100:.0f}（{excess_rate:.1%}）× {comm_rate:.2%} = ¥{amt/100:.0f}"
-        ), None
+        return amt, (f"超额 ¥{excess/100:.0f}（{excess_rate:.1%}）× {comm_rate:.2%} = ¥{amt/100:.0f}"), None
 
     # ── 绩效系数奖：综合得分 × 系数 × 基础工资 ──────────────────────────
     if rtype == "score_coefficient":
         if total_score is None:
             return None, f"【数据缺失】{rule['desc']}", None
         amt = int(rule["base_salary_fen"] * total_score * rule["coeff_scale"])
-        return amt, (
-            f"¥{rule['base_salary_fen']/100:.0f} × {total_score:.2%} × {rule['coeff_scale']:.0%}"
-            f" = ¥{amt/100:.0f}"
-        ), None
+        return (
+            amt,
+            (f"¥{rule['base_salary_fen']/100:.0f} × {total_score:.2%} × {rule['coeff_scale']:.0%}" f" = ¥{amt/100:.0f}"),
+            None,
+        )
 
     # ── 超额线性提成（如桌均超出部分）─────────────────────────────────
     if rtype == "excess_linear":
         if m is None or m.get("value") is None or m.get("target") is None:
             return None, f"【数据缺失】{rule['desc']}", None
         excess = max(0.0, m["value"] - m["target"])
-        amt    = int(excess * rule["rate"])
+        amt = int(excess * rule["rate"])
         if excess <= 0:
             return 0, f"桌均 ¥{m['value']/100:.0f} ≤ 目标 ¥{m['target']/100:.0f} → 无超额 ¥0", None
-        return amt, (
-            f"超额桌均 ¥{excess/100:.0f} × {rule['rate']} = ¥{amt/100:.0f}"
-        ), None
+        return amt, (f"超额桌均 ¥{excess/100:.0f} × {rule['rate']} = ¥{amt/100:.0f}"), None
 
     # ── 按数量提成（整数指标 × 单价）───────────────────────────────────
     if rtype == "count_commission":
         if m is None or m.get("value") is None:
             return None, f"【数据缺失】{rule['desc']}", None
         count = max(0, int(m["value"]))
-        amt   = count * rule["per_unit_fen"]
+        amt = count * rule["per_unit_fen"]
         return amt, f"{count} 个 × ¥{rule['per_unit_fen']/100:.1f} = ¥{amt/100:.0f}", None
 
     # ── 比率 × 数量 × 单价（如加单率 × 订单数 × ¥1）───────────────────
@@ -328,11 +327,15 @@ def _compute_rule_amount(
         if m is None or m.get("value") is None or cnt_m is None or cnt_m.get("value") is None:
             return None, f"【数据缺失】{rule['desc']}", None
         n_units = int(m["value"] * cnt_m["value"])
-        amt     = n_units * rule["per_unit_fen"]
-        return amt, (
-            f"比率 {m['value']:.1%} × {int(cnt_m['value'])} 单"
-            f" = {n_units} 次 × ¥{rule['per_unit_fen']/100:.1f} = ¥{amt/100:.0f}"
-        ), None
+        amt = n_units * rule["per_unit_fen"]
+        return (
+            amt,
+            (
+                f"比率 {m['value']:.1%} × {int(cnt_m['value'])} 单"
+                f" = {n_units} 次 × ¥{rule['per_unit_fen']/100:.1f} = ¥{amt/100:.0f}"
+            ),
+            None,
+        )
 
     # ── 按金额比率（如储值销售 × 1%）───────────────────────────────────
     if rtype == "rate_on_value":
@@ -357,23 +360,21 @@ def _compute_rule_amount(
         saving = rule["base_target"] - m["value"]
         if saving <= 0:
             return 0, f"损耗率 {m['value']:.2%} ≥ 目标 {rule['base_target']:.2%} → 无节约奖励 ¥0", None
-        amt = int(saving * 100 * rule["coeff_fen"])   # saving_pct×100 = 百分点数
-        return amt, (
-            f"节约 {saving:.2%} × ¥{rule['coeff_fen']/100:.0f}/1% = ¥{amt/100:.0f}"
-        ), None
+        amt = int(saving * 100 * rule["coeff_fen"])  # saving_pct×100 = 百分点数
+        return amt, (f"节约 {saving:.2%} × ¥{rule['coeff_fen']/100:.0f}/1% = ¥{amt/100:.0f}"), None
 
     # ── 阶梯单量提成 ───────────────────────────────────────────────────
     if rtype == "tiered_count":
         if m is None or m.get("value") is None:
             return None, f"【数据缺失】{rule['desc']}", None
-        count  = max(0, int(m["value"]))
-        total  = 0
-        prev   = 0
+        count = max(0, int(m["value"]))
+        total = 0
+        prev = 0
         detail = []
         for tier_max, rate_fen in rule["tiers"]:
             n = max(0, min(count, tier_max) - prev)
             if n > 0:
-                total  += n * rate_fen
+                total += n * rate_fen
                 detail.append(f"{n} 单×¥{rate_fen/100:.1f}")
             prev = tier_max
             if count <= tier_max:
@@ -386,11 +387,15 @@ def _compute_rule_amount(
         if m is None or m.get("value") is None or cnt_m is None or cnt_m.get("value") is None:
             return None, f"【数据缺失】{rule['desc']}", None
         bad_count = int(m["value"] * cnt_m["value"])
-        amt       = bad_count * rule["per_unit_fen"]   # per_unit_fen 为负数
-        return amt, (
-            f"差评 {bad_count} 条（{m['value']:.2%} × {int(cnt_m['value'])} 单）"
-            f"× ¥{rule['per_unit_fen']/100:.0f} = ¥{amt/100:.0f}"
-        ), amt
+        amt = bad_count * rule["per_unit_fen"]  # per_unit_fen 为负数
+        return (
+            amt,
+            (
+                f"差评 {bad_count} 条（{m['value']:.2%} × {int(cnt_m['value'])} 单）"
+                f"× ¥{rule['per_unit_fen']/100:.0f} = ¥{amt/100:.0f}"
+            ),
+            amt,
+        )
 
     return None, f"未知规则类型: {rtype}", None
 
@@ -439,8 +444,7 @@ def _build_rule_explanation(rule: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "calculation_steps": [
                 "1. 取综合绩效得分 total_score（0.0–2.0）",
-                f"2. 系数奖 = ¥{rule['base_salary_fen']/100:.0f}（基薪参考）"
-                f" × total_score × {rule['coeff_scale']:.0%}",
+                f"2. 系数奖 = ¥{rule['base_salary_fen']/100:.0f}（基薪参考）" f" × total_score × {rule['coeff_scale']:.0%}",
             ],
             "applicable_data": {
                 "required_metrics": ["（全部指标综合得分）"],
@@ -601,16 +605,16 @@ def _parse_period_to_ym(period: str) -> Tuple[Optional[int], Optional[int]]:
 _NL_ROLE_KEYWORDS: Dict[str, List[str]] = {
     "store_manager": ["店长", "门店经理"],
     "shift_manager": ["值班经理", "值班"],
-    "waiter":        ["服务员", "服务", "waiter"],
-    "cashier":       ["收银", "收款"],
-    "kitchen":       ["后厨", "厨师", "厨房"],
-    "delivery":      ["外卖", "配送", "骑手"],
+    "waiter": ["服务员", "服务", "waiter"],
+    "cashier": ["收银", "收款"],
+    "kitchen": ["后厨", "厨师", "厨房"],
+    "delivery": ["外卖", "配送", "骑手"],
 }
 
-_NL_INTENT_REPORT     = ["报告", "报表", "绩效", "得分", "评分", "综合", "汇总", "总结"]
+_NL_INTENT_REPORT = ["报告", "报表", "绩效", "得分", "评分", "综合", "汇总", "总结"]
 _NL_INTENT_COMMISSION = ["提成", "奖金", "薪资", "工资", "收入", "佣金"]
-_NL_INTENT_RULE       = ["规则", "公式", "怎么算", "怎么计算", "如何计算", "计算方式", "说明", "解释", "阈值", "比例"]
-_NL_INTENT_CONFIG     = ["配置", "指标", "岗位", "有哪些", "什么指标", "考核"]
+_NL_INTENT_RULE = ["规则", "公式", "怎么算", "怎么计算", "如何计算", "计算方式", "说明", "解释", "阈值", "比例"]
+_NL_INTENT_CONFIG = ["配置", "指标", "岗位", "有哪些", "什么指标", "考核"]
 
 
 def _detect_nl_role(question: str) -> Optional[str]:
@@ -624,7 +628,7 @@ def _detect_nl_role(question: str) -> Optional[str]:
 def _detect_nl_rule(question: str) -> Optional[str]:
     """从问题文本中识别规则名称片段（所有规则名的子串匹配）。"""
     all_rules = [r["name"] for rules in COMMISSION_RULE_CONFIG.values() for r in rules]
-    for rule_name in sorted(all_rules, key=len, reverse=True):   # 长名优先
+    for rule_name in sorted(all_rules, key=len, reverse=True):  # 长名优先
         if any(seg in question for seg in rule_name.split("(")):
             return rule_name
     return None
@@ -739,16 +743,17 @@ class PerformanceAgent(LLMEnhancedAgent):
         # ── DB-first：有 store_id 时尝试计算真实指标 ─────────────────────────
         if store_id and year and month:
             try:
+                from sqlalchemy import and_ as sa_and
+                from sqlalchemy import func as sa_func
+                from sqlalchemy import select as sa_select
+
                 from ..core.database import get_db_session
-                from ..services.performance_compute_service import PerformanceComputeService
                 from ..models.employee_metric import EmployeeMetricRecord
-                from sqlalchemy import func as sa_func, select as sa_select, and_ as sa_and
+                from ..services.performance_compute_service import PerformanceComputeService
 
                 async with get_db_session(enable_tenant_isolation=False) as session:
                     # 计算并写入最新指标
-                    await PerformanceComputeService.compute_and_write(
-                        session, store_id, year, month
-                    )
+                    await PerformanceComputeService.compute_and_write(session, store_id, year, month)
 
                     period_start = date(year, month, 1)
                     metric_ids = [m["id"] for m in role["metrics"]]
@@ -779,25 +784,24 @@ class PerformanceAgent(LLMEnhancedAgent):
                     items = []
                     for m in role["metrics"]:
                         row = db_map.get(m["id"])
-                        items.append({
-                            "metric_id": m["id"],
-                            "metric_name": m["name"],
-                            "weight": m["weight"],
-                            "value": float(row.value) if row and row.value is not None else None,
-                            "target": float(row.target) if row and row.target is not None else None,
-                            "achievement_rate": (
-                                float(row.achievement_rate)
-                                if row and row.achievement_rate is not None else None
-                            ),
-                        })
+                        items.append(
+                            {
+                                "metric_id": m["id"],
+                                "metric_name": m["name"],
+                                "weight": m["weight"],
+                                "value": float(row.value) if row and row.value is not None else None,
+                                "target": float(row.target) if row and row.target is not None else None,
+                                "achievement_rate": (
+                                    float(row.achievement_rate) if row and row.achievement_rate is not None else None
+                                ),
+                            }
+                        )
 
                     # 加权总得分（仅含有数据的指标）
                     scored = [i for i in items if i["achievement_rate"] is not None]
                     if scored:
                         w_sum = sum(i["weight"] for i in scored)
-                        total_score = round(
-                            sum(i["weight"] * i["achievement_rate"] for i in scored) / w_sum, 4
-                        )
+                        total_score = round(sum(i["weight"] * i["achievement_rate"] for i in scored) / w_sum, 4)
                     else:
                         total_score = None
 
@@ -825,14 +829,16 @@ class PerformanceAgent(LLMEnhancedAgent):
         # ── 降级：空指标结构（DB 不可用或缺少 store_id） ─────────────────────
         items = []
         for m in role["metrics"]:
-            items.append({
-                "metric_id": m["id"],
-                "metric_name": m["name"],
-                "weight": m["weight"],
-                "value": None,
-                "target": None,
-                "achievement_rate": None,
-            })
+            items.append(
+                {
+                    "metric_id": m["id"],
+                    "metric_name": m["name"],
+                    "weight": m["weight"],
+                    "value": None,
+                    "target": None,
+                    "achievement_rate": None,
+                }
+            )
 
         return {
             "success": True,
@@ -851,36 +857,37 @@ class PerformanceAgent(LLMEnhancedAgent):
 
     async def _calculate_commission(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """计算提成金额。DB-first：从 employee_metric_records 读取真实指标，再应用规则引擎。"""
-        store_id  = params.get("store_id", "")
-        role_id   = params.get("role_id", "")
-        period    = params.get("period", "month")
+        store_id = params.get("store_id", "")
+        role_id = params.get("role_id", "")
+        period = params.get("period", "month")
         staff_ids = params.get("staff_ids")
 
         if not role_id or role_id not in DEFAULT_ROLE_CONFIG:
             return {"success": False, "error": "缺少或无效的 role_id", "data": None}
 
-        role  = DEFAULT_ROLE_CONFIG[role_id]
+        role = DEFAULT_ROLE_CONFIG[role_id]
         rules = COMMISSION_RULE_CONFIG.get(role_id, [])
         year, month = _parse_period_to_ym(period)
 
         # ── DB-first：读取 employee_metric_records ────────────────────────
         # metric_map: metric_id -> {value, target, achievement_rate}（浮点，分或小数）
-        metric_map:  Dict[str, Dict[str, Any]] = {}
-        total_score: Optional[float]            = None
+        metric_map: Dict[str, Dict[str, Any]] = {}
+        total_score: Optional[float] = None
         data_source = "commission_rule_engine（无指标数据，规则逐条为 None）"
 
         if store_id and year and month:
             try:
+                from sqlalchemy import and_ as sa_and
+                from sqlalchemy import func as sa_func
+                from sqlalchemy import select as sa_select
+
                 from ..core.database import get_db_session
-                from ..services.performance_compute_service import PerformanceComputeService
                 from ..models.employee_metric import EmployeeMetricRecord
-                from sqlalchemy import func as sa_func, select as sa_select, and_ as sa_and
+                from ..services.performance_compute_service import PerformanceComputeService
 
                 async with get_db_session(enable_tenant_isolation=False) as session:
                     # 触发最新指标计算（幂等）
-                    await PerformanceComputeService.compute_and_write(
-                        session, store_id, year, month
-                    )
+                    await PerformanceComputeService.compute_and_write(session, store_id, year, month)
 
                     period_start = date(year, month, 1)
 
@@ -906,20 +913,23 @@ class PerformanceAgent(LLMEnhancedAgent):
                     rows = (await session.execute(stmt)).all()
                     for r in rows:
                         metric_map[r.metric_id] = {
-                            "value":            float(r.value)            if r.value            is not None else None,
-                            "target":           float(r.target)           if r.target           is not None else None,
+                            "value": float(r.value) if r.value is not None else None,
+                            "target": float(r.target) if r.target is not None else None,
                             "achievement_rate": float(r.achievement_rate) if r.achievement_rate is not None else None,
                         }
 
                     # 综合绩效得分（加权平均达成率，仅基于当前岗位指标）
-                    weights  = {m["id"]: m["weight"] for m in role["metrics"]}
-                    scored   = [(mid, v) for mid, v in metric_map.items()
-                                if mid in weights and v["achievement_rate"] is not None]
+                    weights = {m["id"]: m["weight"] for m in role["metrics"]}
+                    scored = [
+                        (mid, v) for mid, v in metric_map.items() if mid in weights and v["achievement_rate"] is not None
+                    ]
                     if scored:
-                        w_sum       = sum(weights[mid] for mid, _ in scored)
-                        total_score = round(
-                            sum(weights[mid] * v["achievement_rate"] for mid, v in scored) / w_sum, 4
-                        ) if w_sum > 0 else None
+                        w_sum = sum(weights[mid] for mid, _ in scored)
+                        total_score = (
+                            round(sum(weights[mid] * v["achievement_rate"] for mid, v in scored) / w_sum, 4)
+                            if w_sum > 0
+                            else None
+                        )
 
                     data_source = "employee_metric_records + commission_rule_engine"
             except Exception as e:
@@ -927,39 +937,41 @@ class PerformanceAgent(LLMEnhancedAgent):
 
         # ── 应用提成规则引擎 ──────────────────────────────────────────────
         details: List[Dict[str, Any]] = []
-        total_fen     = 0
-        has_any_data  = False
+        total_fen = 0
+        has_any_data = False
 
         for rule in rules:
             amount_fen, trace, deduction_fen = _compute_rule_amount(rule, metric_map, total_score)
-            details.append({
-                "rule_name":          rule["name"],
-                "amount":             round(amount_fen / 100, 2) if amount_fen is not None else None,
-                "formula_trace":      trace,
-                "red_line_deduction": round(deduction_fen / 100, 2) if deduction_fen is not None else None,
-            })
+            details.append(
+                {
+                    "rule_name": rule["name"],
+                    "amount": round(amount_fen / 100, 2) if amount_fen is not None else None,
+                    "formula_trace": trace,
+                    "red_line_deduction": round(deduction_fen / 100, 2) if deduction_fen is not None else None,
+                }
+            )
             if amount_fen is not None:
-                total_fen    += amount_fen
-                has_any_data  = True
+                total_fen += amount_fen
+                has_any_data = True
 
         total_commission = round(total_fen / 100, 2) if has_any_data else None
 
         return {
             "success": True,
             "data": {
-                "store_id":         store_id,
-                "role_id":          role_id,
-                "role_name":        role["name"],
-                "period":           period,
-                "staff_ids":        staff_ids,
+                "store_id": store_id,
+                "role_id": role_id,
+                "role_name": role["name"],
+                "period": period,
+                "staff_ids": staff_ids,
                 "total_commission": total_commission,
-                "details":          details,
+                "details": details,
                 "data_source_note": data_source,
             },
             "metadata": {
-                "source":      "commission_engine",
-                "year":        year,
-                "month":       month,
+                "source": "commission_engine",
+                "year": year,
+                "month": month,
                 "total_score": total_score,
             },
         }
@@ -975,27 +987,22 @@ class PerformanceAgent(LLMEnhancedAgent):
         """
         import asyncio
 
-        store_id      = params.get("store_id", "")
-        period        = params.get("period", "month")
-        role_id       = params.get("role_id")
-        report_format = params.get("format", "summary")   # summary | detail | trend
-        staff_ids     = params.get("staff_ids")
+        store_id = params.get("store_id", "")
+        period = params.get("period", "month")
+        role_id = params.get("role_id")
+        report_format = params.get("format", "summary")  # summary | detail | trend
+        staff_ids = params.get("staff_ids")
 
         if role_id and role_id not in DEFAULT_ROLE_CONFIG:
             return {"success": False, "error": f"未知岗位: {role_id}", "data": None}
 
-        target_roles = (
-            [DEFAULT_ROLE_CONFIG[role_id]]
-            if role_id
-            else list(DEFAULT_ROLE_CONFIG.values())
-        )
+        target_roles = [DEFAULT_ROLE_CONFIG[role_id]] if role_id else list(DEFAULT_ROLE_CONFIG.values())
 
         year, month = _parse_period_to_ym(period)
 
         # ── 并发拉取每个岗位的绩效 + 提成数据 ──────────────────────────────
         async def _fetch_role(role: Dict[str, Any]) -> Dict[str, Any]:
-            base = {"store_id": store_id, "role_id": role["id"],
-                    "period": period, "staff_ids": staff_ids}
+            base = {"store_id": store_id, "role_id": role["id"], "period": period, "staff_ids": staff_ids}
             perf_res, comm_res = await asyncio.gather(
                 self._calculate_performance(base),
                 self._calculate_commission(base),
@@ -1004,14 +1011,14 @@ class PerformanceAgent(LLMEnhancedAgent):
             comm_data = comm_res.get("data", {}) or {}
 
             row: Dict[str, Any] = {
-                "role_id":         role["id"],
-                "role_name":       role["name"],
-                "period":          period,
-                "avg_score":       perf_data.get("total_score"),
+                "role_id": role["id"],
+                "role_name": role["name"],
+                "period": period,
+                "avg_score": perf_data.get("total_score"),
                 "total_commission": comm_data.get("total_commission"),
             }
             if report_format in ("detail", "trend"):
-                row["metrics"]          = perf_data.get("metrics", [])
+                row["metrics"] = perf_data.get("metrics", [])
                 row["commission_detail"] = comm_data.get("details", [])
 
             return row
@@ -1025,19 +1032,16 @@ class PerformanceAgent(LLMEnhancedAgent):
             # 推算上一个月
             if year and month:
                 first_this = date(year, month, 1)
-                last_prev  = first_this - timedelta(days=1)
+                last_prev = first_this - timedelta(days=1)
                 prev_period = f"{last_prev.year}-{last_prev.month:02d}"
             else:
                 prev_period = "last_month"
 
-            prev_rows = await asyncio.gather(*[
-                _fetch_role(r) for r in target_roles
-            ])
+            prev_rows = await asyncio.gather(*[_fetch_role(r) for r in target_roles])
 
             # 用上期数据单独构建（复用 _fetch_role 但传 prev_period）
             async def _fetch_role_prev(role: Dict[str, Any]) -> Dict[str, Any]:
-                base = {"store_id": store_id, "role_id": role["id"],
-                        "period": prev_period, "staff_ids": staff_ids}
+                base = {"store_id": store_id, "role_id": role["id"], "period": prev_period, "staff_ids": staff_ids}
                 perf_res, comm_res = await asyncio.gather(
                     self._calculate_performance(base),
                     self._calculate_commission(base),
@@ -1045,8 +1049,8 @@ class PerformanceAgent(LLMEnhancedAgent):
                 perf_data = perf_res.get("data", {}) or {}
                 comm_data = comm_res.get("data", {}) or {}
                 return {
-                    "role_id":          role["id"],
-                    "avg_score":        perf_data.get("total_score"),
+                    "role_id": role["id"],
+                    "avg_score": perf_data.get("total_score"),
                     "total_commission": comm_data.get("total_commission"),
                 }
 
@@ -1057,43 +1061,43 @@ class PerformanceAgent(LLMEnhancedAgent):
             for row in summary:
                 prev = prev_map.get(row["role_id"], {})
                 prev_score = prev.get("avg_score")
-                prev_comm  = prev.get("total_commission")
-                row["prev_period"]           = prev_period
-                row["prev_avg_score"]        = prev_score
+                prev_comm = prev.get("total_commission")
+                row["prev_period"] = prev_period
+                row["prev_avg_score"] = prev_score
                 row["prev_total_commission"] = prev_comm
-                row["score_delta"]           = (
+                row["score_delta"] = (
                     round(row["avg_score"] - prev_score, 4)
-                    if row["avg_score"] is not None and prev_score is not None else None
+                    if row["avg_score"] is not None and prev_score is not None
+                    else None
                 )
-                row["commission_delta"]      = (
+                row["commission_delta"] = (
                     round(row["total_commission"] - prev_comm, 2)
-                    if row["total_commission"] is not None and prev_comm is not None else None
+                    if row["total_commission"] is not None and prev_comm is not None
+                    else None
                 )
 
         # ── 门店合计行 ───────────────────────────────────────────────────────
-        scored_rows  = [r for r in summary if r["avg_score"] is not None]
-        comm_rows    = [r for r in summary if r["total_commission"] is not None]
+        scored_rows = [r for r in summary if r["avg_score"] is not None]
+        comm_rows = [r for r in summary if r["total_commission"] is not None]
         store_totals = {
-            "avg_score":        round(sum(r["avg_score"] for r in scored_rows) / len(scored_rows), 4)
-                                if scored_rows else None,
-            "total_commission": round(sum(r["total_commission"] for r in comm_rows), 2)
-                                if comm_rows else None,
+            "avg_score": round(sum(r["avg_score"] for r in scored_rows) / len(scored_rows), 4) if scored_rows else None,
+            "total_commission": round(sum(r["total_commission"] for r in comm_rows), 2) if comm_rows else None,
         }
 
         return {
             "success": True,
             "data": {
-                "store_id":     store_id,
-                "period":       period,
-                "year":         year,
-                "month":        month,
-                "format":       report_format,
-                "summary":      summary,
+                "store_id": store_id,
+                "period": period,
+                "year": year,
+                "month": month,
+                "format": report_format,
+                "summary": summary,
                 "store_totals": store_totals,
             },
             "metadata": {
-                "source":       "performance_report",
-                "roles_count":  len(summary),
+                "source": "performance_report",
+                "roles_count": len(summary),
             },
         }
 
@@ -1106,9 +1110,9 @@ class PerformanceAgent(LLMEnhancedAgent):
         2. 否则全量搜索所有岗位（名称子串匹配）
         3. 找不到时返回错误
         """
-        rule_id       = params.get("rule_id")
+        rule_id = params.get("rule_id")
         commission_id = params.get("commission_id")
-        role_id       = params.get("role_id")
+        role_id = params.get("role_id")
 
         search_key = str(rule_id or commission_id or "").strip()
         if not search_key:
@@ -1120,7 +1124,7 @@ class PerformanceAgent(LLMEnhancedAgent):
             if role_id and role_id in COMMISSION_RULE_CONFIG
             else COMMISSION_RULE_CONFIG
         )
-        matches: List[tuple] = []   # (role_id, rule_dict)
+        matches: List[tuple] = []  # (role_id, rule_dict)
         for rid, rules in candidate_roles.items():
             for rule in rules:
                 if search_key.lower() in rule["name"].lower():
@@ -1138,20 +1142,20 @@ class PerformanceAgent(LLMEnhancedAgent):
         exact = [(rid, r) for rid, r in matches if r["name"] == search_key]
         matched_role_id, matched_rule = (exact or matches)[0]
 
-        role_cfg    = DEFAULT_ROLE_CONFIG.get(matched_role_id, {})
+        role_cfg = DEFAULT_ROLE_CONFIG.get(matched_role_id, {})
         explanation = _build_rule_explanation(matched_rule)
 
         return {
             "success": True,
             "data": {
-                "rule_id":           matched_rule["name"],
-                "role_id":           matched_role_id,
-                "role_name":         role_cfg.get("name", matched_role_id),
-                "rule_text":         matched_rule["desc"],
-                "type":              matched_rule["type"],
+                "rule_id": matched_rule["name"],
+                "role_id": matched_role_id,
+                "role_name": role_cfg.get("name", matched_role_id),
+                "rule_text": matched_rule["desc"],
+                "type": matched_rule["type"],
                 "calculation_steps": explanation["calculation_steps"],
-                "applicable_data":   explanation["applicable_data"],
-                "all_matches":       len(matches),
+                "applicable_data": explanation["applicable_data"],
+                "all_matches": len(matches),
             },
             "metadata": {"source": "config"},
         }
@@ -1181,7 +1185,7 @@ class PerformanceAgent(LLMEnhancedAgent):
                 result = await self.execute_with_tools(
                     user_message=user_message,
                     store_id=store_id or "",
-                    context={"period": period, "role_config_summary": role_summary}
+                    context={"period": period, "role_config_summary": role_summary},
                 )
                 return {
                     "success": result.success,
@@ -1201,7 +1205,7 @@ class PerformanceAgent(LLMEnhancedAgent):
         detected_role = _detect_nl_role(question)
         base = {
             "store_id": store_id,
-            "period":   period or "month",
+            "period": period or "month",
             **({"role_id": detected_role} if detected_role else {}),
         }
 
@@ -1213,10 +1217,7 @@ class PerformanceAgent(LLMEnhancedAgent):
                 if rule_res["success"]:
                     d = rule_res["data"]
                     steps_text = "\n".join(f"  {s}" for s in d["calculation_steps"])
-                    answer = (
-                        f"【{d['role_name']}】{d['rule_id']} 计算说明：\n"
-                        f"{d['rule_text']}\n\n计算步骤：\n{steps_text}"
-                    )
+                    answer = f"【{d['role_name']}】{d['rule_id']} 计算说明：\n" f"{d['rule_text']}\n\n计算步骤：\n{steps_text}"
                     return {
                         "success": True,
                         "data": {"answer": answer, "question": question, "tool": "explain_rule", "detail": d},
@@ -1235,9 +1236,8 @@ class PerformanceAgent(LLMEnhancedAgent):
                     if r.get("amount_yuan") is not None
                 )
                 role_label = DEFAULT_ROLE_CONFIG.get(detected_role or "", {}).get("name", detected_role or "全员")
-                answer = (
-                    f"【{role_label}】{period or '本月'}提成合计：¥{total:.0f}\n"
-                    + (f"明细：{rules_summary}" if rules_summary else "（暂无数据）")
+                answer = f"【{role_label}】{period or '本月'}提成合计：¥{total:.0f}\n" + (
+                    f"明细：{rules_summary}" if rules_summary else "（暂无数据）"
                 )
                 return {
                     "success": True,
@@ -1254,13 +1254,12 @@ class PerformanceAgent(LLMEnhancedAgent):
                 lines = []
                 for r in roles_data:
                     score = r.get("avg_score")
-                    comm  = r.get("total_commission_yuan")
+                    comm = r.get("total_commission_yuan")
                     score_str = f"{score:.2f}" if score is not None else "暂无"
-                    comm_str  = f"¥{comm:.0f}" if comm  is not None else "暂无"
+                    comm_str = f"¥{comm:.0f}" if comm is not None else "暂无"
                     lines.append(f"  {r['role_name']}: 得分 {score_str}，提成 {comm_str}")
-                answer = (
-                    f"门店 {store_id or '-'} {period or '本月'} 绩效汇总：\n"
-                    + ("\n".join(lines) if lines else "  （暂无数据）")
+                answer = f"门店 {store_id or '-'} {period or '本月'} 绩效汇总：\n" + (
+                    "\n".join(lines) if lines else "  （暂无数据）"
                 )
                 return {
                     "success": True,
@@ -1275,11 +1274,8 @@ class PerformanceAgent(LLMEnhancedAgent):
                 roles = cfg_res["data"].get("roles", [])
                 cfg = roles[0] if roles else {}
                 metrics_text = "、".join(m["name"] for m in cfg.get("metrics", []))
-                rules_text   = "、".join(cfg.get("commission_rules", []))
-                answer = (
-                    f"【{cfg.get('name', detected_role)}】考核指标：{metrics_text}\n"
-                    f"提成规则：{rules_text}"
-                )
+                rules_text = "、".join(cfg.get("commission_rules", []))
+                answer = f"【{cfg.get('name', detected_role)}】考核指标：{metrics_text}\n" f"提成规则：{rules_text}"
                 return {
                     "success": True,
                     "data": {"answer": answer, "question": question, "tool": "get_role_config", "detail": cfg},

@@ -4,10 +4,11 @@ ARCH-003: 门店记忆层 API
 GET  /api/v1/stores/{store_id}/memory          — 获取门店记忆快照
 POST /api/v1/stores/{store_id}/memory/refresh  — 手动触发记忆更新
 """
-from typing import Optional
-from fastapi import APIRouter, HTTPException, status
-import structlog
 
+from typing import Optional
+
+import structlog
+from fastapi import APIRouter, HTTPException, status
 from src.services.store_memory_service import StoreMemoryService
 
 logger = structlog.get_logger()

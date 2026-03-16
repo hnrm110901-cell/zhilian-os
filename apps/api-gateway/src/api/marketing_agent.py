@@ -2,6 +2,7 @@
 营销 Agent API
 暴露 MarketingAgentService 的完整能力：顾客画像、发券策略、营销活动管理、个性化推荐
 """
+
 from __future__ import annotations
 
 import uuid
@@ -11,13 +12,13 @@ from typing import Any, Dict, List, Optional
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
-from ..models.user import User
 from ..models.marketing_campaign import MarketingCampaign as MarketingCampaignModel
+from ..models.user import User
 from ..services.marketing_agent_service import MarketingAgentService
 
 logger = structlog.get_logger()
@@ -31,32 +32,34 @@ def _get_service(db: AsyncSession) -> MarketingAgentService:
 
 # ── Request / Response schemas ─────────────────────────────────────────────────
 
+
 class CouponStrategyRequest(BaseModel):
-    scenario: str               # traffic_decline / new_product_launch / member_day / default
+    scenario: str  # traffic_decline / new_product_launch / member_day / default
     store_id: str
     context: Optional[Dict[str, Any]] = None
 
 
 class CreateCampaignRequest(BaseModel):
-    store_id:  str
-    objective: str              # acquisition / activation / retention
-    budget:    float
-    name:      Optional[str] = None
+    store_id: str
+    objective: str  # acquisition / activation / retention
+    budget: float
+    name: Optional[str] = None
     description: Optional[str] = None
 
 
 class TriggerMarketingRequest(BaseModel):
-    trigger_type: str           # birthday / churn_warning / repurchase_reminder
-    store_id:     str
+    trigger_type: str  # birthday / churn_warning / repurchase_reminder
+    store_id: str
 
 
 # ── Customer Profile ───────────────────────────────────────────────────────────
 
+
 @router.get("/stores/{store_id}/customers/{customer_id}/profile")
 async def get_customer_profile(
-    store_id:    str,
+    store_id: str,
     customer_id: str,
-    db:          AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Dict[str, Any]:
     """构建顾客 360° 画像（RFM 价值评分、流失风险、口味偏好向量、分群标签）"""
@@ -70,10 +73,10 @@ async def get_customer_profile(
 
 @router.get("/stores/{store_id}/customers/{customer_id}/recommendations")
 async def recommend_dishes(
-    store_id:    str,
+    store_id: str,
     customer_id: str,
-    top_k:       int = Query(5, ge=1, le=20, description="推荐数量"),
-    db:          AsyncSession = Depends(get_db),
+    top_k: int = Query(5, ge=1, le=20, description="推荐数量"),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> List[Dict[str, Any]]:
     """基于顾客口味向量的个性化菜品推荐"""
@@ -87,14 +90,16 @@ async def recommend_dishes(
 
 @router.post("/stores/{store_id}/customers/{customer_id}/trigger")
 async def trigger_marketing(
-    store_id:    str,
+    store_id: str,
     customer_id: str,
-    body:        TriggerMarketingRequest,
-    db:          AsyncSession = Depends(get_db),
+    body: TriggerMarketingRequest,
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Dict[str, Any]:
     """手动触发营销动作（生日券 / 流失预警挽回 / 复购提醒）"""
-    import datetime, uuid
+    import datetime
+    import uuid
+
     try:
         svc = _get_service(db)
         await svc.auto_trigger_marketing(body.trigger_type, customer_id, store_id)
@@ -116,15 +121,16 @@ async def trigger_marketing(
 
 # ── Coupon Strategy ────────────────────────────────────────────────────────────
 
+
 @router.post("/coupon-strategy")
 async def generate_coupon_strategy(
     body: CouponStrategyRequest,
-    db:   AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Dict[str, Any]:
     """AI 生成发券策略（满减/折扣/代金 + 预期转化率/ROI）"""
     try:
-        svc      = _get_service(db)
+        svc = _get_service(db)
         strategy = await svc.generate_coupon_strategy(body.scenario, body.store_id, body.context)
         return strategy.model_dump()
     except Exception as e:
@@ -134,13 +140,14 @@ async def generate_coupon_strategy(
 
 # ── Campaigns ─────────────────────────────────────────────────────────────────
 
+
 @router.get("/stores/{store_id}/campaigns")
 async def list_campaigns(
     store_id: str,
-    status:   Optional[str] = Query(None, description="过滤状态: draft/active/completed/cancelled"),
-    limit:    int = Query(20, ge=1, le=100),
-    offset:   int = Query(0, ge=0),
-    db:       AsyncSession = Depends(get_db),
+    status: Optional[str] = Query(None, description="过滤状态: draft/active/completed/cancelled"),
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Dict[str, Any]:
     """列出门店所有营销活动"""
@@ -160,19 +167,19 @@ async def list_campaigns(
 
         campaigns = [
             {
-                "id":               c.id,
-                "name":             c.name,
-                "campaign_type":    c.campaign_type,
-                "status":           c.status,
-                "start_date":       str(c.start_date) if c.start_date else None,
-                "end_date":         str(c.end_date)   if c.end_date   else None,
-                "budget":           float(c.budget or 0),
-                "actual_cost":      float(c.actual_cost or 0),
-                "reach_count":      c.reach_count,
+                "id": c.id,
+                "name": c.name,
+                "campaign_type": c.campaign_type,
+                "status": c.status,
+                "start_date": str(c.start_date) if c.start_date else None,
+                "end_date": str(c.end_date) if c.end_date else None,
+                "budget": float(c.budget or 0),
+                "actual_cost": float(c.actual_cost or 0),
+                "reach_count": c.reach_count,
                 "conversion_count": c.conversion_count,
-                "revenue_generated":float(c.revenue_generated or 0),
-                "description":      c.description,
-                "created_at":       str(c.created_at),
+                "revenue_generated": float(c.revenue_generated or 0),
+                "description": c.description,
+                "created_at": str(c.created_at),
             }
             for c in rows
         ]
@@ -185,13 +192,13 @@ async def list_campaigns(
 @router.post("/stores/{store_id}/campaigns")
 async def create_campaign(
     store_id: str,
-    body:     CreateCampaignRequest,
-    db:       AsyncSession = Depends(get_db),
+    body: CreateCampaignRequest,
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Dict[str, Any]:
     """AI 生成营销活动方案并持久化到 marketing_campaigns 表"""
     try:
-        svc      = _get_service(db)
+        svc = _get_service(db)
         campaign = await svc.create_marketing_campaign(body.objective, store_id, body.budget)
 
         # 持久化到数据库
@@ -212,16 +219,16 @@ async def create_campaign(
         await db.commit()
 
         return {
-            "campaign_id":     campaign.campaign_id,
-            "name":            record.name,
-            "objective":       body.objective,
-            "target_segment":  campaign.target_segment,
-            "channel":         campaign.channel,
+            "campaign_id": campaign.campaign_id,
+            "name": record.name,
+            "objective": body.objective,
+            "target_segment": campaign.target_segment,
+            "channel": campaign.channel,
             "coupon_strategy": campaign.coupon_strategy.model_dump(),
-            "expected_reach":  campaign.expected_reach,
-            "budget":          float(campaign.budget),
-            "start_date":      str(campaign.start_time.date()),
-            "end_date":        str(campaign.end_time.date()),
+            "expected_reach": campaign.expected_reach,
+            "budget": float(campaign.budget),
+            "start_date": str(campaign.start_time.date()),
+            "end_date": str(campaign.end_time.date()),
         }
     except Exception as e:
         logger.error("create_campaign_failed", error=str(e))
@@ -230,9 +237,9 @@ async def create_campaign(
 
 @router.get("/stores/{store_id}/campaigns/{campaign_id}")
 async def get_campaign(
-    store_id:    str,
+    store_id: str,
     campaign_id: str,
-    db:          AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Dict[str, Any]:
     """获取营销活动详情"""
@@ -241,43 +248,45 @@ async def get_campaign(
         raise HTTPException(status_code=404, detail="Campaign not found")
 
     return {
-        "id":               c.id,
-        "name":             c.name,
-        "campaign_type":    c.campaign_type,
-        "status":           c.status,
-        "start_date":       str(c.start_date) if c.start_date else None,
-        "end_date":         str(c.end_date)   if c.end_date   else None,
-        "budget":           float(c.budget or 0),
-        "actual_cost":      float(c.actual_cost or 0),
-        "reach_count":      c.reach_count,
+        "id": c.id,
+        "name": c.name,
+        "campaign_type": c.campaign_type,
+        "status": c.status,
+        "start_date": str(c.start_date) if c.start_date else None,
+        "end_date": str(c.end_date) if c.end_date else None,
+        "budget": float(c.budget or 0),
+        "actual_cost": float(c.actual_cost or 0),
+        "reach_count": c.reach_count,
         "conversion_count": c.conversion_count,
-        "revenue_generated":float(c.revenue_generated or 0),
-        "target_audience":  c.target_audience,
-        "description":      c.description,
-        "created_at":       str(c.created_at),
+        "revenue_generated": float(c.revenue_generated or 0),
+        "target_audience": c.target_audience,
+        "description": c.description,
+        "created_at": str(c.created_at),
     }
 
 
 # ── Store-level segment & risk analytics ───────────────────────────────────────
 
+
 class BatchChurnRecoveryRequest(BaseModel):
-    dry_run: bool = False   # True=仅统计，不实际发送
+    dry_run: bool = False  # True=仅统计，不实际发送
 
 
 class CampaignAttributionRequest(BaseModel):
-    delta_reach:      int   = 0
-    delta_conversion: int   = 0
-    delta_revenue:    float = 0.0
-    delta_cost:       float = 0.0
+    delta_reach: int = 0
+    delta_conversion: int = 0
+    delta_revenue: float = 0.0
+    delta_cost: float = 0.0
 
 
 # ── Batch churn recovery ────────────────────────────────────────────────────────
 
+
 @router.post("/stores/{store_id}/batch-churn-recovery")
 async def batch_churn_recovery(
     store_id: str,
-    body:     BatchChurnRecoveryRequest,
-    db:       AsyncSession = Depends(get_db),
+    body: BatchChurnRecoveryRequest,
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Dict[str, Any]:
     """
@@ -298,11 +307,12 @@ async def batch_churn_recovery(
 
 # ── Campaign ROI summary ────────────────────────────────────────────────────────
 
+
 @router.get("/stores/{store_id}/campaigns/roi-summary")
 async def get_campaign_roi_summary(
     store_id: str,
-    days:     int = Query(30, ge=1, le=365, description="近N天"),
-    db:       AsyncSession = Depends(get_db),
+    days: int = Query(30, ge=1, le=365, description="近N天"),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Dict[str, Any]:
     """营销活动 ROI 汇总：转化率/总营收¥/综合ROI + 按活动类型细分"""
@@ -316,12 +326,13 @@ async def get_campaign_roi_summary(
 
 # ── Campaign attribution tracking ──────────────────────────────────────────────
 
+
 @router.post("/stores/{store_id}/campaigns/{campaign_id}/track")
 async def track_campaign_attribution(
-    store_id:    str,
+    store_id: str,
     campaign_id: str,
-    body:        CampaignAttributionRequest,
-    db:          AsyncSession = Depends(get_db),
+    body: CampaignAttributionRequest,
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Dict[str, Any]:
     """
@@ -351,7 +362,7 @@ async def track_campaign_attribution(
 @router.get("/stores/{store_id}/segments")
 async def get_store_segment_summary(
     store_id: str,
-    db:       AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Dict[str, Any]:
     """门店客群分布摘要：批量 RFM 计算，返回各客群人数+占比（高价值/潜力/流失风险/已流失/新客）"""
@@ -365,11 +376,11 @@ async def get_store_segment_summary(
 
 @router.get("/stores/{store_id}/customers/at-risk")
 async def list_at_risk_customers(
-    store_id:       str,
-    limit:          int   = Query(50, ge=1, le=200, description="返回条数上限"),
+    store_id: str,
+    limit: int = Query(50, ge=1, le=200, description="返回条数上限"),
     risk_threshold: float = Query(0.5, ge=0.0, le=1.0, description="流失风险阈值（0-1）"),
-    db:             AsyncSession = Depends(get_db),
-    current_user:   User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ) -> Dict[str, Any]:
     """流失风险客户列表：按风险评分降序，含最近下单日期/消费总额/推荐营销动作"""
     try:
@@ -384,33 +395,36 @@ async def list_at_risk_customers(
 @router.get("/stores/{store_id}/statistics")
 async def get_store_marketing_statistics(
     store_id: str,
-    db:       AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Dict[str, Any]:
     """门店营销统计：活动数/活跃活动/总触达/总转化/平均ROI（基于 marketing_campaigns 表）"""
     try:
-        from sqlalchemy import and_, func as sqlfunc
+        from sqlalchemy import and_
+        from sqlalchemy import func as sqlfunc
+
         stmt = select(
             sqlfunc.count(MarketingCampaignModel.id),
-            sqlfunc.sum(
-                sqlfunc.cast(MarketingCampaignModel.status == "active", sqlfunc.Integer)
-            ),
+            sqlfunc.sum(sqlfunc.cast(MarketingCampaignModel.status == "active", sqlfunc.Integer)),
             sqlfunc.coalesce(sqlfunc.sum(MarketingCampaignModel.reach_count), 0),
             sqlfunc.coalesce(sqlfunc.sum(MarketingCampaignModel.conversion_count), 0),
-            sqlfunc.coalesce(sqlfunc.avg(
-                (MarketingCampaignModel.revenue_generated - MarketingCampaignModel.actual_cost)
-                / sqlfunc.nullif(MarketingCampaignModel.actual_cost, 0)
-            ), 0.0),
+            sqlfunc.coalesce(
+                sqlfunc.avg(
+                    (MarketingCampaignModel.revenue_generated - MarketingCampaignModel.actual_cost)
+                    / sqlfunc.nullif(MarketingCampaignModel.actual_cost, 0)
+                ),
+                0.0,
+            ),
         ).where(MarketingCampaignModel.store_id == store_id)
 
         row = (await db.execute(stmt)).one()
         return {
             "store_id": store_id,
-            "total_campaigns":   int(row[0] or 0),
-            "active_campaigns":  int(row[1] or 0),
-            "total_reach":       int(row[2] or 0),
-            "total_conversion":  int(row[3] or 0),
-            "avg_roi":           round(float(row[4] or 0.0), 4),
+            "total_campaigns": int(row[0] or 0),
+            "active_campaigns": int(row[1] or 0),
+            "total_reach": int(row[2] or 0),
+            "total_conversion": int(row[3] or 0),
+            "avg_roi": round(float(row[4] or 0.0), 4),
         }
     except Exception as e:
         logger.error("get_store_marketing_statistics_failed", error=str(e), store_id=store_id)
@@ -419,10 +433,10 @@ async def get_store_marketing_statistics(
 
 @router.patch("/stores/{store_id}/campaigns/{campaign_id}/status")
 async def update_campaign_status(
-    store_id:    str,
+    store_id: str,
     campaign_id: str,
-    status:      str = Query(..., pattern="^(active|completed|cancelled)$"),
-    db:          AsyncSession = Depends(get_db),
+    status: str = Query(..., pattern="^(active|completed|cancelled)$"),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Dict[str, Any]:
     """更新活动状态（draft→active→completed/cancelled）"""

@@ -2,22 +2,19 @@
 财务服务
 管理财务交易、预算、发票、报表
 """
-from typing import List, Dict, Any, Optional
-from numbers import Number
-from datetime import datetime, date, timedelta
-from calendar import monthrange
+
 import os
+from calendar import monthrange
+from datetime import date, datetime, timedelta
+from numbers import Number
+from typing import Any, Dict, List, Optional
+
 import structlog
+from sqlalchemy import and_, extract, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_, func, extract
-
-from src.core.money import D, mul_rate
-
-from src.models import (
-    FinancialTransaction, Budget, Invoice, FinancialReport,
-    Store, Supplier
-)
 from src.core.exceptions import NotFoundError, ValidationError
+from src.core.money import D, mul_rate
+from src.models import Budget, FinancialReport, FinancialTransaction, Invoice, Store, Supplier
 
 logger = structlog.get_logger()
 
@@ -118,14 +115,10 @@ class FinanceService:
             "total": total_count,
         }
 
-    async def generate_income_statement(
-        self, store_id: str, start_date: date, end_date: date
-    ) -> Dict[str, Any]:
+    async def generate_income_statement(self, store_id: str, start_date: date, end_date: date) -> Dict[str, Any]:
         """生成损益表"""
         # 查询收入
-        income_query = select(
-            func.sum(FinancialTransaction.amount)
-        ).where(
+        income_query = select(func.sum(FinancialTransaction.amount)).where(
             and_(
                 FinancialTransaction.store_id == store_id,
                 FinancialTransaction.transaction_date >= start_date,
@@ -142,9 +135,7 @@ class FinanceService:
         total_expenses = 0
 
         for category in categories:
-            expense_query = select(
-                func.sum(FinancialTransaction.amount)
-            ).where(
+            expense_query = select(func.sum(FinancialTransaction.amount)).where(
                 and_(
                     FinancialTransaction.store_id == store_id,
                     FinancialTransaction.transaction_date >= start_date,
@@ -166,6 +157,7 @@ class FinanceService:
         try:
             from src.core.database import get_db_session
             from src.models.store import Store
+
             async with get_db_session() as session:
                 result = await session.execute(select(Store.config).where(Store.id == store_id))
                 cfg = result.scalar_one_or_none() or {}
@@ -204,25 +196,25 @@ class FinanceService:
             },
         }
 
-    async def generate_cash_flow(
-        self, store_id: str, start_date: date, end_date: date
-    ) -> Dict[str, Any]:
+    async def generate_cash_flow(self, store_id: str, start_date: date, end_date: date) -> Dict[str, Any]:
         """生成现金流量表"""
         # 按日期分组统计现金流入和流出
-        query = select(
-            FinancialTransaction.transaction_date,
-            FinancialTransaction.transaction_type,
-            func.sum(FinancialTransaction.amount).label("total")
-        ).where(
-            and_(
-                FinancialTransaction.store_id == store_id,
-                FinancialTransaction.transaction_date >= start_date,
-                FinancialTransaction.transaction_date <= end_date,
+        query = (
+            select(
+                FinancialTransaction.transaction_date,
+                FinancialTransaction.transaction_type,
+                func.sum(FinancialTransaction.amount).label("total"),
             )
-        ).group_by(
-            FinancialTransaction.transaction_date,
-            FinancialTransaction.transaction_type
-        ).order_by(FinancialTransaction.transaction_date)
+            .where(
+                and_(
+                    FinancialTransaction.store_id == store_id,
+                    FinancialTransaction.transaction_date >= start_date,
+                    FinancialTransaction.transaction_date <= end_date,
+                )
+            )
+            .group_by(FinancialTransaction.transaction_date, FinancialTransaction.transaction_type)
+            .order_by(FinancialTransaction.transaction_date)
+        )
 
         result = await self.db.execute(query)
         rows = result.all()
@@ -239,9 +231,7 @@ class FinanceService:
             else:
                 cash_flow_data[date_str]["outflow"] = row.total
 
-            cash_flow_data[date_str]["net"] = (
-                cash_flow_data[date_str]["inflow"] - cash_flow_data[date_str]["outflow"]
-            )
+            cash_flow_data[date_str]["net"] = cash_flow_data[date_str]["inflow"] - cash_flow_data[date_str]["outflow"]
 
         # 计算累计现金流
         cumulative = 0
@@ -282,9 +272,7 @@ class FinanceService:
             "budgeted_amount": budget.budgeted_amount,
         }
 
-    async def get_budget_analysis(
-        self, store_id: str, year: int, month: int
-    ) -> Dict[str, Any]:
+    async def get_budget_analysis(self, store_id: str, year: int, month: int) -> Dict[str, Any]:
         """获取预算分析"""
         # 查询预算
         budget_query = select(Budget).where(
@@ -305,9 +293,7 @@ class FinanceService:
         analysis = []
         for budget in budgets:
             # 查询该类别的实际金额
-            actual_query = select(
-                func.sum(FinancialTransaction.amount)
-            ).where(
+            actual_query = select(func.sum(FinancialTransaction.amount)).where(
                 and_(
                     FinancialTransaction.store_id == store_id,
                     FinancialTransaction.transaction_date >= start_date,
@@ -321,19 +307,18 @@ class FinanceService:
             # 更新预算记录
             budget.actual_amount = actual_amount
             budget.variance = actual_amount - budget.budgeted_amount
-            budget.variance_percentage = (
-                (budget.variance / budget.budgeted_amount * 100)
-                if budget.budgeted_amount > 0 else 0
-            )
+            budget.variance_percentage = (budget.variance / budget.budgeted_amount * 100) if budget.budgeted_amount > 0 else 0
 
-            analysis.append({
-                "category": budget.category,
-                "budgeted_amount": budget.budgeted_amount,
-                "actual_amount": actual_amount,
-                "variance": budget.variance,
-                "variance_percentage": round(budget.variance_percentage, 2),
-                "status": "over" if budget.variance > 0 else "under" if budget.variance < 0 else "on_track",
-            })
+            analysis.append(
+                {
+                    "category": budget.category,
+                    "budgeted_amount": budget.budgeted_amount,
+                    "actual_amount": actual_amount,
+                    "variance": budget.variance,
+                    "variance_percentage": round(budget.variance_percentage, 2),
+                    "status": "over" if budget.variance > 0 else "under" if budget.variance < 0 else "on_track",
+                }
+            )
 
         await self.db.commit()
 
@@ -344,9 +329,7 @@ class FinanceService:
             "analysis": analysis,
         }
 
-    async def get_financial_metrics(
-        self, store_id: str, start_date: date, end_date: date
-    ) -> Dict[str, Any]:
+    async def get_financial_metrics(self, store_id: str, start_date: date, end_date: date) -> Dict[str, Any]:
         """获取财务指标"""
         # 生成损益表
         income_statement = await self.generate_income_statement(store_id, start_date, end_date)

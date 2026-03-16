@@ -1,15 +1,18 @@
 """
 Purchase Order Items — 采购单明细行
 """
-from sqlalchemy import Column, String, Integer, Numeric
-from sqlalchemy.dialects.postgresql import UUID
+
 import uuid
+
+from sqlalchemy import Column, Integer, Numeric, String
+from sqlalchemy.dialects.postgresql import UUID
 
 from .base import Base, TimestampMixin
 
 
 class PurchaseOrderItem(Base, TimestampMixin):
     """采购单明细"""
+
     __tablename__ = "purchase_order_items"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

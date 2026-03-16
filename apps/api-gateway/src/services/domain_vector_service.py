@@ -17,6 +17,7 @@
   events    — 神经系统事件（通用）
   decisions — AI决策日志
 """
+
 import hashlib
 import json
 import os
@@ -29,11 +30,11 @@ logger = structlog.get_logger()
 
 # 支持的领域及其向量维度
 DOMAINS = {
-    "revenue":   384,
+    "revenue": 384,
     "inventory": 384,
-    "menu":      384,
-    "staff":     384,
-    "events":    384,
+    "menu": 384,
+    "staff": 384,
+    "events": 384,
     "decisions": 384,
 }
 
@@ -41,7 +42,7 @@ DOMAINS = {
 LEGACY_COLLECTION_MAP = {
     "orders": "revenue",
     "dishes": "menu",
-    "staff":  "staff",
+    "staff": "staff",
     "events": "events",
 }
 
@@ -62,11 +63,12 @@ class DomainVectorService:
         self.client = None
         self.embedding_model = None
         self.embedding_degraded: bool = False  # True 表示当前使用伪随机向量降级
-        self._ensured: set[str] = set()   # 已确认存在的 collection 缓存
+        self._ensured: set[str] = set()  # 已确认存在的 collection 缓存
 
     async def initialize(self):
         """初始化 Qdrant 客户端和嵌入模型"""
         from qdrant_client import QdrantClient
+
         self.client = QdrantClient(
             url=self.qdrant_url,
             api_key=self.qdrant_api_key or None,
@@ -78,6 +80,7 @@ class DomainVectorService:
             return
         try:
             from sentence_transformers import SentenceTransformer
+
             model_name = os.getenv("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2")
             self.embedding_model = SentenceTransformer(model_name)
             logger.info("DomainVectorService 嵌入模型加载成功", model=model_name)
@@ -96,6 +99,7 @@ class DomainVectorService:
             text_preview=text[:50],
         )
         import random
+
         random.seed(hashlib.md5(text.encode()).hexdigest())
         return [random.random() for _ in range(384)]
 
@@ -104,6 +108,7 @@ class DomainVectorService:
         if cname in self._ensured:
             return
         from qdrant_client.models import Distance, VectorParams
+
         existing = {c.name for c in self.client.get_collections().collections}
         if cname not in existing:
             self.client.create_collection(
@@ -142,6 +147,7 @@ class DomainVectorService:
             await self._ensure_collection(cname, DOMAINS.get(domain, 384))
 
             from qdrant_client.models import PointStruct
+
             point_id = int(hashlib.md5(doc_id.encode()).hexdigest()[:15], 16)
             embedding = self._embed(text)
 
@@ -270,12 +276,10 @@ class DomainVectorService:
     ) -> Dict[str, List[Dict[str, Any]]]:
         """跨多领域搜索，返回按领域分组的结果"""
         import asyncio
+
         tasks = {d: self.search(d, store_id, query, top_k_per_domain) for d in domains}
         results = await asyncio.gather(*tasks.values(), return_exceptions=True)
-        return {
-            domain: (res if not isinstance(res, Exception) else [])
-            for domain, res in zip(tasks.keys(), results)
-        }
+        return {domain: (res if not isinstance(res, Exception) else []) for domain, res in zip(tasks.keys(), results)}
 
     async def list_store_collections(self, store_id: str) -> List[str]:
         """列出门店已有的领域 collection"""

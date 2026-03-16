@@ -6,16 +6,15 @@ Prefix: /api/v1/fin-rec
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.services.financial_recommendation_service import (
+    METRIC_LABELS,
+    REC_TYPES,
     generate_store_recommendations,
+    get_brand_rec_summary,
+    get_recommendation_stats,
     get_recommendations,
     update_recommendation_status,
-    get_recommendation_stats,
-    get_brand_rec_summary,
-    REC_TYPES,
-    METRIC_LABELS,
 )
 
 router = APIRouter(prefix="/api/v1/fin-rec", tags=["financial_recommendation"])
@@ -24,6 +23,7 @@ router = APIRouter(prefix="/api/v1/fin-rec", tags=["financial_recommendation"])
 # ---------------------------------------------------------------------------
 # 生成
 # ---------------------------------------------------------------------------
+
 
 @router.post("/generate/{store_id}")
 async def generate_recommendations(
@@ -43,6 +43,7 @@ async def generate_recommendations(
 # ---------------------------------------------------------------------------
 # 查询
 # ---------------------------------------------------------------------------
+
 
 @router.get("/{store_id}")
 async def list_recommendations(
@@ -81,6 +82,7 @@ async def brand_summary(
 # 操作
 # ---------------------------------------------------------------------------
 
+
 @router.post("/{rec_id}/adopt")
 async def adopt(
     rec_id: int,
@@ -109,11 +111,12 @@ async def dismiss(
 # 元数据
 # ---------------------------------------------------------------------------
 
+
 @router.get("/meta/types")
 async def meta_types():
     return {
-        "rec_types":     list(REC_TYPES),
+        "rec_types": list(REC_TYPES),
         "urgency_levels": ["high", "medium", "low"],
-        "statuses":      ["pending", "adopted", "dismissed"],
+        "statuses": ["pending", "adopted", "dismissed"],
         "metric_labels": METRIC_LABELS,
     }

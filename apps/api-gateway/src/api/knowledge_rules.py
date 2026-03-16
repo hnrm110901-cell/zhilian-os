@@ -17,10 +17,10 @@
 """
 
 from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.core.dependencies import get_current_user, require_role
 from src.models.knowledge_rule import RuleCategory, RuleStatus, RuleType
@@ -31,6 +31,7 @@ router = APIRouter(tags=["knowledge_rules"])
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
+
 
 class RuleCreateIn(BaseModel):
     rule_code: str = Field(..., max_length=50)
@@ -61,6 +62,7 @@ class BenchmarkCompareIn(BaseModel):
 
 
 # ── 规则端点 ──────────────────────────────────────────────────────────────────
+
 
 @router.get("/api/v1/rules/stats")
 async def get_rule_stats(
@@ -111,11 +113,13 @@ async def create_rule(
     existing = await svc.get_by_code(payload.rule_code)
     if existing:
         raise HTTPException(status_code=409, detail=f"规则编码 {payload.rule_code} 已存在")
-    rule = await svc.create_rule({
-        **payload.model_dump(),
-        "status": RuleStatus.DRAFT,
-        "contributed_by": str(current_user.id),
-    })
+    rule = await svc.create_rule(
+        {
+            **payload.model_dump(),
+            "status": RuleStatus.DRAFT,
+            "contributed_by": str(current_user.id),
+        }
+    )
     await db.commit()
     return _rule_to_dict(rule)
 
@@ -201,6 +205,7 @@ async def seed_rules(
 
 # ── 行业基准端点 ──────────────────────────────────────────────────────────────
 
+
 @router.get("/api/v1/benchmarks/{industry_type}")
 async def get_benchmarks(
     industry_type: str,
@@ -230,9 +235,7 @@ async def compare_to_benchmark(
     返回每项指标的分位数区间和差距分析
     """
     svc = KnowledgeRuleService(db)
-    results = await svc.compare_to_benchmark(
-        payload.industry_type, payload.actual_values
-    )
+    results = await svc.compare_to_benchmark(payload.industry_type, payload.actual_values)
     above = sum(1 for r in results if r["status"] == "above_median")
     return {
         "industry_type": payload.industry_type,
@@ -256,6 +259,7 @@ async def seed_benchmarks(
 
 
 # ── 辅助函数 ──────────────────────────────────────────────────────────────────
+
 
 def _rule_to_dict(r) -> dict:
     return {

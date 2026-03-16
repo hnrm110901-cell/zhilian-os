@@ -24,16 +24,23 @@ from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 import structlog
-from sqlalchemy import and_, select, func
+from sqlalchemy import and_, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.models.workflow import (
     ALL_PHASES,
-    PHASE_INITIAL_PLAN, PHASE_PROCUREMENT, PHASE_SCHEDULING,
-    PHASE_MENU, PHASE_MENU_SYNC, PHASE_MARKETING,
-    DailyWorkflow, DecisionVersion, GenerationMode,
-    PhaseStatus, WorkflowPhase, WorkflowStatus,
+    PHASE_INITIAL_PLAN,
+    PHASE_MARKETING,
+    PHASE_MENU,
+    PHASE_MENU_SYNC,
+    PHASE_PROCUREMENT,
+    PHASE_SCHEDULING,
+    DailyWorkflow,
+    DecisionVersion,
+    GenerationMode,
+    PhaseStatus,
+    WorkflowPhase,
+    WorkflowStatus,
 )
 
 logger = structlog.get_logger()
@@ -43,46 +50,46 @@ logger = structlog.get_logger()
 
 PHASE_CONFIG: Dict[str, Dict] = {
     PHASE_INITIAL_PLAN: {
-        "order":           1,
-        "deadline_hour":   17,
+        "order": 1,
+        "deadline_hour": 17,
         "deadline_minute": 30,
-        "is_auto":         False,   # 需要店长确认
-        "label":           "初版规划",
+        "is_auto": False,  # 需要店长确认
+        "label": "初版规划",
     },
     PHASE_PROCUREMENT: {
-        "order":           2,
-        "deadline_hour":   18,
+        "order": 2,
+        "deadline_hour": 18,
         "deadline_minute": 0,
-        "is_auto":         False,
-        "label":           "采购确认",
+        "is_auto": False,
+        "label": "采购确认",
     },
     PHASE_SCHEDULING: {
-        "order":           3,
-        "deadline_hour":   19,
+        "order": 3,
+        "deadline_hour": 19,
         "deadline_minute": 0,
-        "is_auto":         False,
-        "label":           "排班确认",
+        "is_auto": False,
+        "label": "排班确认",
     },
     PHASE_MENU: {
-        "order":           4,
-        "deadline_hour":   20,
+        "order": 4,
+        "deadline_hour": 20,
         "deadline_minute": 0,
-        "is_auto":         False,
-        "label":           "菜单确认",
+        "is_auto": False,
+        "label": "菜单确认",
     },
     PHASE_MENU_SYNC: {
-        "order":           5,
-        "deadline_hour":   21,
+        "order": 5,
+        "deadline_hour": 21,
         "deadline_minute": 0,
-        "is_auto":         True,    # 自动执行，无需人工确认
-        "label":           "菜单同步",
+        "is_auto": True,  # 自动执行，无需人工确认
+        "label": "菜单同步",
     },
     PHASE_MARKETING: {
-        "order":           6,
-        "deadline_hour":   22,
+        "order": 6,
+        "deadline_hour": 22,
         "deadline_minute": 0,
-        "is_auto":         False,
-        "label":           "营销推送",
+        "is_auto": False,
+        "label": "营销推送",
     },
 }
 
@@ -112,8 +119,8 @@ class WorkflowEngine:
 
     async def start_daily_workflow(
         self,
-        store_id:    str,
-        plan_date:   date,
+        store_id: str,
+        plan_date: date,
         store_config: Optional[Dict] = None,
     ) -> DailyWorkflow:
         """
@@ -152,8 +159,8 @@ class WorkflowEngine:
         # 初始化 6 个阶段（第一个 RUNNING，其余 PENDING）
         for phase_name, cfg in PHASE_CONFIG.items():
             deadline = self._calc_deadline(trigger_date, cfg, store_config)
-            status   = PhaseStatus.RUNNING.value if phase_name == PHASE_INITIAL_PLAN else PhaseStatus.PENDING.value
-            phase    = WorkflowPhase(
+            status = PhaseStatus.RUNNING.value if phase_name == PHASE_INITIAL_PLAN else PhaseStatus.PENDING.value
+            phase = WorkflowPhase(
                 id=uuid.uuid4(),
                 workflow_id=wf.id,
                 phase_name=phase_name,
@@ -176,24 +183,19 @@ class WorkflowEngine:
     async def get_current_workflow(self, store_id: str) -> Optional[DailyWorkflow]:
         """获取门店当日（今天 trigger）正在进行的工作流"""
         today = date.today()
-        stmt  = (
-            select(DailyWorkflow)
-            .where(
-                and_(
-                    DailyWorkflow.store_id    == store_id,
-                    DailyWorkflow.trigger_date == today,
-                )
+        stmt = select(DailyWorkflow).where(
+            and_(
+                DailyWorkflow.store_id == store_id,
+                DailyWorkflow.trigger_date == today,
             )
         )
         return (await self.db.execute(stmt)).scalar_one_or_none()
 
-    async def get_workflow_by_date(
-        self, store_id: str, plan_date: date
-    ) -> Optional[DailyWorkflow]:
+    async def get_workflow_by_date(self, store_id: str, plan_date: date) -> Optional[DailyWorkflow]:
         """按 store_id + plan_date 查找工作流"""
         stmt = select(DailyWorkflow).where(
             and_(
-                DailyWorkflow.store_id  == store_id,
+                DailyWorkflow.store_id == store_id,
                 DailyWorkflow.plan_date == plan_date,
             )
         )
@@ -201,25 +203,17 @@ class WorkflowEngine:
 
     # ── 阶段管理 ──────────────────────────────────────────────────────────────
 
-    async def get_phase(
-        self, workflow_id: uuid.UUID, phase_name: str
-    ) -> Optional[WorkflowPhase]:
+    async def get_phase(self, workflow_id: uuid.UUID, phase_name: str) -> Optional[WorkflowPhase]:
         stmt = select(WorkflowPhase).where(
             and_(
                 WorkflowPhase.workflow_id == workflow_id,
-                WorkflowPhase.phase_name  == phase_name,
+                WorkflowPhase.phase_name == phase_name,
             )
         )
         return (await self.db.execute(stmt)).scalar_one_or_none()
 
-    async def get_all_phases(
-        self, workflow_id: uuid.UUID
-    ) -> List[WorkflowPhase]:
-        stmt = (
-            select(WorkflowPhase)
-            .where(WorkflowPhase.workflow_id == workflow_id)
-            .order_by(WorkflowPhase.phase_order)
-        )
+    async def get_all_phases(self, workflow_id: uuid.UUID) -> List[WorkflowPhase]:
+        stmt = select(WorkflowPhase).where(WorkflowPhase.workflow_id == workflow_id).order_by(WorkflowPhase.phase_order)
         return (await self.db.execute(stmt)).scalars().all()
 
     async def advance_to_next_phase(self, workflow_id: uuid.UUID) -> Optional[WorkflowPhase]:
@@ -247,14 +241,14 @@ class WorkflowEngine:
         next_phase = phases[running_idx + 1]
         if next_phase.status != PhaseStatus.PENDING.value:
             return None
-        next_phase.status     = PhaseStatus.RUNNING.value
+        next_phase.status = PhaseStatus.RUNNING.value
         next_phase.started_at = datetime.utcnow()
 
         # 更新工作流当前阶段
         wf = await self._get_workflow(workflow_id)
         if wf:
             wf.current_phase = next_phase.phase_name
-            wf.status        = WorkflowStatus.PARTIAL_LOCKED.value
+            wf.status = WorkflowStatus.PARTIAL_LOCKED.value
 
         return next_phase
 
@@ -262,14 +256,14 @@ class WorkflowEngine:
 
     async def submit_decision(
         self,
-        phase_id:     uuid.UUID,
-        content:      Dict[str, Any],
+        phase_id: uuid.UUID,
+        content: Dict[str, Any],
         submitted_by: str = "system",
-        mode:         str = GenerationMode.FAST.value,
+        mode: str = GenerationMode.FAST.value,
         generation_seconds: float = 0.0,
-        data_completeness:  float = 1.0,
-        confidence:         float = 0.8,
-        change_reason:      str   = "",
+        data_completeness: float = 1.0,
+        confidence: float = 0.8,
+        change_reason: str = "",
     ) -> DecisionVersion:
         """
         向阶段提交新的决策版本。
@@ -347,7 +341,7 @@ class WorkflowEngine:
 
     async def lock_phase(
         self,
-        phase_id:  uuid.UUID,
+        phase_id: uuid.UUID,
         locked_by: str = "auto",
     ) -> WorkflowPhase:
         """
@@ -366,14 +360,12 @@ class WorkflowEngine:
 
         # 标记最新版本为最终版
         if phase.current_version_id:
-            ver_stmt = select(DecisionVersion).where(
-                DecisionVersion.id == phase.current_version_id
-            )
+            ver_stmt = select(DecisionVersion).where(DecisionVersion.id == phase.current_version_id)
             version = (await self.db.execute(ver_stmt)).scalar_one_or_none()
             if version:
                 version.is_final = True
 
-        phase.status    = PhaseStatus.LOCKED.value
+        phase.status = PhaseStatus.LOCKED.value
         phase.locked_at = datetime.utcnow()
         phase.locked_by = locked_by
 
@@ -399,16 +391,15 @@ class WorkflowEngine:
             本次被自动锁定的 WorkflowPhase 列表
         """
         now = datetime.utcnow()
-        stmt = (
-            select(WorkflowPhase)
-            .where(
-                and_(
-                    WorkflowPhase.status.in_([
+        stmt = select(WorkflowPhase).where(
+            and_(
+                WorkflowPhase.status.in_(
+                    [
                         PhaseStatus.RUNNING.value,
                         PhaseStatus.REVIEWING.value,
-                    ]),
-                    WorkflowPhase.deadline < now,
-                )
+                    ]
+                ),
+                WorkflowPhase.deadline < now,
             )
         )
         expired_phases = (await self.db.execute(stmt)).scalars().all()
@@ -435,8 +426,8 @@ class WorkflowEngine:
 
     async def request_approval(
         self,
-        phase_id:        uuid.UUID,
-        approver_id:     Optional[str] = None,
+        phase_id: uuid.UUID,
+        approver_id: Optional[str] = None,
         timeout_minutes: int = 120,
     ) -> Dict[str, Any]:
         """
@@ -455,22 +446,18 @@ class WorkflowEngine:
         """
         phase = await self._get_phase(phase_id)
         if phase.status not in (PhaseStatus.REVIEWING.value, PhaseStatus.RUNNING.value):
-            raise ValueError(
-                f"阶段 {phase.phase_name} 当前状态 {phase.status} 不支持发起审批"
-            )
+            raise ValueError(f"阶段 {phase.phase_name} 当前状态 {phase.status} 不支持发起审批")
 
-        cfg       = PHASE_CONFIG.get(phase.phase_name, {})
-        label     = cfg.get("label", phase.phase_name)
-        expires   = datetime.utcnow() + timedelta(minutes=timeout_minutes)
+        cfg = PHASE_CONFIG.get(phase.phase_name, {})
+        label = cfg.get("label", phase.phase_name)
+        expires = datetime.utcnow() + timedelta(minutes=timeout_minutes)
         request_id = f"wf_approval_{phase_id}_{int(datetime.utcnow().timestamp())}"
 
         # 获取最新版本内容
         content_summary: Dict = {}
         store_id = ""
         if phase.current_version_id:
-            ver_stmt = select(DecisionVersion).where(
-                DecisionVersion.id == phase.current_version_id
-            )
+            ver_stmt = select(DecisionVersion).where(DecisionVersion.id == phase.current_version_id)
             ver = (await self.db.execute(ver_stmt)).scalar_one_or_none()
             if ver:
                 content_summary = ver.content or {}
@@ -479,9 +466,10 @@ class WorkflowEngine:
         # 非阻塞推送企微通知
         try:
             from .wechat_work_message_service import WeChatWorkMessageService
-            wechat   = WeChatWorkMessageService()
-            message  = self._build_approval_message(label, content_summary, expires, request_id)
-            target   = approver_id or "@all"
+
+            wechat = WeChatWorkMessageService()
+            message = self._build_approval_message(label, content_summary, expires, request_id)
+            target = approver_id or "@all"
             await wechat.send_text_message(target, message)
         except Exception as exc:
             logger.warning(
@@ -498,19 +486,19 @@ class WorkflowEngine:
             approver_id=approver_id,
         )
         return {
-            "request_id":  request_id,
-            "phase_id":    str(phase_id),
-            "phase_name":  phase.phase_name,
+            "request_id": request_id,
+            "phase_id": str(phase_id),
+            "phase_name": phase.phase_name,
             "phase_label": label,
-            "expires_at":  expires.isoformat(),
+            "expires_at": expires.isoformat(),
             "approver_id": approver_id,
         }
 
     async def approve_phase(
         self,
-        phase_id:    uuid.UUID,
+        phase_id: uuid.UUID,
         approver_id: str,
-        comment:     str = "",
+        comment: str = "",
     ) -> WorkflowPhase:
         """
         店长批准阶段决策，触发阶段锁定并推进到下一阶段。
@@ -528,9 +516,7 @@ class WorkflowEngine:
             return phase  # 幂等
 
         if phase.status not in (PhaseStatus.REVIEWING.value, PhaseStatus.RUNNING.value):
-            raise ValueError(
-                f"阶段 {phase.phase_name} 状态 {phase.status} 不支持审批"
-            )
+            raise ValueError(f"阶段 {phase.phase_name} 状态 {phase.status} 不支持审批")
 
         logger.info(
             "工作流阶段人工批准",
@@ -542,9 +528,9 @@ class WorkflowEngine:
 
     async def reject_phase(
         self,
-        phase_id:    uuid.UUID,
+        phase_id: uuid.UUID,
         approver_id: str,
-        reason:      str,
+        reason: str,
     ) -> WorkflowPhase:
         """
         店长拒绝阶段决策，阶段回退至 RUNNING（允许重新 submit_decision）。
@@ -567,9 +553,7 @@ class WorkflowEngine:
 
         # 在版本记录上追加拒绝原因
         if phase.current_version_id:
-            ver_stmt = select(DecisionVersion).where(
-                DecisionVersion.id == phase.current_version_id
-            )
+            ver_stmt = select(DecisionVersion).where(DecisionVersion.id == phase.current_version_id)
             ver = (await self.db.execute(ver_stmt)).scalar_one_or_none()
             if ver:
                 ver.change_reason = f"[拒绝] {reason}"
@@ -584,14 +568,15 @@ class WorkflowEngine:
 
     def _build_approval_message(
         self,
-        label:      str,
-        content:    Dict[str, Any],
+        label: str,
+        content: Dict[str, Any],
         expires_at: datetime,
         request_id: str,
     ) -> str:
         """构建企微审批通知文本（截断超长内容）"""
         import json
-        summary      = json.dumps(content, ensure_ascii=False)[:400]
+
+        summary = json.dumps(content, ensure_ascii=False)[:400]
         deadline_str = expires_at.strftime("%m-%d %H:%M")
         return (
             f"【屯象OS · 工作流审批】\n\n"
@@ -603,20 +588,12 @@ class WorkflowEngine:
 
     # ── 版本查询 ──────────────────────────────────────────────────────────────
 
-    async def get_phase_versions(
-        self, phase_id: uuid.UUID
-    ) -> List[DecisionVersion]:
+    async def get_phase_versions(self, phase_id: uuid.UUID) -> List[DecisionVersion]:
         """获取阶段所有版本（按版本号升序）"""
-        stmt = (
-            select(DecisionVersion)
-            .where(DecisionVersion.phase_id == phase_id)
-            .order_by(DecisionVersion.version_number)
-        )
+        stmt = select(DecisionVersion).where(DecisionVersion.phase_id == phase_id).order_by(DecisionVersion.version_number)
         return (await self.db.execute(stmt)).scalars().all()
 
-    async def get_latest_version(
-        self, phase_id: uuid.UUID
-    ) -> Optional[DecisionVersion]:
+    async def get_latest_version(self, phase_id: uuid.UUID) -> Optional[DecisionVersion]:
         stmt = (
             select(DecisionVersion)
             .where(DecisionVersion.phase_id == phase_id)
@@ -630,24 +607,28 @@ class WorkflowEngine:
     def _calc_deadline(
         self,
         trigger_date: date,
-        cfg:          Dict,
+        cfg: Dict,
         store_config: Optional[Dict],
     ) -> datetime:
         """计算阶段硬 deadline（支持门店个性化覆盖）"""
-        hour   = cfg["deadline_hour"]
+        hour = cfg["deadline_hour"]
         minute = cfg["deadline_minute"]
 
         if store_config:
             key = f"{cfg.get('phase_name', '')}_deadline"
             custom = store_config.get(key)
             if custom and ":" in str(custom):
-                parts  = str(custom).split(":")
-                hour   = int(parts[0])
+                parts = str(custom).split(":")
+                hour = int(parts[0])
                 minute = int(parts[1])
 
         return datetime(
-            trigger_date.year, trigger_date.month, trigger_date.day,
-            hour, minute, 0,
+            trigger_date.year,
+            trigger_date.month,
+            trigger_date.day,
+            hour,
+            minute,
+            0,
         )
 
     async def _get_workflow(self, workflow_id: uuid.UUID) -> Optional[DailyWorkflow]:
@@ -664,17 +645,14 @@ class WorkflowEngine:
 
 # ── 辅助函数 ──────────────────────────────────────────────────────────────────
 
+
 def _simple_diff(prev: Dict, curr: Dict) -> Dict:
     """计算两个 dict 的简单 diff（只处理一层 key 变化）"""
-    added    = {k: curr[k] for k in curr if k not in prev}
-    removed  = {k: prev[k] for k in prev if k not in curr}
-    modified = {
-        k: {"before": prev[k], "after": curr[k]}
-        for k in curr
-        if k in prev and prev[k] != curr[k]
-    }
+    added = {k: curr[k] for k in curr if k not in prev}
+    removed = {k: prev[k] for k in prev if k not in curr}
+    modified = {k: {"before": prev[k], "after": curr[k]} for k in curr if k in prev and prev[k] != curr[k]}
     return {
-        "added":    added,
-        "removed":  removed,
+        "added": added,
+        "removed": removed,
         "modified": modified,
     }

@@ -10,8 +10,8 @@ from __future__ import annotations
 
 from datetime import date
 from typing import Optional
-import structlog
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,11 +25,11 @@ router = APIRouter(prefix="/api/v1/reports", tags=["monthly_report"])
 
 @router.get("/monthly/{store_id}")
 async def get_monthly_report(
-    store_id:     str,
-    year:         Optional[int] = None,
-    month:        Optional[int] = None,
-    current_user: User          = Depends(get_current_active_user),
-    db: AsyncSession            = Depends(get_db),
+    store_id: str,
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     获取月度经营报告 JSON 数据。
@@ -51,8 +51,9 @@ async def get_monthly_report(
         first_of_this = today.replace(day=1)
         prev = first_of_this.replace(day=1)
         from datetime import timedelta
+
         prev = (first_of_this - timedelta(days=1)).replace(day=1)
-        year  = prev.year
+        year = prev.year
         month = prev.month
 
     if not (1 <= month <= 12):
@@ -70,11 +71,11 @@ async def get_monthly_report(
 
 @router.get("/monthly/{store_id}/html", response_class=HTMLResponse)
 async def get_monthly_report_html(
-    store_id:     str,
-    year:         Optional[int] = None,
-    month:        Optional[int] = None,
-    current_user: User          = Depends(get_current_active_user),
-    db: AsyncSession            = Depends(get_db),
+    store_id: str,
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     获取月度经营报告 HTML（可直接在浏览器打印为 PDF）。
@@ -86,8 +87,9 @@ async def get_monthly_report_html(
     today = date.today()
     if year is None or month is None:
         from datetime import timedelta
-        prev  = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
-        year  = prev.year
+
+        prev = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
+        year = prev.year
         month = prev.month
 
     try:
@@ -100,11 +102,11 @@ async def get_monthly_report_html(
 
 @router.get("/monthly/{store_id}/excel")
 async def get_monthly_report_excel(
-    store_id:     str,
-    year:         Optional[int] = None,
-    month:        Optional[int] = None,
-    current_user: User          = Depends(get_current_active_user),
-    db: AsyncSession            = Depends(get_db),
+    store_id: str,
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     下载月度经营报告 Excel（.xlsx）。
@@ -116,8 +118,9 @@ async def get_monthly_report_excel(
     today = date.today()
     if year is None or month is None:
         from datetime import timedelta
-        prev  = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
-        year  = prev.year
+
+        prev = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
+        year = prev.year
         month = prev.month
 
     if not (1 <= month <= 12):

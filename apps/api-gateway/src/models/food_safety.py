@@ -2,11 +2,11 @@
 Food Safety Models — 食品安全追溯
 食材溯源记录 + 食品安全检查记录
 """
+
 import uuid
-from sqlalchemy import (
-    Column, String, Integer, Numeric, Date, Text,
-)
-from sqlalchemy.dialects.postgresql import UUID, JSON
+
+from sqlalchemy import Column, Date, Integer, Numeric, String, Text
+from sqlalchemy.dialects.postgresql import JSON, UUID
 
 from .base import Base, TimestampMixin
 
@@ -16,6 +16,7 @@ class FoodTraceRecord(Base, TimestampMixin):
     食材溯源记录。
     记录每批食材的来源、批次、保质期、检验信息。
     """
+
     __tablename__ = "food_trace_records"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -61,6 +62,7 @@ class FoodSafetyInspection(Base, TimestampMixin):
     食品安全检查记录。
     支持日常/周检/月检/政府/第三方多种检查类型。
     """
+
     __tablename__ = "food_safety_inspections"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

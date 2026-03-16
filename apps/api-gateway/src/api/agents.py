@@ -1,15 +1,17 @@
 """
 Agent API路由
 """
-from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
-from typing import Dict, Any
-import structlog
 
-from ..services.agent_service import AgentService
+from typing import Any, Dict
+
+import structlog
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+
 from ..core.dependencies import get_current_active_user, require_permission
 from ..core.permissions import Permission
 from ..models.user import User
+from ..services.agent_service import AgentService
 
 logger = structlog.get_logger()
 router = APIRouter()

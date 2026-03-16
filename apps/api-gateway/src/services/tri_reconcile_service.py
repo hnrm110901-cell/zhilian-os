@@ -1,16 +1,16 @@
 """三角对账引擎 — Order ↔ Payment ↔ Bank Statement ↔ Invoice 四方自动匹配"""
+
 import uuid
 from datetime import date, datetime, timedelta
 from typing import Optional
 
-from sqlalchemy import select, func, and_, case, cast, Date
+from sqlalchemy import Date, and_, case, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.models.tri_reconciliation import TriReconciliationRecord
-from src.models.order import Order
-from src.models.payment_reconciliation import PaymentRecord
 from src.models.bank_reconciliation import BankStatement
 from src.models.e_invoice import EInvoice
+from src.models.order import Order
+from src.models.payment_reconciliation import PaymentRecord
+from src.models.tri_reconciliation import TriReconciliationRecord
 
 
 class TriReconcileService:
@@ -56,9 +56,7 @@ class TriReconcileService:
                 bank_by_ref[b["reference_number"]] = b
             if b.get("matched_order_id"):
                 bank_by_ref[b["matched_order_id"]] = b
-        invoice_by_order: dict[str, dict] = {
-            str(inv["order_id"]): inv for inv in invoices if inv.get("order_id")
-        }
+        invoice_by_order: dict[str, dict] = {str(inv["order_id"]): inv for inv in invoices if inv.get("order_id")}
 
         matched_records: list[TriReconciliationRecord] = []
         used_order_ids: set[str] = set()
@@ -125,15 +123,9 @@ class TriReconcileService:
 
         # ── Phase 2: 模糊匹配（金额+时间窗口） ─────────────────────────────
 
-        remaining_payments = [
-            p for p in payments if str(p["id"]) not in used_payment_ids
-        ]
-        remaining_banks = [
-            b for b in bank_stmts if str(b["id"]) not in used_bank_ids
-        ]
-        remaining_invoices = [
-            inv for inv in invoices if str(inv["id"]) not in used_invoice_ids
-        ]
+        remaining_payments = [p for p in payments if str(p["id"]) not in used_payment_ids]
+        remaining_banks = [b for b in bank_stmts if str(b["id"]) not in used_bank_ids]
+        remaining_invoices = [inv for inv in invoices if str(inv["id"]) not in used_invoice_ids]
 
         # 尝试把未匹配的支付与银行流水按金额配对
         for pay in remaining_payments:
@@ -337,9 +329,7 @@ class TriReconcileService:
         record_id: str,
     ) -> Optional[dict]:
         """获取单条对账记录详情，含四方实体摘要"""
-        q = select(TriReconciliationRecord).where(
-            TriReconciliationRecord.id == record_id
-        )
+        q = select(TriReconciliationRecord).where(TriReconciliationRecord.id == record_id)
         rec = (await db.execute(q)).scalar_one_or_none()
         if not rec:
             return None
@@ -412,9 +402,7 @@ class TriReconcileService:
         invoice_id: Optional[str] = None,
     ) -> Optional[dict]:
         """手动关联实体到已有对账记录"""
-        q = select(TriReconciliationRecord).where(
-            TriReconciliationRecord.id == record_id
-        )
+        q = select(TriReconciliationRecord).where(TriReconciliationRecord.id == record_id)
         rec = (await db.execute(q)).scalar_one_or_none()
         if not rec:
             return None
@@ -450,8 +438,7 @@ class TriReconcileService:
         # 重新计算匹配级别和差异
         sides = 0
         amounts: list[int] = []
-        for amt in [rec.order_amount_fen, rec.payment_amount_fen,
-                    rec.bank_amount_fen, rec.invoice_amount_fen]:
+        for amt in [rec.order_amount_fen, rec.payment_amount_fen, rec.bank_amount_fen, rec.invoice_amount_fen]:
             if amt is not None:
                 sides += 1
                 amounts.append(amt)
@@ -474,9 +461,7 @@ class TriReconcileService:
         notes: str,
     ) -> Optional[dict]:
         """标记争议记录为已解决"""
-        q = select(TriReconciliationRecord).where(
-            TriReconciliationRecord.id == record_id
-        )
+        q = select(TriReconciliationRecord).where(TriReconciliationRecord.id == record_id)
         rec = (await db.execute(q)).scalar_one_or_none()
         if not rec:
             return None
@@ -506,18 +491,10 @@ class TriReconcileService:
         # 总计+各级别计数
         count_q = select(
             func.count().label("total"),
-            func.sum(case(
-                (TriReconciliationRecord.match_level == "full_match", 1), else_=0
-            )).label("full_match"),
-            func.sum(case(
-                (TriReconciliationRecord.match_level == "triple_match", 1), else_=0
-            )).label("triple_match"),
-            func.sum(case(
-                (TriReconciliationRecord.match_level == "double_match", 1), else_=0
-            )).label("double_match"),
-            func.sum(case(
-                (TriReconciliationRecord.match_level == "single", 1), else_=0
-            )).label("single"),
+            func.sum(case((TriReconciliationRecord.match_level == "full_match", 1), else_=0)).label("full_match"),
+            func.sum(case((TriReconciliationRecord.match_level == "triple_match", 1), else_=0)).label("triple_match"),
+            func.sum(case((TriReconciliationRecord.match_level == "double_match", 1), else_=0)).label("double_match"),
+            func.sum(case((TriReconciliationRecord.match_level == "single", 1), else_=0)).label("single"),
             func.sum(TriReconciliationRecord.discrepancy_fen).label("total_discrepancy_fen"),
         ).where(base)
         row = (await db.execute(count_q)).one()
@@ -533,9 +510,7 @@ class TriReconcileService:
             select(
                 TriReconciliationRecord.match_date,
                 func.count().label("total"),
-                func.sum(case(
-                    (TriReconciliationRecord.match_level == "full_match", 1), else_=0
-                )).label("full_match"),
+                func.sum(case((TriReconciliationRecord.match_level == "full_match", 1), else_=0)).label("full_match"),
             )
             .where(base)
             .group_by(TriReconciliationRecord.match_date)
@@ -622,9 +597,7 @@ def _record_to_dict(rec: TriReconciliationRecord) -> dict:
     }
 
 
-async def _fetch_orders(
-    db: AsyncSession, brand_id: str, target_date: date, store_id: Optional[str]
-) -> list[dict]:
+async def _fetch_orders(db: AsyncSession, brand_id: str, target_date: date, store_id: Optional[str]) -> list[dict]:
     """拉取指定日期的订单（已完成状态）"""
     conditions = [
         cast(Order.order_time, Date) == target_date,
@@ -647,9 +620,7 @@ async def _fetch_orders(
     ]
 
 
-async def _fetch_payments(
-    db: AsyncSession, brand_id: str, target_date: date, store_id: Optional[str]
-) -> list[dict]:
+async def _fetch_payments(db: AsyncSession, brand_id: str, target_date: date, store_id: Optional[str]) -> list[dict]:
     """拉取指定日期的支付流水"""
     conditions = [
         PaymentRecord.brand_id == brand_id,
@@ -674,9 +645,7 @@ async def _fetch_payments(
     ]
 
 
-async def _fetch_bank_statements(
-    db: AsyncSession, brand_id: str, target_date: date
-) -> list[dict]:
+async def _fetch_bank_statements(db: AsyncSession, brand_id: str, target_date: date) -> list[dict]:
     """拉取指定日期的银行流水（仅收入类）"""
     q = select(BankStatement).where(
         and_(
@@ -698,9 +667,7 @@ async def _fetch_bank_statements(
     ]
 
 
-async def _fetch_invoices(
-    db: AsyncSession, brand_id: str, target_date: date, store_id: Optional[str]
-) -> list[dict]:
+async def _fetch_invoices(db: AsyncSession, brand_id: str, target_date: date, store_id: Optional[str]) -> list[dict]:
     """拉取指定日期的电子发票（已开具状态）"""
     conditions = [
         EInvoice.brand_id == brand_id,

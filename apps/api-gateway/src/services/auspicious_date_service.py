@@ -35,13 +35,13 @@ logger = structlog.get_logger()
 
 # ── 固定谐音吉日 (month, day) → (label, demand_factor) ──────────────────────
 _FIXED_AUSPICIOUS: Dict[Tuple[int, int], Tuple[str, float]] = {
-    (1, 14):  ("一生一世 1.14",  1.4),
-    (2, 14):  ("西方情人节",     1.3),
-    (5, 20):  ("我爱你 5.20",    2.2),
-    (5, 21):  ("我爱你 5.21",    2.0),
-    (7, 7):   ("七夕情人节",     1.9),   # 公历固定7/7占位；精确七夕由 _estimate_qixi 覆盖
-    (8, 8):   ("双喜吉日 8.8",   1.5),
-    (9, 9):   ("长长久久 9.9",   1.6),
+    (1, 14): ("一生一世 1.14", 1.4),
+    (2, 14): ("西方情人节", 1.3),
+    (5, 20): ("我爱你 5.20", 2.2),
+    (5, 21): ("我爱你 5.21", 2.0),
+    (7, 7): ("七夕情人节", 1.9),  # 公历固定7/7占位；精确七夕由 _estimate_qixi 覆盖
+    (8, 8): ("双喜吉日 8.8", 1.5),
+    (9, 9): ("长长久久 9.9", 1.6),
     (10, 10): ("十全十美 10.10", 1.5),
     (11, 11): ("一生一世 11.11", 1.3),
     (12, 12): ("要爱要爱 12.12", 1.4),
@@ -50,15 +50,15 @@ _FIXED_AUSPICIOUS: Dict[Tuple[int, int], Tuple[str, float]] = {
 # ── 黄金周区间 ────────────────────────────────────────────────────────────────
 _GOLDEN_WEEK_RANGES: List[Tuple[int, int, int, int, str, float]] = [
     # (start_month, start_day, end_month, end_day, label, factor)
-    (5,  1, 5,  7,  "劳动节黄金周", 1.7),
-    (10, 1, 10, 7,  "国庆节黄金周", 1.8),
+    (5, 1, 5, 7, "劳动节黄金周", 1.7),
+    (10, 1, 10, 7, "国庆节黄金周", 1.8),
 ]
 
 # 七夕区间估算（农历7月7日通常落在公历8月10~25日之间）
 _QIXI_WINDOW_START = (8, 10)  # (month, day)
-_QIXI_WINDOW_END   = (8, 25)  # (month, day)
-_QIXI_FACTOR       = 1.9
-_QIXI_LABEL        = "七夕情人节"
+_QIXI_WINDOW_END = (8, 25)  # (month, day)
+_QIXI_FACTOR = 1.9
+_QIXI_LABEL = "七夕情人节"
 
 # 周末基础加成（与其他因子 max 叠加，而非相乘，避免过度高估）
 _WEEKEND_FACTOR = 1.2
@@ -68,7 +68,7 @@ def _in_golden_week(d: date) -> Optional[Tuple[str, float]]:
     """判断日期是否在黄金周区间内，返回 (label, factor) 或 None。"""
     for sm, sd, em, ed, label, factor in _GOLDEN_WEEK_RANGES:
         start = date(d.year, sm, sd)
-        end   = date(d.year, em, ed)
+        end = date(d.year, em, ed)
         if start <= d <= end:
             return label, factor
     return None
@@ -92,10 +92,7 @@ def _estimate_qixi(year: int) -> date:
 
 def _is_in_qixi_window(d: date) -> bool:
     """判断日期是否落在七夕区间（8/10~8/25）。"""
-    return (
-        d.month == 8
-        and _QIXI_WINDOW_START[1] <= d.day <= _QIXI_WINDOW_END[1]
-    )
+    return d.month == 8 and _QIXI_WINDOW_START[1] <= d.day <= _QIXI_WINDOW_END[1]
 
 
 class AuspiciousDateInfo:
@@ -105,25 +102,25 @@ class AuspiciousDateInfo:
 
     def __init__(
         self,
-        target_date:   date,
+        target_date: date,
         is_auspicious: bool,
-        label:         str,
+        label: str,
         demand_factor: float,
-        sources:       List[str],
+        sources: List[str],
     ):
-        self.date          = target_date
+        self.date = target_date
         self.is_auspicious = is_auspicious
-        self.label         = label
+        self.label = label
         self.demand_factor = demand_factor
-        self.sources       = sources  # e.g. ["fixed_auspicious", "golden_week", "weekend"]
+        self.sources = sources  # e.g. ["fixed_auspicious", "golden_week", "weekend"]
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "date":          self.date.isoformat(),
+            "date": self.date.isoformat(),
             "is_auspicious": self.is_auspicious,
-            "label":         self.label,
+            "label": self.label,
             "demand_factor": self.demand_factor,
-            "sources":       self.sources,
+            "sources": self.sources,
         }
 
 
@@ -226,7 +223,7 @@ class AuspiciousDateService:
 
     def get_calendar(
         self,
-        days:       int  = 30,
+        days: int = 30,
         start_date: Optional[date] = None,
     ) -> List[Dict[str, Any]]:
         """
@@ -244,7 +241,7 @@ class AuspiciousDateService:
 
         calendar = []
         for i in range(days):
-            d    = start_date + timedelta(days=i)
+            d = start_date + timedelta(days=i)
             info = self.get_info(d)
             calendar.append(info.to_dict())
 
@@ -252,8 +249,8 @@ class AuspiciousDateService:
 
     def get_high_demand_dates(
         self,
-        days:       int           = 90,
-        threshold:  float         = 1.5,
+        days: int = 90,
+        threshold: float = 1.5,
         start_date: Optional[date] = None,
     ) -> List[Dict[str, Any]]:
         """

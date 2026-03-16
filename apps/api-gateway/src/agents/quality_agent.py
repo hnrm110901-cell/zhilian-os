@@ -7,13 +7,15 @@ QualityAgent - 菜品质量检测 Agent
 - 不合格时推送企业微信告警
 - 触发 quality.* 事件到神经系统
 """
+
 import os
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
+
 import structlog
 
-from .llm_agent import LLMEnhancedAgent, AgentResult
 from ..services.quality_service import quality_service
 from ..services.wechat_alert_service import wechat_alert_service
+from .llm_agent import AgentResult, LLMEnhancedAgent
 
 logger = structlog.get_logger()
 
@@ -95,10 +97,10 @@ class QualityAgent(LLMEnhancedAgent):
 
             # 3. 不合格 → 企业微信告警
             if score < ALERT_THRESHOLD and recipient_ids:
-                issues_text = "\n".join(
-                    f"  [{i['severity'].upper()}] {i['description']}"
-                    for i in record.get("issues", [])
-                ) or "  无具体问题描述"
+                issues_text = (
+                    "\n".join(f"  [{i['severity'].upper()}] {i['description']}" for i in record.get("issues", []))
+                    or "  无具体问题描述"
+                )
 
                 await wechat_alert_service.send_system_alert(
                     alert_type="quality_fail",
@@ -185,8 +187,7 @@ class QualityAgent(LLMEnhancedAgent):
                 success=True,
                 data=summary,
                 message=(
-                    f"门店 {store_id} 质量合格率 {summary['pass_rate_pct']}%，"
-                    f"平均评分 {summary['avg_quality_score']}"
+                    f"门店 {store_id} 质量合格率 {summary['pass_rate_pct']}%，" f"平均评分 {summary['avg_quality_score']}"
                 ),
                 confidence=1.0,
                 source_data={"store_id": store_id},

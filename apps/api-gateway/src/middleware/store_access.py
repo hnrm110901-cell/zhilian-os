@@ -3,13 +3,14 @@ Store ID Validation Middleware
 门店ID归属校验中间件 - 防止跨店铺/跨品牌数据访问
 支持 X-Tenant-ID Header（Nginx 注入）+ JWT brand_id 双层隔离
 """
-from fastapi import Request, HTTPException, status
-from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
-from typing import Optional, List
-import structlog
 
+from typing import List, Optional
+
+import structlog
+from fastapi import HTTPException, Request, status
+from fastapi.responses import JSONResponse
 from src.core.tenant_context import TenantContext
+from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = structlog.get_logger()
 
@@ -22,6 +23,7 @@ def _decode_user_from_request(request: Request) -> Optional[dict]:
     token = auth_header[7:]
     try:
         from src.core.security import decode_access_token
+
         payload = decode_access_token(token)
         return {
             "sub": payload.get("sub"),
@@ -224,6 +226,7 @@ class StoreAccessMiddleware(BaseHTTPMiddleware):
                 body = await request.body()
                 if body:
                     import json
+
                     try:
                         data = json.loads(body)
                         if isinstance(data, dict) and "brand_id" in data:
@@ -235,9 +238,7 @@ class StoreAccessMiddleware(BaseHTTPMiddleware):
 
         return None
 
-    async def _validate_store_access(
-        self, request: Request, store_id: str
-    ) -> bool:
+    async def _validate_store_access(self, request: Request, store_id: str) -> bool:
         """
         验证用户是否有权访问指定门店
 

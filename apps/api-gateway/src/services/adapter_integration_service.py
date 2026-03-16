@@ -2,12 +2,13 @@
 屯象OS API适配器集成服务
 统一管理所有第三方API适配器，并与神经系统集成
 """
-from typing import Dict, Any, Optional, List
-import structlog
-from datetime import datetime
+
 import asyncio
 import os
-from datetime import timedelta
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
+
+import structlog
 
 logger = structlog.get_logger()
 
@@ -471,12 +472,8 @@ class AdapterIntegrationService:
             "day_seq": order_data.get("day_seq"),
             "source_system": "meituan",
             "poi_id": order_data.get("poi_id"),
-            "order_time": datetime.fromtimestamp(order_data.get("order_time", 0)).strftime(
-                "%Y-%m-%d %H:%M:%S"
-            ),
-            "delivery_time": datetime.fromtimestamp(order_data.get("delivery_time", 0)).strftime(
-                "%Y-%m-%d %H:%M:%S"
-            ),
+            "order_time": datetime.fromtimestamp(order_data.get("order_time", 0)).strftime("%Y-%m-%d %H:%M:%S"),
+            "delivery_time": datetime.fromtimestamp(order_data.get("delivery_time", 0)).strftime("%Y-%m-%d %H:%M:%S"),
             "recipient_name": order_data.get("recipient_name"),
             "recipient_phone": order_data.get("recipient_phone"),
             "recipient_address": order_data.get("recipient_address"),

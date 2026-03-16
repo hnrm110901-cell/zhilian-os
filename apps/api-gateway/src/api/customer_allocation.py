@@ -7,18 +7,20 @@
 - 新客自动分配（轮询/按能力）
 - 复用现有 CustomerOwnership 模型
 """
+
+import uuid
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
-from datetime import datetime
-import uuid
+from sqlalchemy import and_, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
 from ..models.customer_ownership import CustomerOwnership, TransferReason
 from ..models.user import User
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, func
 
 router = APIRouter()
 
@@ -60,6 +62,7 @@ def _to_dict(o: CustomerOwnership) -> Dict[str, Any]:
 
 # ── 查看员工名下客户 ─────────────────────────────────────────────
 
+
 @router.get("/api/v1/customer-allocation/by-employee")
 async def get_employee_customers(
     store_id: str = Query(...),
@@ -69,13 +72,15 @@ async def get_employee_customers(
 ):
     """查看员工名下所有客户"""
     result = await session.execute(
-        select(CustomerOwnership).where(
+        select(CustomerOwnership)
+        .where(
             and_(
                 CustomerOwnership.store_id == store_id,
                 CustomerOwnership.owner_employee_id == employee_id,
                 CustomerOwnership.is_active == True,
             )
-        ).order_by(CustomerOwnership.total_spent.desc())
+        )
+        .order_by(CustomerOwnership.total_spent.desc())
     )
     customers = result.scalars().all()
     return {
@@ -86,6 +91,7 @@ async def get_employee_customers(
 
 
 # ── 分配客户 ─────────────────────────────────────────────────────
+
 
 @router.post("/api/v1/customer-allocation/assign")
 async def assign_customer(
@@ -131,6 +137,7 @@ async def assign_customer(
 
 # ── 批量分配 ─────────────────────────────────────────────────────
 
+
 @router.post("/api/v1/customer-allocation/batch-assign")
 async def batch_assign(
     req: BatchAllocateRequest,
@@ -173,6 +180,7 @@ async def batch_assign(
 
 # ── 转移客户 ─────────────────────────────────────────────────────
 
+
 @router.post("/api/v1/customer-allocation/{store_id}/transfer")
 async def transfer_customers(
     store_id: str,
@@ -213,6 +221,7 @@ async def transfer_customers(
 
 # ── 分配统计 ─────────────────────────────────────────────────────
 
+
 @router.get("/api/v1/customer-allocation/{store_id}/overview")
 async def get_allocation_overview(
     store_id: str,
@@ -224,8 +233,8 @@ async def get_allocation_overview(
         select(
             CustomerOwnership.owner_employee_id,
             CustomerOwnership.customer_level,
-            func.count().label('count'),
-            func.sum(CustomerOwnership.total_spent).label('total_spent'),
+            func.count().label("count"),
+            func.sum(CustomerOwnership.total_spent).label("total_spent"),
         )
         .where(
             and_(

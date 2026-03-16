@@ -37,14 +37,15 @@ logger = structlog.get_logger()
 
 # 禁用开关（环境变量 QUERY_OPTIMIZER_ENABLED=false 可运行时关闭）
 import os
+
 _ENABLED = os.getenv("QUERY_OPTIMIZER_ENABLED", "true").lower() != "false"
 
 # 向量DB中各领域的存储描述（用于 system prompt 引导改写方向）
 _DOMAIN_HINTS = {
-    "events":    "经营事件记录（营业额异常、设备故障、促销活动、特殊情况等）",
-    "revenue":   "营收订单数据（日销售额、时段客流、桌均消费、翻台率等）",
-    "menu":      "菜品信息（菜品名称、价格、食材用量、毛利率、销量排名等）",
-    "staff":     "员工排班记录（姓名、岗位、工时、绩效、排班冲突等）",
+    "events": "经营事件记录（营业额异常、设备故障、促销活动、特殊情况等）",
+    "revenue": "营收订单数据（日销售额、时段客流、桌均消费、翻台率等）",
+    "menu": "菜品信息（菜品名称、价格、食材用量、毛利率、销量排名等）",
+    "staff": "员工排班记录（姓名、岗位、工时、绩效、排班冲突等）",
     "inventory": "库存食材记录（食材名称、进货量、损耗量、过期浪费、库存预警等）",
 }
 
@@ -77,10 +78,11 @@ _SYSTEM_PROMPT = """\
 @dataclass
 class QueryOptimizationResult:
     """查询优化结果"""
+
     original_query: str
-    optimized_queries: List[str]         # 始终 ≥1 条（降级时等于 [original_query]）
+    optimized_queries: List[str]  # 始终 ≥1 条（降级时等于 [original_query]）
     reasoning: str = ""
-    optimized: bool = True               # False 表示降级未优化
+    optimized: bool = True  # False 表示降级未优化
 
 
 class QueryOptimizer:
@@ -125,7 +127,7 @@ class QueryOptimizer:
 
     @async_graceful_retry(
         HTTP_RETRY_CONFIG,
-        default_return=None,   # None 触发外层降级逻辑
+        default_return=None,  # None 触发外层降级逻辑
     )
     async def _call_llm(self, query: str, domain_hint: str) -> Optional[QueryOptimizationResult]:
         """实际 LLM 调用（被 graceful retry 包裹）。"""
@@ -157,9 +159,7 @@ class QueryOptimizer:
             optimized=optimized,
         )
 
-    async def _call_llm_with_fallback(
-        self, query: str, domain_hint: str
-    ) -> QueryOptimizationResult:
+    async def _call_llm_with_fallback(self, query: str, domain_hint: str) -> QueryOptimizationResult:
         """调用 LLM，任何失败都降级返回原始查询。"""
         result = await self._call_llm(query, domain_hint)
         if result is None:

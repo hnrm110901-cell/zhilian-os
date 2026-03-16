@@ -4,16 +4,19 @@ Voice Interaction Service
 
 支持语音命令识别、语音合成、与Agent系统集成
 """
+
 import os
-from typing import Dict, Any, Optional
-import structlog
 from enum import Enum
+from typing import Any, Dict, Optional
+
+import structlog
 
 logger = structlog.get_logger()
 
 
 class VoiceProvider(Enum):
     """语音服务提供商"""
+
     AZURE = "azure"  # Azure Speech Services
     GOOGLE = "google"  # Google Cloud Speech
     BAIDU = "baidu"  # 百度语音
@@ -144,6 +147,7 @@ class VoiceService:
         """Azure语音识别"""
         try:
             import httpx
+
             from ..core.config import settings
 
             if not settings.AZURE_SPEECH_KEY:
@@ -188,6 +192,7 @@ class VoiceService:
         """Azure语音合成"""
         try:
             import httpx
+
             from ..core.config import settings
 
             if not settings.AZURE_SPEECH_KEY:
@@ -248,9 +253,11 @@ class VoiceService:
     ) -> str:
         """百度语音识别"""
         try:
-            import httpx
-            import json
             import base64
+            import json
+
+            import httpx
+
             from ..core.config import settings
 
             # 获取access_token
@@ -263,7 +270,9 @@ class VoiceService:
 
             async with httpx.AsyncClient() as client:
                 # 获取token
-                token_response = await client.post(token_url, params=token_params, timeout=float(os.getenv("HTTP_TIMEOUT", "30.0")))
+                token_response = await client.post(
+                    token_url, params=token_params, timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
+                )
                 token_data = token_response.json()
                 access_token = token_data.get("access_token")
 
@@ -274,7 +283,7 @@ class VoiceService:
                 asr_url = "https://vop.baidu.com/server_api"
 
                 # 将音频数据转为base64
-                audio_base64 = base64.b64encode(audio_data).decode('utf-8')
+                audio_base64 = base64.b64encode(audio_data).decode("utf-8")
 
                 asr_data = {
                     "format": "pcm",  # 音频格式
@@ -290,7 +299,7 @@ class VoiceService:
                     asr_url,
                     json=asr_data,
                     headers={"Content-Type": "application/json"},
-                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
+                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0")),
                 )
                 result = asr_response.json()
 
@@ -315,8 +324,10 @@ class VoiceService:
     ) -> bytes:
         """百度语音合成"""
         try:
-            import httpx
             import json
+
+            import httpx
+
             from ..core.config import settings
 
             # 获取access_token
@@ -329,7 +340,9 @@ class VoiceService:
 
             async with httpx.AsyncClient() as client:
                 # 获取token
-                token_response = await client.post(token_url, params=token_params, timeout=float(os.getenv("HTTP_TIMEOUT", "30.0")))
+                token_response = await client.post(
+                    token_url, params=token_params, timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
+                )
                 token_data = token_response.json()
                 access_token = token_data.get("access_token")
 
@@ -342,7 +355,7 @@ class VoiceService:
                 # 语音参数映射
                 voice_map = {
                     "female": 0,  # 女声
-                    "male": 1,    # 男声
+                    "male": 1,  # 男声
                 }
 
                 tts_params = {
@@ -358,11 +371,7 @@ class VoiceService:
                     "ctp": 1,
                 }
 
-                tts_response = await client.post(
-                    tts_url,
-                    data=tts_params,
-                    timeout=float(os.getenv("HTTP_TIMEOUT", "30.0"))
-                )
+                tts_response = await client.post(tts_url, data=tts_params, timeout=float(os.getenv("HTTP_TIMEOUT", "30.0")))
 
                 # 检查是否返回音频数据
                 content_type = tts_response.headers.get("Content-Type", "")
@@ -388,6 +397,7 @@ class VoiceService:
     ) -> str:
         """讯飞语音识别 (WebSocket IAT)"""
         from .iflytek_websocket_service import iflytek_ws_service
+
         # 讯飞语言代码: zh-CN → zh_cn, en-US → en_us
         lang = language.lower().replace("-", "_")
         return await iflytek_ws_service.speech_to_text(
@@ -405,6 +415,7 @@ class VoiceService:
     ) -> bytes:
         """讯飞语音合成 (WebSocket TTS)"""
         from .iflytek_websocket_service import iflytek_ws_service
+
         voice_map = {"female": "xiaoyan", "male": "aisjiuxu"}
         vcn = voice_map.get(voice, "xiaoyan")
         speed_int = max(0, min(100, int(speed * 50)))

@@ -101,14 +101,30 @@ def upgrade() -> None:
     op.add_column("reservations", sa.Column("consumer_id", postgresql.UUID(as_uuid=True), nullable=True))
     op.create_index("idx_reservation_consumer_id", "reservations", ["consumer_id"])
 
-    op.add_column("queues", sa.Column("consumer_id", postgresql.UUID(as_uuid=True), nullable=True))
-    op.create_index("idx_queue_consumer_id", "queues", ["consumer_id"])
+    # queues 表可能尚未创建（模型存在但无迁移），安全跳过
+    op.execute(sa.text("""
+        DO $$ BEGIN
+            ALTER TABLE queues ADD COLUMN IF NOT EXISTS consumer_id UUID;
+        EXCEPTION WHEN undefined_table THEN NULL;
+        END $$
+    """))
+    op.execute(sa.text("""
+        DO $$ BEGIN
+            CREATE INDEX IF NOT EXISTS idx_queue_consumer_id ON queues (consumer_id);
+        EXCEPTION WHEN undefined_table THEN NULL;
+        END $$
+    """))
 
 
 def downgrade() -> None:
     # 三表移除 consumer_id
-    op.drop_index("idx_queue_consumer_id", "queues")
-    op.drop_column("queues", "consumer_id")
+    op.execute(sa.text("""
+        DO $$ BEGIN
+            DROP INDEX IF EXISTS idx_queue_consumer_id;
+            ALTER TABLE queues DROP COLUMN IF EXISTS consumer_id;
+        EXCEPTION WHEN undefined_table THEN NULL;
+        END $$
+    """))
 
     op.drop_index("idx_reservation_consumer_id", "reservations")
     op.drop_column("reservations", "consumer_id")

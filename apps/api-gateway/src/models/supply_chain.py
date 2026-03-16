@@ -1,10 +1,12 @@
 """
 供应链相关数据模型
 """
-from sqlalchemy import Column, String, Float, Integer, DateTime, Text, ForeignKey, JSON
-from sqlalchemy.orm import relationship
-from datetime import datetime
+
 import uuid
+from datetime import datetime
+
+from sqlalchemy import JSON, Column, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import relationship
 
 from .base import Base
 

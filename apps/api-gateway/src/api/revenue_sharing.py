@@ -2,6 +2,7 @@
 
 ISV 月度结算：基于插件安装量 + 定价模型计算应付分成，支持管理员审核付款。
 """
+
 import re
 import uuid
 from typing import Optional
@@ -11,7 +12,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 
 logger = structlog.get_logger()
@@ -38,7 +38,7 @@ VALID_TRANSITIONS: dict[str, set[str]] = {
     "paid": set(),
 }
 
-PERIOD_RE = re.compile(r'^\d{4}-(?:0[1-9]|1[0-2])$')
+PERIOD_RE = re.compile(r"^\d{4}-(?:0[1-9]|1[0-2])$")
 
 # ── Pydantic models ────────────────────────────────────────────────────────────
 
@@ -138,9 +138,12 @@ async def generate_settlements(
                     WHERE developer_id = :dev_id AND period = :period
                 """),
                 {
-                    "installed": installed_count, "gross": gross_fen,
-                    "share_pct": share_pct, "net": net_fen,
-                    "dev_id": dev.id, "period": period,
+                    "installed": installed_count,
+                    "gross": gross_fen,
+                    "share_pct": share_pct,
+                    "net": net_fen,
+                    "dev_id": dev.id,
+                    "period": period,
                 },
             )
             updated += 1
@@ -153,9 +156,13 @@ async def generate_settlements(
                     VALUES (:id, :dev_id, :period, :installed, :gross, :share_pct, :net)
                 """),
                 {
-                    "id": record_id, "dev_id": dev.id, "period": period,
-                    "installed": installed_count, "gross": gross_fen,
-                    "share_pct": share_pct, "net": net_fen,
+                    "id": record_id,
+                    "dev_id": dev.id,
+                    "period": period,
+                    "installed": installed_count,
+                    "gross": gross_fen,
+                    "share_pct": share_pct,
+                    "net": net_fen,
                 },
             )
             created += 1

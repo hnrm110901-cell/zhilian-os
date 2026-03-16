@@ -3,12 +3,12 @@
 前缀: /api/v1/supplier-intel
 跨系统供应商评分：B2B采购 + 食品安全溯源 + 价格趋势
 """
+
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.core.dependencies import require_role
 from src.models.user import User, UserRole

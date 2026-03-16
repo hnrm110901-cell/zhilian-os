@@ -2,14 +2,16 @@
 监控中间件
 自动记录请求性能和错误
 """
+
 import time
 import uuid
+
+import structlog
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
-import structlog
 
-from ..core.monitoring import error_monitor, ErrorSeverity, ErrorCategory
+from ..core.monitoring import ErrorCategory, ErrorSeverity, error_monitor
 
 logger = structlog.get_logger()
 

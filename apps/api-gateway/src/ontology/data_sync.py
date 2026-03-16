@@ -14,12 +14,12 @@
   - 库存快照写入
 """
 
-import os
 import hashlib
-import structlog
+import os
 from datetime import datetime
 from typing import Optional
 
+import structlog
 from neo4j import GraphDatabase
 
 logger = structlog.get_logger()
@@ -56,17 +56,17 @@ class OntologyDataSync:
 
     def upsert_store(
         self,
-        store_id:           str,
-        name:               str,
-        region:             str,
-        city:               str,
-        tier:               str,
-        seats:              int   = 0,
-        area:               float = 0.0,
-        status:             str   = "active",
-        opening_date:       str   = "",
-        peer_group:         str   = "",
-        waste_rate_p30d:    Optional[float] = None,
+        store_id: str,
+        name: str,
+        region: str,
+        city: str,
+        tier: str,
+        seats: int = 0,
+        area: float = 0.0,
+        status: str = "active",
+        opening_date: str = "",
+        peer_group: str = "",
+        waste_rate_p30d: Optional[float] = None,
         menu_coverage_p30d: Optional[float] = None,
     ) -> None:
         """
@@ -126,12 +126,12 @@ class OntologyDataSync:
 
     def create_similar_to_edge(
         self,
-        store_a_id:      str,
-        store_b_id:      str,
+        store_a_id: str,
+        store_b_id: str,
         similarity_score: float,
-        menu_overlap:    float  = 0.0,
-        tier_match:      bool   = False,
-        region_match:    bool   = False,
+        menu_overlap: float = 0.0,
+        tier_match: bool = False,
+        region_match: bool = False,
     ) -> None:
         """
         建立双向相似门店边（无方向语义，MERGE 两条有方向边）：
@@ -145,10 +145,10 @@ class OntologyDataSync:
         """
         props = {
             "similarity_score": similarity_score,
-            "menu_overlap":     menu_overlap,
-            "tier_match":       tier_match,
-            "region_match":     region_match,
-            "computed_at":      int(__import__("time").time() * 1000),
+            "menu_overlap": menu_overlap,
+            "tier_match": tier_match,
+            "region_match": region_match,
+            "computed_at": int(__import__("time").time() * 1000),
         }
         with self.driver.session() as session:
             for a, b in [(store_a_id, store_b_id), (store_b_id, store_a_id)]:
@@ -168,7 +168,8 @@ class OntologyDataSync:
                         r.menu_overlap     = $menu_overlap,
                         r.computed_at      = $computed_at
                     """,
-                    a=a, b=b,
+                    a=a,
+                    b=b,
                     score=similarity_score,
                     menu_overlap=menu_overlap,
                     tier_match=tier_match,
@@ -177,18 +178,19 @@ class OntologyDataSync:
                 )
         logger.debug(
             "SIMILAR_TO 边建立",
-            a=store_a_id, b=store_b_id,
+            a=store_a_id,
+            b=store_b_id,
             score=similarity_score,
         )
 
     def create_benchmark_of_edge(
         self,
-        store_id:    str,
+        store_id: str,
         metric_name: str,
-        percentile:  float,
-        value:       float,
-        peer_group:  str,
-        peer_p50:    float,
+        percentile: float,
+        value: float,
+        peer_group: str,
+        peer_p50: float,
     ) -> None:
         """
         建立门店→基准快照边，保留每日多版本（不 MERGE，直接 CREATE）：
@@ -198,6 +200,7 @@ class OntologyDataSync:
         因为 BenchmarkSnapshot 按日追加，用时间戳作为节点 ID 的一部分。
         """
         import time
+
         snap_id = f"BENCH-{store_id}-{metric_name}-{int(time.time() // 86400)}"
         with self.driver.session() as session:
             session.run(
@@ -236,17 +239,19 @@ class OntologyDataSync:
             )
         logger.debug(
             "BENCHMARK_OF 边建立",
-            store_id=store_id, metric=metric_name, percentile=percentile,
+            store_id=store_id,
+            metric=metric_name,
+            percentile=percentile,
         )
 
     def create_shares_recipe_edge(
         self,
-        store_a_id:    str,
-        store_b_id:    str,
-        dish_id:       str,
+        store_a_id: str,
+        store_b_id: str,
+        dish_id: str,
         ingredient_id: str,
-        variance_pct:  float,
-        mean_qty:      float,
+        variance_pct: float,
+        mean_qty: float,
     ) -> None:
         """
         建立两门店间同菜品食材用量差异边：
@@ -278,7 +283,8 @@ class OntologyDataSync:
                     r.variance_pct = $variance_pct,
                     r.mean_qty     = $mean_qty
                 """,
-                a=store_a_id, b=store_b_id,
+                a=store_a_id,
+                b=store_b_id,
                 dish_id=dish_id,
                 ingredient_id=ingredient_id,
                 variance_pct=variance_pct,
@@ -475,6 +481,7 @@ class OntologyDataSync:
         追加写入库存快照节点，返回 snapshot_id
         """
         import time
+
         ts = timestamp_ms or int(time.time() * 1000)
         # 用时间戳+食材ID生成确定性 snapshot_id
         raw = f"{ingredient_id}:{ts}"
@@ -510,14 +517,14 @@ class OntologyDataSync:
 
     def upsert_ingredient_mapping(
         self,
-        canonical_id:     str,
-        canonical_name:   str,
-        category:         str,
-        unit:             str,
-        external_ids:     dict,
+        canonical_id: str,
+        canonical_name: str,
+        category: str,
+        unit: str,
+        external_ids: dict,
         fusion_confidence: float,
-        fusion_method:    str,
-        conflict_flag:    bool = False,
+        fusion_method: str,
+        conflict_flag: bool = False,
         canonical_cost_fen: int = 0,
     ) -> None:
         """
@@ -576,11 +583,11 @@ class OntologyDataSync:
 
     def link_external_source(
         self,
-        canonical_id:  str,
+        canonical_id: str,
         source_system: str,
-        external_id:   str,
-        confidence:    float,
-        method:        str,
+        external_id: str,
+        confidence: float,
+        method: str,
     ) -> None:
         """
         将外部系统食材节点链接到规范 IngredientMapping：
@@ -626,8 +633,8 @@ class OntologyDataSync:
         self,
         canonical_id_a: str,
         canonical_id_b: str,
-        reason:         str,
-        confidence:     float,
+        reason: str,
+        confidence: float,
     ) -> None:
         """
         在两个 IngredientMapping 间建立 SOURCE_CONFLICT 关系
@@ -661,9 +668,7 @@ class OntologyDataSync:
                 reason=reason,
             )
 
-    def upsert_store_external_ids(
-        self, store_id: str, external_ids: dict
-    ) -> None:
+    def upsert_store_external_ids(self, store_id: str, external_ids: dict) -> None:
         """
         将门店的多源外部 ID 写入 Store 节点属性。
         external_ids = {"meituan_poi": "12345678", "tiancai": "TC-BJ-001",
@@ -693,14 +698,14 @@ class OntologyDataSync:
 
     def upsert_reasoning_report(
         self,
-        report_id:    str,
-        store_id:     str,
-        report_date:  str,           # ISO date string "2026-02-28"
-        dimension:    str,
-        severity:     str,           # P1/P2/P3/OK
-        root_cause:   Optional[str],
-        confidence:   float,
-        triggered_rules: list,       # List[str] rule_codes
+        report_id: str,
+        store_id: str,
+        report_date: str,  # ISO date string "2026-02-28"
+        dimension: str,
+        severity: str,  # P1/P2/P3/OK
+        root_cause: Optional[str],
+        confidence: float,
+        triggered_rules: list,  # List[str] rule_codes
     ) -> None:
         """
         在 Neo4j 中写入 ReasoningReport 节点，并创建 Store→HAS_REPORT→ReasoningReport 边。

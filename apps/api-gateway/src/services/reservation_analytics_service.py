@@ -2,17 +2,17 @@
 预订数据分析引擎 — 8维度深度分析
 提供：总览/渠道ROI/高峰热力图/客户洞察/No-Show预测/营收影响/取消深度/趋势
 """
+
 import logging
+from collections import defaultdict
 from datetime import date, datetime, timedelta
 from typing import Optional
-from collections import defaultdict
 
-from sqlalchemy import select, and_, func, case, extract, text, distinct
+from sqlalchemy import and_, case, distinct, extract, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.models.reservation import Reservation, ReservationStatus, ReservationType
-from src.models.reservation_channel import ReservationChannel, ChannelType
 from src.models.order import Order
+from src.models.reservation import Reservation, ReservationStatus, ReservationType
+from src.models.reservation_channel import ChannelType, ReservationChannel
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +22,7 @@ class ReservationAnalyticsService:
 
     # ── 1. 总览 ──────────────────────────────────────────
 
-    async def get_overview(
-        self, db: AsyncSession, store_id: str, start_date: date, end_date: date
-    ) -> dict:
+    async def get_overview(self, db: AsyncSession, store_id: str, start_date: date, end_date: date) -> dict:
         """预订经营总览"""
         base_filter = and_(
             Reservation.store_id == store_id,
@@ -51,7 +49,12 @@ class ReservationAnalyticsService:
             total += row.cnt
             total_guests += row.total_guests or 0
 
-        confirmed = status_map.get("confirmed", 0) + status_map.get("completed", 0) + status_map.get("seated", 0) + status_map.get("arrived", 0)
+        confirmed = (
+            status_map.get("confirmed", 0)
+            + status_map.get("completed", 0)
+            + status_map.get("seated", 0)
+            + status_map.get("arrived", 0)
+        )
         cancelled = status_map.get("cancelled", 0)
         no_show = status_map.get("no_show", 0)
 
@@ -90,9 +93,7 @@ class ReservationAnalyticsService:
 
     # ── 2. 渠道ROI ──────────────────────────────────────
 
-    async def get_channel_roi(
-        self, db: AsyncSession, store_id: str, start_date: date, end_date: date
-    ) -> dict:
+    async def get_channel_roi(self, db: AsyncSession, store_id: str, start_date: date, end_date: date) -> dict:
         """各渠道预订量/转化率/佣金成本"""
         result = await db.execute(
             select(
@@ -120,11 +121,13 @@ class ReservationAnalyticsService:
             comm = float(row.commission or 0)
             total_count += cnt
             total_commission += comm
-            channels.append({
-                "channel": ch,
-                "count": cnt,
-                "commission_yuan": round(comm, 2),
-            })
+            channels.append(
+                {
+                    "channel": ch,
+                    "count": cnt,
+                    "commission_yuan": round(comm, 2),
+                }
+            )
 
         # 每个渠道的转化率（完成/总数）
         for ch_data in channels:
@@ -146,7 +149,9 @@ class ReservationAnalyticsService:
             ch_data["completed"] = completed
             ch_data["conversion_rate"] = round(completed / ch_data["count"] * 100, 1) if ch_data["count"] > 0 else 0
             ch_data["percentage"] = round(ch_data["count"] / total_count * 100, 1) if total_count > 0 else 0
-            ch_data["cost_per_reservation"] = round(ch_data["commission_yuan"] / ch_data["count"], 2) if ch_data["count"] > 0 else 0
+            ch_data["cost_per_reservation"] = (
+                round(ch_data["commission_yuan"] / ch_data["count"], 2) if ch_data["count"] > 0 else 0
+            )
 
         channels.sort(key=lambda x: x["count"], reverse=True)
 
@@ -158,9 +163,7 @@ class ReservationAnalyticsService:
 
     # ── 3. 高峰时段热力图 ──────────────────────────────
 
-    async def get_peak_heatmap(
-        self, db: AsyncSession, store_id: str, start_date: date, end_date: date
-    ) -> dict:
+    async def get_peak_heatmap(self, db: AsyncSession, store_id: str, start_date: date, end_date: date) -> dict:
         """按星期×时段的预订分布热力图"""
         result = await db.execute(
             select(
@@ -186,13 +189,15 @@ class ReservationAnalyticsService:
         for row in result.all():
             dow = int(row.dow)
             hour = int(row.hour)
-            heatmap.append({
-                "day": dow,
-                "day_name": day_names[dow],
-                "hour": hour,
-                "count": row.cnt,
-                "guests": row.guests or 0,
-            })
+            heatmap.append(
+                {
+                    "day": dow,
+                    "day_name": day_names[dow],
+                    "hour": hour,
+                    "count": row.cnt,
+                    "guests": row.guests or 0,
+                }
+            )
 
         # 找出最高峰
         peak = max(heatmap, key=lambda x: x["count"]) if heatmap else None
@@ -211,9 +216,7 @@ class ReservationAnalyticsService:
 
     # ── 4. 客户洞察 ──────────────────────────────────────
 
-    async def get_customer_insights(
-        self, db: AsyncSession, store_id: str, start_date: date, end_date: date
-    ) -> dict:
+    async def get_customer_insights(self, db: AsyncSession, store_id: str, start_date: date, end_date: date) -> dict:
         """新客/回头客/VIP分析"""
         # 当期所有不同手机号
         current_phones = await db.execute(
@@ -242,10 +245,9 @@ class ReservationAnalyticsService:
             # 分批查询避免参数过多
             batch_size = 500
             for i in range(0, len(phones_in_period), batch_size):
-                batch = phones_in_period[i:i + batch_size]
+                batch = phones_in_period[i : i + batch_size]
                 prior_result = await db.execute(
-                    select(func.count(distinct(Reservation.customer_phone)))
-                    .where(
+                    select(func.count(distinct(Reservation.customer_phone))).where(
                         and_(
                             Reservation.store_id == store_id,
                             Reservation.reservation_date < start_date,
@@ -272,24 +274,21 @@ class ReservationAnalyticsService:
             "returning_rate": round(returning_count / total_customers * 100, 1) if total_customers > 0 else 0,
             "frequent_customers": len(frequent),
             "big_party_customers": len(big_party),
-            "avg_visits_per_customer": round(
-                sum(c.visit_count for c in customers) / total_customers, 2
-            ) if total_customers > 0 else 0,
+            "avg_visits_per_customer": (
+                round(sum(c.visit_count for c in customers) / total_customers, 2) if total_customers > 0 else 0
+            ),
         }
 
     # ── 5. No-Show 风险预测 ──────────────────────────────
 
-    async def get_no_show_risk(
-        self, db: AsyncSession, store_id: str, target_date: Optional[date] = None
-    ) -> dict:
+    async def get_no_show_risk(self, db: AsyncSession, store_id: str, target_date: Optional[date] = None) -> dict:
         """基于历史数据预测明天/指定日期的 No-Show 风险"""
         if not target_date:
             target_date = date.today() + timedelta(days=1)
 
         # 获取目标日期的预订
         upcoming = await db.execute(
-            select(Reservation)
-            .where(
+            select(Reservation).where(
                 and_(
                     Reservation.store_id == store_id,
                     Reservation.reservation_date == target_date,
@@ -306,14 +305,9 @@ class ReservationAnalyticsService:
             history = await db.execute(
                 select(
                     func.count(Reservation.id).label("total"),
-                    func.sum(
-                        case((Reservation.status == ReservationStatus.NO_SHOW, 1), else_=0)
-                    ).label("no_shows"),
-                    func.sum(
-                        case((Reservation.status == ReservationStatus.CANCELLED, 1), else_=0)
-                    ).label("cancels"),
-                )
-                .where(
+                    func.sum(case((Reservation.status == ReservationStatus.NO_SHOW, 1), else_=0)).label("no_shows"),
+                    func.sum(case((Reservation.status == ReservationStatus.CANCELLED, 1), else_=0)).label("cancels"),
+                ).where(
                     and_(
                         Reservation.customer_phone == r.customer_phone,
                         Reservation.store_id == store_id,
@@ -346,19 +340,21 @@ class ReservationAnalyticsService:
             if r.status == ReservationStatus.PENDING:
                 risk_score = min(100, risk_score + 10)
 
-            risk_list.append({
-                "reservation_id": r.id,
-                "customer_name": r.customer_name,
-                "customer_phone": r.customer_phone[-4:],  # 脱敏
-                "party_size": r.party_size,
-                "time": str(r.reservation_time)[:5],
-                "status": r.status.value,
-                "risk_score": risk_score,
-                "risk_level": risk_level,
-                "history_visits": total_history,
-                "history_no_shows": no_shows,
-                "suggestion": self._no_show_suggestion(risk_level, r.status.value),
-            })
+            risk_list.append(
+                {
+                    "reservation_id": r.id,
+                    "customer_name": r.customer_name,
+                    "customer_phone": r.customer_phone[-4:],  # 脱敏
+                    "party_size": r.party_size,
+                    "time": str(r.reservation_time)[:5],
+                    "status": r.status.value,
+                    "risk_score": risk_score,
+                    "risk_level": risk_level,
+                    "history_visits": total_history,
+                    "history_no_shows": no_shows,
+                    "suggestion": self._no_show_suggestion(risk_level, r.status.value),
+                }
+            )
 
         risk_list.sort(key=lambda x: x["risk_score"], reverse=True)
 
@@ -386,9 +382,7 @@ class ReservationAnalyticsService:
 
     # ── 6. 营收影响分析 ──────────────────────────────────
 
-    async def get_revenue_impact(
-        self, db: AsyncSession, store_id: str, start_date: date, end_date: date
-    ) -> dict:
+    async def get_revenue_impact(self, db: AsyncSession, store_id: str, start_date: date, end_date: date) -> dict:
         """预订客 vs 非预订客的消费对比"""
         # 有预订的订单（通过 table_number 匹配或时间重叠）
         # 简化逻辑：统计有预订记录且完成的客户的消费
@@ -397,8 +391,7 @@ class ReservationAnalyticsService:
                 func.count(Reservation.id).label("count"),
                 func.sum(Reservation.party_size).label("guests"),
                 func.avg(Reservation.estimated_budget).label("avg_budget"),
-            )
-            .where(
+            ).where(
                 and_(
                     Reservation.store_id == store_id,
                     Reservation.reservation_date >= start_date,
@@ -415,8 +408,7 @@ class ReservationAnalyticsService:
                 func.count(Reservation.id).label("count"),
                 func.sum(Reservation.party_size).label("guests"),
                 func.sum(Reservation.estimated_budget).label("lost_budget"),
-            )
-            .where(
+            ).where(
                 and_(
                     Reservation.store_id == store_id,
                     Reservation.reservation_date >= start_date,
@@ -433,8 +425,7 @@ class ReservationAnalyticsService:
                 func.count(Reservation.id).label("count"),
                 func.sum(Reservation.party_size).label("guests"),
                 func.sum(Reservation.estimated_budget).label("lost_budget"),
-            )
-            .where(
+            ).where(
                 and_(
                     Reservation.store_id == store_id,
                     Reservation.reservation_date >= start_date,
@@ -481,13 +472,10 @@ class ReservationAnalyticsService:
 
     # ── 7. 取消深度分析 ──────────────────────────────────
 
-    async def get_cancellation_deep(
-        self, db: AsyncSession, store_id: str, start_date: date, end_date: date
-    ) -> dict:
+    async def get_cancellation_deep(self, db: AsyncSession, store_id: str, start_date: date, end_date: date) -> dict:
         """取消预订的深度分析：提前量/时段分布/损失"""
         result = await db.execute(
-            select(Reservation)
-            .where(
+            select(Reservation).where(
                 and_(
                     Reservation.store_id == store_id,
                     Reservation.reservation_date >= start_date,
@@ -568,9 +556,7 @@ class ReservationAnalyticsService:
 
     # ── 8. 每日趋势 ──────────────────────────────────────
 
-    async def get_daily_trend(
-        self, db: AsyncSession, store_id: str, days: int = 30
-    ) -> dict:
+    async def get_daily_trend(self, db: AsyncSession, store_id: str, days: int = 30) -> dict:
         """每日预订量/确认量/取消量折线数据"""
         end_date = date.today()
         start_date = end_date - timedelta(days=days - 1)
@@ -594,7 +580,9 @@ class ReservationAnalyticsService:
         )
 
         # 按日期聚合
-        daily_data = defaultdict(lambda: {"total": 0, "confirmed": 0, "cancelled": 0, "no_show": 0, "completed": 0, "guests": 0})
+        daily_data = defaultdict(
+            lambda: {"total": 0, "confirmed": 0, "cancelled": 0, "no_show": 0, "completed": 0, "guests": 0}
+        )
         for row in result.all():
             d = row.reservation_date.isoformat()
             status = row.status.value if hasattr(row.status, "value") else str(row.status)

@@ -9,13 +9,13 @@ MemberAgent Service — CDP 驱动的会员生命周期管理（Sprint 3）
 
 Sprint 3 KPI: 沉睡唤醒 ≥ 50条/周
 """
+
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, List
+from typing import List, Optional
 
-from sqlalchemy import select, func, and_, update
+from sqlalchemy import and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.models.consumer_identity import ConsumerIdentity
 from src.models.private_domain import PrivateDomainMember
 
@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 # ── 纯函数 ──────────────────────────────────────────────────────
+
 
 def classify_dormant_urgency(recency_days: int, monetary_fen: int) -> str:
     """
@@ -121,17 +122,19 @@ class MemberAgentService:
         members = []
         for row in rows:
             urgency = classify_dormant_urgency(row[3] or 0, row[4] or 0)
-            members.append({
-                "member_id": str(row[0]),
-                "consumer_id": str(row[1]),
-                "customer_id": row[2],
-                "recency_days": row[3],
-                "monetary_yuan": round((row[4] or 0) / 100, 2),
-                "frequency": row[5],
-                "rfm_level": row[6],
-                "has_wechat": bool(row[7]),
-                "urgency": urgency,
-            })
+            members.append(
+                {
+                    "member_id": str(row[0]),
+                    "consumer_id": str(row[1]),
+                    "customer_id": row[2],
+                    "recency_days": row[3],
+                    "monetary_yuan": round((row[4] or 0) / 100, 2),
+                    "frequency": row[5],
+                    "rfm_level": row[6],
+                    "has_wechat": bool(row[7]),
+                    "urgency": urgency,
+                }
+            )
 
         return members
 
@@ -156,7 +159,8 @@ class MemberAgentService:
         """
         # Step 1: 扫描
         dormant = await self.scan_dormant_members(
-            db, store_id,
+            db,
+            store_id,
             min_recency_days=min_recency_days,
             limit=max_count * 2,
         )
@@ -179,6 +183,7 @@ class MemberAgentService:
             try:
                 # 调用 JourneyOrchestrator 触发
                 from src.services.journey_orchestrator import journey_orchestrator
+
                 await journey_orchestrator.trigger(
                     customer_id=member["customer_id"],
                     store_id=store_id,
@@ -189,13 +194,17 @@ class MemberAgentService:
             except Exception as e:
                 logger.warning(
                     "MemberAgent wakeup trigger failed: member=%s error=%s",
-                    member["member_id"], e,
+                    member["member_id"],
+                    e,
                 )
 
         await db.flush()
         logger.info(
             "MemberAgent batch_wakeup: store=%s scanned=%d eligible=%d triggered=%d",
-            store_id, len(dormant), len(eligible), triggered,
+            store_id,
+            len(dormant),
+            len(eligible),
+            triggered,
         )
         return {
             "scanned": len(dormant),
@@ -219,29 +228,35 @@ class MemberAgentService:
         - 唤醒后回店率（consumer_id 在唤醒后有新订单）
         - 按 RFM 等级分布
         """
-        from src.models.private_domain import PrivateDomainJourney
         from src.models.order import Order
+        from src.models.private_domain import PrivateDomainJourney
 
         cutoff = datetime.utcnow() - timedelta(days=days)
 
         # 统计本周触发的唤醒旅程
-        sent_count = await db.scalar(
-            select(func.count(PrivateDomainJourney.id)).where(
-                PrivateDomainJourney.store_id == store_id,
-                PrivateDomainJourney.journey_type == "dormant_wakeup",
-                PrivateDomainJourney.started_at >= cutoff,
+        sent_count = (
+            await db.scalar(
+                select(func.count(PrivateDomainJourney.id)).where(
+                    PrivateDomainJourney.store_id == store_id,
+                    PrivateDomainJourney.journey_type == "dormant_wakeup",
+                    PrivateDomainJourney.started_at >= cutoff,
+                )
             )
-        ) or 0
+            or 0
+        )
 
         # 统计唤醒后有回店的（started journey + has order after journey start）
         converted = 0
-        total_journeys = await db.scalar(
-            select(func.count(PrivateDomainJourney.id)).where(
-                PrivateDomainJourney.store_id == store_id,
-                PrivateDomainJourney.journey_type == "dormant_wakeup",
-                PrivateDomainJourney.started_at >= cutoff - timedelta(days=30),
+        total_journeys = (
+            await db.scalar(
+                select(func.count(PrivateDomainJourney.id)).where(
+                    PrivateDomainJourney.store_id == store_id,
+                    PrivateDomainJourney.journey_type == "dormant_wakeup",
+                    PrivateDomainJourney.started_at >= cutoff - timedelta(days=30),
+                )
             )
-        ) or 0
+            or 0
+        )
 
         conversion_rate = round(converted / total_journeys, 4) if total_journeys > 0 else 0.0
 
@@ -302,15 +317,17 @@ class MemberAgentService:
         result = await db.execute(stmt)
         alerts = []
         for row in result.all():
-            alerts.append({
-                "consumer_id": str(row[0]) if row[0] else None,
-                "customer_id": row[1],
-                "recency_days": row[2],
-                "total_spent_yuan": round((row[3] or 0) / 100, 2),
-                "frequency": row[4],
-                "suggested_action": "立即安排店长电话回访",
-                "estimated_loss_yuan": round((row[3] or 0) / 100 * 0.3, 2),  # 预估年化损失30%
-            })
+            alerts.append(
+                {
+                    "consumer_id": str(row[0]) if row[0] else None,
+                    "customer_id": row[1],
+                    "recency_days": row[2],
+                    "total_spent_yuan": round((row[3] or 0) / 100, 2),
+                    "frequency": row[4],
+                    "suggested_action": "立即安排店长电话回访",
+                    "estimated_loss_yuan": round((row[3] or 0) / 100 * 0.3, 2),  # 预估年化损失30%
+                }
+            )
         return alerts
 
     def _urgency_breakdown(self, members: List[dict]) -> dict:

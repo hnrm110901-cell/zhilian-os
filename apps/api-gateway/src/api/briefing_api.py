@@ -9,12 +9,12 @@ Store Manager Daily Briefing API
   POST /api/v1/briefing/sm/celery-push         — 触发 Celery 异步推送全部门店
 """
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-import structlog
 
-from ..core.dependencies import get_current_active_user
 from ..core.database import get_db
+from ..core.dependencies import get_current_active_user
 from ..models.user import User
 
 router = APIRouter(prefix="/api/v1/briefing", tags=["briefing"])
@@ -37,6 +37,7 @@ async def get_sm_briefing(
     - push_text：企微推送正文（可直接预览）
     """
     from ..services.store_manager_briefing_service import generate_briefing
+
     try:
         return await generate_briefing(store_id, db)
     except Exception as exc:
@@ -55,6 +56,7 @@ async def push_sm_briefing(
     推送失败时返回 briefing 结构 + 错误信息，不抛 500。
     """
     from ..services.store_manager_briefing_service import push_briefing
+
     try:
         return await push_briefing(store_id, db, dry_run=False)
     except Exception as exc:
@@ -73,6 +75,7 @@ async def dry_run_sm_briefing(
     返回与 push 完全相同的结构，pushed=false。
     """
     from ..services.store_manager_briefing_service import push_briefing
+
     try:
         return await push_briefing(store_id, db, dry_run=True)
     except Exception as exc:
@@ -90,6 +93,7 @@ async def trigger_celery_briefing(
     """
     try:
         from ..core.celery_tasks import push_sm_daily_briefing
+
         task = push_sm_daily_briefing.apply_async(queue="default", priority=9)
         return {"task_id": task.id, "status": "queued"}
     except Exception as exc:

@@ -1,0 +1,227 @@
+/* ── MyPayslipPage ────────────────────────────────── */
+
+.page {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 100vh;
+  background: #f5f5f5;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #333;
+  margin: 0;
+}
+
+.monthSelect {
+  padding: 6px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #333;
+  background: #fff;
+  min-height: 44px;
+}
+
+.loading {
+  text-align: center;
+  padding: 48px;
+  color: #999;
+  font-size: 14px;
+}
+
+/* ── Empty ────────────────────────────────────────── */
+
+.emptyCard {
+  background: #fff;
+  border-radius: 12px;
+  padding: 48px 16px;
+  text-align: center;
+}
+
+.emptyIcon { font-size: 48px; margin-bottom: 12px; }
+.emptyText { font-size: 14px; color: #999; }
+
+/* ── Total Card ──────────────────────────────────── */
+
+.totalCard {
+  background: linear-gradient(135deg, #0AAF9A, #08C9B0);
+  border-radius: 12px;
+  padding: 24px 20px;
+  text-align: center;
+  color: #fff;
+}
+
+.totalLabel {
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.totalAmount {
+  font-size: 36px;
+  font-weight: 700;
+  margin: 8px 0;
+}
+
+.currency {
+  font-size: 20px;
+  font-weight: 400;
+  margin-right: 2px;
+}
+
+.totalSub {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.confirmBtn {
+  margin-top: 16px;
+  padding: 10px 32px;
+  background: rgba(255, 255, 255, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 24px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.confirmBtn:active { background: rgba(255, 255, 255, 0.35); }
+.confirmBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.confirmedBadge {
+  display: inline-block;
+  margin-top: 12px;
+  padding: 4px 16px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+/* ── Card ─────────────────────────────────────────── */
+
+.card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.cardTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dotGreen {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #27AE60;
+  display: inline-block;
+}
+
+.dotRed {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #EB5757;
+  display: inline-block;
+}
+
+/* ── Item Row ─────────────────────────────────────── */
+
+.itemRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.itemRow:last-child { border-bottom: none; }
+
+.itemName {
+  font-size: 13px;
+  color: #666;
+}
+
+.itemAmountGreen {
+  font-size: 14px;
+  font-weight: 600;
+  color: #27AE60;
+}
+
+.itemAmountRed {
+  font-size: 14px;
+  font-weight: 600;
+  color: #EB5757;
+}
+
+.itemRowTotal {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0 0;
+  border-top: 1px solid #eee;
+  margin-top: 4px;
+  font-weight: 600;
+  font-size: 14px;
+  color: #333;
+}
+
+/* ── History ──────────────────────────────────────── */
+
+.historyRow {
+  display: flex;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.historyRow:last-child { border-bottom: none; }
+.historyRow:active { background: #fafafa; }
+
+.historyMonth {
+  flex: 1;
+  font-size: 14px;
+  color: #333;
+}
+
+.historyAmount {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-right: 12px;
+}
+
+.statusConfirmed {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(39, 174, 96, 0.1);
+  color: #27AE60;
+}
+
+.statusPending {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(242, 153, 74, 0.1);
+  color: #F2994A;
+}

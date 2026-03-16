@@ -2,16 +2,17 @@
 审计日志服务
 记录和查询系统操作日志
 """
+
 import csv
 import io
 import os
-from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_, func, desc
-import structlog
+from typing import Any, Dict, List, Optional
 
-from src.models.audit_log import AuditLog, AuditAction, ResourceType
+import structlog
+from sqlalchemy import and_, desc, func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from src.models.audit_log import AuditAction, AuditLog, ResourceType
 
 logger = structlog.get_logger()
 
@@ -38,7 +39,7 @@ class AuditLogService:
         status: str = "success",
         error_message: Optional[str] = None,
         store_id: Optional[str] = None,
-        db: Optional[AsyncSession] = None
+        db: Optional[AsyncSession] = None,
     ) -> AuditLog:
         """
         记录审计日志
@@ -99,7 +100,7 @@ class AuditLogService:
                 action=action,
                 resource_type=resource_type,
                 user_id=user_id,
-                status=status
+                status=status,
             )
 
             return audit_log
@@ -117,7 +118,7 @@ class AuditLogService:
         search_query: Optional[str] = None,
         skip: int = 0,
         limit: int = int(os.getenv("AUDIT_QUERY_LIMIT", "100")),
-        db: Optional[AsyncSession] = None
+        db: Optional[AsyncSession] = None,
     ) -> tuple[List[AuditLog], int]:
         """
         查询审计日志
@@ -198,10 +199,7 @@ class AuditLogService:
             return list(logs), total
 
     async def get_user_activity_stats(
-        self,
-        user_id: str,
-        days: int = int(os.getenv("AUDIT_STATS_DAYS_SHORT", "30")),
-        db: Optional[AsyncSession] = None
+        self, user_id: str, days: int = int(os.getenv("AUDIT_STATS_DAYS_SHORT", "30")), db: Optional[AsyncSession] = None
     ) -> Dict[str, Any]:
         """
         获取用户活动统计
@@ -221,21 +219,14 @@ class AuditLogService:
         async with get_db_session() as session:
             # 总操作数
             total_stmt = select(func.count(AuditLog.id)).where(
-                and_(
-                    AuditLog.user_id == user_id,
-                    AuditLog.created_at >= start_date
-                )
+                and_(AuditLog.user_id == user_id, AuditLog.created_at >= start_date)
             )
             total_result = await session.execute(total_stmt)
             total_actions = total_result.scalar() or 0
 
             # 成功操作数
             success_stmt = select(func.count(AuditLog.id)).where(
-                and_(
-                    AuditLog.user_id == user_id,
-                    AuditLog.created_at >= start_date,
-                    AuditLog.status == "success"
-                )
+                and_(AuditLog.user_id == user_id, AuditLog.created_at >= start_date, AuditLog.status == "success")
             )
             success_result = await session.execute(success_stmt)
             success_actions = success_result.scalar() or 0
@@ -244,26 +235,22 @@ class AuditLogService:
             failed_actions = total_actions - success_actions
 
             # 按操作类型统计
-            action_stats_stmt = select(
-                AuditLog.action,
-                func.count(AuditLog.id).label('count')
-            ).where(
-                and_(
-                    AuditLog.user_id == user_id,
-                    AuditLog.created_at >= start_date
-                )
-            ).group_by(AuditLog.action)
+            action_stats_stmt = (
+                select(AuditLog.action, func.count(AuditLog.id).label("count"))
+                .where(and_(AuditLog.user_id == user_id, AuditLog.created_at >= start_date))
+                .group_by(AuditLog.action)
+            )
 
             action_stats_result = await session.execute(action_stats_stmt)
             action_stats = {row[0]: row[1] for row in action_stats_result}
 
             # 最近登录时间
-            last_login_stmt = select(AuditLog.created_at).where(
-                and_(
-                    AuditLog.user_id == user_id,
-                    AuditLog.action == AuditAction.LOGIN
-                )
-            ).order_by(desc(AuditLog.created_at)).limit(1)
+            last_login_stmt = (
+                select(AuditLog.created_at)
+                .where(and_(AuditLog.user_id == user_id, AuditLog.action == AuditAction.LOGIN))
+                .order_by(desc(AuditLog.created_at))
+                .limit(1)
+            )
 
             last_login_result = await session.execute(last_login_stmt)
             last_login = last_login_result.scalar()
@@ -279,11 +266,7 @@ class AuditLogService:
                 "last_login": last_login.isoformat() if last_login else None,
             }
 
-    async def get_system_activity_stats(
-        self,
-        days: int = 7,
-        db: Optional[AsyncSession] = None
-    ) -> Dict[str, Any]:
+    async def get_system_activity_stats(self, days: int = 7, db: Optional[AsyncSession] = None) -> Dict[str, Any]:
         """
         获取系统活动统计
 
@@ -300,47 +283,41 @@ class AuditLogService:
 
         async with get_db_session() as session:
             # 总操作数
-            total_stmt = select(func.count(AuditLog.id)).where(
-                AuditLog.created_at >= start_date
-            )
+            total_stmt = select(func.count(AuditLog.id)).where(AuditLog.created_at >= start_date)
             total_result = await session.execute(total_stmt)
             total_actions = total_result.scalar() or 0
 
             # 活跃用户数
-            active_users_stmt = select(func.count(func.distinct(AuditLog.user_id))).where(
-                AuditLog.created_at >= start_date
-            )
+            active_users_stmt = select(func.count(func.distinct(AuditLog.user_id))).where(AuditLog.created_at >= start_date)
             active_users_result = await session.execute(active_users_stmt)
             active_users = active_users_result.scalar() or 0
 
             # 按操作类型统计
-            action_stats_stmt = select(
-                AuditLog.action,
-                func.count(AuditLog.id).label('count')
-            ).where(
-                AuditLog.created_at >= start_date
-            ).group_by(AuditLog.action).order_by(desc('count')).limit(int(os.getenv("AUDIT_TOP_OPS_LIMIT", "10")))
+            action_stats_stmt = (
+                select(AuditLog.action, func.count(AuditLog.id).label("count"))
+                .where(AuditLog.created_at >= start_date)
+                .group_by(AuditLog.action)
+                .order_by(desc("count"))
+                .limit(int(os.getenv("AUDIT_TOP_OPS_LIMIT", "10")))
+            )
 
             action_stats_result = await session.execute(action_stats_stmt)
             top_actions = [{"action": row[0], "count": row[1]} for row in action_stats_result]
 
             # 按资源类型统计
-            resource_stats_stmt = select(
-                AuditLog.resource_type,
-                func.count(AuditLog.id).label('count')
-            ).where(
-                AuditLog.created_at >= start_date
-            ).group_by(AuditLog.resource_type).order_by(desc('count'))
+            resource_stats_stmt = (
+                select(AuditLog.resource_type, func.count(AuditLog.id).label("count"))
+                .where(AuditLog.created_at >= start_date)
+                .group_by(AuditLog.resource_type)
+                .order_by(desc("count"))
+            )
 
             resource_stats_result = await session.execute(resource_stats_stmt)
             resource_stats = [{"resource_type": row[0], "count": row[1]} for row in resource_stats_result]
 
             # 失败操作统计
             failed_stmt = select(func.count(AuditLog.id)).where(
-                and_(
-                    AuditLog.created_at >= start_date,
-                    AuditLog.status == "failed"
-                )
+                and_(AuditLog.created_at >= start_date, AuditLog.status == "failed")
             )
             failed_result = await session.execute(failed_stmt)
             failed_actions = failed_result.scalar() or 0
@@ -356,9 +333,7 @@ class AuditLogService:
             }
 
     async def delete_old_logs(
-        self,
-        days: int = int(os.getenv("AUDIT_STATS_DAYS_LONG", "90")),
-        db: Optional[AsyncSession] = None
+        self, days: int = int(os.getenv("AUDIT_STATS_DAYS_LONG", "90")), db: Optional[AsyncSession] = None
     ) -> int:
         """
         删除旧日志
@@ -425,30 +400,46 @@ class AuditLogService:
         writer = csv.writer(output)
 
         # 写入表头
-        writer.writerow([
-            "ID", "操作时间", "用户ID", "用户名", "用户角色",
-            "操作类型", "资源类型", "资源ID", "描述",
-            "IP地址", "请求方法", "请求路径", "状态", "错误信息", "门店ID"
-        ])
+        writer.writerow(
+            [
+                "ID",
+                "操作时间",
+                "用户ID",
+                "用户名",
+                "用户角色",
+                "操作类型",
+                "资源类型",
+                "资源ID",
+                "描述",
+                "IP地址",
+                "请求方法",
+                "请求路径",
+                "状态",
+                "错误信息",
+                "门店ID",
+            ]
+        )
 
         for log in logs:
-            writer.writerow([
-                str(log.id),
-                log.created_at.isoformat() if log.created_at else "",
-                str(log.user_id) if log.user_id else "",
-                log.username or "",
-                log.user_role or "",
-                log.action or "",
-                log.resource_type or "",
-                str(log.resource_id) if log.resource_id else "",
-                log.description or "",
-                log.ip_address or "",
-                log.request_method or "",
-                log.request_path or "",
-                log.status or "",
-                log.error_message or "",
-                str(log.store_id) if log.store_id else "",
-            ])
+            writer.writerow(
+                [
+                    str(log.id),
+                    log.created_at.isoformat() if log.created_at else "",
+                    str(log.user_id) if log.user_id else "",
+                    log.username or "",
+                    log.user_role or "",
+                    log.action or "",
+                    log.resource_type or "",
+                    str(log.resource_id) if log.resource_id else "",
+                    log.description or "",
+                    log.ip_address or "",
+                    log.request_method or "",
+                    log.request_path or "",
+                    log.status or "",
+                    log.error_message or "",
+                    str(log.store_id) if log.store_id else "",
+                ]
+            )
 
         return output.getvalue()
 

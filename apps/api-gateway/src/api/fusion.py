@@ -16,23 +16,22 @@ Neo4j 同步：
   OntologyDataSync.upsert_ingredient_mapping + link_external_source
 """
 
-from typing import Dict, List, Optional
 from datetime import datetime
+from typing import Dict, List, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.core.dependencies import get_current_user
 from src.models.user import User
 from src.services.ingredient_fusion_service import (
-    IngredientFusionService,
     FusionInput,
     FusionResult,
-    reconcile_unit_cost,
+    IngredientFusionService,
     SourceCost,
+    reconcile_unit_cost,
 )
 
 router = APIRouter(prefix="/api/v1/fusion", tags=["fusion"])
@@ -41,12 +40,15 @@ logger = structlog.get_logger()
 
 # ── Pydantic Schemas ──────────────────────────────────────────────────────────
 
+
 class ResolveIn(BaseModel):
-    source_system: str  = Field(..., description="数据源标识: pinzhi / meituan / tiancai / aoqiwei / yiding / supplier_invoice / manual")
-    external_id:   str  = Field(..., description="外部系统的原始食材 ID")
-    name:          str  = Field(..., description="食材名称（原始）")
+    source_system: str = Field(
+        ..., description="数据源标识: pinzhi / meituan / tiancai / aoqiwei / yiding / supplier_invoice / manual"
+    )
+    external_id: str = Field(..., description="外部系统的原始食材 ID")
+    name: str = Field(..., description="食材名称（原始）")
     category: Optional[str] = Field(None, description="食材分类: meat/seafood/vegetable/...")
-    unit:     Optional[str] = Field(None, description="单位: kg/piece/ml/...")
+    unit: Optional[str] = Field(None, description="单位: kg/piece/ml/...")
     cost_fen: Optional[int] = Field(None, ge=0, description="单位成本（分）")
 
 
@@ -55,68 +57,69 @@ class BatchResolveIn(BaseModel):
 
 
 class ResolveOut(BaseModel):
-    canonical_id:   str
+    canonical_id: str
     canonical_name: str
-    confidence:     float
-    method:         str
-    is_new:         bool
-    conflict_flag:  bool
-    evidence:       Dict = {}
+    confidence: float
+    method: str
+    is_new: bool
+    conflict_flag: bool
+    evidence: Dict = {}
 
 
 class MappingOut(BaseModel):
-    canonical_id:      str
-    canonical_name:    str
-    aliases:           List[str]
-    category:          Optional[str]
-    unit:              Optional[str]
-    external_ids:      Dict
-    source_costs:      Dict
+    canonical_id: str
+    canonical_name: str
+    aliases: List[str]
+    category: Optional[str]
+    unit: Optional[str]
+    external_ids: Dict
+    source_costs: Dict
     canonical_cost_fen: Optional[int]
     fusion_confidence: float
-    fusion_method:     Optional[str]
-    conflict_flag:     bool
-    merge_of:          List[str]
-    is_active:         bool
-    created_at:        Optional[datetime]
-    updated_at:        Optional[datetime]
+    fusion_method: Optional[str]
+    conflict_flag: bool
+    merge_of: List[str]
+    is_active: bool
+    created_at: Optional[datetime]
+    updated_at: Optional[datetime]
 
 
 class MergeIn(BaseModel):
-    keep_id:  str = Field(..., description="保留的规范 ID")
+    keep_id: str = Field(..., description="保留的规范 ID")
     merge_id: str = Field(..., description="被合并（软删除）的规范 ID")
-    reason:   str = Field(..., description="合并原因（人工备注）")
+    reason: str = Field(..., description="合并原因（人工备注）")
 
 
 class CostUpdateIn(BaseModel):
     source_system: str
-    cost_fen:      int = Field(..., ge=0)
-    confidence:    Optional[float] = Field(None, ge=0, le=1)
+    cost_fen: int = Field(..., ge=0)
+    confidence: Optional[float] = Field(None, ge=0, le=1)
 
 
 class AuditOut(BaseModel):
-    id:                   str
-    entity_type:          str
-    canonical_id:         Optional[str]
-    action:               str
-    source_system:        Optional[str]
-    raw_external_id:      Optional[str]
-    raw_name:             Optional[str]
+    id: str
+    entity_type: str
+    canonical_id: Optional[str]
+    action: str
+    source_system: Optional[str]
+    raw_external_id: Optional[str]
+    raw_name: Optional[str]
     matched_canonical_id: Optional[str]
-    confidence:           Optional[float]
-    fusion_method:        Optional[str]
-    evidence:             Optional[Dict]
-    created_at:           Optional[datetime]
-    created_by:           Optional[str]
+    confidence: Optional[float]
+    fusion_method: Optional[str]
+    evidence: Optional[Dict]
+    created_at: Optional[datetime]
+    created_by: Optional[str]
 
 
 # ── 工具函数 ──────────────────────────────────────────────────────────────────
 
-def _sync_to_neo4j(mapping, method: str, source_system: str = None,
-                   external_id: str = None, confidence: float = 1.0):
+
+def _sync_to_neo4j(mapping, method: str, source_system: str = None, external_id: str = None, confidence: float = 1.0):
     """异步触发 Neo4j 融合节点同步（不阻断响应）"""
     try:
         from src.ontology.data_sync import OntologyDataSync
+
         sync = OntologyDataSync()
         sync.upsert_ingredient_mapping(
             canonical_id=mapping.canonical_id,
@@ -144,25 +147,26 @@ def _sync_to_neo4j(mapping, method: str, source_system: str = None,
 
 def _serialize_mapping(m) -> dict:
     return {
-        "canonical_id":      m.canonical_id,
-        "canonical_name":    m.canonical_name,
-        "aliases":           m.aliases or [],
-        "category":          m.category,
-        "unit":              m.unit,
-        "external_ids":      m.external_ids or {},
-        "source_costs":      m.source_costs or {},
+        "canonical_id": m.canonical_id,
+        "canonical_name": m.canonical_name,
+        "aliases": m.aliases or [],
+        "category": m.category,
+        "unit": m.unit,
+        "external_ids": m.external_ids or {},
+        "source_costs": m.source_costs or {},
         "canonical_cost_fen": m.canonical_cost_fen,
         "fusion_confidence": m.fusion_confidence,
-        "fusion_method":     m.fusion_method,
-        "conflict_flag":     m.conflict_flag,
-        "merge_of":          m.merge_of or [],
-        "is_active":         m.is_active,
-        "created_at":        m.created_at,
-        "updated_at":        m.updated_at,
+        "fusion_method": m.fusion_method,
+        "conflict_flag": m.conflict_flag,
+        "merge_of": m.merge_of or [],
+        "is_active": m.is_active,
+        "created_at": m.created_at,
+        "updated_at": m.updated_at,
     }
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
+
 
 @router.post(
     "/ingredients/resolve",
@@ -171,9 +175,9 @@ def _serialize_mapping(m) -> dict:
     summary="单条解析：外部食材 → 规范 canonical_id",
 )
 async def resolve_ingredient(
-    payload:      ResolveIn,
-    db:           AsyncSession = Depends(get_db),
-    current_user: User         = Depends(get_current_user),
+    payload: ResolveIn,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     将任意外部系统食材（名称 + 源 ID）解析为系统内规范 canonical_id。
@@ -201,8 +205,11 @@ async def resolve_ingredient(
         mapping = await svc.get_mapping(result.canonical_id)
         if mapping:
             _sync_to_neo4j(
-                mapping, result.method,
-                payload.source_system, payload.external_id, result.confidence,
+                mapping,
+                result.method,
+                payload.source_system,
+                payload.external_id,
+                result.confidence,
             )
 
     return ResolveOut(
@@ -222,9 +229,9 @@ async def resolve_ingredient(
     summary="批量解析（最多 200 条）",
 )
 async def batch_resolve_ingredients(
-    payload:      BatchResolveIn,
-    db:           AsyncSession = Depends(get_db),
-    current_user: User         = Depends(get_current_user),
+    payload: BatchResolveIn,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     适合 L1 适配器接入后的批量流水线调用。
@@ -243,7 +250,7 @@ async def batch_resolve_ingredients(
         )
         for i in payload.items
     ]
-    results = await svc.batch_resolve(inputs)   # 内部已 commit
+    results = await svc.batch_resolve(inputs)  # 内部已 commit
     return [
         ResolveOut(
             canonical_id=r.canonical_id,
@@ -264,19 +271,19 @@ async def batch_resolve_ingredients(
     summary="列出规范映射（分页）",
 )
 async def list_ingredient_mappings(
-    category:  Optional[str] = Query(None),
-    page:      int           = Query(1,  ge=1),
-    page_size: int           = Query(50, ge=1, le=200),
-    db:        AsyncSession  = Depends(get_db),
-    current_user: User       = Depends(get_current_user),
+    category: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     svc = IngredientFusionService(db)
     rows, total = await svc.list_mappings(category=category, page=page, page_size=page_size)
     return {
-        "total":     total,
-        "page":      page,
+        "total": total,
+        "page": page,
         "page_size": page_size,
-        "items":     [_serialize_mapping(m) for m in rows],
+        "items": [_serialize_mapping(m) for m in rows],
     }
 
 
@@ -286,9 +293,9 @@ async def list_ingredient_mappings(
     summary="列出冲突或低置信度映射（需人工审核）",
 )
 async def get_ingredient_conflicts(
-    confidence_threshold: float        = Query(0.70, ge=0, le=1),
-    db:                   AsyncSession = Depends(get_db),
-    current_user:         User         = Depends(get_current_user),
+    confidence_threshold: float = Query(0.70, ge=0, le=1),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     svc = IngredientFusionService(db)
     rows = await svc.get_conflicts(confidence_threshold)
@@ -302,8 +309,8 @@ async def get_ingredient_conflicts(
 )
 async def get_ingredient_mapping(
     canonical_id: str,
-    db:           AsyncSession = Depends(get_db),
-    current_user: User         = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     svc = IngredientFusionService(db)
     mapping = await svc.get_mapping(canonical_id)
@@ -318,9 +325,9 @@ async def get_ingredient_mapping(
     summary="人工合并两个规范 ID（HitL 审批后调用）",
 )
 async def merge_ingredient_mappings(
-    payload:      MergeIn,
-    db:           AsyncSession = Depends(get_db),
-    current_user: User         = Depends(get_current_user),
+    payload: MergeIn,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     将 merge_id 合并入 keep_id：
@@ -351,9 +358,9 @@ async def merge_ingredient_mappings(
 )
 async def update_ingredient_cost(
     canonical_id: str,
-    payload:      CostUpdateIn,
-    db:           AsyncSession = Depends(get_db),
-    current_user: User         = Depends(get_current_user),
+    payload: CostUpdateIn,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     svc = IngredientFusionService(db)
     mapping = await svc.update_source_cost(
@@ -374,11 +381,11 @@ async def update_ingredient_cost(
     summary="查询融合审计日志",
 )
 async def get_fusion_audit(
-    canonical_id:  Optional[str] = Query(None),
+    canonical_id: Optional[str] = Query(None),
     source_system: Optional[str] = Query(None),
-    limit:         int           = Query(100, ge=1, le=500),
-    db:            AsyncSession  = Depends(get_db),
-    current_user:  User          = Depends(get_current_user),
+    limit: int = Query(100, ge=1, le=500),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     svc = IngredientFusionService(db)
     logs = await svc.get_audit_log(
@@ -388,19 +395,19 @@ async def get_fusion_audit(
     )
     return [
         {
-            "id":                   str(log.id),
-            "entity_type":          log.entity_type,
-            "canonical_id":         log.canonical_id,
-            "action":               log.action,
-            "source_system":        log.source_system,
-            "raw_external_id":      log.raw_external_id,
-            "raw_name":             log.raw_name,
+            "id": str(log.id),
+            "entity_type": log.entity_type,
+            "canonical_id": log.canonical_id,
+            "action": log.action,
+            "source_system": log.source_system,
+            "raw_external_id": log.raw_external_id,
+            "raw_name": log.raw_name,
             "matched_canonical_id": log.matched_canonical_id,
-            "confidence":           log.confidence,
-            "fusion_method":        log.fusion_method,
-            "evidence":             log.evidence,
-            "created_at":           log.created_at,
-            "created_by":           log.created_by,
+            "confidence": log.confidence,
+            "fusion_method": log.fusion_method,
+            "evidence": log.evidence,
+            "created_at": log.created_at,
+            "created_by": log.created_by,
         }
         for log in logs
     ]

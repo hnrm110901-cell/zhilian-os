@@ -13,6 +13,7 @@ Webhook POS 适配器
   - keruyun   客如云
   - generic   通用格式（自定义字段映射）
 """
+
 import hashlib
 import hmac
 import os
@@ -22,7 +23,6 @@ from typing import Any, Dict, List, Optional
 import structlog
 from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import BaseModel
-
 from src.core.database import get_db_session
 from src.models.order import Order, OrderItem, OrderStatus
 
@@ -35,27 +35,29 @@ WEBHOOK_SECRET = os.getenv("WEBHOOK_POS_SECRET", "")
 
 # ── Pydantic 入参模型 ──────────────────────────────────────────
 
+
 class WebhookOrderItem(BaseModel):
     item_id: str = ""
     item_name: str
     quantity: int = 1
-    unit_price: int       # 分
-    subtotal: int         # 分
+    unit_price: int  # 分
+    subtotal: int  # 分
     notes: Optional[str] = None
 
 
 class WebhookOrderPayload(BaseModel):
     """通用 Webhook 订单格式（各 POS 字段映射后统一为此结构）"""
-    source: str = "generic"          # meituan | keruyun | generic
-    external_order_id: str           # POS 系统内部订单号
+
+    source: str = "generic"  # meituan | keruyun | generic
+    external_order_id: str  # POS 系统内部订单号
     table_number: Optional[str] = None
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
-    status: str = "completed"        # POS 推送时通常已完成
-    total_amount: int                # 分
-    discount_amount: int = 0         # 分
-    final_amount: int                # 分
-    order_time: Optional[str] = None # ISO8601，缺省用当前时间
+    status: str = "completed"  # POS 推送时通常已完成
+    total_amount: int  # 分
+    discount_amount: int = 0  # 分
+    final_amount: int  # 分
+    order_time: Optional[str] = None  # ISO8601，缺省用当前时间
     items: List[WebhookOrderItem] = []
     notes: Optional[str] = None
     raw: Optional[Dict[str, Any]] = None  # 原始 payload 存档
@@ -63,21 +65,19 @@ class WebhookOrderPayload(BaseModel):
 
 # ── 签名验证 ───────────────────────────────────────────────────
 
+
 def _verify_signature(body: bytes, signature: Optional[str]) -> bool:
     """HMAC-SHA256 签名验证，未配置 secret 时跳过"""
     if not WEBHOOK_SECRET:
         return True
     if not signature:
         return False
-    expected = hmac.new(
-        WEBHOOK_SECRET.encode(),
-        body,
-        hashlib.sha256
-    ).hexdigest()
+    expected = hmac.new(WEBHOOK_SECRET.encode(), body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature.removeprefix("sha256="))
 
 
 # ── 各 POS 格式归一化 ──────────────────────────────────────────
+
 
 def _normalize_meituan(raw: Dict[str, Any]) -> WebhookOrderPayload:
     """美团收银 Webhook 字段映射"""
@@ -143,24 +143,20 @@ NORMALIZERS = {
 
 # ── 写库 ───────────────────────────────────────────────────────
 
+
 async def _upsert_order(store_id: str, payload: WebhookOrderPayload) -> str:
     """将归一化订单写入 orders 表（幂等：同一 external_order_id 不重复写）"""
     order_id = f"POS_{payload.source.upper()}_{payload.external_order_id}"
 
     async with get_db_session() as session:
         from sqlalchemy import select
-        existing = await session.execute(
-            select(Order).where(Order.id == order_id)
-        )
+
+        existing = await session.execute(select(Order).where(Order.id == order_id))
         if existing.scalar_one_or_none():
             logger.info("POS 订单已存在，跳过", order_id=order_id)
             return order_id
 
-        order_time = (
-            datetime.fromisoformat(payload.order_time)
-            if payload.order_time
-            else datetime.utcnow()
-        )
+        order_time = datetime.fromisoformat(payload.order_time) if payload.order_time else datetime.utcnow()
 
         order = Order(
             id=order_id,
@@ -184,15 +180,17 @@ async def _upsert_order(store_id: str, payload: WebhookOrderPayload) -> str:
         session.add(order)
 
         for item in payload.items:
-            session.add(OrderItem(
-                order_id=order_id,
-                item_id=item.item_id or item.item_name,
-                item_name=item.item_name,
-                quantity=item.quantity,
-                unit_price=item.unit_price,
-                subtotal=item.subtotal,
-                notes=item.notes,
-            ))
+            session.add(
+                OrderItem(
+                    order_id=order_id,
+                    item_id=item.item_id or item.item_name,
+                    item_name=item.item_name,
+                    quantity=item.quantity,
+                    unit_price=item.unit_price,
+                    subtotal=item.subtotal,
+                    notes=item.notes,
+                )
+            )
 
         await session.commit()
         logger.info("POS 订单写入成功", order_id=order_id, store_id=store_id)
@@ -200,6 +198,7 @@ async def _upsert_order(store_id: str, payload: WebhookOrderPayload) -> str:
 
 
 # ── API 端点 ───────────────────────────────────────────────────
+
 
 @router.post("/{store_id}/order")
 async def receive_pos_order(

@@ -5,14 +5,15 @@ AI Evolution Metrics Service
 核心价值：让客户用数据回答"AI这周帮我省了多少钱"
 支撑RaaS商业模式的续费论证
 """
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any
-from sqlalchemy import select, func, and_, case
-from sqlalchemy.ext.asyncio import AsyncSession
-import structlog
 
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
+
+import structlog
+from sqlalchemy import and_, case, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_db_session
-from src.models.decision_log import DecisionLog, DecisionStatus, DecisionOutcome
+from src.models.decision_log import DecisionLog, DecisionOutcome, DecisionStatus
 
 logger = structlog.get_logger()
 
@@ -46,7 +47,9 @@ class AIEvolutionService:
                 select(
                     DecisionLog.decision_status,
                     func.count(DecisionLog.id).label("count"),
-                ).where(and_(*filters)).group_by(DecisionLog.decision_status)
+                )
+                .where(and_(*filters))
+                .group_by(DecisionLog.decision_status)
             )
             rows = result.all()
 
@@ -88,11 +91,13 @@ class AIEvolutionService:
             filters = [
                 DecisionLog.created_at >= cutoff,
                 DecisionLog.outcome.isnot(None),
-                DecisionLog.decision_status.in_([
-                    DecisionStatus.APPROVED,
-                    DecisionStatus.EXECUTED,
-                    DecisionStatus.MODIFIED,
-                ]),
+                DecisionLog.decision_status.in_(
+                    [
+                        DecisionStatus.APPROVED,
+                        DecisionStatus.EXECUTED,
+                        DecisionStatus.MODIFIED,
+                    ]
+                ),
             ]
             if store_id:
                 filters.append(DecisionLog.store_id == store_id)
@@ -157,7 +162,9 @@ class AIEvolutionService:
                     select(
                         DecisionLog.decision_status,
                         func.count(DecisionLog.id).label("count"),
-                    ).where(and_(*filters)).group_by(DecisionLog.decision_status)
+                    )
+                    .where(and_(*filters))
+                    .group_by(DecisionLog.decision_status)
                 )
                 rows = result.all()
 
@@ -165,13 +172,15 @@ class AIEvolutionService:
             total = sum(counts.values()) or 1
             adopted = counts.get(DecisionStatus.APPROVED, 0) + counts.get(DecisionStatus.EXECUTED, 0)
 
-            trend.append({
-                "week_start": week_start.strftime("%Y-%m-%d"),
-                "week_end": week_end.strftime("%Y-%m-%d"),
-                "total": total,
-                "adopted": adopted,
-                "adoption_rate": round(adopted / total, 4),
-            })
+            trend.append(
+                {
+                    "week_start": week_start.strftime("%Y-%m-%d"),
+                    "week_end": week_end.strftime("%Y-%m-%d"),
+                    "total": total,
+                    "adopted": adopted,
+                    "adoption_rate": round(adopted / total, 4),
+                }
+            )
 
         return trend
 
@@ -196,10 +205,7 @@ class AIEvolutionService:
             if store_id:
                 filters.append(DecisionLog.store_id == store_id)
 
-            result = await session.execute(
-                select(func.count(DecisionLog.id).label("escalations"))
-                .where(and_(*filters))
-            )
+            result = await session.execute(select(func.count(DecisionLog.id).label("escalations")).where(and_(*filters)))
             escalations = result.scalar() or 0
 
             # 对比上一个同等周期
@@ -213,15 +219,11 @@ class AIEvolutionService:
                 prev_filters.append(DecisionLog.store_id == store_id)
 
             prev_result = await session.execute(
-                select(func.count(DecisionLog.id).label("prev_escalations"))
-                .where(and_(*prev_filters))
+                select(func.count(DecisionLog.id).label("prev_escalations")).where(and_(*prev_filters))
             )
             prev_escalations = prev_result.scalar() or 0
 
-        change_pct = (
-            round((escalations - prev_escalations) / prev_escalations * 100, 1)
-            if prev_escalations else None
-        )
+        change_pct = round((escalations - prev_escalations) / prev_escalations * 100, 1) if prev_escalations else None
 
         return {
             "period_days": days,
@@ -256,16 +258,23 @@ class AIEvolutionService:
                     func.count(DecisionLog.id).label("total"),
                     func.sum(
                         case(
-                            (DecisionLog.decision_status.in_([
-                                DecisionStatus.APPROVED,
-                                DecisionStatus.EXECUTED,
-                            ]), 1),
+                            (
+                                DecisionLog.decision_status.in_(
+                                    [
+                                        DecisionStatus.APPROVED,
+                                        DecisionStatus.EXECUTED,
+                                    ]
+                                ),
+                                1,
+                            ),
                             else_=0,
                         )
                     ).label("adopted"),
                     func.avg(DecisionLog.ai_confidence).label("avg_confidence"),
                     func.sum(DecisionLog.cost_impact).label("cost_impact"),
-                ).where(and_(*filters)).group_by(DecisionLog.agent_type)
+                )
+                .where(and_(*filters))
+                .group_by(DecisionLog.agent_type)
             )
             rows = result.all()
 

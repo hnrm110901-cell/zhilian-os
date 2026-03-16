@@ -2,6 +2,7 @@
 Agent OKR API — P1 统一量化日志
 前缀: /api/v1/agent-okr
 """
+
 from __future__ import annotations
 
 from datetime import date
@@ -10,7 +11,6 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.services.agent_okr_service import agent_okr_service
 
@@ -45,9 +45,7 @@ async def log_recommendation(
     db: AsyncSession = Depends(get_db),
 ):
     """记录 Agent 推送的建议"""
-    log_id = await agent_okr_service.log_recommendation(
-        db=db, **payload.model_dump()
-    )
+    log_id = await agent_okr_service.log_recommendation(db=db, **payload.model_dump())
     await db.commit()
     return {"log_id": log_id, "message": "建议已记录"}
 
@@ -58,9 +56,7 @@ async def record_adoption(
     db: AsyncSession = Depends(get_db),
 ):
     """记录用户响应（接受/拒绝）"""
-    result = await agent_okr_service.record_adoption(
-        db=db, log_id=payload.log_id, adopted=payload.adopted
-    )
+    result = await agent_okr_service.record_adoption(db=db, log_id=payload.log_id, adopted=payload.adopted)
     await db.commit()
     return result
 
@@ -86,9 +82,7 @@ async def get_okr_summary(
     db: AsyncSession = Depends(get_db),
 ):
     """获取所有 Agent 的 OKR 达成概览"""
-    return await agent_okr_service.get_okr_summary(
-        db=db, brand_id=brand_id, store_id=store_id, days=days
-    )
+    return await agent_okr_service.get_okr_summary(db=db, brand_id=brand_id, store_id=store_id, days=days)
 
 
 @router.get("/logs")
@@ -102,8 +96,7 @@ async def get_recent_logs(
 ):
     """获取近期 Agent 响应日志"""
     logs = await agent_okr_service.get_recent_logs(
-        db=db, brand_id=brand_id, store_id=store_id,
-        agent_name=agent_name, status=status, limit=limit
+        db=db, brand_id=brand_id, store_id=store_id, agent_name=agent_name, status=status, limit=limit
     )
     return {"logs": logs, "count": len(logs)}
 
@@ -115,8 +108,6 @@ async def compute_daily_snapshot(
     db: AsyncSession = Depends(get_db),
 ):
     """手动触发日快照计算（生产环境由 Celery Beat 自动触发）"""
-    result = await agent_okr_service.compute_daily_snapshot(
-        db=db, brand_id=brand_id, target_date=target_date
-    )
+    result = await agent_okr_service.compute_daily_snapshot(db=db, brand_id=brand_id, target_date=target_date)
     await db.commit()
     return result

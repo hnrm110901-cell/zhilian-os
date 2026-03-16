@@ -15,21 +15,24 @@
 3. 云边协同（数据同步、模型更新）
 4. 设备管理（Shokz耳机、POS机、KDS）
 """
-from datetime import datetime
-from typing import Dict, List, Optional
-from enum import Enum
-from pydantic import BaseModel
-import structlog
+
 import asyncio
+import hashlib
 import os
 import secrets
-import hashlib
+from datetime import datetime
+from enum import Enum
+from typing import Dict, List, Optional
+
+import structlog
+from pydantic import BaseModel
 
 logger = structlog.get_logger()
 
 
 class EdgeNodeStatus(str, Enum):
     """边缘节点状态"""
+
     ONLINE = "online"  # 在线
     OFFLINE = "offline"  # 离线
     SYNCING = "syncing"  # 同步中
@@ -38,6 +41,7 @@ class EdgeNodeStatus(str, Enum):
 
 class NetworkMode(str, Enum):
     """网络模式"""
+
     CLOUD = "cloud"  # 云端模式（正常联网）
     EDGE = "edge"  # 边缘模式（离线工作）
     HYBRID = "hybrid"  # 混合模式（云边协同）
@@ -45,6 +49,7 @@ class NetworkMode(str, Enum):
 
 class EdgeNodeInfo(BaseModel):
     """边缘节点信息"""
+
     node_id: str
     store_id: str
     device_name: str  # 例如："徐记海鲜-旗舰店-RPI5-001"
@@ -67,6 +72,7 @@ class EdgeNodeInfo(BaseModel):
 
 class LocalAIModel(BaseModel):
     """本地AI模型"""
+
     model_id: str
     model_name: str
     model_type: str  # asr, tts, intent, decision
@@ -87,35 +93,20 @@ class RaspberryPiEdgeService:
         "storage": "128GB microSD (Class 10 UHS-I)",
         "network": "Gigabit Ethernet + WiFi 6 (802.11ax)",
         "bluetooth": "Bluetooth 5.0 / BLE",
-        "cost": 800.0  # 人民币
+        "cost": 800.0,  # 人民币
     }
 
     # 本地AI模型配置
     LOCAL_AI_MODELS = {
-        "asr": {
-            "model_name": "Whisper Tiny (中文优化)",
-            "model_size_mb": 75,
-            "inference_time_ms": 200,
-            "accuracy": 0.92
-        },
-        "tts": {
-            "model_name": "PaddleSpeech FastSpeech2",
-            "model_size_mb": 50,
-            "inference_time_ms": 100,
-            "quality": "high"
-        },
-        "intent": {
-            "model_name": "DistilBERT (餐饮领域微调)",
-            "model_size_mb": 250,
-            "inference_time_ms": 50,
-            "accuracy": 0.95
-        },
+        "asr": {"model_name": "Whisper Tiny (中文优化)", "model_size_mb": 75, "inference_time_ms": 200, "accuracy": 0.92},
+        "tts": {"model_name": "PaddleSpeech FastSpeech2", "model_size_mb": 50, "inference_time_ms": 100, "quality": "high"},
+        "intent": {"model_name": "DistilBERT (餐饮领域微调)", "model_size_mb": 250, "inference_time_ms": 50, "accuracy": 0.95},
         "decision": {
             "model_name": "LightGBM (排班/库存/采购)",
             "model_size_mb": 20,
             "inference_time_ms": 10,
-            "accuracy": 0.90
-        }
+            "accuracy": 0.90,
+        },
     }
 
     def __init__(self):
@@ -150,7 +141,9 @@ class RaspberryPiEdgeService:
                 hub.runtime_version = "edge-agent-v1"
                 hub.ip_address = node.ip_address
                 hub.mac_address = node.mac_address
-                hub.network_mode = node.network_mode.value if isinstance(node.network_mode, NetworkMode) else str(node.network_mode)
+                hub.network_mode = (
+                    node.network_mode.value if isinstance(node.network_mode, NetworkMode) else str(node.network_mode)
+                )
                 hub.last_heartbeat = node.updated_at
                 hub.cpu_pct = node.cpu_usage
                 hub.mem_pct = node.memory_usage
@@ -251,24 +244,13 @@ class RaspberryPiEdgeService:
             return loaded
         return self.edge_nodes[node_id]
 
-    async def register_edge_node(
-        self,
-        store_id: str,
-        device_name: str,
-        ip_address: str,
-        mac_address: str
-    ) -> EdgeNodeInfo:
+    async def register_edge_node(self, store_id: str, device_name: str, ip_address: str, mac_address: str) -> EdgeNodeInfo:
         """
         注册边缘节点
 
         门店部署树莓派5时，首次启动自动注册到云端
         """
-        logger.info(
-            "注册边缘节点",
-            store_id=store_id,
-            device_name=device_name,
-            ip_address=ip_address
-        )
+        logger.info("注册边缘节点", store_id=store_id, device_name=device_name, ip_address=ip_address)
 
         node_id = f"edge_{store_id}_{mac_address.replace(':', '')}"
 
@@ -289,7 +271,7 @@ class RaspberryPiEdgeService:
             pending_status_queue=0,
             last_queue_error=None,
             created_at=datetime.now(),
-            updated_at=datetime.now()
+            updated_at=datetime.now(),
         )
 
         self.edge_nodes[node_id] = node
@@ -402,17 +384,15 @@ class RaspberryPiEdgeService:
             logger.warning("边缘节点温度过高", node_id=node_id, temperature=temperature)
             node.status = EdgeNodeStatus.ERROR
 
-        if cpu_usage > float(os.getenv("EDGE_CPU_ALERT_THRESHOLD", "90")) or memory_usage > float(os.getenv("EDGE_MEMORY_ALERT_THRESHOLD", "90")):
+        if cpu_usage > float(os.getenv("EDGE_CPU_ALERT_THRESHOLD", "90")) or memory_usage > float(
+            os.getenv("EDGE_MEMORY_ALERT_THRESHOLD", "90")
+        ):
             logger.warning("边缘节点资源紧张", node_id=node_id, cpu=cpu_usage, memory=memory_usage)
 
         await self._persist_edge_hub(node)
         return node
 
-    async def switch_network_mode(
-        self,
-        node_id: str,
-        mode: NetworkMode
-    ) -> EdgeNodeInfo:
+    async def switch_network_mode(self, node_id: str, mode: NetworkMode) -> EdgeNodeInfo:
         """
         切换网络模式
 
@@ -425,21 +405,12 @@ class RaspberryPiEdgeService:
         node.network_mode = mode
         node.updated_at = datetime.now()
 
-        logger.info(
-            "切换网络模式",
-            node_id=node_id,
-            old_mode=old_mode,
-            new_mode=mode
-        )
+        logger.info("切换网络模式", node_id=node_id, old_mode=old_mode, new_mode=mode)
 
         await self._persist_edge_hub(node)
         return node
 
-    async def load_local_model(
-        self,
-        node_id: str,
-        model_type: str
-    ) -> LocalAIModel:
+    async def load_local_model(self, node_id: str, model_type: str) -> LocalAIModel:
         """
         加载本地AI模型到内存
 
@@ -459,26 +430,16 @@ class RaspberryPiEdgeService:
             model_version="v1.0",
             model_size_mb=model_config["model_size_mb"],
             loaded=True,
-            last_updated=datetime.now()
+            last_updated=datetime.now(),
         )
 
         self.local_models[model.model_id] = model
 
-        logger.info(
-            "加载本地AI模型",
-            node_id=node_id,
-            model_type=model_type,
-            model_name=model_config["model_name"]
-        )
+        logger.info("加载本地AI模型", node_id=node_id, model_type=model_type, model_name=model_config["model_name"])
 
         return model
 
-    async def local_inference(
-        self,
-        node_id: str,
-        model_type: str,
-        input_data: Dict
-    ) -> Dict:
+    async def local_inference(self, node_id: str, model_type: str, input_data: Dict) -> Dict:
         """
         本地AI推理
 
@@ -493,18 +454,15 @@ class RaspberryPiEdgeService:
 
         model = self.local_models[model_id]
 
-        logger.info(
-            "本地AI推理",
-            node_id=node_id,
-            model_type=model_type,
-            model_name=model.model_name
-        )
+        logger.info("本地AI推理", node_id=node_id, model_type=model_type, model_name=model.model_name)
 
         # 本地AI推理分发
         if model_type == "asr":
             # 语音识别：调用 voice_service
-            from .voice_service import voice_service
             import base64
+
+            from .voice_service import voice_service
+
             try:
                 audio_bytes = base64.b64decode(input_data) if isinstance(input_data, str) else (input_data or b"")
                 stt = await voice_service.speech_to_text(audio_bytes)
@@ -517,8 +475,10 @@ class RaspberryPiEdgeService:
                 result = {"text": "", "confidence": 0.0, "inference_time_ms": 200}
         elif model_type == "tts":
             # 语音合成：调用 voice_service
-            from .voice_service import voice_service
             import base64
+
+            from .voice_service import voice_service
+
             try:
                 text = input_data if isinstance(input_data, str) else ""
                 tts = await voice_service.text_to_speech(text)
@@ -532,29 +492,21 @@ class RaspberryPiEdgeService:
                 result = {"audio_data": "", "duration_ms": 0, "inference_time_ms": 100}
         elif model_type == "intent":
             # 意图识别
-            result = {
-                "intent": "query_revenue",
-                "entities": {"date": "today"},
-                "confidence": 0.98,
-                "inference_time_ms": 50
-            }
+            result = {"intent": "query_revenue", "entities": {"date": "today"}, "confidence": 0.98, "inference_time_ms": 50}
         elif model_type == "decision":
             # 决策生成
             result = {
                 "decision": "建议明天增加2名服务员",
                 "reasoning": "预测明天客流量增加30%",
                 "confidence": 0.92,
-                "inference_time_ms": 10
+                "inference_time_ms": 10,
             }
         else:
             result = {"error": "不支持的模型类型"}
 
         return result
 
-    async def sync_with_cloud(
-        self,
-        node_id: str
-    ) -> Dict:
+    async def sync_with_cloud(self, node_id: str) -> Dict:
         """
         与云端同步
 
@@ -570,32 +522,31 @@ class RaspberryPiEdgeService:
 
         # 查询 DB 统计实际待同步记录数
         import time
+
         sync_start = time.time()
         uploaded_records = 0
         downloaded_models = 0
         try:
+            from sqlalchemy import func, select
             from src.core.database import get_db_session
-            from src.models.order import Order
-            from src.models.inventory import InventoryItem
             from src.models.fl_training_round import FLTrainingRound
-            from sqlalchemy import select, func
+            from src.models.inventory import InventoryItem
+            from src.models.order import Order
 
             since = node.last_sync_time or datetime.now().replace(hour=0, minute=0, second=0)
             async with get_db_session() as session:
-                order_cnt = await session.execute(
-                    select(func.count(Order.id)).where(Order.order_time >= since)
-                )
-                inv_cnt = await session.execute(
-                    select(func.count(InventoryItem.id)).where(InventoryItem.updated_at >= since)
-                )
+                order_cnt = await session.execute(select(func.count(Order.id)).where(Order.order_time >= since))
+                inv_cnt = await session.execute(select(func.count(InventoryItem.id)).where(InventoryItem.updated_at >= since))
                 uploaded_records = (order_cnt.scalar() or 0) + (inv_cnt.scalar() or 0)
 
                 # 检查是否有新模型
                 latest_model = await session.execute(
-                    select(FLTrainingRound).where(
+                    select(FLTrainingRound)
+                    .where(
                         FLTrainingRound.status == "completed",
                         FLTrainingRound.completed_at >= since,
-                    ).limit(1)
+                    )
+                    .limit(1)
                 )
                 downloaded_models = 1 if latest_model.scalar_one_or_none() else 0
         except Exception as e:
@@ -607,7 +558,7 @@ class RaspberryPiEdgeService:
             "uploaded_records": uploaded_records,
             "downloaded_models": downloaded_models,
             "sync_duration_seconds": sync_duration,
-            "last_sync_time": datetime.now()
+            "last_sync_time": datetime.now(),
         }
 
         node.status = EdgeNodeStatus.ONLINE
@@ -618,17 +569,11 @@ class RaspberryPiEdgeService:
 
         return sync_result
 
-    async def get_node_info(
-        self,
-        node_id: str
-    ) -> EdgeNodeInfo:
+    async def get_node_info(self, node_id: str) -> EdgeNodeInfo:
         """获取边缘节点信息"""
         return await self._ensure_node_loaded(node_id)
 
-    async def list_store_nodes(
-        self,
-        store_id: str
-    ) -> List[EdgeNodeInfo]:
+    async def list_store_nodes(self, store_id: str) -> List[EdgeNodeInfo]:
         """列出门店的所有边缘节点"""
         nodes = [node for node in self.edge_nodes.values() if node.store_id == store_id]
         if not nodes:
@@ -683,20 +628,12 @@ class RaspberryPiEdgeService:
                 "microsd_card": 80.0,  # 128GB存储卡
                 "case": 50.0,  # 外壳
                 "cables": 20.0,  # 线缆
-                "total": 800.0
+                "total": 800.0,
             },
-            "software": {
-                "os_license": 0.0,  # Raspberry Pi OS免费
-                "ai_models": 0.0,  # 开源模型
-                "total": 0.0
-            },
-            "implementation": {
-                "remote_setup": 500.0,  # 远程部署（2小时）
-                "training": 200.0,  # 视频培训
-                "total": 700.0
-            },
+            "software": {"os_license": 0.0, "ai_models": 0.0, "total": 0.0},  # Raspberry Pi OS免费  # 开源模型
+            "implementation": {"remote_setup": 500.0, "training": 200.0, "total": 700.0},  # 远程部署（2小时）  # 视频培训
             "total_cost_per_store": 1500.0,  # 每店总成本
-            "deployment_time_hours": 2  # 部署时长
+            "deployment_time_hours": 2,  # 部署时长
         }
 
 

@@ -13,11 +13,10 @@ from datetime import datetime
 from typing import List, Optional
 
 import structlog
-from sqlalchemy import select, and_, update
+from sqlalchemy import and_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-
-from src.models.bom import BOMTemplate, BOMItem
+from src.models.bom import BOMItem, BOMTemplate
 from src.models.inventory import InventoryItem
 
 logger = structlog.get_logger()
@@ -82,11 +81,7 @@ class BOMService:
 
     async def get_bom(self, bom_id: str) -> Optional[BOMTemplate]:
         """按 ID 查询 BOM（含明细行）"""
-        stmt = (
-            select(BOMTemplate)
-            .options(selectinload(BOMTemplate.items))
-            .where(BOMTemplate.id == uuid.UUID(bom_id))
-        )
+        stmt = select(BOMTemplate).options(selectinload(BOMTemplate.items)).where(BOMTemplate.id == uuid.UUID(bom_id))
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -315,6 +310,7 @@ class BOMService:
         """
         try:
             from src.ontology.data_sync import OntologyDataSync
+
             sync = OntologyDataSync()
             dish_id_str = f"DISH-{bom.dish_id}"
 

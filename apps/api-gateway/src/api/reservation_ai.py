@@ -2,25 +2,28 @@
 预订AI助手 API — Phase P4 (屯象独有)
 智能跟进 · 意向预测 · 退订分析 · AI报表
 """
+
+from datetime import date
+from typing import List, Optional
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional, List
-from datetime import date
 from sqlalchemy.ext.asyncio import AsyncSession
-import structlog
 
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
 from ..models.user import User
+from ..services.cancellation_analyzer import cancellation_analyzer
 from ..services.follow_up_copilot import follow_up_copilot
 from ..services.intent_predictor import intent_predictor
-from ..services.cancellation_analyzer import cancellation_analyzer
 
 logger = structlog.get_logger()
 router = APIRouter()
 
 
 # ── Request Models ──
+
 
 class FollowUpRequest(BaseModel):
     store_id: str
@@ -56,6 +59,7 @@ class BatchPredictRequest(BaseModel):
 
 # ── 智能跟进 Routes ──
 
+
 @router.post("/reservation-ai/follow-up")
 async def generate_follow_up(
     req: FollowUpRequest,
@@ -63,12 +67,11 @@ async def generate_follow_up(
     current_user: User = Depends(get_current_active_user),
 ):
     """AI生成个性化跟进话术"""
-    return await follow_up_copilot.generate_follow_up(
-        session=session, **req.model_dump()
-    )
+    return await follow_up_copilot.generate_follow_up(session=session, **req.model_dump())
 
 
 # ── 意向预测 Routes ──
+
 
 @router.post("/reservation-ai/intent-predict")
 async def predict_intent(
@@ -77,9 +80,7 @@ async def predict_intent(
     current_user: User = Depends(get_current_active_user),
 ):
     """预测客户成交概率"""
-    return await intent_predictor.predict_intent(
-        session=session, **req.model_dump()
-    )
+    return await intent_predictor.predict_intent(session=session, **req.model_dump())
 
 
 @router.post("/reservation-ai/rank-leads")
@@ -95,6 +96,7 @@ async def rank_leads(
 
 # ── 退订分析 Routes ──
 
+
 @router.get("/reservation-ai/cancellation-analysis")
 async def get_cancellation_analysis(
     store_id: str = Query(...),
@@ -104,9 +106,7 @@ async def get_cancellation_analysis(
     current_user: User = Depends(get_current_active_user),
 ):
     """退订/输单原因分析"""
-    return await cancellation_analyzer.analyze_cancellations(
-        session, store_id, start_date, end_date
-    )
+    return await cancellation_analyzer.analyze_cancellations(session, store_id, start_date, end_date)
 
 
 @router.get("/reservation-ai/cancellation-trend")
@@ -120,6 +120,7 @@ async def get_cancellation_trend(
 
 
 # ── AI 日报 Routes ──
+
 
 @router.get("/reservation-ai/daily-report")
 async def get_daily_report(
@@ -158,14 +159,21 @@ async def get_daily_report(
             "insights": cancellation.get("insights", []),
         },
         "ai_message": _compose_daily_message(
-            total_leads, total_value, signed_count, completed_count,
+            total_leads,
+            total_value,
+            signed_count,
+            completed_count,
             cancellation.get("total_lost", 0),
         ),
     }
 
 
 def _compose_daily_message(
-    leads: int, value: float, signed: int, completed: int, lost: int,
+    leads: int,
+    value: float,
+    signed: int,
+    completed: int,
+    lost: int,
 ) -> str:
     """生成企微推送消息"""
     return (

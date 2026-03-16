@@ -1,6 +1,7 @@
 """
 L4 Action 状态机服务：创建、推送、回执、超时升级
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -9,13 +10,7 @@ from typing import Any, Dict, List, Optional
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.models.ontology_action import (
-    OntologyAction,
-    ActionStatus,
-    ActionPriority,
-    ESCALATION_MINUTES,
-)
+from src.models.ontology_action import ESCALATION_MINUTES, ActionPriority, ActionStatus, OntologyAction
 
 logger = structlog.get_logger()
 
@@ -87,8 +82,10 @@ async def update_status(
     status: str,
 ) -> Optional[OntologyAction]:
     """更新状态（SENT/ACKED/IN_PROGRESS/DONE/CLOSED）。"""
-    from sqlalchemy import update
     from uuid import UUID
+
+    from sqlalchemy import update
+
     now = datetime.utcnow()
     q = select(OntologyAction).where(OntologyAction.id == UUID(action_id))
     res = await session.execute(q)
@@ -175,7 +172,9 @@ def _action_ack_sign(action_id: str) -> str:
     """生成一键回执链接签名（HMAC-SHA256）。"""
     import hashlib
     import hmac as hm
+
     from src.core.config import settings
+
     secret = getattr(settings, "WECHAT_TOKEN", None) or getattr(settings, "ACTION_ACK_SECRET", "") or "default_ack_secret"
     return hm.new(secret.encode(), action_id.encode(), hashlib.sha256).hexdigest()
 
@@ -189,8 +188,9 @@ async def push_action_to_wechat(
     需配置 wechat_service（WECHAT_CORP_ID/SECRET/AGENT_ID）。
     """
     from uuid import UUID
-    from src.services.wechat_service import wechat_service
+
     from src.core.config import settings
+    from src.services.wechat_service import wechat_service
 
     q = select(OntologyAction).where(OntologyAction.id == UUID(action_id))
     res = await session.execute(q)

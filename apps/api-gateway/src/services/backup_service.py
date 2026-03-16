@@ -1,13 +1,15 @@
 """
 数据备份服务
 """
+
 import asyncio
 import gzip
 import os
-import structlog
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
+
+import structlog
 
 logger = structlog.get_logger()
 
@@ -82,12 +84,14 @@ class BackupService:
             parts = f.name.split("_")
             btype = parts[1] if len(parts) >= 2 else "unknown"
             stat = f.stat()
-            backups.append({
-                "name": f.name,
-                "type": btype,
-                "size_bytes": stat.st_size,
-                "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-            })
+            backups.append(
+                {
+                    "name": f.name,
+                    "type": btype,
+                    "size_bytes": stat.st_size,
+                    "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                }
+            )
         backups.sort(key=lambda x: x["created_at"], reverse=True)
         return backups
 
@@ -122,7 +126,7 @@ class BackupService:
         """保留最新 max_backups 个备份，删除多余的旧备份。"""
         backups = await self.list_backups()
         if len(backups) > self.max_backups:
-            to_delete = backups[self.max_backups:]
+            to_delete = backups[self.max_backups :]
             for backup in to_delete:
                 await self.delete_backup(backup["name"])
 

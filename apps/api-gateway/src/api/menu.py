@@ -4,10 +4,11 @@ FEAT-004: 动态菜单推荐 API
 GET /api/v1/menu/recommendations?store_id=&limit=10
 目标响应时间：< 200ms（Redis 缓存，TTL 5分钟）
 """
-from typing import Optional
-from fastapi import APIRouter, HTTPException, status
-import structlog
 
+from typing import Optional
+
+import structlog
+from fastapi import APIRouter, HTTPException, status
 from src.services.menu_ranker import MenuRanker
 
 logger = structlog.get_logger()

@@ -16,9 +16,9 @@
 from __future__ import annotations
 
 import asyncio
+import uuid
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional
-import uuid
 
 import structlog
 from sqlalchemy import text
@@ -28,14 +28,14 @@ logger = structlog.get_logger()
 
 # ── 根因 → 建议行动映射 ─────────────────────────────────────────────────────
 _ROOT_CAUSE_ACTIONS: Dict[str, str] = {
-    "staff_error":       "建议针对相关岗位开展操作规范培训（1周内）",
-    "food_quality":      "建议检查供应商批次质量，评估换供应商可行性",
-    "over_prep":         "建议根据近7天客流数据调整备餐量（上浮系数建议1.15）",
-    "spoilage":          "建议缩短该食材采购周期或改用每日采购模式",
-    "bom_deviation":     "建议更新 BOM 配方——实际用量已系统性超出标准",
-    "transfer_loss":     "建议优化称重/分拣流程，配置精准计量工具",
-    "drop_damage":       "建议在高损耗时段加强备货区巡查或调整摆放位置",
-    "unknown":           "建议开启损耗事件追踪，记录损耗发生原因",
+    "staff_error": "建议针对相关岗位开展操作规范培训（1周内）",
+    "food_quality": "建议检查供应商批次质量，评估换供应商可行性",
+    "over_prep": "建议根据近7天客流数据调整备餐量（上浮系数建议1.15）",
+    "spoilage": "建议缩短该食材采购周期或改用每日采购模式",
+    "bom_deviation": "建议更新 BOM 配方——实际用量已系统性超出标准",
+    "transfer_loss": "建议优化称重/分拣流程，配置精准计量工具",
+    "drop_damage": "建议在高损耗时段加强备货区巡查或调整摆放位置",
+    "unknown": "建议开启损耗事件追踪，记录损耗发生原因",
 }
 
 _DEFAULT_ACTION = "建议启用损耗事件记录功能，逐步建立归因数据"
@@ -138,40 +138,42 @@ class WasteGuardService:
             for row in attr_result.fetchall():
                 iid = str(row.ingredient_id)
                 if iid in attribution_map:
-                    attribution_map[iid].append({
-                        "root_cause":  row.root_cause,
-                        "event_type":  row.event_type,
-                        "event_count": int(row.event_count),
-                    })
+                    attribution_map[iid].append(
+                        {
+                            "root_cause": row.root_cause,
+                            "event_type": row.event_type,
+                            "event_count": int(row.event_count),
+                        }
+                    )
 
         # ── 拼装 Top5 列表 ─────────────────────────────────────────────────────
         top5: List[dict] = []
         for rank, row in enumerate(top5_rows, start=1):
             waste_cost_fen = int(row.waste_cost_fen or 0)
             root_causes = attribution_map.get(str(row.item_id), [])
-            top5.append({
-                "rank":            rank,
-                "item_id":         str(row.item_id),
-                "item_name":       row.item_name,
-                "category":        row.category or "",
-                "unit":            row.unit or "",
-                "waste_cost_fen":  waste_cost_fen,
-                "waste_cost_yuan": round(waste_cost_fen / 100, 2),
-                "waste_qty":       round(float(row.waste_qty or 0), 3),
-                "cost_share_pct":  round(
-                    waste_cost_fen / total_waste_fen * 100, 1
-                ) if total_waste_fen > 0 else 0.0,
-                "root_causes":     root_causes,
-                "action":          _action_for_causes(root_causes),
-            })
+            top5.append(
+                {
+                    "rank": rank,
+                    "item_id": str(row.item_id),
+                    "item_name": row.item_name,
+                    "category": row.category or "",
+                    "unit": row.unit or "",
+                    "waste_cost_fen": waste_cost_fen,
+                    "waste_cost_yuan": round(waste_cost_fen / 100, 2),
+                    "waste_qty": round(float(row.waste_qty or 0), 3),
+                    "cost_share_pct": round(waste_cost_fen / total_waste_fen * 100, 1) if total_waste_fen > 0 else 0.0,
+                    "root_causes": root_causes,
+                    "action": _action_for_causes(root_causes),
+                }
+            )
 
         return {
-            "store_id":         store_id,
-            "start_date":       start_date.isoformat(),
-            "end_date":         end_date.isoformat(),
-            "total_waste_fen":  total_waste_fen,
+            "store_id": store_id,
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+            "total_waste_fen": total_waste_fen,
             "total_waste_yuan": round(total_waste_fen / 100, 2),
-            "top5":             top5,
+            "top5": top5,
         }
 
     # ── 门店损耗率汇总 ──────────────────────────────────────────────────────────
@@ -252,28 +254,26 @@ class WasteGuardService:
 
         # 环比变化
         waste_change_fen = waste_fen - prev_waste_fen
-        waste_change_pct = round(
-            waste_change_fen / prev_waste_fen * 100, 1
-        ) if prev_waste_fen > 0 else None
+        waste_change_pct = round(waste_change_fen / prev_waste_fen * 100, 1) if prev_waste_fen > 0 else None
 
         return {
-            "store_id":           store_id,
-            "start_date":         start_date.isoformat(),
-            "end_date":           end_date.isoformat(),
-            "waste_cost_fen":     waste_fen,
-            "waste_cost_yuan":    round(waste_fen / 100, 2),
-            "revenue_fen":        revenue_fen,
-            "revenue_yuan":       round(revenue_fen / 100, 2),
-            "waste_rate_pct":     waste_rate_pct,
-            "waste_rate_status":  waste_rate_status,
+            "store_id": store_id,
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+            "waste_cost_fen": waste_fen,
+            "waste_cost_yuan": round(waste_fen / 100, 2),
+            "revenue_fen": revenue_fen,
+            "revenue_yuan": round(revenue_fen / 100, 2),
+            "waste_rate_pct": waste_rate_pct,
+            "waste_rate_status": waste_rate_status,
             "prev_period": {
-                "start_date":      prev_start.isoformat(),
-                "end_date":        prev_end.isoformat(),
-                "waste_cost_fen":  prev_waste_fen,
+                "start_date": prev_start.isoformat(),
+                "end_date": prev_end.isoformat(),
+                "waste_cost_fen": prev_waste_fen,
                 "waste_cost_yuan": round(prev_waste_fen / 100, 2),
             },
-            "waste_change_yuan":  round(waste_change_fen / 100, 2),
-            "waste_change_pct":   waste_change_pct,
+            "waste_change_yuan": round(waste_change_fen / 100, 2),
+            "waste_change_pct": waste_change_pct,
         }
 
     # ── BOM 差异：理论 vs 实际损耗（菜品维度） ─────────────────────────────────
@@ -322,26 +322,28 @@ class WasteGuardService:
         items = []
         for rank, row in enumerate(rows, start=1):
             var_cost_fen = int(row.variance_cost_fen or 0)
-            items.append({
-                "rank":                rank,
-                "ingredient_id":       str(row.ingredient_id),
-                "item_name":           row.item_name,
-                "unit":                row.unit or "",
-                "unit_cost_fen":       int(row.unit_cost_fen or 0),
-                "unit_cost_yuan":      round(int(row.unit_cost_fen or 0) / 100, 2),
-                "total_variance_qty":  round(float(row.total_variance_qty or 0), 3),
-                "variance_cost_fen":   var_cost_fen,
-                "variance_cost_yuan":  round(var_cost_fen / 100, 2),
-                "avg_variance_pct":    round(float(row.avg_variance_pct or 0) * 100, 1),
-                "event_count":         int(row.event_count),
-            })
+            items.append(
+                {
+                    "rank": rank,
+                    "ingredient_id": str(row.ingredient_id),
+                    "item_name": row.item_name,
+                    "unit": row.unit or "",
+                    "unit_cost_fen": int(row.unit_cost_fen or 0),
+                    "unit_cost_yuan": round(int(row.unit_cost_fen or 0) / 100, 2),
+                    "total_variance_qty": round(float(row.total_variance_qty or 0), 3),
+                    "variance_cost_fen": var_cost_fen,
+                    "variance_cost_yuan": round(var_cost_fen / 100, 2),
+                    "avg_variance_pct": round(float(row.avg_variance_pct or 0) * 100, 1),
+                    "event_count": int(row.event_count),
+                }
+            )
 
         return {
-            "store_id":   store_id,
+            "store_id": store_id,
             "start_date": start_date.isoformat(),
-            "end_date":   end_date.isoformat(),
-            "top_n":      top_n,
-            "items":      items,
+            "end_date": end_date.isoformat(),
+            "top_n": top_n,
+            "items": items,
         }
 
     # ── 便捷入口：综合损耗报告 ──────────────────────────────────────────────────
@@ -368,15 +370,15 @@ class WasteGuardService:
         bom_dev = await WasteGuardService.get_bom_waste_deviation(store_id, start_date, end_date, db)
 
         return {
-            "store_id":          store_id,
-            "start_date":        start_date.isoformat(),
-            "end_date":          end_date.isoformat(),
-            "waste_rate_pct":    summary["waste_rate_pct"],
+            "store_id": store_id,
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+            "waste_rate_pct": summary["waste_rate_pct"],
             "waste_rate_status": summary["waste_rate_status"],
-            "total_waste_yuan":  summary["waste_cost_yuan"],
+            "total_waste_yuan": summary["waste_cost_yuan"],
             "waste_change_yuan": summary["waste_change_yuan"],
-            "top5":              top5["top5"],
-            "bom_deviation":     bom_dev["items"],
+            "top5": top5["top5"],
+            "bom_deviation": bom_dev["items"],
         }
 
     # ── 实时告警：检测并推送偏差超阈值的食材 ──────────────────────────────────
@@ -402,6 +404,7 @@ class WasteGuardService:
             event_id = f"WG-{uuid.uuid4().hex[:8].upper()}"
             try:
                 from src.services import waste_reasoning_service as _wrs
+
                 reasoning = await asyncio.wait_for(
                     _wrs.run_waste_reasoning(v.get("ingredient_id"), store_id, session),
                     timeout=10.0,
@@ -410,6 +413,7 @@ class WasteGuardService:
                 action = _action_for_causes(top3)
 
                 from src.services.wechat_work_message_service import wechat_work_message_service as _wms
+
                 await asyncio.wait_for(
                     _wms.send_card_message(
                         user_id=tenant_id,
@@ -437,7 +441,7 @@ class WasteGuardService:
     ) -> Dict[str, Any]:
         """生成月度四维损耗报告。"""
         try:
-            from sqlalchemy import select, func
+            from sqlalchemy import func, select
             from src.models.waste_event import WasteEvent
 
             start = date(year, month, 1)
@@ -511,8 +515,8 @@ class WasteGuardService:
         返回告警记录列表。
         """
         try:
-            from sqlalchemy import select, func
-            from src.models.bom import BOMTemplate, BOMItem
+            from sqlalchemy import func, select
+            from src.models.bom import BOMItem, BOMTemplate
 
             stmt = (
                 select(
@@ -558,6 +562,7 @@ class WasteGuardService:
                     alerts.append(alert)
                     try:
                         from src.services.wechat_work_message_service import wechat_work_message_service as _wms
+
                         await asyncio.wait_for(
                             _wms.send_card_message(
                                 user_id=tenant_id,

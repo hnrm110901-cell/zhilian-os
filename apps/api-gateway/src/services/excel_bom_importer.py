@@ -28,15 +28,14 @@ Excel BOM 导入器（徐记海鲜 POC 配方批量录入）
 """
 
 import io
-from decimal import Decimal
 from collections import defaultdict
 from dataclasses import dataclass, field
+from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
 
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.models.dish import Dish
 from src.models.inventory import InventoryItem, InventoryStatus
 from src.services.bom_service import BOMService
@@ -48,23 +47,40 @@ logger = structlog.get_logger()
 
 COLUMN_ALIASES: Dict[str, str] = {
     # 菜品
-    "菜品编码": "dish_code", "dish_code": "dish_code",
-    "菜品名称": "dish_name", "菜品": "dish_name", "dish_name": "dish_name",
-    "版本": "version", "配方版本": "version", "version": "version",
-    "售价": "dish_price", "价格": "dish_price", "单价": "dish_price",
-    "dish_price": "dish_price", "price": "dish_price",
-    "出成率": "yield_rate", "yield_rate": "yield_rate",
-    "标准份重": "standard_portion", "份重": "standard_portion",
-    "制作工时": "prep_time_minutes", "工时": "prep_time_minutes",
-    "备注": "notes", "notes": "notes",
+    "菜品编码": "dish_code",
+    "dish_code": "dish_code",
+    "菜品名称": "dish_name",
+    "菜品": "dish_name",
+    "dish_name": "dish_name",
+    "版本": "version",
+    "配方版本": "version",
+    "version": "version",
+    "售价": "dish_price",
+    "价格": "dish_price",
+    "单价": "dish_price",
+    "dish_price": "dish_price",
+    "price": "dish_price",
+    "出成率": "yield_rate",
+    "yield_rate": "yield_rate",
+    "标准份重": "standard_portion",
+    "份重": "standard_portion",
+    "制作工时": "prep_time_minutes",
+    "工时": "prep_time_minutes",
+    "备注": "notes",
+    "notes": "notes",
     # 食材
-    "食材名称": "ingredient_name", "食材": "ingredient_name",
+    "食材名称": "ingredient_name",
+    "食材": "ingredient_name",
     "食材编码": "ingredient_code",
-    "食材分类": "ingredient_category", "分类": "ingredient_category",
-    "标准用量": "standard_qty", "用量": "standard_qty", "qty": "standard_qty",
+    "食材分类": "ingredient_category",
+    "分类": "ingredient_category",
+    "标准用量": "standard_qty",
+    "用量": "standard_qty",
+    "qty": "standard_qty",
     "单位": "unit",
     "毛料用量": "raw_qty",
-    "核心食材": "is_key", "关键食材": "is_key",
+    "核心食材": "is_key",
+    "关键食材": "is_key",
     "可选": "is_optional",
     "加工说明": "prep_notes",
 }
@@ -173,6 +189,7 @@ class ExcelBOMImporter:
 
     def _parse_row(self, row: tuple, col_map: Dict[str, int], row_num: int) -> Optional[ImportRow]:
         """解析单行数据，跳过空行"""
+
         def get(col: str):
             idx = col_map.get(col)
             return row[idx] if idx is not None and idx < len(row) else None
@@ -212,6 +229,7 @@ class ExcelBOMImporter:
         price_val = get("dish_price")
         try:
             from decimal import Decimal as _Decimal
+
             dish_price = _Decimal(str(price_val)).quantize(_Decimal("0.01")) if price_val not in (None, "", 0, "0") else None
         except Exception:
             dish_price = None
@@ -288,31 +306,33 @@ class ExcelBOMImporter:
                         )
                         report.total_items_created += 1
                     except Exception as e:
-                        report.warnings.append(
-                            f"行 {ir.row_number} 食材添加失败({ir.ingredient_name}): {e}"
-                        )
+                        report.warnings.append(f"行 {ir.row_number} 食材添加失败({ir.ingredient_name}): {e}")
 
                 # 4. Neo4j 同步
                 await self.bom_svc.sync_to_neo4j(bom)
 
-                report.dish_results.append({
-                    "dish_code": dish_code,
-                    "dish_name": first.dish_name,
-                    "version": version,
-                    "bom_id": str(bom.id),
-                    "items_count": report.total_items_created,
-                    "status": "success",
-                })
+                report.dish_results.append(
+                    {
+                        "dish_code": dish_code,
+                        "dish_name": first.dish_name,
+                        "version": version,
+                        "bom_id": str(bom.id),
+                        "items_count": report.total_items_created,
+                        "status": "success",
+                    }
+                )
 
             except Exception as e:
                 report.errors.append(f"菜品 {dish_code}({version}) 导入失败: {e}")
-                report.dish_results.append({
-                    "dish_code": dish_code,
-                    "dish_name": first.dish_name,
-                    "version": version,
-                    "status": "error",
-                    "error": str(e),
-                })
+                report.dish_results.append(
+                    {
+                        "dish_code": dish_code,
+                        "dish_name": first.dish_name,
+                        "version": version,
+                        "status": "error",
+                        "error": str(e),
+                    }
+                )
 
         await self.db.commit()
 
@@ -326,6 +346,7 @@ class ExcelBOMImporter:
 
         import uuid as _uuid
         from decimal import Decimal
+
         dish = Dish(
             id=_uuid.uuid4(),
             store_id=self.store_id,

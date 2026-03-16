@@ -2,12 +2,13 @@
 AI邀请函模型
 支持5套主题模板 + AI文案生成 + RSVP回执
 """
+
 import enum
-import uuid
 import secrets
+import uuid
 from datetime import datetime
 
-from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, Enum, ForeignKey, Text, JSON
+from sqlalchemy import JSON, Boolean, Column, DateTime, Enum, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 
 from .base import Base, TimestampMixin
@@ -15,15 +16,17 @@ from .base import Base, TimestampMixin
 
 class InvitationTemplate(str, enum.Enum):
     """邀请函主题模板"""
-    WEDDING_RED = "wedding_red"           # 婚宴红金
-    BIRTHDAY_GOLD = "birthday_gold"       # 寿宴暖金
-    CORPORATE_BLUE = "corporate_blue"     # 商务深蓝
-    FULL_MOON_PINK = "full_moon_pink"     # 满月粉色
-    GRADUATION_GREEN = "graduation_green" # 升学翠绿
+
+    WEDDING_RED = "wedding_red"  # 婚宴红金
+    BIRTHDAY_GOLD = "birthday_gold"  # 寿宴暖金
+    CORPORATE_BLUE = "corporate_blue"  # 商务深蓝
+    FULL_MOON_PINK = "full_moon_pink"  # 满月粉色
+    GRADUATION_GREEN = "graduation_green"  # 升学翠绿
 
 
 class RSVPStatus(str, enum.Enum):
     """回执状态"""
+
     ATTENDING = "attending"
     DECLINED = "declined"
     PENDING = "pending"
@@ -31,6 +34,7 @@ class RSVPStatus(str, enum.Enum):
 
 class Invitation(Base, TimestampMixin):
     """邀请函"""
+
     __tablename__ = "invitations"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -70,6 +74,7 @@ class Invitation(Base, TimestampMixin):
 
 class InvitationRSVP(Base, TimestampMixin):
     """邀请函RSVP回执"""
+
     __tablename__ = "invitation_rsvps"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

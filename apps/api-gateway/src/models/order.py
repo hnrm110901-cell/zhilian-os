@@ -1,18 +1,21 @@
 """
 Order Models
 """
-from sqlalchemy import Column, String, Integer, ForeignKey, Enum, JSON, DateTime, Index, Numeric
+
+import enum
+import uuid
+from datetime import datetime
+
+from sqlalchemy import JSON, Column, DateTime, Enum, ForeignKey, Index, Integer, Numeric, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-import uuid
-import enum
-from datetime import datetime
 
 from .base import Base, TimestampMixin
 
 
 class OrderStatus(str, enum.Enum):
     """Order status"""
+
     PENDING = "pending"
     CONFIRMED = "confirmed"
     PREPARING = "preparing"
@@ -48,7 +51,7 @@ class Order(Base, TimestampMixin):
     completed_at = Column(DateTime)
 
     # Staff tracking
-    waiter_id = Column(String(50), index=True)   # 服务员ID（用于员工绩效基线计算）
+    waiter_id = Column(String(50), index=True)  # 服务员ID（用于员工绩效基线计算）
 
     # 销售渠道（Task2 P0 字段）
     sales_channel = Column(String(30), nullable=True, index=True)
@@ -62,10 +65,10 @@ class Order(Base, TimestampMixin):
 
     # Composite indexes for common query patterns
     __table_args__ = (
-        Index('idx_order_store_status', 'store_id', 'status'),
-        Index('idx_order_store_time', 'store_id', 'order_time'),
-        Index('idx_order_status_time', 'status', 'order_time'),
-        Index('idx_order_store_waiter', 'store_id', 'waiter_id'),
+        Index("idx_order_store_status", "store_id", "status"),
+        Index("idx_order_store_time", "store_id", "order_time"),
+        Index("idx_order_status_time", "status", "order_time"),
+        Index("idx_order_store_waiter", "store_id", "waiter_id"),
     )
 
     def __repr__(self):
@@ -85,11 +88,11 @@ class OrderItem(Base, TimestampMixin):
     item_name = Column(String(100), nullable=False)
     quantity = Column(Integer, nullable=False)
     unit_price = Column(Numeric(10, 2), nullable=False)  # yuan in DB
-    subtotal = Column(Numeric(10, 2), nullable=False)    # yuan in DB
+    subtotal = Column(Numeric(10, 2), nullable=False)  # yuan in DB
 
     # 食材实际成本（BOM 理论成本）
-    food_cost_actual = Column(Integer, nullable=True)       # 分，BOM 理论成本
-    gross_margin     = Column(Numeric(6, 4), nullable=True) # 毛利率 0.0000–1.0000
+    food_cost_actual = Column(Integer, nullable=True)  # 分，BOM 理论成本
+    gross_margin = Column(Numeric(6, 4), nullable=True)  # 毛利率 0.0000–1.0000
 
     # Special requests
     notes = Column(String(255))

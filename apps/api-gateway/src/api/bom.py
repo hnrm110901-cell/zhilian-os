@@ -26,7 +26,6 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.core.dependencies import get_current_user
 from src.models.user import User
@@ -37,6 +36,7 @@ logger = structlog.get_logger()
 
 
 # ── Pydantic Schemas ──────────────────────────────────────────────────────────
+
 
 class BOMItemIn(BaseModel):
     ingredient_id: str = Field(..., description="食材 ID（InventoryItem.id）")
@@ -112,6 +112,7 @@ class BOMOut(BaseModel):
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
+
 
 @router.post("/", response_model=BOMOut, status_code=status.HTTP_201_CREATED)
 async def create_bom(
@@ -281,6 +282,7 @@ async def delete_bom(
 
 # ── BOMItem endpoints ─────────────────────────────────────────────────────────
 
+
 @router.post("/{bom_id}/items/", response_model=BOMItemOut, status_code=status.HTTP_201_CREATED)
 async def add_bom_item(
     bom_id: str,
@@ -354,6 +356,7 @@ async def get_bom_cost_report(
 ):
     """查询 BOM 版本的标准食材成本报告（含 food_cost%）"""
     from src.services.food_cost_service import FoodCostService
+
     report = await FoodCostService.get_bom_cost_report(bom_id, db)
     if report is None:
         raise HTTPException(status_code=404, detail="BOM 不存在")
@@ -377,23 +380,26 @@ async def sync_bom_to_neo4j(
 
 # ── Internal helper ───────────────────────────────────────────────────────────
 
+
 def _serialize_bom(bom) -> dict:
     """将 BOMTemplate ORM 对象转为可序列化字典"""
     items = []
-    for it in (bom.items or []):
-        items.append({
-            "id": it.id,
-            "bom_id": it.bom_id,
-            "ingredient_id": it.ingredient_id,
-            "standard_qty": float(it.standard_qty),
-            "raw_qty": float(it.raw_qty) if it.raw_qty else None,
-            "unit": it.unit,
-            "unit_cost": it.unit_cost,
-            "waste_factor": float(it.waste_factor) if it.waste_factor else 0.0,
-            "is_key_ingredient": bool(it.is_key_ingredient),
-            "is_optional": bool(it.is_optional),
-            "prep_notes": it.prep_notes,
-        })
+    for it in bom.items or []:
+        items.append(
+            {
+                "id": it.id,
+                "bom_id": it.bom_id,
+                "ingredient_id": it.ingredient_id,
+                "standard_qty": float(it.standard_qty),
+                "raw_qty": float(it.raw_qty) if it.raw_qty else None,
+                "unit": it.unit,
+                "unit_cost": it.unit_cost,
+                "waste_factor": float(it.waste_factor) if it.waste_factor else 0.0,
+                "is_key_ingredient": bool(it.is_key_ingredient),
+                "is_optional": bool(it.is_optional),
+                "prep_notes": it.prep_notes,
+            }
+        )
     return {
         "id": bom.id,
         "store_id": bom.store_id,

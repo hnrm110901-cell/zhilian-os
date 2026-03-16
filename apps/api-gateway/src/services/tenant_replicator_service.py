@@ -9,23 +9,24 @@ TenantReplicator Service — 多客户复制引擎（Sprint 6）
 定位：新客户快速入驻的自动化引擎，降低实施成本
 复用：基于 StoreOntologyReplicator 的克隆能力
 """
+
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, List
+from typing import List, Optional
 
-from sqlalchemy import select, func, and_
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.models.dish import Dish
 from src.models.bom import BOMTemplate
-from src.models.inventory import InventoryItem
+from src.models.dish import Dish
 from src.models.employee import Employee
+from src.models.inventory import InventoryItem
 from src.models.store import Store
 
 logger = logging.getLogger(__name__)
 
 
 # ── 纯函数 ──────────────────────────────────────────────────────
+
 
 def compute_onboarding_progress(
     dish_count: int,
@@ -49,12 +50,7 @@ def compute_onboarding_progress(
     emp_pct = min(employee_count / max(min_employees, 1), 1.0)
 
     # 综合进度（加权）
-    overall = (
-        dish_pct * 0.30
-        + bom_pct * 0.25
-        + inv_pct * 0.25
-        + emp_pct * 0.20
-    )
+    overall = dish_pct * 0.30 + bom_pct * 0.25 + inv_pct * 0.25 + emp_pct * 0.20
 
     return {
         "dish_progress": round(dish_pct, 4),
@@ -110,35 +106,50 @@ class TenantReplicatorService:
 
         返回：各维度数据量 + 完成进度 + 状态 + 预计剩余天数
         """
-        dish_count = await db.scalar(
-            select(func.count(Dish.id)).where(
-                Dish.store_id == store_id,
-                Dish.is_available.is_(True),
+        dish_count = (
+            await db.scalar(
+                select(func.count(Dish.id)).where(
+                    Dish.store_id == store_id,
+                    Dish.is_available.is_(True),
+                )
             )
-        ) or 0
+            or 0
+        )
 
-        bom_count = await db.scalar(
-            select(func.count(BOMTemplate.id)).where(
-                BOMTemplate.store_id == store_id,
-                BOMTemplate.is_active.is_(True),
+        bom_count = (
+            await db.scalar(
+                select(func.count(BOMTemplate.id)).where(
+                    BOMTemplate.store_id == store_id,
+                    BOMTemplate.is_active.is_(True),
+                )
             )
-        ) or 0
+            or 0
+        )
 
-        inventory_count = await db.scalar(
-            select(func.count(InventoryItem.id)).where(
-                InventoryItem.store_id == store_id,
+        inventory_count = (
+            await db.scalar(
+                select(func.count(InventoryItem.id)).where(
+                    InventoryItem.store_id == store_id,
+                )
             )
-        ) or 0
+            or 0
+        )
 
-        employee_count = await db.scalar(
-            select(func.count(Employee.id)).where(
-                Employee.store_id == store_id,
-                Employee.is_active.is_(True),
+        employee_count = (
+            await db.scalar(
+                select(func.count(Employee.id)).where(
+                    Employee.store_id == store_id,
+                    Employee.is_active.is_(True),
+                )
             )
-        ) or 0
+            or 0
+        )
 
         progress = compute_onboarding_progress(
-            dish_count, bom_count, inventory_count, employee_count,
+            dish_count,
+            bom_count,
+            inventory_count,
+            employee_count,
         )
         status = classify_onboarding_status(progress["overall_progress"])
         est_days = estimate_onboarding_days(progress["overall_progress"])
@@ -173,9 +184,7 @@ class TenantReplicatorService:
         replicator = StoreOntologyReplicator(db)
 
         # 获取目标门店名称
-        target_store = await db.scalar(
-            select(Store.name).where(Store.id == target_store_id)
-        )
+        target_store = await db.scalar(select(Store.name).where(Store.id == target_store_id))
         target_name = target_store or target_store_id
 
         report = await replicator.replicate(

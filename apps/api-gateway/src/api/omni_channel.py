@@ -14,7 +14,6 @@ from typing import Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Query
-
 from src.core.database import get_db_session
 from src.core.dependencies import require_role
 from src.models.user import UserRole

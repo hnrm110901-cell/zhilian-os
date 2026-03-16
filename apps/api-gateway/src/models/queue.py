@@ -2,17 +2,22 @@
 等位/排队数据模型
 Queue/Waiting List Models
 """
-from sqlalchemy import Column, String, Integer, DateTime, Boolean, Text, Enum as SQLEnum
+
+import enum
+from datetime import datetime
+
+from sqlalchemy import Boolean, Column, DateTime
+from sqlalchemy import Enum as SQLEnum
+from sqlalchemy import Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
-from datetime import datetime
-import enum
 
 from .base import Base
 
 
 class QueueStatus(str, enum.Enum):
     """排队状态"""
+
     WAITING = "waiting"  # 等待中
     CALLED = "called"  # 已叫号
     SEATED = "seated"  # 已入座
@@ -22,6 +27,7 @@ class QueueStatus(str, enum.Enum):
 
 class Queue(Base):
     """排队记录"""
+
     __tablename__ = "queues"
 
     # 基础信息
@@ -38,13 +44,7 @@ class Queue(Base):
     consumer_id = Column(UUID(as_uuid=True), nullable=True, index=True, comment="CDP消费者ID")
 
     # 状态信息
-    status = Column(
-        SQLEnum(QueueStatus),
-        nullable=False,
-        default=QueueStatus.WAITING,
-        index=True,
-        comment="排队状态"
-    )
+    status = Column(SQLEnum(QueueStatus), nullable=False, default=QueueStatus.WAITING, index=True, comment="排队状态")
 
     # 时间信息
     created_at = Column(DateTime, nullable=False, default=func.now(), comment="创建时间")

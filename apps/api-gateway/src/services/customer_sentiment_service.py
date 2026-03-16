@@ -54,11 +54,13 @@ _NEGATIVE_ALERT_THRESHOLD: float = float(os.getenv("SENTIMENT_NEGATIVE_THRESHOLD
 # 数据类（参考 BettaFish SentimentResult / BatchSentimentResult）
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class CustomerReview:
     """单条顾客评论"""
+
     text: str
-    source: str = "unknown"          # meituan / dianping / waimai / wecom
+    source: str = "unknown"  # meituan / dianping / waimai / wecom
     dish_name: Optional[str] = None  # 预标注菜品（None 时由 LLM 从文本提取）
     platform_rating: Optional[float] = None  # 平台星级 1-5（辅助参考）
     review_id: Optional[str] = None
@@ -67,31 +69,33 @@ class CustomerReview:
 @dataclass
 class SentimentResult:
     """单条评论的情感分析结果（对标 BettaFish SentimentResult）"""
+
     review_id: Optional[str]
     text: str
-    dish_mentions: List[str]          # 评论中提到的菜品
-    sentiment: str                    # "positive" / "negative" / "neutral"
-    confidence: float                 # 0.0–1.0
-    key_points: List[str]             # 关键点：["偏咸", "份量少"] / ["鲜嫩", "够味"]
+    dish_mentions: List[str]  # 评论中提到的菜品
+    sentiment: str  # "positive" / "negative" / "neutral"
+    confidence: float  # 0.0–1.0
+    key_points: List[str]  # 关键点：["偏咸", "份量少"] / ["鲜嫩", "够味"]
     success: bool = True
     error_message: str = ""
-    analysis_performed: bool = True   # False 表示服务关闭或降级
+    analysis_performed: bool = True  # False 表示服务关闭或降级
 
 
 @dataclass
 class DishSentimentSummary:
     """按菜品聚合的情感摘要（屯象OS新增，BettaFish无此概念）"""
+
     dish_name: str
     total_reviews: int
     positive_count: int
     negative_count: int
     neutral_count: int
-    positive_rate: float              # 好评率 0.0–1.0
-    negative_rate: float              # 差评率 0.0–1.0
-    sentiment_score: float            # 综合情感分 0.0–1.0（用于健康评分加权）
-    top_complaints: List[str]         # 高频差评关键词
-    top_praises: List[str]            # 高频好评关键词
-    sentiment_label: str              # "好评为主" / "差评预警" / "口碑中性" / "数据不足"
+    positive_rate: float  # 好评率 0.0–1.0
+    negative_rate: float  # 差评率 0.0–1.0
+    sentiment_score: float  # 综合情感分 0.0–1.0（用于健康评分加权）
+    top_complaints: List[str]  # 高频差评关键词
+    top_praises: List[str]  # 高频好评关键词
+    sentiment_label: str  # "好评为主" / "差评预警" / "口碑中性" / "数据不足"
 
     @property
     def sentiment_score_25(self) -> float:
@@ -130,6 +134,7 @@ _SYSTEM_PROMPT = """\
 # ─────────────────────────────────────────────────────────────────────────────
 # 服务类
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class CustomerSentimentService:
     """
@@ -188,7 +193,7 @@ class CustomerSentimentService:
 
         all_results: List[SentimentResult] = []
         for i in range(0, len(reviews), _BATCH_SIZE):
-            batch = reviews[i: i + _BATCH_SIZE]
+            batch = reviews[i : i + _BATCH_SIZE]
             batch_results = await self._analyze_single_batch(batch)
             all_results.extend(batch_results)
 
@@ -210,15 +215,10 @@ class CustomerSentimentService:
             max_tokens=512,
         )
 
-    async def _analyze_single_batch(
-        self, batch: List[CustomerReview]
-    ) -> List[SentimentResult]:
+    async def _analyze_single_batch(self, batch: List[CustomerReview]) -> List[SentimentResult]:
         """处理单个批次，返回与 batch 等长的 SentimentResult 列表。"""
         # 构建输入 payload
-        payload_items = [
-            {"id": r.review_id or str(i), "text": r.text}
-            for i, r in enumerate(batch)
-        ]
+        payload_items = [{"id": r.review_id or str(i), "text": r.text} for i, r in enumerate(batch)]
         payload = json.dumps(payload_items, ensure_ascii=False)
 
         raw = await self._call_llm_batch(payload)
@@ -285,15 +285,17 @@ class CustomerSentimentService:
                 rid = rev.review_id or str(i)
                 item = id_to_item.get(rid)
                 if item:
-                    results.append(SentimentResult(
-                        review_id=rev.review_id,
-                        text=rev.text,
-                        dish_mentions=self._clean_list(item.get("dish_mentions", [])),
-                        sentiment=item.get("sentiment", "neutral"),
-                        confidence=float(item.get("confidence", 0.5)),
-                        key_points=self._clean_list(item.get("key_points", []))[:4],
-                        success=True,
-                    ))
+                    results.append(
+                        SentimentResult(
+                            review_id=rev.review_id,
+                            text=rev.text,
+                            dish_mentions=self._clean_list(item.get("dish_mentions", [])),
+                            sentiment=item.get("sentiment", "neutral"),
+                            confidence=float(item.get("confidence", 0.5)),
+                            key_points=self._clean_list(item.get("key_points", []))[:4],
+                            success=True,
+                        )
+                    )
                 else:
                     results.append(self._fallback_result(rev))
 
@@ -305,9 +307,7 @@ class CustomerSentimentService:
 
     # ── 聚合辅助 ─────────────────────────────────────────────────────────────
 
-    def _build_summary(
-        self, dish_name: str, results: List[SentimentResult]
-    ) -> DishSentimentSummary:
+    def _build_summary(self, dish_name: str, results: List[SentimentResult]) -> DishSentimentSummary:
         total = len(results)
         pos = sum(1 for r in results if r.sentiment == "positive")
         neg = sum(1 for r in results if r.sentiment == "negative")

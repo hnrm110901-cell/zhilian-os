@@ -29,29 +29,30 @@ logger = structlog.get_logger()
 
 # ── 频控限制（环境变量可覆盖）──────────────────────────────────────────────────
 # 企业微信每人每天最多1条，每周最多3条（官方建议）
-_WXWORK_DAILY_LIMIT  = int(os.getenv("FC_WXWORK_DAILY_LIMIT",  "1"))
+_WXWORK_DAILY_LIMIT = int(os.getenv("FC_WXWORK_DAILY_LIMIT", "1"))
 _WXWORK_WEEKLY_LIMIT = int(os.getenv("FC_WXWORK_WEEKLY_LIMIT", "3"))
 
 # 小程序订阅消息
-_MINIAPP_DAILY_LIMIT  = int(os.getenv("FC_MINIAPP_DAILY_LIMIT",  "2"))
+_MINIAPP_DAILY_LIMIT = int(os.getenv("FC_MINIAPP_DAILY_LIMIT", "2"))
 _MINIAPP_WEEKLY_LIMIT = int(os.getenv("FC_MINIAPP_WEEKLY_LIMIT", "5"))
 
 # 短信（成本高，限制更严）
-_SMS_DAILY_LIMIT  = int(os.getenv("FC_SMS_DAILY_LIMIT",  "1"))
+_SMS_DAILY_LIMIT = int(os.getenv("FC_SMS_DAILY_LIMIT", "1"))
 _SMS_WEEKLY_LIMIT = int(os.getenv("FC_SMS_WEEKLY_LIMIT", "2"))
 
 # 勿扰时间：22:00-09:00
 _QUIET_START = int(os.getenv("FC_QUIET_START", "22"))
-_QUIET_END   = int(os.getenv("FC_QUIET_END",   "9"))
+_QUIET_END = int(os.getenv("FC_QUIET_END", "9"))
 
 # Redis key TTL
-_DAY_TTL  = 86400      # 24h
-_WEEK_TTL = 604800     # 7d
+_DAY_TTL = 86400  # 24h
+_WEEK_TTL = 604800  # 7d
 
 SUPPORTED_CHANNELS = ("wxwork", "miniapp", "sms")
 
 
 # ── 纯函数 ────────────────────────────────────────────────────────────────────
+
 
 def make_daily_key(person_id: str, store_id: str, channel: str) -> str:
     """
@@ -94,22 +95,23 @@ def is_quiet_hours(hour: Optional[int] = None) -> bool:
 def get_channel_daily_limit(channel: str) -> int:
     """返回指定渠道的每日发送上限。"""
     return {
-        "wxwork":  _WXWORK_DAILY_LIMIT,
+        "wxwork": _WXWORK_DAILY_LIMIT,
         "miniapp": _MINIAPP_DAILY_LIMIT,
-        "sms":     _SMS_DAILY_LIMIT,
+        "sms": _SMS_DAILY_LIMIT,
     }.get(channel, 1)
 
 
 def get_channel_weekly_limit(channel: str) -> int:
     """返回指定渠道的每周发送上限。"""
     return {
-        "wxwork":  _WXWORK_WEEKLY_LIMIT,
+        "wxwork": _WXWORK_WEEKLY_LIMIT,
         "miniapp": _MINIAPP_WEEKLY_LIMIT,
-        "sms":     _SMS_WEEKLY_LIMIT,
+        "sms": _SMS_WEEKLY_LIMIT,
     }.get(channel, 3)
 
 
 # ── 服务类 ────────────────────────────────────────────────────────────────────
+
 
 class FrequencyCapEngine:
     """
@@ -161,10 +163,10 @@ class FrequencyCapEngine:
             return True  # Redis 不可用时降级允许
 
         try:
-            daily_key  = make_daily_key(person_id, store_id, channel)
+            daily_key = make_daily_key(person_id, store_id, channel)
             weekly_key = make_weekly_key(person_id, store_id, channel)
 
-            daily_count  = int(await self._redis.get(daily_key)  or 0)
+            daily_count = int(await self._redis.get(daily_key) or 0)
             weekly_count = int(await self._redis.get(weekly_key) or 0)
 
             if daily_count >= get_channel_daily_limit(channel):
@@ -208,7 +210,7 @@ class FrequencyCapEngine:
             return
 
         try:
-            daily_key  = make_daily_key(person_id, store_id, channel)
+            daily_key = make_daily_key(person_id, store_id, channel)
             weekly_key = make_weekly_key(person_id, store_id, channel)
 
             await self._redis.incr(daily_key)
@@ -248,16 +250,16 @@ class FrequencyCapEngine:
             }
 
         try:
-            daily_key  = make_daily_key(person_id, store_id, channel)
+            daily_key = make_daily_key(person_id, store_id, channel)
             weekly_key = make_weekly_key(person_id, store_id, channel)
 
-            daily  = int(await self._redis.get(daily_key)  or 0)
+            daily = int(await self._redis.get(daily_key) or 0)
             weekly = int(await self._redis.get(weekly_key) or 0)
 
             return {
-                "daily":        daily,
-                "daily_limit":  get_channel_daily_limit(channel),
-                "weekly":       weekly,
+                "daily": daily,
+                "daily_limit": get_channel_daily_limit(channel),
+                "weekly": weekly,
                 "weekly_limit": get_channel_weekly_limit(channel),
             }
 

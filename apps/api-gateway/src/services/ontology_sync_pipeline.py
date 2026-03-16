@@ -12,13 +12,13 @@ PostgreSQL → Neo4j 本体同步管道（Palantir Fusion Layer 实现）
 """
 
 import asyncio
-import structlog
 from typing import Set
-from sqlalchemy import event
-from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine
-from sqlalchemy.orm import Session
 
-from src.models.bom import BOMTemplate, BOMItem
+import structlog
+from sqlalchemy import event
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
+from sqlalchemy.orm import Session
+from src.models.bom import BOMItem, BOMTemplate
 from src.models.dish import Dish
 from src.models.inventory import InventoryItem
 
@@ -26,6 +26,7 @@ logger = structlog.get_logger()
 
 
 # ── 待同步队列（内存级，per-session） ────────────────────────────────────────
+
 
 class _SyncQueue:
     """跟踪一个 SQLAlchemy Session 中需要同步到 Neo4j 的对象"""
@@ -38,19 +39,19 @@ class _SyncQueue:
 
 # ── 同步执行函数 ──────────────────────────────────────────────────────────────
 
+
 def _sync_bom(bom_id: str) -> None:
     """将单个 BOM（含明细）同步到 Neo4j（同步驱动）"""
     try:
-        from src.ontology.data_sync import OntologyDataSync
         # 由于此处在同步上下文，需要创建新的同步 DB session
         from src.core.database import sync_session_factory  # type: ignore[import]
+        from src.ontology.data_sync import OntologyDataSync
 
         with sync_session_factory() as db:
             from sqlalchemy.orm import joinedload
             from src.models.bom import BOMTemplate
-            bom = db.query(BOMTemplate).options(
-                joinedload(BOMTemplate.items)
-            ).filter(BOMTemplate.id == bom_id).first()
+
+            bom = db.query(BOMTemplate).options(joinedload(BOMTemplate.items)).filter(BOMTemplate.id == bom_id).first()
 
             if not bom:
                 return
@@ -81,11 +82,12 @@ def _sync_bom(bom_id: str) -> None:
 def _sync_dish(dish_id: str) -> None:
     """将单个 Dish 节点同步到 Neo4j"""
     try:
-        from src.ontology.data_sync import OntologyDataSync
         from src.core.database import sync_session_factory  # type: ignore[import]
+        from src.ontology.data_sync import OntologyDataSync
 
         with sync_session_factory() as db:
             from src.models.dish import Dish
+
             dish = db.query(Dish).filter(Dish.id == dish_id).first()
             if not dish:
                 return
@@ -106,11 +108,12 @@ def _sync_dish(dish_id: str) -> None:
 def _sync_ingredient(ing_id: str) -> None:
     """将单个食材节点同步到 Neo4j"""
     try:
-        from src.ontology.data_sync import OntologyDataSync
         from src.core.database import sync_session_factory  # type: ignore[import]
+        from src.ontology.data_sync import OntologyDataSync
 
         with sync_session_factory() as db:
             from src.models.inventory import InventoryItem
+
             ing = db.query(InventoryItem).filter(InventoryItem.id == ing_id).first()
             if not ing:
                 return
@@ -129,6 +132,7 @@ def _sync_ingredient(ing_id: str) -> None:
 
 
 # ── SQLAlchemy 事件监听器 ─────────────────────────────────────────────────────
+
 
 def register_sync_listeners(session_factory) -> None:
     """

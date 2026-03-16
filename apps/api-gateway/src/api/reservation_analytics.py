@@ -2,12 +2,12 @@
 预订数据分析 API — 8 维度深度分析端点
 提供预订经营洞察: 总览/渠道ROI/高峰热力图/客户洞察/No-Show预测/营收影响/取消分析/趋势
 """
+
 from datetime import date, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.api.auth import get_current_active_user
 from src.core.database import get_db
 from src.services.reservation_analytics_service import reservation_analytics_service

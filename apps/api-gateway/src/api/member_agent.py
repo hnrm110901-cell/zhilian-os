@@ -13,13 +13,13 @@ MemberAgent + BossAgent API — Sprint 3
     GET  /boss/member-health    — 会员健康仪表盘
     GET  /boss/store-comparison — 跨门店对标
 """
+
 import logging
-from typing import Optional, List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.core.dependencies import get_current_user
 
@@ -30,6 +30,7 @@ router = APIRouter(prefix="/api/v1/cdp/agent", tags=["CDP-Agent"])
 
 # ── Request Schemas ────────────────────────────────────────────────
 
+
 class WakeupRequest(BaseModel):
     store_id: str
     min_recency_days: int = 30
@@ -38,6 +39,7 @@ class WakeupRequest(BaseModel):
 
 
 # ── MemberAgent Endpoints ─────────────────────────────────────────
+
 
 @router.get("/dormant/scan")
 async def scan_dormant_members(
@@ -49,8 +51,10 @@ async def scan_dormant_members(
 ):
     """扫描沉睡会员列表（按紧急度排序）"""
     from src.services.member_agent_service import member_agent_service
+
     return await member_agent_service.scan_dormant_members(
-        db, store_id,
+        db,
+        store_id,
         min_recency_days=min_recency_days,
         limit=limit,
     )
@@ -64,8 +68,10 @@ async def batch_trigger_wakeup(
 ):
     """批量触发沉睡唤醒旅程（默认 dry_run=True 仅预估）"""
     from src.services.member_agent_service import member_agent_service
+
     result = await member_agent_service.batch_trigger_wakeup(
-        db, req.store_id,
+        db,
+        req.store_id,
         min_recency_days=req.min_recency_days,
         max_count=req.max_count,
         dry_run=req.dry_run,
@@ -84,6 +90,7 @@ async def get_wakeup_metrics(
 ):
     """唤醒效果指标（Sprint 3 KPI: ≥50条/周）"""
     from src.services.member_agent_service import member_agent_service
+
     return await member_agent_service.get_wakeup_metrics(db, store_id, days=days)
 
 
@@ -95,10 +102,12 @@ async def get_vip_alerts(
 ):
     """S1 高价值客户流失预警"""
     from src.services.member_agent_service import member_agent_service
+
     return await member_agent_service.get_vip_protection_alerts(db, store_id)
 
 
 # ── BossAgent Endpoints ───────────────────────────────────────────
+
 
 @router.get("/boss/brief")
 async def get_daily_brief(
@@ -108,6 +117,7 @@ async def get_daily_brief(
 ):
     """老板每日经营速览（30秒读懂生意）"""
     from src.services.boss_agent_service import boss_agent_service
+
     return await boss_agent_service.get_daily_brief(db, store_id)
 
 
@@ -119,6 +129,7 @@ async def get_member_health(
 ):
     """CDP 会员健康仪表盘"""
     from src.services.boss_agent_service import boss_agent_service
+
     return await boss_agent_service.get_member_health_dashboard(db, store_id=store_id)
 
 
@@ -130,5 +141,6 @@ async def get_store_comparison(
 ):
     """跨门店会员健康对标"""
     from src.services.boss_agent_service import boss_agent_service
+
     ids = store_ids.split(",") if store_ids else None
     return await boss_agent_service.get_multi_store_comparison(db, store_ids=ids)

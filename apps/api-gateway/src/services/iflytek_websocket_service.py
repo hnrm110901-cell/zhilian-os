@@ -6,6 +6,7 @@
 IAT: wss://iat-api.xfyun.cn/v2/iat
 TTS: wss://tts-api.xfyun.cn/v2/tts
 """
+
 import asyncio
 import base64
 import hashlib
@@ -18,6 +19,7 @@ from typing import Optional
 from urllib.parse import urlencode
 
 import structlog
+
 try:
     import websockets
 except ImportError:
@@ -32,8 +34,8 @@ TTS_HOST = "tts-api.xfyun.cn"
 TTS_PATH = "/v2/tts"
 
 # Audio frame config for IAT streaming
-FRAME_SIZE = 1280          # bytes per frame (40ms @ 16kHz 16-bit mono)
-FRAME_INTERVAL = 0.04      # seconds between frames
+FRAME_SIZE = 1280  # bytes per frame (40ms @ 16kHz 16-bit mono)
+FRAME_INTERVAL = 0.04  # seconds between frames
 
 
 def _build_auth_url(host: str, path: str, api_key: str, api_secret: str) -> str:
@@ -47,8 +49,7 @@ def _build_auth_url(host: str, path: str, api_key: str, api_secret: str) -> str:
     ).digest()
     signature = base64.b64encode(signature_sha).decode("utf-8")
     authorization_origin = (
-        f'api_key="{api_key}", algorithm="hmac-sha256", '
-        f'headers="host date request-line", signature="{signature}"'
+        f'api_key="{api_key}", algorithm="hmac-sha256", ' f'headers="host date request-line", signature="{signature}"'
     )
     authorization = base64.b64encode(authorization_origin.encode("utf-8")).decode("utf-8")
     params = {"authorization": authorization, "date": date, "host": host}
@@ -118,7 +119,7 @@ class IflytekWebSocketService:
                 # 流式发送剩余帧
                 offset = FRAME_SIZE
                 while offset < len(audio_data):
-                    chunk = audio_data[offset: offset + FRAME_SIZE]
+                    chunk = audio_data[offset : offset + FRAME_SIZE]
                     offset += FRAME_SIZE
                     status = 1 if offset < len(audio_data) else 2  # 1=mid, 2=last
                     frame = {
@@ -193,7 +194,7 @@ class IflytekWebSocketService:
                 request = {
                     "common": {"app_id": self.app_id},
                     "business": {
-                        "aue": "raw",          # raw PCM
+                        "aue": "raw",  # raw PCM
                         "auf": f"audio/L16;rate={sample_rate}",
                         "vcn": voice,
                         "speed": speed,
@@ -202,7 +203,7 @@ class IflytekWebSocketService:
                         "tte": "UTF8",
                     },
                     "data": {
-                        "status": 2,           # 2=complete text (single-shot)
+                        "status": 2,  # 2=complete text (single-shot)
                         "text": base64.b64encode(text.encode("utf-8")).decode("utf-8"),
                     },
                 }

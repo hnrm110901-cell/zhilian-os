@@ -19,7 +19,6 @@ from typing import Any, Dict, List, Optional
 import structlog
 from sqlalchemy import and_, case, extract, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.models.channel_config import SalesChannelConfig
 from src.models.order import Order, OrderStatus
 
@@ -115,17 +114,19 @@ class OmniChannelService:
             packaging_fen = packaging_per_order * order_count
             net_fen = gross_fen - commission_fen - delivery_fen - packaging_fen
 
-            channels.append({
-                "channel": ch,
-                "channel_label": CHANNEL_LABELS.get(ch, ch),
-                "order_count": order_count,
-                "gross_revenue_yuan": _fen_to_yuan(gross_fen),
-                "commission_yuan": _fen_to_yuan(commission_fen),
-                "commission_rate": round(commission_pct * 100, 2),
-                "delivery_cost_yuan": _fen_to_yuan(delivery_fen),
-                "packaging_cost_yuan": _fen_to_yuan(packaging_fen),
-                "net_revenue_yuan": _fen_to_yuan(net_fen),
-            })
+            channels.append(
+                {
+                    "channel": ch,
+                    "channel_label": CHANNEL_LABELS.get(ch, ch),
+                    "order_count": order_count,
+                    "gross_revenue_yuan": _fen_to_yuan(gross_fen),
+                    "commission_yuan": _fen_to_yuan(commission_fen),
+                    "commission_rate": round(commission_pct * 100, 2),
+                    "delivery_cost_yuan": _fen_to_yuan(delivery_fen),
+                    "packaging_cost_yuan": _fen_to_yuan(packaging_fen),
+                    "net_revenue_yuan": _fen_to_yuan(net_fen),
+                }
+            )
 
             total_orders += order_count
             total_gross_fen += gross_fen
@@ -136,9 +137,7 @@ class OmniChannelService:
         # 计算各渠道占比
         for ch in channels:
             ch["share_pct"] = (
-                round(ch["gross_revenue_yuan"] / _fen_to_yuan(total_gross_fen) * 100, 1)
-                if total_gross_fen > 0
-                else 0.0
+                round(ch["gross_revenue_yuan"] / _fen_to_yuan(total_gross_fen) * 100, 1) if total_gross_fen > 0 else 0.0
             )
 
         channels.sort(key=lambda c: c["gross_revenue_yuan"], reverse=True)
@@ -212,9 +211,13 @@ class OmniChannelService:
             day_data: Dict[str, Any] = {"date": day_str, "channels": {}}
             day_total = 0.0
             for ch in ALL_CHANNELS:
-                ch_data = trend_map.get(day_str, {}).get(ch, {
-                    "order_count": 0, "revenue_yuan": 0.00,
-                })
+                ch_data = trend_map.get(day_str, {}).get(
+                    ch,
+                    {
+                        "order_count": 0,
+                        "revenue_yuan": 0.00,
+                    },
+                )
                 day_data["channels"][ch] = ch_data
                 day_total += ch_data["revenue_yuan"]
             day_data["total_revenue_yuan"] = round(day_total, 2)
@@ -293,27 +296,25 @@ class OmniChannelService:
             commission_fen = int(gross_fen * (commission_rate / 100))
             net_fen = gross_fen - commission_fen
 
-            comparisons.append({
-                "channel": ch,
-                "channel_label": CHANNEL_LABELS.get(ch, ch),
-                "order_count": row.order_count,
-                "total_revenue_yuan": _fen_to_yuan(gross_fen),
-                "avg_order_yuan": _fen_to_yuan(int(row.avg_fen)),
-                "commission_rate_pct": round(commission_rate, 2),
-                "net_revenue_yuan": _fen_to_yuan(net_fen),
-                "peak_hour": peak_map.get(ch),
-            })
+            comparisons.append(
+                {
+                    "channel": ch,
+                    "channel_label": CHANNEL_LABELS.get(ch, ch),
+                    "order_count": row.order_count,
+                    "total_revenue_yuan": _fen_to_yuan(gross_fen),
+                    "avg_order_yuan": _fen_to_yuan(int(row.avg_fen)),
+                    "commission_rate_pct": round(commission_rate, 2),
+                    "net_revenue_yuan": _fen_to_yuan(net_fen),
+                    "peak_hour": peak_map.get(ch),
+                }
+            )
 
         comparisons.sort(key=lambda c: c["total_revenue_yuan"], reverse=True)
 
         # 计算占比
         grand_total = sum(c["total_revenue_yuan"] for c in comparisons)
         for c in comparisons:
-            c["share_pct"] = (
-                round(c["total_revenue_yuan"] / grand_total * 100, 1)
-                if grand_total > 0
-                else 0.0
-            )
+            c["share_pct"] = round(c["total_revenue_yuan"] / grand_total * 100, 1) if grand_total > 0 else 0.0
 
         return {
             "period": f"{start_date} ~ {end_date}",
@@ -378,17 +379,19 @@ class OmniChannelService:
             pkg_fen = pkg_per * order_count
             net_fen = gross_fen - comm_fen - dlv_fen - pkg_fen
 
-            waterfall.append({
-                "channel": ch,
-                "channel_label": CHANNEL_LABELS.get(ch, ch),
-                "order_count": order_count,
-                "gross_revenue_yuan": _fen_to_yuan(gross_fen),
-                "commission_yuan": _fen_to_yuan(comm_fen),
-                "delivery_cost_yuan": _fen_to_yuan(dlv_fen),
-                "packaging_cost_yuan": _fen_to_yuan(pkg_fen),
-                "net_profit_yuan": _fen_to_yuan(net_fen),
-                "margin_pct": round(net_fen / gross_fen * 100, 1) if gross_fen > 0 else 0.0,
-            })
+            waterfall.append(
+                {
+                    "channel": ch,
+                    "channel_label": CHANNEL_LABELS.get(ch, ch),
+                    "order_count": order_count,
+                    "gross_revenue_yuan": _fen_to_yuan(gross_fen),
+                    "commission_yuan": _fen_to_yuan(comm_fen),
+                    "delivery_cost_yuan": _fen_to_yuan(dlv_fen),
+                    "packaging_cost_yuan": _fen_to_yuan(pkg_fen),
+                    "net_profit_yuan": _fen_to_yuan(net_fen),
+                    "margin_pct": round(net_fen / gross_fen * 100, 1) if gross_fen > 0 else 0.0,
+                }
+            )
 
             total_gross += gross_fen
             total_commission += comm_fen
@@ -448,13 +451,15 @@ class OmniChannelService:
         for row in rows:
             ch = row.sales_channel or "dine_in"
             rev_fen = int(row.revenue_fen)
-            mix.append({
-                "channel": ch,
-                "channel_label": CHANNEL_LABELS.get(ch, ch),
-                "order_count": row.order_count,
-                "revenue_yuan": _fen_to_yuan(rev_fen),
-                "share_pct": round(rev_fen / total_fen * 100, 1) if total_fen > 0 else 0.0,
-            })
+            mix.append(
+                {
+                    "channel": ch,
+                    "channel_label": CHANNEL_LABELS.get(ch, ch),
+                    "order_count": row.order_count,
+                    "revenue_yuan": _fen_to_yuan(rev_fen),
+                    "share_pct": round(rev_fen / total_fen * 100, 1) if total_fen > 0 else 0.0,
+                }
+            )
 
         return {
             "period": f"{start} ~ {end}",

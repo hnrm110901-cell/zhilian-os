@@ -1,6 +1,7 @@
 """
 Onboarding Engine ORM Models
 """
+
 import uuid
 from datetime import datetime
 
@@ -27,9 +28,7 @@ class OnboardingTask(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
-    __table_args__ = (
-        Index("ix_onboarding_tasks_store_step", "store_id", "step"),
-    )
+    __table_args__ = (Index("ix_onboarding_tasks_store_step", "store_id", "step"),)
 
 
 class OnboardingImport(Base):
@@ -63,6 +62,4 @@ class OnboardingRawData(Base):
     error_msg = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
-    __table_args__ = (
-        Index("ix_onboarding_raw_store_dtype", "store_id", "data_type"),
-    )
+    __table_args__ = (Index("ix_onboarding_raw_store_dtype", "store_id", "data_type"),)

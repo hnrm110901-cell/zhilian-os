@@ -1,15 +1,18 @@
 """
 Daily Summary tables — 每日营业/损耗/经营汇总
 """
-from sqlalchemy import Column, String, Integer, Numeric, Boolean, Date, Time, UniqueConstraint
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+
 import uuid
+
+from sqlalchemy import Boolean, Column, Date, Integer, Numeric, String, Time, UniqueConstraint
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 from .base import Base, TimestampMixin
 
 
 class DailyRevenueSummary(Base, TimestampMixin):
     """每日营业汇总"""
+
     __tablename__ = "daily_revenue_summary"
     __table_args__ = (UniqueConstraint("store_id", "biz_date"),)
 
@@ -34,6 +37,7 @@ class DailyRevenueSummary(Base, TimestampMixin):
 
 class DailyWasteSummary(Base, TimestampMixin):
     """每日损耗汇总"""
+
     __tablename__ = "daily_waste_summary"
     __table_args__ = (UniqueConstraint("store_id", "biz_date"),)
 
@@ -51,6 +55,7 @@ class DailyWasteSummary(Base, TimestampMixin):
 
 class DailyPnlSummary(Base, TimestampMixin):
     """经营日报（每日损益汇总）"""
+
     __tablename__ = "daily_pnl_summary"
     __table_args__ = (UniqueConstraint("store_id", "biz_date"),)
 

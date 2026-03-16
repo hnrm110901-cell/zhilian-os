@@ -5,20 +5,17 @@ Neural System Orchestrator
 屯象OS作为餐饮门店的神经系统
 统一协调订单、菜品、人员、时间、金额五个核心维度
 """
-import os
-from typing import Dict, Any, List, Optional
-import structlog
-from datetime import datetime
-import uuid
 
-from .vector_db_service import vector_db_service
-from ..schemas.restaurant_standard_schema import (
-    NeuralEventSchema,
-    OrderSchema,
-    DishSchema,
-    StaffSchema,
-)
+import os
+import uuid
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+import structlog
+
 from ..core.celery_tasks import process_neural_event
+from ..schemas.restaurant_standard_schema import DishSchema, NeuralEventSchema, OrderSchema, StaffSchema
+from .vector_db_service import vector_db_service
 
 logger = structlog.get_logger()
 
@@ -237,15 +234,18 @@ class NeuralSystemOrchestrator:
         try:
             from src.core.database import get_db_session
             from src.models.notification import Notification
+
             async with get_db_session() as session:
-                session.add(Notification(
-                    store_id=staff_data.get("store_id", ""),
-                    type="system",
-                    title="员工上班",
-                    content=f"{staff_data.get('name', '员工')} 已上班签到",
-                    priority="low",
-                    extra_data={"employee_id": staff_data.get("employee_id"), "event": "shift_start"},
-                ))
+                session.add(
+                    Notification(
+                        store_id=staff_data.get("store_id", ""),
+                        type="system",
+                        title="员工上班",
+                        content=f"{staff_data.get('name', '员工')} 已上班签到",
+                        priority="low",
+                        extra_data={"employee_id": staff_data.get("employee_id"), "event": "shift_start"},
+                    )
+                )
                 await session.commit()
         except Exception as e:
             logger.error("处理员工上班事件失败", error=str(e))
@@ -255,9 +255,11 @@ class NeuralSystemOrchestrator:
         """处理员工下班事件"""
         staff_data = event["data"]
         try:
+            from datetime import datetime as dt
+
             from src.core.database import get_db_session
             from src.models.notification import Notification
-            from datetime import datetime as dt
+
             start_str = staff_data.get("shift_start_time")
             work_hours = 0.0
             if start_str:
@@ -267,14 +269,20 @@ class NeuralSystemOrchestrator:
                 except Exception as e:
                     logger.warning("time_parse_failed", start_str=start_str, error=str(e))
             async with get_db_session() as session:
-                session.add(Notification(
-                    store_id=staff_data.get("store_id", ""),
-                    type="system",
-                    title="员工下班",
-                    content=f"{staff_data.get('name', '员工')} 已下班，本次工时 {work_hours} 小时",
-                    priority="low",
-                    extra_data={"employee_id": staff_data.get("employee_id"), "work_hours": work_hours, "event": "shift_end"},
-                ))
+                session.add(
+                    Notification(
+                        store_id=staff_data.get("store_id", ""),
+                        type="system",
+                        title="员工下班",
+                        content=f"{staff_data.get('name', '员工')} 已下班，本次工时 {work_hours} 小时",
+                        priority="low",
+                        extra_data={
+                            "employee_id": staff_data.get("employee_id"),
+                            "work_hours": work_hours,
+                            "event": "shift_end",
+                        },
+                    )
+                )
                 await session.commit()
         except Exception as e:
             logger.error("处理员工下班事件失败", error=str(e))
@@ -284,10 +292,11 @@ class NeuralSystemOrchestrator:
         """处理支付完成事件"""
         payment_data = event["data"]
         try:
-            from src.core.database import get_db_session
-            from src.models.order import Order, OrderStatus
-            from src.models.notification import Notification
             from sqlalchemy import select
+            from src.core.database import get_db_session
+            from src.models.notification import Notification
+            from src.models.order import Order, OrderStatus
+
             async with get_db_session() as session:
                 order_id = payment_data.get("order_id")
                 if order_id:
@@ -296,20 +305,23 @@ class NeuralSystemOrchestrator:
                     if order:
                         order.status = OrderStatus.COMPLETED
                         from datetime import datetime as dt
+
                         order.completed_at = dt.utcnow()
                 # 会员积分通知
                 customer_phone = payment_data.get("customer_phone")
                 if customer_phone:
                     amount = payment_data.get("amount", 0)
                     points = int(amount / 100)  # 每消费1元积1分
-                    session.add(Notification(
-                        store_id=payment_data.get("store_id", ""),
-                        type="member",
-                        title="积分更新",
-                        content=f"本次消费获得 {points} 积分",
-                        priority="low",
-                        extra_data={"customer_phone": customer_phone, "points_earned": points},
-                    ))
+                    session.add(
+                        Notification(
+                            store_id=payment_data.get("store_id", ""),
+                            type="member",
+                            title="积分更新",
+                            content=f"本次消费获得 {points} 积分",
+                            priority="low",
+                            extra_data={"customer_phone": customer_phone, "points_earned": points},
+                        )
+                    )
                 await session.commit()
         except Exception as e:
             logger.error("处理支付完成事件失败", error=str(e))
@@ -321,26 +333,29 @@ class NeuralSystemOrchestrator:
         try:
             from src.core.database import get_db_session
             from src.models.notification import Notification
+
             item_name = inventory_data.get("item_name", "未知物料")
             current_qty = inventory_data.get("current_quantity", 0)
             store_id = inventory_data.get("store_id", "")
             async with get_db_session() as session:
-                session.add(Notification(
-                    store_id=store_id,
-                    type="inventory",
-                    title="库存预警",
-                    content=f"【库存不足】{item_name} 当前库存 {current_qty}，请及时补货",
-                    priority="high",
-                    extra_data={"item_id": inventory_data.get("item_id"), "current_quantity": current_qty},
-                ))
+                session.add(
+                    Notification(
+                        store_id=store_id,
+                        type="inventory",
+                        title="库存预警",
+                        content=f"【库存不足】{item_name} 当前库存 {current_qty}，请及时补货",
+                        priority="high",
+                        extra_data={"item_id": inventory_data.get("item_id"), "current_quantity": current_qty},
+                    )
+                )
                 await session.commit()
             # 企微推送
             try:
                 from src.services.wechat_work_message_service import WeChatWorkMessageService
+
                 wechat = WeChatWorkMessageService()
                 await wechat.send_text_message(
-                    "@all",
-                    f"【库存预警】{item_name} 库存不足（当前：{current_qty}），请尽快补货！"
+                    "@all", f"【库存预警】{item_name} 库存不足（当前：{current_qty}），请尽快补货！"
                 )
             except Exception as we:
                 logger.warning("库存预警企微推送失败", error=str(we))
@@ -359,22 +374,25 @@ class NeuralSystemOrchestrator:
         try:
             from src.core.database import get_db_session
             from src.models.notification import Notification
+
             async with get_db_session() as session:
-                session.add(Notification(
-                    store_id=store_id,
-                    type="compliance",
-                    title="证照即将到期",
-                    content=f"【证照预警】{license_name}{holder_str} 还剩 {days_left} 天到期，请尽快续期",
-                    priority="high" if days_left <= 7 else "medium",
-                    extra_data=data,
-                ))
+                session.add(
+                    Notification(
+                        store_id=store_id,
+                        type="compliance",
+                        title="证照即将到期",
+                        content=f"【证照预警】{license_name}{holder_str} 还剩 {days_left} 天到期，请尽快续期",
+                        priority="high" if days_left <= 7 else "medium",
+                        extra_data=data,
+                    )
+                )
                 await session.commit()
             try:
                 from src.services.wechat_work_message_service import WeChatWorkMessageService
+
                 wechat = WeChatWorkMessageService()
                 await wechat.send_text_message(
-                    "@all",
-                    f"【证照预警】{license_name}{holder_str} 还剩 {days_left} 天到期，请尽快续期！"
+                    "@all", f"【证照预警】{license_name}{holder_str} 还剩 {days_left} 天到期，请尽快续期！"
                 )
             except Exception as we:
                 logger.warning("compliance_expire_soon_wechat_failed", error=str(we))
@@ -392,22 +410,25 @@ class NeuralSystemOrchestrator:
         try:
             from src.core.database import get_db_session
             from src.models.notification import Notification
+
             async with get_db_session() as session:
-                session.add(Notification(
-                    store_id=store_id,
-                    type="compliance",
-                    title="证照已过期",
-                    content=f"【紧急】{license_name}{holder_str} 已过期，请立即处理，否则面临合规风险",
-                    priority="critical",
-                    extra_data=data,
-                ))
+                session.add(
+                    Notification(
+                        store_id=store_id,
+                        type="compliance",
+                        title="证照已过期",
+                        content=f"【紧急】{license_name}{holder_str} 已过期，请立即处理，否则面临合规风险",
+                        priority="critical",
+                        extra_data=data,
+                    )
+                )
                 await session.commit()
             try:
                 from src.services.wechat_work_message_service import WeChatWorkMessageService
+
                 wechat = WeChatWorkMessageService()
                 await wechat.send_text_message(
-                    "@all",
-                    f"【紧急】{license_name}{holder_str} 已过期！请立即续期，否则面临合规风险！"
+                    "@all", f"【紧急】{license_name}{holder_str} 已过期！请立即续期，否则面临合规风险！"
                 )
             except Exception as we:
                 logger.warning("compliance_expired_wechat_failed", error=str(we))
@@ -426,24 +447,25 @@ class NeuralSystemOrchestrator:
         try:
             from src.core.database import get_db_session
             from src.models.notification import Notification
+
             async with get_db_session() as session:
-                session.add(Notification(
-                    store_id=store_id,
-                    type="alert",
-                    title="菜品质量不合格",
-                    message=f"【质量预警】{dish_name} 质量评分 {score:.1f}，低于合格线，请立即检查",
-                    priority="high",
-                    extra_data=data,
-                    source="quality_agent",
-                ))
+                session.add(
+                    Notification(
+                        store_id=store_id,
+                        type="alert",
+                        title="菜品质量不合格",
+                        message=f"【质量预警】{dish_name} 质量评分 {score:.1f}，低于合格线，请立即检查",
+                        priority="high",
+                        extra_data=data,
+                        source="quality_agent",
+                    )
+                )
                 await session.commit()
             try:
                 from src.services.wechat_work_message_service import WeChatWorkMessageService
+
                 wechat = WeChatWorkMessageService()
-                await wechat.send_text_message(
-                    "@all",
-                    f"【质量预警】{dish_name} 质量评分 {score:.1f}，请立即检查！"
-                )
+                await wechat.send_text_message("@all", f"【质量预警】{dish_name} 质量评分 {score:.1f}，请立即检查！")
             except Exception as we:
                 logger.warning("quality_fail_wechat_failed", error=str(we))
         except Exception as e:
@@ -459,16 +481,19 @@ class NeuralSystemOrchestrator:
         try:
             from src.core.database import get_db_session
             from src.models.notification import Notification
+
             async with get_db_session() as session:
-                session.add(Notification(
-                    store_id=store_id,
-                    type="info",
-                    title="菜品质量合格",
-                    message=f"{dish_name} 质量检测通过，评分 {score:.1f}",
-                    priority="low",
-                    extra_data=data,
-                    source="quality_agent",
-                ))
+                session.add(
+                    Notification(
+                        store_id=store_id,
+                        type="info",
+                        title="菜品质量合格",
+                        message=f"{dish_name} 质量检测通过，评分 {score:.1f}",
+                        priority="low",
+                        extra_data=data,
+                        source="quality_agent",
+                    )
+                )
                 await session.commit()
         except Exception as e:
             logger.error("handle_quality_inspection_passed_error", error=str(e))
@@ -482,19 +507,23 @@ class NeuralSystemOrchestrator:
         try:
             from src.core.database import get_db_session
             from src.models.notification import Notification
+
             async with get_db_session() as session:
-                session.add(Notification(
-                    store_id=store_id,
-                    type="alert",
-                    title="质量告警",
-                    message=message,
-                    priority="high",
-                    extra_data=data,
-                    source="quality_agent",
-                ))
+                session.add(
+                    Notification(
+                        store_id=store_id,
+                        type="alert",
+                        title="质量告警",
+                        message=message,
+                        priority="high",
+                        extra_data=data,
+                        source="quality_agent",
+                    )
+                )
                 await session.commit()
             try:
                 from src.services.wechat_work_message_service import WeChatWorkMessageService
+
                 wechat = WeChatWorkMessageService()
                 await wechat.send_text_message("@all", f"【质量告警】{message}")
             except Exception as we:
@@ -514,24 +543,25 @@ class NeuralSystemOrchestrator:
         try:
             from src.core.database import get_db_session
             from src.models.notification import Notification
+
             async with get_db_session() as session:
-                session.add(Notification(
-                    store_id=store_id,
-                    type="alert",
-                    title="设备故障",
-                    message=f"【设备故障】{equipment_name}：{fault_desc}，请立即处理",
-                    priority="urgent",
-                    extra_data=data,
-                    source="equipment_monitor",
-                ))
+                session.add(
+                    Notification(
+                        store_id=store_id,
+                        type="alert",
+                        title="设备故障",
+                        message=f"【设备故障】{equipment_name}：{fault_desc}，请立即处理",
+                        priority="urgent",
+                        extra_data=data,
+                        source="equipment_monitor",
+                    )
+                )
                 await session.commit()
             try:
                 from src.services.wechat_work_message_service import WeChatWorkMessageService
+
                 wechat = WeChatWorkMessageService()
-                await wechat.send_text_message(
-                    "@all",
-                    f"【设备故障】{equipment_name} 发生故障：{fault_desc}，请立即处理！"
-                )
+                await wechat.send_text_message("@all", f"【设备故障】{equipment_name} 发生故障：{fault_desc}，请立即处理！")
             except Exception as we:
                 logger.warning("equipment_fault_wechat_failed", error=str(we))
         except Exception as e:
@@ -547,16 +577,19 @@ class NeuralSystemOrchestrator:
         try:
             from src.core.database import get_db_session
             from src.models.notification import Notification
+
             async with get_db_session() as session:
-                session.add(Notification(
-                    store_id=store_id,
-                    type="warning",
-                    title="设备保养提醒",
-                    message=f"{equipment_name} 保养到期日：{due_date}，请安排保养",
-                    priority="normal",
-                    extra_data=data,
-                    source="equipment_monitor",
-                ))
+                session.add(
+                    Notification(
+                        store_id=store_id,
+                        type="warning",
+                        title="设备保养提醒",
+                        message=f"{equipment_name} 保养到期日：{due_date}，请安排保养",
+                        priority="normal",
+                        extra_data=data,
+                        source="equipment_monitor",
+                    )
+                )
                 await session.commit()
         except Exception as e:
             logger.error("handle_equipment_maintenance_due_error", error=str(e))
@@ -570,16 +603,19 @@ class NeuralSystemOrchestrator:
         try:
             from src.core.database import get_db_session
             from src.models.notification import Notification
+
             async with get_db_session() as session:
-                session.add(Notification(
-                    store_id=store_id,
-                    type="info",
-                    title="设备修复完成",
-                    message=f"{equipment_name} 已修复，恢复正常使用",
-                    priority="low",
-                    extra_data=data,
-                    source="equipment_monitor",
-                ))
+                session.add(
+                    Notification(
+                        store_id=store_id,
+                        type="info",
+                        title="设备修复完成",
+                        message=f"{equipment_name} 已修复，恢复正常使用",
+                        priority="low",
+                        extra_data=data,
+                        source="equipment_monitor",
+                    )
+                )
                 await session.commit()
         except Exception as e:
             logger.error("handle_equipment_repaired_error", error=str(e))
@@ -596,16 +632,19 @@ class NeuralSystemOrchestrator:
         try:
             from src.core.database import get_db_session
             from src.models.notification import Notification
+
             async with get_db_session() as session:
-                session.add(Notification(
-                    store_id=store_id,
-                    type="info",
-                    title="新会员注册",
-                    message=f"新会员 {member_name}（{phone}）已注册，请做好欢迎服务",
-                    priority="low",
-                    extra_data=data,
-                    source="crm",
-                ))
+                session.add(
+                    Notification(
+                        store_id=store_id,
+                        type="info",
+                        title="新会员注册",
+                        message=f"新会员 {member_name}（{phone}）已注册，请做好欢迎服务",
+                        priority="low",
+                        extra_data=data,
+                        source="crm",
+                    )
+                )
                 await session.commit()
         except Exception as e:
             logger.error("handle_crm_member_joined_error", error=str(e))
@@ -619,16 +658,19 @@ class NeuralSystemOrchestrator:
         try:
             from src.core.database import get_db_session
             from src.models.notification import Notification
+
             async with get_db_session() as session:
-                session.add(Notification(
-                    store_id=store_id,
-                    type="info",
-                    title="会员生日提醒",
-                    message=f"今日是会员 {member_name} 的生日，可发送生日祝福或优惠券",
-                    priority="normal",
-                    extra_data=data,
-                    source="crm",
-                ))
+                session.add(
+                    Notification(
+                        store_id=store_id,
+                        type="info",
+                        title="会员生日提醒",
+                        message=f"今日是会员 {member_name} 的生日，可发送生日祝福或优惠券",
+                        priority="normal",
+                        extra_data=data,
+                        source="crm",
+                    )
+                )
                 await session.commit()
         except Exception as e:
             logger.error("handle_crm_member_birthday_error", error=str(e))
@@ -645,24 +687,27 @@ class NeuralSystemOrchestrator:
         try:
             from src.core.database import get_db_session
             from src.models.notification import Notification
+
             async with get_db_session() as session:
-                session.add(Notification(
-                    store_id=store_id,
-                    type="warning" if rating <= 2 else "info",
-                    title=f"{'差评' if rating <= 2 else '新评价'}（{platform} {rating}星）",
-                    message=f"来自 {platform} 的 {rating} 星评价：{content[:100]}",
-                    priority=priority,
-                    extra_data=data,
-                    source="crm",
-                ))
+                session.add(
+                    Notification(
+                        store_id=store_id,
+                        type="warning" if rating <= 2 else "info",
+                        title=f"{'差评' if rating <= 2 else '新评价'}（{platform} {rating}星）",
+                        message=f"来自 {platform} 的 {rating} 星评价：{content[:100]}",
+                        priority=priority,
+                        extra_data=data,
+                        source="crm",
+                    )
+                )
                 await session.commit()
             if rating <= 2:
                 try:
                     from src.services.wechat_work_message_service import WeChatWorkMessageService
+
                     wechat = WeChatWorkMessageService()
                     await wechat.send_text_message(
-                        "@all",
-                        f"【差评预警】{platform} 收到 {rating} 星差评，请及时处理！\n内容：{content[:100]}"
+                        "@all", f"【差评预警】{platform} 收到 {rating} 星差评，请及时处理！\n内容：{content[:100]}"
                     )
                 except Exception as we:
                     logger.warning("crm_review_wechat_failed", error=str(we))
@@ -785,7 +830,7 @@ class NeuralSystemOrchestrator:
                 "success": False,
                 "store_id": store_id,
                 "model_type": model_type,
-                "message": "Federated learning removed - insufficient data volume"
+                "message": "Federated learning removed - insufficient data volume",
             }
 
         except Exception as e:

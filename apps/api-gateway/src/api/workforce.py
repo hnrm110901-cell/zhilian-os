@@ -14,11 +14,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.core.dependencies import get_current_user, require_role
-from src.repositories import EmployeeRepository
 from src.models.user import User, UserRole
+from src.repositories import EmployeeRepository
 from src.services.labor_cost_service import LaborCostService
 from src.services.labor_demand_service import LaborDemandService
 from src.services.shift_fairness_service import ShiftFairnessService
@@ -187,8 +186,7 @@ async def get_staffing_advice(
         raise HTTPException(status_code=400, detail="meal_period 必须是 morning/lunch/dinner/all_day")
 
     result = await db.execute(
-        text(
-            """
+        text("""
             SELECT
                 sa.id, sa.store_id, sa.advice_date, sa.meal_period, sa.status,
                 sa.recommended_headcount, sa.current_scheduled_headcount, sa.headcount_delta,
@@ -202,8 +200,7 @@ async def get_staffing_advice(
               AND sa.meal_period = :meal_period
             ORDER BY sa.created_at DESC, sac.confirmed_at DESC NULLS LAST
             LIMIT 1
-            """
-        ),
+            """),
         {"sid": store_id, "advice_date": advice_date, "meal_period": meal_period},
     )
     row = result.fetchone()
@@ -222,7 +219,9 @@ async def get_staffing_advice(
         meal_period=row.meal_period,
         status=row.status,
         recommended_headcount=int(row.recommended_headcount) if row.recommended_headcount is not None else None,
-        current_scheduled_headcount=int(row.current_scheduled_headcount) if row.current_scheduled_headcount is not None else None,
+        current_scheduled_headcount=(
+            int(row.current_scheduled_headcount) if row.current_scheduled_headcount is not None else None
+        ),
         headcount_delta=int(row.headcount_delta) if row.headcount_delta is not None else None,
         estimated_saving_yuan=float(row.estimated_saving_yuan) if row.estimated_saving_yuan is not None else None,
         estimated_overspend_yuan=float(row.estimated_overspend_yuan) if row.estimated_overspend_yuan is not None else None,
@@ -247,8 +246,7 @@ async def get_staffing_advice_history(
     start_date = date.today() - timedelta(days=days - 1)
 
     result = await db.execute(
-        text(
-            """
+        text("""
             SELECT
                 sa.advice_date,
                 sa.meal_period,
@@ -269,8 +267,7 @@ async def get_staffing_advice_history(
             WHERE sa.store_id = :sid
               AND sa.advice_date >= :start_date
             ORDER BY sa.advice_date DESC, sa.created_at DESC
-            """
-        ),
+            """),
         {"sid": store_id, "start_date": start_date},
     )
     rows = result.fetchall()
@@ -314,7 +311,9 @@ async def get_staffing_advice_history(
                 rejection_reason_text=reason_text,
                 rejection_reason=reason_display,
                 cost_impact_yuan=round(cost_impact, 2) if cost_impact is not None else None,
-                confirmed_at=row.confirmed_at.isoformat() if hasattr(row.confirmed_at, "isoformat") and row.confirmed_at else None,
+                confirmed_at=(
+                    row.confirmed_at.isoformat() if hasattr(row.confirmed_at, "isoformat") and row.confirmed_at else None
+                ),
             )
         )
 
@@ -384,8 +383,7 @@ async def get_labor_efficiency(
         raise HTTPException(status_code=400, detail="end_date 不能早于 start_date")
 
     result = await db.execute(
-        text(
-            """
+        text("""
             SELECT
                 d.snapshot_date,
                 d.actual_revenue_yuan,
@@ -395,8 +393,7 @@ async def get_labor_efficiency(
               AND d.snapshot_date >= :start_date
               AND d.snapshot_date <= :end_date
             ORDER BY d.snapshot_date
-            """
-        ),
+            """),
         {"sid": store_id, "start_date": sd, "end_date": ed},
     )
     rows = result.fetchall()
@@ -414,9 +411,7 @@ async def get_labor_efficiency(
             }
         )
 
-    avg_efficiency = round(
-        sum(d["labor_efficiency_yuan_per_person"] for d in days) / len(days), 2
-    ) if days else 0.0
+    avg_efficiency = round(sum(d["labor_efficiency_yuan_per_person"] for d in days) / len(days), 2) if days else 0.0
 
     return {
         "store_id": store_id,
@@ -450,10 +445,7 @@ async def get_employee_health(
         month=m,
         db=db,
     )
-    fairness_map = {
-        item["employee_id"]: item
-        for item in fairness_data.get("employee_stats", [])
-    }
+    fairness_map = {item["employee_id"]: item for item in fairness_data.get("employee_stats", [])}
 
     items = []
     for employee in employees:
@@ -519,8 +511,7 @@ async def confirm_staffing_advice(
         raise HTTPException(status_code=400, detail="rejected 动作必须提供 rejection_reason 或 rejection_reason_code")
 
     advice_result = await db.execute(
-        text(
-            """
+        text("""
             SELECT
                 id, created_at,
                 recommended_headcount, current_scheduled_headcount,
@@ -531,8 +522,7 @@ async def confirm_staffing_advice(
               AND meal_period = :meal_period
             ORDER BY created_at DESC
             LIMIT 1
-            """
-        ),
+            """),
         {"sid": store_id, "advice_date": advice_date, "meal_period": meal_period},
     )
     advice_row = advice_result.fetchone()
@@ -546,7 +536,9 @@ async def confirm_staffing_advice(
     baseline_recommended = int(getattr(advice_row, "recommended_headcount", 0) or 0)
     baseline_current = int(getattr(advice_row, "current_scheduled_headcount", 0) or 0)
     avg_wage_per_day = float(os.getenv("L8_AVG_WAGE_PER_DAY", "200"))
-    effective_headcount = int(body.modified_headcount) if action == "modified" and body.modified_headcount is not None else baseline_recommended
+    effective_headcount = (
+        int(body.modified_headcount) if action == "modified" and body.modified_headcount is not None else baseline_recommended
+    )
     cost_impact_yuan = float((effective_headcount - baseline_current) * avg_wage_per_day)
 
     rejection_reason_payload = _build_rejection_reason_payload(
@@ -555,18 +547,15 @@ async def confirm_staffing_advice(
     )
 
     await db.execute(
-        text(
-            """
+        text("""
             UPDATE staffing_advice
             SET status = :status, updated_at = NOW()
             WHERE id = :advice_id
-            """
-        ),
+            """),
         {"status": advice_status, "advice_id": advice_row.id},
     )
     await db.execute(
-        text(
-            """
+        text("""
             INSERT INTO staffing_advice_confirmations (
                 advice_id, store_id, confirmed_by, action, modified_headcount,
                 rejection_reason, response_time_seconds, actual_saving_yuan,
@@ -576,8 +565,7 @@ async def confirm_staffing_advice(
                 :rejection_reason, :response_time_seconds, NULL,
                 NOW(), NOW()
             )
-            """
-        ),
+            """),
         {
             "advice_id": advice_row.id,
             "store_id": store_id,
@@ -591,11 +579,7 @@ async def confirm_staffing_advice(
     await db.commit()
 
     message = (
-        "排班建议已确认"
-        if action == "confirmed"
-        else "排班建议已修改并确认"
-        if action == "modified"
-        else "排班建议已拒绝"
+        "排班建议已确认" if action == "confirmed" else "排班建议已修改并确认" if action == "modified" else "排班建议已拒绝"
     )
 
     return {
@@ -642,8 +626,7 @@ async def get_labor_budget(
     period = month or date.today().strftime("%Y-%m")
     _parse_yyyymm(period)
     result = await db.execute(
-        text(
-            """
+        text("""
             SELECT
                 store_id, budget_period, budget_type,
                 target_labor_cost_rate, max_labor_cost_yuan,
@@ -653,8 +636,7 @@ async def get_labor_budget(
               AND budget_period = :period
             ORDER BY updated_at DESC
             LIMIT 1
-            """
-        ),
+            """),
         {"sid": store_id, "period": period},
     )
     row = result.fetchone()
@@ -683,8 +665,7 @@ async def upsert_labor_budget(
 ):
     _parse_yyyymm(body.month)
     await db.execute(
-        text(
-            """
+        text("""
             INSERT INTO store_labor_budgets (
                 store_id, budget_period, budget_type,
                 target_labor_cost_rate, max_labor_cost_yuan,
@@ -705,8 +686,7 @@ async def upsert_labor_budget(
                 approved_by            = EXCLUDED.approved_by,
                 is_active              = EXCLUDED.is_active,
                 updated_at             = NOW()
-            """
-        ),
+            """),
         {
             "store_id": store_id,
             "budget_period": body.month,
@@ -798,16 +778,14 @@ async def get_shift_fairness_detail(
     m = month or target.month
 
     fairness_service = ShiftFairnessService()
-    data = await fairness_service.get_monthly_shift_fairness(
-        store_id=store_id, year=y, month=m, db=db
-    )
+    data = await fairness_service.get_monthly_shift_fairness(store_id=store_id, year=y, month=m, db=db)
 
     # 按 unfavorable_ratio 分三档，供前端柱状图渲染
     stats = data.get("employee_stats", [])
     buckets = {
-        "high":   [s for s in stats if s["unfavorable_ratio"] >= 0.5],
+        "high": [s for s in stats if s["unfavorable_ratio"] >= 0.5],
         "medium": [s for s in stats if 0.25 <= s["unfavorable_ratio"] < 0.5],
-        "low":    [s for s in stats if s["unfavorable_ratio"] < 0.25],
+        "low": [s for s in stats if s["unfavorable_ratio"] < 0.25],
     }
 
     alerts = await fairness_service.detect_unfair_assignment_alerts(
@@ -821,9 +799,9 @@ async def get_shift_fairness_detail(
         "fairness_index": data.get("fairness_index", 100.0),
         "total_employees": data.get("total_employees", 0),
         "distribution": {
-            "high_unfairness_count":   len(buckets["high"]),
+            "high_unfairness_count": len(buckets["high"]),
             "medium_unfairness_count": len(buckets["medium"]),
-            "low_unfairness_count":    len(buckets["low"]),
+            "low_unfairness_count": len(buckets["low"]),
         },
         # 所有员工按 unfavorable_ratio 降序，供前端绘制水平条形图
         "employee_stats": stats,

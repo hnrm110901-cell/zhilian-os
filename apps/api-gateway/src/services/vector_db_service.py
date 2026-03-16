@@ -5,12 +5,14 @@ Vector Database Service
 使用Qdrant实现语义搜索和AI能力
 支持餐饮业务标准Schema的向量化存储和检索
 """
-from typing import List, Dict, Any, Optional
-import structlog
-import os
-from datetime import datetime
+
 import hashlib
 import json
+import os
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+import structlog
 
 logger = structlog.get_logger()
 
@@ -47,6 +49,7 @@ class VectorDatabaseService:
             if rag_enabled:
                 try:
                     from sentence_transformers import SentenceTransformer
+
                     model_name = os.getenv("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2")
                     self.embedding_model = SentenceTransformer(model_name)
                     logger.info("嵌入模型加载成功", model=model_name)
@@ -136,6 +139,7 @@ class VectorDatabaseService:
                 text_preview=text[:50],
             )
             import random
+
             random.seed(hashlib.md5(text.encode()).hexdigest())
             return [random.random() for _ in range(int(os.getenv("VECTOR_EMBEDDING_DIM", "384")))]
 
@@ -167,7 +171,11 @@ class VectorDatabaseService:
                     "order_number": order_data["order_number"],
                     "order_type": order_data["order_type"],
                     "total": float(order_data["total"]),
-                    "created_at": order_data["created_at"].isoformat() if isinstance(order_data["created_at"], datetime) else order_data["created_at"],
+                    "created_at": (
+                        order_data["created_at"].isoformat()
+                        if isinstance(order_data["created_at"], datetime)
+                        else order_data["created_at"]
+                    ),
                     "store_id": order_data["store_id"],
                     "text": text,
                 },
@@ -258,7 +266,11 @@ class VectorDatabaseService:
                     "event_id": event_data["event_id"],
                     "event_type": event_data["event_type"],
                     "event_source": event_data["event_source"],
-                    "timestamp": event_data["timestamp"].isoformat() if isinstance(event_data["timestamp"], datetime) else event_data["timestamp"],
+                    "timestamp": (
+                        event_data["timestamp"].isoformat()
+                        if isinstance(event_data["timestamp"], datetime)
+                        else event_data["timestamp"]
+                    ),
                     "store_id": event_data["store_id"],
                     "priority": event_data.get("priority", 0),
                     "text": text,
@@ -301,7 +313,7 @@ class VectorDatabaseService:
             query_embedding = self.generate_embedding(query)
 
             # 构建过滤条件
-            from qdrant_client.models import Filter, FieldCondition, MatchValue
+            from qdrant_client.models import FieldCondition, Filter, MatchValue
 
             qdrant_filter = None
             if filters:
@@ -327,10 +339,12 @@ class VectorDatabaseService:
             # 格式化结果
             formatted_results = []
             for result in results:
-                formatted_results.append({
-                    "score": result.score,
-                    "payload": result.payload,
-                })
+                formatted_results.append(
+                    {
+                        "score": result.score,
+                        "payload": result.payload,
+                    }
+                )
 
             logger.info(
                 "语义搜索完成",
@@ -347,76 +361,51 @@ class VectorDatabaseService:
 
     def _order_to_text(self, order_data: Dict[str, Any]) -> str:
         """将订单数据转换为文本表示"""
-        items_text = ", ".join([
-            f"{item['dish_name']} x {item['quantity']}"
-            for item in order_data.get("items", [])
-        ])
+        items_text = ", ".join([f"{item['dish_name']} x {item['quantity']}" for item in order_data.get("items", [])])
 
-        return f"订单号 {order_data['order_number']}, " \
-               f"类型 {order_data['order_type']}, " \
-               f"状态 {order_data['order_status']}, " \
-               f"菜品: {items_text}, " \
-               f"总金额 {order_data['total']}元"
+        return (
+            f"订单号 {order_data['order_number']}, "
+            f"类型 {order_data['order_type']}, "
+            f"状态 {order_data['order_status']}, "
+            f"菜品: {items_text}, "
+            f"总金额 {order_data['total']}元"
+        )
 
     def _dish_to_text(self, dish_data: Dict[str, Any]) -> str:
         """将菜品数据转换为文本表示"""
         tags_text = ", ".join(dish_data.get("tags", []))
 
-        return f"菜品 {dish_data['name']}, " \
-               f"分类 {dish_data['category']}, " \
-               f"价格 {dish_data['price']}元, " \
-               f"描述: {dish_data.get('description', '')}, " \
-               f"标签: {tags_text}"
+        return (
+            f"菜品 {dish_data['name']}, "
+            f"分类 {dish_data['category']}, "
+            f"价格 {dish_data['price']}元, "
+            f"描述: {dish_data.get('description', '')}, "
+            f"标签: {tags_text}"
+        )
 
     def _event_to_text(self, event_data: Dict[str, Any]) -> str:
         """将事件数据转换为文本表示"""
         data_text = json.dumps(event_data.get("data", {}), ensure_ascii=False)
 
-        return f"事件类型 {event_data['event_type']}, " \
-               f"来源 {event_data['event_source']}, " \
-               f"数据: {data_text}"
+        return f"事件类型 {event_data['event_type']}, " f"来源 {event_data['event_source']}, " f"数据: {data_text}"
 
     async def search_orders(
-        self,
-        query: str,
-        store_id: str,
-        limit: int = int(os.getenv("VECTOR_DB_SEARCH_LIMIT", "10"))
+        self, query: str, store_id: str, limit: int = int(os.getenv("VECTOR_DB_SEARCH_LIMIT", "10"))
     ) -> List[Dict[str, Any]]:
         """搜索订单"""
-        return await self.semantic_search(
-            collection_name="orders",
-            query=query,
-            limit=limit,
-            filters={"store_id": store_id}
-        )
+        return await self.semantic_search(collection_name="orders", query=query, limit=limit, filters={"store_id": store_id})
 
     async def search_dishes(
-        self,
-        query: str,
-        store_id: str,
-        limit: int = int(os.getenv("VECTOR_DB_SEARCH_LIMIT", "10"))
+        self, query: str, store_id: str, limit: int = int(os.getenv("VECTOR_DB_SEARCH_LIMIT", "10"))
     ) -> List[Dict[str, Any]]:
         """搜索菜品"""
-        return await self.semantic_search(
-            collection_name="dishes",
-            query=query,
-            limit=limit,
-            filters={"store_id": store_id}
-        )
+        return await self.semantic_search(collection_name="dishes", query=query, limit=limit, filters={"store_id": store_id})
 
     async def search_events(
-        self,
-        query: str,
-        store_id: str,
-        limit: int = int(os.getenv("VECTOR_DB_SEARCH_LIMIT", "10"))
+        self, query: str, store_id: str, limit: int = int(os.getenv("VECTOR_DB_SEARCH_LIMIT", "10"))
     ) -> List[Dict[str, Any]]:
         """搜索事件"""
-        return await self.semantic_search(
-            collection_name="events",
-            query=query,
-            limit=limit,
-            filters={"store_id": store_id}
-        )
+        return await self.semantic_search(collection_name="events", query=query, limit=limit, filters={"store_id": store_id})
 
 
 # 创建全局实例

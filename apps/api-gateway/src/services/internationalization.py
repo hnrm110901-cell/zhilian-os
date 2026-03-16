@@ -6,15 +6,17 @@ Phase 5: 生态扩展期 (Ecosystem Expansion Period)
 Provides multi-language and multi-currency support
 """
 
-from typing import Dict, List, Optional, Any
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class Language(Enum):
     """Supported languages"""
+
     ZH_CN = "zh_CN"  # 简体中文
     ZH_TW = "zh_TW"  # 繁体中文
     EN_US = "en_US"  # English (US)
@@ -27,6 +29,7 @@ class Language(Enum):
 
 class Currency(Enum):
     """Supported currencies"""
+
     CNY = "CNY"  # 人民币
     USD = "USD"  # 美元
     EUR = "EUR"  # 欧元
@@ -40,6 +43,7 @@ class Currency(Enum):
 @dataclass
 class LocalizationConfig:
     """Localization configuration"""
+
     locale: str  # e.g., "zh_CN"
     language: Language
     currency: Currency
@@ -52,6 +56,7 @@ class LocalizationConfig:
 @dataclass
 class Translation:
     """Translation entry"""
+
     key: str
     language: Language
     value: str
@@ -91,7 +96,7 @@ class InternationalizationService:
             Currency.JPY: 20.0,
             Currency.KRW: 185.0,
             Currency.THB: 4.8,
-            Currency.VND: 3500.0
+            Currency.VND: 3500.0,
         }
         # Store localization configs
         self.localization_configs: Dict[str, LocalizationConfig] = {}
@@ -121,7 +126,7 @@ class InternationalizationService:
             timezone="Asia/Shanghai",
             date_format="YYYY-MM-DD",
             time_format="HH:mm:ss",
-            number_format="1,234.56"
+            number_format="1,234.56",
         )
 
         self.localization_configs["en_US"] = LocalizationConfig(
@@ -131,7 +136,7 @@ class InternationalizationService:
             timezone="America/New_York",
             date_format="MM/DD/YYYY",
             time_format="hh:mm:ss A",
-            number_format="1,234.56"
+            number_format="1,234.56",
         )
 
         self.localization_configs["ja_JP"] = LocalizationConfig(
@@ -141,16 +146,10 @@ class InternationalizationService:
             timezone="Asia/Tokyo",
             date_format="YYYY年MM月DD日",
             time_format="HH:mm:ss",
-            number_format="1,234"
+            number_format="1,234",
         )
 
-    def add_translation(
-        self,
-        key: str,
-        language: Language,
-        value: str,
-        context: Optional[str] = None
-    ):
+    def add_translation(self, key: str, language: Language, value: str, context: Optional[str] = None):
         """
         Add translation
         添加翻译
@@ -166,12 +165,7 @@ class InternationalizationService:
 
         self.translations[key][language] = value
 
-    def get_translation(
-        self,
-        key: str,
-        language: Language,
-        fallback: Optional[str] = None
-    ) -> str:
+    def get_translation(self, key: str, language: Language, fallback: Optional[str] = None) -> str:
         """
         Get translation
         获取翻译
@@ -194,12 +188,7 @@ class InternationalizationService:
         # Return fallback or key
         return fallback if fallback else key
 
-    def translate_dict(
-        self,
-        data: Dict[str, Any],
-        language: Language,
-        keys_to_translate: List[str]
-    ) -> Dict[str, Any]:
+    def translate_dict(self, data: Dict[str, Any], language: Language, keys_to_translate: List[str]) -> Dict[str, Any]:
         """
         Translate dictionary values
         翻译字典值
@@ -217,20 +206,11 @@ class InternationalizationService:
         for key in keys_to_translate:
             if key in translated:
                 translation_key = f"data.{key}.{translated[key]}"
-                translated[key] = self.get_translation(
-                    translation_key,
-                    language,
-                    fallback=translated[key]
-                )
+                translated[key] = self.get_translation(translation_key, language, fallback=translated[key])
 
         return translated
 
-    def convert_currency(
-        self,
-        amount: float,
-        from_currency: Currency,
-        to_currency: Currency
-    ) -> float:
+    def convert_currency(self, amount: float, from_currency: Currency, to_currency: Currency) -> float:
         """
         Convert currency
         货币转换
@@ -252,12 +232,7 @@ class InternationalizationService:
 
         return round(converted_amount, 2)
 
-    def format_currency(
-        self,
-        amount: float,
-        currency: Currency,
-        locale: str = "zh_CN"
-    ) -> str:
+    def format_currency(self, amount: float, currency: Currency, locale: str = "zh_CN") -> str:
         """
         Format currency
         格式化货币
@@ -279,7 +254,7 @@ class InternationalizationService:
             Currency.JPY: "¥",
             Currency.KRW: "₩",
             Currency.THB: "฿",
-            Currency.VND: "₫"
+            Currency.VND: "₫",
         }
 
         symbol = currency_symbols.get(currency, "")
@@ -294,11 +269,7 @@ class InternationalizationService:
         else:
             return f"{symbol}{amount:,.2f}"
 
-    def format_date(
-        self,
-        date: datetime,
-        locale: str = "zh_CN"
-    ) -> str:
+    def format_date(self, date: datetime, locale: str = "zh_CN") -> str:
         """
         Format date
         格式化日期
@@ -324,11 +295,7 @@ class InternationalizationService:
         else:
             return date.strftime("%Y-%m-%d")
 
-    def format_number(
-        self,
-        number: float,
-        locale: str = "zh_CN"
-    ) -> str:
+    def format_number(self, number: float, locale: str = "zh_CN") -> str:
         """
         Format number
         格式化数字
@@ -346,10 +313,7 @@ class InternationalizationService:
         else:
             return f"{number:,.2f}"
 
-    def get_localization_config(
-        self,
-        locale: str
-    ) -> Optional[LocalizationConfig]:
+    def get_localization_config(self, locale: str) -> Optional[LocalizationConfig]:
         """
         Get localization configuration
         获取本地化配置
@@ -378,7 +342,7 @@ class InternationalizationService:
             {"code": "ja_JP", "name": "Japanese", "native_name": "日本語"},
             {"code": "ko_KR", "name": "Korean", "native_name": "한국어"},
             {"code": "th_TH", "name": "Thai", "native_name": "ไทย"},
-            {"code": "vi_VN", "name": "Vietnamese", "native_name": "Tiếng Việt"}
+            {"code": "vi_VN", "name": "Vietnamese", "native_name": "Tiếng Việt"},
         ]
 
     def get_supported_currencies(self) -> List[Dict[str, Any]]:
@@ -397,14 +361,10 @@ class InternationalizationService:
             {"code": "JPY", "name": "Japanese Yen", "symbol": "¥", "rate": self.exchange_rates[Currency.JPY]},
             {"code": "KRW", "name": "Korean Won", "symbol": "₩", "rate": self.exchange_rates[Currency.KRW]},
             {"code": "THB", "name": "Thai Baht", "symbol": "฿", "rate": self.exchange_rates[Currency.THB]},
-            {"code": "VND", "name": "Vietnamese Dong", "symbol": "₫", "rate": self.exchange_rates[Currency.VND]}
+            {"code": "VND", "name": "Vietnamese Dong", "symbol": "₫", "rate": self.exchange_rates[Currency.VND]},
         ]
 
-    def update_exchange_rate(
-        self,
-        currency: Currency,
-        rate: float
-    ):
+    def update_exchange_rate(self, currency: Currency, rate: float):
         """
         Update exchange rate
         更新汇率

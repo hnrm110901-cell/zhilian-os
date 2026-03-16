@@ -2,21 +2,19 @@
 Notification API endpoints
 通知相关的API接口
 """
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, Query, HTTPException
-from typing import Optional, List
+
+from typing import List, Optional
+
+import structlog
+from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, ConfigDict
 
-from ..models.user import User, UserRole
-from ..models.notification import NotificationType, NotificationPriority
 from ..core.dependencies import get_current_active_user, require_role
 from ..core.websocket import manager
+from ..models.notification import NotificationPriority, NotificationType
+from ..models.user import User, UserRole
+from ..services.multi_channel_notification import NotificationChannel, NotificationTemplate, multi_channel_notification_service
 from ..services.notification_service import notification_service
-from ..services.multi_channel_notification import (
-    multi_channel_notification_service,
-    NotificationChannel,
-    NotificationTemplate
-)
-import structlog
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -65,10 +63,11 @@ async def websocket_endpoint(
     使用方式:
     ws://localhost:8000/api/v1/notifications/ws?token=<your_jwt_token>
     """
-    from ..core.security import decode_access_token
-    from ..core.database import get_db_session
-    from ..core.config import settings
     from sqlalchemy import select
+
+    from ..core.config import settings
+    from ..core.database import get_db_session
+    from ..core.security import decode_access_token
 
     try:
         # 验证token并获取用户信息
@@ -80,12 +79,18 @@ async def websocket_endpoint(
             return
 
         if settings.APP_ENV == "test":
+
             class _TestUser:
                 id = user_id
                 username = payload.get("username", "test-user")
-                role = UserRole(payload.get("role", "staff")) if payload.get("role", "staff") in [r.value for r in UserRole] else UserRole.STAFF
+                role = (
+                    UserRole(payload.get("role", "staff"))
+                    if payload.get("role", "staff") in [r.value for r in UserRole]
+                    else UserRole.STAFF
+                )
                 store_id = payload.get("store_id", "STORE001")
                 is_active = True
+
             user = _TestUser()
         else:
             # 从数据库获取完整的用户信息
@@ -103,19 +108,10 @@ async def websocket_endpoint(
                     return
 
         # 连接WebSocket
-        await manager.connect(
-            websocket,
-            user_id=str(user.id),
-            role=user.role.value,
-            store_id=user.store_id
-        )
+        await manager.connect(websocket, user_id=str(user.id), role=user.role.value, store_id=user.store_id)
 
         logger.info(
-            "WebSocket连接已建立",
-            user_id=user.id,
-            username=user.username,
-            role=user.role.value,
-            store_id=user.store_id
+            "WebSocket连接已建立", user_id=user.id, username=user.username, role=user.role.value, store_id=user.store_id
         )
 
         try:
@@ -156,10 +152,7 @@ async def create_notification(
     # 如果不是管理员，确保只能为自己的门店创建通知
     if current_user.role != UserRole.ADMIN:
         if request.store_id and request.store_id != current_user.store_id:
-            raise HTTPException(
-                status_code=403,
-                detail="无权限为其他门店创建通知"
-            )
+            raise HTTPException(status_code=403, detail="无权限为其他门店创建通知")
         # 如果没有指定store_id，使用当前用户的store_id
         if not request.store_id:
             request.store_id = current_user.store_id
@@ -246,9 +239,7 @@ async def mark_notification_as_read(
     """
     标记通知为已读
     """
-    success = await notification_service.mark_as_read(
-        notification_id=notification_id, user_id=str(current_user.id)
-    )
+    success = await notification_service.mark_as_read(notification_id=notification_id, user_id=str(current_user.id))
 
     if not success:
         return {"success": False, "message": "通知不存在或无权限"}
@@ -280,9 +271,7 @@ async def delete_notification(
     """
     删除通知
     """
-    success = await notification_service.delete_notification(
-        notification_id=notification_id, user_id=str(current_user.id)
-    )
+    success = await notification_service.delete_notification(notification_id=notification_id, user_id=str(current_user.id))
 
     if not success:
         return {"success": False, "message": "通知不存在或无权限"}
@@ -340,20 +329,13 @@ async def send_multi_channel_notification(
             recipient=request.recipient,
             title=request.title,
             content=request.content,
-            extra_data=request.extra_data
+            extra_data=request.extra_data,
         )
 
         # 转换结果为可序列化格式
-        serialized_results = {
-            channel.value: success
-            for channel, success in results.items()
-        }
+        serialized_results = {channel.value: success for channel, success in results.items()}
 
-        return {
-            "success": True,
-            "message": "通知已发送",
-            "results": serialized_results
-        }
+        return {"success": True, "message": "通知已发送", "results": serialized_results}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"无效的通知渠道: {str(e)}")
     except Exception as e:
@@ -382,26 +364,16 @@ async def send_template_notification(
     try:
         # 发送模板通知
         results = await multi_channel_notification_service.send_template_notification(
-            template_name=request.template_name,
-            recipient=request.recipient,
-            **request.template_vars
+            template_name=request.template_name, recipient=request.recipient, **request.template_vars
         )
 
         if not results:
             raise HTTPException(status_code=404, detail=f"模板不存在: {request.template_name}")
 
         # 转换结果为可序列化格式
-        serialized_results = {
-            channel.value: success
-            for channel, success in results.items()
-        }
+        serialized_results = {channel.value: success for channel, success in results.items()}
 
-        return {
-            "success": True,
-            "message": "模板通知已发送",
-            "template": request.template_name,
-            "results": serialized_results
-        }
+        return {"success": True, "message": "模板通知已发送", "template": request.template_name, "results": serialized_results}
     except HTTPException:
         raise
     except Exception as e:
@@ -425,22 +397,20 @@ async def get_notification_templates(
             "priority": template["priority"],
         }
 
-    return {
-        "templates": templates,
-        "count": len(templates)
-    }
+    return {"templates": templates, "count": len(templates)}
 
 
 # ------------------------------------------------------------------ #
 # 通知偏好设置 API                                                      #
 # ------------------------------------------------------------------ #
 
+
 class PreferenceUpsertRequest(BaseModel):
     notification_type: Optional[str] = None  # None 表示全局默认
-    channels: List[str]                       # ["system", "email", "sms", ...]
+    channels: List[str]  # ["system", "email", "sms", ...]
     is_enabled: bool = True
     quiet_hours_start: Optional[str] = None  # "22:00"
-    quiet_hours_end: Optional[str] = None    # "08:00"
+    quiet_hours_end: Optional[str] = None  # "08:00"
 
 
 class PreferenceResponse(BaseModel):
@@ -515,10 +485,11 @@ async def delete_preference(
 # 通知频率规则 API                                                      #
 # ------------------------------------------------------------------ #
 
+
 class RuleUpsertRequest(BaseModel):
     notification_type: Optional[str] = None  # None 表示适用所有类型
-    max_count: int                            # 时间窗口内最多发送条数
-    time_window_minutes: int                  # 时间窗口（分钟）
+    max_count: int  # 时间窗口内最多发送条数
+    time_window_minutes: int  # 时间窗口（分钟）
     description: Optional[str] = None
 
 

@@ -1,11 +1,11 @@
 """三角对账 API — 执行对账/查询记录/手动匹配/争议解决/汇总统计"""
-from typing import Optional
+
 from datetime import date
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.core.dependencies import require_role
 from src.models.user import User, UserRole
@@ -17,6 +17,7 @@ svc = TriReconcileService()
 
 
 # ── 请求模型 ──────────────────────────────────────────────────────────────────
+
 
 class RunReconciliationRequest(BaseModel):
     brand_id: str = "default"
@@ -37,6 +38,7 @@ class ResolveDisputeRequest(BaseModel):
 
 # ── 执行对账 ──────────────────────────────────────────────────────────────────
 
+
 @router.post("/run")
 async def run_reconciliation(
     req: RunReconciliationRequest,
@@ -45,7 +47,10 @@ async def run_reconciliation(
 ):
     """对指定日期执行三角对账（Order ↔ Payment ↔ Bank ↔ Invoice）"""
     result = await svc.run_reconciliation(
-        db, req.brand_id, req.target_date, req.store_id,
+        db,
+        req.brand_id,
+        req.target_date,
+        req.store_id,
     )
     return {
         "success": True,
@@ -55,6 +60,7 @@ async def run_reconciliation(
 
 
 # ── 记录列表 ──────────────────────────────────────────────────────────────────
+
 
 @router.get("/records")
 async def list_records(
@@ -69,12 +75,19 @@ async def list_records(
 ):
     """查询三角对账记录列表（支持筛选）"""
     data = await svc.get_records(
-        db, brand_id, target_date, match_level, status, page, page_size,
+        db,
+        brand_id,
+        target_date,
+        match_level,
+        status,
+        page,
+        page_size,
     )
     return {"success": True, "data": data}
 
 
 # ── 记录详情 ──────────────────────────────────────────────────────────────────
+
 
 @router.get("/records/{record_id}")
 async def get_record_detail(
@@ -91,6 +104,7 @@ async def get_record_detail(
 
 # ── 手动匹配 ──────────────────────────────────────────────────────────────────
 
+
 @router.post("/records/{record_id}/manual-match")
 async def manual_match(
     record_id: str,
@@ -100,7 +114,12 @@ async def manual_match(
 ):
     """手动将订单/支付/银行流水/发票关联到对账记录"""
     data = await svc.manual_match(
-        db, record_id, req.order_id, req.payment_id, req.bank_id, req.invoice_id,
+        db,
+        record_id,
+        req.order_id,
+        req.payment_id,
+        req.bank_id,
+        req.invoice_id,
     )
     if not data:
         raise HTTPException(status_code=404, detail="对账记录不存在")
@@ -108,6 +127,7 @@ async def manual_match(
 
 
 # ── 解决争议 ──────────────────────────────────────────────────────────────────
+
 
 @router.post("/records/{record_id}/resolve")
 async def resolve_dispute(
@@ -124,6 +144,7 @@ async def resolve_dispute(
 
 
 # ── 汇总统计 ──────────────────────────────────────────────────────────────────
+
 
 @router.get("/summary")
 async def get_summary(

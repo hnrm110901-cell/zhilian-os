@@ -2,13 +2,15 @@
 Dashboard API
 数据可视化大屏API端点
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import Optional
-import structlog
 
-from ..services.dashboard_service import dashboard_service
+from typing import Optional
+
+import structlog
+from fastapi import APIRouter, Depends, HTTPException, Query
+
 from ..core.dependencies import get_current_active_user
 from ..models.user import User
+from ..services.dashboard_service import dashboard_service
 
 logger = structlog.get_logger()
 

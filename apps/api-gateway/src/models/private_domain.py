@@ -2,10 +2,12 @@
 私域运营数据库模型
 Private Domain Operations Models
 """
-import uuid
+
 import enum
+import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Integer, Float, Boolean, JSON, DateTime, Date, Index, Text, ForeignKey
+
+from sqlalchemy import JSON, Boolean, Column, Date, DateTime, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 
 from .base import Base, TimestampMixin
@@ -51,6 +53,7 @@ class JourneyStatus(str, enum.Enum):
 
 class PrivateDomainMember(Base, TimestampMixin):
     """私域会员档案"""
+
     __tablename__ = "private_domain_members"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -87,6 +90,7 @@ class PrivateDomainMember(Base, TimestampMixin):
 
 class PrivateDomainSignal(Base, TimestampMixin):
     """信号感知记录"""
+
     __tablename__ = "private_domain_signals"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -108,6 +112,7 @@ class PrivateDomainSignal(Base, TimestampMixin):
 
 class PrivateDomainJourney(Base, TimestampMixin):
     """用户旅程记录"""
+
     __tablename__ = "private_domain_journeys"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -131,6 +136,7 @@ class PrivateDomainJourney(Base, TimestampMixin):
 
 class StoreQuadrantRecord(Base, TimestampMixin):
     """门店象限历史记录"""
+
     __tablename__ = "store_quadrant_records"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -142,6 +148,4 @@ class StoreQuadrantRecord(Base, TimestampMixin):
     strategy = Column(Text, nullable=True)
     recorded_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
-    __table_args__ = (
-        Index("ix_sqr_store_date", "store_id", "recorded_at"),
-    )
+    __table_args__ = (Index("ix_sqr_store_date", "store_id", "recorded_at"),)

@@ -10,9 +10,11 @@ DemandForecaster.predict(store_id, target_date)
 
 ForecastResult 包含：confidence, basis, items（备料建议清单）
 """
+
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
-from dataclasses import dataclass, field
+
 import structlog
 
 logger = structlog.get_logger()
@@ -21,24 +23,26 @@ logger = structlog.get_logger()
 @dataclass
 class ForecastItem:
     """单品备料建议"""
+
     sku_id: str
     name: str
     unit: str
     suggested_quantity: float
     unit_price: Optional[float] = None
-    reason: Optional[str] = None   # 为何建议此数量（如"同期上升20%"）
+    reason: Optional[str] = None  # 为何建议此数量（如"同期上升20%"）
 
 
 @dataclass
 class ForecastResult:
     """预测结果"""
+
     store_id: str
     target_date: date
     estimated_revenue: float
-    confidence: str          # low / medium / high
-    basis: str               # rule_based / statistical / ml
+    confidence: str  # low / medium / high
+    basis: str  # rule_based / statistical / ml
     items: List[ForecastItem] = field(default_factory=list)
-    note: Optional[str] = None   # 给用户的备注（如"数据积累中，建议参考近期经验"）
+    note: Optional[str] = None  # 给用户的备注（如"数据积累中，建议参考近期经验"）
 
 
 class DemandForecaster:
@@ -92,12 +96,12 @@ class DemandForecaster:
             return 0  # 无 DB 时返回 0，走 rule_based
 
         try:
-            from sqlalchemy import select, func, text
+            from sqlalchemy import func, select, text
+
             from ..models.order import Order
 
             result = await self._db.execute(
-                select(func.count(func.distinct(func.date(Order.created_at))))
-                .where(Order.store_id == store_id)
+                select(func.count(func.distinct(func.date(Order.created_at)))).where(Order.store_id == store_id)
             )
             return int(result.scalar() or 0)
         except Exception as e:
@@ -148,7 +152,8 @@ class DemandForecaster:
             return await self._rule_based(store_id, target_date, history_days)
 
         try:
-            from sqlalchemy import select, func
+            from sqlalchemy import func, select
+
             from ..models.order import Order
 
             day_of_week = target_date.weekday()
@@ -178,10 +183,7 @@ class DemandForecaster:
             n = len(rows)
             weights = [i + 1 for i in range(n)]
             total_weight = sum(weights)
-            weighted_revenue = sum(
-                float(row.revenue or 0) * w
-                for row, w in zip(rows, weights)
-            ) / total_weight
+            weighted_revenue = sum(float(row.revenue or 0) * w for row, w in zip(rows, weights)) / total_weight
 
             items = await self._fetch_bom_items(store_id, weighted_revenue)
 
@@ -210,13 +212,14 @@ class DemandForecaster:
         Prophet 不在标准依赖中，降级处理。
         """
         try:
-            from prophet import Prophet
             import pandas as pd
+            from prophet import Prophet
 
             if not self._db:
                 return await self._statistical(store_id, target_date, history_days)
 
-            from sqlalchemy import select, func
+            from sqlalchemy import func, select
+
             from ..models.order import Order
 
             result = await self._db.execute(
@@ -266,9 +269,7 @@ class DemandForecaster:
             logger.warning("ml_prophet.failed", store_id=store_id, error=str(e))
             return await self._statistical(store_id, target_date, history_days)
 
-    async def _fetch_bom_items(
-        self, store_id: str, estimated_revenue: float
-    ) -> List[ForecastItem]:
+    async def _fetch_bom_items(self, store_id: str, estimated_revenue: float) -> List[ForecastItem]:
         """从 BOM 查询活跃配方，按预估营收缩放后返回备料建议。
 
         算法：
@@ -284,10 +285,12 @@ class DemandForecaster:
 
         try:
             from collections import defaultdict
+
             from sqlalchemy import select
-            from ..models.bom import BOMTemplate, BOMItem
-            from ..models.inventory import InventoryItem
+
+            from ..models.bom import BOMItem, BOMTemplate
             from ..models.dish import Dish
+            from ..models.inventory import InventoryItem
 
             # 1. 活跃 BOM 模板 + 菜品售价
             bom_stmt = (
@@ -324,9 +327,7 @@ class DemandForecaster:
             item_rows = (await self._db.execute(items_stmt)).all()
 
             # 4. 按食材汇总需求量（含损耗系数）
-            totals: Dict[str, Dict] = defaultdict(
-                lambda: {"name": "", "unit": "", "qty": 0.0}
-            )
+            totals: Dict[str, Dict] = defaultdict(lambda: {"name": "", "unit": "", "qty": 0.0})
             for r in item_rows:
                 waste = float(r.waste_factor or 0)
                 qty = float(r.standard_qty or 0) * (1.0 + waste) * portions_per_dish

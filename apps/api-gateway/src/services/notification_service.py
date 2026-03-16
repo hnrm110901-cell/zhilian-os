@@ -2,21 +2,26 @@
 Notification Service
 通知服务 - 处理通知的创建、发送、查询等业务逻辑
 """
-import os
-import inspect
-from typing import List, Optional
-from datetime import datetime, timedelta
-from sqlalchemy import select, and_, or_, func
-from sqlalchemy.ext.asyncio import AsyncSession
-import uuid
 
-from ..models.notification import (
-    Notification, NotificationType, NotificationPriority,
-    NotificationPreference, NotificationRule,
-)
-from ..core.database import get_db_session
-from ..core import websocket
+import inspect
+import os
+import uuid
+from datetime import datetime, timedelta
+from typing import List, Optional
+
 import structlog
+from sqlalchemy import and_, func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..core import websocket
+from ..core.database import get_db_session
+from ..models.notification import (
+    Notification,
+    NotificationPreference,
+    NotificationPriority,
+    NotificationRule,
+    NotificationType,
+)
 
 logger = structlog.get_logger()
 # 可在测试中 patch：`src.services.notification_service.manager`。
@@ -152,9 +157,7 @@ class NotificationService:
 
             # 发给该门店的通知
             if store_id:
-                conditions.append(
-                    and_(Notification.store_id == store_id, Notification.role.is_(None))
-                )
+                conditions.append(and_(Notification.store_id == store_id, Notification.role.is_(None)))
 
             # 广播通知
             conditions.append(
@@ -183,9 +186,7 @@ class NotificationService:
             # 关键词搜索（标题或内容）
             if keyword is not None:
                 kw = f"%{keyword}%"
-                stmt = stmt.where(
-                    or_(Notification.title.ilike(kw), Notification.message.ilike(kw))
-                )
+                stmt = stmt.where(or_(Notification.title.ilike(kw), Notification.message.ilike(kw)))
 
             # 排序和分页
             stmt = stmt.order_by(Notification.created_at.desc()).limit(limit).offset(offset)
@@ -223,9 +224,7 @@ class NotificationService:
 
     async def mark_all_as_read(self, user_id: str, role: str, store_id: Optional[str] = None) -> int:
         """标记用户的所有未读通知为已读"""
-        notifications = await self.get_user_notifications(
-            user_id=user_id, role=role, store_id=store_id, is_read=False
-        )
+        notifications = await self.get_user_notifications(user_id=user_id, role=role, store_id=store_id, is_read=False)
 
         count = 0
         for notification in notifications:
@@ -258,9 +257,7 @@ class NotificationService:
 
     async def get_unread_count(self, user_id: str, role: str, store_id: Optional[str] = None) -> int:
         """获取未读通知数量"""
-        notifications = await self.get_user_notifications(
-            user_id=user_id, role=role, store_id=store_id, is_read=False
-        )
+        notifications = await self.get_user_notifications(user_id=user_id, role=role, store_id=store_id, is_read=False)
         return len(notifications)
 
     async def _maybe_await(self, value):
@@ -275,9 +272,11 @@ class NotificationService:
     async def get_preferences(self, user_id: str) -> List[NotificationPreference]:
         """获取用户所有通知偏好"""
         async with get_db_session() as session:
-            stmt = select(NotificationPreference).where(
-                NotificationPreference.user_id == user_id
-            ).order_by(NotificationPreference.notification_type)
+            stmt = (
+                select(NotificationPreference)
+                .where(NotificationPreference.user_id == user_id)
+                .order_by(NotificationPreference.notification_type)
+            )
             result = await session.execute(stmt)
             return list(result.scalars().all())
 
@@ -449,10 +448,7 @@ class NotificationService:
                 score += 1
             return score
 
-        matched = [
-            r for r in rules
-            if r.notification_type in (notification_type, None)
-        ]
+        matched = [r for r in rules if r.notification_type in (notification_type, None)]
         if not matched:
             return True
 

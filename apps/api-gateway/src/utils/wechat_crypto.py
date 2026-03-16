@@ -4,12 +4,14 @@ WeChat Work Message Crypto Utility
 
 用于企业微信回调消息的签名验证、加密和解密
 """
-import hashlib
+
 import base64
-import struct
+import hashlib
 import socket
-from typing import Tuple, Optional
+import struct
 import xml.etree.ElementTree as ET
+from typing import Optional, Tuple
+
 import structlog
 
 logger = structlog.get_logger()
@@ -37,13 +39,7 @@ class WeChatCrypto:
         else:
             self.aes_key = None
 
-    def verify_signature(
-        self,
-        signature: str,
-        timestamp: str,
-        nonce: str,
-        echo_str: Optional[str] = None
-    ) -> bool:
+    def verify_signature(self, signature: str, timestamp: str, nonce: str, echo_str: Optional[str] = None) -> bool:
         """
         验证签名
 
@@ -72,11 +68,7 @@ class WeChatCrypto:
             is_valid = calculated_signature == signature
 
             if not is_valid:
-                logger.warning(
-                    "企业微信签名验证失败",
-                    expected=signature,
-                    calculated=calculated_signature
-                )
+                logger.warning("企业微信签名验证失败", expected=signature, calculated=calculated_signature)
 
             return is_valid
 
@@ -122,16 +114,12 @@ class WeChatCrypto:
             # 格式：16字节随机字符串 + 4字节消息长度 + 消息内容 + corp_id
             content = decrypted[16:]
             msg_len = struct.unpack("!I", content[:4])[0]
-            msg_content = content[4:4 + msg_len].decode("utf-8")
-            from_corp_id = content[4 + msg_len:].decode("utf-8")
+            msg_content = content[4 : 4 + msg_len].decode("utf-8")
+            from_corp_id = content[4 + msg_len :].decode("utf-8")
 
             # 验证corp_id
             if from_corp_id != self.corp_id:
-                logger.warning(
-                    "企业ID不匹配",
-                    expected=self.corp_id,
-                    received=from_corp_id
-                )
+                logger.warning("企业ID不匹配", expected=self.corp_id, received=from_corp_id)
                 return None, "企业ID不匹配"
 
             return msg_content, None
@@ -215,12 +203,7 @@ class WeChatCrypto:
             logger.error("XML解析失败", error=str(e), exc_info=e)
             return None
 
-    def generate_response_xml(
-        self,
-        encrypt_msg: str,
-        timestamp: str,
-        nonce: str
-    ) -> str:
+    def generate_response_xml(self, encrypt_msg: str, timestamp: str, nonce: str) -> str:
         """
         生成响应XML
 
@@ -246,9 +229,4 @@ class WeChatCrypto:
 <Nonce><![CDATA[{nonce}]]></Nonce>
 </xml>"""
 
-        return xml_template.format(
-            encrypt=encrypt_msg,
-            signature=signature,
-            timestamp=timestamp,
-            nonce=nonce
-        )
+        return xml_template.format(encrypt=encrypt_msg, signature=signature, timestamp=timestamp, nonce=nonce)

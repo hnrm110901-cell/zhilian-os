@@ -30,7 +30,6 @@ import structlog
 from sqlalchemy import and_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.models.action_plan import ActionOutcome, ActionPlan, DispatchStatus
 from src.models.reasoning import ReasoningReport
 
@@ -40,11 +39,11 @@ logger = structlog.get_logger()
 
 # WeChatActionFSM 的 ActionCategory 字符串常量
 _CAT = {
-    "waste":       "waste_alert",
-    "efficiency":  "kpi_alert",
-    "quality":     "anomaly",
-    "cost":        "kpi_alert",
-    "inventory":   "inventory_low",
+    "waste": "waste_alert",
+    "efficiency": "kpi_alert",
+    "quality": "anomaly",
+    "cost": "kpi_alert",
+    "inventory": "inventory_low",
     "cross_store": "kpi_alert",
 }
 
@@ -53,11 +52,11 @@ _NEEDS_APPROVAL = {"waste", "cost"}
 
 # 维度 → DecisionType 字符串映射（ApprovalService 使用）
 _DECISION_TYPE = {
-    "waste":       "cost_optimization",
-    "cost":        "cost_optimization",
-    "efficiency":  "kpi_improvement",
-    "quality":     "kpi_improvement",
-    "inventory":   "inventory_alert",
+    "waste": "cost_optimization",
+    "cost": "cost_optimization",
+    "efficiency": "kpi_improvement",
+    "quality": "kpi_improvement",
+    "inventory": "inventory_alert",
     "cross_store": "kpi_improvement",
 }
 
@@ -153,10 +152,7 @@ class ActionDispatchService:
         # 更新状态
         plan.dispatched_actions = dispatched_actions
         plan.dispatched_at = datetime.utcnow()
-        plan.dispatch_status = (
-            DispatchStatus.DISPATCHED.value if dispatched_actions
-            else DispatchStatus.FAILED.value
-        )
+        plan.dispatch_status = DispatchStatus.DISPATCHED.value if dispatched_actions else DispatchStatus.FAILED.value
 
         logger.info(
             "行动计划派发完成",
@@ -260,11 +256,11 @@ class ActionDispatchService:
         if not plan:
             return None
 
-        plan.outcome            = outcome
-        plan.outcome_note       = outcome_note
-        plan.resolved_at        = datetime.utcnow()
-        plan.resolved_by        = resolved_by
-        plan.kpi_delta          = kpi_delta
+        plan.outcome = outcome
+        plan.outcome_note = outcome_note
+        plan.resolved_at = datetime.utcnow()
+        plan.resolved_by = resolved_by
+        plan.kpi_delta = kpi_delta
         plan.followup_report_id = followup_report_id
 
         logger.info(
@@ -280,15 +276,15 @@ class ActionDispatchService:
     async def list_plans(
         self,
         store_id: str,
-        days:     int = 30,
+        days: int = 30,
         severity: Optional[str] = None,
-        outcome:  Optional[str] = None,
-        limit:    int = 50,
+        outcome: Optional[str] = None,
+        limit: int = 50,
     ) -> List[ActionPlan]:
         """查询门店行动计划历史"""
         since = date.today() - timedelta(days=days)
         conditions = [
-            ActionPlan.store_id    == store_id,
+            ActionPlan.store_id == store_id,
             ActionPlan.report_date >= since,
         ]
         if severity:
@@ -296,17 +292,13 @@ class ActionDispatchService:
         if outcome:
             conditions.append(ActionPlan.outcome == outcome)
 
-        stmt = (
-            select(ActionPlan)
-            .where(and_(*conditions))
-            .order_by(ActionPlan.report_date.desc())
-            .limit(limit)
-        )
+        stmt = select(ActionPlan).where(and_(*conditions)).order_by(ActionPlan.report_date.desc()).limit(limit)
         return (await self.db.execute(stmt)).scalars().all()
 
     async def get_platform_stats(self, days: int = 7) -> Dict[str, Any]:
         """全平台行动派发统计（供大屏展示）"""
         from sqlalchemy import func
+
         since = date.today() - timedelta(days=days)
 
         # dispatch_status 分布
@@ -315,10 +307,7 @@ class ActionDispatchService:
             .where(ActionPlan.report_date >= since)
             .group_by(ActionPlan.dispatch_status)
         )
-        dispatch_dist = {
-            row.dispatch_status: row.cnt
-            for row in (await self.db.execute(ds_stmt)).all()
-        }
+        dispatch_dist = {row.dispatch_status: row.cnt for row in (await self.db.execute(ds_stmt)).all()}
 
         # outcome 分布
         oc_stmt = (
@@ -326,10 +315,7 @@ class ActionDispatchService:
             .where(ActionPlan.report_date >= since)
             .group_by(ActionPlan.outcome)
         )
-        outcome_dist = {
-            row.outcome: row.cnt
-            for row in (await self.db.execute(oc_stmt)).all()
-        }
+        outcome_dist = {row.outcome: row.cnt for row in (await self.db.execute(oc_stmt)).all()}
 
         # severity 分布
         sv_stmt = (
@@ -337,17 +323,14 @@ class ActionDispatchService:
             .where(ActionPlan.report_date >= since)
             .group_by(ActionPlan.severity)
         )
-        severity_dist = {
-            row.severity: row.cnt
-            for row in (await self.db.execute(sv_stmt)).all()
-        }
+        severity_dist = {row.severity: row.cnt for row in (await self.db.execute(sv_stmt)).all()}
 
         total = sum(dispatch_dist.values())
         return {
-            "days":          days,
-            "total_plans":   total,
+            "days": days,
+            "total_plans": total,
             "dispatch_dist": dispatch_dist,
-            "outcome_dist":  outcome_dist,
+            "outcome_dist": outcome_dist,
             "severity_dist": severity_dist,
         }
 
@@ -395,28 +378,27 @@ class ActionDispatchService:
         dispatched: List[str],
     ) -> None:
         try:
-            from src.services.wechat_action_fsm import (
-                ActionCategory, ActionPriority, get_wechat_fsm,
-            )
-            fsm      = get_wechat_fsm()
+            from src.services.wechat_action_fsm import ActionCategory, ActionPriority, get_wechat_fsm
+
+            fsm = get_wechat_fsm()
             category = ActionCategory(_CAT.get(report.dimension, "kpi_alert"))
             priority = ActionPriority(priority_str)
 
             dim_cn = {
-                "waste": "损耗", "efficiency": "效率",
-                "quality": "质量", "cost": "成本",
-                "inventory": "库存", "cross_store": "跨店",
+                "waste": "损耗",
+                "efficiency": "效率",
+                "quality": "质量",
+                "cost": "成本",
+                "inventory": "库存",
+                "cross_store": "跨店",
             }.get(report.dimension, report.dimension)
 
             actions_text = ""
             if report.recommended_actions:
-                actions_text = "\n".join(
-                    f"  {i+1}. {a}"
-                    for i, a in enumerate(report.recommended_actions[:3])
-                )
+                actions_text = "\n".join(f"  {i+1}. {a}" for i, a in enumerate(report.recommended_actions[:3]))
 
             receiver = os.getenv("WECHAT_DEFAULT_RECEIVER", "store_manager")
-            action   = await fsm.create_action(
+            action = await fsm.create_action(
                 store_id=report.store_id,
                 category=category,
                 priority=priority,
@@ -429,8 +411,8 @@ class ActionDispatchService:
                 receiver_user_id=receiver,
                 source_event_id=str(report.id),
                 evidence={
-                    "dimension":  report.dimension,
-                    "severity":   report.severity,
+                    "dimension": report.dimension,
+                    "severity": report.severity,
                     "confidence": report.confidence,
                     "root_cause": report.root_cause,
                 },
@@ -451,25 +433,28 @@ class ActionDispatchService:
         dispatched: List[str],
     ) -> None:
         try:
-            from src.services.task_service import TaskService
             from src.models.task import TaskPriority
+            from src.services.task_service import TaskService
 
             task_svc = TaskService()
             priority = TaskPriority(priority_str)
 
             dim_cn = {
-                "waste": "损耗管控", "efficiency": "效率提升",
-                "quality": "质量改善", "cost": "成本控制",
-                "inventory": "库存优化", "cross_store": "跨店对标",
+                "waste": "损耗管控",
+                "efficiency": "效率提升",
+                "quality": "质量改善",
+                "cost": "成本控制",
+                "inventory": "库存优化",
+                "cross_store": "跨店对标",
             }.get(report.dimension, report.dimension)
 
-            actions_text = "\n".join(
-                f"{i+1}. {a}"
-                for i, a in enumerate((report.recommended_actions or [])[:5])
-            ) or "请参考推理报告详情制定改善方案"
+            actions_text = (
+                "\n".join(f"{i+1}. {a}" for i, a in enumerate((report.recommended_actions or [])[:5]))
+                or "请参考推理报告详情制定改善方案"
+            )
 
             due_days = {"urgent": 1, "high": 3}.get(priority_str, 7)
-            due_at   = datetime.utcnow().replace(hour=23, minute=59, second=0) + timedelta(days=due_days - 1)
+            due_at = datetime.utcnow().replace(hour=23, minute=59, second=0) + timedelta(days=due_days - 1)
 
             system_user_id = uuid.UUID(os.getenv("SYSTEM_USER_ID", "00000000-0000-0000-0000-000000000001"))
             task = await task_svc.create_task(
@@ -500,12 +485,12 @@ class ActionDispatchService:
         dispatched: List[str],
     ) -> None:
         try:
-            from src.services.approval_service import ApprovalService
             from src.models.decision_log import DecisionType
+            from src.services.approval_service import ApprovalService
 
             approval_svc = ApprovalService()
-            dtype_str    = _DECISION_TYPE.get(report.dimension, "kpi_improvement")
-            dtype        = DecisionType(dtype_str)
+            dtype_str = _DECISION_TYPE.get(report.dimension, "kpi_improvement")
+            dtype = DecisionType(dtype_str)
 
             dl = await approval_svc.create_approval_request(
                 decision_type=dtype,
@@ -513,16 +498,16 @@ class ActionDispatchService:
                 agent_method=f"diagnose_{report.dimension}",
                 store_id=report.store_id,
                 ai_suggestion={
-                    "dimension":  report.dimension,
+                    "dimension": report.dimension,
                     "root_cause": report.root_cause,
-                    "actions":    report.recommended_actions,
+                    "actions": report.recommended_actions,
                 },
                 ai_confidence=report.confidence or 0.0,
                 ai_reasoning="\n".join(report.evidence_chain or []),
                 context_data={
-                    "report_id":  str(report.id),
+                    "report_id": str(report.id),
                     "report_date": str(report.report_date),
-                    "severity":   report.severity,
+                    "severity": report.severity,
                     "kpi_snapshot": report.kpi_snapshot,
                 },
                 db=self.db,

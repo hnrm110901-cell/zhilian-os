@@ -5,6 +5,7 @@ Router prefixes:
   /api/v1/budget      — 预算计划管理（CRUD + FSM）
   /api/v1/fin-alerts  — 预警规则管理 + 事件流水
 """
+
 from __future__ import annotations
 
 from typing import List, Optional
@@ -44,21 +45,21 @@ budget_router = APIRouter(prefix="/api/v1/budget", tags=["budget"])
 
 
 class LineItemIn(BaseModel):
-    category:     str
+    category: str
     sub_category: Optional[str] = None
-    budget_yuan:  float         = 0.0
+    budget_yuan: float = 0.0
 
 
 class BudgetPlanIn(BaseModel):
-    store_id:             str
-    period:               str             = Field(..., description="YYYY-MM")
-    period_type:          str             = "monthly"
-    brand_id:             Optional[str]  = None
-    total_revenue_budget: float           = 0.0
-    total_cost_budget:    float           = 0.0
-    profit_budget:        float           = 0.0
-    notes:                Optional[str]  = None
-    line_items:           List[LineItemIn] = []
+    store_id: str
+    period: str = Field(..., description="YYYY-MM")
+    period_type: str = "monthly"
+    brand_id: Optional[str] = None
+    total_revenue_budget: float = 0.0
+    total_cost_budget: float = 0.0
+    profit_budget: float = 0.0
+    notes: Optional[str] = None
+    line_items: List[LineItemIn] = []
 
 
 @budget_router.post("/plans")
@@ -87,8 +88,8 @@ async def create_budget_plan(
 @budget_router.get("/plans")
 async def list_budget_plans(
     store_id: str = Query(...),
-    limit:    int = Query(20, ge=1, le=100),
-    offset:   int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
 ):
     plans = await get_budget_plans(db, store_id=store_id, limit=limit, offset=offset)
@@ -152,13 +153,13 @@ alerts_router = APIRouter(prefix="/api/v1/fin-alerts", tags=["fin_alerts"])
 
 
 class RuleIn(BaseModel):
-    store_id:         str
-    metric:           str
-    threshold_type:   str            = Field(..., description="above | below | abs_above")
-    threshold_value:  float
-    severity:         str            = "warning"
-    cooldown_minutes: int            = 60
-    brand_id:         Optional[str] = None
+    store_id: str
+    metric: str
+    threshold_type: str = Field(..., description="above | below | abs_above")
+    threshold_value: float
+    severity: str = "warning"
+    cooldown_minutes: int = 60
+    brand_id: Optional[str] = None
 
 
 @alerts_router.get("/rules")
@@ -211,7 +212,7 @@ async def update_rule(
 
 @alerts_router.delete("/rules/{rule_id}")
 async def disable_rule(
-    rule_id:  str,
+    rule_id: str,
     store_id: str = Query(...),
     db: AsyncSession = Depends(get_db),
 ):
@@ -223,7 +224,7 @@ async def disable_rule(
 @alerts_router.post("/evaluate")
 async def evaluate_alerts(
     store_id: str = Query(...),
-    period:   str = Query(..., description="YYYY-MM"),
+    period: str = Query(..., description="YYYY-MM"),
     db: AsyncSession = Depends(get_db),
 ):
     """触发门店预警评估，产生新的预警事件（含冷却期去重）。"""
@@ -233,9 +234,9 @@ async def evaluate_alerts(
 
 @alerts_router.get("/events")
 async def list_events(
-    store_id: str           = Query(...),
-    status:   Optional[str] = Query(None, description="open|acknowledged|resolved"),
-    limit:    int           = Query(50, ge=1, le=200),
+    store_id: str = Query(...),
+    status: Optional[str] = Query(None, description="open|acknowledged|resolved"),
+    limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
 ):
     events = await get_alert_events(db, store_id=store_id, status_filter=status, limit=limit)

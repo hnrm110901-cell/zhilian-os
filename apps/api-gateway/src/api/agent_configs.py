@@ -2,12 +2,12 @@
 Agent 配置管理 API — 品牌级 Agent 启停 / 参数配置
 仅 ADMIN 可用
 """
+
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.core.dependencies import require_role
 from src.models.user import User, UserRole
@@ -55,7 +55,9 @@ async def update_agent_config(
 ):
     """更新 Agent 配置（参数合并更新，未传入的字段保留原值）"""
     result = await agent_config_service.update_agent_config(
-        session, brand_id, agent_type,
+        session,
+        brand_id,
+        agent_type,
         is_enabled=req.is_enabled,
         config=req.config,
     )

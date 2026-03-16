@@ -2,10 +2,12 @@
 看板布局偏好 API
 Dashboard Layout Preferences - 用 Redis 持久化用户自定义看板配置
 """
+
+from typing import Any, Dict, List, Optional
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
-import structlog
 
 from ..core.dependencies import get_current_active_user
 from ..models.user import User
@@ -53,6 +55,7 @@ class SaveLayoutRequest(BaseModel):
 
 async def _get_redis():
     from ..services.redis_cache_service import RedisCacheService
+
     svc = RedisCacheService()
     await svc.initialize()
     return svc

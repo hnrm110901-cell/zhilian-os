@@ -2,19 +2,20 @@
 异步导出任务 API
 提交大数据导出任务、查询进度、下载结果文件
 """
+
 import os
 import uuid
 from typing import Any, Dict, Optional
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
-
-from src.core.dependencies import get_current_active_user
+from sqlalchemy import and_, select
 from src.core.database import get_db_session
+from src.core.dependencies import get_current_active_user
 from src.models import User
 from src.models.export_job import ExportJob, ExportStatus
-from sqlalchemy import select, and_
-import structlog
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/api/v1/export-jobs", tags=["export_jobs"])
@@ -40,8 +41,7 @@ async def get_supported_types(
     """获取支持的导出类型列表"""
     return {
         "types": [
-            {"type": k, "description": v, "supported_params": _get_params_doc(k)}
-            for k, v in SUPPORTED_JOB_TYPES.items()
+            {"type": k, "description": v, "supported_params": _get_params_doc(k)} for k, v in SUPPORTED_JOB_TYPES.items()
         ]
     }
 
@@ -75,8 +75,7 @@ async def create_export_job(
     """
     if request.job_type not in SUPPORTED_JOB_TYPES:
         raise HTTPException(
-            status_code=400,
-            detail=f"不支持的导出类型: {request.job_type}，可选: {list(SUPPORTED_JOB_TYPES.keys())}"
+            status_code=400, detail=f"不支持的导出类型: {request.job_type}，可选: {list(SUPPORTED_JOB_TYPES.keys())}"
         )
     if request.format not in ("csv", "xlsx"):
         raise HTTPException(status_code=400, detail="format 只支持 csv 或 xlsx")
@@ -100,6 +99,7 @@ async def create_export_job(
     # 提交 Celery 任务
     try:
         from src.core.celery_tasks import async_export_data
+
         async_export_data.delay(job_id)
         logger.info("导出任务已提交", job_id=job_id, job_type=request.job_type)
     except Exception as e:
@@ -173,17 +173,13 @@ async def download_export_file(
         if not job or str(job.user_id) != str(current_user.id):
             raise HTTPException(status_code=404, detail="任务不存在或无权限访问")
         if job.status != ExportStatus.COMPLETED:
-            raise HTTPException(
-                status_code=400,
-                detail=f"任务尚未完成，当前状态: {job.status}"
-            )
+            raise HTTPException(status_code=400, detail=f"任务尚未完成，当前状态: {job.status}")
         if not job.file_path or not os.path.exists(job.file_path):
             raise HTTPException(status_code=410, detail="文件已过期或不存在")
 
         filename = os.path.basename(job.file_path)
         media_type = (
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            if job.format == "xlsx" else "text/csv"
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" if job.format == "xlsx" else "text/csv"
         )
         return FileResponse(
             path=job.file_path,

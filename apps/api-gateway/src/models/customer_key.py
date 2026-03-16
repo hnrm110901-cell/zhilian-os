@@ -15,19 +15,20 @@
   业务数据（WasteEvent.evidence / BOMItem.unit_cost / Order.details 等）
 """
 
-import uuid
 import enum
+import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Boolean, DateTime, Integer, Text, Enum, Index
+
+from sqlalchemy import Boolean, Column, DateTime, Enum, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from src.models.base import Base, TimestampMixin
 
 
 class KeyStatus(str, enum.Enum):
-    ACTIVE = "active"       # 当前加密主键
-    ROTATING = "rotating"   # 轮换中
-    RETIRED = "retired"     # 已停用（仅用于解密历史数据）
-    REVOKED = "revoked"     # 已吊销（数据不可恢复）
+    ACTIVE = "active"  # 当前加密主键
+    ROTATING = "rotating"  # 轮换中
+    RETIRED = "retired"  # 已停用（仅用于解密历史数据）
+    REVOKED = "revoked"  # 已吊销（数据不可恢复）
 
 
 class KeyAlgorithm(str, enum.Enum):
@@ -42,6 +43,7 @@ class CustomerKey(Base, TimestampMixin):
     每个门店（store_id）可拥有多版 DEK，当前激活的 is_active=True。
     DEK 明文（256 bit）经 KEK 包裹后以 encrypted_dek 存储。
     """
+
     __tablename__ = "customer_keys"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -89,6 +91,7 @@ class EncryptedField(Base, TimestampMixin):
 
     记录哪些表/字段的哪些行被哪个密钥版本加密，用于批量重加密和审计。
     """
+
     __tablename__ = "encrypted_field_audit"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -97,7 +100,7 @@ class EncryptedField(Base, TimestampMixin):
 
     table_name = Column(String(100), nullable=False)
     field_name = Column(String(100), nullable=False)
-    record_id = Column(String(100), nullable=False)   # 被加密记录的主键
+    record_id = Column(String(100), nullable=False)  # 被加密记录的主键
 
     encrypted_at = Column(DateTime, default=datetime.utcnow)
     algorithm = Column(String(20), default="AES-256-GCM")

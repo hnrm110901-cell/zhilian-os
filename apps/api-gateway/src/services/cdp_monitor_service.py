@@ -9,20 +9,21 @@ CDP Monitor Service — 消费者数据平台监控仪表盘
 
 定位：CDP数据治理的运营监控台
 """
+
 import logging
 from typing import Optional
 
-from sqlalchemy import select, func, case
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.models.consumer_identity import ConsumerIdentity
-from src.models.private_domain import PrivateDomainMember
 from src.models.order import Order
+from src.models.private_domain import PrivateDomainMember
 
 logger = logging.getLogger(__name__)
 
 
 # ── 纯函数 ──────────────────────────────────────────────────────
+
 
 def classify_fill_rate_health(rate: float) -> str:
     """
@@ -83,8 +84,8 @@ class CDPMonitorService:
 
         聚合：消费者统计 + 填充率 + RFM分布 + 偏差率 + KPI达标
         """
-        from src.services.cdp_sync_service import cdp_sync_service
         from src.services.cdp_rfm_service import cdp_rfm_service
+        from src.services.cdp_sync_service import cdp_sync_service
         from src.services.identity_resolution_service import identity_resolution_service
 
         # 1. 消费者基础统计
@@ -177,9 +178,7 @@ class CDPMonitorService:
         ]
         if store_id:
             order_where.append(Order.store_id == store_id)
-        pending_orders = await db.scalar(
-            select(func.count(Order.id)).where(*order_where)
-        ) or 0
+        pending_orders = await db.scalar(select(func.count(Order.id)).where(*order_where)) or 0
 
         # 会员：没有consumer_id
         member_where = [
@@ -188,9 +187,7 @@ class CDPMonitorService:
         ]
         if store_id:
             member_where.append(PrivateDomainMember.store_id == store_id)
-        pending_members = await db.scalar(
-            select(func.count(PrivateDomainMember.id)).where(*member_where)
-        ) or 0
+        pending_members = await db.scalar(select(func.count(PrivateDomainMember.id)).where(*member_where)) or 0
 
         return {
             "orders": pending_orders,
@@ -215,40 +212,47 @@ class CDPMonitorService:
 
         返回：各步骤结果 + 最终KPI
         """
-        from src.services.cdp_sync_service import cdp_sync_service
         from src.services.cdp_rfm_service import cdp_rfm_service
+        from src.services.cdp_sync_service import cdp_sync_service
 
         results = {"steps": {}}
 
         # Step 1: 回填订单
         if store_id:
             order_result = await cdp_sync_service.sync_store_orders(
-                db, store_id, batch_size=batch_size,
+                db,
+                store_id,
+                batch_size=batch_size,
             )
         else:
             order_result = await cdp_sync_service.sync_all_stores(
-                db, batch_size=batch_size,
+                db,
+                batch_size=batch_size,
             )
         await db.commit()
         results["steps"]["backfill_orders"] = order_result
 
         # Step 2: 回填会员
         member_result = await cdp_rfm_service.backfill_members(
-            db, store_id=store_id, batch_size=batch_size,
+            db,
+            store_id=store_id,
+            batch_size=batch_size,
         )
         await db.commit()
         results["steps"]["backfill_members"] = member_result
 
         # Step 3: 重算 RFM
         rfm_result = await cdp_rfm_service.recalculate_all(
-            db, store_id=store_id,
+            db,
+            store_id=store_id,
         )
         await db.commit()
         results["steps"]["rfm_recalculate"] = rfm_result
 
         # Step 4: 偏差校验
         deviation = await cdp_rfm_service.compute_deviation(
-            db, store_id=store_id,
+            db,
+            store_id=store_id,
         )
         results["steps"]["deviation_check"] = deviation
 

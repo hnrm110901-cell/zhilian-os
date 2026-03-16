@@ -1,15 +1,16 @@
 """
 门店对标分析API端点
 """
-import os
-from fastapi import APIRouter, Depends, Query
-from typing import List, Optional
-from pydantic import BaseModel
-from datetime import date
 
-from src.services.benchmark_service import BenchmarkService
+import os
+from datetime import date
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
 from src.core.dependencies import get_current_user
 from src.models.user import User
+from src.services.benchmark_service import BenchmarkService
 
 router = APIRouter(prefix="/benchmark", tags=["benchmark"])
 
@@ -147,9 +148,7 @@ async def get_benchmark_summary(
         percentiles = [r["percentile"] for r in report["rankings"].values()]
         summary["overall_ranking"] = {
             "percentile": round(sum(percentiles) / len(percentiles), 1),
-            "level": service._get_performance_level(
-                sum(percentiles) / len(percentiles)
-            ),
+            "level": service._get_performance_level(sum(percentiles) / len(percentiles)),
         }
 
     return summary

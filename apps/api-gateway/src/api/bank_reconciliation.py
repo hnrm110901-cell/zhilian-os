@@ -1,11 +1,11 @@
 """银行流水对账 API — 导入/对账/查询/分类/匹配/统计"""
-from typing import Optional
-from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
+from datetime import date
+from typing import Optional
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.core.dependencies import require_role
 from src.models.user import User, UserRole
@@ -17,6 +17,7 @@ svc = BankReconcileService()
 
 
 # ── 请求模型 ──────────────────────────────────────────────────────────────
+
 
 class RunReconciliationRequest(BaseModel):
     bank_name: str
@@ -34,6 +35,7 @@ class MatchRequest(BaseModel):
 
 
 # ── 导入银行流水 ──────────────────────────────────────────────────────────
+
 
 @router.post("/import")
 async def import_statements(
@@ -55,9 +57,7 @@ async def import_statements(
     except UnicodeDecodeError:
         content = content_bytes.decode("gbk", errors="replace")
 
-    result = await svc.import_statements(
-        db, brand_id, bank_name, content, file_format
-    )
+    result = await svc.import_statements(db, brand_id, bank_name, content, file_format)
     return {
         "success": True,
         "message": f"成功导入 {result['imported']} 条流水",
@@ -67,6 +67,7 @@ async def import_statements(
 
 # ── 执行对账 ──────────────────────────────────────────────────────────────
 
+
 @router.post("/run")
 async def run_reconciliation(
     req: RunReconciliationRequest,
@@ -74,9 +75,7 @@ async def run_reconciliation(
     _admin: User = Depends(require_role(UserRole.ADMIN)),
 ):
     """执行银行对账：匹配银行流水与系统记录"""
-    result = await svc.run_reconciliation(
-        db, req.brand_id, req.bank_name, req.period_start, req.period_end
-    )
+    result = await svc.run_reconciliation(db, req.brand_id, req.bank_name, req.period_start, req.period_end)
     return {
         "success": True,
         "message": "对账完成",
@@ -85,6 +84,7 @@ async def run_reconciliation(
 
 
 # ── 批次列表 ──────────────────────────────────────────────────────────────
+
 
 @router.get("/batches")
 async def list_batches(
@@ -102,6 +102,7 @@ async def list_batches(
 
 # ── 批次详情 ──────────────────────────────────────────────────────────────
 
+
 @router.get("/batches/{batch_id}")
 async def get_batch_detail(
     batch_id: str,
@@ -116,6 +117,7 @@ async def get_batch_detail(
 
 
 # ── 流水列表 ──────────────────────────────────────────────────────────────
+
 
 @router.get("/statements")
 async def list_statements(
@@ -132,13 +134,21 @@ async def list_statements(
 ):
     """查询银行流水列表（支持多种筛选）"""
     data = await svc.list_statements(
-        db, brand_id, bank_name, is_matched, category,
-        start_date, end_date, page, page_size,
+        db,
+        brand_id,
+        bank_name,
+        is_matched,
+        category,
+        start_date,
+        end_date,
+        page,
+        page_size,
     )
     return {"success": True, "data": data}
 
 
 # ── 手动分类 ──────────────────────────────────────────────────────────────
+
 
 @router.post("/statements/{statement_id}/categorize")
 async def categorize_statement(
@@ -160,6 +170,7 @@ async def categorize_statement(
 
 # ── 手动匹配 ──────────────────────────────────────────────────────────────
 
+
 @router.post("/statements/{statement_id}/match")
 async def match_statement(
     statement_id: str,
@@ -175,6 +186,7 @@ async def match_statement(
 
 
 # ── 统计概览 ──────────────────────────────────────────────────────────────
+
 
 @router.get("/stats")
 async def get_stats(

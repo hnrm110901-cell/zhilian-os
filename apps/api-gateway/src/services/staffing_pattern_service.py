@@ -14,7 +14,6 @@ from typing import Any, Dict, List, Optional
 import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.repositories import EmployeeRepository
 
 logger = structlog.get_logger()
@@ -39,8 +38,7 @@ class StaffingPatternService:
         db: AsyncSession,
     ) -> Dict[str, Any]:
         result = await db.execute(
-            text(
-                """
+            text("""
                 SELECT
                     sc.schedule_date,
                     sh.shift_type,
@@ -59,8 +57,7 @@ class StaffingPatternService:
                   AND sc.schedule_date <= :end_date
                 GROUP BY sc.schedule_date, sh.shift_type, COALESCE(sh.position, 'waiter'), lcs.actual_labor_cost_rate
                 ORDER BY sc.schedule_date
-                """
-            ),
+                """),
             {"sid": store_id, "start_date": start_date, "end_date": end_date},
         )
         rows = result.fetchall()
@@ -107,7 +104,9 @@ class StaffingPatternService:
         stored = 0
         patterns = []
         for day_type, samples in grouped.items():
-            aggregate: Dict[tuple, Dict[str, Any]] = defaultdict(lambda: {"count_sum": 0, "n": 0, "start": "09:00", "end": "17:00"})
+            aggregate: Dict[tuple, Dict[str, Any]] = defaultdict(
+                lambda: {"count_sum": 0, "n": 0, "start": "09:00", "end": "17:00"}
+            )
             sample_rates = [s["labor_cost_rate"] for s in samples if s["labor_cost_rate"] > 0]
             for sample in samples:
                 for s in sample["shifts"]:
@@ -148,8 +147,7 @@ class StaffingPatternService:
 
             try:
                 await db.execute(
-                    text(
-                        """
+                    text("""
                         INSERT INTO staffing_patterns (
                             store_id, pattern_name, day_type, meal_period, shifts_template,
                             source_start_date, source_end_date, sample_days,
@@ -170,8 +168,7 @@ class StaffingPatternService:
                             performance_score = EXCLUDED.performance_score,
                             is_active = TRUE,
                             updated_at = NOW()
-                        """
-                    ),
+                        """),
                     {
                         "store_id": store_id,
                         "pattern_name": pattern_name,
@@ -206,8 +203,7 @@ class StaffingPatternService:
     ) -> Optional[Dict[str, Any]]:
         day_type = infer_day_type(target_date)
         result = await db.execute(
-            text(
-                """
+            text("""
                 SELECT
                     pattern_name, day_type, meal_period, shifts_template,
                     sample_days, avg_labor_cost_rate, performance_score
@@ -217,8 +213,7 @@ class StaffingPatternService:
                   AND is_active = TRUE
                 ORDER BY performance_score DESC NULLS LAST, sample_days DESC
                 LIMIT 1
-                """
-            ),
+                """),
             {"sid": store_id, "day_type": day_type},
         )
         row = result.fetchone()

@@ -4,11 +4,11 @@ TrainingAgent - 员工培训管理智能体
 负责：培训需求评估、培训计划生成、进度追踪、技能差距分析。
 委托给 TrainingService 执行真实 DB 查询。
 """
+
 import time
 from typing import Any, Dict, List
 
 import structlog
-
 from src.core.base_agent import AgentResponse, BaseAgent
 
 logger = structlog.get_logger()
@@ -46,6 +46,7 @@ class TrainingAgent(BaseAgent):
 
         try:
             from src.services.training_service import TrainingService
+
             svc = TrainingService(store_id=store_id)
 
             if action == "assess_training_needs":

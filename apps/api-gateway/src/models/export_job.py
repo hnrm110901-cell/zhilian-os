@@ -2,9 +2,11 @@
 异步导出任务模型
 跟踪大数据导出任务的状态、进度和结果文件
 """
-import uuid
+
 import enum
-from sqlalchemy import Column, String, Boolean, Integer, Text, JSON, ForeignKey
+import uuid
+
+from sqlalchemy import JSON, Boolean, Column, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -12,10 +14,10 @@ from .base import Base, TimestampMixin
 
 
 class ExportStatus(str, enum.Enum):
-    PENDING = "pending"       # 等待执行
-    RUNNING = "running"       # 执行中
-    COMPLETED = "completed"   # 已完成
-    FAILED = "failed"         # 失败
+    PENDING = "pending"  # 等待执行
+    RUNNING = "running"  # 执行中
+    COMPLETED = "completed"  # 已完成
+    FAILED = "failed"  # 失败
 
 
 class ExportJob(Base, TimestampMixin):

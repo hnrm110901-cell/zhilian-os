@@ -2,16 +2,17 @@
 渠道分析 Service — Phase P1 (易订PRO能力)
 渠道来源统计、转化率分析、佣金成本分析
 """
-from datetime import datetime, date, timedelta
-from typing import List, Dict, Any, Optional
-from sqlalchemy import select, func, and_, case
-from sqlalchemy.ext.asyncio import AsyncSession
-import uuid
-import structlog
 
+import uuid
+from datetime import date, datetime, timedelta
+from typing import Any, Dict, List, Optional
+
+import structlog
+from sqlalchemy import and_, case, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_db_session
-from src.models.reservation_channel import ReservationChannel, ChannelType
 from src.models.reservation import Reservation, ReservationStatus
+from src.models.reservation_channel import ChannelType, ReservationChannel
 
 logger = structlog.get_logger()
 
@@ -59,14 +60,16 @@ class ChannelAnalyticsService:
         query = (
             select(
                 ReservationChannel.channel,
-                func.count().label('count'),
-                func.sum(ReservationChannel.channel_commission_amount).label('total_commission'),
+                func.count().label("count"),
+                func.sum(ReservationChannel.channel_commission_amount).label("total_commission"),
             )
-            .where(and_(
-                ReservationChannel.store_id == store_id,
-                func.date(ReservationChannel.created_at) >= start_date,
-                func.date(ReservationChannel.created_at) <= end_date,
-            ))
+            .where(
+                and_(
+                    ReservationChannel.store_id == store_id,
+                    func.date(ReservationChannel.created_at) >= start_date,
+                    func.date(ReservationChannel.created_at) <= end_date,
+                )
+            )
             .group_by(ReservationChannel.channel)
             .order_by(func.count().desc())
         )
@@ -76,12 +79,14 @@ class ChannelAnalyticsService:
         total = sum(r.count for r in rows)
         channels = []
         for r in rows:
-            channels.append({
-                "channel": r.channel.value if hasattr(r.channel, 'value') else str(r.channel),
-                "count": r.count,
-                "percentage": round(r.count / total * 100, 1) if total > 0 else 0,
-                "total_commission": float(r.total_commission or 0),
-            })
+            channels.append(
+                {
+                    "channel": r.channel.value if hasattr(r.channel, "value") else str(r.channel),
+                    "count": r.count,
+                    "percentage": round(r.count / total * 100, 1) if total > 0 else 0,
+                    "total_commission": float(r.total_commission or 0),
+                }
+            )
 
         return {
             "store_id": store_id,
@@ -102,13 +107,15 @@ class ChannelAnalyticsService:
         total_query = (
             select(
                 ReservationChannel.channel,
-                func.count().label('total'),
+                func.count().label("total"),
             )
-            .where(and_(
-                ReservationChannel.store_id == store_id,
-                func.date(ReservationChannel.created_at) >= start_date,
-                func.date(ReservationChannel.created_at) <= end_date,
-            ))
+            .where(
+                and_(
+                    ReservationChannel.store_id == store_id,
+                    func.date(ReservationChannel.created_at) >= start_date,
+                    func.date(ReservationChannel.created_at) <= end_date,
+                )
+            )
             .group_by(ReservationChannel.channel)
         )
 
@@ -116,15 +123,17 @@ class ChannelAnalyticsService:
         completed_query = (
             select(
                 ReservationChannel.channel,
-                func.count().label('completed'),
+                func.count().label("completed"),
             )
             .join(Reservation, Reservation.id == ReservationChannel.reservation_id)
-            .where(and_(
-                ReservationChannel.store_id == store_id,
-                func.date(ReservationChannel.created_at) >= start_date,
-                func.date(ReservationChannel.created_at) <= end_date,
-                Reservation.status == ReservationStatus.COMPLETED,
-            ))
+            .where(
+                and_(
+                    ReservationChannel.store_id == store_id,
+                    func.date(ReservationChannel.created_at) >= start_date,
+                    func.date(ReservationChannel.created_at) <= end_date,
+                    Reservation.status == ReservationStatus.COMPLETED,
+                )
+            )
             .group_by(ReservationChannel.channel)
         )
 
@@ -137,14 +146,16 @@ class ChannelAnalyticsService:
         conversions = []
         for channel, total in totals.items():
             completed = completeds.get(channel, 0)
-            conversions.append({
-                "channel": channel.value if hasattr(channel, 'value') else str(channel),
-                "total": total,
-                "completed": completed,
-                "conversion_rate": round(completed / total * 100, 1) if total > 0 else 0,
-            })
+            conversions.append(
+                {
+                    "channel": channel.value if hasattr(channel, "value") else str(channel),
+                    "total": total,
+                    "completed": completed,
+                    "conversion_rate": round(completed / total * 100, 1) if total > 0 else 0,
+                }
+            )
 
-        return sorted(conversions, key=lambda x: x['conversion_rate'], reverse=True)
+        return sorted(conversions, key=lambda x: x["conversion_rate"], reverse=True)
 
     async def get_cancellation_analysis(
         self,
@@ -155,23 +166,26 @@ class ChannelAnalyticsService:
     ) -> Dict[str, Any]:
         """退订率分析（易订PRO核心功能）"""
         # 总预订 vs 取消
-        query = (
-            select(
-                func.count().label('total'),
-                func.sum(case(
+        query = select(
+            func.count().label("total"),
+            func.sum(
+                case(
                     (Reservation.status == ReservationStatus.CANCELLED, 1),
                     else_=0,
-                )).label('cancelled'),
-                func.sum(case(
+                )
+            ).label("cancelled"),
+            func.sum(
+                case(
                     (Reservation.status == ReservationStatus.NO_SHOW, 1),
                     else_=0,
-                )).label('no_show'),
-            )
-            .where(and_(
+                )
+            ).label("no_show"),
+        ).where(
+            and_(
                 Reservation.store_id == store_id,
                 Reservation.reservation_date >= start_date,
                 Reservation.reservation_date <= end_date,
-            ))
+            )
         )
         result = await session.execute(query)
         row = result.one()
@@ -196,7 +210,7 @@ class ChannelAnalyticsService:
             "id": str(r.id),
             "reservation_id": r.reservation_id,
             "store_id": r.store_id,
-            "channel": r.channel.value if hasattr(r.channel, 'value') else str(r.channel),
+            "channel": r.channel.value if hasattr(r.channel, "value") else str(r.channel),
             "external_order_id": r.external_order_id,
             "created_at": r.created_at.isoformat() if r.created_at else None,
         }

@@ -22,9 +22,9 @@ DemandPredictor — 私域会员到店需求预测（Agent-13）
 
 from __future__ import annotations
 
+import inspect
 from dataclasses import dataclass
 from typing import List
-import inspect
 
 import structlog
 from sqlalchemy import text
@@ -36,13 +36,14 @@ logger = structlog.get_logger()
 @dataclass
 class DemandPrediction:
     """单条到店预测结果。"""
+
     customer_id: str
     store_id: str
     wechat_openid: str | None
-    avg_interval_days: float     # 平均消费间隔（天）
-    recency_days: int            # 距上次消费天数
-    days_until_visit: float      # 预计距下次到店天数（可为负：已超期）
-    order_count: int             # 历史消费次数（置信度参考）
+    avg_interval_days: float  # 平均消费间隔（天）
+    recency_days: int  # 距上次消费天数
+    days_until_visit: float  # 预计距下次到店天数（可为负：已超期）
+    order_count: int  # 历史消费次数（置信度参考）
 
     @property
     def confidence(self) -> float:
@@ -50,7 +51,7 @@ class DemandPrediction:
         简单置信度：消费次数越多、模式越规律，置信度越高。
         范围 [0.3, 1.0]。
         """
-        base = min(self.order_count / 10, 1.0)   # 10次消费 → 满分
+        base = min(self.order_count / 10, 1.0)  # 10次消费 → 满分
         return round(max(base, 0.3), 2)
 
 
@@ -112,6 +113,7 @@ _SCAN_SQL = text("""
 
 
 # ── 核心服务 ──────────────────────────────────────────────────────────────────
+
 
 class DemandPredictor:
     """

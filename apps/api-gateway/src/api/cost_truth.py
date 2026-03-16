@@ -10,14 +10,21 @@
   GET  /insight        — 一句话洞察（供推送/首页）
   GET  /dashboard      — BFF驾驶舱聚合
 """
-from datetime import date, timedelta
-from fastapi import APIRouter, Query
 
+from datetime import date, timedelta
+
+from fastapi import APIRouter, Query
 from src.services.cost_truth_engine import (
-    DishSale, IngredientUsage, WasteRecord,
-    build_cost_truth_report, generate_one_sentence_insight,
-    generate_actionable_decision, predict_month_end_cost_rate,
-    classify_severity, _yuan, _safe_pct,
+    DishSale,
+    IngredientUsage,
+    WasteRecord,
+    _safe_pct,
+    _yuan,
+    build_cost_truth_report,
+    classify_severity,
+    generate_actionable_decision,
+    generate_one_sentence_insight,
+    predict_month_end_cost_rate,
 )
 
 router = APIRouter(prefix="/api/v1/cost-truth", tags=["cost-truth"])
@@ -171,9 +178,7 @@ async def get_prediction(
         "predicted_eom_pct": report.predicted_eom_pct,
         "target_pct": report.target_pct,
         "gap_to_target": round((report.predicted_eom_pct or 0) - report.target_pct, 2),
-        "severity": classify_severity(
-            (report.predicted_eom_pct or 0) - report.target_pct
-        ),
+        "severity": classify_severity((report.predicted_eom_pct or 0) - report.target_pct),
     }
 
 

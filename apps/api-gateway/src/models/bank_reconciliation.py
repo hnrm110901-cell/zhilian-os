@@ -1,9 +1,9 @@
 """银行流水对账模型 — 银行流水记录 / 对账批次"""
+
 import uuid
-from datetime import datetime, date
-from sqlalchemy import (
-    Column, String, Integer, DateTime, Date, Boolean,
-)
+from datetime import date, datetime
+
+from sqlalchemy import Boolean, Column, Date, DateTime, Integer, String
 from sqlalchemy.dialects.postgresql import UUID
 
 from .base import Base, TimestampMixin

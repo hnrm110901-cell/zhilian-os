@@ -51,6 +51,7 @@ def upgrade():
     op.drop_table('reservations')
 
     # ── 2. 重建 employees ────────────────────────────────────────────────
+    # 表已在步骤1中删除，直接重建无需条件检查
     op.create_table(
         'employees',
         sa.Column('id', sa.String(50), primary_key=True),
@@ -228,9 +229,9 @@ def upgrade():
 def downgrade():
     op.drop_table('kpi_records')
     op.drop_table('kpis')
-    op.drop_table('reservations')
-    op.drop_table('shifts')
-    op.drop_table('schedules')
-    op.drop_table('inventory_transactions')
-    op.drop_table('inventory_items')
-    op.drop_table('employees')
+    op.execute('DROP TABLE IF EXISTS reservations CASCADE')
+    op.execute('DROP TABLE IF EXISTS shifts CASCADE')
+    op.execute('DROP TABLE IF EXISTS schedules CASCADE')
+    op.execute('DROP TABLE IF EXISTS inventory_transactions CASCADE')
+    op.execute('DROP TABLE IF EXISTS inventory_items CASCADE')
+    op.execute('DROP TABLE IF EXISTS employees CASCADE')

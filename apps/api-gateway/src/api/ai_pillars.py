@@ -29,6 +29,7 @@ router = APIRouter(prefix="/api/v1/ai", tags=["ai-pillars"])
 
 # ── Skill Registry（P1）────────────────────────────────────────────────────────
 
+
 @router.get("/skills", summary="技能发现（跨Agent）")
 async def discover_skills(
     agent_type: Optional[str] = Query(None, description="按Agent类型筛选"),
@@ -68,6 +69,7 @@ async def get_skill_detail(
 
 # ── Effect Loop（P2）──────────────────────────────────────────────────────────
 
+
 @router.get("/effects/{store_id}", summary="效果评估摘要")
 async def get_effect_summary(
     store_id: str,
@@ -85,8 +87,9 @@ async def get_effect_summary(
     since = (date.today() - timedelta(days=days)).isoformat()
     try:
         # 总体统计
-        stats_row = (await db.execute(
-            text("""
+        stats_row = (
+            await db.execute(
+                text("""
                 SELECT
                     COUNT(*) AS total,
                     COUNT(outcome) AS evaluated,
@@ -102,20 +105,23 @@ async def get_effect_summary(
                 WHERE store_id = :sid
                   AND created_at >= :since
             """),
-            {"sid": store_id, "since": since},
-        )).fetchone()
+                {"sid": store_id, "since": since},
+            )
+        ).fetchone()
 
         # 按类型分布
-        type_rows = (await db.execute(
-            text("""
+        type_rows = (
+            await db.execute(
+                text("""
                 SELECT decision_type, outcome, COUNT(*) AS cnt
                 FROM decision_logs
                 WHERE store_id = :sid AND created_at >= :since AND outcome IS NOT NULL
                 GROUP BY decision_type, outcome
                 ORDER BY decision_type
             """),
-            {"sid": store_id, "since": since},
-        )).fetchall()
+                {"sid": store_id, "since": since},
+            )
+        ).fetchall()
 
         by_type: Dict[str, Dict[str, int]] = {}
         for r in type_rows:
@@ -125,8 +131,9 @@ async def get_effect_summary(
             by_type[dt][r[1]] = int(r[2])
 
         # 信任分趋势（按周）
-        trend_rows = (await db.execute(
-            text("""
+        trend_rows = (
+            await db.execute(
+                text("""
                 SELECT DATE_TRUNC('week', created_at)::date AS week,
                        ROUND(AVG(trust_score)::numeric, 1) AS avg_trust,
                        COUNT(*) AS decisions
@@ -135,8 +142,9 @@ async def get_effect_summary(
                 GROUP BY week
                 ORDER BY week
             """),
-            {"sid": store_id, "since": since},
-        )).fetchall()
+                {"sid": store_id, "since": since},
+            )
+        ).fetchall()
 
         return {
             "store_id": store_id,
@@ -154,10 +162,7 @@ async def get_effect_summary(
             "total_cost_saved_yuan": round(float(stats_row[8]), 2) if stats_row else 0.0,
             "total_revenue_gain_yuan": round(float(stats_row[9]), 2) if stats_row else 0.0,
             "by_type": by_type,
-            "trust_trend": [
-                {"week": str(r[0]), "avg_trust": float(r[1]), "decisions": int(r[2])}
-                for r in trend_rows
-            ],
+            "trust_trend": [{"week": str(r[0]), "avg_trust": float(r[1]), "decisions": int(r[2])} for r in trend_rows],
         }
     except Exception as exc:
         logger.warning("ai_pillars.effects_failed", store_id=store_id, error=str(exc))
@@ -174,8 +179,9 @@ async def get_trust_trend(
     """获取门店AI信任分日趋势。"""
     since = (date.today() - timedelta(days=days)).isoformat()
     try:
-        rows = (await db.execute(
-            text("""
+        rows = (
+            await db.execute(
+                text("""
                 SELECT DATE(created_at) AS day,
                        ROUND(AVG(trust_score)::numeric, 1) AS avg_trust,
                        COUNT(*) AS decisions,
@@ -185,8 +191,9 @@ async def get_trust_trend(
                 GROUP BY day
                 ORDER BY day
             """),
-            {"sid": store_id, "since": since},
-        )).fetchall()
+                {"sid": store_id, "since": since},
+            )
+        ).fetchall()
 
         return {
             "store_id": store_id,
@@ -221,6 +228,7 @@ async def trigger_evaluation(
 
 # ── BusinessContext（P3）──────────────────────────────────────────────────────
 
+
 @router.get("/context/{trace_id}", summary="查询业务上下文链路")
 async def get_context_trace(
     trace_id: str,
@@ -235,6 +243,7 @@ async def get_context_trace(
     # 尝试 Redis
     try:
         from src.core.business_context import get_business_context_store
+
         store = await get_business_context_store()
         if store:
             ctx = await store.load(trace_id)
@@ -245,16 +254,18 @@ async def get_context_trace(
 
     # 回退到 DecisionLog
     try:
-        rows = (await db.execute(
-            text("""
+        rows = (
+            await db.execute(
+                text("""
                 SELECT id, decision_type, store_id, context_data, created_at, outcome, trust_score
                 FROM decision_logs
                 WHERE context_data::text LIKE :pattern
                 ORDER BY created_at DESC
                 LIMIT 10
             """),
-            {"pattern": f"%{trace_id}%"},
-        )).fetchall()
+                {"pattern": f"%{trace_id}%"},
+            )
+        ).fetchall()
 
         decisions = [
             {

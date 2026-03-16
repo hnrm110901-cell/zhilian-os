@@ -6,20 +6,22 @@ Private Domain Operations API
 扩展能力（用户增长）：user_portrait、funnel_optimize、realtime_metrics、personalized_recommend 等 18 个 action，
 见 POST /execute 与 GET /actions。
 """
-from typing import List, Optional, Any, Dict
-from datetime import date
-from fastapi import APIRouter, Depends, Query, HTTPException
-from pydantic import BaseModel
-import structlog
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
-
-from ..core.dependencies import get_current_active_user
-from ..core.database import get_db
-from ..models.user import User
 
 import sys
+from datetime import date
 from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import structlog
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..core.database import get_db
+from ..core.dependencies import get_current_active_user
+from ..models.user import User
+
 # 向上查找包含 packages/ 的目录作为 repo_root
 # Docker: /app/packages/  本地: <repo>/packages/
 _repo_root = next(
@@ -43,6 +45,7 @@ def _get_agent(store_id: str) -> PrivateDomainAgent:
 
 
 # ─────────────────────────── Request Models ───────────────────────────
+
 
 class TriggerJourneyRequest(BaseModel):
     journey_type: str
@@ -72,7 +75,7 @@ class MarkSignalRequest(BaseModel):
 
 
 class TriggerLifecycleRequest(BaseModel):
-    trigger: str                          # StateTransitionTrigger value
+    trigger: str  # StateTransitionTrigger value
     changed_by: str = "api"
     reason: Optional[str] = None
 
@@ -85,6 +88,7 @@ class TriggerJourneyV2Request(BaseModel):
 
 class ExecuteRequest(BaseModel):
     """统一执行请求：action + params（兼容 input_data 包裹格式由调用方展平后传入）"""
+
     action: str
     params: Optional[Dict[str, Any]] = None
 
@@ -101,6 +105,7 @@ class ExecuteRequest(BaseModel):
 
 
 # ─────────────────────────── Endpoints ───────────────────────────
+
 
 @router.post(
     "/execute",
@@ -136,6 +141,7 @@ async def list_actions(current_user: User = Depends(get_current_active_user)):
 
 
 # ─────────────────────────── 原有 Endpoints ───────────────────────────
+
 
 @router.get("/dashboard/{store_id}")
 async def get_dashboard(
@@ -214,10 +220,13 @@ async def trigger_journey(
 ):
     """触发用户旅程"""
     agent = _get_agent(store_id)
-    result = await agent.execute("trigger_journey", {
-        "journey_type": body.journey_type,
-        "customer_id": body.customer_id,
-    })
+    result = await agent.execute(
+        "trigger_journey",
+        {
+            "journey_type": body.journey_type,
+            "customer_id": body.customer_id,
+        },
+    )
     if not result.success:
         raise HTTPException(status_code=500, detail=result.error)
     return result.data
@@ -231,11 +240,14 @@ async def calculate_quadrant(
 ):
     """计算门店四象限"""
     agent = _get_agent(store_id)
-    result = await agent.execute("calculate_store_quadrant", {
-        "competition_density": body.competition_density,
-        "member_count": body.member_count,
-        "estimated_population": body.estimated_population,
-    })
+    result = await agent.execute(
+        "calculate_store_quadrant",
+        {
+            "competition_density": body.competition_density,
+            "member_count": body.member_count,
+            "estimated_population": body.estimated_population,
+        },
+    )
     if not result.success:
         raise HTTPException(status_code=500, detail=result.error)
     return result.data
@@ -249,12 +261,15 @@ async def process_bad_review(
 ):
     """处理差评，触发差评修复旅程"""
     agent = _get_agent(store_id)
-    result = await agent.execute("process_bad_review", {
-        "review_id": body.review_id,
-        "customer_id": body.customer_id,
-        "rating": body.rating,
-        "content": body.content,
-    })
+    result = await agent.execute(
+        "process_bad_review",
+        {
+            "review_id": body.review_id,
+            "customer_id": body.customer_id,
+            "rating": body.rating,
+            "content": body.content,
+        },
+    )
     if not result.success:
         raise HTTPException(status_code=500, detail=result.error)
     return result.data
@@ -270,10 +285,13 @@ async def batch_trigger_journeys(
     agent = _get_agent(store_id)
     results = []
     for cid in body.customer_ids:
-        r = await agent.execute("trigger_journey", {
-            "journey_type": body.journey_type,
-            "customer_id": cid,
-        })
+        r = await agent.execute(
+            "trigger_journey",
+            {
+                "journey_type": body.journey_type,
+                "customer_id": cid,
+            },
+        )
         results.append({"customer_id": cid, "success": r.success, "journey": r.data})
     return {"triggered": len(results), "results": results}
 
@@ -288,7 +306,9 @@ async def mark_signal_handled(
 ):
     """标记信号已处理"""
     import datetime
+
     from sqlalchemy import update as _update
+
     from ..models.private_domain import PrivateDomainSignal
 
     handled_at = datetime.datetime.utcnow()
@@ -317,6 +337,7 @@ async def get_lifecycle_state(
 ):
     """返回该会员当前生命周期状态（优先读已保存值，无则按 RFM 实时判断）。"""
     from ..services.lifecycle_state_machine import LifecycleStateMachine
+
     sm = LifecycleStateMachine()
     state = await sm.detect_state(customer_id, store_id, db)
     return {"customer_id": customer_id, "store_id": store_id, "state": state.value}
@@ -335,8 +356,9 @@ async def apply_lifecycle_trigger(
     register / first_order / repeat_order / high_frequency_milestone /
     vip_upgrade / churn_warning / inactivity_long
     """
-    from ..services.lifecycle_state_machine import LifecycleStateMachine
     from ..models.member_lifecycle import StateTransitionTrigger
+    from ..services.lifecycle_state_machine import LifecycleStateMachine
+
     try:
         trigger = StateTransitionTrigger(body.trigger)
     except ValueError:
@@ -346,8 +368,12 @@ async def apply_lifecycle_trigger(
         )
     sm = LifecycleStateMachine()
     result = await sm.apply_trigger(
-        customer_id, store_id, trigger, db,
-        changed_by=body.changed_by, reason=body.reason,
+        customer_id,
+        store_id,
+        trigger,
+        db,
+        changed_by=body.changed_by,
+        reason=body.reason,
     )
     return result
 
@@ -362,6 +388,7 @@ async def get_lifecycle_history(
 ):
     """返回会员状态转移历史（倒序，最近优先）。"""
     from ..services.lifecycle_state_machine import LifecycleStateMachine
+
     sm = LifecycleStateMachine()
     history = await sm.get_history(customer_id, store_id, db, limit=limit)
     return {"history": history, "total": len(history)}
@@ -379,9 +406,13 @@ async def trigger_journey_v2(
     journey_type: member_activation / first_order_conversion / dormant_wakeup
     """
     from ..services.journey_orchestrator import JourneyOrchestrator
+
     orch = JourneyOrchestrator()
     result = await orch.trigger(
-        body.customer_id, store_id, body.journey_type, db,
+        body.customer_id,
+        store_id,
+        body.journey_type,
+        db,
         wechat_user_id=body.wechat_user_id,
     )
     if "error" in result:
@@ -403,6 +434,7 @@ async def get_private_domain_metrics(
       - **lifecycle_funnel** — 生命周期漏斗分布（9段）
     """
     from ..services.private_domain_metrics import get_full_metrics
+
     return await get_full_metrics(store_id, db)
 
 
@@ -426,6 +458,7 @@ async def get_health_score(
     等级：优秀(85+) / 良好(70-84) / 待改善(50-69) / 预警(<50)
     """
     from ..services.private_domain_health_service import calculate_health_score
+
     try:
         return await calculate_health_score(store_id, db)
     except Exception as exc:
@@ -470,11 +503,11 @@ async def get_maslow_distribution(
 
     total = row[5] or 1  # 避免除零
     distribution = [
-        {"level": 1, "label": "初次接触（未消费）",     "count": row[0], "pct": round(row[0] / total, 3)},
-        {"level": 2, "label": "初步信任（消费1次）",     "count": row[1], "pct": round(row[1] / total, 3)},
-        {"level": 3, "label": "社交习惯（消费2-5次）",   "count": row[2], "pct": round(row[2] / total, 3)},
-        {"level": 4, "label": "高频忠实（≥6次<¥500）",  "count": row[3], "pct": round(row[3] / total, 3)},
-        {"level": 5, "label": "深度忠诚（≥6次≥¥500）",  "count": row[4], "pct": round(row[4] / total, 3)},
+        {"level": 1, "label": "初次接触（未消费）", "count": row[0], "pct": round(row[0] / total, 3)},
+        {"level": 2, "label": "初步信任（消费1次）", "count": row[1], "pct": round(row[1] / total, 3)},
+        {"level": 3, "label": "社交习惯（消费2-5次）", "count": row[2], "pct": round(row[2] / total, 3)},
+        {"level": 4, "label": "高频忠实（≥6次<¥500）", "count": row[3], "pct": round(row[3] / total, 3)},
+        {"level": 5, "label": "深度忠诚（≥6次≥¥500）", "count": row[4], "pct": round(row[4] / total, 3)},
     ]
     return {"store_id": store_id, "total": row[5], "distribution": distribution}
 
@@ -496,8 +529,9 @@ async def get_dynamic_pricing(
     - L5: 主厨体验，无折扣
     - 平峰（非 11-13h / 17-20h）L2/L3 额外让利 1 折
     """
-    from ..services.dynamic_pricing_service import DynamicPricingService
     from dataclasses import asdict
+
+    from ..services.dynamic_pricing_service import DynamicPricingService
 
     svc = DynamicPricingService()
     offer = await svc.recommend(store_id, customer_id, db)
@@ -513,6 +547,7 @@ async def get_trend_stats(
 ):
     """获取趋势统计（会员增长、复购率、旅程完成率）"""
     import datetime
+
     today = datetime.date.today()
     since = today - datetime.timedelta(days=days)
 
@@ -555,14 +590,8 @@ async def get_trend_stats(
 
     params = {"store_id": store_id, "since": since.isoformat()}
     try:
-        revenue_by_day = {
-            str(r[0]): int(r[1])
-            for r in (await db.execute(orders_sql, params)).fetchall()
-        }
-        members_by_day = {
-            str(r[0]): int(r[1])
-            for r in (await db.execute(members_sql, params)).fetchall()
-        }
+        revenue_by_day = {str(r[0]): int(r[1]) for r in (await db.execute(orders_sql, params)).fetchall()}
+        members_by_day = {str(r[0]): int(r[1]) for r in (await db.execute(members_sql, params)).fetchall()}
         journey_by_day = {
             str(r[0]): round(float(r[1]), 3) if r[1] is not None else 0.0
             for r in (await db.execute(journey_sql, params)).fetchall()
@@ -581,17 +610,20 @@ async def get_trend_stats(
     for i in range(days, 0, -1):
         d = today - datetime.timedelta(days=i)
         d_str = d.isoformat()
-        trend.append({
-            "date": d_str,
-            "new_members": members_by_day.get(d_str, 0),
-            "repurchase_rate": repurchase_by_day.get(d_str, 0.0),
-            "journey_completion": journey_by_day.get(d_str, 0.0),
-            "revenue": revenue_by_day.get(d_str, 0),
-        })
+        trend.append(
+            {
+                "date": d_str,
+                "new_members": members_by_day.get(d_str, 0),
+                "repurchase_rate": repurchase_by_day.get(d_str, 0.0),
+                "journey_completion": journey_by_day.get(d_str, 0.0),
+                "revenue": revenue_by_day.get(d_str, 0),
+            }
+        )
     return {"trend": trend, "days": days}
 
 
 # ── 会员档案管理 ────────────────────────────────────────────────────────────────
+
 
 class MemberProfilePatch(BaseModel):
     birth_date: Optional[date] = None
@@ -659,28 +691,28 @@ async def list_members(
 
     members = [
         {
-            "customer_id":     row[0],
-            "rfm_level":       row[1],
+            "customer_id": row[0],
+            "rfm_level": row[1],
             "lifecycle_state": row[2],
-            "birth_date":      str(row[3]) if row[3] else None,
-            "wechat_openid":   row[4],
-            "channel_source":  row[5],
-            "recency_days":    row[6],
-            "frequency":       row[7],
-            "monetary":        row[8],
-            "monetary_yuan":   round(row[8] / 100, 2) if row[8] else 0.0,
-            "last_visit":      str(row[9]) if row[9] else None,
-            "is_active":       row[10],
-            "joined_at":       str(row[11]) if row[11] else None,
+            "birth_date": str(row[3]) if row[3] else None,
+            "wechat_openid": row[4],
+            "channel_source": row[5],
+            "recency_days": row[6],
+            "frequency": row[7],
+            "monetary": row[8],
+            "monetary_yuan": round(row[8] / 100, 2) if row[8] else 0.0,
+            "last_visit": str(row[9]) if row[9] else None,
+            "is_active": row[10],
+            "joined_at": str(row[11]) if row[11] else None,
         }
         for row in rows
     ]
     return {
-        "store_id":  store_id,
-        "total":     total,
-        "page":      page,
+        "store_id": store_id,
+        "total": total,
+        "page": page,
         "page_size": page_size,
-        "members":   members,
+        "members": members,
     }
 
 
@@ -731,6 +763,7 @@ async def patch_member_profile(
 
 # ── 客户360画像（私域视角） ──────────────────────────────────────────────────────
 
+
 @router.get("/customer360/{store_id}/{customer_id}", summary="客户360画像（私域视角）")
 async def get_customer360(
     store_id: str,
@@ -758,9 +791,7 @@ async def get_customer360(
         LIMIT 1
     """)
     try:
-        member_row = (await db.execute(
-            member_sql, {"store_id": store_id, "customer_id": customer_id}
-        )).fetchone()
+        member_row = (await db.execute(member_sql, {"store_id": store_id, "customer_id": customer_id})).fetchone()
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
@@ -768,19 +799,19 @@ async def get_customer360(
         raise HTTPException(status_code=404, detail="会员不存在")
 
     member = {
-        "customer_id":     member_row[0],
-        "rfm_level":       member_row[1],
+        "customer_id": member_row[0],
+        "rfm_level": member_row[1],
         "lifecycle_state": member_row[2],
-        "birth_date":      str(member_row[3]) if member_row[3] else None,
-        "wechat_openid":   member_row[4],
-        "channel_source":  member_row[5],
-        "recency_days":    member_row[6],
-        "frequency":       member_row[7],
-        "monetary":        member_row[8],
-        "monetary_yuan":   round(member_row[8] / 100, 2) if member_row[8] else 0.0,
-        "last_visit":      str(member_row[9]) if member_row[9] else None,
-        "is_active":       member_row[10],
-        "joined_at":       str(member_row[11]) if member_row[11] else None,
+        "birth_date": str(member_row[3]) if member_row[3] else None,
+        "wechat_openid": member_row[4],
+        "channel_source": member_row[5],
+        "recency_days": member_row[6],
+        "frequency": member_row[7],
+        "monetary": member_row[8],
+        "monetary_yuan": round(member_row[8] / 100, 2) if member_row[8] else 0.0,
+        "last_visit": str(member_row[9]) if member_row[9] else None,
+        "is_active": member_row[10],
+        "joined_at": str(member_row[11]) if member_row[11] else None,
     }
 
     # 2. 旅程历史（最近10条）
@@ -792,17 +823,15 @@ async def get_customer360(
         LIMIT 10
     """)
     try:
-        journey_rows = (await db.execute(
-            journeys_sql, {"store_id": store_id, "customer_id": customer_id}
-        )).fetchall()
+        journey_rows = (await db.execute(journeys_sql, {"store_id": store_id, "customer_id": customer_id})).fetchall()
     except Exception:
         journey_rows = []
 
     recent_journeys = [
         {
             "journey_type": r[0],
-            "status":       r[1],
-            "started_at":   str(r[2]) if r[2] else None,
+            "status": r[1],
+            "started_at": str(r[2]) if r[2] else None,
             "completed_at": str(r[3]) if r[3] else None,
         }
         for r in journey_rows
@@ -817,26 +846,26 @@ async def get_customer360(
         LIMIT 5
     """)
     try:
-        order_rows = (await db.execute(
-            orders_sql, {"store_id": store_id, "customer_id": customer_id}
-        )).fetchall()
+        order_rows = (await db.execute(orders_sql, {"store_id": store_id, "customer_id": customer_id})).fetchall()
     except Exception:
         order_rows = []
 
     recent_orders = [
         {
-            "order_id":          str(r[0]),
-            "total_amount":      int(r[1]) if r[1] is not None else 0,
+            "order_id": str(r[0]),
+            "total_amount": int(r[1]) if r[1] is not None else 0,
             "total_amount_yuan": round(int(r[1]) / 100, 2) if r[1] is not None else 0.0,
-            "created_at":        str(r[2]) if r[2] else None,
-            "status":            r[3],
+            "created_at": str(r[2]) if r[2] else None,
+            "status": r[3],
         }
         for r in order_rows
     ]
 
     # 4. 个性化定价策略（DynamicPricingService，失败时静默返回 None）
-    from ..services.dynamic_pricing_service import DynamicPricingService
     from dataclasses import asdict as _asdict
+
+    from ..services.dynamic_pricing_service import DynamicPricingService
+
     pricing_offer = None
     try:
         pricing_offer = _asdict(await DynamicPricingService().recommend(store_id, customer_id, db))
@@ -844,10 +873,10 @@ async def get_customer360(
         logger.warning("private_domain.dynamic_pricing_failed", store_id=store_id, customer_id=customer_id, error=str(exc))
 
     return {
-        "store_id":        store_id,
-        "customer_id":     customer_id,
-        "member":          member,
+        "store_id": store_id,
+        "customer_id": customer_id,
+        "member": member,
         "recent_journeys": recent_journeys,
-        "recent_orders":   recent_orders,
-        "pricing_offer":   pricing_offer,
+        "recent_orders": recent_orders,
+        "pricing_offer": pricing_offer,
     }

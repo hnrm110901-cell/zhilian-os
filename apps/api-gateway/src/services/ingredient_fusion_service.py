@@ -36,32 +36,31 @@ from __future__ import annotations
 
 import re
 import uuid
-from datetime import datetime
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
 import structlog
-from sqlalchemy import select, and_, func
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.models.ingredient_mapping import IngredientMapping, FusionAuditLog, FusionMethod
+from src.models.ingredient_mapping import FusionAuditLog, FusionMethod, IngredientMapping
 
 logger = structlog.get_logger()
 
 # ── 常量 ──────────────────────────────────────────────────────────────────────
 
-FUZZY_MATCH_THRESHOLD = 0.65     # Jaccard ≥ 此值才考虑别名匹配
-CONFLICT_COST_THRESHOLD = 0.20   # 成本偏差超 20% 标记冲突
+FUZZY_MATCH_THRESHOLD = 0.65  # Jaccard ≥ 此值才考虑别名匹配
+CONFLICT_COST_THRESHOLD = 0.20  # 成本偏差超 20% 标记冲突
 
 SOURCE_RELIABILITY: Dict[str, float] = {
     "supplier_invoice": 0.95,
-    "pinzhi":           0.85,
-    "tiancai":          0.80,
-    "aoqiwei":          0.75,
-    "meituan":          0.70,
-    "yiding":           0.60,
-    "manual":           0.55,
-    "unknown":          0.40,
+    "pinzhi": 0.85,
+    "tiancai": 0.80,
+    "aoqiwei": 0.75,
+    "meituan": 0.70,
+    "yiding": 0.60,
+    "manual": 0.55,
+    "unknown": 0.40,
 }
 
 # 成本加权使用与可靠度相同的权重
@@ -69,51 +68,53 @@ SOURCE_COST_WEIGHT = SOURCE_RELIABILITY
 
 # canonical_id 前缀生成用
 CATEGORY_PREFIX: Dict[str, str] = {
-    "meat":       "MEAT",
-    "seafood":    "SEAF",
-    "vegetable":  "VEG",
-    "dry_goods":  "DRY",
-    "dairy":      "DAIR",
-    "beverage":   "BEV",
-    "condiment":  "COND",
-    "grain":      "GRAN",
-    "fruit":      "FRIT",
-    "other":      "MISC",
+    "meat": "MEAT",
+    "seafood": "SEAF",
+    "vegetable": "VEG",
+    "dry_goods": "DRY",
+    "dairy": "DAIR",
+    "beverage": "BEV",
+    "condiment": "COND",
+    "grain": "GRAN",
+    "fruit": "FRIT",
+    "other": "MISC",
 }
 
 
 # ── 数据类 ────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class FusionInput:
     source_system: str
-    external_id:   str
-    name:          str
-    category:      Optional[str] = None
-    unit:          Optional[str] = None
-    cost_fen:      Optional[int] = None
-    submitted_by:  Optional[str] = None
+    external_id: str
+    name: str
+    category: Optional[str] = None
+    unit: Optional[str] = None
+    cost_fen: Optional[int] = None
+    submitted_by: Optional[str] = None
 
 
 @dataclass
 class FusionResult:
-    canonical_id:   str
+    canonical_id: str
     canonical_name: str
-    confidence:     float
-    method:         str
-    is_new:         bool = False
-    conflict_flag:  bool = False
-    evidence:       Dict = field(default_factory=dict)
+    confidence: float
+    method: str
+    is_new: bool = False
+    conflict_flag: bool = False
+    evidence: Dict = field(default_factory=dict)
 
 
 @dataclass
 class SourceCost:
     source_system: str
-    cost_fen:      int
-    confidence:    float = 1.0
+    cost_fen: int
+    confidence: float = 1.0
 
 
 # ── 工具函数（无 IO，可单元测试）─────────────────────────────────────────────
+
 
 def _normalize_name(name: str) -> str:
     """规范化名称：去空格、全角→半角、小写"""
@@ -136,7 +137,7 @@ def _char_bigrams(s: str) -> frozenset:
     """字符级 bigram 集合"""
     if len(s) < 2:
         return frozenset({s}) if s else frozenset()
-    return frozenset(s[i:i + 2] for i in range(len(s) - 1))
+    return frozenset(s[i : i + 2] for i in range(len(s) - 1))
 
 
 def _jaccard(s1: str, s2: str) -> float:
@@ -195,6 +196,7 @@ def _generate_canonical_id(name: str, category: Optional[str]) -> str:
 
 # ── 核心服务 ──────────────────────────────────────────────────────────────────
 
+
 class IngredientFusionService:
     """
     L2 融合层食材解析服务
@@ -220,12 +222,12 @@ class IngredientFusionService:
     async def resolve_or_create(
         self,
         source_system: str,
-        external_id:   str,
-        name:          str,
-        category:      Optional[str] = None,
-        unit:          Optional[str] = None,
-        cost_fen:      Optional[int] = None,
-        submitted_by:  Optional[str] = None,
+        external_id: str,
+        name: str,
+        category: Optional[str] = None,
+        unit: Optional[str] = None,
+        cost_fen: Optional[int] = None,
+        submitted_by: Optional[str] = None,
     ) -> FusionResult:
         """
         四步解析逻辑（按置信度从高到低）：
@@ -239,9 +241,7 @@ class IngredientFusionService:
         # Step 1: 精确 external_id 命中
         result = await self._match_by_external_id(source_system, external_id)
         if result:
-            await self._update_source_cost_internal(
-                result, source_system, cost_fen, source_reliability
-            )
+            await self._update_source_cost_internal(result, source_system, cost_fen, source_reliability)
             await self._write_audit(
                 entity_type="ingredient",
                 canonical_id=result.canonical_id,
@@ -267,9 +267,7 @@ class IngredientFusionService:
         result = await self._match_by_exact_name(name, category)
         if result:
             await self._register_external_id(result, source_system, external_id)
-            await self._update_source_cost_internal(
-                result, source_system, cost_fen, source_reliability
-            )
+            await self._update_source_cost_internal(result, source_system, cost_fen, source_reliability)
             await self._write_audit(
                 entity_type="ingredient",
                 canonical_id=result.canonical_id,
@@ -294,14 +292,12 @@ class IngredientFusionService:
         # Step 3: 模糊名称匹配
         best, best_score = await self._match_fuzzy(name, category)
         if best and best_score >= FUZZY_MATCH_THRESHOLD:
-            conf = best_score * 0.92   # 稍微降低置信度（非精确）
+            conf = best_score * 0.92  # 稍微降低置信度（非精确）
             await self._register_external_id(best, source_system, external_id)
             # 追加 alias（如果不重复）
             if name not in (best.aliases or []):
                 best.aliases = (best.aliases or []) + [name]
-            await self._update_source_cost_internal(
-                best, source_system, cost_fen, source_reliability
-            )
+            await self._update_source_cost_internal(best, source_system, cost_fen, source_reliability)
             await self._write_audit(
                 entity_type="ingredient",
                 canonical_id=best.canonical_id,
@@ -417,20 +413,21 @@ class IngredientFusionService:
     # ── 查询 ──────────────────────────────────────────────────────────────────
 
     async def get_mapping(self, canonical_id: str) -> Optional[IngredientMapping]:
-        stmt = select(IngredientMapping).where(
-            IngredientMapping.canonical_id == canonical_id
-        )
+        stmt = select(IngredientMapping).where(IngredientMapping.canonical_id == canonical_id)
         return (await self.db.execute(stmt)).scalar_one_or_none()
 
     async def get_conflicts(self, confidence_threshold: float = 0.70) -> List[IngredientMapping]:
         """列出置信度低或存在冲突的映射（供人工审核）"""
-        stmt = select(IngredientMapping).where(
-            and_(
-                IngredientMapping.is_active.is_(True),
-                (IngredientMapping.conflict_flag.is_(True))
-                | (IngredientMapping.fusion_confidence < confidence_threshold),
+        stmt = (
+            select(IngredientMapping)
+            .where(
+                and_(
+                    IngredientMapping.is_active.is_(True),
+                    (IngredientMapping.conflict_flag.is_(True)) | (IngredientMapping.fusion_confidence < confidence_threshold),
+                )
             )
-        ).order_by(IngredientMapping.fusion_confidence.asc())
+            .order_by(IngredientMapping.fusion_confidence.asc())
+        )
         rows = (await self.db.execute(stmt)).scalars().all()
         return list(rows)
 
@@ -442,17 +439,13 @@ class IngredientFusionService:
     ) -> Tuple[List[IngredientMapping], int]:
         """分页列出规范映射"""
         stmt = select(IngredientMapping).where(IngredientMapping.is_active.is_(True))
-        count_stmt = select(func.count()).select_from(IngredientMapping).where(
-            IngredientMapping.is_active.is_(True)
-        )
+        count_stmt = select(func.count()).select_from(IngredientMapping).where(IngredientMapping.is_active.is_(True))
         if category:
             stmt = stmt.where(IngredientMapping.category == category)
             count_stmt = count_stmt.where(IngredientMapping.category == category)
 
         total = (await self.db.execute(count_stmt)).scalar_one()
-        stmt = stmt.order_by(IngredientMapping.canonical_name).offset(
-            (page - 1) * page_size
-        ).limit(page_size)
+        stmt = stmt.order_by(IngredientMapping.canonical_name).offset((page - 1) * page_size).limit(page_size)
         rows = (await self.db.execute(stmt)).scalars().all()
         return list(rows), total
 
@@ -460,9 +453,9 @@ class IngredientFusionService:
 
     async def merge_canonical_ids(
         self,
-        keep_id:   str,
-        merge_id:  str,
-        reason:    str,
+        keep_id: str,
+        merge_id: str,
+        reason: str,
         merged_by: Optional[str] = None,
     ) -> Optional[IngredientMapping]:
         """
@@ -483,11 +476,7 @@ class IngredientFusionService:
         keep.external_ids = merged_ext
 
         # 合并 aliases
-        all_aliases = list(set(
-            (keep.aliases or [])
-            + (merge.aliases or [])
-            + [merge.canonical_name]
-        ))
+        all_aliases = list(set((keep.aliases or []) + (merge.aliases or []) + [merge.canonical_name]))
         keep.aliases = all_aliases
 
         # 合并 source_costs，重新计算规范成本
@@ -537,10 +526,10 @@ class IngredientFusionService:
 
     async def update_source_cost(
         self,
-        canonical_id:  str,
+        canonical_id: str,
         source_system: str,
-        cost_fen:      int,
-        confidence:    Optional[float] = None,
+        cost_fen: int,
+        confidence: Optional[float] = None,
     ) -> Optional[IngredientMapping]:
         """单源成本更新，自动重新加权"""
         mapping = await self.get_mapping(canonical_id)
@@ -570,9 +559,7 @@ class IngredientFusionService:
 
     # ── 内部方法 ──────────────────────────────────────────────────────────────
 
-    async def _match_by_external_id(
-        self, source_system: str, external_id: str
-    ) -> Optional[IngredientMapping]:
+    async def _match_by_external_id(self, source_system: str, external_id: str) -> Optional[IngredientMapping]:
         """在 external_ids JSONB 中精确匹配 source_system → external_id"""
         # PostgreSQL: external_ids->>'pinzhi' = '12345'
         stmt = select(IngredientMapping).where(
@@ -583,9 +570,7 @@ class IngredientFusionService:
         )
         return (await self.db.execute(stmt)).scalar_one_or_none()
 
-    async def _match_by_exact_name(
-        self, name: str, category: Optional[str]
-    ) -> Optional[IngredientMapping]:
+    async def _match_by_exact_name(self, name: str, category: Optional[str]) -> Optional[IngredientMapping]:
         """规范名精确匹配，优先同分类"""
         norm = _normalize_name(name)
         stmt = select(IngredientMapping).where(
@@ -601,18 +586,20 @@ class IngredientFusionService:
             return result
         # 不限分类再查一次
         if category:
-            stmt2 = select(IngredientMapping).where(
-                and_(
-                    IngredientMapping.is_active.is_(True),
-                    func.lower(IngredientMapping.canonical_name) == norm,
+            stmt2 = (
+                select(IngredientMapping)
+                .where(
+                    and_(
+                        IngredientMapping.is_active.is_(True),
+                        func.lower(IngredientMapping.canonical_name) == norm,
+                    )
                 )
-            ).limit(1)
+                .limit(1)
+            )
             return (await self.db.execute(stmt2)).scalar_one_or_none()
         return None
 
-    async def _match_fuzzy(
-        self, name: str, category: Optional[str]
-    ) -> Tuple[Optional[IngredientMapping], float]:
+    async def _match_fuzzy(self, name: str, category: Optional[str]) -> Tuple[Optional[IngredientMapping], float]:
         """
         遍历同 category 的规范条目，计算 bigram Jaccard，
         返回得分最高的候选与得分。
@@ -620,24 +607,20 @@ class IngredientFusionService:
         """
         # 先用 LIKE 粗筛（取名称前 2 字）
         prefix = _normalize_name(name)[:2] if len(name) >= 2 else _normalize_name(name)
-        stmt = select(IngredientMapping).where(
-            IngredientMapping.is_active.is_(True)
-        )
+        stmt = select(IngredientMapping).where(IngredientMapping.is_active.is_(True))
         if category:
             stmt = stmt.where(IngredientMapping.category == category)
         # 加 ILIKE 粗筛（PostgreSQL 不区分大小写）
         if prefix:
-            stmt = stmt.where(
-                IngredientMapping.canonical_name.ilike(f"%{prefix}%")
-            )
+            stmt = stmt.where(IngredientMapping.canonical_name.ilike(f"%{prefix}%"))
         candidates = (await self.db.execute(stmt)).scalars().all()
 
         best_mapping = None
-        best_score   = 0.0
+        best_score = 0.0
         for mapping in candidates:
             score = _jaccard(name, mapping.canonical_name)
             if score > best_score:
-                best_score   = score
+                best_score = score
                 best_mapping = mapping
         return best_mapping, best_score
 
@@ -666,7 +649,7 @@ class IngredientFusionService:
             return
         costs = dict(mapping.source_costs or {})
         costs[source_system] = {
-            "cost_fen":   cost_fen,
+            "cost_fen": cost_fen,
             "confidence": reliability,
             "updated_at": datetime.utcnow().isoformat(),
         }
@@ -693,9 +676,7 @@ class IngredientFusionService:
 
     async def _ensure_unique_canonical_id(self, base_id: str, name: str) -> str:
         """处理哈希碰撞：若 base_id 已被其他食材占用则追加序号"""
-        stmt = select(IngredientMapping).where(
-            IngredientMapping.canonical_id == base_id
-        )
+        stmt = select(IngredientMapping).where(IngredientMapping.canonical_id == base_id)
         existing = (await self.db.execute(stmt)).scalar_one_or_none()
         if not existing:
             return base_id

@@ -2,10 +2,12 @@
 调度任务监控服务
 用于监控Celery Beat定时任务的执行情况
 """
+
 import os
-from typing import Dict, Any, List, Optional
-from datetime import datetime, timedelta
 from collections import defaultdict
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
+
 import structlog
 
 logger = structlog.get_logger()
@@ -35,7 +37,7 @@ class SchedulerMonitorService:
         success: bool,
         result: Optional[Dict[str, Any]] = None,
         error: Optional[str] = None,
-        retry_count: int = 0
+        retry_count: int = 0,
     ) -> Dict[str, Any]:
         """
         记录任务执行
@@ -61,18 +63,14 @@ class SchedulerMonitorService:
                 "result": result,
                 "error": error,
                 "retry_count": retry_count,
-                "timestamp": datetime.now()
+                "timestamp": datetime.now(),
             }
 
             self.executions.append(execution_record)
 
             # 更新任务健康状态
             if task_name not in self.task_health:
-                self.task_health[task_name] = {
-                    "last_success": None,
-                    "last_failure": None,
-                    "consecutive_failures": 0
-                }
+                self.task_health[task_name] = {"last_success": None, "last_failure": None, "consecutive_failures": 0}
 
             if success:
                 self.task_health[task_name]["last_success"] = datetime.now()
@@ -83,41 +81,23 @@ class SchedulerMonitorService:
 
             # 清理旧数据 (保留最近24小时)
             cutoff_time = datetime.now() - timedelta(hours=int(os.getenv("SCHEDULER_MONITOR_RETENTION_HOURS", "24")))
-            self.executions = [
-                e for e in self.executions
-                if e["timestamp"] > cutoff_time
-            ]
+            self.executions = [e for e in self.executions if e["timestamp"] > cutoff_time]
 
             logger.info(
                 "Task execution logged",
                 task_name=task_name,
                 execution_time_ms=execution_time_ms,
                 success=success,
-                retry_count=retry_count
+                retry_count=retry_count,
             )
 
-            return {
-                "success": True,
-                "execution_id": task_id
-            }
+            return {"success": True, "execution_id": task_id}
 
         except Exception as e:
-            logger.error(
-                "Failed to log task execution",
-                task_name=task_name,
-                error=str(e),
-                exc_info=e
-            )
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            logger.error("Failed to log task execution", task_name=task_name, error=str(e), exc_info=e)
+            return {"success": False, "error": str(e)}
 
-    async def get_task_metrics(
-        self,
-        task_name: Optional[str] = None,
-        time_range: str = "1h"
-    ) -> Dict[str, Any]:
+    async def get_task_metrics(self, task_name: Optional[str] = None, time_range: str = "1h") -> Dict[str, Any]:
         """
         获取任务指标
 
@@ -130,30 +110,21 @@ class SchedulerMonitorService:
         """
         try:
             # 解析时间范围
-            time_ranges = {
-                "1h": timedelta(hours=1),
-                "6h": timedelta(hours=6),
-                "24h": timedelta(hours=24)
-            }
+            time_ranges = {"1h": timedelta(hours=1), "6h": timedelta(hours=6), "24h": timedelta(hours=24)}
             delta = time_ranges.get(time_range, timedelta(hours=1))
             cutoff_time = datetime.now() - delta
 
             # 过滤执行记录
             filtered_executions = [
-                e for e in self.executions
-                if e["timestamp"] > cutoff_time
-                and (task_name is None or e["task_name"] == task_name)
+                e
+                for e in self.executions
+                if e["timestamp"] > cutoff_time and (task_name is None or e["task_name"] == task_name)
             ]
 
             if not filtered_executions:
                 return {
                     "success": True,
-                    "metrics": {
-                        "total_executions": 0,
-                        "success_rate": 0,
-                        "avg_execution_time_ms": 0,
-                        "total_retries": 0
-                    }
+                    "metrics": {"total_executions": 0, "success_rate": 0, "avg_execution_time_ms": 0, "total_retries": 0},
                 }
 
             # 计算指标
@@ -173,19 +144,17 @@ class SchedulerMonitorService:
                     "total": len(executions),
                     "success_rate": sum(1 for e in executions if e["success"]) / len(executions) * 100,
                     "avg_execution_time_ms": sum(e["execution_time_ms"] for e in executions) / len(executions),
-                    "total_retries": sum(e["retry_count"] for e in executions)
+                    "total_retries": sum(e["retry_count"] for e in executions),
                 }
 
             # 最近失败的任务
             recent_failures = [
-                {
-                    "task_name": e["task_name"],
-                    "error": e["error"],
-                    "timestamp": e["timestamp"].isoformat()
-                }
+                {"task_name": e["task_name"], "error": e["error"], "timestamp": e["timestamp"].isoformat()}
                 for e in sorted(filtered_executions, key=lambda x: x["timestamp"], reverse=True)
                 if not e["success"]
-            ][:10]  # 最近10个失败
+            ][
+                :10
+            ]  # 最近10个失败
 
             metrics = {
                 "total_executions": total_executions,
@@ -196,37 +165,20 @@ class SchedulerMonitorService:
                 "recent_failures": recent_failures,
                 "time_range": time_range,
                 "period_start": cutoff_time.isoformat(),
-                "period_end": datetime.now().isoformat()
+                "period_end": datetime.now().isoformat(),
             }
 
             logger.info(
-                "Task metrics retrieved",
-                task_name=task_name,
-                time_range=time_range,
-                total_executions=total_executions
+                "Task metrics retrieved", task_name=task_name, time_range=time_range, total_executions=total_executions
             )
 
-            return {
-                "success": True,
-                "metrics": metrics
-            }
+            return {"success": True, "metrics": metrics}
 
         except Exception as e:
-            logger.error(
-                "Failed to get task metrics",
-                task_name=task_name,
-                error=str(e),
-                exc_info=e
-            )
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            logger.error("Failed to get task metrics", task_name=task_name, error=str(e), exc_info=e)
+            return {"success": False, "error": str(e)}
 
-    async def check_task_health(
-        self,
-        task_name: Optional[str] = None
-    ) -> Dict[str, Any]:
+    async def check_task_health(self, task_name: Optional[str] = None) -> Dict[str, Any]:
         """
         检查任务健康状态
 
@@ -244,10 +196,7 @@ class SchedulerMonitorService:
 
             for tname in tasks_to_check:
                 if tname not in self.task_health:
-                    health_status[tname] = {
-                        "status": "unknown",
-                        "message": "No execution history"
-                    }
+                    health_status[tname] = {"status": "unknown", "message": "No execution history"}
                     continue
 
                 health = self.task_health[tname]
@@ -280,7 +229,7 @@ class SchedulerMonitorService:
                     "message": message,
                     "last_success": last_success.isoformat() if last_success else None,
                     "last_failure": last_failure.isoformat() if last_failure else None,
-                    "consecutive_failures": consecutive_failures
+                    "consecutive_failures": consecutive_failures,
                 }
 
             # 整体健康评分
@@ -308,33 +257,18 @@ class SchedulerMonitorService:
                     "healthy": sum(1 for h in health_status.values() if h["status"] == "healthy"),
                     "warning": sum(1 for h in health_status.values() if h["status"] == "warning"),
                     "critical": sum(1 for h in health_status.values() if h["status"] == "critical"),
-                    "unknown": sum(1 for h in health_status.values() if h["status"] == "unknown")
+                    "unknown": sum(1 for h in health_status.values() if h["status"] == "unknown"),
                 },
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
-            logger.info(
-                "Task health checked",
-                task_name=task_name,
-                overall_status=overall_status
-            )
+            logger.info("Task health checked", task_name=task_name, overall_status=overall_status)
 
-            return {
-                "success": True,
-                "health": result
-            }
+            return {"success": True, "health": result}
 
         except Exception as e:
-            logger.error(
-                "Failed to check task health",
-                task_name=task_name,
-                error=str(e),
-                exc_info=e
-            )
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            logger.error("Failed to check task health", task_name=task_name, error=str(e), exc_info=e)
+            return {"success": False, "error": str(e)}
 
     async def get_queue_stats(self) -> Dict[str, Any]:
         """
@@ -344,8 +278,9 @@ class SchedulerMonitorService:
             队列统计数据
         """
         try:
-            from src.core.celery_app import celery_app
             import asyncio
+
+            from src.core.celery_app import celery_app
 
             loop = asyncio.get_event_loop()
 
@@ -380,15 +315,8 @@ class SchedulerMonitorService:
             return {"success": True, "stats": stats}
 
         except Exception as e:
-            logger.error(
-                "Failed to get queue stats",
-                error=str(e),
-                exc_info=e
-            )
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            logger.error("Failed to get queue stats", error=str(e), exc_info=e)
+            return {"success": False, "error": str(e)}
 
 
 # 全局实例

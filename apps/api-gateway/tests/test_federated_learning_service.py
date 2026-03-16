@@ -195,12 +195,15 @@ class TestFederatedLearningCoordinator:
         mock_get_db.return_value = session
 
         coordinator = FederatedLearningCoordinator()
-        round_id = await coordinator.start_training_round(
+        result = await coordinator.start_training_round(
             model_type=ModelType.DEMAND_PREDICTION,
             target_stores=["S001", "S002"],
             config={},
         )
 
+        assert isinstance(result, dict)
+        assert "round_id" in result
+        round_id = result["round_id"]
         assert isinstance(round_id, str)
         assert round_id in coordinator.active_rounds
 

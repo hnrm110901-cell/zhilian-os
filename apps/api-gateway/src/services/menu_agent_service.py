@@ -9,21 +9,22 @@ MenuAgent Service — 菜品经营智能（Sprint 4）
 
 定位：老板和厨师长的菜品决策助手
 """
+
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, List
+from typing import List, Optional
 
-from sqlalchemy import select, func, and_, case
+from sqlalchemy import and_, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.models.order import Order, OrderItem
 from src.models.consumer_identity import ConsumerIdentity
+from src.models.order import Order, OrderItem
 from src.models.private_domain import PrivateDomainMember
 
 logger = logging.getLogger(__name__)
 
 
 # ── 纯函数 ──────────────────────────────────────────────────────
+
 
 def classify_dish_star(
     sales_rank_pct: float,
@@ -41,12 +42,12 @@ def classify_dish_star(
     high_margin = margin_pct >= 0.6
 
     if high_sales and high_margin:
-        return "star"          # 明星：高销量高毛利 → 保持
+        return "star"  # 明星：高销量高毛利 → 保持
     if high_sales and not high_margin:
-        return "cash_cow"      # 金牛：高销量低毛利 → 优化成本
+        return "cash_cow"  # 金牛：高销量低毛利 → 优化成本
     if not high_sales and high_margin:
-        return "question"      # 问号：低销量高毛利 → 推广
-    return "dog"               # 瘦狗：低销量低毛利 → 考虑下架
+        return "question"  # 问号：低销量高毛利 → 推广
+    return "dog"  # 瘦狗：低销量低毛利 → 考虑下架
 
 
 def compute_combo_affinity(
@@ -143,15 +144,17 @@ class MenuAgentService:
             star = classify_dish_star(sales_pct, margin)
             star_dist[star] += 1
 
-            dishes.append({
-                "item_id": row[0],
-                "item_name": row[1],
-                "total_qty": row[2],
-                "total_revenue_yuan": round(float(row[3] or 0), 2),
-                "avg_margin": round(margin, 4),
-                "star_class": star,
-                "sales_rank": rank + 1,
-            })
+            dishes.append(
+                {
+                    "item_id": row[0],
+                    "item_name": row[1],
+                    "total_qty": row[2],
+                    "total_revenue_yuan": round(float(row[3] or 0), 2),
+                    "avg_margin": round(margin, 4),
+                    "star_class": star,
+                    "sales_rank": rank + 1,
+                }
+            )
 
         # 低毛利预警（金牛菜：高销量低毛利）
         low_margin = [d for d in dishes if d["star_class"] == "cash_cow"][:5]
@@ -182,9 +185,13 @@ class MenuAgentService:
                 OrderItem.item_id,
                 OrderItem.item_name,
                 func.count(func.distinct(Order.consumer_id)).label("unique_consumers"),
-                func.count(func.distinct(case(
-                    (PrivateDomainMember.rfm_level.in_(["S1", "S2"]), Order.consumer_id),
-                ))).label("vip_consumers"),
+                func.count(
+                    func.distinct(
+                        case(
+                            (PrivateDomainMember.rfm_level.in_(["S1", "S2"]), Order.consumer_id),
+                        )
+                    )
+                ).label("vip_consumers"),
                 func.sum(OrderItem.quantity).label("total_qty"),
             )
             .join(Order, Order.id == OrderItem.order_id)
@@ -202,9 +209,15 @@ class MenuAgentService:
                 Order.consumer_id.isnot(None),
             )
             .group_by(OrderItem.item_id, OrderItem.item_name)
-            .order_by(func.count(func.distinct(case(
-                (PrivateDomainMember.rfm_level.in_(["S1", "S2"]), Order.consumer_id),
-            ))).desc())
+            .order_by(
+                func.count(
+                    func.distinct(
+                        case(
+                            (PrivateDomainMember.rfm_level.in_(["S1", "S2"]), Order.consumer_id),
+                        )
+                    )
+                ).desc()
+            )
             .limit(20)
         )
         result = await db.execute(stmt)
@@ -214,15 +227,17 @@ class MenuAgentService:
             unique = row[2] or 0
             vip = row[3] or 0
             vip_rate = round(vip / unique, 4) if unique > 0 else 0.0
-            insights.append({
-                "item_id": row[0],
-                "item_name": row[1],
-                "unique_consumers": unique,
-                "vip_consumers": vip,
-                "vip_rate": vip_rate,
-                "total_qty": row[4],
-                "is_vip_magnet": vip_rate >= 0.3,
-            })
+            insights.append(
+                {
+                    "item_id": row[0],
+                    "item_name": row[1],
+                    "unique_consumers": unique,
+                    "vip_consumers": vip,
+                    "vip_rate": vip_rate,
+                    "total_qty": row[4],
+                    "is_vip_magnet": vip_rate >= 0.3,
+                }
+            )
         return insights
 
     async def get_combo_recommendations(
@@ -250,10 +265,13 @@ class MenuAgentService:
                 func.count().label("co_count"),
             )
             .join(Order, Order.id == a.c.order_id)
-            .join(b, and_(
-                a.c.order_id == b.c.order_id,
-                a.c.item_id < b.c.item_id,
-            ))
+            .join(
+                b,
+                and_(
+                    a.c.order_id == b.c.order_id,
+                    a.c.item_id < b.c.item_id,
+                ),
+            )
             .where(
                 Order.store_id == store_id,
                 Order.order_time >= cutoff,
@@ -268,12 +286,14 @@ class MenuAgentService:
 
         combos = []
         for row in result.all():
-            combos.append({
-                "dish_a": row[0],
-                "dish_b": row[1],
-                "co_occurrence": row[2],
-                "suggestion": f"推荐组合：{row[0]} + {row[1]}（{row[2]}次同点）",
-            })
+            combos.append(
+                {
+                    "dish_a": row[0],
+                    "dish_b": row[1],
+                    "co_occurrence": row[2],
+                    "suggestion": f"推荐组合：{row[0]} + {row[1]}（{row[2]}次同点）",
+                }
+            )
         return combos
 
 

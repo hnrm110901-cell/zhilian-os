@@ -2,10 +2,12 @@
 Agent决策监控服务
 用于监控和分析Agent的决策质量和性能
 """
-from typing import Dict, Any, List, Optional
-from datetime import datetime, timedelta
-from collections import defaultdict
+
 import os
+from collections import defaultdict
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
+
 import structlog
 
 logger = structlog.get_logger()
@@ -36,7 +38,7 @@ class AgentMonitorService:
         response_data: Dict[str, Any],
         execution_time_ms: float,
         success: bool,
-        error: Optional[str] = None
+        error: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         记录Agent决策
@@ -67,48 +69,30 @@ class AgentMonitorService:
                 "error": error,
                 "timestamp": datetime.now(),
                 "context_used": response_data.get("context_used", 0) if success else 0,
-                "rag_enabled": response_data.get("context_used", 0) > 0 if success else False
+                "rag_enabled": response_data.get("context_used", 0) > 0 if success else False,
             }
 
             self.decisions.append(decision_record)
 
             # 清理旧数据 (保留最近24小时)
             cutoff_time = datetime.now() - timedelta(hours=int(os.getenv("AGENT_MONITOR_RETENTION_HOURS", "24")))
-            self.decisions = [
-                d for d in self.decisions
-                if d["timestamp"] > cutoff_time
-            ]
+            self.decisions = [d for d in self.decisions if d["timestamp"] > cutoff_time]
 
             logger.info(
                 "Agent decision logged",
                 agent_type=agent_type,
                 method_name=method_name,
                 execution_time_ms=execution_time_ms,
-                success=success
+                success=success,
             )
 
-            return {
-                "success": True,
-                "decision_id": decision_record["id"]
-            }
+            return {"success": True, "decision_id": decision_record["id"]}
 
         except Exception as e:
-            logger.error(
-                "Failed to log agent decision",
-                agent_type=agent_type,
-                error=str(e),
-                exc_info=e
-            )
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            logger.error("Failed to log agent decision", agent_type=agent_type, error=str(e), exc_info=e)
+            return {"success": False, "error": str(e)}
 
-    async def get_agent_metrics(
-        self,
-        agent_type: Optional[str] = None,
-        time_range: str = "1h"
-    ) -> Dict[str, Any]:
+    async def get_agent_metrics(self, agent_type: Optional[str] = None, time_range: str = "1h") -> Dict[str, Any]:
         """
         获取Agent指标
 
@@ -121,30 +105,21 @@ class AgentMonitorService:
         """
         try:
             # 解析时间范围
-            time_ranges = {
-                "1h": timedelta(hours=1),
-                "6h": timedelta(hours=6),
-                "24h": timedelta(hours=24)
-            }
+            time_ranges = {"1h": timedelta(hours=1), "6h": timedelta(hours=6), "24h": timedelta(hours=24)}
             delta = time_ranges.get(time_range, timedelta(hours=1))
             cutoff_time = datetime.now() - delta
 
             # 过滤决策记录
             filtered_decisions = [
-                d for d in self.decisions
-                if d["timestamp"] > cutoff_time
-                and (agent_type is None or d["agent_type"] == agent_type)
+                d
+                for d in self.decisions
+                if d["timestamp"] > cutoff_time and (agent_type is None or d["agent_type"] == agent_type)
             ]
 
             if not filtered_decisions:
                 return {
                     "success": True,
-                    "metrics": {
-                        "total_decisions": 0,
-                        "success_rate": 0,
-                        "avg_execution_time_ms": 0,
-                        "rag_usage_rate": 0
-                    }
+                    "metrics": {"total_decisions": 0, "success_rate": 0, "avg_execution_time_ms": 0, "rag_usage_rate": 0},
                 }
 
             # 计算指标
@@ -163,7 +138,7 @@ class AgentMonitorService:
                 agent_breakdown[atype] = {
                     "total": len(decisions),
                     "success_rate": sum(1 for d in decisions if d["success"]) / len(decisions) * 100,
-                    "avg_execution_time_ms": sum(d["execution_time_ms"] for d in decisions) / len(decisions)
+                    "avg_execution_time_ms": sum(d["execution_time_ms"] for d in decisions) / len(decisions),
                 }
 
             # 按方法分组
@@ -176,7 +151,7 @@ class AgentMonitorService:
                 method_breakdown[method] = {
                     "total": len(decisions),
                     "success_rate": sum(1 for d in decisions if d["success"]) / len(decisions) * 100,
-                    "avg_execution_time_ms": sum(d["execution_time_ms"] for d in decisions) / len(decisions)
+                    "avg_execution_time_ms": sum(d["execution_time_ms"] for d in decisions) / len(decisions),
                 }
 
             metrics = {
@@ -188,38 +163,20 @@ class AgentMonitorService:
                 "by_method": method_breakdown,
                 "time_range": time_range,
                 "period_start": cutoff_time.isoformat(),
-                "period_end": datetime.now().isoformat()
+                "period_end": datetime.now().isoformat(),
             }
 
             logger.info(
-                "Agent metrics retrieved",
-                agent_type=agent_type,
-                time_range=time_range,
-                total_decisions=total_decisions
+                "Agent metrics retrieved", agent_type=agent_type, time_range=time_range, total_decisions=total_decisions
             )
 
-            return {
-                "success": True,
-                "metrics": metrics
-            }
+            return {"success": True, "metrics": metrics}
 
         except Exception as e:
-            logger.error(
-                "Failed to get agent metrics",
-                agent_type=agent_type,
-                error=str(e),
-                exc_info=e
-            )
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            logger.error("Failed to get agent metrics", agent_type=agent_type, error=str(e), exc_info=e)
+            return {"success": False, "error": str(e)}
 
-    async def analyze_decision_quality(
-        self,
-        agent_type: str,
-        time_range: str = "24h"
-    ) -> Dict[str, Any]:
+    async def analyze_decision_quality(self, agent_type: str, time_range: str = "24h") -> Dict[str, Any]:
         """
         分析决策质量
 
@@ -279,32 +236,18 @@ class AgentMonitorService:
                 "quality_level": quality_level,
                 "metrics": metrics,
                 "recommendations": recommendations,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
             logger.info(
-                "Decision quality analyzed",
-                agent_type=agent_type,
-                quality_score=quality_score,
-                quality_level=quality_level
+                "Decision quality analyzed", agent_type=agent_type, quality_score=quality_score, quality_level=quality_level
             )
 
-            return {
-                "success": True,
-                "analysis": analysis
-            }
+            return {"success": True, "analysis": analysis}
 
         except Exception as e:
-            logger.error(
-                "Failed to analyze decision quality",
-                agent_type=agent_type,
-                error=str(e),
-                exc_info=e
-            )
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            logger.error("Failed to analyze decision quality", agent_type=agent_type, error=str(e), exc_info=e)
+            return {"success": False, "error": str(e)}
 
     async def get_realtime_stats(self) -> Dict[str, Any]:
         """
@@ -316,47 +259,47 @@ class AgentMonitorService:
         try:
             # 最近1小时的数据
             one_hour_ago = datetime.now() - timedelta(hours=int(os.getenv("AGENT_STATS_WINDOW_HOURS", "1")))
-            recent_decisions = [
-                d for d in self.decisions
-                if d["timestamp"] > one_hour_ago
-            ]
+            recent_decisions = [d for d in self.decisions if d["timestamp"] > one_hour_ago]
 
             # 最近5分钟的数据
             five_min_ago = datetime.now() - timedelta(minutes=int(os.getenv("AGENT_STATS_RECENT_MINUTES", "5")))
-            very_recent_decisions = [
-                d for d in self.decisions
-                if d["timestamp"] > five_min_ago
-            ]
+            very_recent_decisions = [d for d in self.decisions if d["timestamp"] > five_min_ago]
 
             stats = {
                 "last_hour": {
                     "total_decisions": len(recent_decisions),
-                    "success_rate": (sum(1 for d in recent_decisions if d["success"]) / len(recent_decisions) * 100) if recent_decisions else 0,
-                    "avg_execution_time_ms": (sum(d["execution_time_ms"] for d in recent_decisions) / len(recent_decisions)) if recent_decisions else 0
+                    "success_rate": (
+                        (sum(1 for d in recent_decisions if d["success"]) / len(recent_decisions) * 100)
+                        if recent_decisions
+                        else 0
+                    ),
+                    "avg_execution_time_ms": (
+                        (sum(d["execution_time_ms"] for d in recent_decisions) / len(recent_decisions))
+                        if recent_decisions
+                        else 0
+                    ),
                 },
                 "last_5_minutes": {
                     "total_decisions": len(very_recent_decisions),
-                    "success_rate": (sum(1 for d in very_recent_decisions if d["success"]) / len(very_recent_decisions) * 100) if very_recent_decisions else 0,
-                    "avg_execution_time_ms": (sum(d["execution_time_ms"] for d in very_recent_decisions) / len(very_recent_decisions)) if very_recent_decisions else 0
+                    "success_rate": (
+                        (sum(1 for d in very_recent_decisions if d["success"]) / len(very_recent_decisions) * 100)
+                        if very_recent_decisions
+                        else 0
+                    ),
+                    "avg_execution_time_ms": (
+                        (sum(d["execution_time_ms"] for d in very_recent_decisions) / len(very_recent_decisions))
+                        if very_recent_decisions
+                        else 0
+                    ),
                 },
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
-            return {
-                "success": True,
-                "stats": stats
-            }
+            return {"success": True, "stats": stats}
 
         except Exception as e:
-            logger.error(
-                "Failed to get realtime stats",
-                error=str(e),
-                exc_info=e
-            )
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            logger.error("Failed to get realtime stats", error=str(e), exc_info=e)
+            return {"success": False, "error": str(e)}
 
 
 # 全局实例

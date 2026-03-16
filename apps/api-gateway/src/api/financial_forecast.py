@@ -8,12 +8,12 @@
   GET  /api/v1/fin-forecast/brand-summary           — 品牌汇总
   GET  /api/v1/fin-forecast/meta/types              — 预测类型说明
 """
+
 from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.services import financial_forecast_service as svc
 
@@ -33,6 +33,7 @@ def _default_next_period() -> str:
 
 # ── 计算 ──────────────────────────────────────────────────────────────────────
 
+
 @router.post("/compute/{store_id}")
 async def compute_forecast(
     store_id: str,
@@ -44,6 +45,7 @@ async def compute_forecast(
 
 
 # ── 查询 ──────────────────────────────────────────────────────────────────────
+
 
 @router.get("/accuracy/{store_id}")
 async def get_forecast_accuracy(
@@ -74,11 +76,13 @@ async def get_store_forecast(
     result = await svc.get_forecast(db, store_id, tp)
     if result is None:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=404, detail=f"No forecast found for {store_id} / {tp}. POST /compute first.")
     return result
 
 
 # ── 回填 ──────────────────────────────────────────────────────────────────────
+
 
 @router.post("/backfill/{store_id}")
 async def backfill_actuals(
@@ -92,13 +96,14 @@ async def backfill_actuals(
 
 # ── Meta ──────────────────────────────────────────────────────────────────────
 
+
 @router.get("/meta/types")
 async def get_forecast_types():
     return {
-        "types":         list(svc.FORECAST_TYPES),
-        "labels":        svc.FORECAST_TYPE_LABELS,
-        "method":        "weighted_moving_avg + linear_trend CI",
-        "confidence":    "95%",
+        "types": list(svc.FORECAST_TYPES),
+        "labels": svc.FORECAST_TYPE_LABELS,
+        "method": "weighted_moving_avg + linear_trend CI",
+        "confidence": "95%",
         "history_periods": svc.HISTORY_PERIODS,
-        "min_periods":   svc.MIN_PERIODS,
+        "min_periods": svc.MIN_PERIODS,
     }

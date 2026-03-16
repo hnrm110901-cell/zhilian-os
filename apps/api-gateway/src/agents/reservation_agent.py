@@ -5,12 +5,12 @@ ReservationAgent - 预订与宴会管理智能体
 委托给 ReservationRepository 和现有 reservations API 服务层执行 DB 操作。
 宴会相关功能通过 BanquetAgent / banquet_lifecycle_service 提供。
 """
-import time
+
 import datetime
+import time
 from typing import Any, Dict, List
 
 import structlog
-
 from src.core.base_agent import AgentResponse, BaseAgent
 
 logger = structlog.get_logger()
@@ -50,15 +50,26 @@ class ReservationAgent(BaseAgent):
             )
 
         try:
-            from src.core.database import get_db_session
-            from src.models.reservation import Reservation, ReservationStatus, ReservationType
-            from sqlalchemy import select, and_, func
             from datetime import date
 
+            from sqlalchemy import and_, func, select
+            from src.core.database import get_db_session
+            from src.models.reservation import Reservation, ReservationStatus, ReservationType
+
             async with get_db_session() as session:
-                data = await self._dispatch(action, params, store_id, session,
-                                            Reservation, ReservationStatus, ReservationType,
-                                            select, and_, func, date)
+                data = await self._dispatch(
+                    action,
+                    params,
+                    store_id,
+                    session,
+                    Reservation,
+                    ReservationStatus,
+                    ReservationType,
+                    select,
+                    and_,
+                    func,
+                    date,
+                )
 
         except Exception as exc:
             logger.error("reservation_agent.execute_failed", action=action, store_id=store_id, error=str(exc))
@@ -74,9 +85,9 @@ class ReservationAgent(BaseAgent):
             execution_time=time.time() - start,
         )
 
-    async def _dispatch(self, action, params, store_id, session,
-                        Reservation, ReservationStatus, ReservationType,
-                        select, and_, func, date):
+    async def _dispatch(
+        self, action, params, store_id, session, Reservation, ReservationStatus, ReservationType, select, and_, func, date
+    ):
 
         if action == "list_reservations":
             query = select(Reservation).where(Reservation.store_id == store_id)
@@ -106,7 +117,9 @@ class ReservationAgent(BaseAgent):
             target_date = params.get("date", date.today().isoformat())
             party_size = int(params.get("party_size", 2))
             result = await session.execute(
-                select(func.count()).select_from(Reservation).where(
+                select(func.count())
+                .select_from(Reservation)
+                .where(
                     and_(
                         Reservation.store_id == store_id,
                         Reservation.reservation_date == target_date,
@@ -154,8 +167,7 @@ class ReservationAgent(BaseAgent):
                 "no_show_rate": round(no_show / total, 3) if total else 0,
             }
 
-        elif action in ("create_reservation", "update_reservation",
-                        "cancel_reservation", "assign_seating", "send_reminder"):
+        elif action in ("create_reservation", "update_reservation", "cancel_reservation", "assign_seating", "send_reminder"):
             # 写操作委托给 REST API 层，Agent 返回路由指引
             return {
                 "store_id": store_id,
@@ -169,16 +181,16 @@ class ReservationAgent(BaseAgent):
     @staticmethod
     def _serialize(r) -> dict:
         return {
-            "id":               str(r.id),
-            "store_id":         r.store_id,
-            "customer_name":    r.customer_name,
-            "customer_phone":   r.customer_phone,
-            "party_size":       r.party_size,
+            "id": str(r.id),
+            "store_id": r.store_id,
+            "customer_name": r.customer_name,
+            "customer_phone": r.customer_phone,
+            "party_size": r.party_size,
             "reservation_date": str(r.reservation_date),
             "reservation_time": str(r.reservation_time),
-            "status":           str(r.status.value if hasattr(r.status, "value") else r.status),
+            "status": str(r.status.value if hasattr(r.status, "value") else r.status),
             "reservation_type": str(r.reservation_type.value if hasattr(r.reservation_type, "value") else r.reservation_type),
-            "table_number":     r.table_number,
+            "table_number": r.table_number,
             "special_requests": r.special_requests,
-            "notes":            r.notes,
+            "notes": r.notes,
         }

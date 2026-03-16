@@ -9,22 +9,23 @@ CostAgent Service — 成本经营智能（Sprint 5）
 
 定位：老板和厨师长的成本管控仪表盘
 """
+
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, List
+from typing import List, Optional
 
-from sqlalchemy import select, func, and_, case
+from sqlalchemy import and_, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.models.order import Order, OrderItem
 from src.models.inventory import InventoryItem, InventoryTransaction, TransactionType
-from src.models.waste_event import WasteEvent
+from src.models.order import Order, OrderItem
 from src.models.private_domain import PrivateDomainMember
+from src.models.waste_event import WasteEvent
 
 logger = logging.getLogger(__name__)
 
 
 # ── 纯函数 ──────────────────────────────────────────────────────
+
 
 def compute_food_cost_rate(
     food_cost_yuan: float,
@@ -138,9 +139,7 @@ class CostAgentService:
 
         # 损耗统计（quantity × ingredient.unit_cost）
         waste_cost_fen = await db.scalar(
-            select(func.coalesce(
-                func.sum(WasteEvent.quantity * InventoryItem.unit_cost), 0
-            ))
+            select(func.coalesce(func.sum(WasteEvent.quantity * InventoryItem.unit_cost), 0))
             .join(InventoryItem, InventoryItem.id == WasteEvent.ingredient_id)
             .where(
                 WasteEvent.store_id == store_id,
@@ -182,9 +181,7 @@ class CostAgentService:
             select(
                 InventoryItem.category,
                 func.count(InventoryTransaction.id),
-                func.coalesce(func.sum(
-                    InventoryTransaction.quantity * InventoryItem.unit_cost
-                ), 0),
+                func.coalesce(func.sum(InventoryTransaction.quantity * InventoryItem.unit_cost), 0),
             )
             .join(InventoryItem, InventoryItem.id == InventoryTransaction.item_id)
             .where(
@@ -202,12 +199,14 @@ class CostAgentService:
         categories = []
         for row in rows:
             cost = float(row[2] or 0)
-            categories.append({
-                "category": row[0] or "未分类",
-                "transaction_count": row[1],
-                "cost_yuan": round(cost / 100, 2),
-                "percentage": round(cost / total_cost, 4) if total_cost > 0 else 0.0,
-            })
+            categories.append(
+                {
+                    "category": row[0] or "未分类",
+                    "transaction_count": row[1],
+                    "cost_yuan": round(cost / 100, 2),
+                    "percentage": round(cost / total_cost, 4) if total_cost > 0 else 0.0,
+                }
+            )
         return categories
 
     async def get_waste_analysis(
@@ -244,11 +243,13 @@ class CostAgentService:
         total_cost = 0
         for row in result.all():
             cost = float(row[2] or 0)
-            breakdown.append({
-                "type": row[0],
-                "count": row[1],
-                "cost_yuan": round(cost / 100, 2),
-            })
+            breakdown.append(
+                {
+                    "type": row[0],
+                    "count": row[1],
+                    "cost_yuan": round(cost / 100, 2),
+                }
+            )
             total_events += row[1]
             total_cost += cost
 

@@ -2,10 +2,12 @@
 Daily Report Model
 营业日报模型
 """
-from sqlalchemy import Column, String, Integer, Float, Text, Date, JSON
-from sqlalchemy.dialects.postgresql import UUID
+
 import uuid
 from datetime import date
+
+from sqlalchemy import JSON, Column, Date, Float, Integer, String, Text
+from sqlalchemy.dialects.postgresql import UUID
 
 from .base import Base, TimestampMixin
 

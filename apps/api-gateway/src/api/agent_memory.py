@@ -4,9 +4,10 @@ Agent Memory Bus API - Agent共享记忆总线API
 Provides visibility into the per-store agent memory stream so ops can
 inspect what agents have been finding and sharing with each other.
 """
-from fastapi import APIRouter, Depends, Query
+
 from typing import Optional
 
+from fastapi import APIRouter, Depends, Query
 from src.core.dependencies import get_current_user
 from src.models.user import User
 

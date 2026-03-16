@@ -2,18 +2,18 @@
 抖音生活服务 API 端点
 团购订单同步、券核销、结算查询等
 """
-from typing import Optional
+
 from datetime import datetime, timedelta
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_db
 from src.core.dependencies import require_role
-from src.models.user import User, UserRole
 from src.models.order import Order
+from src.models.user import User, UserRole
 from src.services.douyin_service import DouyinService
 
 router = APIRouter(prefix="/douyin", tags=["douyin"])
@@ -133,7 +133,9 @@ async def list_coupons(
     """查询团购券列表"""
     try:
         result = await douyin_service.get_coupons(
-            brand_id=brand_id, page=page, page_size=page_size,
+            brand_id=brand_id,
+            page=page,
+            page_size=page_size,
         )
         return result
     except ValueError as e:

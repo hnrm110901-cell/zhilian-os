@@ -7,14 +7,16 @@ ComplianceAgent - 合规证照管理 Agent
 - 通过企业微信推送告警
 - 触发 compliance.* 事件到神经系统
 """
+
 from datetime import date
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
+
 import structlog
 
-from .llm_agent import LLMEnhancedAgent, AgentResult
+from ..models.compliance import LicenseStatus
 from ..services.compliance_service import ComplianceService
 from ..services.wechat_alert_service import wechat_alert_service
-from ..models.compliance import LicenseStatus
+from .llm_agent import AgentResult, LLMEnhancedAgent
 
 logger = structlog.get_logger()
 
@@ -128,10 +130,8 @@ class ComplianceAgent(LLMEnhancedAgent):
                 reasoning=f"发现 {len(scan['expired'])} 张已过期，{len(scan['expiring_soon'])} 张即将到期",
                 confidence=1.0,
                 source_data={"store_id": store_id, "scanned_at": scan["scanned_at"]},
-                recommendations=[
-                    f"立即续期：{lic['license_name']}"
-                    for lic in scan["expired"]
-                ] + [
+                recommendations=[f"立即续期：{lic['license_name']}" for lic in scan["expired"]]
+                + [
                     f"尽快续期（{lic['days_left']}天内）：{lic['license_name']}"
                     for lic in scan["expiring_soon"]
                     if lic["days_left"] <= WARNING_DAYS
@@ -161,14 +161,12 @@ class ComplianceAgent(LLMEnhancedAgent):
     async def _scan_all(self, params: Dict[str, Any]) -> AgentResult:
         """扫描全部门店（从数据库读取活跃门店列表）"""
         try:
+            from sqlalchemy import select
             from src.core.database import get_db_session
             from src.models.store import Store
-            from sqlalchemy import select
 
             async with get_db_session() as session:
-                result = await session.execute(
-                    select(Store.id).where(Store.is_active == True)
-                )
+                result = await session.execute(select(Store.id).where(Store.is_active == True))
                 store_ids = [str(r[0]) for r in result.all()]
 
             all_results = []

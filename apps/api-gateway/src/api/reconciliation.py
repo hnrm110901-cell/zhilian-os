@@ -2,17 +2,18 @@
 Reconciliation API
 对账管理API
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field, field_validator, ConfigDict
-from typing import Optional, Any
-from datetime import date, datetime
-import structlog
-import uuid
 
+import uuid
+from datetime import date, datetime
+from typing import Any, Optional
+
+import structlog
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from src.core.dependencies import get_current_active_user
-from src.services.reconcile_service import reconcile_service
 from src.models.reconciliation import ReconciliationStatus
 from src.models.user import User
+from src.services.reconcile_service import reconcile_service
 
 logger = structlog.get_logger()
 
@@ -24,17 +25,20 @@ router = APIRouter()
 
 class PerformReconciliationRequest(BaseModel):
     """执行对账请求"""
+
     reconciliation_date: Optional[date] = Field(None, description="对账日期（默认昨天）")
     threshold: Optional[float] = Field(None, description="差异阈值百分比（默认2%）", ge=0, le=100)
 
 
 class ConfirmReconciliationRequest(BaseModel):
     """确认对账请求"""
+
     resolution: Optional[str] = Field(None, description="解决方案说明")
 
 
 class ReconciliationRecordResponse(BaseModel):
     """对账记录响应"""
+
     id: str
     store_id: str
     reconciliation_date: date
@@ -73,10 +77,7 @@ class ReconciliationRecordResponse(BaseModel):
 
 
 @router.post("/reconciliation/perform", response_model=dict, summary="执行对账")
-async def perform_reconciliation(
-    request: PerformReconciliationRequest,
-    current_user: User = Depends(get_current_active_user)
-):
+async def perform_reconciliation(request: PerformReconciliationRequest, current_user: User = Depends(get_current_active_user)):
     """
     执行对账操作
 
@@ -90,17 +91,17 @@ async def perform_reconciliation(
     """
     try:
         record = await reconcile_service.perform_reconciliation(
-            store_id=current_user.store_id,
-            reconciliation_date=request.reconciliation_date,
-            threshold=request.threshold
+            store_id=current_user.store_id, reconciliation_date=request.reconciliation_date, threshold=request.threshold
         )
 
         # 业财税资金一体化：对账完成后推送门店日结事件（若启用）
         fct_result = None
         try:
             from src.core.config import settings
+
             if getattr(settings, "FCT_ENABLED", False):
                 from src.services.fct_integration import push_store_daily_settlement_event
+
                 sales = record.actual_total_amount or record.pos_total_amount or 0
                 fct_result = await push_store_daily_settlement_event(
                     entity_id=record.store_id,
@@ -131,7 +132,7 @@ async def get_reconciliation_records(
     status: Optional[ReconciliationStatus] = Query(None, description="对账状态"),
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     查询对账记录列表
@@ -146,14 +147,11 @@ async def get_reconciliation_records(
             end_date=end_date,
             status=status,
             page=page,
-            page_size=page_size
+            page_size=page_size,
         )
 
         # 转换记录列表
-        records_data = [
-            ReconciliationRecordResponse.model_validate(record).model_dump()
-            for record in result["records"]
-        ]
+        records_data = [ReconciliationRecordResponse.model_validate(record).model_dump() for record in result["records"]]
 
         return {
             "success": True,
@@ -163,9 +161,9 @@ async def get_reconciliation_records(
                     "total": result["total"],
                     "page": result["page"],
                     "page_size": result["page_size"],
-                    "total_pages": result["total_pages"]
-                }
-            }
+                    "total_pages": result["total_pages"],
+                },
+            },
         }
 
     except Exception as e:
@@ -174,10 +172,7 @@ async def get_reconciliation_records(
 
 
 @router.get("/reconciliation/records/{record_id}", response_model=dict, summary="获取对账记录详情")
-async def get_reconciliation_record(
-    record_id: str,
-    current_user: User = Depends(get_current_active_user)
-):
+async def get_reconciliation_record(record_id: str, current_user: User = Depends(get_current_active_user)):
     """获取指定对账记录的详细信息"""
     try:
         # 转换record_id
@@ -186,14 +181,12 @@ async def get_reconciliation_record(
         except ValueError:
             raise HTTPException(status_code=400, detail="无效的record_id格式")
 
+        from sqlalchemy import select
         from src.core.database import get_db_session
         from src.models.reconciliation import ReconciliationRecord
-        from sqlalchemy import select
 
         async with get_db_session() as session:
-            result = await session.execute(
-                select(ReconciliationRecord).where(ReconciliationRecord.id == record_uuid)
-            )
+            result = await session.execute(select(ReconciliationRecord).where(ReconciliationRecord.id == record_uuid))
             record = result.scalar_one_or_none()
 
         if not record:
@@ -209,24 +202,17 @@ async def get_reconciliation_record(
 
 
 @router.get("/reconciliation/date/{reconciliation_date}", response_model=dict, summary="获取指定日期的对账记录")
-async def get_reconciliation_by_date(
-    reconciliation_date: date,
-    current_user: User = Depends(get_current_active_user)
-):
+async def get_reconciliation_by_date(reconciliation_date: date, current_user: User = Depends(get_current_active_user)):
     """获取指定日期的对账记录"""
     try:
         record = await reconcile_service.get_reconciliation_record(
-            store_id=current_user.store_id,
-            reconciliation_date=reconciliation_date
+            store_id=current_user.store_id, reconciliation_date=reconciliation_date
         )
 
         if not record:
             raise HTTPException(status_code=404, detail="对账记录不存在")
 
-        return {
-            "success": True,
-            "data": ReconciliationRecordResponse.model_validate(record).model_dump()
-        }
+        return {"success": True, "data": ReconciliationRecordResponse.model_validate(record).model_dump()}
 
     except HTTPException:
         raise
@@ -237,9 +223,7 @@ async def get_reconciliation_by_date(
 
 @router.put("/reconciliation/records/{record_id}/confirm", response_model=dict, summary="确认对账记录")
 async def confirm_reconciliation(
-    record_id: str,
-    request: ConfirmReconciliationRequest,
-    current_user: User = Depends(get_current_active_user)
+    record_id: str, request: ConfirmReconciliationRequest, current_user: User = Depends(get_current_active_user)
 ):
     """
     确认对账记录
@@ -254,18 +238,13 @@ async def confirm_reconciliation(
             raise HTTPException(status_code=400, detail="无效的record_id格式")
 
         success = await reconcile_service.confirm_reconciliation(
-            record_id=record_uuid,
-            user_id=current_user.id,
-            resolution=request.resolution
+            record_id=record_uuid, user_id=current_user.id, resolution=request.resolution
         )
 
         if not success:
             raise HTTPException(status_code=404, detail="对账记录不存在")
 
-        return {
-            "success": True,
-            "message": "对账记录已确认"
-        }
+        return {"success": True, "message": "对账记录已确认"}
 
     except HTTPException:
         raise
@@ -276,8 +255,7 @@ async def confirm_reconciliation(
 
 @router.get("/reconciliation/summary", response_model=dict, summary="获取对账汇总")
 async def get_reconciliation_summary(
-    days: int = Query(7, ge=1, le=90, description="统计天数"),
-    current_user: User = Depends(get_current_active_user)
+    days: int = Query(7, ge=1, le=90, description="统计天数"), current_user: User = Depends(get_current_active_user)
 ):
     """
     获取对账汇总统计
@@ -285,29 +263,32 @@ async def get_reconciliation_summary(
     返回最近N天的对账情况汇总
     """
     try:
+        from datetime import timedelta
+
+        from sqlalchemy import case, func, select
         from src.core.database import get_db_session
         from src.models.reconciliation import ReconciliationRecord, ReconciliationStatus
-        from sqlalchemy import select, func, case
-        from datetime import timedelta
 
         cutoff = date.today() - timedelta(days=days)
         async with get_db_session() as session:
-            row = (await session.execute(
-                select(
-                    func.count(ReconciliationRecord.id).label("total"),
-                    func.sum(case(
-                        (ReconciliationRecord.status == ReconciliationStatus.MATCHED, 1), else_=0
-                    )).label("matched"),
-                    func.sum(case(
-                        (ReconciliationRecord.status == ReconciliationStatus.MISMATCHED, 1), else_=0
-                    )).label("mismatched"),
-                    func.sum(case(
-                        (ReconciliationRecord.status == ReconciliationStatus.PENDING, 1), else_=0
-                    )).label("pending"),
-                    func.coalesce(func.sum(ReconciliationRecord.diff_amount), 0).label("total_diff"),
-                    func.coalesce(func.avg(ReconciliationRecord.diff_ratio), 0.0).label("avg_diff_ratio"),
-                ).where(ReconciliationRecord.reconciliation_date >= cutoff)
-            )).one()
+            row = (
+                await session.execute(
+                    select(
+                        func.count(ReconciliationRecord.id).label("total"),
+                        func.sum(case((ReconciliationRecord.status == ReconciliationStatus.MATCHED, 1), else_=0)).label(
+                            "matched"
+                        ),
+                        func.sum(case((ReconciliationRecord.status == ReconciliationStatus.MISMATCHED, 1), else_=0)).label(
+                            "mismatched"
+                        ),
+                        func.sum(case((ReconciliationRecord.status == ReconciliationStatus.PENDING, 1), else_=0)).label(
+                            "pending"
+                        ),
+                        func.coalesce(func.sum(ReconciliationRecord.diff_amount), 0).label("total_diff"),
+                        func.coalesce(func.avg(ReconciliationRecord.diff_ratio), 0.0).label("avg_diff_ratio"),
+                    ).where(ReconciliationRecord.reconciliation_date >= cutoff)
+                )
+            ).one()
 
         return {
             "success": True,

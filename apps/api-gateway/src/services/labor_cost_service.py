@@ -38,25 +38,26 @@ logger = structlog.get_logger()
 
 # 各岗位默认时薪（元/小时），无法从员工档案取到时使用
 _DEFAULT_HOURLY_WAGE: Dict[str, float] = {
-    "waiter":   18.0,
-    "chef":     25.0,
-    "cashier":  18.0,
-    "manager":  35.0,
-    "default":  20.0,
+    "waiter": 18.0,
+    "chef": 25.0,
+    "cashier": 18.0,
+    "manager": 35.0,
+    "default": 20.0,
 }
 
 # 人均兜底日薪（方案 D）
 _FALLBACK_DAILY_WAGE_YUAN = 200.0
 
 # 状态判定阈值（超出预算成本率的百分点）
-_THRESHOLD_WARNING  = 2.0   # 超预算 2pp → warning
-_THRESHOLD_CRITICAL = 5.0   # 超预算 5pp → critical
+_THRESHOLD_WARNING = 2.0  # 超预算 2pp → warning
+_THRESHOLD_CRITICAL = 5.0  # 超预算 5pp → critical
 
 # 行业人工成本率参考基准（餐饮，无预算时用）
-_INDUSTRY_BENCHMARK_RATE = 28.0   # %
+_INDUSTRY_BENCHMARK_RATE = 28.0  # %
 
 
 # ─── 纯函数（可单元测试） ─────────────────────────────────────────────────────
+
 
 def compute_labor_cost_rate(
     labor_cost_yuan: float,
@@ -90,9 +91,9 @@ def compute_variance(
             status:            str    # saving / ok / warning / critical
         }
     """
-    variance_pct  = round(actual_rate - budget_rate, 2)
+    variance_pct = round(actual_rate - budget_rate, 2)
     variance_yuan = round(revenue_yuan * variance_pct / 100, 2)
-    saving_yuan   = round(-variance_yuan, 2) if variance_yuan < 0 else 0.0
+    saving_yuan = round(-variance_yuan, 2) if variance_yuan < 0 else 0.0
     overspend_yuan = round(variance_yuan, 2) if variance_yuan > 0 else 0.0
 
     if variance_pct <= 0:
@@ -105,11 +106,11 @@ def compute_variance(
         status = "critical"
 
     return {
-        "variance_pct":   variance_pct,
-        "variance_yuan":  variance_yuan,
-        "saving_yuan":    saving_yuan,
+        "variance_pct": variance_pct,
+        "variance_yuan": variance_yuan,
+        "saving_yuan": saving_yuan,
         "overspend_yuan": overspend_yuan,
-        "status":         status,
+        "status": status,
     }
 
 
@@ -123,6 +124,7 @@ def compute_overtime_cost(
 
 
 # ─── 服务类 ────────────────────────────────────────────────────────────────────
+
 
 class LaborCostService:
     """人工成本服务（全静态方法）"""
@@ -154,14 +156,10 @@ class LaborCostService:
         log = logger.bind(store_id=store_id, date=str(snapshot_date))
 
         # ── 1. 营收 ──────────────────────────────────────────────────────────
-        revenue_yuan = await LaborCostService._fetch_daily_revenue(
-            store_id, snapshot_date, db
-        )
+        revenue_yuan = await LaborCostService._fetch_daily_revenue(store_id, snapshot_date, db)
 
         # ── 2. 实际出勤人数 & 加班时长 ────────────────────────────────────────
-        shift_stats = await LaborCostService._fetch_shift_stats(
-            store_id, snapshot_date, db
-        )
+        shift_stats = await LaborCostService._fetch_shift_stats(store_id, snapshot_date, db)
 
         # ── 3. 人工成本 ───────────────────────────────────────────────────────
         if actual_labor_cost_yuan is None:
@@ -176,36 +174,32 @@ class LaborCostService:
 
         # 如果没有明确日预算，用预算成本率 × 实际营收反推
         if budgeted_labor_cost_yuan is None and budgeted_labor_cost_rate is not None:
-            budgeted_labor_cost_yuan = round(
-                revenue_yuan * budgeted_labor_cost_rate / 100, 2
-            )
+            budgeted_labor_cost_yuan = round(revenue_yuan * budgeted_labor_cost_rate / 100, 2)
         effective_budget_rate = budgeted_labor_cost_rate or _INDUSTRY_BENCHMARK_RATE
 
         # ── 5. 计算成本率与偏差 ───────────────────────────────────────────────
         actual_rate = compute_labor_cost_rate(actual_labor_cost_yuan, revenue_yuan)
-        variance    = compute_variance(actual_rate, effective_budget_rate, revenue_yuan)
+        variance = compute_variance(actual_rate, effective_budget_rate, revenue_yuan)
 
-        overtime_cost_yuan = compute_overtime_cost(
-            shift_stats.get("overtime_hours", 0.0)
-        )
+        overtime_cost_yuan = compute_overtime_cost(shift_stats.get("overtime_hours", 0.0))
 
         snapshot = {
-            "store_id":               store_id,
-            "snapshot_date":          snapshot_date.isoformat(),
-            "actual_revenue_yuan":    round(revenue_yuan, 2),
+            "store_id": store_id,
+            "snapshot_date": snapshot_date.isoformat(),
+            "actual_revenue_yuan": round(revenue_yuan, 2),
             "actual_labor_cost_yuan": round(actual_labor_cost_yuan, 2),
             "actual_labor_cost_rate": actual_rate,
             "budgeted_labor_cost_yuan": budgeted_labor_cost_yuan,
             "budgeted_labor_cost_rate": budgeted_labor_cost_rate,
-            "variance_yuan":          variance["variance_yuan"],
-            "variance_pct":           variance["variance_pct"],
-            "saving_yuan":            variance["saving_yuan"],
-            "overspend_yuan":         variance["overspend_yuan"],
-            "status":                 variance["status"],
-            "headcount_actual":       shift_stats.get("headcount_actual", 0),
-            "headcount_scheduled":    shift_stats.get("headcount_scheduled", 0),
-            "overtime_hours":         shift_stats.get("overtime_hours", 0.0),
-            "overtime_cost_yuan":     overtime_cost_yuan,
+            "variance_yuan": variance["variance_yuan"],
+            "variance_pct": variance["variance_pct"],
+            "saving_yuan": variance["saving_yuan"],
+            "overspend_yuan": variance["overspend_yuan"],
+            "status": variance["status"],
+            "headcount_actual": shift_stats.get("headcount_actual", 0),
+            "headcount_scheduled": shift_stats.get("headcount_scheduled", 0),
+            "overtime_hours": shift_stats.get("overtime_hours", 0.0),
+            "overtime_cost_yuan": overtime_cost_yuan,
         }
 
         await LaborCostService._upsert_snapshot(snapshot, db)
@@ -294,24 +288,24 @@ class LaborCostService:
 
         if not rows:
             return {
-                "store_id":           store_id,
-                "start_date":         start_date.isoformat(),
-                "end_date":           end_date.isoformat(),
-                "avg_labor_cost_rate":  0.0,
-                "total_saving_yuan":    0.0,
+                "store_id": store_id,
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+                "avg_labor_cost_rate": 0.0,
+                "total_saving_yuan": 0.0,
                 "total_overspend_yuan": 0.0,
-                "net_variance_yuan":    0.0,
-                "period_status":      "no_data",
-                "days":               [],
+                "net_variance_yuan": 0.0,
+                "period_status": "no_data",
+                "days": [],
             }
 
         days = [_row_to_snapshot_dict(r) for r in rows]
-        rates        = [d["actual_labor_cost_rate"] for d in days if d["actual_labor_cost_rate"]]
-        variances    = [d["variance_yuan"] or 0.0 for d in days]
-        saving_sum   = sum(max(-v, 0.0) for v in variances)
-        overspend_sum = sum(max(v,  0.0) for v in variances)
+        rates = [d["actual_labor_cost_rate"] for d in days if d["actual_labor_cost_rate"]]
+        variances = [d["variance_yuan"] or 0.0 for d in days]
+        saving_sum = sum(max(-v, 0.0) for v in variances)
+        overspend_sum = sum(max(v, 0.0) for v in variances)
         net_variance = sum(variances)
-        avg_rate     = round(sum(rates) / len(rates), 2) if rates else 0.0
+        avg_rate = round(sum(rates) / len(rates), 2) if rates else 0.0
 
         # 用最差的单日状态决定区间状态
         if net_variance <= 0:
@@ -324,15 +318,15 @@ class LaborCostService:
             period_status = "critical"
 
         return {
-            "store_id":             store_id,
-            "start_date":           start_date.isoformat(),
-            "end_date":             end_date.isoformat(),
-            "avg_labor_cost_rate":  avg_rate,
-            "total_saving_yuan":    round(saving_sum, 2),
+            "store_id": store_id,
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+            "avg_labor_cost_rate": avg_rate,
+            "total_saving_yuan": round(saving_sum, 2),
             "total_overspend_yuan": round(overspend_sum, 2),
-            "net_variance_yuan":    round(net_variance, 2),
-            "period_status":        period_status,
-            "days":                 days,
+            "net_variance_yuan": round(net_variance, 2),
+            "period_status": period_status,
+            "days": days,
         }
 
     # ── 跨店排名 ────────────────────────────────────────────────────────────────
@@ -379,34 +373,39 @@ class LaborCostService:
         rows = rows_result.fetchall()
 
         if not rows:
-            return {"brand_id": brand_id, "ranking_date": ranking_date.isoformat(),
-                    "period_type": period_type, "total_stores": 0, "rankings": []}
+            return {
+                "brand_id": brand_id,
+                "ranking_date": ranking_date.isoformat(),
+                "period_type": period_type,
+                "total_stores": 0,
+                "rankings": [],
+            }
 
         total = len(rows)
         rates = [float(r.avg_rate) for r in rows]
-        avg_rate    = round(sum(rates) / total, 2)
+        avg_rate = round(sum(rates) / total, 2)
         median_rate = round(sorted(rates)[total // 2], 2)
-        best_rate   = round(min(rates), 2)
+        best_rate = round(min(rates), 2)
 
         rankings = []
         for rank, row in enumerate(rows, start=1):
-            rate       = round(float(row.avg_rate), 2)
+            rate = round(float(row.avg_rate), 2)
             percentile = round((total - rank) / (total - 1) * 100, 1) if total > 1 else 100.0
-            rankings.append({
-                "store_id":            row.store_id,
-                "rank_in_group":       rank,
-                "total_stores":        total,
-                "labor_cost_rate":     rate,
-                "percentile_score":    percentile,
-                "group_avg_rate":      avg_rate,
-                "group_median_rate":   median_rate,
-                "best_rate_in_group":  best_rate,
-            })
+            rankings.append(
+                {
+                    "store_id": row.store_id,
+                    "rank_in_group": rank,
+                    "total_stores": total,
+                    "labor_cost_rate": rate,
+                    "percentile_score": percentile,
+                    "group_avg_rate": avg_rate,
+                    "group_median_rate": median_rate,
+                    "best_rate_in_group": best_rate,
+                }
+            )
 
         # 批量 upsert 到 labor_cost_rankings
-        await LaborCostService._upsert_rankings(
-            rankings, brand_id, ranking_date, period_type, db
-        )
+        await LaborCostService._upsert_rankings(rankings, brand_id, ranking_date, period_type, db)
 
         logger.info(
             "labor_cost.rankings_refreshed",
@@ -416,14 +415,14 @@ class LaborCostService:
             total_stores=total,
         )
         return {
-            "brand_id":     brand_id,
+            "brand_id": brand_id,
             "ranking_date": ranking_date.isoformat(),
-            "period_type":  period_type,
+            "period_type": period_type,
             "total_stores": total,
-            "group_avg_rate":    avg_rate,
+            "group_avg_rate": avg_rate,
             "group_median_rate": median_rate,
             "best_rate_in_group": best_rate,
-            "rankings":     rankings,
+            "rankings": rankings,
         }
 
     @staticmethod
@@ -453,17 +452,17 @@ class LaborCostService:
             return None
 
         rate = float(row.labor_cost_rate)
-        avg  = float(row.group_avg_rate or 0)
+        avg = float(row.group_avg_rate or 0)
         return {
-            "store_id":           row.store_id,
-            "ranking_date":       row.ranking_date.isoformat() if hasattr(row.ranking_date, "isoformat") else str(row.ranking_date),
-            "period_type":        row.period_type,
-            "labor_cost_rate":    rate,
-            "rank_in_group":      row.rank_in_group,
-            "total_stores":       row.total_stores_in_group,
-            "percentile_score":   float(row.percentile_score or 0),
-            "group_avg_rate":     avg,
-            "group_median_rate":  float(row.group_median_rate or 0),
+            "store_id": row.store_id,
+            "ranking_date": row.ranking_date.isoformat() if hasattr(row.ranking_date, "isoformat") else str(row.ranking_date),
+            "period_type": row.period_type,
+            "labor_cost_rate": rate,
+            "rank_in_group": row.rank_in_group,
+            "total_stores": row.total_stores_in_group,
+            "percentile_score": float(row.percentile_score or 0),
+            "group_avg_rate": avg,
+            "group_median_rate": float(row.group_median_rate or 0),
             "best_rate_in_group": float(row.best_rate_in_group or 0),
             # ¥ 化排名洞察（Rule 7：建议 + ¥影响）
             "rank_insight": _build_rank_insight(
@@ -493,9 +492,9 @@ class LaborCostService:
                   AND created_at  < :end
             """),
             {
-                "sid":   store_id,
+                "sid": store_id,
                 "start": snapshot_date,
-                "end":   snapshot_date + timedelta(days=1),
+                "end": snapshot_date + timedelta(days=1),
             },
         )
         revenue_fen = int(result.scalar() or 0)
@@ -541,27 +540,27 @@ class LaborCostService:
         rows = result.fetchall()
 
         total_scheduled = 0
-        total_actual    = 0
-        total_hours     = 0.0
-        overtime_hours  = 0.0
+        total_actual = 0
+        total_hours = 0.0
+        overtime_hours = 0.0
         position_hours: Dict[str, float] = {}
 
         for row in rows:
             pos = row.position or "default"
             total_scheduled += int(row.headcount_scheduled or 0)
-            total_actual    += int(row.headcount_actual or 0)
-            hrs              = float(row.total_hours or 0)
-            ot               = float(row.overtime_hours or 0)
-            total_hours     += hrs
-            overtime_hours  += ot
+            total_actual += int(row.headcount_actual or 0)
+            hrs = float(row.total_hours or 0)
+            ot = float(row.overtime_hours or 0)
+            total_hours += hrs
+            overtime_hours += ot
             position_hours[pos] = round(hrs, 2)
 
         return {
             "headcount_scheduled": total_scheduled,
-            "headcount_actual":    total_actual,
-            "total_hours":         round(total_hours, 2),
-            "overtime_hours":      round(overtime_hours, 2),
-            "position_hours":      position_hours,
+            "headcount_actual": total_actual,
+            "total_hours": round(total_hours, 2),
+            "overtime_hours": round(overtime_hours, 2),
+            "position_hours": position_hours,
         }
 
     @staticmethod
@@ -586,9 +585,9 @@ class LaborCostService:
                 hourly = wage_map.get(pos) or wage_map.get("default", _DEFAULT_HOURLY_WAGE["default"])
                 cost += hours * hourly
             # 加上加班补贴（方案 B 已包含在工时内，再补贴 0.5 倍）
-            ot_hrs  = shift_stats.get("overtime_hours", 0.0)
+            ot_hrs = shift_stats.get("overtime_hours", 0.0)
             avg_wage = wage_map.get("default", _DEFAULT_HOURLY_WAGE["default"])
-            cost += ot_hrs * avg_wage * 0.5   # 0.5 倍额外加班费
+            cost += ot_hrs * avg_wage * 0.5  # 0.5 倍额外加班费
             return round(cost, 2)
 
         # 方案 C：日预算参考值
@@ -629,9 +628,9 @@ class LaborCostService:
             if row:
                 return {
                     "target_labor_cost_rate": float(row.target_labor_cost_rate or 0),
-                    "max_labor_cost_yuan":    float(row.max_labor_cost_yuan or 0),
-                    "daily_budget_yuan":      float(row.daily_budget_yuan) if row.daily_budget_yuan else None,
-                    "alert_threshold_pct":    float(row.alert_threshold_pct or 90),
+                    "max_labor_cost_yuan": float(row.max_labor_cost_yuan or 0),
+                    "daily_budget_yuan": float(row.daily_budget_yuan) if row.daily_budget_yuan else None,
+                    "alert_threshold_pct": float(row.alert_threshold_pct or 90),
                 }
         except Exception as exc:
             logger.warning("labor_cost.fetch_budget_failed", store_id=store_id, error=str(exc))
@@ -676,19 +675,19 @@ class LaborCostService:
                         updated_at               = NOW()
                 """),
                 {
-                    "store_id":          snapshot["store_id"],
-                    "snapshot_date":     snapshot["snapshot_date"],
-                    "revenue_yuan":      snapshot["actual_revenue_yuan"],
-                    "labor_cost_yuan":   snapshot["actual_labor_cost_yuan"],
-                    "labor_cost_rate":   snapshot["actual_labor_cost_rate"],
-                    "budgeted_yuan":     snapshot.get("budgeted_labor_cost_yuan"),
-                    "budgeted_rate":     snapshot.get("budgeted_labor_cost_rate"),
-                    "variance_yuan":     snapshot["variance_yuan"],
-                    "variance_pct":      snapshot["variance_pct"],
-                    "hc_actual":         snapshot.get("headcount_actual"),
-                    "hc_scheduled":      snapshot.get("headcount_scheduled"),
-                    "ot_hours":          snapshot.get("overtime_hours"),
-                    "ot_cost_yuan":      snapshot.get("overtime_cost_yuan"),
+                    "store_id": snapshot["store_id"],
+                    "snapshot_date": snapshot["snapshot_date"],
+                    "revenue_yuan": snapshot["actual_revenue_yuan"],
+                    "labor_cost_yuan": snapshot["actual_labor_cost_yuan"],
+                    "labor_cost_rate": snapshot["actual_labor_cost_rate"],
+                    "budgeted_yuan": snapshot.get("budgeted_labor_cost_yuan"),
+                    "budgeted_rate": snapshot.get("budgeted_labor_cost_rate"),
+                    "variance_yuan": snapshot["variance_yuan"],
+                    "variance_pct": snapshot["variance_pct"],
+                    "hc_actual": snapshot.get("headcount_actual"),
+                    "hc_scheduled": snapshot.get("headcount_scheduled"),
+                    "ot_hours": snapshot.get("overtime_hours"),
+                    "ot_cost_yuan": snapshot.get("overtime_cost_yuan"),
                 },
             )
             await db.commit()
@@ -732,17 +731,17 @@ class LaborCostService:
                             best_rate_in_group    = EXCLUDED.best_rate_in_group
                     """),
                     {
-                        "store_id":     r["store_id"],
+                        "store_id": r["store_id"],
                         "ranking_date": ranking_date,
-                        "period_type":  period_type,
-                        "rate":         r["labor_cost_rate"],
-                        "rank":         r["rank_in_group"],
-                        "total":        r["total_stores"],
-                        "percentile":   r["percentile_score"],
-                        "avg_rate":     r["group_avg_rate"],
-                        "median_rate":  r["group_median_rate"],
-                        "best_rate":    r["best_rate_in_group"],
-                        "brand_id":     brand_id,
+                        "period_type": period_type,
+                        "rate": r["labor_cost_rate"],
+                        "rank": r["rank_in_group"],
+                        "total": r["total_stores"],
+                        "percentile": r["percentile_score"],
+                        "avg_rate": r["group_avg_rate"],
+                        "median_rate": r["group_median_rate"],
+                        "best_rate": r["best_rate_in_group"],
+                        "brand_id": brand_id,
                     },
                 )
             await db.commit()
@@ -753,6 +752,7 @@ class LaborCostService:
 
 
 # ─── 私有工具函数 ──────────────────────────────────────────────────────────────
+
 
 def _period_range(ranking_date: date, period_type: str):
     """根据 period_type 返回 (start_date, end_date)"""
@@ -770,18 +770,18 @@ def _period_range(ranking_date: date, period_type: str):
 def _row_to_snapshot_dict(row) -> dict:
     """将 SQLAlchemy Row 转换为 dict"""
     return {
-        "snapshot_date":          str(row.snapshot_date),
-        "actual_revenue_yuan":    float(row.actual_revenue_yuan or 0),
+        "snapshot_date": str(row.snapshot_date),
+        "actual_revenue_yuan": float(row.actual_revenue_yuan or 0),
         "actual_labor_cost_yuan": float(row.actual_labor_cost_yuan or 0),
         "actual_labor_cost_rate": float(row.actual_labor_cost_rate or 0),
         "budgeted_labor_cost_yuan": float(row.budgeted_labor_cost_yuan) if row.budgeted_labor_cost_yuan else None,
         "budgeted_labor_cost_rate": float(row.budgeted_labor_cost_rate) if row.budgeted_labor_cost_rate else None,
-        "variance_yuan":          float(row.variance_yuan or 0),
-        "variance_pct":           float(row.variance_pct or 0),
-        "headcount_actual":       int(row.headcount_actual or 0) if row.headcount_actual else None,
-        "headcount_scheduled":    int(row.headcount_scheduled or 0) if row.headcount_scheduled else None,
-        "overtime_hours":         float(row.overtime_hours or 0) if row.overtime_hours else None,
-        "overtime_cost_yuan":     float(row.overtime_cost_yuan or 0) if row.overtime_cost_yuan else None,
+        "variance_yuan": float(row.variance_yuan or 0),
+        "variance_pct": float(row.variance_pct or 0),
+        "headcount_actual": int(row.headcount_actual or 0) if row.headcount_actual else None,
+        "headcount_scheduled": int(row.headcount_scheduled or 0) if row.headcount_scheduled else None,
+        "overtime_hours": float(row.overtime_hours or 0) if row.overtime_hours else None,
+        "overtime_cost_yuan": float(row.overtime_cost_yuan or 0) if row.overtime_cost_yuan else None,
     }
 
 

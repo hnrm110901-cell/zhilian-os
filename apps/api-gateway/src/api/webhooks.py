@@ -21,6 +21,7 @@ Endpoints:
   rating.created
   developer.tier_changed
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -55,11 +56,12 @@ SUPPORTED_EVENTS: List[str] = [
     "developer.tier_changed",
 ]
 
-MAX_SUBS_PER_DEV = 10          # max webhook subscriptions per developer
-MAX_DELIVERY_RETRIES = 5       # max retry attempts before marking failed
+MAX_SUBS_PER_DEV = 10  # max webhook subscriptions per developer
+MAX_DELIVERY_RETRIES = 5  # max retry attempts before marking failed
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def _row(row) -> Dict[str, Any]:
     return dict(row._mapping)
@@ -72,9 +74,7 @@ def _hash_secret(secret: str) -> str:
 
 def _sign_payload(secret_hash: str, payload: str) -> str:
     """Generate X-Zhilian-Signature header value (HMAC-SHA256 over payload)."""
-    return "sha256=" + hmac.new(
-        secret_hash.encode(), payload.encode(), hashlib.sha256
-    ).hexdigest()
+    return "sha256=" + hmac.new(secret_hash.encode(), payload.encode(), hashlib.sha256).hexdigest()
 
 
 def _validate_events(events: List[str]) -> None:
@@ -86,9 +86,7 @@ def _validate_events(events: List[str]) -> None:
         )
 
 
-async def _get_subscription(
-    sub_id: str, developer_id: str, db: AsyncSession
-) -> Dict[str, Any]:
+async def _get_subscription(sub_id: str, developer_id: str, db: AsyncSession) -> Dict[str, Any]:
     row = await db.execute(
         text("SELECT * FROM webhook_subscriptions WHERE id = :id AND developer_id = :did"),
         {"id": sub_id, "did": developer_id},
@@ -125,40 +123,42 @@ def _format_sub(sub: Dict[str, Any]) -> Dict[str, Any]:
 
 # ── Request schemas ───────────────────────────────────────────────────────────
 
+
 class CreateSubscriptionRequest(BaseModel):
-    developer_id:  str
-    endpoint_url:  str
-    secret:        str      # plaintext; stored as SHA-256 hash
-    events:        List[str]
-    description:   Optional[str] = None
+    developer_id: str
+    endpoint_url: str
+    secret: str  # plaintext; stored as SHA-256 hash
+    events: List[str]
+    description: Optional[str] = None
 
 
 class UpdateSubscriptionRequest(BaseModel):
-    endpoint_url:  Optional[str]       = None
-    events:        Optional[List[str]] = None
-    description:   Optional[str]       = None
-    status:        Optional[str]       = None   # active / paused
+    endpoint_url: Optional[str] = None
+    events: Optional[List[str]] = None
+    description: Optional[str] = None
+    status: Optional[str] = None  # active / paused
 
 
 class DispatchEventRequest(BaseModel):
-    developer_id:  str
-    event_type:    str
-    payload:       Dict[str, Any]
+    developer_id: str
+    event_type: str
+    payload: Dict[str, Any]
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
+
 
 @router.get("/events")
 async def list_supported_events() -> Dict[str, Any]:
     """返回平台支持的全部 Webhook 事件类型。"""
     return {
         "events": [
-            {"type": "plugin.installed",     "description": "店铺安装了您的插件"},
-            {"type": "plugin.uninstalled",   "description": "店铺卸载了您的插件"},
-            {"type": "plugin.reviewed",      "description": "插件审核结果（通过/拒绝）"},
-            {"type": "settlement.approved",  "description": "结算单已审核通过"},
-            {"type": "settlement.paid",      "description": "结算款项已支付"},
-            {"type": "rating.created",       "description": "插件收到新评分"},
+            {"type": "plugin.installed", "description": "店铺安装了您的插件"},
+            {"type": "plugin.uninstalled", "description": "店铺卸载了您的插件"},
+            {"type": "plugin.reviewed", "description": "插件审核结果（通过/拒绝）"},
+            {"type": "settlement.approved", "description": "结算单已审核通过"},
+            {"type": "settlement.paid", "description": "结算款项已支付"},
+            {"type": "rating.created", "description": "插件收到新评分"},
             {"type": "developer.tier_changed", "description": "开发者套餐等级变更"},
         ]
     }
@@ -190,10 +190,7 @@ async def create_subscription(
 
     # Check duplicate URL+developer
     dup = await db.execute(
-        text(
-            "SELECT id FROM webhook_subscriptions "
-            "WHERE developer_id = :did AND endpoint_url = :url"
-        ),
+        text("SELECT id FROM webhook_subscriptions " "WHERE developer_id = :did AND endpoint_url = :url"),
         {"did": req.developer_id, "url": req.endpoint_url},
     )
     if dup.fetchone():
@@ -217,9 +214,7 @@ async def create_subscription(
     )
     await db.commit()
 
-    row = await db.execute(
-        text("SELECT * FROM webhook_subscriptions WHERE id = :id"), {"id": sub_id}
-    )
+    row = await db.execute(text("SELECT * FROM webhook_subscriptions WHERE id = :id"), {"id": sub_id})
     return _format_sub(_row(row.fetchone()))
 
 
@@ -231,10 +226,7 @@ async def list_subscriptions(
     """列出开发者的所有 Webhook 订阅。"""
     await _require_developer(developer_id, db)
     rows = await db.execute(
-        text(
-            "SELECT * FROM webhook_subscriptions "
-            "WHERE developer_id = :did ORDER BY created_at DESC"
-        ),
+        text("SELECT * FROM webhook_subscriptions " "WHERE developer_id = :did ORDER BY created_at DESC"),
         {"did": developer_id},
     )
     subs = [_format_sub(_row(r)) for r in rows.fetchall()]
@@ -243,9 +235,9 @@ async def list_subscriptions(
 
 @router.get("/subscriptions/{sub_id}")
 async def get_subscription(
-    sub_id:      str,
+    sub_id: str,
     developer_id: str = Query(...),
-    db:          AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     sub = await _get_subscription(sub_id, developer_id, db)
     return _format_sub(sub)
@@ -254,9 +246,9 @@ async def get_subscription(
 @router.put("/subscriptions/{sub_id}")
 async def update_subscription(
     sub_id: str,
-    req:    UpdateSubscriptionRequest,
+    req: UpdateSubscriptionRequest,
     developer_id: str = Query(...),
-    db:     AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """更新 Webhook 订阅（URL / 事件列表 / 描述 / 状态）。"""
     sub = await _get_subscription(sub_id, developer_id, db)
@@ -269,10 +261,14 @@ async def update_subscription(
         raise HTTPException(status_code=400, detail="status 必须为 active 或 paused")
 
     updates: Dict[str, Any] = {}
-    if req.endpoint_url  is not None: updates["endpoint_url"]  = req.endpoint_url
-    if req.events        is not None: updates["events"]        = json.dumps(req.events)
-    if req.description   is not None: updates["description"]   = req.description
-    if req.status        is not None: updates["status"]        = req.status
+    if req.endpoint_url is not None:
+        updates["endpoint_url"] = req.endpoint_url
+    if req.events is not None:
+        updates["events"] = json.dumps(req.events)
+    if req.description is not None:
+        updates["description"] = req.description
+    if req.status is not None:
+        updates["status"] = req.status
 
     if not updates:
         return _format_sub(sub)
@@ -285,31 +281,27 @@ async def update_subscription(
     )
     await db.commit()
 
-    row = await db.execute(
-        text("SELECT * FROM webhook_subscriptions WHERE id = :id"), {"id": sub_id}
-    )
+    row = await db.execute(text("SELECT * FROM webhook_subscriptions WHERE id = :id"), {"id": sub_id})
     return _format_sub(_row(row.fetchone()))
 
 
 @router.delete("/subscriptions/{sub_id}", status_code=204)
 async def delete_subscription(
-    sub_id:      str,
+    sub_id: str,
     developer_id: str = Query(...),
-    db:          AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     """删除 Webhook 订阅（同时级联删除投递日志）。"""
     await _get_subscription(sub_id, developer_id, db)
-    await db.execute(
-        text("DELETE FROM webhook_subscriptions WHERE id = :id"), {"id": sub_id}
-    )
+    await db.execute(text("DELETE FROM webhook_subscriptions WHERE id = :id"), {"id": sub_id})
     await db.commit()
 
 
 @router.post("/subscriptions/{sub_id}/ping", status_code=200)
 async def ping_subscription(
-    sub_id:      str,
+    sub_id: str,
     developer_id: str = Query(...),
-    db:          AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """向该 Webhook 端点发送测试 ping 事件，验证端点可达性。"""
     sub = await _get_subscription(sub_id, developer_id, db)
@@ -345,31 +337,23 @@ async def ping_subscription(
 
 @router.get("/subscriptions/{sub_id}/deliveries")
 async def get_delivery_history(
-    sub_id:      str,
+    sub_id: str,
     developer_id: str = Query(...),
-    limit:       int  = Query(20, ge=1, le=100),
-    db:          AsyncSession = Depends(get_db),
+    limit: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """查看 Webhook 投递历史（最近 N 条）。"""
     await _get_subscription(sub_id, developer_id, db)
 
     rows = await db.execute(
-        text(
-            "SELECT * FROM webhook_delivery_logs "
-            "WHERE subscription_id = :sid "
-            "ORDER BY created_at DESC LIMIT :lim"
-        ),
+        text("SELECT * FROM webhook_delivery_logs " "WHERE subscription_id = :sid " "ORDER BY created_at DESC LIMIT :lim"),
         {"sid": sub_id, "lim": limit},
     )
     deliveries = [_row(r) for r in rows.fetchall()]
 
     # Summary counts
     all_rows = await db.execute(
-        text(
-            "SELECT status, COUNT(*) AS cnt "
-            "FROM webhook_delivery_logs WHERE subscription_id = :sid "
-            "GROUP BY status"
-        ),
+        text("SELECT status, COUNT(*) AS cnt " "FROM webhook_delivery_logs WHERE subscription_id = :sid " "GROUP BY status"),
         {"sid": sub_id},
     )
     summary = {r.status: r.cnt for r in all_rows.fetchall()}
@@ -385,7 +369,7 @@ async def get_delivery_history(
 @router.post("/internal/dispatch", status_code=202)
 async def dispatch_event(
     req: DispatchEventRequest,
-    db:  AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """
     内部事件分发接口（供其他服务调用）。
@@ -397,10 +381,7 @@ async def dispatch_event(
 
     # Find active subscriptions for this developer+event
     rows = await db.execute(
-        text(
-            "SELECT * FROM webhook_subscriptions "
-            "WHERE developer_id = :did AND status = 'active'"
-        ),
+        text("SELECT * FROM webhook_subscriptions " "WHERE developer_id = :did AND status = 'active'"),
         {"did": req.developer_id},
     )
     subs = [_row(r) for r in rows.fetchall()]
@@ -447,10 +428,7 @@ async def dispatch_event(
         )
         # Update last_triggered_at on subscription
         await db.execute(
-            text(
-                "UPDATE webhook_subscriptions "
-                "SET last_triggered_at = NOW() WHERE id = :id"
-            ),
+            text("UPDATE webhook_subscriptions " "SET last_triggered_at = NOW() WHERE id = :id"),
             {"id": sub["id"]},
         )
         delivery_ids.append(delivery_id)
