@@ -251,6 +251,7 @@ async def _upsert_order(store_id: str, payload: WebhookOrderPayload) -> str:
             final_amount=payload.final_amount,
             order_time=order_time,
             completed_at=order_time,
+            sales_channel=payload.source,  # 统一 source 标记：pinzhi/meituan/keruyun/generic
             notes=payload.notes,
             order_metadata={
                 "source": payload.source,

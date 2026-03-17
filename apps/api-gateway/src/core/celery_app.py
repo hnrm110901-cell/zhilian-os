@@ -837,6 +837,16 @@ celery_app.conf.update(
             "args": (),
             "options": {"queue": "default", "priority": 8},
         },
+        # 每日凌晨 04:00 品智 Webhook 补漏拉取（对比 API 与本地，补齐漏单）
+        "pull-pinzhi-missed-orders": {
+            "task": "pull_pinzhi_missed_orders",
+            "schedule": crontab(
+                hour=int(os.getenv("PINZHI_MISSED_PULL_HOUR", "4")),
+                minute=int(os.getenv("PINZHI_MISSED_PULL_MINUTE", "0")),
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 6},
+        },
         # 每日凌晨 03:30 微生活会员增量同步（拉取 + ConsumerIdMapping 桥接）
         "sync-weishenghuo-members": {
             "task": "sync_weishenghuo_members",

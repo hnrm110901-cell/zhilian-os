@@ -6775,3 +6775,244 @@ def push_cross_system_alerts(self, store_id: str = None) -> Dict[str, Any]:
         return asyncio.run(_run())
     except Exception as exc:
         raise self.retry(exc=exc)
+
+
+# ── 品智 Webhook 补漏拉取（每日 04:00，补齐 Webhook 漏单）──────────────────────
+
+
+@celery_app.task(
+    bind=True,
+    name="pull_pinzhi_missed_orders",
+    max_retries=int(os.getenv("CELERY_MAX_RETRIES", "3")),
+    default_retry_delay=int(os.getenv("CELERY_RETRY_DELAY_LONG", "300")),
+)
+def pull_pinzhi_missed_orders(self) -> Dict[str, Any]:
+    """
+    对比品智 API 与本地 webhook 已入库订单，补齐遗漏。
+
+    逻辑：
+      1. 查询过去 24h 内 sales_channel='pinzhi' 的本地订单 ID 集合
+      2. 从品智 API 拉取同一时段的订单列表
+      3. 差集 = 品智有但本地无 → 补写入 orders 表（sales_channel='pinzhi'）
+      4. 返回 {success, orders_checked, gaps_filled, errors}
+
+    调度：每日 04:00（beat_schedule 配置）
+    """
+
+    async def _run():
+        from datetime import date, datetime, timedelta
+
+        from sqlalchemy import select
+        from sqlalchemy import text as _text
+
+        from ..core.database import get_db_session
+        from ..models.integration import ExternalSystem, IntegrationType
+        from ..models.store import Store
+
+        global_base_url = os.getenv("PINZHI_BASE_URL", "")
+        global_token = os.getenv("PINZHI_TOKEN", "")
+        global_brand_id = os.getenv("PINZHI_BRAND_ID", "")
+
+        # 补漏窗口：昨日全天
+        yesterday = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
+
+        from packages.api_adapters.pinzhi.src.adapter import PinzhiAdapter
+
+        orders_checked = 0
+        gaps_filled = 0
+        errors = []
+
+        try:
+            async with get_db_session() as session:
+                # 获取所有活跃门店
+                result = await session.execute(select(Store).where(Store.is_active.is_(True)))
+                stores = result.scalars().all()
+
+                # 预加载品智 ExternalSystem 凭证
+                ext_result = await session.execute(
+                    select(ExternalSystem).where(
+                        ExternalSystem.provider == "pinzhi",
+                        ExternalSystem.type == IntegrationType.POS,
+                    )
+                )
+                ext_by_store: dict = {str(e.store_id): e for e in ext_result.scalars().all() if e.store_id}
+
+                if not global_base_url and not global_token and not ext_by_store:
+                    logger.warning("pinzhi_missed.skipped", reason="无品智凭证配置")
+                    return {"success": True, "skipped": True, "orders_checked": 0, "gaps_filled": 0, "errors": []}
+
+                for store in stores:
+                    sid = str(store.id)
+                    cfg = store.config if isinstance(store.config, dict) else {}
+                    ext = ext_by_store.get(sid)
+                    ext_cfg: dict = ext.config if ext and isinstance(ext.config, dict) else {}
+
+                    base_url = (
+                        cfg.get("pinzhi_base_url")
+                        or ext_cfg.get("pinzhi_base_url")
+                        or (ext.api_endpoint if ext else None)
+                        or global_base_url
+                    )
+                    token = (
+                        cfg.get("pinzhi_token")
+                        or ext_cfg.get("pinzhi_store_token")
+                        or (ext.api_secret if ext else None)
+                        or (ext.api_key if ext else None)
+                        or global_token
+                    )
+                    brand_id = (
+                        cfg.get("pinzhi_brand_id")
+                        or ext_cfg.get("brand_id")
+                        or getattr(store, "brand_id", None)
+                        or global_brand_id
+                    )
+                    ognid = str(
+                        cfg.get("pinzhi_ognid")
+                        or ext_cfg.get("pinzhi_oms_id")
+                        or ext_cfg.get("pinzhi_store_id")
+                        or store.code
+                        or sid
+                    )
+
+                    if not base_url or not token:
+                        continue
+
+                    adapter = PinzhiAdapter(
+                        {
+                            "base_url": base_url,
+                            "token": token,
+                            "timeout": int(os.getenv("PINZHI_TIMEOUT", "30")),
+                            "retry_times": int(os.getenv("PINZHI_RETRY_TIMES", "3")),
+                        }
+                    )
+
+                    try:
+                        # Step 1: 查询本地已有的品智订单 ID 集合（昨日）
+                        local_result = await session.execute(
+                            _text("""
+                                SELECT id FROM orders
+                                WHERE store_id = :store_id
+                                  AND sales_channel = 'pinzhi'
+                                  AND order_time >= :start_time
+                                  AND order_time < :end_time
+                            """),
+                            {
+                                "store_id": sid,
+                                "start_time": f"{yesterday} 00:00:00",
+                                "end_time": f"{yesterday} 23:59:59",
+                            },
+                        )
+                        local_ids = {str(row[0]) for row in local_result.fetchall()}
+
+                        # Step 2: 从品智 API 拉取昨日全部订单
+                        remote_orders = []
+                        page = 1
+                        while True:
+                            batch = await adapter.query_orders(
+                                ognid=ognid,
+                                begin_date=yesterday,
+                                end_date=yesterday,
+                                page_index=page,
+                                page_size=100,
+                            )
+                            if not batch:
+                                break
+                            remote_orders.extend(batch)
+                            if len(batch) < 100:
+                                break
+                            page += 1
+
+                        orders_checked += len(remote_orders)
+
+                        # Step 3: 找出差集并补写
+                        for raw in remote_orders:
+                            order_schema = adapter.to_order(raw, sid, brand_id)
+                            # 构造与 pull_pinzhi_daily_data 一致的 order_id
+                            order_id = str(order_schema.order_id)
+                            if order_id in local_ids:
+                                continue
+
+                            # 也检查 webhook 写入的 POS_PINZHI_ 前缀格式
+                            webhook_id = f"POS_PINZHI_{order_id}"
+                            if webhook_id in local_ids:
+                                continue
+
+                            total_cents = int(order_schema.total * 100)
+                            discount_cents = int(order_schema.discount * 100)
+                            vip_phone = raw.get("vipMobile") or raw.get("mobile") or ""
+                            vip_name = raw.get("vipName") or ""
+
+                            await session.execute(
+                                _text("""
+                                    INSERT INTO orders
+                                        (id, store_id, table_number, status,
+                                         total_amount, discount_amount, final_amount,
+                                         order_time, waiter_id, sales_channel, notes,
+                                         customer_phone, customer_name,
+                                         order_metadata, created_at, updated_at)
+                                    VALUES
+                                        (:id, :store_id, :table_number, :status,
+                                         :total_amount, :discount_amount, :final_amount,
+                                         :order_time, :waiter_id, 'pinzhi', :notes,
+                                         :customer_phone, :customer_name,
+                                         '{}', NOW(), NOW())
+                                    ON CONFLICT (id) DO NOTHING
+                                """),
+                                {
+                                    "id": order_id,
+                                    "store_id": sid,
+                                    "table_number": order_schema.table_number,
+                                    "status": order_schema.order_status.value,
+                                    "total_amount": total_cents,
+                                    "discount_amount": discount_cents,
+                                    "final_amount": total_cents - discount_cents,
+                                    "order_time": order_schema.created_at,
+                                    "waiter_id": order_schema.waiter_id,
+                                    "notes": order_schema.notes,
+                                    "customer_phone": vip_phone,
+                                    "customer_name": vip_name,
+                                },
+                            )
+                            gaps_filled += 1
+
+                        await session.commit()
+                        logger.info(
+                            "pinzhi_missed.store_done",
+                            store_id=sid,
+                            date=yesterday,
+                            remote_count=len(remote_orders),
+                            local_count=len(local_ids),
+                            gaps_filled=gaps_filled,
+                        )
+
+                    except Exception as e:
+                        await session.rollback()
+                        errors.append({"store_id": sid, "error": str(e)})
+                        logger.error("pinzhi_missed.store_failed", store_id=sid, error=str(e))
+                    finally:
+                        await adapter.close()
+
+        except Exception as exc:
+            logger.error("pinzhi_missed.session_error", error=str(exc))
+            raise
+
+        logger.info(
+            "pull_pinzhi_missed_orders.done",
+            date=yesterday,
+            orders_checked=orders_checked,
+            gaps_filled=gaps_filled,
+            errors=len(errors),
+        )
+        return {
+            "success": True,
+            "date": yesterday,
+            "orders_checked": orders_checked,
+            "gaps_filled": gaps_filled,
+            "errors": errors,
+        }
+
+    try:
+        return asyncio.run(_run())
+    except Exception as e:
+        logger.error("pull_pinzhi_missed_orders.failed", error=str(e))
+        raise self.retry(exc=e)
