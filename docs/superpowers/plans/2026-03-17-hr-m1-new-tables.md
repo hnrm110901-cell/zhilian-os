@@ -1755,8 +1755,8 @@ feat(hr): M1 complete — z54/z55 migrations, 12 new models, seed service
 - z55: hr_knowledge_rules / skill_nodes / behavior_patterns
        person_achievements / retention_signals / knowledge_captures
 + HrSeedService + CLI cold-start loader
-+ 20条行业规则 + 10个技能节点种子数据
-+ 16个模型单元测试 + 5个迁移集成测试
++ 5条行业规则 + 10个技能节点种子数据
++ 18个模型单元测试 + 5个迁移集成测试
 
 下一步：M2 — 数据迁移脚本 + 双写模式 + HRAgent v1（B级）
 
