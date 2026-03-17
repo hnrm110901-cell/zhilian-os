@@ -6,7 +6,7 @@
   flex-direction: column;
   gap: 16px;
   min-height: 100vh;
-  background: var(--bg, #0B1A20);
+  background: var(--bg);
 }
 
 .header {
@@ -16,13 +16,13 @@
 .title {
   font-size: 20px;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-primary);
   margin: 0;
 }
 
 .subtitle {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.38);
+  color: var(--text-tertiary);
   margin: 4px 0 0;
 }
 
@@ -35,8 +35,8 @@
 }
 
 .statItem {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--surface-hover);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 12px;
   text-align: center;
@@ -45,7 +45,7 @@
 .statNum {
   font-size: 22px;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-primary);
 }
 
 .statNumMint { color: #0AAF9A; }
@@ -54,15 +54,15 @@
 
 .statLabel {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.38);
+  color: var(--text-tertiary);
   margin-top: 4px;
 }
 
 /* ── Cards ─────────────────────────────────────────────── */
 
 .card {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--surface-hover);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 16px;
 }
@@ -70,7 +70,7 @@
 .cardTitle {
   font-size: 14px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-primary);
   margin-bottom: 12px;
 }
 
@@ -80,7 +80,7 @@
   display: flex;
   align-items: center;
   padding: 10px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid var(--surface-hover);
   gap: 12px;
 }
 
@@ -91,12 +91,12 @@
 .approvalName {
   font-size: 14px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-primary);
 }
 
 .approvalMeta {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.38);
+  color: var(--text-tertiary);
   margin-top: 2px;
 }
 
@@ -141,20 +141,20 @@
   align-items: center;
   gap: 6px;
   padding: 14px 8px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--surface-hover);
+  border: 1px solid var(--border);
   border-radius: 10px;
   cursor: pointer;
   transition: background 0.15s;
 }
 
-.quickBtn:active { background: rgba(255, 255, 255, 0.08); }
+.quickBtn:active { background: var(--surface-hover); }
 
 .quickIcon { font-size: 20px; }
 
 .quickLabel {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--text-secondary);
 }
 
 /* ── Empty ─────────────────────────────────────────────── */
@@ -162,6 +162,6 @@
 .empty {
   text-align: center;
   padding: 24px;
-  color: rgba(255, 255, 255, 0.25);
+  color: var(--text-tertiary);
   font-size: 13px;
 }

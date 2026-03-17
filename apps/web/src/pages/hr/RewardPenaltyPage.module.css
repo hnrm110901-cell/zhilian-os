@@ -1,10 +1,10 @@
 .page { padding: 24px; max-width: 1200px; margin: 0 auto; }
 .header { display: flex; align-items: center; gap: 24px; margin-bottom: 20px; }
-.title { font-size: 20px; font-weight: 600; color: rgba(255,255,255,0.92); margin: 0; }
+.title { font-size: 20px; font-weight: 600; color: var(--text-primary); margin: 0; }
 .tabs { display: flex; gap: 4px; }
 .tab {
   padding: 6px 16px; border-radius: 6px; border: none;
-  background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.6);
+  background: var(--surface-hover); color: var(--text-tertiary);
   cursor: pointer; font-size: 13px;
 }
 .tabActive { background: rgba(10,175,154,0.15); color: #0AAF9A; }
@@ -12,14 +12,14 @@
 .table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .table th {
   text-align: left; padding: 10px 12px;
-  color: rgba(255,255,255,0.5); font-weight: 500;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  color: var(--text-tertiary); font-weight: 500;
+  border-bottom: 1px solid var(--border);
 }
 .table td {
-  padding: 10px 12px; color: rgba(255,255,255,0.85);
-  border-bottom: 1px solid rgba(255,255,255,0.04);
+  padding: 10px 12px; color: var(--text-primary);
+  border-bottom: 1px solid var(--surface-hover);
 }
-.empty { text-align: center; padding: 40px; color: rgba(255,255,255,0.38); }
+.empty { text-align: center; padding: 40px; color: var(--text-tertiary); }
 .tagReward {
   display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px;
   background: rgba(10,175,154,0.15); color: #0AAF9A;
