@@ -21,10 +21,17 @@ error() { echo -e "${RED}[ERROR]${NC} $*"; exit 1; }
 # ── 1. 基础依赖 ─────────────────────────────────────────────────────────────
 info "Step 1/9: Installing system dependencies"
 apt-get update -qq
-apt-get install -y -qq \
-  git curl wget rsync nginx \
-  docker.io docker-compose-plugin \
+BASE_PACKAGES=(
+  git curl wget rsync nginx
+  docker.io
   ca-certificates gnupg
+)
+
+if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
+  BASE_PACKAGES+=(docker-compose-plugin)
+fi
+
+apt-get install -y -qq "${BASE_PACKAGES[@]}"
 
 systemctl enable --now docker
 info "Docker version: $(docker --version)"
@@ -109,7 +116,7 @@ cd "$APP_DIR"
 docker compose \
   --env-file .env.prod \
   -f docker-compose.prod.yml \
-  up -d postgres redis qdrant
+  up -d postgres redis redis-replica redis-sentinel-1 redis-sentinel-2 redis-sentinel-3 qdrant neo4j
 info "Waiting 15s for DB to initialise..."
 sleep 15
 
