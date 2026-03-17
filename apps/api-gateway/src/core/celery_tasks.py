@@ -6406,3 +6406,315 @@ def check_approval_timeouts(self) -> Dict[str, Any]:
     except Exception as exc:
         logger.warning("approval_timeout_check.failed", error=str(exc))
         return {"error": str(exc)}
+
+
+# ── 微生活会员：增量拉取 + ConsumerIdMapping 桥接 ────────────────────────────
+
+
+@celery_app.task(
+    bind=True,
+    name="sync_weishenghuo_members",
+    max_retries=3,
+    default_retry_delay=300,
+    soft_time_limit=600,
+    time_limit=900,
+)
+def sync_weishenghuo_members(self) -> Dict[str, Any]:
+    """
+    从微生活会员平台增量拉取会员数据，写入 member_syncs 表并建立 ConsumerIdMapping。
+
+    执行流程：
+      1. 从 external_systems 查找 provider='weishenghuo' 的已启用门店配置
+      2. 初始化 WeishenghuoAdapter，按门店逐个执行增量会员拉取
+      3. 分页调用 adapter.list_members(page, page_size=100, updated_after=last_sync_time)
+      4. 对每个会员：upsert member_syncs + 创建 ConsumerIdMapping（POS_MEMBER_ID + PHONE）
+      5. 更新 Redis last_sync_time 供下次增量同步使用
+
+    Redis Key：wsh:last_sync:{store_id} — ISO 格式时间戳
+
+    Returns:
+        {success, stores_processed, members_synced, new_mappings, errors}
+    """
+
+    import json as _json
+    from datetime import datetime, timezone
+
+    import redis
+    from sqlalchemy import create_engine, text
+
+    db_url = os.getenv("DATABASE_URL", "")
+    if not db_url:
+        logger.warning("sync_weishenghuo_members.skipped", reason="DATABASE_URL 未配置")
+        return {
+            "success": True,
+            "skipped": True,
+            "stores_processed": 0,
+            "members_synced": 0,
+            "new_mappings": 0,
+            "errors": [],
+        }
+
+    engine = create_engine(db_url)
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    rds = redis.Redis.from_url(redis_url, decode_responses=True)
+
+    stores_processed = 0
+    members_synced = 0
+    new_mappings = 0
+    errors: list = []
+
+    try:
+        with engine.connect() as conn:
+            # 1. 查找所有已启用微生活集成的门店配置
+            sys_rows = conn.execute(text("""
+                SELECT id, store_id, api_key, api_secret, api_endpoint, config
+                FROM external_systems
+                WHERE provider = 'weishenghuo'
+                  AND status != 'inactive'
+                ORDER BY created_at ASC
+            """)).fetchall()
+
+            if not sys_rows:
+                logger.info("sync_weishenghuo_members.no_config", reason="无已启用的微生活集成配置")
+                return {
+                    "success": True,
+                    "skipped": True,
+                    "stores_processed": 0,
+                    "members_synced": 0,
+                    "new_mappings": 0,
+                    "errors": [],
+                }
+
+            from packages.api_adapters.weishenghuo.src.adapter import WeishenghuoAdapter
+
+            for sys_row in sys_rows:
+                system_id = sys_row[0]
+                store_id = str(sys_row[1]) if sys_row[1] else str(sys_row[0])
+                api_key = sys_row[2] or ""
+                api_secret = sys_row[3] or ""
+                base_url = sys_row[4] or os.getenv("WSH_BASE_URL", "https://api.weishenghuo.com")
+                extra_config = sys_row[5] if sys_row[5] else {}
+                if isinstance(extra_config, str):
+                    extra_config = _json.loads(extra_config)
+
+                if not api_key or not api_secret:
+                    errors.append(f"store={store_id}: api_key 或 api_secret 未配置，跳过")
+                    logger.warning(
+                        "sync_weishenghuo_members.store_skip",
+                        store_id=store_id,
+                        reason="缺少凭证",
+                    )
+                    continue
+
+                adapter = WeishenghuoAdapter({
+                    "base_url": base_url,
+                    "api_key": api_key,
+                    "api_secret": api_secret,
+                    "timeout": int(os.getenv("WSH_TIMEOUT", "30")),
+                    "retry_times": int(os.getenv("WSH_RETRY_TIMES", "3")),
+                    **extra_config,
+                })
+
+                # 2. 从 Redis 获取上次同步时间（增量拉取）
+                redis_key = f"wsh:last_sync:{store_id}"
+                last_sync_str = rds.get(redis_key)
+                last_sync_time = last_sync_str if last_sync_str else None
+
+                store_synced = 0
+                store_new_mappings = 0
+
+                try:
+                    # 3. 分页拉取会员
+                    page = 1
+                    page_size = 100
+                    while True:
+                        members_resp = adapter.list_members(
+                            page=page,
+                            page_size=page_size,
+                            updated_after=last_sync_time,
+                        )
+                        member_list = members_resp if isinstance(members_resp, list) else members_resp.get("list", [])
+                        if not member_list:
+                            break
+
+                        for member in member_list:
+                            try:
+                                # 4a. 提取字段
+                                member_id = str(member.get("member_id") or member.get("id") or "")
+                                mobile = str(member.get("mobile") or member.get("phone") or "")
+                                name = member.get("name") or member.get("real_name") or ""
+                                level = member.get("level") or member.get("level_name") or ""
+                                points = int(member.get("points") or member.get("credits") or 0)
+                                # 储值金额：外部系统返回元，内部存分
+                                stored_value_yuan = float(member.get("stored_value") or member.get("balance") or 0)
+                                stored_value_fen = int(round(stored_value_yuan * 100))
+                                card_no = member.get("card_no") or member.get("cno") or ""
+                                created_at = member.get("created_at") or member.get("register_time") or ""
+                                last_visit_at = member.get("last_visit_at") or member.get("last_consume_time") or ""
+                                raw_json = _json.dumps(member, ensure_ascii=False)
+
+                                if not member_id and not mobile:
+                                    continue
+
+                                # 4b. Upsert member_syncs（按 mobile 匹配）
+                                conn.execute(
+                                    text("""
+                                        INSERT INTO member_syncs
+                                            (id, system_id, member_id, external_member_id,
+                                             phone, name, level, points, balance,
+                                             sync_status, synced_at, raw_data,
+                                             created_at, updated_at)
+                                        VALUES
+                                            (gen_random_uuid(), :system_id,
+                                             :mobile, :member_id,
+                                             :mobile, :name, :level, :points, :balance,
+                                             'success', NOW(), :raw_data::jsonb,
+                                             NOW(), NOW())
+                                        ON CONFLICT (phone, system_id) DO UPDATE SET
+                                            external_member_id = EXCLUDED.external_member_id,
+                                            name               = EXCLUDED.name,
+                                            level              = EXCLUDED.level,
+                                            points             = EXCLUDED.points,
+                                            balance            = EXCLUDED.balance,
+                                            sync_status        = 'success',
+                                            synced_at          = NOW(),
+                                            raw_data           = EXCLUDED.raw_data,
+                                            updated_at         = NOW()
+                                    """),
+                                    {
+                                        "system_id": system_id,
+                                        "mobile": mobile or member_id,
+                                        "member_id": member_id,
+                                        "name": name,
+                                        "level": str(level),
+                                        "points": points,
+                                        "balance": round(stored_value_fen / 100, 2),
+                                        "raw_data": raw_json,
+                                    },
+                                )
+
+                                # 4c. ConsumerIdMapping: POS_MEMBER_ID
+                                if member_id:
+                                    result = conn.execute(
+                                        text("""
+                                            INSERT INTO consumer_id_mappings
+                                                (id, consumer_id, id_type, external_id,
+                                                 store_id, source_system, confidence,
+                                                 is_verified, is_active, created_at, updated_at)
+                                            SELECT
+                                                gen_random_uuid(),
+                                                COALESCE(
+                                                    (SELECT consumer_id FROM consumer_id_mappings
+                                                     WHERE id_type = 'phone' AND external_id = :mobile
+                                                       AND is_active = true LIMIT 1),
+                                                    gen_random_uuid()
+                                                ),
+                                                'pos_member_id', :member_id,
+                                                :store_id, 'weishenghuo', 80,
+                                                false, true, NOW(), NOW()
+                                            WHERE NOT EXISTS (
+                                                SELECT 1 FROM consumer_id_mappings
+                                                WHERE id_type = 'pos_member_id'
+                                                  AND external_id = :member_id
+                                            )
+                                        """),
+                                        {
+                                            "member_id": member_id,
+                                            "mobile": mobile,
+                                            "store_id": store_id,
+                                        },
+                                    )
+                                    store_new_mappings += result.rowcount
+
+                                # 4d. ConsumerIdMapping: PHONE
+                                if mobile:
+                                    result = conn.execute(
+                                        text("""
+                                            INSERT INTO consumer_id_mappings
+                                                (id, consumer_id, id_type, external_id,
+                                                 store_id, source_system, confidence,
+                                                 is_verified, is_active, created_at, updated_at)
+                                            SELECT
+                                                gen_random_uuid(),
+                                                COALESCE(
+                                                    (SELECT consumer_id FROM consumer_id_mappings
+                                                     WHERE id_type = 'pos_member_id' AND external_id = :member_id
+                                                       AND is_active = true LIMIT 1),
+                                                    gen_random_uuid()
+                                                ),
+                                                'phone', :mobile,
+                                                :store_id, 'weishenghuo', 90,
+                                                false, true, NOW(), NOW()
+                                            WHERE NOT EXISTS (
+                                                SELECT 1 FROM consumer_id_mappings
+                                                WHERE id_type = 'phone'
+                                                  AND external_id = :mobile
+                                            )
+                                        """),
+                                        {
+                                            "mobile": mobile,
+                                            "member_id": member_id,
+                                            "store_id": store_id,
+                                        },
+                                    )
+                                    store_new_mappings += result.rowcount
+
+                                store_synced += 1
+
+                            except Exception as member_exc:
+                                errors.append(f"store={store_id}, member={member_id}: {str(member_exc)}")
+                                logger.warning(
+                                    "sync_weishenghuo_members.member_error",
+                                    store_id=store_id,
+                                    member_id=member_id,
+                                    error=str(member_exc),
+                                )
+
+                        # 翻页：不足一页说明已到末尾
+                        if len(member_list) < page_size:
+                            break
+                        page += 1
+
+                    conn.commit()
+
+                    # 5. 更新 Redis last_sync_time
+                    now_iso = datetime.now(timezone.utc).isoformat()
+                    rds.set(redis_key, now_iso)
+
+                    stores_processed += 1
+                    members_synced += store_synced
+                    new_mappings += store_new_mappings
+
+                    logger.info(
+                        "sync_weishenghuo_members.store_done",
+                        store_id=store_id,
+                        members_synced=store_synced,
+                        new_mappings=store_new_mappings,
+                    )
+
+                except Exception as store_exc:
+                    errors.append(f"store={store_id}: {str(store_exc)}")
+                    logger.error(
+                        "sync_weishenghuo_members.store_error",
+                        store_id=store_id,
+                        error=str(store_exc),
+                    )
+
+    except Exception as exc:
+        logger.error("sync_weishenghuo_members.failed", error=str(exc))
+        raise self.retry(exc=exc)
+
+    logger.info(
+        "sync_weishenghuo_members.done",
+        stores_processed=stores_processed,
+        members_synced=members_synced,
+        new_mappings=new_mappings,
+        errors=len(errors),
+    )
+    return {
+        "success": len(errors) == 0,
+        "stores_processed": stores_processed,
+        "members_synced": members_synced,
+        "new_mappings": new_mappings,
+        "errors": errors[:20],
+    }

@@ -830,6 +830,16 @@ celery_app.conf.update(
             "args": (),
             "options": {"queue": "default", "priority": 6},
         },
+        # 每日凌晨 03:30 微生活会员增量同步（拉取 + ConsumerIdMapping 桥接）
+        "sync-weishenghuo-members": {
+            "task": "sync_weishenghuo_members",
+            "schedule": crontab(
+                hour=int(os.getenv("WSH_SYNC_HOUR", "3")),
+                minute=int(os.getenv("WSH_SYNC_MINUTE", "30")),
+            ),
+            "args": (),
+            "options": {"queue": "default", "priority": 7},
+        },
     },
 )
 
