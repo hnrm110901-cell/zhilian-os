@@ -372,7 +372,7 @@ const SupplierB2BPage: React.FC = () => {
       title: '状态',
       render: (o) => {
         const s = STATUS_MAP[o.status] || { label: o.status, variant: 'default' as const };
-        return <ZBadge variant={s.variant}>{s.label}</ZBadge>;
+        return <ZBadge type={s.variant === 'processing' ? 'info' : s.variant} text={s.label} />;
       },
     },
     {
@@ -390,15 +390,15 @@ const SupplierB2BPage: React.FC = () => {
       title: '',
       render: (o) => (
         <div className={styles.actionGroup}>
-          <ZButton size="xs" variant="ghost" onClick={() => handleViewDetail(o.id)}>详情</ZButton>
+          <ZButton size="sm" variant="ghost" onClick={() => handleViewDetail(o.id)}>详情</ZButton>
           {o.status === 'draft' && (
-            <ZButton size="xs" onClick={() => handleSubmitOrder(o.id)}>提交</ZButton>
+            <ZButton size="sm" onClick={() => handleSubmitOrder(o.id)}>提交</ZButton>
           )}
           {(o.status === 'shipping' || o.status === 'confirmed') && (
-            <ZButton size="xs" onClick={() => openReceiveModal(o)}>收货</ZButton>
+            <ZButton size="sm" onClick={() => openReceiveModal(o)}>收货</ZButton>
           )}
           {['draft', 'submitted', 'confirmed'].includes(o.status) && (
-            <ZButton size="xs" variant="danger" onClick={() => handleCancelOrder(o.id)}>取消</ZButton>
+            <ZButton size="sm" variant="danger" onClick={() => handleCancelOrder(o.id)}>取消</ZButton>
           )}
         </div>
       ),
@@ -497,7 +497,7 @@ const SupplierB2BPage: React.FC = () => {
         }
       >
         <div className={styles.modalBody}>
-          {createErr && <ZAlert type="error" className={styles.modalErr}>{createErr}</ZAlert>}
+          {createErr && <ZAlert variant="error" style={{ marginBottom: 12 }}>{createErr}</ZAlert>}
 
           <div className={styles.fieldGrid}>
             <div className={styles.fieldRow}>
@@ -539,7 +539,7 @@ const SupplierB2BPage: React.FC = () => {
           <div className={styles.itemsSection}>
             <div className={styles.itemsSectionHeader}>
               <span className={styles.itemsSectionTitle}>采购明细</span>
-              <ZButton size="xs" variant="ghost" onClick={addItem}>+ 添加行</ZButton>
+              <ZButton size="sm" variant="ghost" onClick={addItem}>+ 添加行</ZButton>
             </div>
             <div className={styles.itemLabels}>
               <span>食材名称 *</span>
@@ -649,7 +649,7 @@ const SupplierB2BPage: React.FC = () => {
                         partial:  { label: '部分合格', variant: 'warning' },
                       };
                       const q = qMap[it.quality_status] || { label: it.quality_status, variant: 'default' as any };
-                      return <ZBadge variant={q.variant}>{q.label}</ZBadge>;
+                      return <ZBadge type={q.variant} text={q.label} />;
                     },
                   },
                 ]}

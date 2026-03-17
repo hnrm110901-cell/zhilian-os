@@ -14,8 +14,8 @@ import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../../services/api';
 import {
   CUISINE_LABELS, INDUSTRY_LABELS, CUISINE_OPTIONS,
-  MerchantSummary, PlatformStats,
 } from './merchant-constants';
+import type { MerchantSummary, PlatformStats } from './merchant-constants';
 import styles from './MerchantListPage.module.css';
 
 const MerchantListPage: React.FC = () => {

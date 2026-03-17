@@ -378,7 +378,7 @@ const ComplianceEnginePage: React.FC = () => {
       render: (_v, row) => {
         const count = row.risk_items?.length || 0;
         return count > 0
-          ? <ZBadge variant="error">{count} 项</ZBadge>
+          ? <ZBadge type="error" text={`${count} 项`} />
           : <span style={{ color: '#9ca3af', fontSize: 12 }}>无</span>;
       },
     },
@@ -413,13 +413,13 @@ const ComplianceEnginePage: React.FC = () => {
           </p>
         </div>
         <div className={styles.headerActions}>
-          <ZButton size="small" onClick={handleCompute} loading={computing}>
+          <ZButton size="sm" onClick={handleCompute} loading={computing}>
             重新计算
           </ZButton>
-          <ZButton size="small" onClick={handleGenerate} loading={generating}>
+          <ZButton size="sm" onClick={handleGenerate} loading={generating}>
             生成告警
           </ZButton>
-          <ZButton size="small" variant="primary" onClick={handleAutoActions} loading={executing}>
+          <ZButton size="sm" variant="primary" onClick={handleAutoActions} loading={executing}>
             执行自动操作
           </ZButton>
         </div>
@@ -487,7 +487,7 @@ const ComplianceEnginePage: React.FC = () => {
         </h2>
 
         {alerts.length === 0 ? (
-          <ZEmpty message="暂无未处理告警" />
+          <ZEmpty description="暂无未处理告警" />
         ) : (
           <div className={styles.alertList}>
             {alerts.slice(0, 10).map((a) => (
@@ -503,7 +503,7 @@ const ComplianceEnginePage: React.FC = () => {
                 </div>
                 <div className={styles.alertActions}>
                   <ZButton
-                    size="small"
+                    size="sm"
                     onClick={() => handleResolve(a.id)}
                     loading={resolving === a.id}
                   >
@@ -546,7 +546,7 @@ const ComplianceEnginePage: React.FC = () => {
       <ZCard className={styles.tableCard}>
         {scores.length === 0 ? (
           <div className={styles.centered}>
-            <ZEmpty message="暂无评分数据，请先点击「重新计算」" />
+            <ZEmpty description="暂无评分数据，请先点击「重新计算」" />
           </div>
         ) : (
           <ZTable<ComplianceScore>

@@ -329,7 +329,7 @@ const HealthCertPage: React.FC = () => {
       title: '状态',
       render: (cert) => {
         const s = STATUS_MAP[cert.status] || { label: cert.status, variant: 'default' as const };
-        return <ZBadge variant={s.variant}>{s.label}</ZBadge>;
+        return <ZBadge type={s.variant} text={s.label} />;
       },
     },
     {
@@ -344,13 +344,13 @@ const HealthCertPage: React.FC = () => {
       title: '',
       render: (cert) => (
         <div className={styles.actionGroup}>
-          <ZButton size="xs" variant="ghost" onClick={() => openEdit(cert)}>编辑</ZButton>
+          <ZButton size="sm" variant="ghost" onClick={() => openEdit(cert)}>编辑</ZButton>
           {cert.certificate_image_url && (
-            <ZButton size="xs" variant="ghost" onClick={() => handleViewImage(cert.certificate_image_url)}>
+            <ZButton size="sm" variant="ghost" onClick={() => handleViewImage(cert.certificate_image_url)}>
               查看
             </ZButton>
           )}
-          <ZButton size="xs" variant="danger" onClick={() => handleDelete(cert.id)}>删除</ZButton>
+          <ZButton size="sm" variant="danger" onClick={() => handleDelete(cert.id)}>删除</ZButton>
         </div>
       ),
     },
@@ -404,7 +404,7 @@ const HealthCertPage: React.FC = () => {
       {/* 过期预警 */}
       {!loading && expiredCount > 0 && (
         <div className={styles.alertBanner}>
-          <ZAlert type="error">
+          <ZAlert variant="error">
             {`有 ${expiredCount} 名员工健康证已过期，请尽快安排续办！`}
           </ZAlert>
         </div>
@@ -442,10 +442,10 @@ const HealthCertPage: React.FC = () => {
         <div className={styles.toolbarSpacer} />
         {totalPages > 1 && (
           <div style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 13 }}>
-            <ZButton size="xs" variant="ghost" disabled={page <= 1}
+            <ZButton size="sm" variant="ghost" disabled={page <= 1}
               onClick={() => setPage(p => p - 1)}>上一页</ZButton>
             <span>{page} / {totalPages}</span>
-            <ZButton size="xs" variant="ghost" disabled={page >= totalPages}
+            <ZButton size="sm" variant="ghost" disabled={page >= totalPages}
               onClick={() => setPage(p => p + 1)}>下一页</ZButton>
           </div>
         )}
@@ -477,7 +477,7 @@ const HealthCertPage: React.FC = () => {
         }
       >
         <div className={styles.modalBody}>
-          {modalErr && <ZAlert type="error" className={styles.modalErr}>{modalErr}</ZAlert>}
+          {modalErr && <ZAlert variant="error" style={{ marginBottom: 12 }}>{modalErr}</ZAlert>}
 
           {/* 员工信息 */}
           <div className={styles.fieldGrid}>

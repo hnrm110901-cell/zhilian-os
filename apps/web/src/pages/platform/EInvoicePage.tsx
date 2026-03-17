@@ -277,7 +277,7 @@ const EInvoicePage: React.FC = () => {
       title: '状态',
       render: (inv) => {
         const s = STATUS_MAP[inv.status] || { label: inv.status, variant: 'default' as const };
-        return <ZBadge variant={s.variant}>{s.label}</ZBadge>;
+        return <ZBadge type={s.variant === 'processing' ? 'info' : s.variant} text={s.label} />;
       },
     },
     {
@@ -296,12 +296,12 @@ const EInvoicePage: React.FC = () => {
       render: (inv) => (
         <div className={styles.actionGroup}>
           {inv.status === 'draft' && (
-            <ZButton size="xs" onClick={() => handleSubmitInvoice(inv.id)}>提交开票</ZButton>
+            <ZButton size="sm" onClick={() => handleSubmitInvoice(inv.id)}>提交开票</ZButton>
           )}
           {inv.status === 'issued' && (
             <>
-              <ZButton size="xs" variant="ghost" onClick={() => handleDownloadPdf(inv.pdf_url)}>PDF</ZButton>
-              <ZButton size="xs" variant="danger" onClick={() => handleVoidInvoice(inv.id)}>作废</ZButton>
+              <ZButton size="sm" variant="ghost" onClick={() => handleDownloadPdf(inv.pdf_url)}>PDF</ZButton>
+              <ZButton size="sm" variant="danger" onClick={() => handleVoidInvoice(inv.id)}>作废</ZButton>
             </>
           )}
         </div>
@@ -398,7 +398,7 @@ const EInvoicePage: React.FC = () => {
         }
       >
         <div className={styles.modalBody}>
-          {createErr && <ZAlert type="error" className={styles.modalErr}>{createErr}</ZAlert>}
+          {createErr && <ZAlert variant="error" style={{ marginBottom: 12 }}>{createErr}</ZAlert>}
 
           {/* 购方信息 */}
           <div className={styles.fieldGrid}>
@@ -461,7 +461,7 @@ const EInvoicePage: React.FC = () => {
           <div className={styles.itemsSection}>
             <div className={styles.itemsSectionHeader}>
               <span className={styles.itemsSectionTitle}>发票明细</span>
-              <ZButton size="xs" variant="ghost" onClick={addItem}>+ 添加行</ZButton>
+              <ZButton size="sm" variant="ghost" onClick={addItem}>+ 添加行</ZButton>
             </div>
             <div className={styles.itemLabels}>
               <span>商品名称 *</span>

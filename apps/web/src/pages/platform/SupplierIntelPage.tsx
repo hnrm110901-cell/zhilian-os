@@ -109,9 +109,9 @@ function scoreColor(score: number): string {
   return styles.fillRed;
 }
 
-function tierVariant(tier: string): 'success' | 'processing' | 'warning' | 'error' {
+function tierVariant(tier: string): 'success' | 'info' | 'warning' | 'error' {
   if (tier === 'A') return 'success';
-  if (tier === 'B') return 'processing';
+  if (tier === 'B') return 'info';
   if (tier === 'C') return 'warning';
   return 'error';
 }
@@ -286,7 +286,7 @@ const SupplierIntelPage: React.FC = () => {
       key: 'tier',
       title: '评级',
       width: 70,
-      render: (row) => <ZBadge variant={tierVariant(row.tier)}>{row.tier}级</ZBadge>,
+      render: (row) => <ZBadge type={tierVariant(row.tier)} text={`${row.tier}级`} />,
     },
     {
       key: 'price_trend',
@@ -310,7 +310,7 @@ const SupplierIntelPage: React.FC = () => {
       width: 80,
       render: (row) => (
         <ZButton
-          size="small"
+          size="sm"
           variant="ghost"
           onClick={() => {
             setTrendSupplierId(row.supplier_id);
@@ -429,7 +429,7 @@ const SupplierIntelPage: React.FC = () => {
               <ZCard key={alert.scorecard_id} className={styles.riskCard}>
                 <div className={styles.riskCardHeader}>
                   <span className={styles.riskSupplier}>{alert.supplier_name}</span>
-                  <ZBadge variant="error">{alert.tier}级 {alert.overall_score}分</ZBadge>
+                  <ZBadge type="error" text={`${alert.tier}级 ${alert.overall_score}分`} />
                 </div>
                 <ul className={styles.riskReasons}>
                   {alert.reasons.map((reason, idx) => (

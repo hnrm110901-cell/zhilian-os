@@ -390,7 +390,7 @@ const FoodSafetyPage: React.FC = () => {
       key: 'status', title: '状态', dataIndex: 'status',
       render: (v: any) => {
         const s = TRACE_STATUS_MAP[v] || { label: v, variant: 'default' as const };
-        return <ZBadge variant={s.variant}>{s.label}</ZBadge>;
+        return <ZBadge type={s.variant} text={s.label} />;
       },
     },
     {
@@ -398,7 +398,7 @@ const FoodSafetyPage: React.FC = () => {
       render: (_v: any, row: TraceRecord) => (
         <div className={styles.actionGroup}>
           {row.status === 'normal' && (
-            <ZButton size="xs" variant="ghost" onClick={() => handleRecall(row.id)}>
+            <ZButton size="sm" variant="ghost" onClick={() => handleRecall(row.id)}>
               召回
             </ZButton>
           )}
@@ -429,7 +429,7 @@ const FoodSafetyPage: React.FC = () => {
       key: 'status', title: '结果', dataIndex: 'status',
       render: (v: any) => {
         const s = INSPECTION_STATUS_MAP[v] || { label: v, variant: 'default' as const };
-        return <ZBadge variant={s.variant}>{s.label}</ZBadge>;
+        return <ZBadge type={s.variant} text={s.label} />;
       },
     },
     {
@@ -648,7 +648,7 @@ const FoodSafetyPage: React.FC = () => {
                       {item.origin && <div>产地: {item.origin}</div>}
                     </div>
                     <div style={{ marginTop: 8 }}>
-                      <ZButton size="xs" variant="ghost" onClick={() => handleRecall(item.id)}>
+                      <ZButton size="sm" variant="ghost" onClick={() => handleRecall(item.id)}>
                         召回
                       </ZButton>
                     </div>
@@ -667,7 +667,7 @@ const FoodSafetyPage: React.FC = () => {
         onClose={() => setShowTraceModal(false)}
       >
         <div className={styles.modalBody}>
-          {formErr && <ZAlert type="error" className={styles.modalErr}>{formErr}</ZAlert>}
+          {formErr && <ZAlert variant="error" style={{ marginBottom: 12 }}>{formErr}</ZAlert>}
 
           <div className={styles.fieldGrid}>
             <div className={styles.fieldRow}>
@@ -842,7 +842,7 @@ const FoodSafetyPage: React.FC = () => {
         onClose={() => setShowInspModal(false)}
       >
         <div className={styles.modalBody}>
-          {formErr && <ZAlert type="error" className={styles.modalErr}>{formErr}</ZAlert>}
+          {formErr && <ZAlert variant="error" style={{ marginBottom: 12 }}>{formErr}</ZAlert>}
 
           <div className={styles.fieldGrid}>
             <div className={styles.fieldRow}>
