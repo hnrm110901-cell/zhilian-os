@@ -27,11 +27,18 @@ class HrSeedService:
         """Load hr_seed_rules.json into hr_knowledge_rules.
 
         Returns number of rows inserted (0 if skipped).
-        Uses ON CONFLICT DO NOTHING to handle re-runs safely.
+        When skip_if_exists=False (--force), truncates the table first to avoid
+        duplicates, since each insert generates a fresh UUID and ON CONFLICT
+        only catches PK collisions.
         """
         if skip_if_exists and await self._rule_count() > 0:
             logger.info("hr_knowledge_rules already seeded, skipping.")
             return 0
+
+        if not skip_if_exists:
+            await self._session.execute(
+                sa.text("TRUNCATE TABLE hr_knowledge_rules")
+            )
 
         rules = self._load_json("hr_seed_rules.json")
         inserted = 0
@@ -67,11 +74,18 @@ class HrSeedService:
         """Load hr_seed_skills.json into skill_nodes.
 
         Returns number of rows inserted (0 if skipped).
-        Uses ON CONFLICT DO NOTHING to handle re-runs safely.
+        When skip_if_exists=False (--force), truncates the table first to avoid
+        duplicates, since each insert generates a fresh UUID and ON CONFLICT
+        only catches PK collisions.
         """
         if skip_if_exists and await self._skill_count() > 0:
             logger.info("skill_nodes already seeded, skipping.")
             return 0
+
+        if not skip_if_exists:
+            await self._session.execute(
+                sa.text("TRUNCATE TABLE skill_nodes CASCADE")
+            )
 
         skills = self._load_json("hr_seed_skills.json")
         inserted = 0

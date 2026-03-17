@@ -23,7 +23,8 @@ async def test_load_rules_inserts_correct_count():
         count = await service.load_rules(skip_if_exists=False)
 
     assert count == 3
-    assert mock_session.execute.call_count == 3
+    # 1 TRUNCATE + 3 inserts = 4 execute calls when skip_if_exists=False
+    assert mock_session.execute.call_count == 4
 
 
 @pytest.mark.asyncio
