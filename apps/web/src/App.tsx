@@ -113,6 +113,7 @@ const RoleManagementPage = lazy(() => import('./pages/RoleManagementPage'));
 const QueueManagementPage = lazy(() => import('./pages/QueueManagementPage'));
 const AgentMemoryPage = lazy(() => import('./pages/AgentMemoryPage'));
 const WeChatTriggersPage = lazy(() => import('./pages/WeChatTriggersPage'));
+const IMChannelPage = lazy(() => import('./pages/IMChannelPage'));
 const EventSourcingPage = lazy(() => import('./pages/EventSourcingPage'));
 const MeituanQueuePage = lazy(() => import('./pages/MeituanQueuePage'));
 const VectorIndexPage = lazy(() => import('./pages/VectorIndexPage'));
@@ -689,6 +690,9 @@ const AppContent: React.FC = () => {
                   } />
                   <Route path="wechat-triggers" element={
                     <ProtectedRoute requiredRole="admin"><WeChatTriggersPage /></ProtectedRoute>
+                  } />
+                  <Route path="im-channels" element={
+                    <ProtectedRoute requiredRole="admin"><IMChannelPage /></ProtectedRoute>
                   } />
                   <Route path="event-sourcing" element={
                     <ProtectedRoute requiredRole="admin"><EventSourcingPage /></ProtectedRoute>

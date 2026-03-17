@@ -472,6 +472,12 @@
   letter-spacing: 0.06em;
 }
 
+.versionTag {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+
 /* ── Content ─────────────────────────────────────────────────────────────── */
 
 .content {

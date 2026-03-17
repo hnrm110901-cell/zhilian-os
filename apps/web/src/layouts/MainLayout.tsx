@@ -65,6 +65,7 @@ import {
   MenuUnfoldOutlined,
   EnvironmentOutlined,
   ShareAltOutlined,
+  MessageOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -311,6 +312,7 @@ const DOMAIN_SIDEBAR: DomainSidebar = {
         { key: '/integrations',        icon: <ApiOutlined />,          label: 'POS集成' },
         { key: '/llm-config',          icon: <SettingOutlined />,      label: 'LLM配置' },
         { key: '/edge-hub',            icon: <WifiOutlined />,         label: 'Edge Hub' },
+        { key: '/im-channels',         icon: <MessageOutlined />,      label: 'IM渠道管理' },
       ],
     },
     {
@@ -471,6 +473,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   '/isv-dashboard': 'ISV 看板',
   '/platform-analytics': '商业化总览',
   '/webhook-management': 'Webhook',
+  '/im-channels': 'IM渠道管理',
   '/api-billing': 'API 计费',
   '/developer-console': '开发者控制台',
   '/business-events': '事件中心',
@@ -579,11 +582,13 @@ const MainLayout: React.FC = () => {
   const [sidebarFilter, setSidebarFilter] = useState('');
   const [recentPages, setRecentPages] = useState<RecentPage[]>(getRecentPages);
 
-  // 路由变化时同步 domain + 记录最近访问
+  // 路由变化时同步 domain
   const effectiveDomain = ROUTE_TO_DOMAIN[location.pathname] || activeDomain;
-  if (effectiveDomain && effectiveDomain !== activeDomain) {
-    setActiveDomain(effectiveDomain);
-  }
+  React.useEffect(() => {
+    if (effectiveDomain && effectiveDomain !== activeDomain) {
+      setActiveDomain(effectiveDomain);
+    }
+  }, [effectiveDomain]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 记录最近访问页面
   React.useEffect(() => {

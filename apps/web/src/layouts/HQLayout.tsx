@@ -301,6 +301,7 @@ const HQLayout: React.FC = () => {
           </div>
           <div className={styles.topbarRight}>
             <span className={styles.envBadge}>总部视图</span>
+            <span className={styles.versionTag}>v0.1.0-beta</span>
           </div>
         </header>
         <main className={styles.content}>
