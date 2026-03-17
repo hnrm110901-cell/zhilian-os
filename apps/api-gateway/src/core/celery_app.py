@@ -830,6 +830,13 @@ celery_app.conf.update(
             "args": (),
             "options": {"queue": "default", "priority": 6},
         },
+        # v2.0 跨系统异常告警（营业时段每2小时：10,12,14,16,18,20,22 点整）
+        "push-cross-system-alerts": {
+            "task": "push_cross_system_alerts",
+            "schedule": crontab(minute=0, hour="10,12,14,16,18,20,22"),
+            "args": (),
+            "options": {"queue": "default", "priority": 8},
+        },
         # 每日凌晨 03:30 微生活会员增量同步（拉取 + ConsumerIdMapping 桥接）
         "sync-weishenghuo-members": {
             "task": "sync_weishenghuo_members",

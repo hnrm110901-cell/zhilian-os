@@ -23,7 +23,7 @@ from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import structlog
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.services.decision_flow_state import DecisionFlowState
 from src.services.decision_priority_engine import DecisionPriorityEngine
@@ -166,6 +166,293 @@ def _format_evening_description(
     return "\n".join(lines)[:_DESC_MAX]
 
 
+# ── 三源数据融合：跨系统洞察 ──────────────────────────────────────────────────
+
+
+async def _fetch_cross_system_insights(
+    store_id: str,
+    brand_id: str,
+    db: AsyncSession,
+    date: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    聚合品智POS / 微生活会员 / 奥琦玮供应链三源数据，返回跨系统洞察。
+
+    每个子查询独立 try/except，单源失败不影响其他源。
+    金额：DB 存分 → 展示元（÷100）。
+    """
+    today = date or datetime.now().strftime("%Y-%m-%d")
+    result: Dict[str, Any] = {
+        "pos": None,
+        "member": None,
+        "supply": None,
+        "cross_system": None,
+    }
+
+    # ── 1. POS 数据（品智）──────────────────────────────────────────────────
+    try:
+        pos_row = await db.execute(
+            text("""
+                SELECT
+                    COALESCE(SUM(final_amount), 0)   AS total_revenue_fen,
+                    COUNT(*)                          AS order_count,
+                    CASE WHEN COUNT(*) > 0
+                         THEN COALESCE(SUM(final_amount), 0) / COUNT(*)
+                         ELSE 0 END                   AS avg_ticket_fen
+                FROM orders
+                WHERE store_id = :store_id
+                  AND DATE(created_at) = :today
+            """),
+            {"store_id": store_id, "today": today},
+        )
+        pos_data = pos_row.mappings().first()
+
+        # Top3 菜品
+        top_dishes_rows = await db.execute(
+            text("""
+                SELECT oi.dish_name, SUM(oi.quantity) AS total_qty
+                FROM order_items oi
+                JOIN orders o ON o.id = oi.order_id
+                WHERE o.store_id = :store_id
+                  AND DATE(o.created_at) = :today
+                GROUP BY oi.dish_name
+                ORDER BY total_qty DESC
+                LIMIT 3
+            """),
+            {"store_id": store_id, "today": today},
+        )
+        top_dishes = [r.dish_name for r in top_dishes_rows.all() if r.dish_name]
+
+        result["pos"] = {
+            "today_revenue_yuan": (pos_data["total_revenue_fen"] or 0) / 100.0 if pos_data else 0.0,
+            "order_count": pos_data["order_count"] if pos_data else 0,
+            "avg_ticket_yuan": (pos_data["avg_ticket_fen"] or 0) / 100.0 if pos_data else 0.0,
+            "top_dishes": top_dishes,
+        }
+    except Exception as exc:
+        logger.warning("cross_system_insights.pos_failed", store_id=store_id, error=str(exc))
+        result["pos"] = {
+            "today_revenue_yuan": 0.0,
+            "order_count": 0,
+            "avg_ticket_yuan": 0.0,
+            "top_dishes": [],
+        }
+
+    # ── 2. 会员数据（微生活）─────────────────────────────────────────────────
+    try:
+        member_row = await db.execute(
+            text("""
+                SELECT
+                    COUNT(*) FILTER (
+                        WHERE last_visit_at >= NOW() - INTERVAL '30 days'
+                    ) AS active_30d,
+                    COUNT(*) FILTER (
+                        WHERE created_at >= NOW() - INTERVAL '7 days'
+                    ) AS new_7d,
+                    COUNT(*) FILTER (
+                        WHERE last_visit_at < NOW() - INTERVAL '60 days'
+                          AND total_spend_fen > 50000
+                    ) AS churning,
+                    CASE WHEN COUNT(*) > 0
+                         THEN COALESCE(SUM(stored_value_fen), 0) / COUNT(*)
+                         ELSE 0 END AS avg_stored_fen
+                FROM private_domain_members
+                WHERE store_id = :store_id
+            """),
+            {"store_id": store_id},
+        )
+        m = member_row.mappings().first()
+        result["member"] = {
+            "active_members_30d": m["active_30d"] if m else 0,
+            "new_members_7d": m["new_7d"] if m else 0,
+            "churning_members": m["churning"] if m else 0,
+            "avg_stored_value_yuan": (m["avg_stored_fen"] or 0) / 100.0 if m else 0.0,
+        }
+    except Exception as exc:
+        logger.warning("cross_system_insights.member_failed", store_id=store_id, error=str(exc))
+        result["member"] = {
+            "active_members_30d": 0,
+            "new_members_7d": 0,
+            "churning_members": 0,
+            "avg_stored_value_yuan": 0.0,
+        }
+
+    # ── 3. 供应链数据（奥琦玮）────────────────────────────────────────────────
+    try:
+        supply_row = await db.execute(
+            text("""
+                SELECT
+                    COUNT(*) FILTER (
+                        WHERE current_stock < safety_stock AND current_stock IS NOT NULL
+                    ) AS low_stock_items,
+                    0 AS pending_orders
+                FROM inventory_items
+                WHERE store_id = :store_id
+            """),
+            {"store_id": store_id},
+        )
+        s = supply_row.mappings().first()
+        low_stock = s["low_stock_items"] if s else 0
+
+        # 待收货采购单
+        try:
+            po_row = await db.execute(
+                text("""
+                    SELECT COUNT(*) AS cnt
+                    FROM purchase_orders
+                    WHERE store_id = :store_id
+                      AND status IN ('pending', 'ordered')
+                """),
+                {"store_id": store_id},
+            )
+            po = po_row.mappings().first()
+            pending_orders = po["cnt"] if po else 0
+        except Exception:
+            pending_orders = 0
+
+        # 昨日损耗
+        yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+        try:
+            waste_row = await db.execute(
+                text("""
+                    SELECT COALESCE(SUM(waste_cost_fen), 0) AS total_waste_fen
+                    FROM waste_events
+                    WHERE store_id = :store_id
+                      AND DATE(created_at) = :yesterday
+                """),
+                {"store_id": store_id, "yesterday": yesterday},
+            )
+            w = waste_row.mappings().first()
+            waste_yuan = (w["total_waste_fen"] or 0) / 100.0 if w else 0.0
+        except Exception:
+            waste_yuan = 0.0
+
+        # 食材成本率（本月累计食材成本 / 本月累计营收）
+        try:
+            cost_row = await db.execute(
+                text("""
+                    SELECT
+                        COALESCE(SUM(ingredient_cost_fen), 0) AS cost_fen,
+                        COALESCE(SUM(revenue_fen), 0)         AS rev_fen
+                    FROM daily_summaries
+                    WHERE store_id = :store_id
+                      AND summary_date >= DATE_TRUNC('month', CURRENT_DATE)
+                """),
+                {"store_id": store_id},
+            )
+            c = cost_row.mappings().first()
+            cost_fen = c["cost_fen"] if c else 0
+            rev_fen = c["rev_fen"] if c else 0
+            cost_ratio = round((cost_fen / rev_fen * 100), 1) if rev_fen > 0 else 0.0
+        except Exception:
+            cost_ratio = 0.0
+
+        result["supply"] = {
+            "low_stock_items": low_stock,
+            "pending_orders": pending_orders,
+            "yesterday_waste_yuan": waste_yuan,
+            "cost_ratio": cost_ratio,
+        }
+    except Exception as exc:
+        logger.warning("cross_system_insights.supply_failed", store_id=store_id, error=str(exc))
+        result["supply"] = {
+            "low_stock_items": 0,
+            "pending_orders": 0,
+            "yesterday_waste_yuan": 0.0,
+            "cost_ratio": 0.0,
+        }
+
+    # ── 4. 跨系统关联洞察 ─────────────────────────────────────────────────────
+    try:
+        # 高价值会员7天未到店
+        hv_row = await db.execute(
+            text("""
+                SELECT COUNT(*) AS cnt
+                FROM private_domain_members
+                WHERE store_id = :store_id
+                  AND total_spend_fen > 100000
+                  AND last_visit_at < NOW() - INTERVAL '7 days'
+            """),
+            {"store_id": store_id},
+        )
+        hv = hv_row.mappings().first()
+        high_value_no_visit = hv["cnt"] if hv else 0
+
+        # 热销菜品对应食材库存不足
+        popular_low_stock: List[str] = []
+        if result["pos"] and result["pos"]["top_dishes"]:
+            for dish_name in result["pos"]["top_dishes"]:
+                try:
+                    ls_row = await db.execute(
+                        text("""
+                            SELECT ii.item_name
+                            FROM bom_items bi
+                            JOIN bom_templates bt ON bt.id = bi.bom_id
+                            JOIN dishes d ON d.id = bt.dish_id
+                            JOIN inventory_items ii ON ii.item_name = bi.ingredient_name
+                                AND ii.store_id = :store_id
+                            WHERE d.name = :dish_name
+                              AND ii.current_stock < ii.safety_stock
+                            LIMIT 1
+                        """),
+                        {"store_id": store_id, "dish_name": dish_name},
+                    )
+                    ls = ls_row.first()
+                    if ls:
+                        popular_low_stock.append(dish_name)
+                except Exception:
+                    pass
+
+        # 会员消费与成本差异（会员人均消费 vs 人均食材成本）
+        member_avg = result.get("pos", {}).get("avg_ticket_yuan", 0.0)
+        cost_r = result.get("supply", {}).get("cost_ratio", 0.0)
+        gap = round(member_avg * (1 - cost_r / 100), 2) if member_avg > 0 else 0.0
+
+        result["cross_system"] = {
+            "high_value_member_no_visit_7d": high_value_no_visit,
+            "popular_dish_low_stock": popular_low_stock,
+            "member_spend_vs_cost_gap": gap,
+        }
+    except Exception as exc:
+        logger.warning("cross_system_insights.cross_failed", store_id=store_id, error=str(exc))
+        result["cross_system"] = {
+            "high_value_member_no_visit_7d": 0,
+            "popular_dish_low_stock": [],
+            "member_spend_vs_cost_gap": 0.0,
+        }
+
+    return result
+
+
+def _format_cross_system_alert_description(
+    insights: Dict[str, Any],
+    alerts: List[Dict[str, str]],
+    store_name: str,
+) -> str:
+    """跨系统异常告警卡片描述格式化。"""
+    lines = [f"【{store_name}】跨系统异常检测"]
+
+    for alert in alerts[:3]:
+        emoji = alert.get("emoji", "🔔")
+        title = alert.get("title", "")
+        detail = alert.get("detail", "")
+        conf = alert.get("confidence_pct", 0)
+        lines.append(f"{emoji} {title}")
+        lines.append(f"   {detail}")
+        lines.append(f"   置信度{conf}%")
+
+    # 附加数据摘要
+    pos = insights.get("pos") or {}
+    supply = insights.get("supply") or {}
+    if pos.get("today_revenue_yuan"):
+        lines.append(f"\n📊 今日营收：¥{pos['today_revenue_yuan']:.0f}，{pos.get('order_count', 0)}单")
+    if supply.get("cost_ratio"):
+        lines.append(f"📦 食材成本率：{supply['cost_ratio']:.1f}%")
+
+    desc = "\n".join(lines)
+    return desc[:_DESC_MAX]
+
+
 # ── DecisionPushService ────────────────────────────────────────────────────────
 
 
@@ -214,9 +501,56 @@ class DecisionPushService:
             logger.info("decision_push.morning.no_decisions", store_id=store_id)
             return {"sent": False, "decision_count": 0, "message_id": None, "flow_id": state.flow_id}
 
+        # ── 三源数据融合：补充跨系统决策 ──────────────────────────────────
+        try:
+            insights = await _fetch_cross_system_insights(
+                store_id=store_id, brand_id=brand_id, db=db,
+            )
+            cross = insights.get("cross_system") or {}
+            supply = insights.get("supply") or {}
+
+            # 高价值会员7天未到店 → 回访计划
+            if cross.get("high_value_member_no_visit_7d", 0) > 5:
+                decisions.append({
+                    "rank": len(decisions) + 1,
+                    "title": "启动高价值会员回访计划",
+                    "action": f"{cross['high_value_member_no_visit_7d']}位高价值会员7天未到店，建议短信/企微触达",
+                    "expected_saving_yuan": cross["high_value_member_no_visit_7d"] * 80,
+                    "confidence_pct": 72,
+                    "execution_difficulty": "easy",
+                    "source": "cross_system",
+                })
+
+            # 热销菜品食材库存不足 → 紧急补货
+            popular_low = cross.get("popular_dish_low_stock", [])
+            if popular_low:
+                decisions.append({
+                    "rank": len(decisions) + 1,
+                    "title": "热销菜品食材预警，建议紧急补货",
+                    "action": f"{'、'.join(popular_low[:3])}对应食材低于安全库存",
+                    "expected_saving_yuan": len(popular_low) * 200,
+                    "confidence_pct": 85,
+                    "execution_difficulty": "medium",
+                    "source": "cross_system",
+                })
+
+            # 食材成本率偏高 → 检查损耗
+            if supply.get("cost_ratio", 0) > 38:
+                decisions.append({
+                    "rank": len(decisions) + 1,
+                    "title": "食材成本率偏高，建议检查损耗",
+                    "action": f"本月成本率{supply['cost_ratio']:.1f}%（阈值38%），昨日损耗¥{supply.get('yesterday_waste_yuan', 0):.0f}",
+                    "expected_saving_yuan": supply.get("yesterday_waste_yuan", 0) * 5,
+                    "confidence_pct": 78,
+                    "execution_difficulty": "medium",
+                    "source": "cross_system",
+                })
+        except Exception as exc:
+            logger.warning("decision_push.morning.cross_system_failed", store_id=store_id, error=str(exc))
+
         state.set_decisions_from_engine(decisions)
 
-        title = f"【晨推·Top{len(decisions)}决策】{store_name or store_id}"
+        title = f"【晨推·Top{min(len(decisions), 3)}决策】{store_name or store_id}"
         description = _format_card_description(decisions)
         action_url = f"{_APPROVAL_BASE_URL}?store_id={store_id}&window=morning"
 
@@ -484,6 +818,131 @@ class DecisionPushService:
             "sent": state.push_sent,
             "pending_approvals": pending_count,
             "decision_count": len(decisions),
+            "message_id": state.push_message_id,
+            "flow_id": state.flow_id,
+        }
+
+
+    @staticmethod
+    async def push_cross_system_alert(
+        store_id: str,
+        brand_id: str,
+        recipient_user_id: str,
+        db: AsyncSession,
+        store_name: str = "",
+    ) -> Dict[str, Any]:
+        """
+        跨系统异常告警推送（每2小时，营业时段 10:00-22:00）。
+
+        聚合 POS + 会员 + 供应链三源数据，检测跨系统异常：
+          - 高价值会员流失 + 营收下降 → 紧急告警
+          - 热销菜品食材库存不足 → 采购告警
+          - 成本率飙升 + 损耗增加 → 止损告警
+
+        仅在检测到异常时推送（纯信息不推 — Rule 7）。
+
+        Returns:
+            {"sent": bool, "alert_count": int, "message_id": str | None, "flow_id": str}
+        """
+        state = DecisionFlowState.new(store_id=store_id, push_window="跨系统告警")
+        wechat = _get_wechat_service()
+
+        try:
+            insights = await _fetch_cross_system_insights(
+                store_id=store_id, brand_id=brand_id, db=db,
+            )
+        except Exception as exc:
+            logger.warning("decision_push.cross_alert.insights_failed", store_id=store_id, error=str(exc))
+            return {"sent": False, "alert_count": 0, "message_id": None, "flow_id": state.flow_id}
+
+        cross = insights.get("cross_system") or {}
+        pos = insights.get("pos") or {}
+        supply = insights.get("supply") or {}
+        member = insights.get("member") or {}
+
+        alerts: List[Dict[str, str]] = []
+
+        # 告警1：高价值会员流失 + 营收下降
+        hv_no_visit = cross.get("high_value_member_no_visit_7d", 0)
+        churning = member.get("churning_members", 0)
+        if hv_no_visit > 5 and churning > 3:
+            estimated_loss = hv_no_visit * 150  # 预估流失金额
+            alerts.append({
+                "emoji": "🔴",
+                "title": "高价值会员流失预警",
+                "detail": (
+                    f"{hv_no_visit}位高价值会员7天未到店，{churning}位沉睡风险。"
+                    f"预估月损失¥{estimated_loss}"
+                ),
+                "confidence_pct": 75,
+                "expected_saving_yuan": str(estimated_loss),
+                "action_type": "member_recall",
+            })
+
+        # 告警2：热销菜品食材库存不足
+        popular_low = cross.get("popular_dish_low_stock", [])
+        if popular_low:
+            alerts.append({
+                "emoji": "📦",
+                "title": "热销菜品食材紧急补货",
+                "detail": (
+                    f"{'、'.join(popular_low[:3])}对应食材低于安全库存，"
+                    f"可能导致晚高峰缺菜。待收货采购单{supply.get('pending_orders', 0)}笔"
+                ),
+                "confidence_pct": 88,
+                "expected_saving_yuan": str(len(popular_low) * 300),
+                "action_type": "emergency_purchase",
+            })
+
+        # 告警3：成本率飙升 + 损耗增加
+        cost_ratio = supply.get("cost_ratio", 0)
+        waste_yuan = supply.get("yesterday_waste_yuan", 0)
+        if cost_ratio > 38 and waste_yuan > 200:
+            alerts.append({
+                "emoji": "⚠️",
+                "title": "成本率+损耗双高告警",
+                "detail": (
+                    f"本月成本率{cost_ratio:.1f}%（阈值38%），"
+                    f"昨日损耗¥{waste_yuan:.0f}。建议立即盘点+检查出品流程"
+                ),
+                "confidence_pct": 82,
+                "expected_saving_yuan": str(int(waste_yuan * 3)),
+                "action_type": "loss_prevention",
+            })
+
+        if not alerts:
+            logger.info("decision_push.cross_alert.no_anomaly", store_id=store_id)
+            return {"sent": False, "alert_count": 0, "message_id": None, "flow_id": state.flow_id}
+
+        title = f"【跨系统告警·{len(alerts)}项异常】{store_name or store_id}"
+        description = _format_cross_system_alert_description(insights, alerts, store_name or store_id)
+        action_url = f"{_APPROVAL_BASE_URL}?store_id={store_id}&window=cross_alert"
+
+        result = await wechat.send_decision_card(
+            title=title,
+            description=description,
+            action_url=action_url,
+            btntxt="立即处理",
+            to_user_id=recipient_user_id,
+        )
+
+        state.push_sent = result.get("status") == "sent"
+        state.push_message_id = result.get("message_id")
+        if not state.push_sent:
+            state.push_error = result.get("error") or result.get("status")
+        state.mark_completed()
+        await state.save_to_redis()
+
+        logger.info(
+            "decision_push.cross_alert.sent",
+            store_id=store_id,
+            alert_count=len(alerts),
+            alert_types=[a.get("action_type") for a in alerts],
+            flow_id=state.flow_id,
+        )
+        return {
+            "sent": state.push_sent,
+            "alert_count": len(alerts),
             "message_id": state.push_message_id,
             "flow_id": state.flow_id,
         }

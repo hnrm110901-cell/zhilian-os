@@ -6718,3 +6718,60 @@ def sync_weishenghuo_members(self) -> Dict[str, Any]:
         "new_mappings": new_mappings,
         "errors": errors[:20],
     }
+
+
+# ============================================================
+# v2.0 跨系统异常告警（营业时段每2小时 10:00-22:00）
+# ============================================================
+
+
+@celery_app.task(bind=True, name="push_cross_system_alerts", max_retries=2, default_retry_delay=180)
+def push_cross_system_alerts(self, store_id: str = None) -> Dict[str, Any]:
+    """
+    跨系统异常告警：聚合 POS + 会员 + 供应链三源数据，检测跨系统异常并推送。
+
+    调度：营业时段每2小时（10:00, 12:00, 14:00, 16:00, 18:00, 20:00, 22:00）。
+    """
+    import asyncio
+
+    async def _run():
+        from sqlalchemy import select
+        from src.core.database import get_db_session
+        from src.models.store import Store
+        from src.services.decision_push_service import DecisionPushService
+
+        results = {"stores_checked": 0, "alerts_sent": 0, "errors": []}
+
+        async with get_db_session() as db:
+            if store_id:
+                stores = [(store_id, "")]
+            else:
+                rows = (await db.execute(select(Store.id, Store.name))).all()
+                stores = [(str(r.id), r.name or "") for r in rows]
+
+            for sid, sname in stores:
+                try:
+                    result = await DecisionPushService.push_cross_system_alert(
+                        store_id=sid,
+                        brand_id="",
+                        recipient_user_id=_get_store_recipient(sid),
+                        db=db,
+                        store_name=sname,
+                    )
+                    results["stores_checked"] += 1
+                    if result.get("sent"):
+                        results["alerts_sent"] += 1
+                except Exception as exc:
+                    results["errors"].append(f"store={sid}: {str(exc)}")
+                    logger.warning(
+                        "push_cross_system_alerts.store_failed",
+                        store_id=sid,
+                        error=str(exc),
+                    )
+
+        return results
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        raise self.retry(exc=exc)
