@@ -126,6 +126,11 @@ class Settings(BaseSettings):
     PINZHI_TIMEOUT: int = 30
     PINZHI_RETRY_TIMES: int = 3
 
+    # Neo4j 图数据库（本体层）
+    NEO4J_URI: str = "bolt://localhost:7687"
+    NEO4J_USER: str = "neo4j"
+    NEO4J_PASSWORD: str = "changeme"
+
     # Celery配置
     CELERY_BROKER_URL: str
     CELERY_RESULT_BACKEND: str

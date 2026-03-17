@@ -15,6 +15,9 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from src.models import Dish, DishCategory, Employee, InventoryItem, Order, OrderItem, Store
+from src.models.supply_chain import Supplier
+from src.models.bom import BOMTemplate, BOMItem
+from src.models.waste_event import WasteEvent
 from src.ontology import NodeLabel, RelType, get_ontology_repository
 
 # InventoryItem.id 作为 ing_id；Store.id 作为 store_id；Dish.id 转为 str 作为 dish_id
@@ -300,12 +303,18 @@ async def sync_ontology_from_pg(
     ingredients_n = await sync_ingredients_to_graph(session, tenant_id, store_id)
     staff_n = await sync_staff_to_graph(session, tenant_id, store_id)
     orders_n = await sync_orders_to_graph(session, tenant_id, store_id)
+    suppliers_n = await sync_suppliers_to_graph(session, tenant_id)
+    boms_n = await sync_boms_to_graph(session, tenant_id, store_id)
+    waste_n = await sync_waste_events_to_graph(session, tenant_id, store_id)
     return {
         "stores": stores_n,
         "dishes": dishes_n,
         "ingredients": ingredients_n,
         "staff": staff_n,
         "orders": orders_n,
+        "suppliers": suppliers_n,
+        "boms": boms_n,
+        "waste_events": waste_n,
     }
 
 
@@ -362,6 +371,151 @@ def push_normalized_order_to_graph(
             rel_props={"quantity": qty},
         )
     return True
+
+
+async def sync_suppliers_to_graph(
+    session: AsyncSession,
+    tenant_id: str,
+) -> int:
+    """将供应商从 PG 同步到图谱（Supplier 节点），并建立 Supplier -[:SUPPLIES]-> Ingredient 关系。"""
+    repo = get_ontology_repository()
+    if not repo:
+        return 0
+    q = select(Supplier).where(Supplier.status == "active")
+    result = await session.execute(q)
+    suppliers = result.scalars().all()
+    count = 0
+    for s in suppliers:
+        repo.merge_node(
+            NodeLabel.Supplier.value,
+            "sup_id",
+            s.id,
+            {
+                "name": s.name or "",
+                "category": s.category or "food",
+                "contact_phone": s.phone or "",
+                "lead_time": s.delivery_time or 3,
+                "reliability": 1.0,
+                "quality_score": float(s.rating or 5.0),
+                "tenant_id": tenant_id,
+            },
+            tenant_id=tenant_id,
+        )
+        count += 1
+    return count
+
+
+async def sync_boms_to_graph(
+    session: AsyncSession,
+    tenant_id: str,
+    store_id: Optional[str] = None,
+) -> int:
+    """将 BOM（配方版本）从 PG 批量同步到图谱，含 Dish -[:HAS_BOM]-> BOM -[:REQUIRES]-> Ingredient 关系。"""
+    repo = get_ontology_repository()
+    if not repo:
+        return 0
+    q = select(BOMTemplate).where(BOMTemplate.is_active == True).options(selectinload(BOMTemplate.items))
+    if store_id:
+        q = q.where(BOMTemplate.store_id == store_id)
+    result = await session.execute(q)
+    boms = result.scalars().all()
+    count = 0
+    for bom in boms:
+        bom_id = f"{bom.dish_id}_{bom.version}"
+        eff = bom.effective_date.isoformat() if getattr(bom.effective_date, "isoformat", None) else str(bom.effective_date or "")
+        repo.merge_node(
+            NodeLabel.BOM.value,
+            "bom_id",
+            bom_id,
+            {
+                "dish_id": str(bom.dish_id),
+                "version": bom.version or "",
+                "effective_date": eff,
+                "yield_rate": float(bom.yield_rate or 1.0),
+                "tenant_id": tenant_id,
+            },
+            tenant_id=tenant_id,
+        )
+        # Dish -[:HAS_BOM]-> BOM
+        repo.merge_relation(
+            NodeLabel.Dish.value,
+            "dish_id",
+            str(bom.dish_id),
+            RelType.HAS_BOM.value,
+            NodeLabel.BOM.value,
+            "bom_id",
+            bom_id,
+        )
+        # BOM -[:REQUIRES]-> Ingredient
+        for item in (bom.items or []):
+            repo.merge_relation(
+                NodeLabel.BOM.value,
+                "bom_id",
+                bom_id,
+                RelType.REQUIRES.value,
+                NodeLabel.Ingredient.value,
+                "ing_id",
+                str(item.ingredient_id),
+                rel_props={
+                    "quantity": float(item.standard_qty or 0),
+                    "unit": item.unit or "",
+                    "waste_factor": float(item.waste_factor or 0),
+                },
+            )
+        count += 1
+    return count
+
+
+async def sync_waste_events_to_graph(
+    session: AsyncSession,
+    tenant_id: str,
+    store_id: Optional[str] = None,
+) -> int:
+    """将损耗事件从 PG 同步到图谱（WasteEvent 节点 + 关联关系）。用于历史数据回灌。"""
+    repo = get_ontology_repository()
+    if not repo:
+        return 0
+    q = select(WasteEvent)
+    if store_id:
+        q = q.where(WasteEvent.store_id == store_id)
+    result = await session.execute(q)
+    events = result.scalars().all()
+    count = 0
+    for ev in events:
+        ts = ev.occurred_at.isoformat() if getattr(ev.occurred_at, "isoformat", None) else str(ev.occurred_at or "")
+        props: dict = {
+            "ingredient_id": str(ev.ingredient_id),
+            "amount": float(ev.quantity or 0),
+            "unit": ev.unit or "",
+            "occurred_at": ts,
+            "event_type": ev.event_type.value if ev.event_type else "unknown",
+            "store_id": ev.store_id or "",
+            "tenant_id": tenant_id,
+        }
+        if ev.root_cause:
+            props["root_cause"] = ev.root_cause
+        if ev.confidence is not None:
+            props["confidence"] = ev.confidence
+        repo.merge_node(
+            NodeLabel.WasteEvent.value,
+            "event_id",
+            ev.event_id,
+            props,
+            tenant_id=tenant_id,
+        )
+        # WasteEvent -[:TRIGGERED_BY]-> Staff（如有疑似责任人）
+        if ev.assigned_staff_id:
+            repo.merge_relation(
+                NodeLabel.WasteEvent.value,
+                "event_id",
+                ev.event_id,
+                RelType.TRIGGERED_BY.value,
+                NodeLabel.Staff.value,
+                "staff_id",
+                ev.assigned_staff_id,
+            )
+        count += 1
+    return count
 
 
 async def sync_bom_version_to_pg(

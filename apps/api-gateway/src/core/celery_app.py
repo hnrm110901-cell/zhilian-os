@@ -371,7 +371,7 @@ celery_app.conf.update(
         },
         # 每日凌晨 2AM 同步 PG 主数据 → Neo4j 图谱
         "sync-ontology-graph": {
-            "task": "src.core.celery_tasks.sync_ontology_graph",
+            "task": "tasks.daily_ontology_sync",
             "schedule": crontab(
                 hour=int(os.getenv("CELERY_ONTOLOGY_SYNC_HOUR", "2")),
                 minute=0,

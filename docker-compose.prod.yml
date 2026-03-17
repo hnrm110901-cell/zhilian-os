@@ -281,6 +281,30 @@ services:
       - redis
       - redis-replica
 
+  # Neo4j 图数据库（本体层 / 推理层核心）
+  neo4j:
+    image: neo4j:5.17-community
+    container_name: zhilian-neo4j
+    restart: always
+    ports:
+      - "7687:7687"
+      - "7474:7474"
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:?NEO4J_PASSWORD is required}
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_memory_heap_initial__size: 1G
+      NEO4J_dbms_memory_heap_max__size: 2G
+      NEO4J_dbms_memory_pagecache_size: 1G
+    volumes:
+      - neo4j-data:/data
+    networks:
+      - zhilian-network
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "${NEO4J_PASSWORD:?NEO4J_PASSWORD is required}", "RETURN 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
   # Qdrant向量数据库 (用于神经系统语义搜索)
   qdrant:
     image: qdrant/qdrant:v1.7.4
@@ -327,6 +351,8 @@ volumes:
   redis-replica-data:
     driver: local
   postgres-data:
+    driver: local
+  neo4j-data:
     driver: local
   qdrant-data:
     driver: local

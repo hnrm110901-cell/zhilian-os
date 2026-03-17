@@ -26,7 +26,13 @@ def get_ontology_repository() -> "OntologyRepository":
     """
     from .repository import OntologyRepository  # 懒加载，避免 neo4j 未安装时影响整体启动
 
-    uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-    user = os.getenv("NEO4J_USER", "neo4j")
-    password = os.getenv("NEO4J_PASSWORD", "password")
+    try:
+        from src.core.config import settings
+        uri = settings.NEO4J_URI
+        user = settings.NEO4J_USER
+        password = settings.NEO4J_PASSWORD
+    except Exception:
+        uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+        user = os.getenv("NEO4J_USER", "neo4j")
+        password = os.getenv("NEO4J_PASSWORD", "changeme")
     return OntologyRepository(uri=uri, user=user, password=password)

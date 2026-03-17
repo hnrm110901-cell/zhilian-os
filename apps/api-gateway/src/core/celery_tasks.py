@@ -2101,90 +2101,23 @@ def daily_ontology_sync(
     """
 
     async def _run():
-        from datetime import datetime, timedelta
-
-        from sqlalchemy import and_, select
-
         from ..core.database import get_db_session
-        from ..models.bom import BOMTemplate
-        from ..models.store import Store
-        from ..models.waste_event import WasteEvent
+        from ..services.ontology_sync_service import sync_ontology_from_pg
 
-        synced_stores = 0
-        nodes_upserted = 0
         errors = []
 
         async with get_db_session() as session:
-            # 确定要同步的门店
-            if store_id:
-                stmt = select(Store).where(Store.id == store_id, Store.is_active.is_(True))
-            else:
-                stmt = select(Store).where(Store.is_active.is_(True))
-            result = await session.execute(stmt)
-            stores = result.scalars().all()
-
-            for store in stores:
-                sid = str(store.id)
-                try:
-                    # 1. 同步活跃 BOM
-                    bom_stmt = select(BOMTemplate).where(and_(BOMTemplate.store_id == sid, BOMTemplate.is_active.is_(True)))
-                    bom_result = await session.execute(bom_stmt)
-                    active_boms = bom_result.scalars().all()
-
-                    try:
-                        from ..ontology.data_sync import OntologyDataSync
-
-                        with OntologyDataSync() as sync:
-                            for bom in active_boms:
-                                dish_id_str = f"DISH-{bom.dish_id}"
-                                sync.upsert_bom(
-                                    dish_id=dish_id_str,
-                                    version=bom.version,
-                                    effective_date=bom.effective_date,
-                                    yield_rate=float(bom.yield_rate),
-                                    expiry_date=bom.expiry_date,
-                                    notes=bom.notes,
-                                )
-                                nodes_upserted += 1
-                    except Exception as neo4j_err:
-                        logger.warning("Neo4j BOM 同步失败", store_id=sid, error=str(neo4j_err))
-
-                    # 2. 同步近 30 天 WasteEvent
-                    since = datetime.utcnow() - timedelta(days=30)
-                    we_stmt = select(WasteEvent).where(
-                        and_(
-                            WasteEvent.store_id == sid,
-                            WasteEvent.occurred_at >= since,
-                        )
-                    )
-                    we_result = await session.execute(we_stmt)
-                    events = we_result.scalars().all()
-
-                    from ..services.waste_event_service import WasteEventService
-
-                    svc = WasteEventService(session)
-                    for ev in events:
-                        try:
-                            await svc._sync_to_neo4j(ev)
-                            nodes_upserted += 1
-                        except Exception as e:
-                            logger.warning(
-                                "WasteEvent Neo4j 同步失败",
-                                event_id=ev.event_id,
-                                error=str(e),
-                            )
-
-                    synced_stores += 1
-                    logger.info(
-                        "门店本体同步完成",
-                        store_id=sid,
-                        boms=len(active_boms),
-                        waste_events=len(events),
-                    )
-
-                except Exception as e:
-                    errors.append({"store_id": sid, "error": str(e)})
-                    logger.error("门店本体同步失败", store_id=sid, error=str(e))
+            try:
+                # 使用统一同步入口（含 stores/dishes/ingredients/staff/orders/suppliers/boms/waste_events）
+                tenant_id = store_id or "default"
+                result = await sync_ontology_from_pg(session, tenant_id, store_id)
+                nodes_upserted = sum(result.values())
+                synced_stores = result.get("stores", 0)
+            except Exception as e:
+                errors.append({"store_id": store_id or "all", "error": str(e)})
+                logger.error("本体同步失败", error=str(e))
+                nodes_upserted = 0
+                synced_stores = 0
 
         logger.info(
             "日常本体同步完成",

@@ -111,6 +111,29 @@ services:
       timeout: 5s
       retries: 5
 
+  # ── Neo4j 图数据库（本体层）────────────────────────────────────────
+  neo4j:
+    image: neo4j:5.17-community
+    container_name: zhilian-staging-neo4j
+    restart: unless-stopped
+    ports:
+      - "7688:7687"
+      - "7475:7474"
+    environment:
+      NEO4J_AUTH: neo4j/staging_neo4j
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_memory_heap_initial__size: 512m
+      NEO4J_dbms_memory_heap_max__size: 1G
+    volumes:
+      - staging-neo4j-data:/data
+    networks:
+      - staging-network
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "staging_neo4j", "RETURN 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
   # ── Qdrant 向量数据库 ────────────────────────────────────────────
   qdrant:
     image: qdrant/qdrant:v1.7.4
@@ -132,6 +155,8 @@ networks:
 
 volumes:
   staging-postgres-data:
+    driver: local
+  staging-neo4j-data:
     driver: local
   staging-qdrant-data:
     driver: local
