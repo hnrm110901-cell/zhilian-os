@@ -413,6 +413,13 @@ __all__ = [
     "PayslipRecord",
     # HR — 操作审计日志
     "OperationAuditLog",
+    # 组织层级
+    "OrgNode",
+    "OrgNodeType",
+    "StoreType",
+    "OperationMode",
+    "OrgConfig",
+    "ConfigKey",
 ]
 
 from .business_intel import (

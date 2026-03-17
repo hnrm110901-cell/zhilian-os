@@ -63,12 +63,12 @@ class OrgNode(Base, TimestampMixin):
 
     # 元数据
     description  = Column(Text, nullable=True)
-    extra        = Column(JSON, default=dict)   # 扩展字段（如企微部门ID、POS编码）
+    extra        = Column(JSON, default=dict, server_default="{}")   # 扩展字段（如企微部门ID、POS编码）
     is_active    = Column(Boolean, default=True, nullable=False)
     sort_order   = Column(Integer, default=0)
 
     # 关系
-    parent   = relationship("OrgNode", remote_side="OrgNode.id", foreign_keys=[parent_id])
+    parent   = relationship("OrgNode", remote_side=[id], foreign_keys=[parent_id])
     configs  = relationship("OrgConfig", back_populates="org_node", cascade="all, delete-orphan")
 
     def __repr__(self):

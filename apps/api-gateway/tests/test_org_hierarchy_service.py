@@ -18,6 +18,7 @@ def test_store_type_enums_exist():
     assert StoreType.MALL.value == "mall"
     assert StoreType.DARK_KITCHEN.value == "dark_kitchen"
     assert StoreType.FRANCHISE.value == "franchise"
+    assert StoreType.KIOSK.value == "kiosk"
 
 
 def test_operation_mode_enums_exist():
