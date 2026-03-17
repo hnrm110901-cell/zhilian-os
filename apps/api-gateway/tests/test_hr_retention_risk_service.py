@@ -177,7 +177,9 @@ async def test_run_wf1_pushes_wechat(mock_wechat, mock_session):
     # Patch scan_store to return (high_risk_list, total_scanned)
     svc = RetentionRiskService(session=mock_session)
 
-    with patch.object(svc, "scan_store", return_value=(
+    mock_wechat.send_text_message = AsyncMock()
+
+    with patch.object(svc, "scan_store", new_callable=AsyncMock, return_value=(
         [{"assignment_id": str(uuid.uuid4()), "person_name": "张三",
           "risk_score": 0.85, "risk_factors": {"new_hire": True}}],
         3,  # 3 total active assignments scanned, 1 is high-risk

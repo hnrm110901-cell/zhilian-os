@@ -200,7 +200,7 @@ class RetentionRiskService:
                 ws = _get_wechat_service()
                 if ws is None:
                     logger.warning("hr_retention.wechat_unavailable")
-                    break
+                    continue
                 message = (
                     f"【离职风险预警】\n"
                     f"员工: {entry['person_name']}\n"
