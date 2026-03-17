@@ -40,14 +40,17 @@
 
 ```sql
 persons (
-  id              UUID PRIMARY KEY,
-  name            VARCHAR(50) NOT NULL,
-  id_number       VARCHAR(18),          -- 身份证号（加密存储）
-  phone           VARCHAR(20),
-  photo_url       VARCHAR(500),
-  emergency_contact JSON,
-  created_at      TIMESTAMPTZ DEFAULT NOW(),
-  updated_at      TIMESTAMPTZ DEFAULT NOW()
+  id                  UUID PRIMARY KEY,
+  legacy_employee_id  VARCHAR(50),       -- 迁移桥接：原 employees.id（如 "EMP001"）
+  name                VARCHAR(50) NOT NULL,
+  id_number           VARCHAR(18),       -- 身份证号（加密存储）
+  phone               VARCHAR(20),
+  email               VARCHAR(200),
+  photo_url           VARCHAR(500),
+  preferences         JSONB,             -- 原 employees.preferences 迁移
+  emergency_contact   JSONB,
+  created_at          TIMESTAMPTZ DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ DEFAULT NOW()
 )
 ```
 
@@ -254,7 +257,7 @@ ActionRecord（D级自主执行动作记录）：
 IntentRouter → [DiagnosisNode | PredictionNode | ActionNode]
                       ↓
               KnowledgeRetriever（共享）
-              ├── RuleRetriever      → knowledge_rules
+              ├── RuleRetriever      → hr_knowledge_rules
               ├── GraphTraversal     → skill_nodes 关系链
               └── PatternMatcher     → behavior_patterns ML
                       ↓
@@ -302,7 +305,7 @@ IntentRouter → [DiagnosisNode | PredictionNode | ActionNode]
 触发条件：离职申请 / 月度复盘时间点 / 异常事件处理后
 → AI通过企业微信发送结构化问题（情境/动作/结果三段式）
 → LLM解析回答 → 存入 knowledge_captures
-→ 质量评分 > 0.8 → 提升为 knowledge_rules 或 skill_nodes
+→ 质量评分 > 0.8 → 提升为 hr_knowledge_rules 或 skill_nodes
 ```
 
 #### WF-5 新店人才梯队复制流（手动触发）
@@ -373,10 +376,13 @@ employees.training_completed → 转换：同上，查找 skill_nodes 匹配后�
 **外键桥接表**（临时，M4删除）：
 ```sql
 employee_id_map (
-  legacy_employee_id VARCHAR(50),
-  person_id UUID,
-  assignment_id UUID
+  legacy_employee_id  VARCHAR(50) PRIMARY KEY,  -- 原 "EMP001" 风格 ID
+  person_id           UUID NOT NULL,
+  assignment_id       UUID NOT NULL
 )
+
+CREATE INDEX idx_employee_id_map_person     ON employee_id_map (person_id);
+CREATE INDEX idx_employee_id_map_assignment ON employee_id_map (assignment_id);
 ```
 所有旧 `employee_id` FK 字段在过渡期通过此表查找对应的 `assignment_id`。
 
