@@ -960,6 +960,9 @@ app.include_router(daily_ops.router)
 app.include_router(job_standard.router)
 # 组织层级 + 多层配置继承
 app.include_router(org_hierarchy.router)
+# M2 HR Foundation — HRAgent v1 + REST API
+from src.api import hr as hr_api
+app.include_router(hr_api.router, prefix="/api/v1/hr", tags=["HR"])
 
 # 业财税资金一体化（FCT）
 if getattr(settings, "FCT_ENABLED", False):
