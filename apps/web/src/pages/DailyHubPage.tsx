@@ -16,6 +16,7 @@ import {
 } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { apiClient } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import AISuggestionCard from '../design-system/components/AISuggestionCard';
 import { OpsTimeline } from '../design-system/components';
 
@@ -64,9 +65,10 @@ async function loadKpiData(storeId: string) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 const DailyHubPage: React.FC = () => {
+  const { user } = useAuth();
   const [loading, setLoading]   = useState(false);
   const [approving, setApproving] = useState(false);
-  const [selectedStore, setSelectedStore] = useState('STORE001');
+  const [selectedStore, setSelectedStore] = useState(user?.store_id || 'STORE001');
   const [board, setBoard]       = useState<any>(null);
   const [kpi, setKpi]           = useState<any>(null);
   const phaseIdx = currentPhaseIndex();

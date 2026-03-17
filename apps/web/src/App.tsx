@@ -304,6 +304,15 @@ const SmBanquetPush        = lazy(() => import('./pages/sm/BanquetPush'));
 const SmBanquetFollowups   = lazy(() => import('./pages/sm/BanquetFollowups'));
 const SmBanquetSearch      = lazy(() => import('./pages/sm/BanquetSearch'));
 const SmPrivateDomainHealth = lazy(() => import('./pages/sm/PrivateDomainHealthPage'));
+const SmDailyDashboard  = lazy(() => import('./pages/sm/DailyDashboard'));
+const SmDailySettlement = lazy(() => import('./pages/sm/DailySettlement'));
+const SmAbnormalTasks   = lazy(() => import('./pages/sm/AbnormalTasks'));
+const SmWeeklyReview    = lazy(() => import('./pages/sm/WeeklyReview'));
+
+// 岗位标准化知识库 + 员工成长溯源 (Phase 2-3 HR知识OS)
+const JobStandardLibrary  = lazy(() => import('./pages/hr/JobStandardLibrary'));
+const EmployeeGrowthTrace = lazy(() => import('./pages/hr/EmployeeGrowthTrace'));
+const JobStandardDetail   = lazy(() => import('./pages/hr/JobStandardDetail'));
 
 // Role-based views — Employee H5 Self-Service (/emp)
 const EmployeeLayout    = lazy(() => import('./pages/employee/EmployeeLayout'));
@@ -925,6 +934,16 @@ const AppContent: React.FC = () => {
                   <Route path="attendance-rules" element={
                     <ProtectedRoute requiredRole="admin"><AttendanceRulePage /></ProtectedRoute>
                   } />
+                  {/* 岗位标准化知识库 + 员工成长溯源 */}
+                  <Route path="job-standard-library" element={
+                    <ProtectedRoute requiredRole="admin"><JobStandardLibrary /></ProtectedRoute>
+                  } />
+                  <Route path="employee-growth-trace" element={
+                    <ProtectedRoute requiredRole="store_manager"><EmployeeGrowthTrace /></ProtectedRoute>
+                  } />
+                  <Route path="job-standard/:jobCode" element={
+                    <ProtectedRoute><JobStandardDetail /></ProtectedRoute>
+                  } />
                   {/* 替换易订 — R3 桌台平面图 / R4 AI邀请函 */}
                   <Route path="floor-plan" element={
                     <ProtectedRoute><FloorPlanPage /></ProtectedRoute>
@@ -1033,6 +1052,11 @@ const AppContent: React.FC = () => {
                   <Route path="hr"       element={<SmHRQuick />} />
                   <Route path="patrol"   element={<SmPatrol />} />
                   <Route path="profile"  element={<SmProfile />} />
+                  {/* 日清日结 + 周复盘 */}
+                  <Route path="daily-dashboard"  element={<SmDailyDashboard />} />
+                  <Route path="daily-settlement" element={<SmDailySettlement />} />
+                  <Route path="tasks-abnormal"   element={<SmAbnormalTasks />} />
+                  <Route path="weekly-review"    element={<SmWeeklyReview />} />
                 </Route>
 
                 {/* Role-based views — Chef (手机) */}

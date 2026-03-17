@@ -1,0 +1,452 @@
+/* ============================================================
+   EmployeeGrowthTrace.module.css
+   ============================================================ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--bg, #f5f6fa);
+  font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+}
+
+/* --- Header --- */
+.pageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  background: #fff;
+  border-bottom: 1px solid #f0f0f0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.headerTitle {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.headerTitleMain {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.headerTitleSub {
+  font-size: 15px;
+  color: #666;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.currentJobLabel {
+  font-size: 13px;
+  color: #888;
+}
+
+/* --- Body --- */
+.pageBody {
+  flex: 1;
+  padding: 24px;
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 768px) {
+  .pageBody {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- Left Col --- */
+.leftCol {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: sticky;
+  top: 80px;
+}
+
+.leftColAction {
+  display: flex;
+  justify-content: center;
+}
+
+/* --- KPI Gap Card --- */
+.kpiGapCard {
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.kpiGapHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.kpiGapTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.kpiList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kpiRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #f9fafb;
+}
+
+.kpiRow.good {
+  border-left: 3px solid #22c55e;
+}
+
+.kpiRow.warning {
+  border-left: 3px solid #f59e0b;
+}
+
+.kpiRow.danger {
+  border-left: 3px solid #ef4444;
+}
+
+.kpiRow.unknown {
+  border-left: 3px solid #d1d5db;
+}
+
+.kpiName {
+  font-size: 13px;
+  color: #374151;
+  font-weight: 500;
+}
+
+.kpiStatus {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.kpiStatusIcon {
+  font-size: 14px;
+}
+
+.kpiStatusText {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.kpiStatus_good {
+  color: #16a34a;
+}
+
+.kpiStatus_warning {
+  color: #d97706;
+}
+
+.kpiStatus_danger {
+  color: #dc2626;
+}
+
+.kpiStatus_unknown {
+  color: #9ca3af;
+}
+
+/* --- AI Suggestion --- */
+.aiSuggestion {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.aiSuggestionLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #9a3412;
+  margin-bottom: 6px;
+}
+
+.aiSuggestionIcon {
+  font-size: 14px;
+}
+
+.aiSuggestionText {
+  margin: 0;
+  font-size: 13px;
+  color: #7c2d12;
+  line-height: 1.6;
+}
+
+/* --- Right Col --- */
+.rightCol {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* --- Timeline --- */
+.timeline {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 0;
+}
+
+.timelineAddBtn {
+  padding-top: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+.timelineNode {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  position: relative;
+  padding-bottom: 20px;
+}
+
+.timelineConnector {
+  position: absolute;
+  left: 19px;
+  top: 38px;
+  bottom: 0;
+  width: 2px;
+  background: #e5e7eb;
+  z-index: 0;
+}
+
+.timelineDot {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 2px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: #fff;
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.timelineDotMilestone {
+  width: 42px;
+  height: 42px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+
+.timelineDotIcon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.timelineContent {
+  flex: 1;
+  min-width: 0;
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  padding: 12px 14px;
+  transition: box-shadow 0.15s;
+}
+
+.timelineContent:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
+}
+
+.timelineContentMilestone {
+  border-color: #fde68a;
+  background: #fffbeb;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.1);
+}
+
+.timelineContentHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.timelineTitle {
+  font-size: 14px;
+  color: #1a1a1a;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.timelineTitleMilestone {
+  font-weight: 700;
+}
+
+.milestoneStarLabel {
+  color: #d97706;
+  font-weight: 700;
+}
+
+.timelineDate {
+  font-size: 12px;
+  color: #9ca3af;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.jobChangeRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0;
+}
+
+.jobChangeFrom {
+  font-size: 12px;
+  background: #f3f4f6;
+  color: #6b7280;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.jobChangeArrow {
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.jobChangeTo {
+  font-size: 12px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.timelineDetail {
+  margin: 6px 0 8px;
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.55;
+}
+
+.scoreTag {
+  display: inline-block;
+  font-size: 12px;
+  color: #374151;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 4px;
+  padding: 2px 8px;
+  margin-bottom: 6px;
+}
+
+.timelineTypeBadge {
+  margin-top: 4px;
+}
+
+/* --- Modal Form --- */
+.modalForm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.formRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.formRowInline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.formLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.required {
+  color: #ef4444;
+}
+
+.formInput,
+.formSelect,
+.formTextarea {
+  padding: 8px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+  background: #fff;
+}
+
+.formInput:focus,
+.formSelect:focus,
+.formTextarea:focus {
+  border-color: var(--accent, #FF6B2C);
+}
+
+.formTextarea {
+  resize: vertical;
+  min-height: 72px;
+}
+
+.formError {
+  font-size: 12px;
+  color: #ef4444;
+  margin: 2px 0 0;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #374151;
+  cursor: pointer;
+}
+
+/* --- Modal Footer --- */
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}

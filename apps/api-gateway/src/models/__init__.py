@@ -176,6 +176,11 @@ from .compliance_engine import ComplianceScore, ComplianceAlert
 # Batch 3 — 自动化闭环层
 from .auto_procurement import ProcurementRule, ProcurementExecution
 from .financial_closing import DailyClosingReport
+# 岗位标准化知识库 + 员工成长
+from .job_standard import JobStandard
+from .job_sop import JobSOP
+from .employee_job_binding import EmployeeJobBinding
+from .employee_growth_trace import EmployeeGrowthTrace
 
 __all__ = [
     "Base",
@@ -502,3 +507,12 @@ try:
     from .operation_audit_log import OperationAuditLog
 except ImportError:
     pass  # HR model files not yet created — skip gracefully
+
+# 日清日结 + 周复盘模块
+from .daily_metric import StoreDailyMetric
+from .daily_settlement import StoreDailySettlement
+from .warning_rule import WarningRule
+from .warning_record import WarningRecord
+from .action_task import ActionTask
+from .weekly_review import WeeklyReview, WeeklyReviewItem
+from .data_quality_check import DataQualityCheckRecord

@@ -78,6 +78,8 @@ from src.api import bulk_import
 from src.api import hq_dashboard
 from src.api import dish_rd_agent
 from src.api import supplier_agent
+from src.api import daily_ops
+from src.api import job_standard
 from src.api import ai_pillars
 from src.api import ai_accuracy
 from src.api import dashboard_preferences
@@ -951,6 +953,10 @@ app.include_router(compliance_engine.router, tags=["compliance-engine"])
 app.include_router(auto_procurement.router, prefix="/api/v1", tags=["auto-procurement"])
 app.include_router(financial_closing.router, tags=["financial-closing"])
 app.include_router(command_center.router, tags=["command-center"])
+# 日清日结 + 周复盘
+app.include_router(daily_ops.router)
+# 岗位标准化知识库 + 员工成长
+app.include_router(job_standard.router)
 
 # 业财税资金一体化（FCT）
 if getattr(settings, "FCT_ENABLED", False):
