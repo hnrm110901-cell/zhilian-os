@@ -10,6 +10,7 @@
  *   POST   /api/v1/e-invoices/{id}/void   — 作废
  */
 import React, { useState, useEffect, useCallback } from 'react';
+import { message } from 'antd';
 import {
   ZCard, ZBadge, ZButton, ZEmpty, ZAlert, ZSkeleton, ZModal,
 } from '../../design-system/components';
@@ -125,7 +126,7 @@ const EInvoicePage: React.FC = () => {
       setInvoices(listRes);
       setStats(statsRes);
     } catch (err) {
-      console.error('加载发票数据失败', err);
+      message.error('加载发票数据失败');
     } finally {
       setLoading(false);
     }
@@ -140,7 +141,7 @@ const EInvoicePage: React.FC = () => {
       await apiClient.post(`/api/v1/e-invoices/${id}/submit`);
       fetchData();
     } catch (err) {
-      console.error('提交开票失败', err);
+      message.error('提交开票失败');
     }
   };
 
@@ -149,7 +150,7 @@ const EInvoicePage: React.FC = () => {
       await apiClient.post(`/api/v1/e-invoices/${id}/void`);
       fetchData();
     } catch (err) {
-      console.error('作废失败', err);
+      message.error('作废失败');
     }
   };
 

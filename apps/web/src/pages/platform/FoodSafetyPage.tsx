@@ -14,7 +14,7 @@
  *   GET    /api/v1/food-safety/stats            — 统计概览
  */
 import React, { useState, useEffect, useCallback } from 'react';
-import { Alert } from 'antd';
+import { Alert, message } from 'antd';
 import {
   ZCard, ZBadge, ZButton, ZEmpty, ZSkeleton, ZModal,
 } from '../../design-system/components';
@@ -183,7 +183,7 @@ const FoodSafetyPage: React.FC = () => {
       });
       setStats(res);
     } catch (err) {
-      console.error('加载统计数据失败', err);
+      message.error('加载统计数据失败');
     }
   }, [brandId]);
 
@@ -202,7 +202,7 @@ const FoodSafetyPage: React.FC = () => {
       setTraces(res.items);
       setTraceTotal(res.total);
     } catch (err) {
-      console.error('加载溯源记录失败', err);
+      message.error('加载溯源记录失败');
     } finally {
       setLoading(false);
     }
@@ -222,7 +222,7 @@ const FoodSafetyPage: React.FC = () => {
       setInspections(res.items);
       setInspectionTotal(res.total);
     } catch (err) {
-      console.error('加载检查记录失败', err);
+      message.error('加载检查记录失败');
     } finally {
       setLoading(false);
     }
@@ -235,7 +235,7 @@ const FoodSafetyPage: React.FC = () => {
       });
       setExpiringItems(res.items);
     } catch (err) {
-      console.error('加载预警数据失败', err);
+      message.error('加载预警数据失败');
     }
   }, [brandId]);
 
@@ -257,7 +257,7 @@ const FoodSafetyPage: React.FC = () => {
       fetchTraces();
       fetchStats();
     } catch (err) {
-      console.error('召回失败', err);
+      message.error('召回失败');
     }
   };
 

@@ -13,7 +13,7 @@
  *   POST   /api/v1/health-certs/auto-update — 批量状态更新
  */
 import React, { useState, useEffect, useCallback } from 'react';
-import { Alert } from 'antd';
+import { Alert, message } from 'antd';
 import {
   ZCard, ZBadge, ZButton, ZEmpty, ZSkeleton, ZModal,
 } from '../../design-system/components';
@@ -144,7 +144,7 @@ const HealthCertPage: React.FC = () => {
       setTotal(listRes.total);
       setStats(statsRes);
     } catch (err) {
-      console.error('加载健康证数据失败', err);
+      message.error('加载健康证数据失败');
     } finally {
       setLoading(false);
     }
@@ -161,7 +161,7 @@ const HealthCertPage: React.FC = () => {
       });
       fetchData();
     } catch (err) {
-      console.error('批量更新失败', err);
+      message.error('批量更新失败');
     }
   };
 
@@ -172,7 +172,7 @@ const HealthCertPage: React.FC = () => {
       await apiClient.delete(`/api/v1/health-certs/${id}`);
       fetchData();
     } catch (err) {
-      console.error('删除失败', err);
+      message.error('删除失败');
     }
   };
 

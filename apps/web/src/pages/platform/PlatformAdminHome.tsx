@@ -236,9 +236,9 @@ const PlatformAdminHome: React.FC = () => {
       })));
     } catch {
       setMerchants([
-        { brand_id: 'czq', brand_name: '尝在一起', cuisine_type: '湘菜', store_count: 3, user_count: 3, status: 'active' },
-        { brand_id: 'zqx', brand_name: '最黔线',   cuisine_type: '贵州菜', store_count: 6, user_count: 2, status: 'active' },
-        { brand_id: 'sgc', brand_name: '尚宫厨',   cuisine_type: '创新湘菜', store_count: 5, user_count: 2, status: 'active' },
+        { brand_id: 'BRD_CZYZ0001', brand_name: '尝在一起', cuisine_type: '湘菜', store_count: 3, user_count: 1, status: 'active' },
+        { brand_id: 'BRD_ZQX0001',  brand_name: '最黔线',   cuisine_type: '黔菜', store_count: 6, user_count: 1, status: 'active' },
+        { brand_id: 'BRD_SGC0001',  brand_name: '尚宫厨',   cuisine_type: '精品湘菜', store_count: 5, user_count: 1, status: 'active' },
       ]);
     }
 

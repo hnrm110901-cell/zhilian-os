@@ -12,7 +12,7 @@
  *   GET    /api/v1/supplier-b2b/stats             — 统计概览
  */
 import React, { useState, useEffect, useCallback } from 'react';
-import { Alert } from 'antd';
+import { Alert, message } from 'antd';
 import {
   ZCard, ZBadge, ZButton, ZEmpty, ZSkeleton, ZModal,
 } from '../../design-system/components';
@@ -157,21 +157,18 @@ const SupplierB2BPage: React.FC = () => {
     setLoading(true);
     try {
       const [listRes, statsRes] = await Promise.all([
-        apiClient.get<{ data: { items: PurchaseOrder[]; total: number } }>('/api/v1/supplier-b2b/orders', {
+        apiClient.get<{ items: PurchaseOrder[]; total: number }>('/api/v1/supplier-b2b/orders', {
           params: { brand_id: brandId, page, page_size: 20, status: filterStatus || undefined },
         }),
-        apiClient.get<{ data: Stats }>('/api/v1/supplier-b2b/stats', {
+        apiClient.get<Stats>('/api/v1/supplier-b2b/stats', {
           params: { brand_id: brandId },
         }),
       ]);
-      // apiClient.get<T>() returns T directly (response.data already unwrapped)
-      const listData = (listRes as any).data || listRes;
-      const statsData = (statsRes as any).data || statsRes;
-      setOrders(listData.items || []);
-      setTotal(listData.total || 0);
-      setStats(statsData);
+      setOrders(listRes.items || []);
+      setTotal(listRes.total || 0);
+      setStats(statsRes);
     } catch (err) {
-      console.error('加载采购单数据失败', err);
+      message.error('加载采购单数据失败');
     } finally {
       setLoading(false);
     }
@@ -186,7 +183,7 @@ const SupplierB2BPage: React.FC = () => {
       await apiClient.post(`/api/v1/supplier-b2b/orders/${id}/submit`);
       fetchData();
     } catch (err) {
-      console.error('提交采购单失败', err);
+      message.error('提交采购单失败');
     }
   };
 
@@ -195,18 +192,17 @@ const SupplierB2BPage: React.FC = () => {
       await apiClient.post(`/api/v1/supplier-b2b/orders/${id}/cancel`, { reason: '手动取消' });
       fetchData();
     } catch (err) {
-      console.error('取消采购单失败', err);
+      message.error('取消采购单失败');
     }
   };
 
   const handleViewDetail = async (id: string) => {
     try {
-      const res = await apiClient.get<{ data: PurchaseOrder }>(`/api/v1/supplier-b2b/orders/${id}`);
-      const data = (res as any).data || res;
-      setDetailOrder(data);
+      const res = await apiClient.get<PurchaseOrder>(`/api/v1/supplier-b2b/orders/${id}`);
+      setDetailOrder(res);
       setShowDetail(true);
     } catch (err) {
-      console.error('获取采购单详情失败', err);
+      message.error('获取采购单详情失败');
     }
   };
 
@@ -238,7 +234,7 @@ const SupplierB2BPage: React.FC = () => {
       setShowReceive(false);
       fetchData();
     } catch (err) {
-      console.error('收货确认失败', err);
+      message.error('收货确认失败');
     } finally {
       setReceiveSubmitting(false);
     }
