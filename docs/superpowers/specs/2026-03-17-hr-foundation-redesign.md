@@ -99,10 +99,12 @@ employment_contracts (
 
 ### 1.2 三位一体知识OS层
 
-#### `knowledge_rules` — 行业经验库
+#### `hr_knowledge_rules` — HR专属行业经验库
+
+> ⚠️ **注意**：现有 `knowledge_rules` 表（`apps/api-gateway/src/models/knowledge_rule.py`）已存在，且 schema 不兼容（使用 `RuleCategory` Enum、`rule_code`、`conclusion` 等不同字段）。HR 知识库**单独建表** `hr_knowledge_rules`，避免破坏现有规则引擎。
 
 ```sql
-knowledge_rules (
+hr_knowledge_rules (
   id            UUID PRIMARY KEY,
   rule_type     VARCHAR(30) NOT NULL,  -- sop / kpi_baseline / alert / best_practice
   category      VARCHAR(50),           -- turnover / scheduling / standards / training
@@ -127,8 +129,8 @@ skill_nodes (
   skill_name            VARCHAR(100) NOT NULL,
   category              VARCHAR(50),    -- service / kitchen / management / compliance
   description           TEXT,
-  prerequisite_skill_ids UUID[],        -- 前置技能
-  related_training_ids   UUID[],        -- 关联培训
+  prerequisite_skill_ids UUID[],        -- 前置技能（PostgreSQL数组，无FK约束）
+  related_training_ids   UUID[],        -- 关联培训ID数组
   kpi_impact            JSONB,          -- 影响哪些KPI
   estimated_revenue_lift DECIMAL(10,2), -- 预计¥收入提升（元/月）
   org_node_id           UUID REFERENCES org_nodes(id),  -- NULL = 行业通用
@@ -138,13 +140,16 @@ skill_nodes (
 
 **核心推理链**：`岗位 → 所需技能集 → 前置技能 → 关联培训 → KPI影响 → ¥提升`
 
+**关于 Neo4j**：`prerequisite_skill_ids UUID[]` 为 PostgreSQL 原生数组，无 FK 约束，适合 POC 阶段快速开发。现有 `ARCHITECTURE.md` 规划 Neo4j 用于本体图，当 skill_nodes 数量超过 1000 条或需要复杂多跳推理时，可将此表迁移为 Neo4j 节点——`skill_nodes.id` 作为桥接键，届时 `prerequisite_skill_ids` 改为 Neo4j 边关系。本阶段 **skill_nodes 是 PostgreSQL 的临时实现**，不与 Neo4j 双写。
+
 #### `behavior_patterns` — 行为模式学习
 
 ```sql
 behavior_patterns (
   id            UUID PRIMARY KEY,
   pattern_type  VARCHAR(50),    -- turnover_risk / high_performance / schedule_optimal
-  feature_vector JSONB NOT NULL, -- 特征向量（行为指标组合）
+  feature_vector JSONB NOT NULL, -- 特征元数据（字段名 + 权重，非向量值）
+  qdrant_vector_id VARCHAR(100), -- 对应 Qdrant collection hr_behavior_patterns 的向量ID
   outcome       VARCHAR(100),   -- 结果标签
   confidence    FLOAT,
   sample_size   INTEGER,
@@ -155,7 +160,9 @@ behavior_patterns (
 )
 ```
 
-**冷启动降级**：样本不足时自动降级为 KnowledgeRule（规则引擎）兜底。
+**向量存储说明**：`feature_vector` 存储特征元数据（可读），实际384维嵌入向量存入 Qdrant collection `hr_behavior_patterns`（与现有架构一致）。`qdrant_vector_id` 为桥接字段。未来若迁移到 Neo4j 本体图，行为模式节点通过 `qdrant_vector_id` 与向量检索层解耦。
+
+**冷启动降级**：样本不足时自动降级为 `hr_knowledge_rules` 规则引擎兜底。
 
 ### 1.3 职业发展 + 留人层
 
@@ -185,6 +192,12 @@ retention_signals (
   intervention_at     TIMESTAMPTZ,
   computed_at         TIMESTAMPTZ DEFAULT NOW()
 )
+
+-- WF-1 每日扫描索引（必须）
+CREATE INDEX idx_retention_signals_scan
+  ON retention_signals (risk_score DESC, computed_at DESC);
+CREATE INDEX idx_retention_signals_assignment
+  ON retention_signals (assignment_id, computed_at DESC);
 ```
 
 #### `knowledge_captures` — 对话式知识采集记录
@@ -193,7 +206,11 @@ retention_signals (
 knowledge_captures (
   id                UUID PRIMARY KEY,
   person_id         UUID NOT NULL REFERENCES persons(id),
-  trigger_type      VARCHAR(30),  -- exit / monthly_review / incident / onboarding
+  trigger_type      VARCHAR(30),
+  -- exit / monthly_review / incident / onboarding /
+  -- growth_review（WF-3技能催化后触发）/
+  -- talent_assessment（WF-5新店梯队评估触发）/
+  -- legacy_import（Employee迁移历史数据导入）
   raw_dialogue      TEXT,         -- 原始对话记录
   context           TEXT,         -- 情境（Context）
   action            TEXT,         -- 处理动作（Action）
@@ -218,7 +235,20 @@ HRAgentState
 ├── knowledge_results: list        # 知识检索结果
 ├── prediction_results: dict       # 预测模型输出
 ├── recommendations: list          # 最终建议列表
-└── actions_taken: list            # 已执行动作（D级）
+└── actions_taken: list[ActionRecord]  # 已执行动作（D级）
+
+ActionRecord（D级自主执行动作记录）：
+{
+  "action_type": str,        # publish_schedule / send_training / send_wechat
+  "target_id": str,          # 操作对象ID
+  "payload": dict,           # 操作内容
+  "requires_approval": bool, # 是否需要人工审批
+  "dry_run": bool,           # True = 预演模式，不真实执行
+  "executed_at": datetime,
+  "approved_by": str | None
+}
+# D级 ActionNode 在 requires_approval=True 时写入待审批队列，
+# 不直接执行；只有 requires_approval=False 且 dry_run=False 时才真实执行。
 
 节点（Nodes）：
 IntentRouter → [DiagnosisNode | PredictionNode | ActionNode]
@@ -288,50 +318,98 @@ IntentRouter → [DiagnosisNode | PredictionNode | ActionNode]
 
 ## 3. 迁移策略
 
+### 3.0 前置条件（⚠️ 硬性阻断门）
+
+**M1 开始前必须完成：**
+
+| 前置工作 | Alembic | 状态 |
+|---------|---------|------|
+| OrgHierarchy（OrgNode/OrgConfig 模型） | z52 | 计划已写，待实施 |
+| OrgScope 传播（权限中间件）| z53 | 计划已写，待实施 |
+
+`employment_assignments.org_node_id REFERENCES org_nodes(id)` 依赖 `org_nodes` 表存在。z52/z53 未合并则 M1 的 Alembic migration 会失败。预留 Week 0（2周）完成 OrgHierarchy 实施，HR 重构从 Week 3 启动，总工期调整为 14 周。
+
 ### 3.1 迁移原则
 
 **Expand → Migrate → Contract**：先建新表，新旧并存，验证后删旧表。全程不停服，种子客户数据完整保留。
 
-### 3.2 四个里程碑
+### 3.2 五个里程碑（含前置）
 
 | 里程碑 | 周期 | Alembic | 关键交付 |
 |--------|------|---------|---------|
-| **M1** | Week 1-2 | z54, z55 | 新表建立 + 餐饮知识包冷启动 |
-| **M2** | Week 3-5 | — | 数据迁移脚本 + 双写模式 + HRAgent v1（B级） |
-| **M3** | Week 6-9 | z56 | 99模型外键更新 + HRAgent v2（C级）|
-| **M4** | Week 10-12 | z57 | 旧表清理 + OrgHierarchy联通 + 前端全面接入 |
+| **M0（前置）** | Week 1-2 | z52, z53 | OrgHierarchy + OrgScope 实施完成 |
+| **M1** | Week 3-4 | z54, z55 | 新表建立 + 餐饮知识包冷启动 |
+| **M2** | Week 5-7 | — | 数据迁移脚本 + 双写模式 + HRAgent v1（B级） |
+| **M3** | Week 8-11 | z56 | 外键更新 + HRAgent v2（C级）|
+| **M4** | Week 12-14 | z57 | 旧表清理 + 前端全面接入 |
 
-### 3.3 数据迁移映射
+### 3.3 数据迁移映射（完整12字段）
+
+Employee PK 现为 `String(50)`（如 "EMP001"），**不是 UUID**。迁移策略：为每个 Employee 生成新 UUID，保留 `legacy_employee_id` 作为查找桥接。
 
 ```
-employees.id              → persons.id（保持UUID不变）
+employees.id              → persons.legacy_employee_id（保留原值）
+                            persons.id 生成新 UUID
 employees.name            → persons.name
 employees.phone           → persons.phone
-employees.store_id        → employment_assignments.org_node_id（通过stores.org_node_id关联）
+employees.email           → persons.email（新增字段）
+employees.store_id        → employment_assignments.org_node_id
+                            （通过 stores.org_node_id 关联，需 z52 完成后才有此列）
 employees.position        → employment_assignments.job_standard_id
 employees.employment_type → employment_assignments.employment_type
 employees.salary          → employment_contracts.pay_scheme.base_salary
 employees.hire_date       → employment_assignments.start_date
-employees.status          → employment_assignments.status
+employees.is_active       → employment_assignments.status
+                            （True → 'active', False → 'ended'）
+employees.preferences     → persons.preferences（新增 JSONB 字段）
+employees.performance_score → 丢弃：新系统由 KPI 模块重新计算
+employees.skills          → 转换：每个技能字符串查找 skill_nodes.skill_name
+                            → 在 person_achievements 创建记录
+                            （无匹配则跳过，人工后续补录）
+employees.training_completed → 转换：同上，查找 skill_nodes 匹配后写 achievements
+                              （trigger_type='legacy_import'）
 ```
 
-### 3.4 99个模型外键迁移策略
-
+**外键桥接表**（临时，M4删除）：
+```sql
+employee_id_map (
+  legacy_employee_id VARCHAR(50),
+  person_id UUID,
+  assignment_id UUID
+)
 ```
-原来：schedule.employee_id → employees.id
-迁移后：schedule.assignment_id → employment_assignments.id
+所有旧 `employee_id` FK 字段在过渡期通过此表查找对应的 `assignment_id`。
+
+### 3.4 外键迁移范围（实际清单）
+
+通过 `grep -r "employee_id" apps/ packages/ --include="*.py"` 确认的迁移目标：
+
+**硬外键（4个，必须更新）：**
+```
+compliance.holder_employee_id        → assignment_id
+customer_ownership.owner_employee_id → assignment_id
+schedule.employee_id                 → assignment_id
+employee_metric.employee_id          → assignment_id
 ```
 
-**Assignment 是"在职关系"，与旧 employee 语义最接近**，所有现有关联表（排班/KPI/考勤/培训记录）的外键统一从 `employee_id` 更新为 `assignment_id`。
+**软引用字符串（~10个，逐项验证后更新）：**
+```
+attendance / people_agent / edge_hub / banquet_sales /
+employee_growth_trace / health_certificate 等
+```
+
+实施前执行 grep 脚本生成完整清单，逐项标记「迁移/保留/删除」后才进入 M3。
 
 ### 3.5 风险对策
 
 | 风险 | 对策 |
 |------|------|
-| 迁移脚本数据丢失 | 双写模式保证安全窗口；迁移前全量备份；验证脚本逐行核对记录数 |
-| 99个模型漏更新 | Grep扫描所有 employee_id 引用，生成迁移清单，逐项确认 |
-| 种子客户数据中断 | M2双写期间新旧API并行；M3迁移选业务低峰期（凌晨2-4点）|
-| BehaviorPattern冷启动 | 样本不足时自动降级为 RuleRetriever |
+| OrgNode 未完成导致 M1 失败 | M0 完成并验证后才开始 M1（硬性阻断门） |
+| Employee PK String→UUID 类型冲突 | `employee_id_map` 桥接表 + legacy_employee_id 保留 |
+| `attendance_rules`/`kpi_templates` 不存在 | z54 同时创建这两张基础配置表（或外键设 NULLABLE，表存在后再补约束）|
+| 数据迁移丢失 | 双写模式；迁移前全量备份；验证脚本核对每张表记录数 |
+| 软引用字段漏更新 | grep 清单逐项确认，M3 分批提交，每批跑回归测试 |
+| BehaviorPattern 冷启动 | 样本不足时自动降级为 RuleRetriever |
 
 ---
 
@@ -443,11 +521,14 @@ POST   /api/v1/hr/knowledge-captures       # 提交知识采集
 
 | 现有模块 | 关系 | 变更 |
 |---------|------|------|
-| OrgNode / OrgHierarchy | 强依赖 | Assignment.org_node_id 依赖 OrgNode |
+| OrgNode / OrgHierarchy（z52） | **强依赖·硬性前置** | M0 完成后 M1 才能启动；Assignment.org_node_id 依赖 org_nodes 表 |
 | JobStandard | 依赖 | Assignment.job_standard_id 使用现有 job_standards 表 |
+| knowledge_rules（现有） | 共存·不修改 | HR 专属规则存入新表 hr_knowledge_rules，不触碰现有规则引擎 |
 | Schedule / Shift | 外键更新 | employee_id → assignment_id |
 | KPI | 外键更新 | employee_id → assignment_id |
 | Attendance | 外键更新 | employee_id → assignment_id |
+| Neo4j 本体图 | 暂不集成 | skill_nodes 本阶段在 PostgreSQL 实现；数据量大或需多跳推理后再迁移 Neo4j，skill_nodes.id 作为桥接键 |
+| Qdrant 向量库 | 集成 | behavior_patterns 的实际向量存入 Qdrant collection hr_behavior_patterns |
 | POS适配器 | 不变 | 无需修改 |
 | OrderAgent / InventoryAgent | 不变 | 无需修改 |
 
