@@ -5433,10 +5433,40 @@ def cdp_rfm_recalculate(self) -> Dict[str, Any]:
             deviation = await cdp_rfm_service.compute_deviation(session)
             await session.commit()
 
+            # Step 4: 生命周期状态同步 — RFM 等级变化触发状态转移
+            lifecycle_transitions = 0
+            try:
+                from sqlalchemy import text as _text
+                from src.services.lifecycle_state_machine import LifecycleStateMachine
+                lsm = LifecycleStateMachine()
+                # 查询所有 RFM 等级发生变化的会员（本次重算后 rfm_level != lifecycle implied level）
+                changed_sql = _text("""
+                    SELECT DISTINCT store_id, customer_id, rfm_level, recency_days, frequency, monetary
+                    FROM private_domain_members
+                    WHERE updated_at >= NOW() - INTERVAL '1 hour'
+                      AND lifecycle_state IS NOT NULL
+                    LIMIT 500
+                """)
+                changed = await session.execute(changed_sql)
+                rows = changed.fetchall()
+                for row in rows:
+                    try:
+                        rfm_data = {"recency_days": row.recency_days, "frequency": row.frequency, "monetary": row.monetary}
+                        new_state = lsm.classify_lifecycle(rfm_data)
+                        if new_state:
+                            await lsm.apply_trigger(session, row.store_id, row.customer_id, "rfm_change", f"RFM重算: {row.rfm_level}")
+                            lifecycle_transitions += 1
+                    except Exception as e:
+                        logger.warning("lifecycle_sync.row_failed", customer_id=row.customer_id, error=str(e))
+                await session.commit()
+            except Exception as exc:
+                logger.warning("lifecycle_sync.failed", error=str(exc))
+
         result = {
             "link": link_result,
             "rfm": rfm_result,
             "deviation": deviation,
+            "lifecycle_transitions": lifecycle_transitions,
         }
         logger.info("cdp_rfm_recalculate.done", **result)
         return result
