@@ -170,7 +170,11 @@ class TestShokzService:
         await service.connect_device("device123")
 
         audio_data = b"fake_audio_data"
-        result = await service.send_audio("device123", audio_data)
+        mock_proc = AsyncMock()
+        mock_proc.communicate = AsyncMock(return_value=(b"", b""))
+        mock_proc.returncode = 0
+        with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
+            result = await service.send_audio("device123", audio_data)
 
         assert result["success"] is True
         assert result["device_id"] == "device123"
@@ -216,13 +220,18 @@ class TestShokzService:
         )
         await service.connect_device("device123")
 
-        result = await service.send_audio("device123", b"audio", format="mp3")
+        mock_proc = AsyncMock()
+        mock_proc.communicate = AsyncMock(return_value=(b"", b""))
+        mock_proc.returncode = 0
+        with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
+            result = await service.send_audio("device123", b"audio", format="mp3")
 
         assert result["success"] is True
 
     @pytest.mark.asyncio
     async def test_receive_audio_success(self):
         """测试接收音频成功"""
+        import asyncio as _asyncio
         service = ShokzService()
         await service.register_device(
             device_id="device123",
@@ -233,7 +242,18 @@ class TestShokzService:
         )
         await service.connect_device("device123")
 
-        result = await service.receive_audio("device123", duration_seconds=3)
+        mock_proc = AsyncMock()
+        mock_proc.terminate = MagicMock()
+        mock_proc.kill = MagicMock()
+        mock_proc.wait = AsyncMock()
+        with patch("asyncio.create_subprocess_exec", return_value=mock_proc), \
+             patch("asyncio.sleep", new_callable=AsyncMock), \
+             patch("asyncio.wait_for", new_callable=AsyncMock), \
+             patch("builtins.open", MagicMock(return_value=MagicMock(
+                 __enter__=MagicMock(return_value=MagicMock(read=MagicMock(return_value=b""))),
+                 __exit__=MagicMock(return_value=False),
+             ))):
+            result = await service.receive_audio("device123", duration_seconds=3)
 
         assert result["success"] is True
         assert result["device_id"] == "device123"
@@ -282,7 +302,18 @@ class TestShokzService:
         )
         await service.connect_device("device123")
 
-        result = await service.receive_audio("device123", duration_seconds=10)
+        mock_proc = AsyncMock()
+        mock_proc.terminate = MagicMock()
+        mock_proc.kill = MagicMock()
+        mock_proc.wait = AsyncMock()
+        with patch("asyncio.create_subprocess_exec", return_value=mock_proc), \
+             patch("asyncio.sleep", new_callable=AsyncMock), \
+             patch("asyncio.wait_for", new_callable=AsyncMock), \
+             patch("builtins.open", MagicMock(return_value=MagicMock(
+                 __enter__=MagicMock(return_value=MagicMock(read=MagicMock(return_value=b""))),
+                 __exit__=MagicMock(return_value=False),
+             ))):
+            result = await service.receive_audio("device123", duration_seconds=10)
 
         assert result["success"] is True
         assert result["duration"] == 10
