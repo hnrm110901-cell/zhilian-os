@@ -508,6 +508,10 @@ try:
 except ImportError:
     pass  # HR model files not yet created — skip gracefully
 
+# 组织层级
+from .org_node import OrgNode, OrgNodeType, StoreType, OperationMode
+from .org_config import OrgConfig, ConfigKey
+
 # 日清日结 + 周复盘模块
 from .daily_metric import StoreDailyMetric
 from .daily_settlement import StoreDailySettlement
