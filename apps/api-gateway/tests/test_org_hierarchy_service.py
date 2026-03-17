@@ -82,3 +82,18 @@ from src.models.employee import Employee
 def test_employee_has_dept_node_id():
     cols = {c.key for c in Employee.__table__.columns}
     assert "dept_node_id" in cols
+
+
+import pytest
+
+
+@pytest.mark.skip(reason="需要测试数据库，集成测试阶段执行")
+async def test_create_and_get_node():
+    """TODO: 集成测试 — 创建节点并查询"""
+    pass
+
+
+@pytest.mark.skip(reason="需要测试数据库")
+async def test_get_subtree():
+    """TODO: 集成测试 — 子树查询"""
+    pass
