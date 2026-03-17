@@ -962,6 +962,11 @@ from src.api import bff
 
 app.include_router(bff.router, tags=["bff"])
 
+# BFF 会员数据聚合（三源融合：member_syncs + consumer_identities + private_domain_members）
+from src.api import bff_member
+
+app.include_router(bff_member.router, tags=["BFF-会员"])
+
 # v2.0 MVP — 决策中枢（Top3 + 手动推送 + 场景识别）
 from src.api import decision_hub, monthly_report
 
