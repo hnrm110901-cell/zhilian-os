@@ -26,12 +26,21 @@ AUTH="Authorization:Bearer $TK"
 # 2. 查看商户列表
 echo ""
 echo "[2/5] 商户列表..."
-curl -s "$API/api/v1/merchants" -H "$AUTH" | python3 -c '
+MERCHANTS=$(curl -s "$API/api/v1/merchants" -H "$AUTH")
+echo "$MERCHANTS" | python3 -c '
 import sys,json
-data=json.load(sys.stdin)
-for m in data:
-    print(f"  {m[\"brand_name\"]} ({m[\"brand_id\"]}) - {m[\"store_count\"]}店 - {m[\"status\"]}")
-' 2>/dev/null
+try:
+    data=json.load(sys.stdin)
+    if isinstance(data, list):
+        for m in data:
+            print(f"  {m.get(\"brand_name\",\"?\")} ({m.get(\"brand_id\",\"?\")}) - {m.get(\"store_count\",0)}店 - {m.get(\"status\",\"?\")}")
+    elif isinstance(data, dict) and "detail" in data:
+        print(f"  错误: {data[\"detail\"]}")
+    else:
+        print(f"  响应: {json.dumps(data,ensure_ascii=False)[:300]}")
+except Exception as e:
+    print(f"  解析失败: {e}")
+'
 
 # 3. 查看已有订单
 echo ""
@@ -71,7 +80,7 @@ except:
 # 5. 品智健康检查
 echo ""
 echo "[5/5] 适配器健康检查..."
-HEALTH=$(curl -s "$API/api/v1/integrations/adapters/health" -H "$AUTH" 2>/dev/null)
+HEALTH=$(curl -s "$API/api/v1/external-systems" -H "$AUTH" 2>/dev/null)
 if [ -n "$HEALTH" ]; then
   echo "$HEALTH" | python3 -c '
 import sys,json

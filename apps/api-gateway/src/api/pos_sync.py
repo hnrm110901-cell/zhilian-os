@@ -49,6 +49,27 @@ import importlib.util
 import types as _types
 
 
+def _resolve_adapter_src(adapter_name: str) -> str:
+    """解析适配器源码路径，兼容本地开发和 Docker 容器两种目录布局。
+
+    本地：apps/api-gateway/src/api/ → ../../../../packages/api-adapters/{name}/src
+    Docker：/app/src/api/ → /app/packages/api-adapters/{name}/src
+    """
+    # 本地开发相对路径
+    local = os.path.abspath(os.path.join(
+        os.path.dirname(__file__), "../../../../packages/api-adapters", adapter_name, "src",
+    ))
+    if os.path.isdir(local):
+        return local
+    # Docker 容器布局
+    docker = os.path.join("/app/packages/api-adapters", adapter_name, "src")
+    if os.path.isdir(docker):
+        return docker
+    raise FileNotFoundError(
+        f"适配器 {adapter_name} 源码目录未找到，已尝试: {local}, {docker}"
+    )
+
+
 def _load_pkg_module(pkg_key: str, pkg_src_dir: str, submodules: list) -> dict:
     """
     将 pkg_src_dir 作为包 pkg_key 注册到 sys.modules，并加载 submodules 列表中的子模块。
@@ -78,21 +99,21 @@ def _load_pkg_module(pkg_key: str, pkg_src_dir: str, submodules: list) -> dict:
 
 def _pinzhi_adapter_class():
     """按需加载品智适配器类（使用独立命名空间，避免与 api-gateway src/ 冲突）。"""
-    _src = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../packages/api-adapters/pinzhi/src"))
+    _src = _resolve_adapter_src("pinzhi")
     mods = _load_pkg_module("_pinzhi_pkg", _src, ["signature", "adapter"])
     return mods["adapter"].PinzhiAdapter
 
 
 def _aoqiwei_supply_adapter_class():
     """按需加载奥琦玮供应链适配器类。"""
-    _src = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../packages/api-adapters/aoqiwei/src"))
+    _src = _resolve_adapter_src("aoqiwei")
     mods = _load_pkg_module("_aoqiwei_pkg", _src, ["adapter", "crm_adapter"])
     return mods["adapter"].AoqiweiAdapter
 
 
 def _aoqiwei_crm_adapter_class():
     """按需加载奥琦玮 CRM 适配器类。"""
-    _src = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../packages/api-adapters/aoqiwei/src"))
+    _src = _resolve_adapter_src("aoqiwei")
     mods = _load_pkg_module("_aoqiwei_pkg", _src, ["adapter", "crm_adapter"])
     return mods["crm_adapter"].AoqiweiCrmAdapter
 

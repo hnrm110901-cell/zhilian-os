@@ -26,8 +26,11 @@ class DouyinService:
         import os as _os
         import sys
 
+        # 兼容本地开发和 Docker 容器两种目录布局
         adapter_root = _os.path.abspath(_os.path.join(_os.path.dirname(__file__), "../../../../packages/api-adapters"))
         douyin_src = _os.path.join(adapter_root, "douyin", "src")
+        if not _os.path.isdir(douyin_src):
+            douyin_src = "/app/packages/api-adapters/douyin/src"
         if douyin_src not in sys.path:
             sys.path.insert(0, douyin_src)
 
