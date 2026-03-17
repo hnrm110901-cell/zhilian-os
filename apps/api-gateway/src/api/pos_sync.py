@@ -192,6 +192,8 @@ async def _sync_pinzhi(sync_date: str, store_ids: Optional[List[str]]) -> PosSyn
 
     支持三商户（尝在一起 / 最黔线 / 尚宫厨）各自独立 token。
     """
+    # 确保 sync_date 是 date 对象（SQL 参数绑定需要）
+    sync_date_obj = date.fromisoformat(sync_date) if isinstance(sync_date, str) else sync_date
     global_base_url = os.getenv("PINZHI_BASE_URL", "")
     global_token = os.getenv("PINZHI_TOKEN", "")
     global_brand_id = os.getenv("PINZHI_BRAND_ID", "")
@@ -278,7 +280,7 @@ async def _sync_pinzhi(sync_date: str, store_ids: Optional[List[str]]) -> PosSyn
                       AND DATE(order_time) = :dt
                       AND sales_channel = 'pinzhi'
                 """),
-                {"sid": sid, "dt": sync_date},
+                {"sid": sid, "dt": sync_date_obj},
             )
             db_data = db_row.fetchone()
             db_orders = int(db_data[0]) if db_data else 0
@@ -403,6 +405,7 @@ async def _sync_pinzhi(sync_date: str, store_ids: Optional[List[str]]) -> PosSyn
 
 async def _sync_tiancai(sync_date: str, store_ids: Optional[List[str]]) -> PosSyncResponse:
     """按需拉取天财商龙数据并与 DB 对比（使用 MD5 签名版适配器）"""
+    sync_date_obj = date.fromisoformat(sync_date) if isinstance(sync_date, str) else sync_date
     app_id = os.getenv("TIANCAI_APP_ID", "")
     app_secret = os.getenv("TIANCAI_APP_SECRET", "")
 
@@ -465,7 +468,7 @@ async def _sync_tiancai(sync_date: str, store_ids: Optional[List[str]]) -> PosSy
                       AND DATE(order_time) = :dt
                       AND sales_channel = 'tiancai'
                 """),
-                {"sid": sid, "dt": sync_date},
+                {"sid": sid, "dt": sync_date_obj},
             )
             db_data = db_row.fetchone()
             db_orders = int(db_data[0]) if db_data else 0
@@ -580,6 +583,7 @@ async def _sync_tiancai(sync_date: str, store_ids: Optional[List[str]]) -> PosSy
 
 async def _sync_aoqiwei_supply(sync_date: str, store_ids: Optional[List[str]]) -> PosSyncResponse:
     """按需拉取奥琦玮供应链数据（采购 + 库存）"""
+    sync_date_obj = date.fromisoformat(sync_date) if isinstance(sync_date, str) else sync_date
     app_key = os.getenv("AOQIWEI_APP_KEY", "")
     app_secret = os.getenv("AOQIWEI_APP_SECRET", "")
 
@@ -635,7 +639,7 @@ async def _sync_aoqiwei_supply(sync_date: str, store_ids: Optional[List[str]]) -
                       AND source = 'aoqiwei_supply'
                     LIMIT 1
                 """),
-                {"sid": sid, "dt": sync_date},
+                {"sid": sid, "dt": sync_date_obj},
             )
             db_data = db_row.fetchone()
             db_orders = int(db_data[0]) if db_data else 0
