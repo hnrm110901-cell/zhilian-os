@@ -22,6 +22,7 @@ class EmploymentAssignment(Base):
     start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=True)
     status = Column(String(20), nullable=False, default="active",
+                    server_default="'active'",
                     comment="active/ended/suspended")
     created_at = Column(TIMESTAMP(timezone=True), server_default=text("NOW()"),
                         nullable=False)

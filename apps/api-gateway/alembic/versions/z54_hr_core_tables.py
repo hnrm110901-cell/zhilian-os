@@ -98,7 +98,7 @@ def upgrade() -> None:
                       comment="full_time / hourly / outsourced / dispatched / partner"),
             sa.Column("start_date", sa.Date, nullable=False),
             sa.Column("end_date", sa.Date, nullable=True),
-            sa.Column("status", sa.String(20), nullable=False, server_default="active",
+            sa.Column("status", sa.String(20), nullable=False, server_default="'active'",
                       comment="active / ended / suspended"),
             sa.Column("created_at", sa.TIMESTAMP(timezone=True),
                       server_default=sa.text("NOW()"), nullable=False),

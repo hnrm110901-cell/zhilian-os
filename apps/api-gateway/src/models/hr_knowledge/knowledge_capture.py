@@ -24,3 +24,6 @@ class KnowledgeCapture(Base):
     quality_score = Column(Float, nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=text("NOW()"),
                         nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<KnowledgeCapture(id={self.id}, trigger={self.trigger_type!r})>"

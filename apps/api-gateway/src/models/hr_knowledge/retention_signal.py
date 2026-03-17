@@ -18,3 +18,6 @@ class RetentionSignal(Base):
     intervention_at = Column(TIMESTAMP(timezone=True), nullable=True)
     computed_at = Column(TIMESTAMP(timezone=True), server_default=text("NOW()"),
                          nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<RetentionSignal(id={self.id}, risk_score={self.risk_score})>"

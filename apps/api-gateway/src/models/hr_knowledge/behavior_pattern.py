@@ -22,3 +22,6 @@ class BehaviorPattern(Base):
     last_trained = Column(TIMESTAMP(timezone=True), nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=text("NOW()"),
                         nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<BehaviorPattern(id={self.id}, type={self.pattern_type!r})>"
