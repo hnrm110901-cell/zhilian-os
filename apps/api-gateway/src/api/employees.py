@@ -113,6 +113,13 @@ async def create_employee(
     await session.commit()
     await session.refresh(emp)
     logger.info("employee_created", employee_id=emp.id, store_id=emp.store_id)
+    # --- HR double-write (shadow, non-blocking) ---
+    try:
+        from src.services.hr.double_write_service import DoubleWriteService
+        dw = DoubleWriteService(session=session)
+        await dw.on_employee_created(emp)
+    except Exception as exc:
+        logger.warning("hr_double_write.create_hook_failed", employee_id=emp.id, error=str(exc))
     return EmployeeResponse(
         id=emp.id, store_id=emp.store_id, name=emp.name, phone=emp.phone,
         email=emp.email, position=emp.position, skills=emp.skills or [],
@@ -132,10 +139,18 @@ async def update_employee(
     emp = await EmployeeRepository.get_by_id(session, employee_id)
     if not emp:
         raise HTTPException(status_code=404, detail="员工不存在")
+    changed = set(req.model_dump(exclude_none=True).keys())
     for field, value in req.model_dump(exclude_none=True).items():
         setattr(emp, field, value)
     await session.commit()
     await session.refresh(emp)
+    # --- HR double-write (shadow, non-blocking) ---
+    try:
+        from src.services.hr.double_write_service import DoubleWriteService
+        dw = DoubleWriteService(session=session)
+        await dw.on_employee_updated(emp, changed_fields=changed)
+    except Exception as exc:
+        logger.warning("hr_double_write.update_hook_failed", employee_id=emp.id, error=str(exc))
     return EmployeeResponse(
         id=emp.id, store_id=emp.store_id, name=emp.name, phone=emp.phone,
         email=emp.email, position=emp.position, skills=emp.skills or [],
