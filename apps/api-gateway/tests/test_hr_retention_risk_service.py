@@ -36,6 +36,12 @@ def _mock_scalars_all(rows):
     return result
 
 
+def _mock_fetchone(row):
+    result = MagicMock()
+    result.fetchone.return_value = row
+    return result
+
+
 @pytest.fixture
 def mock_session():
     session = AsyncMock()
@@ -48,18 +54,20 @@ def mock_session():
 async def test_compute_risk_new_hire_no_achievements(mock_session):
     """New hire (<90 days) with no achievements → higher risk."""
     assignment_id = uuid.uuid4()
+    person_id = uuid.uuid4()
+
+    combined_row = MagicMock()
+    combined_row.start_date = date.today() - timedelta(days=30)
+    combined_row.person_id = person_id
 
     async def fake_execute(stmt, params=None):
         sql_text = getattr(stmt, 'text', str(stmt))
-        # start_date query
-        if "start_date" in sql_text and "employment_assignments" in sql_text:
-            return _mock_scalar_one_or_none(date.today() - timedelta(days=30))
+        # combined start_date + person_id query
+        if "start_date, person_id" in sql_text and "employment_assignments" in sql_text:
+            return _mock_fetchone(combined_row)
         # achievement count
         if "person_achievements" in sql_text and "COUNT" in sql_text:
             return _mock_scalar(0)
-        # person_id lookup
-        if "person_id" in sql_text and "employment_assignments" in sql_text:
-            return _mock_scalar_one_or_none(uuid.uuid4())
         # existing retention signal
         if "retention_signals" in sql_text and "SELECT" in sql_text:
             return _mock_scalar_one_or_none(None)
@@ -78,15 +86,18 @@ async def test_compute_risk_new_hire_no_achievements(mock_session):
 async def test_compute_risk_veteran_with_skills(mock_session):
     """Veteran (>90 days) with achievements → lower risk."""
     assignment_id = uuid.uuid4()
+    person_id = uuid.uuid4()
+
+    combined_row = MagicMock()
+    combined_row.start_date = date.today() - timedelta(days=200)
+    combined_row.person_id = person_id
 
     async def fake_execute(stmt, params=None):
         sql_text = getattr(stmt, 'text', str(stmt))
-        if "start_date" in sql_text and "employment_assignments" in sql_text:
-            return _mock_scalar_one_or_none(date.today() - timedelta(days=200))
+        if "start_date, person_id" in sql_text and "employment_assignments" in sql_text:
+            return _mock_fetchone(combined_row)
         if "person_achievements" in sql_text and "COUNT" in sql_text:
             return _mock_scalar(3)
-        if "person_id" in sql_text and "employment_assignments" in sql_text:
-            return _mock_scalar_one_or_none(uuid.uuid4())
         if "retention_signals" in sql_text and "SELECT" in sql_text:
             return _mock_scalar_one_or_none(None)
         return MagicMock()
@@ -104,15 +115,18 @@ async def test_compute_risk_veteran_with_skills(mock_session):
 async def test_compute_risk_with_existing_signal(mock_session):
     """Existing retention signal blends into score."""
     assignment_id = uuid.uuid4()
+    person_id = uuid.uuid4()
+
+    combined_row = MagicMock()
+    combined_row.start_date = date.today() - timedelta(days=200)
+    combined_row.person_id = person_id
 
     async def fake_execute(stmt, params=None):
         sql_text = getattr(stmt, 'text', str(stmt))
-        if "start_date" in sql_text and "employment_assignments" in sql_text:
-            return _mock_scalar_one_or_none(date.today() - timedelta(days=200))
+        if "start_date, person_id" in sql_text and "employment_assignments" in sql_text:
+            return _mock_fetchone(combined_row)
         if "person_achievements" in sql_text and "COUNT" in sql_text:
             return _mock_scalar(2)
-        if "person_id" in sql_text and "employment_assignments" in sql_text:
-            return _mock_scalar_one_or_none(uuid.uuid4())
         if "retention_signals" in sql_text and "SELECT" in sql_text:
             return _mock_scalar_one_or_none(0.6)
         return MagicMock()
@@ -140,18 +154,26 @@ async def test_scan_store_returns_high_risk(mock_session):
 
     async def fake_execute(stmt, params=None):
         sql_text = getattr(stmt, 'text', str(stmt))
-        # Fetch active assignments for store
-        if "employment_assignments" in sql_text and "org_node_id" in sql_text and "SELECT" in sql_text and "INSERT" not in sql_text and "UPDATE" not in sql_text:
-            if "start_date" in sql_text and "COUNT" not in sql_text and "person_id" not in sql_text:
-                return _mock_scalar_one_or_none(assignment_row.start_date)
-            if "person_id" in sql_text and "COUNT" not in sql_text:
-                return _mock_scalar_one_or_none(person_id)
+        # Fetch active assignments for store (uses org_node_id, no :aid param)
+        if (
+            "employment_assignments" in sql_text
+            and "org_node_id" in sql_text
+            and "SELECT" in sql_text
+            and "INSERT" not in sql_text
+        ):
             return _mock_fetchall([assignment_row])
+        # Combined start_date + person_id query inside compute_risk_for_assignment
+        if (
+            "employment_assignments" in sql_text
+            and "id = :aid" in sql_text
+            and "SELECT" in sql_text
+        ):
+            return _mock_fetchone(assignment_row)
         if "person_achievements" in sql_text and "COUNT" in sql_text:
             return _mock_scalar(0)
         if "retention_signals" in sql_text and "SELECT" in sql_text:
             return _mock_scalar_one_or_none(None)
-        # INSERT/UPDATE retention_signals
+        # INSERT retention_signals
         if "retention_signals" in sql_text:
             return MagicMock()
         # person name lookup
@@ -166,6 +188,9 @@ async def test_scan_store_returns_high_risk(mock_session):
 
     assert isinstance(high_risk, list)
     assert isinstance(total_scanned, int)
+    assert total_scanned == 1  # one active assignment mocked
+    # 30-day new hire with no achievements should score >= 0.70
+    assert len(high_risk) >= 1
 
 
 @pytest.mark.asyncio

@@ -197,13 +197,14 @@ class HRAgentV1(BaseAgent):
             if next_skill:
                 lift = float(next_skill.get("estimated_revenue_lift", 0) or 0)
                 total_potential += lift
-                recommendations.append({
-                    "action": f"培训 {next_skill['skill_name']}",
-                    "expected_yuan": lift,
-                    "confidence": 0.75,
-                    "person_id": analysis["person_id"],
-                    "source": "skill_gap_analysis",
-                })
+                if lift > 0:
+                    recommendations.append({
+                        "action": f"培训 {next_skill['skill_name']}",
+                        "expected_yuan": lift,
+                        "confidence": 0.75,
+                        "person_id": analysis["person_id"],
+                        "source": "skill_gap_analysis",
+                    })
 
         summary = (
             f"技能差距分析：{len(analyses)} 人，总潜在提升 "

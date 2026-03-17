@@ -34,6 +34,7 @@ _NEW_HIRE_BONUS = 0.2       # <90 days tenure
 _NO_ACHIEVEMENT_BONUS = 0.2  # zero person_achievements
 _EXISTING_SIGNAL_WEIGHT = 0.5
 _HIGH_RISK_THRESHOLD = 0.70
+_ESTIMATED_RECRUITMENT_COST_YUAN = 3000.00
 
 
 class RetentionRiskService:
@@ -53,27 +54,19 @@ class RetentionRiskService:
         """
         s = session or self._session
 
-        # Get start_date
-        start_result = await s.execute(
+        # Fetch start_date and person_id in one round-trip
+        assignment_result = await s.execute(
             sa.text(
-                "SELECT start_date FROM employment_assignments "
+                "SELECT start_date, person_id FROM employment_assignments "
                 "WHERE id = :aid"
             ),
             {"aid": str(assignment_id)},
         )
-        start_date = start_result.scalar_one_or_none()
-        if start_date is None:
+        row = assignment_result.fetchone()
+        if row is None:
             return 0.0
-
-        # Get person_id
-        pid_result = await s.execute(
-            sa.text(
-                "SELECT person_id FROM employment_assignments "
-                "WHERE id = :aid"
-            ),
-            {"aid": str(assignment_id)},
-        )
-        person_id = pid_result.scalar_one_or_none()
+        start_date = row.start_date
+        person_id = row.person_id
 
         score = _BASELINE_RISK
 
@@ -205,7 +198,7 @@ class RetentionRiskService:
                     f"【离职风险预警】\n"
                     f"员工: {entry['person_name']}\n"
                     f"风险分: {entry['risk_score']}\n"
-                    f"建议: 安排1对1面谈，了解诉求，预期挽留可避免¥{3000:.2f}招聘成本"
+                    f"建议: 安排1对1面谈，了解诉求，预期挽留可避免¥{_ESTIMATED_RECRUITMENT_COST_YUAN:.2f}招聘成本"
                 )
                 await ws.send_text_message(content=message)
                 alerted += 1
