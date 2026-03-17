@@ -176,18 +176,33 @@ class OrgScopeMiddleware(BaseHTTPMiddleware):
         return scope or GLOBAL_ADMIN_SCOPE
 
     async def _build_scope_from_db(self, request, org_node_id: str, user) -> Optional[OrgScope]:
-        """从 org_nodes 子树构建 OrgScope"""
+        """从 org_nodes 子树构建 OrgScope，同时从 org_permissions 读取权限级别"""
         try:
             db = request.state.db  # 由数据库中间件注入
             from src.services.org_hierarchy_service import OrgHierarchyService
+            from src.models.org_permission import OrgPermission
+            from sqlalchemy import select
             svc = OrgHierarchyService(db)
             subtree = await svc.get_subtree(org_node_id)
             if not subtree:
                 return None
+
+            # 从 org_permissions 读取用户对该节点的权限级别
+            perm_result = await db.execute(
+                select(OrgPermission).where(
+                    OrgPermission.user_id == str(getattr(user, "id", "")),
+                    OrgPermission.org_node_id == org_node_id,
+                    OrgPermission.is_active == True,
+                )
+            )
+            perm = perm_result.scalar_one_or_none()
+            # 无显式权限记录时降级为只读（最小权限原则）
+            permission_level = perm.permission_level if perm else "read_only"
+
             return build_org_scope_from_nodes(
                 home_node_id=org_node_id,
                 subtree_nodes=subtree,
-                permission_level="read_write",  # TODO: 从 OrgPermission 表读取实际权限
+                permission_level=permission_level,
             )
         except Exception as e:
             logger.warning("org_scope_build_failed", error=str(e), node_id=org_node_id)
