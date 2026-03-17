@@ -33,10 +33,10 @@ class DoubleWriteService:
             )
             return False
 
-    async def on_employee_updated(self, employee, changed_fields: set[str]) -> bool:
+    async def on_employee_updated(self, employee) -> bool:
         """Sync relevant changes to persons/assignments. Returns True if succeeded."""
         try:
-            return await self._do_update(employee, changed_fields)
+            return await self._do_update(employee)
         except Exception as exc:
             logger.warning(
                 "hr_double_write.update_failed",
@@ -188,8 +188,8 @@ class DoubleWriteService:
         )
         return True
 
-    async def _do_update(self, emp, changed_fields: set[str]) -> bool:
-        """Propagate Employee field changes to HR tables."""
+    async def _do_update(self, emp) -> bool:
+        """Propagate Employee field changes to HR tables (always checks all relevant fields)."""
         id_map = await self._lookup_id_map_full(emp.id)
         if id_map is None:
             logger.info(
@@ -201,8 +201,8 @@ class DoubleWriteService:
         person_id = id_map.person_id
         assignment_id = id_map.assignment_id
 
-        # Sync person-level fields — use individual UPDATE per field (no f-string SQL)
-        if "name" in changed_fields:
+        # Sync person-level fields — always update all non-None fields
+        if emp.name is not None:
             await self._session.execute(
                 sa.text(
                     "UPDATE persons SET name = :name, updated_at = NOW() "
@@ -210,7 +210,7 @@ class DoubleWriteService:
                 ),
                 {"name": emp.name, "person_id": str(person_id)},
             )
-        if "phone" in changed_fields:
+        if emp.phone is not None:
             await self._session.execute(
                 sa.text(
                     "UPDATE persons SET phone = :phone, updated_at = NOW() "
@@ -218,7 +218,7 @@ class DoubleWriteService:
                 ),
                 {"phone": emp.phone, "person_id": str(person_id)},
             )
-        if "email" in changed_fields:
+        if emp.email is not None:
             await self._session.execute(
                 sa.text(
                     "UPDATE persons SET email = :email, updated_at = NOW() "
@@ -226,7 +226,7 @@ class DoubleWriteService:
                 ),
                 {"email": emp.email, "person_id": str(person_id)},
             )
-        if "preferences" in changed_fields:
+        if emp.preferences is not None:
             await self._session.execute(
                 sa.text(
                     "UPDATE persons SET preferences = :preferences::jsonb, "
@@ -237,9 +237,10 @@ class DoubleWriteService:
                     "person_id": str(person_id),
                 },
             )
+        # department: Employee model does not expose this field; skipped
 
         # Sync assignment-level fields
-        if "is_active" in changed_fields:
+        if emp.is_active is not None:
             new_status = "active" if emp.is_active else "ended"
             await self._session.execute(
                 sa.text(
@@ -254,7 +255,7 @@ class DoubleWriteService:
             )
 
         # Sync position → contract pay_scheme
-        if "position" in changed_fields:
+        if emp.position is not None:
             pay_scheme = {
                 "base_salary": 0,
                 "position_title": emp.position or "unknown",
@@ -278,7 +279,6 @@ class DoubleWriteService:
         logger.info(
             "hr_double_write.updated",
             employee_id=emp.id,
-            changed_fields=list(changed_fields),
         )
         return True
 

@@ -2,6 +2,7 @@
 import os
 import uuid
 from datetime import date
+from uuid import uuid4
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -163,7 +164,7 @@ async def test_on_employee_updated_name_sync(mock_session):
     mock_session.execute = AsyncMock(side_effect=fake_execute)
 
     svc = DoubleWriteService(session=mock_session)
-    result = await svc.on_employee_updated(emp, changed_fields={"name"})
+    result = await svc.on_employee_updated(emp)
 
     assert result is True
     update_sqls = [s for s, _ in call_log if "UPDATE" in s and "persons" in s]
@@ -191,7 +192,7 @@ async def test_on_employee_updated_is_active_false(mock_session):
     mock_session.execute = AsyncMock(side_effect=fake_execute)
 
     svc = DoubleWriteService(session=mock_session)
-    result = await svc.on_employee_updated(emp, changed_fields={"is_active"})
+    result = await svc.on_employee_updated(emp)
 
     assert result is True
     update_sqls = [s for s, _ in call_log if "UPDATE" in s and "employment_assignments" in s]
@@ -212,6 +213,17 @@ async def test_on_employee_updated_no_id_map_entry(mock_session):
     mock_session.execute = AsyncMock(side_effect=fake_execute)
 
     svc = DoubleWriteService(session=mock_session)
-    result = await svc.on_employee_updated(emp, changed_fields={"name"})
+    result = await svc.on_employee_updated(emp)
 
     assert result is False
+
+
+@pytest.mark.asyncio
+async def test_on_employee_updated_exception_is_silent(mock_session):
+    """on_employee_updated must return False and not raise when _do_update fails."""
+    svc = DoubleWriteService(mock_session)
+    # Make _do_update raise
+    with patch.object(svc, "_do_update", side_effect=RuntimeError("db error")):
+        result = await svc.on_employee_updated(MagicMock(id=uuid4(), name="Test"))
+    assert result is False
+    # Must not raise — test passing IS the assertion

@@ -148,7 +148,7 @@ async def update_employee(
     try:
         from src.services.hr.double_write_service import DoubleWriteService
         dw = DoubleWriteService(session=session)
-        await dw.on_employee_updated(emp, changed_fields=changed)
+        await dw.on_employee_updated(emp)
     except Exception as exc:
         logger.warning("hr_double_write.update_hook_failed", employee_id=emp.id, error=str(exc))
     return EmployeeResponse(
