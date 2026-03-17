@@ -80,6 +80,7 @@ from src.api import dish_rd_agent
 from src.api import supplier_agent
 from src.api import daily_ops
 from src.api import job_standard
+from src.api import org_hierarchy
 from src.api import ai_pillars
 from src.api import ai_accuracy
 from src.api import dashboard_preferences
@@ -957,6 +958,8 @@ app.include_router(command_center.router, tags=["command-center"])
 app.include_router(daily_ops.router)
 # 岗位标准化知识库 + 员工成长
 app.include_router(job_standard.router)
+# 组织层级 + 多层配置继承
+app.include_router(org_hierarchy.router)
 
 # 业财税资金一体化（FCT）
 if getattr(settings, "FCT_ENABLED", False):
