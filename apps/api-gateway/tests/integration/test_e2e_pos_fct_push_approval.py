@@ -257,14 +257,23 @@ class TestDecisionPushPipeline:
         db = AsyncMock()
         decisions = [self._make_decision(rank=1, saving=3000.0)]
 
+        mock_ws = AsyncMock()
+        mock_ws.send_decision_card = AsyncMock(
+            return_value={"status": "sent", "message_id": "e2e_msg_001"}
+        )
+        cross_insights = {
+            "pos": {"today_revenue_yuan": 0, "order_count": 0, "avg_ticket_yuan": 0, "top_dishes": []},
+            "member": {"active_members_30d": 0, "new_members_7d": 0, "churning_members": 0, "avg_stored_value_yuan": 0},
+            "supply": {"low_stock_items": 0, "pending_orders": 0, "yesterday_waste_yuan": 0, "cost_ratio": 30.0},
+            "cross_system": {"high_value_member_no_visit_7d": 0, "popular_dish_low_stock": [], "member_spend_vs_cost_gap": 0},
+        }
+
         with (
             patch("src.services.decision_push_service.DecisionPriorityEngine", autospec=True) as MockEngine,
-            patch("src.services.wechat_service.wechat_service") as mock_ws,
+            patch("src.services.decision_push_service._get_wechat_service", return_value=mock_ws),
+            patch("src.services.decision_push_service._fetch_cross_system_insights", new_callable=AsyncMock, return_value=cross_insights),
         ):
             MockEngine.return_value.get_top3 = AsyncMock(return_value=decisions)
-            mock_ws.send_decision_card = AsyncMock(
-                return_value={"status": "sent", "message_id": "e2e_msg_001"}
-            )
 
             result = await DecisionPushService.push_morning_decisions(
                 store_id="S001", brand_id="B001",
@@ -324,14 +333,16 @@ class TestDecisionPushPipeline:
         db = AsyncMock()
         decisions = [self._make_decision(source="inventory", urgency_hours=0.5)]
 
+        mock_ws = AsyncMock()
+        mock_ws.send_decision_card = AsyncMock(
+            return_value={"status": "sent", "message_id": "prebattle_001"}
+        )
+
         with (
             patch("src.services.decision_push_service.DecisionPriorityEngine", autospec=True) as MockEngine,
-            patch("src.services.wechat_service.wechat_service") as mock_ws,
+            patch("src.services.decision_push_service._get_wechat_service", return_value=mock_ws),
         ):
             MockEngine.return_value.get_top3 = AsyncMock(return_value=decisions)
-            mock_ws.send_decision_card = AsyncMock(
-                return_value={"status": "sent", "message_id": "prebattle_001"}
-            )
 
             result = await DecisionPushService.push_prebattle_decisions(
                 store_id="S001", brand_id="B001",

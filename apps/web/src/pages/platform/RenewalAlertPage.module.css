@@ -1,0 +1,105 @@
+/* RenewalAlertPage.module.css */
+
+.container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 28px;
+}
+
+.header {
+  margin-bottom: 24px;
+}
+
+.header h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin: 0 0 4px;
+}
+
+.header p {
+  font-size: 13px;
+  color: var(--text-tertiary, #9ca3af);
+  margin: 0;
+}
+
+.kpiRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.section {
+  margin-bottom: 24px;
+}
+
+.sectionTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+  margin: 0 0 12px;
+}
+
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.alertCard {
+  text-align: center;
+  padding: 20px !important;
+}
+
+.alertCardNum {
+  font-size: 36px;
+  font-weight: 800;
+  line-height: 1.1;
+  margin-bottom: 6px;
+}
+
+.alertCardRed { color: #ef4444; }
+.alertCardOrange { color: var(--accent, #FF6B2C); }
+.alertCardYellow { color: #eab308; }
+
+.alertCardLabel {
+  font-size: 13px;
+  color: var(--text-tertiary, #9ca3af);
+  font-weight: 500;
+}
+
+.tableCard {
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.riskHigh { color: #ef4444; font-weight: 600; }
+.riskMid { color: var(--accent, #FF6B2C); font-weight: 600; }
+.riskLow { color: #22c55e; font-weight: 600; }
+
+.probCell {
+  font-weight: 600;
+}
+
+.actionBtn {
+  padding: 4px 12px;
+  font-size: 12px;
+  border: 1px solid var(--accent, #FF6B2C);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--accent, #FF6B2C);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.actionBtn:hover {
+  background: var(--accent, #FF6B2C);
+  color: #fff;
+}
+
+@media (max-width: 768px) {
+  .kpiRow { grid-template-columns: 1fr; }
+  .cardGrid { grid-template-columns: 1fr; }
+}
