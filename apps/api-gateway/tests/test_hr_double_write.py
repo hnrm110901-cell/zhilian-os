@@ -1,6 +1,5 @@
 """Tests for HR double-write service."""
 import os
-import uuid
 from datetime import date
 from uuid import uuid4
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -62,8 +61,18 @@ def mock_session():
     return session
 
 
+@pytest.fixture
+def mock_session_factory(mock_session):
+    """Factory that returns mock_session via async context manager."""
+    cm = AsyncMock()
+    cm.__aenter__ = AsyncMock(return_value=mock_session)
+    cm.__aexit__ = AsyncMock(return_value=False)
+    factory = MagicMock(return_value=cm)
+    return factory
+
+
 @pytest.mark.asyncio
-async def test_on_employee_created_success(mock_session):
+async def test_on_employee_created_success(mock_session, mock_session_factory):
     """on_employee_created inserts person + assignment + contract + id_map."""
     emp = _make_employee()
 
@@ -81,7 +90,7 @@ async def test_on_employee_created_success(mock_session):
 
     mock_session.execute = AsyncMock(side_effect=fake_execute)
 
-    svc = DoubleWriteService(session=mock_session)
+    svc = DoubleWriteService(session_factory=mock_session_factory)
     result = await svc.on_employee_created(emp)
 
     assert result is True
@@ -91,7 +100,7 @@ async def test_on_employee_created_success(mock_session):
 
 
 @pytest.mark.asyncio
-async def test_on_employee_created_no_org_node(mock_session):
+async def test_on_employee_created_no_org_node(mock_session, mock_session_factory):
     """If store has no org_node_id, double-write is skipped (returns False)."""
     emp = _make_employee()
 
@@ -105,50 +114,50 @@ async def test_on_employee_created_no_org_node(mock_session):
 
     mock_session.execute = AsyncMock(side_effect=fake_execute)
 
-    svc = DoubleWriteService(session=mock_session)
+    svc = DoubleWriteService(session_factory=mock_session_factory)
     result = await svc.on_employee_created(emp)
 
     assert result is False
 
 
 @pytest.mark.asyncio
-async def test_on_employee_created_already_exists(mock_session):
+async def test_on_employee_created_already_exists(mock_session, mock_session_factory):
     """If employee_id_map entry exists, skip (idempotent)."""
     emp = _make_employee()
 
     async def fake_execute(stmt, params=None):
         sql_text = getattr(stmt, 'text', str(stmt))
         if "employee_id_map" in sql_text and "SELECT" in sql_text:
-            return _mock_scalar_one_or_none(uuid.uuid4())
+            return _mock_scalar_one_or_none(uuid4())
         if "org_node_id" in sql_text and "stores" in sql_text:
             return _mock_scalar_one_or_none("ORG_NODE_001")
         return MagicMock()
 
     mock_session.execute = AsyncMock(side_effect=fake_execute)
 
-    svc = DoubleWriteService(session=mock_session)
+    svc = DoubleWriteService(session_factory=mock_session_factory)
     result = await svc.on_employee_created(emp)
 
     assert result is True  # not an error, just already synced
 
 
 @pytest.mark.asyncio
-async def test_on_employee_created_exception_is_silent(mock_session):
+async def test_on_employee_created_exception_is_silent(mock_session, mock_session_factory):
     """Exception in double-write does NOT propagate — returns False."""
     emp = _make_employee()
     mock_session.execute = AsyncMock(side_effect=Exception("DB boom"))
 
-    svc = DoubleWriteService(session=mock_session)
+    svc = DoubleWriteService(session_factory=mock_session_factory)
     result = await svc.on_employee_created(emp)
 
     assert result is False  # silent failure
 
 
 @pytest.mark.asyncio
-async def test_on_employee_updated_name_sync(mock_session):
+async def test_on_employee_updated_name_sync(mock_session, mock_session_factory):
     """Updating name propagates to persons table."""
     emp = _make_employee(name="王五_updated")
-    person_id = uuid.uuid4()
+    person_id = uuid4()
 
     call_log = []
     async def fake_execute(stmt, params=None):
@@ -157,13 +166,13 @@ async def test_on_employee_updated_name_sync(mock_session):
         if "employee_id_map" in sql_text and "SELECT" in sql_text:
             row = MagicMock()
             row.person_id = person_id
-            row.assignment_id = uuid.uuid4()
+            row.assignment_id = uuid4()
             return MagicMock(fetchone=MagicMock(return_value=row))
         return MagicMock()
 
     mock_session.execute = AsyncMock(side_effect=fake_execute)
 
-    svc = DoubleWriteService(session=mock_session)
+    svc = DoubleWriteService(session_factory=mock_session_factory)
     result = await svc.on_employee_updated(emp)
 
     assert result is True
@@ -172,11 +181,11 @@ async def test_on_employee_updated_name_sync(mock_session):
 
 
 @pytest.mark.asyncio
-async def test_on_employee_updated_is_active_false(mock_session):
+async def test_on_employee_updated_is_active_false(mock_session, mock_session_factory):
     """Deactivating employee sets assignment status to 'ended'."""
     emp = _make_employee(is_active=False)
-    person_id = uuid.uuid4()
-    assignment_id = uuid.uuid4()
+    person_id = uuid4()
+    assignment_id = uuid4()
 
     call_log = []
     async def fake_execute(stmt, params=None):
@@ -191,7 +200,7 @@ async def test_on_employee_updated_is_active_false(mock_session):
 
     mock_session.execute = AsyncMock(side_effect=fake_execute)
 
-    svc = DoubleWriteService(session=mock_session)
+    svc = DoubleWriteService(session_factory=mock_session_factory)
     result = await svc.on_employee_updated(emp)
 
     assert result is True
@@ -200,7 +209,7 @@ async def test_on_employee_updated_is_active_false(mock_session):
 
 
 @pytest.mark.asyncio
-async def test_on_employee_updated_no_id_map_entry(mock_session):
+async def test_on_employee_updated_no_id_map_entry(mock_session, mock_session_factory):
     """If employee has no id_map entry, update is a no-op (returns False)."""
     emp = _make_employee()
 
@@ -212,16 +221,16 @@ async def test_on_employee_updated_no_id_map_entry(mock_session):
 
     mock_session.execute = AsyncMock(side_effect=fake_execute)
 
-    svc = DoubleWriteService(session=mock_session)
+    svc = DoubleWriteService(session_factory=mock_session_factory)
     result = await svc.on_employee_updated(emp)
 
     assert result is False
 
 
 @pytest.mark.asyncio
-async def test_on_employee_updated_exception_is_silent(mock_session):
+async def test_on_employee_updated_exception_is_silent(mock_session_factory):
     """on_employee_updated must return False and not raise when _do_update fails."""
-    svc = DoubleWriteService(mock_session)
+    svc = DoubleWriteService(session_factory=mock_session_factory)
     # Make _do_update raise
     with patch.object(svc, "_do_update", side_effect=RuntimeError("db error")):
         result = await svc.on_employee_updated(MagicMock(id=uuid4(), name="Test"))

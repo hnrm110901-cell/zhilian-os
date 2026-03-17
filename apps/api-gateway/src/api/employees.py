@@ -19,6 +19,7 @@ from ..models.task import Task, TaskStatus, TaskPriority
 from ..models.user import User, UserRole
 from ..repositories import EmployeeRepository
 from ..services.wechat_service import wechat_service
+from ..services.hr.double_write_service import DoubleWriteService
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -114,9 +115,10 @@ async def create_employee(
     await session.refresh(emp)
     logger.info("employee_created", employee_id=emp.id, store_id=emp.store_id)
     # --- HR double-write (shadow, non-blocking) ---
+    # DoubleWriteService.on_employee_created already catches internally;
+    # this outer try/except guards against DoubleWriteService constructor failures.
     try:
-        from src.services.hr.double_write_service import DoubleWriteService
-        dw = DoubleWriteService(session=session)
+        dw = DoubleWriteService()
         await dw.on_employee_created(emp)
     except Exception as exc:
         logger.warning("hr_double_write.create_hook_failed", employee_id=emp.id, error=str(exc))
@@ -139,15 +141,15 @@ async def update_employee(
     emp = await EmployeeRepository.get_by_id(session, employee_id)
     if not emp:
         raise HTTPException(status_code=404, detail="员工不存在")
-    changed = set(req.model_dump(exclude_none=True).keys())
     for field, value in req.model_dump(exclude_none=True).items():
         setattr(emp, field, value)
     await session.commit()
     await session.refresh(emp)
     # --- HR double-write (shadow, non-blocking) ---
+    # DoubleWriteService.on_employee_updated already catches internally;
+    # this outer try/except guards against DoubleWriteService constructor failures.
     try:
-        from src.services.hr.double_write_service import DoubleWriteService
-        dw = DoubleWriteService(session=session)
+        dw = DoubleWriteService()
         await dw.on_employee_updated(emp)
     except Exception as exc:
         logger.warning("hr_double_write.update_hook_failed", employee_id=emp.id, error=str(exc))
