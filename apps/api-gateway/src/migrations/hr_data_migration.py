@@ -11,7 +11,7 @@ import asyncio
 import json
 import uuid
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date
 from typing import Optional
 
 import structlog
@@ -283,6 +283,7 @@ class HrDataMigration:
         if not skills:
             return []
         # Use individual queries per skill to stay fully parameterized
+        # N+1 accepted: migration runs once offline; not a latency-sensitive path
         matched = []
         for skill_str in skills:
             result = await self._session.execute(

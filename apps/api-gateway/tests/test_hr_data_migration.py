@@ -1,7 +1,7 @@
 """Tests for HR data migration script (employees → persons/assignments)."""
 import os
 import uuid
-from datetime import date, datetime
+from datetime import date
 from unittest.mock import AsyncMock, patch, MagicMock
 
 import pytest
@@ -71,13 +71,6 @@ def _make_employee_row(
     return row
 
 
-def _mock_scalars_all(rows):
-    """Helper: mock session.execute().scalars().all() pattern (single-column queries)."""
-    result = MagicMock()
-    result.scalars.return_value.all.return_value = rows
-    return result
-
-
 def _mock_fetchall(rows):
     """Helper: mock session.execute().fetchall() pattern (multi-column queries)."""
     result = MagicMock()
@@ -89,13 +82,6 @@ def _mock_scalar_one_or_none(value):
     """Helper: mock session.execute().scalar_one_or_none()."""
     result = MagicMock()
     result.scalar_one_or_none.return_value = value
-    return result
-
-
-def _mock_scalar(value):
-    """Helper: mock session.execute().scalar()."""
-    result = MagicMock()
-    result.scalar.return_value = value
     return result
 
 
@@ -138,6 +124,7 @@ async def test_migrate_all_basic(mock_session):
     assert report.migrated == 1
     assert report.skipped_no_org_node == 0
     assert report.errors == 0
+    mock_session.commit.assert_called_once()
 
 
 @pytest.mark.asyncio
