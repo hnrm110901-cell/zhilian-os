@@ -12,6 +12,7 @@ from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_db
 from src.services.org_hierarchy_service import OrgHierarchyService
+from src.services.org_aggregator import OrgAggregator
 
 router = APIRouter(prefix="/api/v1/org", tags=["org-hierarchy"])
 
@@ -95,3 +96,22 @@ async def set_config(
     await db.commit()
     return {"node_id": node_id, "key": cfg.config_key,
             "effective_value": cfg.typed_value()}
+
+
+@router.get("/nodes/{node_id}/snapshot/{period}")
+async def get_org_snapshot(
+    node_id: str,
+    period: str,                    # 格式: "2026-03" 或 "2026-03-17"
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    获取节点聚合快照（含子节点）
+    区域经理调用：返回区域内所有门店汇总
+    集团CFO调用：返回集团所有品牌汇总
+    """
+    aggregator = OrgAggregator(db)
+    try:
+        snapshot = await aggregator.get_snapshot(node_id, period=period)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return snapshot.to_dict()
