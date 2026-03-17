@@ -423,6 +423,13 @@ __all__ = [
     "ConfigKey",
     "OrgPermission",
     "OrgPermissionLevel",
+    # HR domain models (z54)
+    "Person",
+    "EmploymentAssignment",
+    "EmploymentContract",
+    "EmployeeIdMap",
+    "AttendanceRule",
+    "KpiTemplate",
 ]
 
 from .business_intel import (
@@ -530,3 +537,13 @@ from .warning_record import WarningRecord
 from .action_task import ActionTask
 from .weekly_review import WeeklyReview, WeeklyReviewItem
 from .data_quality_check import DataQualityCheckRecord
+
+# HR domain models (z54)
+from .hr import (
+    Person,
+    EmploymentAssignment,
+    EmploymentContract,
+    EmployeeIdMap,
+    AttendanceRule,
+    KpiTemplate,
+)
