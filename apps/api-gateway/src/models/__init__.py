@@ -430,6 +430,13 @@ __all__ = [
     "EmployeeIdMap",
     "AttendanceRule",
     "KpiTemplate",
+    # HR Knowledge OS models (z55)
+    "HrKnowledgeRule",
+    "SkillNode",
+    "BehaviorPattern",
+    "PersonAchievement",
+    "RetentionSignal",
+    "KnowledgeCapture",
 ]
 
 from .business_intel import (
@@ -546,4 +553,14 @@ from .hr import (
     EmployeeIdMap,
     AttendanceRule,
     KpiTemplate,
+)
+
+# HR Knowledge OS models (z55)
+from .hr_knowledge import (
+    HrKnowledgeRule,
+    SkillNode,
+    BehaviorPattern,
+    PersonAchievement,
+    RetentionSignal,
+    KnowledgeCapture,
 )
