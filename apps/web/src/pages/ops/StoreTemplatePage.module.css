@@ -1,0 +1,132 @@
+/* StoreTemplatePage.module.css */
+
+.container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 28px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  gap: 16px;
+}
+
+.headerLeft h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin: 0 0 4px;
+}
+
+.headerLeft p {
+  font-size: 13px;
+  color: var(--text-tertiary, #9ca3af);
+  margin: 0;
+}
+
+.headerActions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.searchInput {
+  height: 36px;
+  width: 220px;
+  padding: 0 12px;
+  border: 1px solid var(--border-default, #e5e7eb);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-primary, #111827);
+  background: var(--bg-raised, #fff);
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.15s;
+}
+
+.searchInput:focus {
+  border-color: var(--accent, #FF6B2C);
+}
+
+.createBtn {
+  height: 36px;
+  padding: 0 18px;
+  background: var(--accent, #FF6B2C);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: opacity 0.15s;
+}
+
+.createBtn:hover {
+  opacity: 0.85;
+}
+
+.kpiRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.section {
+  margin-bottom: 24px;
+}
+
+.sectionTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+  margin: 0 0 12px;
+}
+
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.tableCard {
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.actionGroup {
+  display: flex;
+  gap: 6px;
+}
+
+.actionBtn {
+  padding: 4px 10px;
+  font-size: 12px;
+  border: 1px solid var(--border-default, #e5e7eb);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary, #6b7280);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.actionBtn:hover {
+  border-color: var(--accent, #FF6B2C);
+  color: var(--accent, #FF6B2C);
+}
+
+.actionBtnPrimary {
+  border-color: var(--accent, #FF6B2C);
+  color: var(--accent, #FF6B2C);
+}
+
+@media (max-width: 768px) {
+  .kpiRow { grid-template-columns: repeat(2, 1fr); }
+  .headerActions { flex-wrap: wrap; }
+}

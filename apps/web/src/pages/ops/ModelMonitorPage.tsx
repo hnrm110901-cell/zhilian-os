@@ -1,26 +1,110 @@
 import React from 'react';
-import { Card, Typography, Tag, Space, Empty } from 'antd';
-import { MonitorOutlined } from '@ant-design/icons';
+import { ZCard, ZBadge, ZKpi } from '../../design-system/components';
+import type { ZTableColumn } from '../../design-system/components';
+import ZTable from '../../design-system/components/ZTable';
+import styles from './ModelMonitorPage.module.css';
 
-const { Title, Paragraph } = Typography;
+// ── 类型 ─────────────────────────────────────────────────────────────────────
+
+interface CallLog {
+  id: string;
+  time: string;
+  agent: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  latency: number;
+  status: string;
+}
+
+// ── Mock 数据 ────────────────────────────────────────────────────────────────
+
+const MOCK_LOGS: CallLog[] = [
+  { id: 'CL01', time: '09:15:02', agent: 'ScheduleAgent', model: 'claude-3-opus', inputTokens: 1250, outputTokens: 380, latency: 820, status: '成功' },
+  { id: 'CL02', time: '09:12:30', agent: 'InventoryAgent', model: 'deepseek-v3', inputTokens: 890, outputTokens: 220, latency: 450, status: '成功' },
+  { id: 'CL03', time: '09:10:15', agent: 'OrderAgent', model: 'claude-3-opus', inputTokens: 2100, outputTokens: 550, latency: 1200, status: '成功' },
+  { id: 'CL04', time: '09:08:42', agent: 'PerformanceAgent', model: 'claude-3-opus', inputTokens: 3200, outputTokens: 890, latency: 1850, status: '降级' },
+  { id: 'CL05', time: '09:05:18', agent: 'DecisionAgent', model: 'deepseek-v3', inputTokens: 1800, outputTokens: 420, latency: 680, status: '成功' },
+  { id: 'CL06', time: '09:02:33', agent: 'ServiceAgent', model: 'gpt-4o', inputTokens: 950, outputTokens: 280, latency: 920, status: '成功' },
+  { id: 'CL07', time: '08:58:11', agent: 'ScheduleAgent', model: 'claude-3-opus', inputTokens: 1100, outputTokens: 350, latency: 780, status: '成功' },
+  { id: 'CL08', time: '08:55:05', agent: 'InventoryAgent', model: 'deepseek-v3', inputTokens: 760, outputTokens: 190, latency: 380, status: '成功' },
+  { id: 'CL09', time: '08:50:22', agent: 'OrderAgent', model: 'claude-3-opus', inputTokens: 1980, outputTokens: 510, latency: 1100, status: '错误' },
+  { id: 'CL10', time: '08:45:00', agent: 'PerformanceAgent', model: 'claude-3-opus', inputTokens: 2800, outputTokens: 720, latency: 1650, status: '成功' },
+];
+
+// ── 组件 ─────────────────────────────────────────────────────────────────────
 
 const ModelMonitorPage: React.FC = () => {
+  const columns: ZTableColumn<CallLog>[] = [
+    { key: 'time', dataIndex: 'time', title: '时间' },
+    { key: 'agent', dataIndex: 'agent', title: 'Agent' },
+    { key: 'model', dataIndex: 'model', title: '模型' },
+    { key: 'inputTokens', dataIndex: 'inputTokens', title: '输入tokens', align: 'right',
+      render: (v: number) => <span className={styles.tokenCell}>{v.toLocaleString()}</span>,
+    },
+    { key: 'outputTokens', dataIndex: 'outputTokens', title: '输出tokens', align: 'right',
+      render: (v: number) => <span className={styles.tokenCell}>{v.toLocaleString()}</span>,
+    },
+    { key: 'latency', dataIndex: 'latency', title: '耗时', align: 'right',
+      render: (v: number) => <span className={styles.latencyCell}>{v}ms</span>,
+    },
+    { key: 'status', dataIndex: 'status', title: '状态',
+      render: (v: string) => {
+        const typeMap: Record<string, 'success' | 'warning' | 'error'> = {
+          '成功': 'success', '降级': 'warning', '错误': 'error',
+        };
+        return <ZBadge type={typeMap[v] || 'default'} text={v} />;
+      },
+    },
+  ];
+
   return (
-    <div style={{ maxWidth: 800, margin: '0 auto' }}>
-      <Space direction="vertical" size="large" style={{ width: '100%' }}>
-        <div>
-          <Space align="center" size="middle">
-            <Title level={3} style={{ margin: 0 }}>模型监控</Title>
-            <Tag color="blue">开发中</Tag>
-          </Space>
-          <Paragraph type="secondary" style={{ marginTop: 8 }}>
-            AI模型运行监控，追踪推理延迟、准确率与异常漂移
-          </Paragraph>
-        </div>
-        <Card>
-          <Empty description="功能开发中，敬请期待" />
-        </Card>
-      </Space>
+    <div className={styles.container}>
+      <div className={styles.header}>
+        <h2>模型监控</h2>
+        <p>AI 模型运行监控，追踪推理延迟、准确率与异常漂移</p>
+      </div>
+
+      {/* KPI 行 */}
+      <div className={styles.kpiRow}>
+        <ZCard><ZKpi label="准确率" value="92.3" unit="%" status="good" /></ZCard>
+        <ZCard><ZKpi label="响应 P99" value="850" unit="ms" change={-3.2} changeLabel="较昨日" /></ZCard>
+        <ZCard><ZKpi label="错误率" value="0.8" unit="%" status="good" /></ZCard>
+        <ZCard><ZKpi label="降级次数" value={2} change={-50} changeLabel="较昨日" /></ZCard>
+      </div>
+
+      {/* 嵌入模型状态 */}
+      <div className={styles.section}>
+        <div className={styles.sectionTitle}>嵌入模型状态</div>
+        <ZCard title="本地嵌入模型" extra={<ZBadge type="success" text="正常" />}>
+          <div className={styles.embedInfo}>
+            <div className={styles.embedRow}>
+              <span className={styles.embedLabel}>模型类型</span>
+              <span className={styles.embedValue}>sentence-transformers (本地)</span>
+            </div>
+            <div className={styles.embedRow}>
+              <span className={styles.embedLabel}>向量维度</span>
+              <span className={styles.embedValue}>384维</span>
+            </div>
+            <div className={styles.embedRow}>
+              <span className={styles.embedLabel}>状态</span>
+              <span className={styles.embedValue}>正常运行</span>
+            </div>
+          </div>
+        </ZCard>
+      </div>
+
+      {/* 调用链日志 */}
+      <div className={styles.section}>
+        <div className={styles.sectionTitle}>调用链日志</div>
+        <ZCard noPadding>
+          <ZTable<CallLog>
+            columns={columns}
+            dataSource={MOCK_LOGS}
+            rowKey="id"
+          />
+        </ZCard>
+      </div>
     </div>
   );
 };

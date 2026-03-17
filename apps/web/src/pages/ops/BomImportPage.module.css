@@ -1,0 +1,132 @@
+.container {
+  padding: var(--spacing-lg, 24px);
+}
+
+.header {
+  margin-bottom: 24px;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 4px;
+}
+
+.subtitle {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.section {
+  margin-bottom: 24px;
+}
+
+.sectionTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 12px;
+}
+
+/* 步骤条 */
+.steps {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-bottom: 32px;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.stepCircle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--border-default, #e0e0e0);
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.stepCircleActive {
+  background: var(--accent);
+  color: #fff;
+}
+
+.stepCircleDone {
+  background: var(--green, #34c759);
+  color: #fff;
+}
+
+.stepLabel {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.stepLabelActive {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.stepLine {
+  flex: 1;
+  height: 2px;
+  background: var(--border-default, #e0e0e0);
+  margin: 0 8px;
+}
+
+.stepLineDone {
+  background: var(--green, #34c759);
+}
+
+/* 上传区 */
+.uploadZone {
+  border: 2px dashed var(--border-default, #d0d0d0);
+  border-radius: 12px;
+  padding: 48px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.uploadZone:hover {
+  border-color: var(--accent);
+}
+
+.uploadIcon {
+  font-size: 40px;
+  margin-bottom: 12px;
+  color: var(--text-tertiary);
+}
+
+.uploadTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 6px;
+}
+
+.uploadHint {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+.uploadFormats {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
+}
