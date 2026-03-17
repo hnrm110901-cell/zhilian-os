@@ -85,32 +85,3 @@ class ConfigResolver:
                 merged[cfg.config_key] = cfg.typed_value()
         return merged
 
-    def set_config(
-        self,
-        node: OrgNode,
-        key: str,
-        value: Any,
-        value_type: str = "str",
-        is_override: bool = False,
-    ) -> OrgConfig:
-        """
-        在内存中设置节点配置（调用方负责持久化到数据库）
-        如果 key 已存在则更新，否则新建
-        """
-        existing = self._find_config(node, key)
-        if existing:
-            existing.config_value = str(value)
-            existing.value_type = value_type
-            existing.is_override = is_override
-            return existing
-
-        cfg = OrgConfig()
-        cfg.org_node_id = node.id
-        cfg.config_key = key
-        cfg.config_value = str(value)
-        cfg.value_type = value_type
-        cfg.is_override = is_override
-        if node.configs is None:
-            node.configs = []
-        node.configs.append(cfg)
-        return cfg

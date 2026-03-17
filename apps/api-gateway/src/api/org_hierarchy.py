@@ -67,17 +67,20 @@ async def get_effective_config(node_id: str, db: AsyncSession = Depends(get_db))
 @router.post("/nodes", status_code=201)
 async def create_node(req: CreateNodeRequest, db: AsyncSession = Depends(get_db)):
     svc = OrgHierarchyService(db)
-    node = await svc.create_node(
-        id_=req.id, name=req.name, node_type=req.node_type,
-        parent_id=req.parent_id, store_type=req.store_type,
-        operation_mode=req.operation_mode, description=req.description,
-        sort_order=req.sort_order,
-    )
+    try:
+        node = await svc.create_node(
+            id_=req.id, name=req.name, node_type=req.node_type,
+            parent_id=req.parent_id, store_type=req.store_type,
+            operation_mode=req.operation_mode, description=req.description,
+            sort_order=req.sort_order,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     await db.commit()
     return {"id": node.id, "path": node.path, "depth": node.depth}
 
 
-@router.post("/nodes/{node_id}/config", status_code=200)
+@router.post("/nodes/{node_id}/config", status_code=201)
 async def set_config(
     node_id: str, req: SetConfigRequest, db: AsyncSession = Depends(get_db)
 ):

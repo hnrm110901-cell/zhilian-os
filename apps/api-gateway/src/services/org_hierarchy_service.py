@@ -4,7 +4,7 @@ OrgHierarchyService — 组织层级 CRUD + 查询
 from __future__ import annotations
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from src.models.org_node import OrgNode
 from src.models.org_config import OrgConfig
 from src.services.config_resolver import ConfigResolver
@@ -64,10 +64,12 @@ class OrgHierarchyService:
         node = await self.get_node(node_id)
         if not node:
             return []
-        # path LIKE 'node_id%' 匹配自身及所有后代
         result = await self.db.execute(
             select(OrgNode).where(
-                OrgNode.path.like(f"{node.path}%")
+                or_(
+                    OrgNode.id == node_id,                      # 自身
+                    OrgNode.path.like(f"{node.path}.%")         # 所有后代（子树）
+                )
             ).order_by(OrgNode.depth, OrgNode.sort_order)
         )
         return list(result.scalars().all())
@@ -96,6 +98,12 @@ class OrgHierarchyService:
         for nid, node_obj in nodes.items():
             node_obj.configs = configs_by_node.get(nid, [])
 
+        # 按路径深度排序：当前节点（最深）在前，根节点在后
+        target_node = nodes.get(node_id)
+        if target_node:
+            path_parts = target_node.path.split(".")
+            ordered = [nodes[p] for p in reversed(path_parts) if p in nodes]
+            return ordered
         return list(nodes.values())
 
     # ── 配置 CRUD ──────────────────────────────────────────────────────

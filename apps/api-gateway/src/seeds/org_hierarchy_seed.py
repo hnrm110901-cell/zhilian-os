@@ -6,6 +6,8 @@ import asyncio
 import structlog
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy import select as sa_select
+from src.models.org_config import OrgConfig as OrgConfigModel
 from src.core.config import get_settings
 from src.services.org_hierarchy_service import OrgHierarchyService
 from src.models.org_config import ConfigKey
@@ -70,6 +72,16 @@ async def seed():
 
         # 配置
         for node_id, key, value, value_type, is_override in SAMPLE_CONFIGS:
+            # 检查是否已有配置，跳过（避免覆盖用户修改）
+            existing_cfg_result = await db.execute(
+                sa_select(OrgConfigModel).where(
+                    OrgConfigModel.org_node_id == node_id,
+                    OrgConfigModel.config_key == key,
+                )
+            )
+            if existing_cfg_result.scalar_one_or_none():
+                skipped_configs += 1
+                continue
             await svc.set_config(
                 node_id=node_id, key=key, value=value,
                 value_type=value_type, is_override=is_override,
@@ -80,7 +92,7 @@ async def seed():
 
     print(f"\n组织层级种子数据写入完成:")
     print(f"  节点  — 新增: {created_nodes}, 跳过: {skipped_nodes}")
-    print(f"  配置  — 写入: {created_configs}")
+    print(f"  配置  — 新增: {created_configs}, 跳过: {skipped_configs}")
 
 
 if __name__ == "__main__":
