@@ -62,3 +62,22 @@ def test_org_config_override_flag():
     )
     assert cfg.typed_value() is False
     assert cfg.is_override is True
+
+
+from src.models.store import Store
+
+
+def test_store_has_org_node_id():
+    """Store 必须有 org_node_id 和 operation_mode 字段"""
+    cols = {c.key for c in Store.__table__.columns}
+    assert "org_node_id" in cols
+    assert "store_type" in cols
+    assert "operation_mode" in cols
+
+
+from src.models.employee import Employee
+
+
+def test_employee_has_dept_node_id():
+    cols = {c.key for c in Employee.__table__.columns}
+    assert "dept_node_id" in cols

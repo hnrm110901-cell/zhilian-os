@@ -1,7 +1,7 @@
 """
 Employee Model
 """
-from sqlalchemy import Column, String, Boolean, JSON, ForeignKey, Date
+from sqlalchemy import Column, String, Boolean, JSON, ForeignKey, Date, Integer
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
 import uuid
 
@@ -15,6 +15,8 @@ class Employee(Base, TimestampMixin):
 
     id = Column(String(50), primary_key=True)  # e.g., EMP001
     store_id = Column(String(50), ForeignKey("stores.id"), nullable=False, index=True)
+    # 部门节点（指向 org_nodes 中 node_type=department 的节点）
+    dept_node_id = Column(String(64), ForeignKey("org_nodes.id"), nullable=True, index=True)
     name = Column(String(100), nullable=False)
     phone = Column(String(20))
     email = Column(String(100))
