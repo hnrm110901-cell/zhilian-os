@@ -160,3 +160,22 @@ async def get_current_tenant(
         )
     TenantContext.set_current_tenant(store_id)
     return store_id
+
+
+from src.core.org_scope import OrgScope, GLOBAL_ADMIN_SCOPE
+from fastapi import Request
+
+
+def get_org_scope(request: Request) -> OrgScope:
+    """
+    依赖注入：获取当前请求的 OrgScope
+    用法：
+        @router.get("/orders")
+        async def list_orders(
+            scope: OrgScope = Depends(get_org_scope),
+            db: AsyncSession = Depends(get_db),
+        ):
+            q = OrgQueryFilter.apply(select(Order), Order, scope)
+            ...
+    """
+    return getattr(request.state, "org_scope", GLOBAL_ADMIN_SCOPE)
