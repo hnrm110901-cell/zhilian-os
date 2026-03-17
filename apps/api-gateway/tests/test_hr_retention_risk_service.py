@@ -154,43 +154,36 @@ async def test_scan_store_returns_high_risk(mock_session):
 
     async def fake_execute(stmt, params=None):
         sql_text = getattr(stmt, 'text', str(stmt))
-        # Fetch active assignments for store (uses org_node_id, no :aid param)
-        if (
-            "employment_assignments" in sql_text
-            and "org_node_id" in sql_text
-            and "SELECT" in sql_text
-            and "INSERT" not in sql_text
-        ):
+        if "employment_assignments" in sql_text and "org_node_id" in sql_text:
             return _mock_fetchall([assignment_row])
-        # Combined start_date + person_id query inside compute_risk_for_assignment
-        if (
-            "employment_assignments" in sql_text
-            and "id = :aid" in sql_text
-            and "SELECT" in sql_text
-        ):
+        if "employment_assignments" in sql_text and "id = :aid" in sql_text:
             return _mock_fetchone(assignment_row)
         if "person_achievements" in sql_text and "COUNT" in sql_text:
             return _mock_scalar(0)
         if "retention_signals" in sql_text and "SELECT" in sql_text:
             return _mock_scalar_one_or_none(None)
-        # INSERT retention_signals
-        if "retention_signals" in sql_text:
-            return MagicMock()
-        # person name lookup
         if "persons" in sql_text:
             return _mock_scalar_one_or_none("张三")
         return MagicMock()
 
     mock_session.execute = AsyncMock(side_effect=fake_execute)
 
+    # Mock the write session (AsyncSessionLocal) used internally for inserts
+    write_session = AsyncMock()
+    write_session.execute = AsyncMock()
+    write_session.commit = AsyncMock()
+    write_cm = AsyncMock()
+    write_cm.__aenter__ = AsyncMock(return_value=write_session)
+    write_cm.__aexit__ = AsyncMock(return_value=False)
+
     svc = RetentionRiskService(session=mock_session)
-    high_risk, total_scanned = await svc.scan_store(org_node_id)
+    with patch("src.services.hr.retention_risk_service.AsyncSessionLocal", return_value=write_cm):
+        high_risk, total_scanned = await svc.scan_store(org_node_id)
 
     assert isinstance(high_risk, list)
     assert isinstance(total_scanned, int)
-    assert total_scanned == 1  # one active assignment mocked
-    # 30-day new hire with no achievements should score >= 0.70
-    assert len(high_risk) >= 1
+    assert total_scanned == 1
+    assert len(high_risk) >= 1  # 30-day new hire with no achievements scores >= 0.70
 
 
 @pytest.mark.asyncio

@@ -12,6 +12,8 @@ import structlog
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.database import AsyncSessionLocal
+
 logger = structlog.get_logger()
 
 # Lazy import to avoid circular import at module level
@@ -110,7 +112,7 @@ class RetentionRiskService:
         total_scanned_count: all active assignments processed.
         Writes retention_signals for each assignment.
         """
-        # Get active assignments
+        # Get active assignments using the caller's read session
         assign_result = await self._session.execute(
             sa.text(
                 "SELECT ea.id, ea.person_id, ea.start_date "
@@ -123,53 +125,57 @@ class RetentionRiskService:
         assignments = assign_result.fetchall()
 
         high_risk = []
-        for row in assignments:
-            aid = row.id if hasattr(row, 'id') else row[0]
-            person_id = row.person_id if hasattr(row, 'person_id') else row[1]
+        # Use a dedicated session for writing retention_signals
+        # to avoid committing the caller's request session mid-flight.
+        async with AsyncSessionLocal() as write_session:
+            for row in assignments:
+                aid = row.id if hasattr(row, 'id') else row[0]
+                person_id = row.person_id if hasattr(row, 'person_id') else row[1]
 
-            risk_score = await self.compute_risk_for_assignment(
-                uuid.UUID(str(aid)), session=self._session
-            )
-
-            risk_factors = {
-                "computed_by": "rule_based_v1",
-                "threshold": _HIGH_RISK_THRESHOLD,
-            }
-
-            # Insert new retention_signal row (history tracking)
-            await self._session.execute(
-                sa.text(
-                    "INSERT INTO retention_signals "
-                    "(id, assignment_id, risk_score, risk_factors, "
-                    " intervention_status, computed_at) "
-                    "VALUES (:id, :aid, :score, :factors::jsonb, "
-                    "        'pending', NOW())"
-                ),
-                {
-                    "id": str(uuid.uuid4()),
-                    "aid": str(aid),
-                    "score": risk_score,
-                    "factors": json.dumps(risk_factors),
-                },
-            )
-
-            if risk_score >= _HIGH_RISK_THRESHOLD:
-                # Look up person name
-                name_result = await self._session.execute(
-                    sa.text("SELECT name FROM persons WHERE id = :pid"),
-                    {"pid": str(person_id)},
+                # Compute risk using the read session (no writes)
+                risk_score = await self.compute_risk_for_assignment(
+                    uuid.UUID(str(aid)), session=self._session
                 )
-                person_name = name_result.scalar_one_or_none() or "未知"
 
-                high_risk.append({
-                    "assignment_id": str(aid),
-                    "person_id": str(person_id),
-                    "person_name": person_name,
-                    "risk_score": round(risk_score, 2),
-                    "risk_factors": risk_factors,
-                })
+                risk_factors = {
+                    "computed_by": "rule_based_v1",
+                    "threshold": _HIGH_RISK_THRESHOLD,
+                }
 
-        await self._session.commit()
+                # Write to dedicated session only
+                await write_session.execute(
+                    sa.text(
+                        "INSERT INTO retention_signals "
+                        "(id, assignment_id, risk_score, risk_factors, "
+                        " intervention_status, computed_at) "
+                        "VALUES (:id, :aid, :score, :factors::jsonb, "
+                        "        'pending', NOW())"
+                    ),
+                    {
+                        "id": str(uuid.uuid4()),
+                        "aid": str(aid),
+                        "score": risk_score,
+                        "factors": json.dumps(risk_factors),
+                    },
+                )
+
+                if risk_score >= _HIGH_RISK_THRESHOLD:
+                    # Look up person name using the read session
+                    name_result = await self._session.execute(
+                        sa.text("SELECT name FROM persons WHERE id = :pid"),
+                        {"pid": str(person_id)},
+                    )
+                    person_name = name_result.scalar_one_or_none() or "未知"
+
+                    high_risk.append({
+                        "assignment_id": str(aid),
+                        "person_id": str(person_id),
+                        "person_name": person_name,
+                        "risk_score": round(risk_score, 2),
+                        "risk_factors": risk_factors,
+                    })
+
+            await write_session.commit()
 
         total_scanned = len(assignments)
         logger.info(

@@ -115,6 +115,9 @@ class HrKnowledgeService:
 
         # Find unskilled nodes in category, ordered by revenue lift
         if achieved_ids:
+            # N.B.: the f-string below injects only parameter *names* (:excl_0, :excl_1, ...)
+            # into the SQL text, never data values — actual UUIDs go through the params dict.
+            # This is the standard SQLAlchemy pattern for parameterized IN clauses.
             # Build safe parameterized exclusion
             placeholders = ", ".join(f":excl_{i}" for i in range(len(achieved_ids)))
             params = {

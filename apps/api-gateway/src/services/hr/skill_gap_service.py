@@ -1,6 +1,5 @@
 """SkillGapService — per-person skill gap analysis + next-skill recommendation (WF-3)."""
 import uuid
-from typing import Optional
 
 import structlog
 import sqlalchemy as sa
