@@ -181,6 +181,7 @@ from .job_standard import JobStandard
 from .job_sop import JobSOP
 from .employee_job_binding import EmployeeJobBinding
 from .employee_growth_trace import EmployeeGrowthTrace
+from .org_permission import OrgPermission, OrgPermissionLevel
 
 __all__ = [
     "Base",
@@ -420,6 +421,8 @@ __all__ = [
     "OperationMode",
     "OrgConfig",
     "ConfigKey",
+    "OrgPermission",
+    "OrgPermissionLevel",
 ]
 
 from .business_intel import (

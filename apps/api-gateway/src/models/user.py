@@ -1,7 +1,7 @@
 """
 User Model
 """
-from sqlalchemy import Column, String, Boolean, Enum
+from sqlalchemy import Column, String, Boolean, Enum, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 import enum
@@ -51,6 +51,8 @@ class User(Base, TimestampMixin):
     brand_id = Column(String(50), index=True)  # Associated brand (multi-brand isolation)
     phone = Column(String(20), unique=True, nullable=True, index=True)  # 手机号，用于短信验证码登录
     wechat_user_id = Column(String(100), index=True)  # WeChat Work user ID for push notifications
+    # 组织层级挂载点（用户的"主节点"，兼容旧 store_id）
+    org_node_id = Column(String(64), ForeignKey("org_nodes.id"), nullable=True, index=True)
 
     def __repr__(self):
         return f"<User(username='{self.username}', role='{self.role}')>"
