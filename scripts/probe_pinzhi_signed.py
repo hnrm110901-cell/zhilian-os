@@ -32,7 +32,7 @@ try:
             ))
             row = r.fetchone()
             if row:
-                cfg = json.loads(row[2]) if row[2] else {}
+                cfg = row[2] if isinstance(row[2], dict) else (json.loads(row[2]) if row[2] else {})
                 return {
                     "api_endpoint": row[0],
                     "token": cfg.get("pinzhi_store_token") or row[1],
