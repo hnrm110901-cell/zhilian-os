@@ -299,6 +299,7 @@ const HQHrKnowledge       = lazy(() => import('./pages/hq/HRKnowledge'));
 const HQHrTalentPipeline  = lazy(() => import('./pages/hq/HRTalentPipeline'));
 const HQHrLifecycle       = lazy(() => import('./pages/hq/HRLifecycle'));
 const HQHrApprovals       = lazy(() => import('./pages/hq/HRApprovals'));
+const HQHrAttendance      = lazy(() => import('./pages/hq/HRAttendance'));
 const SmHRTeam            = lazy(() => import('./pages/sm/HRTeam'));
 const SmHRPerson          = lazy(() => import('./pages/sm/HRPerson'));
 const SmBanquet       = lazy(() => import('./pages/sm/Banquet'));
@@ -1111,6 +1112,7 @@ const AppContent: React.FC = () => {
                   <Route path="hr/talent-pipeline"       element={<HQHrTalentPipeline />} />
                   <Route path="hr/lifecycle"             element={<HQHrLifecycle />} />
                   <Route path="hr/approvals"             element={<HQHrApprovals />} />
+                  <Route path="hr/attendance"            element={<HQHrAttendance />} />
                 </Route>
 
                 {/* Role-based views — Employee H5 Self-Service (手机) */}
