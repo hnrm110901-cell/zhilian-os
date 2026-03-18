@@ -963,6 +963,9 @@ app.include_router(org_hierarchy.router)
 # M2 HR Foundation — HRAgent v1 + REST API
 from src.api import hr as hr_api
 app.include_router(hr_api.router, prefix="/api/v1/hr", tags=["HR"])
+# 企微考勤Webhook（无需认证，外部系统回调）
+from src.api.webhooks.wechat_attendance import router as wechat_attendance_router
+app.include_router(wechat_attendance_router, prefix="/api/v1", tags=["webhooks"])
 
 # 业财税资金一体化（FCT）
 if getattr(settings, "FCT_ENABLED", False):

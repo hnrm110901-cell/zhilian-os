@@ -16,6 +16,8 @@ from ..services.hr.onboarding_service import OnboardingService
 from ..services.hr.offboarding_service import OffboardingService
 from ..services.hr.transfer_service import TransferService
 from ..services.hr.approval_workflow_service import HRApprovalWorkflowService
+from ..services.hr.attendance_service import AttendanceService
+from ..services.hr.leave_service import LeaveService
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -1234,3 +1236,183 @@ async def create_approval_template(
     session.add(template)
     await session.commit()
     return {"id": str(template.id), "name": template.name}
+
+
+# ── Attendance & Leave Schemas ─────────────────────────────────────
+
+class ClockRecordRequest(BaseModel):
+    assignment_id: str
+    clock_type: str  # in/out/break_start/break_end
+    clock_time: str  # ISO datetime string
+    source: str  # wechat_work/dingtalk/manual/face_recognition
+
+
+class LeaveApplyRequest(BaseModel):
+    assignment_id: str
+    leave_type: str
+    start_datetime: str  # ISO datetime
+    end_datetime: str    # ISO datetime
+    days: float
+    reason: str
+    created_by: str
+
+
+class LeaveApproveRequest(BaseModel):
+    approved_by: str
+
+
+# ── Attendance Endpoints ─────────────────────────────────────────
+
+@router.post("/attendance/clock", status_code=201)
+async def record_clock(
+    req: ClockRecordRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """记录打卡"""
+    svc = AttendanceService()
+    try:
+        record = await svc.record_clock(
+            assignment_id=uuid.UUID(req.assignment_id),
+            clock_type=req.clock_type,
+            clock_time=datetime.fromisoformat(req.clock_time),
+            source=req.source,
+            session=session,
+        )
+        await session.commit()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"id": str(record.id), "is_anomaly": record.is_anomaly}
+
+
+@router.get("/attendance/monthly")
+async def get_monthly_attendance(
+    assignment_id: str = Query(...),
+    year: int = Query(...),
+    month: int = Query(...),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """月度考勤汇总"""
+    svc = AttendanceService()
+    summary = await svc.get_monthly_summary(
+        assignment_id=uuid.UUID(assignment_id),
+        year=year,
+        month=month,
+        session=session,
+    )
+    return summary
+
+
+@router.get("/attendance/anomalies")
+async def get_attendance_anomalies(
+    assignment_id: str = Query(...),
+    date_str: str = Query(..., alias="date", description="YYYY-MM-DD"),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """检测异常打卡"""
+    svc = AttendanceService()
+    anomalies = await svc.detect_anomalies(
+        assignment_id=uuid.UUID(assignment_id),
+        target_date=date.fromisoformat(date_str),
+        session=session,
+    )
+    return {"anomalies": anomalies, "count": len(anomalies)}
+
+
+# ── Leave Endpoints ──────────────────────────────────────────────
+
+@router.post("/leave/apply", status_code=201)
+async def apply_leave(
+    req: LeaveApplyRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """提交请假申请"""
+    svc = LeaveService()
+    try:
+        request = await svc.apply(
+            assignment_id=uuid.UUID(req.assignment_id),
+            leave_type=req.leave_type,
+            start_datetime=datetime.fromisoformat(req.start_datetime),
+            end_datetime=datetime.fromisoformat(req.end_datetime),
+            days=req.days,
+            reason=req.reason,
+            created_by=req.created_by,
+            session=session,
+        )
+        await session.commit()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"id": str(request.id), "status": request.status}
+
+
+@router.post("/leave/{request_id}/approve")
+async def approve_leave(
+    request_id: str,
+    req: LeaveApproveRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """审批请假"""
+    svc = LeaveService()
+    try:
+        leave_req = await svc.approve(
+            request_id=uuid.UUID(request_id),
+            approved_by=req.approved_by,
+            session=session,
+        )
+        await session.commit()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"id": str(leave_req.id), "status": leave_req.status}
+
+
+@router.get("/leave/balance")
+async def get_leave_balance(
+    assignment_id: str = Query(...),
+    leave_type: str = Query(...),
+    year: int = Query(...),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """查询假期余额"""
+    svc = LeaveService()
+    balance = await svc.get_balance(
+        assignment_id=uuid.UUID(assignment_id),
+        leave_type=leave_type,
+        year=year,
+        session=session,
+    )
+    if balance is None:
+        return {"assignment_id": assignment_id, "leave_type": leave_type, "year": year, "remaining_days": 0}
+    return {
+        "id": str(balance.id),
+        "leave_type": balance.leave_type,
+        "year": balance.year,
+        "total_days": float(balance.total_days),
+        "used_days": float(balance.used_days),
+        "remaining_days": float(balance.remaining_days),
+    }
+
+
+@router.get("/leave/simulate")
+async def simulate_leave(
+    assignment_id: str = Query(...),
+    leave_type: str = Query(...),
+    days: float = Query(...),
+    year: int = Query(...),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """模拟请假（检查余额是否足够）"""
+    svc = LeaveService()
+    result = await svc.simulate(
+        assignment_id=uuid.UUID(assignment_id),
+        leave_type=leave_type,
+        days=days,
+        year=year,
+        session=session,
+    )
+    return result

@@ -5911,3 +5911,112 @@ def check_approval_deadline(instance_id: str):
                 # 超时升级占位：实际实现时查找上级审批人并创建新step record
 
     asyncio.run(_run())
+
+
+@celery_app.task(name="hr.calculate_yesterday_attendance")
+def calculate_yesterday_attendance():
+    """每日00:30计算全部门店前日考勤（DailyAttendance）"""
+    async def _run():
+        from src.core.database import AsyncSessionLocal
+        from src.services.hr.attendance_service import AttendanceService
+        from src.models.hr.clock_record import ClockRecord
+        import sqlalchemy as sa
+        from datetime import date, timedelta
+
+        yesterday = date.today() - timedelta(days=1)
+        async with AsyncSessionLocal() as session:
+            # 查找昨天有打卡记录的所有assignment_id
+            result = await session.execute(
+                sa.select(sa.distinct(ClockRecord.assignment_id)).where(
+                    sa.func.date(ClockRecord.clock_time) == yesterday
+                )
+            )
+            assignment_ids = [row[0] for row in result.fetchall()]
+
+            svc = AttendanceService()
+            count = 0
+            for aid in assignment_ids:
+                await svc.calculate_daily(aid, yesterday, session)
+                count += 1
+
+            await session.commit()
+            logger.info(
+                "celery.calculate_yesterday_attendance",
+                date=str(yesterday),
+                processed=count,
+            )
+
+    asyncio.run(_run())
+
+
+@celery_app.task(name="hr.lock_previous_month_attendance")
+def lock_previous_month_attendance():
+    """每月5日锁定上月考勤（locked=True）"""
+    async def _run():
+        from src.core.database import AsyncSessionLocal
+        from src.models.hr.daily_attendance import DailyAttendance
+        import sqlalchemy as sa
+        from datetime import date
+
+        today = date.today()
+        if today.month == 1:
+            prev_year, prev_month = today.year - 1, 12
+        else:
+            prev_year, prev_month = today.year, today.month - 1
+
+        first_day = date(prev_year, prev_month, 1)
+        if prev_month == 12:
+            last_day = date(prev_year + 1, 1, 1)
+        else:
+            last_day = date(prev_year, prev_month + 1, 1)
+
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                sa.update(DailyAttendance)
+                .where(
+                    DailyAttendance.date >= first_day,
+                    DailyAttendance.date < last_day,
+                    DailyAttendance.locked == False,
+                )
+                .values(locked=True)
+            )
+            await session.commit()
+            logger.info(
+                "celery.lock_previous_month",
+                year=prev_year,
+                month=prev_month,
+                locked_count=result.rowcount,
+            )
+
+    asyncio.run(_run())
+
+
+@celery_app.task(name="hr.accrue_monthly_leave")
+def accrue_monthly_leave():
+    """每月1日自动发放月度假期配额"""
+    async def _run():
+        from src.core.database import AsyncSessionLocal
+        from src.services.hr.leave_service import LeaveService
+        from src.models.hr.employment_assignment import EmploymentAssignment
+        import sqlalchemy as sa
+        from datetime import date
+
+        year = date.today().year
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                sa.select(EmploymentAssignment.id).where(
+                    EmploymentAssignment.status == "active"
+                )
+            )
+            assignment_ids = [row[0] for row in result.fetchall()]
+
+            svc = LeaveService()
+            count = 0
+            for aid in assignment_ids:
+                await svc.accrue_annual_leave(aid, year, session)
+                count += 1
+
+            await session.commit()
+            logger.info("celery.accrue_monthly_leave", year=year, processed=count)
+
+    asyncio.run(_run())
