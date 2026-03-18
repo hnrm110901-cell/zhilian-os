@@ -19,6 +19,7 @@ from .social_insurance_service import SocialInsuranceService
 from .tax_service import TaxService
 from .hr_import_service import HRImportService
 from .hr_export_service import HRExportService
+from .employee_sync_service import EmployeeSyncService
 
 __all__ = [
     "HrSeedService",
@@ -41,4 +42,5 @@ __all__ = [
     "TaxService",
     "HRImportService",
     "HRExportService",
+    "EmployeeSyncService",
 ]

@@ -25,11 +25,19 @@ interface SkillHealthRow {
   coverage_pct: number;
 }
 
+interface QuickStats {
+  total_employees: number;
+  monthly_payroll_yuan: number;
+  attendance_rate_pct: number;
+  pending_approvals: number;
+}
+
 interface BffData {
   org_node_id: string;
   risk_distribution: RiskDistribution | null;
   knowledge_stats: KnowledgeStats | null;
   skill_health_ranking: SkillHealthRow[] | null;
+  quick_stats?: QuickStats | null;
 }
 
 const TRIGGER_TYPE_LABELS: Record<string, string> = {
@@ -108,6 +116,7 @@ export default function HQHr() {
   const skillRanking = data?.skill_health_ranking ?? [];
   const riskDist = data?.risk_distribution;
   const kStats = data?.knowledge_stats;
+  const qStats = data?.quick_stats;
 
   const skillColumns: ZTableColumn<SkillHealthRow>[] = [
     { key: 'store_name', title: '门店', render: (r) => r.store_name },
@@ -152,7 +161,37 @@ export default function HQHr() {
         <div className={styles.body}><ZSkeleton rows={6} /></div>
       ) : (
         <div className={styles.body}>
-          {/* KPI 行 */}
+          {/* 快速统计 */}
+          <div className={styles.kpiRow}>
+            <ZCard>
+              <ZKpi
+                value={qStats?.total_employees ?? '-'}
+                label="总员工数"
+                unit="人"
+              />
+            </ZCard>
+            <ZCard>
+              <ZKpi
+                value={qStats ? `¥${qStats.monthly_payroll_yuan.toFixed(2)}` : '-'}
+                label="本月薪资总额"
+              />
+            </ZCard>
+            <ZCard>
+              <ZKpi
+                value={qStats ? `${qStats.attendance_rate_pct}%` : '-'}
+                label="本月出勤率"
+              />
+            </ZCard>
+            <ZCard>
+              <ZKpi
+                value={qStats?.pending_approvals ?? '-'}
+                label="待审批数"
+                unit="条"
+              />
+            </ZCard>
+          </div>
+
+          {/* 风险 KPI 行 */}
           <div className={styles.kpiRow}>
             <ZCard>
               <ZKpi

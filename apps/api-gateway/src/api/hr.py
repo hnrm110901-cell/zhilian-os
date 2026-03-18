@@ -1824,3 +1824,30 @@ async def export_payroll(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename=payroll_{batch_id[:8]}.xlsx"},
     )
+
+
+# ── Employee POS Sync ────────────────────────────────────────────────
+
+
+class EmployeeSyncRequest(BaseModel):
+    store_org_node_id: str
+    employees: List[dict]  # [{external_id, name, phone, position, status}]
+
+
+@router.post("/sync/employees")
+async def sync_pos_employees(
+    req: EmployeeSyncRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """从POS系统同步员工数据"""
+    from ..services.hr.employee_sync_service import EmployeeSyncService
+
+    svc = EmployeeSyncService()
+    result = await svc.sync_from_pos(
+        store_org_node_id=req.store_org_node_id,
+        pos_employees=req.employees,
+        session=session,
+    )
+    await session.commit()
+    return result

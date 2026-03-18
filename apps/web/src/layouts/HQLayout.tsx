@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { to: '/hq/hr/approvals',  label: '审批中心', icon: '✅' },
   { to: '/hq/hr/attendance',  label: '考勤', icon: '⏰' },
   { to: '/hq/hr/payroll',    label: '薪资', icon: '💳' },
+  { to: '/hq/hr/import',     label: '导入', icon: '📥' },
   { to: '/hq/banquet',     label: '宴会',    icon: '🎊' },
 ];
 

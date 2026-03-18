@@ -5991,6 +5991,23 @@ def lock_previous_month_attendance():
     asyncio.run(_run())
 
 
+@celery_app.task(name="hr.sync_pos_employees")
+def sync_pos_employees_task():
+    """每日01:00从POS同步全部门店员工数据"""
+    async def _run():
+        from src.core.database import AsyncSessionLocal
+        from src.services.hr.employee_sync_service import EmployeeSyncService
+
+        async with AsyncSessionLocal() as session:
+            # 占位：实际需从store配置表查找所有有POS配置的门店
+            svc = EmployeeSyncService()
+            logger.info("celery.sync_pos_employees.start")
+            # 占位：遍历门店调用 svc.sync_single_store(...)
+            logger.info("celery.sync_pos_employees.done")
+
+    asyncio.run(_run())
+
+
 @celery_app.task(name="hr.accrue_monthly_leave")
 def accrue_monthly_leave():
     """每月1日自动发放月度假期配额"""

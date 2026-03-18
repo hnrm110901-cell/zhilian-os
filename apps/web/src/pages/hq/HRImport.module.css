@@ -1,0 +1,127 @@
+.page {
+  padding: var(--space-5, 20px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4, 16px);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+  margin: 0;
+}
+
+.orgField {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.label {
+  font-size: 14px;
+  color: var(--text-secondary, #666);
+  white-space: nowrap;
+}
+
+.input {
+  flex: 1;
+  max-width: 300px;
+  padding: 8px 12px;
+  border: 1px solid var(--border, #d9d9d9);
+  border-radius: var(--radius-sm, 6px);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.input:focus {
+  border-color: var(--accent, #ff6b2c);
+}
+
+.dropZone {
+  border: 2px dashed var(--border, #d9d9d9);
+  border-radius: var(--radius-md, 8px);
+  padding: 40px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.dropZone:hover {
+  border-color: var(--accent, #ff6b2c);
+  background: var(--bg-muted, #fafafa);
+}
+
+.fileInput {
+  display: none;
+}
+
+.dropHint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary, #666);
+  font-size: 14px;
+}
+
+.dropIcon {
+  font-size: 32px;
+  color: var(--accent, #ff6b2c);
+  line-height: 1;
+}
+
+.dropSub {
+  font-size: 12px;
+  color: var(--text-tertiary, #999);
+}
+
+.fileInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.fileName {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.fileSize {
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+}
+
+.importAction {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.resultRow {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.errorList {
+  margin: 0;
+  padding-left: 20px;
+  list-style: disc;
+}
+
+.errorItem {
+  font-size: 13px;
+  color: var(--text-danger, #f5222d);
+  margin-bottom: 4px;
+}
