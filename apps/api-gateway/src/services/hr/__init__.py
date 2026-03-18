@@ -7,6 +7,7 @@ from .skill_gap_service import SkillGapService
 from .onboarding_service import OnboardingService
 from .offboarding_service import OffboardingService
 from .transfer_service import TransferService
+from .approval_workflow_service import HRApprovalWorkflowService
 
 __all__ = [
     "HrSeedService",
@@ -17,4 +18,5 @@ __all__ = [
     "OnboardingService",
     "OffboardingService",
     "TransferService",
+    "HRApprovalWorkflowService",
 ]
