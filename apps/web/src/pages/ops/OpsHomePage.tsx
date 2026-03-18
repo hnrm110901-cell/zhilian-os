@@ -1,76 +1,59 @@
 import React from 'react';
-import { ZCard, ZKpi, ZBadge, ZTable, HealthRing } from '../../design-system/components';
+import { Progress } from 'antd';
+import { ZCard, ZKpi, ZBadge, ZTable, ZTimeline, HealthRing } from '../../design-system/components';
 import type { ZTableColumn } from '../../design-system/components';
+import type { TimelineItem } from '../../design-system/components/ZTimeline';
 import styles from './OpsHomePage.module.css';
+
+/* TODO: GET /api/v1/bff/ops/dashboard */
 
 /* ── Mock 数据 ── */
 
-interface SyncEvent {
-  time: string;
-  store: string;
-  type: string;
-  result: string;
-  duration: number;
-}
-
 interface AlertItem {
+  id: string;
   time: string;
-  level: string;
+  level: 'critical' | 'warning' | 'info';
   content: string;
   status: string;
 }
 
-const syncEvents: SyncEvent[] = [
-  { time: '14:32:05', store: '长沙万达店', type: '订单同步', result: '成功', duration: 230 },
-  { time: '14:28:11', store: '株洲天元店', type: '库存同步', result: '成功', duration: 185 },
-  { time: '14:25:40', store: '湘潭步行街店', type: '订单同步', result: '成功', duration: 312 },
-  { time: '14:20:03', store: '长沙IFS店', type: '菜单同步', result: '成功', duration: 156 },
-  { time: '14:15:22', store: '衡阳雁峰店', type: '订单同步', result: '失败', duration: 5002 },
-  { time: '14:10:45', store: '岳阳步行街店', type: '订单同步', result: '成功', duration: 278 },
-  { time: '14:05:18', store: '常德武陵店', type: '库存同步', result: '成功', duration: 198 },
-  { time: '14:00:01', store: '长沙万达店', type: '会员同步', result: '成功', duration: 420 },
+const services = [
+  { name: 'API Gateway', score: 98, latency: '12ms', status: 'success' as const },
+  { name: 'Redis', score: 92, latency: '2ms', status: 'success' as const },
+  { name: 'PostgreSQL', score: 95, latency: '8ms', status: 'success' as const },
+  { name: 'Qdrant', score: 68, latency: '45ms', status: 'warning' as const },
+];
+
+const recentSyncTimeline: TimelineItem[] = [
+  { key: '1', label: '长沙万达店 — 订单同步成功（230ms）', time: '14:32:05', status: 'done' },
+  { key: '2', label: '株洲天元店 — 库存同步成功（185ms）', time: '14:28:11', status: 'done' },
+  { key: '3', label: '湘潭步行街店 — 订单同步成功（312ms）', time: '14:25:40', status: 'done' },
+  { key: '4', label: '长沙IFS店 — 菜单同步成功（156ms）', time: '14:20:03', status: 'done' },
+  { key: '5', label: '衡阳雁峰店 — 订单同步超时（5002ms）', time: '14:15:22', status: 'current' },
 ];
 
 const alerts: AlertItem[] = [
-  { time: '14:15:22', level: 'critical', content: '衡阳雁峰店 POS 连接超时', status: '待处理' },
-  { time: '13:45:00', level: 'warning', content: '株洲天元店订单数据延迟 >5min', status: '待处理' },
-  { time: '12:30:11', level: 'warning', content: 'Redis 内存使用率达 82%', status: '处理中' },
-  { time: '11:20:05', level: 'critical', content: 'Qdrant 向量索引重建失败', status: '待处理' },
-  { time: '10:05:33', level: 'info', content: '每日数据备份完成', status: '已完成' },
-];
-
-const services = [
-  { name: 'API Gateway', score: 98, latency: '12ms' },
-  { name: 'Redis', score: 92, latency: '2ms' },
-  { name: 'PostgreSQL', score: 95, latency: '8ms' },
-  { name: 'Qdrant', score: 78, latency: '45ms' },
+  { id: 'a1', time: '14:15:22', level: 'critical', content: '衡阳雁峰店 POS 连接超时', status: '待处理' },
+  { id: 'a2', time: '13:45:00', level: 'warning', content: '株洲天元店订单数据延迟 >5min', status: '待处理' },
+  { id: 'a3', time: '12:30:11', level: 'warning', content: 'Redis 内存使用率达 82%', status: '处理中' },
+  { id: 'a4', time: '11:20:05', level: 'critical', content: 'Qdrant 向量索引重建失败', status: '待处理' },
 ];
 
 /* ── 列定义 ── */
-
-const syncColumns: ZTableColumn<SyncEvent>[] = [
-  { key: 'time', dataIndex: 'time', title: '时间', width: 100 },
-  { key: 'store', dataIndex: 'store', title: '门店' },
-  { key: 'type', dataIndex: 'type', title: '类型', width: 100 },
-  {
-    key: 'result', dataIndex: 'result', title: '结果', width: 80,
-    render: (v: string) => (
-      <ZBadge type={v === '成功' ? 'success' : 'critical'} text={v} />
-    ),
-  },
-  { key: 'duration', dataIndex: 'duration', title: '耗时(ms)', width: 100, align: 'right' },
-];
 
 const alertColumns: ZTableColumn<AlertItem>[] = [
   { key: 'time', dataIndex: 'time', title: '时间', width: 100 },
   {
     key: 'level', dataIndex: 'level', title: '级别', width: 80,
     render: (v: string) => {
-      const map: Record<string, 'critical' | 'warning' | 'info'> = { critical: 'critical', warning: 'warning', info: 'info' };
-      return <ZBadge type={map[v] || 'default'} text={v === 'critical' ? '严重' : v === 'warning' ? '警告' : '信息'} />;
+      const map: Record<string, 'critical' | 'warning' | 'info'> = {
+        critical: 'critical', warning: 'warning', info: 'info',
+      };
+      const labelMap: Record<string, string> = { critical: '严重', warning: '警告', info: '信息' };
+      return <ZBadge type={map[v] ?? 'default'} text={labelMap[v] ?? v} />;
     },
   },
-  { key: 'content', dataIndex: 'content', title: '内容' },
+  { key: 'content', dataIndex: 'content', title: '告警内容' },
   {
     key: 'status', dataIndex: 'status', title: '状态', width: 90,
     render: (v: string) => {
@@ -90,15 +73,23 @@ const OpsHomePage: React.FC = () => {
         <p className={styles.subtitle}>系统运行状态总览与告警管理</p>
       </div>
 
-      {/* KPI 区 */}
+      {/* KPI 区 — 4 个指标 */}
       <div className={styles.kpiRow}>
-        <ZCard><ZKpi label="活跃门店数" value={32} change={3.2} changeLabel="较昨日" /></ZCard>
-        <ZCard><ZKpi label="POS连接率" value="96.8" unit="%" change={0.5} changeLabel="较昨日" /></ZCard>
-        <ZCard><ZKpi label="数据同步成功率" value="99.2" unit="%" change={-0.1} changeLabel="较昨日" /></ZCard>
-        <ZCard><ZKpi label="今日告警数" value={3} change={-2} changeLabel="较昨日" color="var(--red)" /></ZCard>
+        <ZCard>
+          <ZKpi label="活跃门店" value={12} changeLabel="较昨日" />
+        </ZCard>
+        <ZCard>
+          <ZKpi label="POS连接率" value="94.5" unit="%" change={-0.3} changeLabel="较昨日" />
+        </ZCard>
+        <ZCard>
+          <ZKpi label="数据同步成功率" value="99.2" unit="%" change={-0.1} changeLabel="较昨日" />
+        </ZCard>
+        <ZCard>
+          <ZKpi label="今日告警" value={3} change={-2} changeLabel="较昨日" color="var(--red)" />
+        </ZCard>
       </div>
 
-      {/* 系统健康 */}
+      {/* 系统健康卡片 */}
       <div className={styles.section}>
         <h2 className={styles.sectionTitle}>系统健康</h2>
         <div className={styles.healthGrid}>
@@ -110,25 +101,34 @@ const OpsHomePage: React.FC = () => {
                   <div className={styles.serviceName}>{s.name}</div>
                   <div className={styles.serviceLatency}>延迟 {s.latency}</div>
                 </div>
-                <ZBadge type={s.score >= 90 ? 'success' : s.score >= 70 ? 'warning' : 'critical'} text={s.score >= 90 ? '正常' : s.score >= 70 ? '注意' : '异常'} />
+                <ZBadge
+                  type={s.score >= 90 ? 'success' : s.score >= 70 ? 'warning' : 'critical'}
+                  text={s.score >= 90 ? '✅ 正常' : s.score >= 70 ? '⚠️ 注意' : '❌ 异常'}
+                />
+              </div>
+              <div className={styles.healthBar}>
+                <Progress
+                  percent={s.score}
+                  size="small"
+                  strokeColor={s.score >= 90 ? 'var(--green)' : s.score >= 70 ? 'var(--amber)' : 'var(--red)'}
+                  showInfo={false}
+                />
               </div>
             </ZCard>
           ))}
         </div>
       </div>
 
-      {/* 同步事件 + 告警 */}
+      {/* 最近同步事件 + 待处理告警 */}
       <div className={styles.twoCol}>
         <div className={styles.section}>
-          <ZCard title="最近同步事件">
-            {/* GET /api/v1/ops/sync-events */}
-            <ZTable<SyncEvent> columns={syncColumns} data={syncEvents} rowKey="time" />
+          <ZCard title="最近同步事件（最新 5 条）">
+            <ZTimeline items={recentSyncTimeline} />
           </ZCard>
         </div>
         <div className={styles.section}>
           <ZCard title="待处理告警">
-            {/* GET /api/v1/ops/alerts?status=pending */}
-            <ZTable<AlertItem> columns={alertColumns} data={alerts} rowKey="time" />
+            <ZTable<AlertItem> columns={alertColumns} data={alerts} rowKey="id" />
           </ZCard>
         </div>
       </div>

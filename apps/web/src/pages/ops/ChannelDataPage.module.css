@@ -3,7 +3,16 @@
 }
 
 .header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
   margin-bottom: 24px;
+}
+
+.headerLeft {
+  flex: 1;
 }
 
 .title {
@@ -19,17 +28,45 @@
   margin: 0;
 }
 
-.section {
+/* 时段切换 */
+.periodSwitch {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-raised, #f5f5f5);
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.periodBtn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.periodBtnActive {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* KPI 行 */
+.kpiRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
   margin-bottom: 24px;
 }
 
-.sectionTitle {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0 0 12px;
+@media (max-width: 900px) {
+  .kpiRow { grid-template-columns: repeat(2, 1fr); }
 }
 
+/* 渠道卡片网格 */
 .channelGrid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -45,21 +82,35 @@
   .channelGrid { grid-template-columns: 1fr; }
 }
 
+.channelHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.channelIcon {
+  font-size: 20px;
+}
+
 .channelName {
   font-size: 15px;
   font-weight: 600;
   color: var(--text-primary);
-  margin: 0 0 12px;
+  flex: 1;
+}
+
+.channelMetrics {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .channelMetric {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 6px 0;
+  gap: 6px;
+  padding: 4px 0;
   border-bottom: 1px solid var(--border-default, #eee);
 }
 
@@ -67,22 +118,128 @@
   border-bottom: none;
 }
 
-.channelMetricLabel {
+.metricLabel {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  min-width: 56px;
+}
+
+.metricValue {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.changeUp {
+  font-size: 12px;
+  color: var(--green, #34c759);
+  font-weight: 600;
+}
+
+.changeDown {
+  font-size: 12px;
+  color: var(--red, #ff3b30);
+  font-weight: 600;
+}
+
+/* 区块 */
+.section {
+  margin-bottom: 24px;
+}
+
+/* 图例 */
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
   font-size: 13px;
   color: var(--text-secondary);
 }
 
-.channelMetricValue {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
+.legendDot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 4px;
 }
 
-.chartPlaceholder {
-  padding: 48px 24px;
-  text-align: center;
-  color: var(--text-tertiary);
-  font-size: 14px;
-  border: 1px dashed var(--border-default, #d0d0d0);
+/* 趋势表 */
+.trendTable {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--border-default, #eee);
   border-radius: 8px;
+  overflow: hidden;
+}
+
+.trendHeader {
+  display: grid;
+  grid-template-columns: 60px 1fr 1fr 1fr;
+  gap: 0;
+  padding: 10px 16px;
+  background: var(--bg-raised, #f9f9f9);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+}
+
+.trendRow {
+  display: grid;
+  grid-template-columns: 60px 1fr 1fr 1fr;
+  gap: 0;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border-default, #eee);
+  align-items: center;
+}
+
+.trendRow:hover {
+  background: var(--bg-raised, #fafafa);
+}
+
+.trendDate,
+.trendChannel {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.trendDateVal {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.trendBarCell {
+  padding-right: 8px;
+}
+
+/* 迷你柱 */
+.miniBarWrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.miniBar {
+  height: 8px;
+  border-radius: 4px;
+  min-width: 4px;
+  transition: width 0.3s ease;
+}
+
+.miniBarVal {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* 异常影响列 */
+.impact {
+  font-size: 12px;
+  color: var(--red, #ff3b30);
+  font-weight: 500;
 }

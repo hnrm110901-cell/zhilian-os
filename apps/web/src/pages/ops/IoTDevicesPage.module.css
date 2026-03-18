@@ -39,36 +39,111 @@
   font-weight: 600;
   color: var(--text-primary, #111827);
   margin: 0 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
+
+.filterTag {
+  font-weight: 400;
+  color: var(--accent, #FF6B2C);
+  font-size: 13px;
+}
+
+.alertBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ef4444;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* Type cards */
 
 .cardGrid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
-  margin-bottom: 24px;
+  margin-bottom: 4px;
 }
 
-.tableCard {
-  padding: 0 !important;
-  overflow: hidden;
+.typeCard {
+  cursor: pointer;
+  transition: box-shadow 0.15s;
 }
 
-.deviceStat {
+.typeCardActive {
+  box-shadow: 0 0 0 2px var(--accent, #FF6B2C) !important;
+}
+
+.typeCardContent {
   text-align: center;
   padding: 8px 0;
 }
 
-.deviceStatNum {
-  font-size: 32px;
+.typeNum {
+  font-size: 36px;
   font-weight: 800;
   color: var(--text-primary, #111827);
   line-height: 1.1;
   margin-bottom: 4px;
 }
 
-.deviceStatLabel {
+.typeLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary, #6b7280);
+  margin-bottom: 8px;
+}
+
+.typeOnline {
   font-size: 12px;
+}
+
+.onlineNum {
+  color: #22c55e;
+  font-weight: 700;
+}
+
+.onlineLbl {
   color: var(--text-tertiary, #9ca3af);
+}
+
+.offlineNum {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+/* Table cells */
+
+.deviceId {
+  font-family: 'SF Mono', 'Fira Mono', monospace;
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+}
+
+.naText {
+  color: var(--text-tertiary, #9ca3af);
+}
+
+.batteryOk {
+  font-weight: 600;
+  color: #22c55e;
+}
+
+.batteryMid {
+  font-weight: 600;
+  color: var(--accent, #FF6B2C);
+}
+
+.batteryLow {
+  font-weight: 600;
+  color: #ef4444;
 }
 
 .actionGroup {
@@ -97,9 +172,14 @@
   font-family: 'SF Mono', 'Fira Mono', monospace;
   font-size: 12px;
   color: #ef4444;
+  font-weight: 600;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 960px) {
   .kpiRow { grid-template-columns: repeat(2, 1fr); }
+  .cardGrid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 600px) {
   .cardGrid { grid-template-columns: 1fr; }
 }

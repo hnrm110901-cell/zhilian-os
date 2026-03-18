@@ -83,6 +83,10 @@
   color: var(--text-tertiary);
 }
 
+.healthBar {
+  padding: 0 16px 12px;
+}
+
 .twoCol {
   display: grid;
   grid-template-columns: 1fr 1fr;

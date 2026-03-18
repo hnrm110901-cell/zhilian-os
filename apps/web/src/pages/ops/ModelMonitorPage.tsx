@@ -4,7 +4,18 @@ import type { ZTableColumn } from '../../design-system/components';
 import ZTable from '../../design-system/components/ZTable';
 import styles from './ModelMonitorPage.module.css';
 
+// TODO: GET /api/v1/ops/model-monitor/health
+// TODO: GET /api/v1/ops/model-monitor/call-traces
+
 // ── 类型 ─────────────────────────────────────────────────────────────────────
+
+interface HealthCard {
+  key: string;
+  label: string;
+  score: number;
+  status: 'good' | 'warning' | 'error';
+  detail: string;
+}
 
 interface CallLog {
   id: string;
@@ -17,7 +28,46 @@ interface CallLog {
   status: string;
 }
 
+interface ErrorLog {
+  id: string;
+  time: string;
+  agent: string;
+  errorType: string;
+  message: string;
+}
+
 // ── Mock 数据 ────────────────────────────────────────────────────────────────
+
+const HEALTH_CARDS: HealthCard[] = [
+  {
+    key: 'embedding',
+    label: '嵌入模型',
+    score: 98,
+    status: 'good',
+    detail: 'sentence-transformers 本地 · 384维 · 正常',
+  },
+  {
+    key: 'llm',
+    label: 'LLM 服务',
+    score: 94,
+    status: 'good',
+    detail: 'claude-3-opus 主力 · deepseek-v3 备用',
+  },
+  {
+    key: 'agent',
+    label: 'Agent 运行',
+    score: 87,
+    status: 'warning',
+    detail: 'PrivateDomainAgent 排队中 · 1个Agent降级',
+  },
+  {
+    key: 'rag',
+    label: 'RAG 检索',
+    score: 96,
+    status: 'good',
+    detail: 'Qdrant 正常 · 向量召回率 P90=91%',
+  },
+];
 
 const MOCK_LOGS: CallLog[] = [
   { id: 'CL01', time: '09:15:02', agent: 'ScheduleAgent', model: 'claude-3-opus', inputTokens: 1250, outputTokens: 380, latency: 820, status: '成功' },
@@ -32,10 +82,22 @@ const MOCK_LOGS: CallLog[] = [
   { id: 'CL10', time: '08:45:00', agent: 'PerformanceAgent', model: 'claude-3-opus', inputTokens: 2800, outputTokens: 720, latency: 1650, status: '成功' },
 ];
 
+const MOCK_ERRORS: ErrorLog[] = [
+  { id: 'E001', time: '08:50:22', agent: 'OrderAgent', errorType: 'TokenLimitExceeded', message: 'Input exceeds model context window (4096 tokens)' },
+  { id: 'E002', time: '2026-03-16 23:15:08', agent: 'PrivateDomainAgent', errorType: 'RateLimitError', message: 'Rate limit hit on Claude API, falling back to DeepSeek' },
+  { id: 'E003', time: '2026-03-16 22:03:41', agent: 'DecisionAgent', errorType: 'QdrantTimeout', message: 'Vector similarity search timed out after 5000ms' },
+];
+
 // ── 组件 ─────────────────────────────────────────────────────────────────────
 
+const healthScoreColor = (status: HealthCard['status']) => {
+  if (status === 'good') return styles.scoreGood;
+  if (status === 'warning') return styles.scoreWarning;
+  return styles.scoreError;
+};
+
 const ModelMonitorPage: React.FC = () => {
-  const columns: ZTableColumn<CallLog>[] = [
+  const callColumns: ZTableColumn<CallLog>[] = [
     { key: 'time', dataIndex: 'time', title: '时间' },
     { key: 'agent', dataIndex: 'agent', title: 'Agent' },
     { key: 'model', dataIndex: 'model', title: '模型' },
@@ -46,7 +108,10 @@ const ModelMonitorPage: React.FC = () => {
       render: (v: number) => <span className={styles.tokenCell}>{v.toLocaleString()}</span>,
     },
     { key: 'latency', dataIndex: 'latency', title: '耗时', align: 'right',
-      render: (v: number) => <span className={styles.latencyCell}>{v}ms</span>,
+      render: (v: number) => {
+        const cls = v > 1500 ? styles.latencyHigh : v > 800 ? styles.latencyMid : styles.latencyCell;
+        return <span className={cls}>{v}ms</span>;
+      },
     },
     { key: 'status', dataIndex: 'status', title: '状态',
       render: (v: string) => {
@@ -58,6 +123,17 @@ const ModelMonitorPage: React.FC = () => {
     },
   ];
 
+  const errorColumns: ZTableColumn<ErrorLog>[] = [
+    { key: 'time', dataIndex: 'time', title: '时间' },
+    { key: 'agent', dataIndex: 'agent', title: 'Agent' },
+    { key: 'errorType', dataIndex: 'errorType', title: '错误类型',
+      render: (v: string) => <ZBadge type="error" text={v} />,
+    },
+    { key: 'message', dataIndex: 'message', title: '错误信息',
+      render: (v: string) => <span className={styles.errorMsg}>{v}</span>,
+    },
+  ];
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -65,7 +141,35 @@ const ModelMonitorPage: React.FC = () => {
         <p>AI 模型运行监控，追踪推理延迟、准确率与异常漂移</p>
       </div>
 
-      {/* KPI 行 */}
+      {/* 4 个系统健康 KPI 卡片 */}
+      <div className={styles.section}>
+        <div className={styles.sectionTitle}>系统健康总览</div>
+        <div className={styles.healthGrid}>
+          {HEALTH_CARDS.map((card) => (
+            <ZCard key={card.key} className={styles.healthCard}>
+              <div className={styles.healthCardTop}>
+                <span className={styles.healthLabel}>{card.label}</span>
+                <ZBadge
+                  type={card.status === 'good' ? 'success' : card.status === 'warning' ? 'warning' : 'error'}
+                  text={card.status === 'good' ? '正常' : card.status === 'warning' ? '警告' : '异常'}
+                />
+              </div>
+              <div className={`${styles.healthScore} ${healthScoreColor(card.status)}`}>
+                {card.score}
+              </div>
+              <div className={styles.healthDetail}>{card.detail}</div>
+              <div className={styles.healthBar}>
+                <div
+                  className={`${styles.healthBarFill} ${healthScoreColor(card.status)}`}
+                  style={{ width: `${card.score}%` }}
+                />
+              </div>
+            </ZCard>
+          ))}
+        </div>
+      </div>
+
+      {/* 性能 KPI 行 */}
       <div className={styles.kpiRow}>
         <ZCard><ZKpi label="准确率" value="92.3" unit="%" status="good" /></ZCard>
         <ZCard><ZKpi label="响应 P99" value="850" unit="ms" change={-3.2} changeLabel="较昨日" /></ZCard>
@@ -73,34 +177,25 @@ const ModelMonitorPage: React.FC = () => {
         <ZCard><ZKpi label="降级次数" value={2} change={-50} changeLabel="较昨日" /></ZCard>
       </div>
 
-      {/* 嵌入模型状态 */}
-      <div className={styles.section}>
-        <div className={styles.sectionTitle}>嵌入模型状态</div>
-        <ZCard title="本地嵌入模型" extra={<ZBadge type="success" text="正常" />}>
-          <div className={styles.embedInfo}>
-            <div className={styles.embedRow}>
-              <span className={styles.embedLabel}>模型类型</span>
-              <span className={styles.embedValue}>sentence-transformers (本地)</span>
-            </div>
-            <div className={styles.embedRow}>
-              <span className={styles.embedLabel}>向量维度</span>
-              <span className={styles.embedValue}>384维</span>
-            </div>
-            <div className={styles.embedRow}>
-              <span className={styles.embedLabel}>状态</span>
-              <span className={styles.embedValue}>正常运行</span>
-            </div>
-          </div>
-        </ZCard>
-      </div>
-
       {/* 调用链日志 */}
       <div className={styles.section}>
         <div className={styles.sectionTitle}>调用链日志</div>
         <ZCard noPadding>
           <ZTable<CallLog>
-            columns={columns}
+            columns={callColumns}
             dataSource={MOCK_LOGS}
+            rowKey="id"
+          />
+        </ZCard>
+      </div>
+
+      {/* 错误日志 */}
+      <div className={styles.section}>
+        <div className={styles.sectionTitle}>错误日志</div>
+        <ZCard noPadding>
+          <ZTable<ErrorLog>
+            columns={errorColumns}
+            dataSource={MOCK_ERRORS}
             rowKey="id"
           />
         </ZCard>

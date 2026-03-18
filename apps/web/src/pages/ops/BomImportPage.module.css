@@ -3,7 +3,15 @@
 }
 
 .header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 24px;
+}
+
+.headerLeft {
+  flex: 1;
 }
 
 .title {
@@ -19,15 +27,16 @@
   margin: 0;
 }
 
-.section {
+/* KPI 行 */
+.kpiRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
   margin-bottom: 24px;
 }
 
-.sectionTitle {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0 0 12px;
+@media (max-width: 900px) {
+  .kpiRow { grid-template-columns: repeat(2, 1fr); }
 }
 
 /* 步骤条 */
@@ -36,6 +45,9 @@
   align-items: center;
   gap: 0;
   margin-bottom: 32px;
+  background: var(--bg-raised, #f5f5f5);
+  border-radius: 12px;
+  padding: 16px 24px;
 }
 
 .step {
@@ -91,6 +103,11 @@
   background: var(--green, #34c759);
 }
 
+/* 区块 */
+.section {
+  margin-bottom: 24px;
+}
+
 /* 上传区 */
 .uploadZone {
   border: 2px dashed var(--border-default, #d0d0d0);
@@ -98,17 +115,23 @@
   padding: 48px 24px;
   text-align: center;
   cursor: pointer;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, background 0.2s;
+  margin-bottom: 16px;
 }
 
 .uploadZone:hover {
   border-color: var(--accent);
+  background: rgba(255, 107, 44, 0.03);
+}
+
+.uploadZoneDragOver {
+  border-color: var(--accent);
+  background: rgba(255, 107, 44, 0.06);
 }
 
 .uploadIcon {
   font-size: 40px;
   margin-bottom: 12px;
-  color: var(--text-tertiary);
 }
 
 .uploadTitle {
@@ -121,7 +144,7 @@
 .uploadHint {
   font-size: 13px;
   color: var(--text-tertiary);
-  margin: 0;
+  margin: 2px 0;
 }
 
 .uploadFormats {
@@ -129,4 +152,49 @@
   justify-content: center;
   gap: 8px;
   margin-top: 12px;
+}
+
+/* 字段映射 */
+.mappingHint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: rgba(255, 200, 0, 0.06);
+  border-radius: 8px;
+  border-left: 3px solid var(--yellow, #ffc800);
+}
+
+.mappingHintText {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.optional {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+/* 数据预览 */
+.previewNote {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.previewNoteText {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* 历史表格 */
+.successNum {
+  color: var(--green, #34c759);
+  font-weight: 600;
+}
+
+.zeroNum {
+  color: var(--text-tertiary);
 }

@@ -4,6 +4,9 @@ import type { ZTableColumn } from '../../design-system/components';
 import ZTable from '../../design-system/components/ZTable';
 import styles from './DataIsolationPage.module.css';
 
+// TODO: GET /api/v1/ops/data-isolation/rules
+// TODO: GET /api/v1/ops/data-isolation/audit-log
+
 // ── 类型 ─────────────────────────────────────────────────────────────────────
 
 interface IsolationRule {
@@ -22,6 +25,14 @@ interface AuditLog {
   dataAccessed: string;
   sourceIp: string;
   result: string;
+}
+
+interface PermissionMatrixRow {
+  dataType: string;
+  brand1: boolean;
+  brand2: boolean;
+  brand3: boolean;
+  platform: boolean;
 }
 
 // ── Mock 数据 ────────────────────────────────────────────────────────────────
@@ -45,6 +56,23 @@ const MOCK_AUDIT: AuditLog[] = [
   { id: 'A007', time: '2026-03-17 07:30:00', operator: '系统备份', dataAccessed: '全量快照', sourceIp: '10.0.1.1', result: '允许' },
   { id: 'A008', time: '2026-03-16 23:55:12', operator: '未知来源', dataAccessed: '会员表(徐记海鲜)', sourceIp: '203.0.113.50', result: '拒绝' },
 ];
+
+const PERMISSION_MATRIX: PermissionMatrixRow[] = [
+  { dataType: '订单数据', brand1: true, brand2: true, brand3: true, platform: true },
+  { dataType: '财务报表', brand1: true, brand2: true, brand3: true, platform: true },
+  { dataType: '员工信息', brand1: true, brand2: false, brand3: false, platform: true },
+  { dataType: '菜品配方', brand1: true, brand2: false, brand3: false, platform: false },
+  { dataType: '会员数据', brand1: true, brand2: true, brand3: false, platform: false },
+  { dataType: '库存记录', brand1: true, brand2: true, brand3: true, platform: true },
+  { dataType: 'AI训练样本', brand1: false, brand2: false, brand3: false, platform: true },
+];
+
+const BRAND_COLS = [
+  { key: 'brand1', label: '尝在一起' },
+  { key: 'brand2', label: '徐记海鲜' },
+  { key: 'brand3', label: '最黔线' },
+  { key: 'platform', label: '平台（屯象）' },
+] as const;
 
 // ── 组件 ─────────────────────────────────────────────────────────────────────
 
@@ -84,6 +112,7 @@ const DataIsolationPage: React.FC = () => {
         </div>
       </div>
 
+      {/* 隔离规则 */}
       <div className={styles.section}>
         <div className={styles.sectionTitle}>隔离规则</div>
         <ZCard noPadding>
@@ -95,6 +124,42 @@ const DataIsolationPage: React.FC = () => {
         </ZCard>
       </div>
 
+      {/* 门店数据权限矩阵 */}
+      <div className={styles.section}>
+        <div className={styles.sectionTitle}>品牌数据访问权限矩阵</div>
+        <ZCard noPadding>
+          <div className={styles.matrixWrapper}>
+            <table className={styles.matrix}>
+              <thead>
+                <tr>
+                  <th className={styles.matrixHeader}>数据类型</th>
+                  {BRAND_COLS.map((col) => (
+                    <th key={col.key} className={styles.matrixHeader}>{col.label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {PERMISSION_MATRIX.map((row) => (
+                  <tr key={row.dataType} className={styles.matrixRow}>
+                    <td className={styles.matrixDataType}>{row.dataType}</td>
+                    {BRAND_COLS.map((col) => (
+                      <td key={col.key} className={styles.matrixCell}>
+                        {row[col.key] ? (
+                          <span className={styles.checkYes}>✓</span>
+                        ) : (
+                          <span className={styles.checkNo}>✗</span>
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </ZCard>
+      </div>
+
+      {/* 数据访问审计日志 */}
       <div className={styles.section}>
         <div className={styles.sectionTitle}>数据访问审计日志</div>
         <ZCard noPadding>

@@ -52,6 +52,30 @@
   border-color: var(--accent, #FF6B2C);
 }
 
+.viewToggle {
+  display: flex;
+  border: 1px solid var(--border-default, #e5e7eb);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.viewBtn {
+  padding: 0 14px;
+  height: 36px;
+  font-size: 13px;
+  font-family: inherit;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary, #6b7280);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.viewBtnActive {
+  background: var(--accent, #FF6B2C);
+  color: #fff;
+}
+
 .createBtn {
   height: 36px;
   padding: 0 18px;
@@ -70,13 +94,6 @@
   opacity: 0.85;
 }
 
-.kpiRow {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
 .section {
   margin-bottom: 24px;
 }
@@ -90,13 +107,66 @@
 
 .cardGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 16px;
 }
 
-.tableCard {
-  padding: 0 !important;
-  overflow: hidden;
+.templateCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.cardTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+}
+
+.cardDesc {
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+  line-height: 1.6;
+  margin: 0 0 12px;
+}
+
+.cardMeta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.metaText {
+  font-size: 12px;
+  color: var(--text-tertiary, #9ca3af);
+}
+
+.cardFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--border-default, #e5e7eb);
+  padding-top: 12px;
+  margin-top: auto;
+}
+
+.cardDate {
+  font-size: 12px;
+  color: var(--text-tertiary, #9ca3af);
+}
+
+.cardActions {
+  display: flex;
+  gap: 6px;
 }
 
 .actionGroup {
@@ -127,6 +197,6 @@
 }
 
 @media (max-width: 768px) {
-  .kpiRow { grid-template-columns: repeat(2, 1fr); }
+  .cardGrid { grid-template-columns: 1fr; }
   .headerActions { flex-wrap: wrap; }
 }

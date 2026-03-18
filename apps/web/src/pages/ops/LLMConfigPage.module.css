@@ -25,7 +25,7 @@
 
 .kpiRow {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
   margin-bottom: 20px;
 }
@@ -41,6 +41,8 @@
   margin: 0 0 12px;
 }
 
+/* Provider cards */
+
 .cardGrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -49,7 +51,12 @@
 }
 
 .providerCard {
-  padding: 20px !important;
+  cursor: pointer;
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+
+.providerCardActive {
+  box-shadow: 0 0 0 2px var(--accent, #FF6B2C) !important;
 }
 
 .providerHeader {
@@ -60,7 +67,7 @@
 }
 
 .providerName {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--text-primary, #111827);
 }
@@ -69,6 +76,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  margin-bottom: 16px;
 }
 
 .providerRow {
@@ -84,17 +92,84 @@
 .providerValue {
   color: var(--text-primary, #111827);
   font-weight: 500;
+  font-family: 'SF Mono', 'Fira Mono', monospace;
+  font-size: 12px;
 }
 
-.tableCard {
-  padding: 0 !important;
-  overflow: hidden;
+/* Provider stats row */
+
+.providerStats {
+  display: flex;
+  gap: 0;
+  border-top: 1px solid var(--border-default, #e5e7eb);
+  padding-top: 12px;
 }
+
+.statItem {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.statItem:not(:last-child) {
+  border-right: 1px solid var(--border-default, #e5e7eb);
+}
+
+.statVal {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+}
+
+.statLbl {
+  font-size: 11px;
+  color: var(--text-tertiary, #9ca3af);
+}
+
+.statOk { color: #22c55e; }
+.statErr { color: #ef4444; }
+
+/* API Key table */
 
 .maskedKey {
   font-family: 'SF Mono', 'Fira Mono', monospace;
   font-size: 12px;
   color: var(--text-secondary, #6b7280);
+}
+
+.actionGroup {
+  display: flex;
+  gap: 6px;
+}
+
+.actionBtn {
+  padding: 4px 10px;
+  font-size: 12px;
+  border: 1px solid var(--border-default, #e5e7eb);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary, #6b7280);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.actionBtn:hover {
+  border-color: var(--accent, #FF6B2C);
+  color: var(--accent, #FF6B2C);
+}
+
+.actionBtnDanger {
+  color: #ef4444;
+  border-color: #fecaca;
+}
+
+.actionBtnDanger:hover {
+  border-color: #ef4444;
+  color: #ef4444;
+  background: #fef2f2;
 }
 
 @media (max-width: 900px) {

@@ -26,13 +26,6 @@
   margin: 0;
 }
 
-.kpiRow {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
 .section {
   margin-bottom: 24px;
 }
@@ -44,17 +37,82 @@
   margin: 0 0 12px;
 }
 
-.cardGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
+/* Permission Matrix */
+
+.matrixWrapper {
+  overflow-x: auto;
 }
 
-.tableCard {
-  padding: 0 !important;
-  overflow: hidden;
+.matrix {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.matrixHeader {
+  padding: 12px 16px;
+  text-align: center;
+  font-weight: 600;
+  color: var(--text-secondary, #6b7280);
+  background: var(--bg-subtle, #f9fafb);
+  border-bottom: 1px solid var(--border-default, #e5e7eb);
+  white-space: nowrap;
+}
+
+.matrixHeader:first-child {
+  text-align: left;
+}
+
+.matrixRow {
+  border-bottom: 1px solid var(--border-default, #e5e7eb);
+  transition: background 0.1s;
+}
+
+.matrixRow:last-child {
+  border-bottom: none;
+}
+
+.matrixRow:hover {
+  background: var(--bg-subtle, #f9fafb);
+}
+
+.matrixDataType {
+  padding: 12px 16px;
+  font-weight: 500;
+  color: var(--text-primary, #111827);
+}
+
+.matrixCell {
+  padding: 12px 16px;
+  text-align: center;
+}
+
+.checkYes {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #dcfce7;
+  color: #16a34a;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.checkNo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fee2e2;
+  color: #dc2626;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 @media (max-width: 768px) {
-  .kpiRow { grid-template-columns: repeat(2, 1fr); }
+  .container { padding: 16px; }
 }

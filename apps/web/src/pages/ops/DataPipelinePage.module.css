@@ -3,6 +3,10 @@
 }
 
 .header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
   margin-bottom: 24px;
 }
 
@@ -34,9 +38,25 @@
   margin-bottom: 24px;
 }
 
-.sectionTitle {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0 0 12px;
+.qualityGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  padding: 8px 0;
+}
+
+@media (max-width: 900px) {
+  .qualityGrid { grid-template-columns: 1fr; }
+}
+
+.qualityItem {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.qualityLabel {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
 }

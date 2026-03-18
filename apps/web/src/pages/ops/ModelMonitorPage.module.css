@@ -41,16 +41,98 @@
   margin: 0 0 12px;
 }
 
-.cardGrid {
+/* Health cards */
+
+.healthGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
+  margin-bottom: 20px;
 }
 
-.tableCard {
-  padding: 0 !important;
-  overflow: hidden;
+.healthCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
+
+.healthCardTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.healthLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary, #6b7280);
+}
+
+.healthScore {
+  font-size: 36px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -1px;
+}
+
+.scoreGood { color: #22c55e; }
+.scoreWarning { color: var(--accent, #FF6B2C); }
+.scoreError { color: #ef4444; }
+
+.healthDetail {
+  font-size: 12px;
+  color: var(--text-tertiary, #9ca3af);
+  line-height: 1.4;
+}
+
+.healthBar {
+  height: 4px;
+  background: var(--border-default, #e5e7eb);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.healthBarFill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.4s ease;
+}
+
+/* override colors to background */
+.healthBarFill.scoreGood { background: #22c55e; }
+.healthBarFill.scoreWarning { background: var(--accent, #FF6B2C); }
+.healthBarFill.scoreError { background: #ef4444; }
+
+/* Token / latency cells */
+
+.tokenCell {
+  font-family: 'SF Mono', 'Fira Mono', monospace;
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+}
+
+.latencyCell {
+  font-family: 'SF Mono', 'Fira Mono', monospace;
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+}
+
+.latencyMid {
+  font-family: 'SF Mono', 'Fira Mono', monospace;
+  font-size: 12px;
+  color: var(--accent, #FF6B2C);
+  font-weight: 600;
+}
+
+.latencyHigh {
+  font-family: 'SF Mono', 'Fira Mono', monospace;
+  font-size: 12px;
+  color: #ef4444;
+  font-weight: 600;
+}
+
+/* Embed info */
 
 .embedInfo {
   display: flex;
@@ -73,17 +155,15 @@
   font-weight: 500;
 }
 
-.latencyCell {
+/* Error log */
+
+.errorMsg {
   font-family: 'SF Mono', 'Fira Mono', monospace;
   font-size: 12px;
+  color: #b91c1c;
 }
 
-.tokenCell {
-  font-family: 'SF Mono', 'Fira Mono', monospace;
-  font-size: 12px;
-  color: var(--text-secondary, #6b7280);
-}
-
-@media (max-width: 768px) {
+@media (max-width: 960px) {
+  .healthGrid { grid-template-columns: repeat(2, 1fr); }
   .kpiRow { grid-template-columns: repeat(2, 1fr); }
 }

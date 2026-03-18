@@ -1,17 +1,25 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ZCard, ZBadge, ZKpi } from '../../design-system/components';
 import type { ZTableColumn } from '../../design-system/components';
 import ZTable from '../../design-system/components/ZTable';
 import styles from './LLMConfigPage.module.css';
 
+// TODO: GET /api/v1/ops/llm-config/providers
+// TODO: GET /api/v1/ops/llm-config/api-keys
+// TODO: GET /api/v1/ops/llm-config/usage-stats
+
 // ── 类型 ─────────────────────────────────────────────────────────────────────
 
 interface Provider {
+  id: string;
   name: string;
-  status: string;
+  status: 'active' | 'standby' | 'disabled';
   model: string;
   temperature: number;
-  dailyTokens: string;
+  maxTokens: number;
+  dailyCalls: number;
+  avgLatency: number;
+  errorRate: number;
 }
 
 interface ApiKey {
@@ -25,9 +33,39 @@ interface ApiKey {
 // ── Mock 数据 ────────────────────────────────────────────────────────────────
 
 const PROVIDERS: Provider[] = [
-  { name: 'Claude', status: '已启用', model: 'claude-3-opus', temperature: 0.3, dailyTokens: '8.2K' },
-  { name: 'DeepSeek', status: '已启用', model: 'deepseek-v3', temperature: 0.5, dailyTokens: '3.1K' },
-  { name: 'OpenAI', status: '备用', model: 'gpt-4o', temperature: 0.4, dailyTokens: '1.2K' },
+  {
+    id: 'claude',
+    name: 'Claude',
+    status: 'active',
+    model: 'claude-3-opus',
+    temperature: 0.3,
+    maxTokens: 4096,
+    dailyCalls: 820,
+    avgLatency: 920,
+    errorRate: 0.2,
+  },
+  {
+    id: 'deepseek',
+    name: 'DeepSeek',
+    status: 'active',
+    model: 'deepseek-v3',
+    temperature: 0.5,
+    maxTokens: 4096,
+    dailyCalls: 310,
+    avgLatency: 480,
+    errorRate: 0.4,
+  },
+  {
+    id: 'openai',
+    name: 'OpenAI',
+    status: 'standby',
+    model: 'gpt-4o',
+    temperature: 0.4,
+    maxTokens: 4096,
+    dailyCalls: 120,
+    avgLatency: 1050,
+    errorRate: 0.8,
+  },
 ];
 
 const MOCK_KEYS: ApiKey[] = [
@@ -39,7 +77,21 @@ const MOCK_KEYS: ApiKey[] = [
 
 // ── 组件 ─────────────────────────────────────────────────────────────────────
 
+const statusLabel: Record<Provider['status'], string> = {
+  active: '主力',
+  standby: '备用',
+  disabled: '已禁用',
+};
+
+const statusType: Record<Provider['status'], 'success' | 'warning' | 'default'> = {
+  active: 'success',
+  standby: 'warning',
+  disabled: 'default',
+};
+
 const LLMConfigPage: React.FC = () => {
+  const [selectedProvider, setSelectedProvider] = useState<Provider>(PROVIDERS[0]);
+
   const keyColumns: ZTableColumn<ApiKey>[] = [
     { key: 'provider', dataIndex: 'provider', title: 'Provider' },
     { key: 'maskedKey', dataIndex: 'maskedKey', title: 'Key',
@@ -51,7 +103,17 @@ const LLMConfigPage: React.FC = () => {
         <ZBadge type={v === '正常' ? 'success' : 'error'} text={v} />
       ),
     },
+    { key: 'actions', title: '操作',
+      render: () => (
+        <div className={styles.actionGroup}>
+          <button className={styles.actionBtn}>轮换</button>
+          <button className={`${styles.actionBtn} ${styles.actionBtnDanger}`}>吊销</button>
+        </div>
+      ),
+    },
   ];
+
+  const totalCalls = PROVIDERS.reduce((s, p) => s + p.dailyCalls, 0);
 
   return (
     <div className={styles.container}>
@@ -60,15 +122,27 @@ const LLMConfigPage: React.FC = () => {
         <p>为商户配置 LLM 模型选型，平衡成本与效果</p>
       </div>
 
+      {/* 今日汇总 KPI */}
+      <div className={styles.kpiRow}>
+        <ZCard><ZKpi label="今日调用次数" value={totalCalls} change={5.2} changeLabel="较昨日" /></ZCard>
+        <ZCard><ZKpi label="今日 Tokens" value="12.5K" change={3.1} changeLabel="较昨日" /></ZCard>
+        <ZCard><ZKpi label="平均响应延迟" value="820" unit="ms" change={-4.2} changeLabel="较昨日" /></ZCard>
+        <ZCard><ZKpi label="综合错误率" value="0.4" unit="%" status="good" /></ZCard>
+      </div>
+
       {/* Provider 卡片 */}
       <div className={styles.section}>
         <div className={styles.sectionTitle}>Provider 配置</div>
         <div className={styles.cardGrid}>
           {PROVIDERS.map((p) => (
-            <ZCard key={p.name} className={styles.providerCard}>
+            <ZCard
+              key={p.id}
+              className={`${styles.providerCard} ${selectedProvider.id === p.id ? styles.providerCardActive : ''}`}
+              onClick={() => setSelectedProvider(p)}
+            >
               <div className={styles.providerHeader}>
                 <span className={styles.providerName}>{p.name}</span>
-                <ZBadge type={p.status === '已启用' ? 'success' : 'default'} text={p.status} />
+                <ZBadge type={statusType[p.status]} text={statusLabel[p.status]} />
               </div>
               <div className={styles.providerDetail}>
                 <div className={styles.providerRow}>
@@ -80,22 +154,26 @@ const LLMConfigPage: React.FC = () => {
                   <span className={styles.providerValue}>{p.temperature}</span>
                 </div>
                 <div className={styles.providerRow}>
-                  <span className={styles.providerLabel}>每日用量</span>
-                  <span className={styles.providerValue}>{p.dailyTokens} tokens</span>
+                  <span className={styles.providerLabel}>Max Tokens</span>
+                  <span className={styles.providerValue}>{p.maxTokens.toLocaleString()}</span>
+                </div>
+              </div>
+              <div className={styles.providerStats}>
+                <div className={styles.statItem}>
+                  <span className={styles.statVal}>{p.dailyCalls}</span>
+                  <span className={styles.statLbl}>今日调用</span>
+                </div>
+                <div className={styles.statItem}>
+                  <span className={styles.statVal}>{p.avgLatency}ms</span>
+                  <span className={styles.statLbl}>平均延迟</span>
+                </div>
+                <div className={styles.statItem}>
+                  <span className={`${styles.statVal} ${p.errorRate > 0.5 ? styles.statErr : styles.statOk}`}>{p.errorRate}%</span>
+                  <span className={styles.statLbl}>错误率</span>
                 </div>
               </div>
             </ZCard>
           ))}
-        </div>
-      </div>
-
-      {/* 用量统计 KPI */}
-      <div className={styles.section}>
-        <div className={styles.sectionTitle}>用量统计</div>
-        <div className={styles.kpiRow}>
-          <ZCard><ZKpi label="今日 Tokens" value="12.5K" change={5.2} changeLabel="较昨日" /></ZCard>
-          <ZCard><ZKpi label="估算费用" value="¥3.28" prefix="" change={-2.1} changeLabel="较昨日" /></ZCard>
-          <ZCard><ZKpi label="平均响应" value="1.2" unit="s" change={-8.5} changeLabel="较昨日" /></ZCard>
         </div>
       </div>
 

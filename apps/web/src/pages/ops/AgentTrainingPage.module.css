@@ -44,28 +44,132 @@
   margin: 0 0 12px;
 }
 
-.cardGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
-}
-
-.tableCard {
-  padding: 0 !important;
-  overflow: hidden;
+.reviewingAgent {
+  font-weight: 400;
+  color: var(--accent, #FF6B2C);
 }
 
 .accuracyHigh { color: #22c55e; font-weight: 600; }
 .accuracyMid { color: var(--accent, #FF6B2C); font-weight: 600; }
 .accuracyLow { color: #ef4444; font-weight: 600; }
 
-.reviewPanel {
+/* Review button */
+
+.reviewBtn {
+  padding: 4px 10px;
+  font-size: 12px;
+  border: 1px solid var(--border-default, #e5e7eb);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary, #6b7280);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.reviewBtn:hover,
+.reviewBtnActive {
+  border-color: var(--accent, #FF6B2C);
+  color: var(--accent, #FF6B2C);
+  background: rgba(255, 107, 44, 0.05);
+}
+
+/* Review panel */
+
+.reviewPlaceholder {
   min-height: 120px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--text-tertiary, #9ca3af);
   font-size: 13px;
+}
+
+.reviewContent {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.reviewStats {
+  display: flex;
+  gap: 24px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-default, #e5e7eb);
+}
+
+.reviewStat {
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+}
+
+.sampleList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sampleCard {
+  border: 1px solid var(--border-default, #e5e7eb);
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sampleCorrect {
+  border-left: 3px solid #22c55e;
+  background: #f0fdf4;
+}
+
+.sampleWrong {
+  border-left: 3px solid #ef4444;
+  background: #fef2f2;
+}
+
+.sampleHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.sampleId {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-tertiary, #9ca3af);
+}
+
+.sampleRow {
+  display: flex;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.sampleLabel {
+  flex-shrink: 0;
+  width: 72px;
+  color: var(--text-tertiary, #9ca3af);
+  font-weight: 500;
+}
+
+.sampleText {
+  color: var(--text-primary, #111827);
+  line-height: 1.5;
+}
+
+.sampleDiff {
+  color: #b91c1c;
+}
+
+.reviewNote {
+  font-size: 12px;
+  color: #92400e;
+  background: #fef3c7;
+  border-radius: 4px;
+  padding: 6px 10px;
+  margin-top: 4px;
 }
 
 @media (max-width: 768px) {
