@@ -4,6 +4,9 @@ from .double_write_service import DoubleWriteService
 from .knowledge_service import HrKnowledgeService
 from .retention_risk_service import RetentionRiskService
 from .skill_gap_service import SkillGapService
+from .onboarding_service import OnboardingService
+from .offboarding_service import OffboardingService
+from .transfer_service import TransferService
 
 __all__ = [
     "HrSeedService",
@@ -11,4 +14,7 @@ __all__ = [
     "HrKnowledgeService",
     "RetentionRiskService",
     "SkillGapService",
+    "OnboardingService",
+    "OffboardingService",
+    "TransferService",
 ]
