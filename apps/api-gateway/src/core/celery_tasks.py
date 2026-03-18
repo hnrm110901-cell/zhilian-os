@@ -5829,3 +5829,25 @@ def trigger_staffing_analysis_weekly():
             r.close()
 
     asyncio.run(_run())
+
+
+@celery_app.task(name="hr.trigger_exit_knowledge_capture")
+def trigger_exit_knowledge_capture(person_id: str):
+    """WF-4: 当留任信号 risk_score > 0.85 时触发知识采集推送.
+
+    由 WF-1 扫描任务在高危员工时调用，也可手动触发（离职申请提交时）。
+    """
+    async def _run():
+        from src.core.database import AsyncSessionLocal
+        from src.services.hr.knowledge_capture_service import KnowledgeCaptureService
+
+        async with AsyncSessionLocal() as session:
+            svc = KnowledgeCaptureService(session=session)
+            result = await svc.trigger_capture(person_id, "exit")
+            logger.info(
+                "celery.hr_knowledge_capture_triggered",
+                person_id=person_id,
+                wechat_sent=result.get("wechat_sent"),
+            )
+
+    asyncio.run(_run())
