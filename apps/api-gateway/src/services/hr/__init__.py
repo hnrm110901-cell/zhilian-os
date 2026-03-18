@@ -12,6 +12,8 @@ from .attendance_service import AttendanceService
 from .leave_service import LeaveService
 from .growth_guidance_service import GrowthGuidanceService
 from .career_path_service import CareerPathService
+from .compensation_fairness_service import CompensationFairnessService
+from .talent_health_service import TalentHealthService
 
 __all__ = [
     "HrSeedService",
@@ -27,4 +29,6 @@ __all__ = [
     "LeaveService",
     "GrowthGuidanceService",
     "CareerPathService",
+    "CompensationFairnessService",
+    "TalentHealthService",
 ]
