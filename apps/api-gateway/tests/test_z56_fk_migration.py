@@ -31,8 +31,7 @@ def test_revision_metadata():
 
 def test_upgrade_adds_column_for_all_tables():
     """upgrade() executes SQL touching each of the 4 target tables."""
-    with patch("alembic.op.execute") as mock_exec, \
-         patch("alembic.op.get_bind") as mock_bind:
+    with patch("alembic.op.get_bind") as mock_bind:
         conn = MagicMock()
         conn.execute.return_value.scalar.return_value = False
         mock_bind.return_value = conn
@@ -47,9 +46,12 @@ def test_upgrade_adds_column_for_all_tables():
 
 
 def test_upgrade_skips_existing_column():
-    """upgrade() skips ADD COLUMN when assignment_id already exists (idempotent)."""
-    with patch("alembic.op.execute") as mock_exec, \
-         patch("alembic.op.get_bind") as mock_bind:
+    """upgrade() skips ADD COLUMN when assignment_id already exists (idempotent).
+
+    When _column_exists returns True, conn.execute is only called for the
+    existence check (once per table), never for ADD COLUMN / UPDATE / CREATE INDEX.
+    """
+    with patch("alembic.op.get_bind") as mock_bind:
         conn = MagicMock()
         conn.execute.return_value.scalar.return_value = True  # column already exists
         mock_bind.return_value = conn
@@ -57,13 +59,21 @@ def test_upgrade_skips_existing_column():
         from alembic.versions.z56_fk_migration_to_assignment_id import upgrade
         upgrade()
 
-    mock_exec.assert_not_called()
+    # Only existence-check calls (4 tables × 1 check each)
+    assert conn.execute.call_count == len(TARGET_TABLES), (
+        f"Expected {len(TARGET_TABLES)} existence-check calls, "
+        f"got {conn.execute.call_count}"
+    )
+    # No DDL or DML should have been executed
+    all_sqls = " ".join(str(c.args[0]) for c in conn.execute.call_args_list)
+    assert "ADD COLUMN" not in all_sqls.upper()
+    assert "UPDATE" not in all_sqls.upper()
+    assert "CREATE INDEX" not in all_sqls.upper()
 
 
 def test_upgrade_runs_backfill_update():
     """upgrade() runs UPDATE referencing employee_id_map for each table."""
-    with patch("alembic.op.execute") as mock_exec, \
-         patch("alembic.op.get_bind") as mock_bind:
+    with patch("alembic.op.get_bind") as mock_bind:
         conn = MagicMock()
         conn.execute.return_value.scalar.return_value = False
         mock_bind.return_value = conn
@@ -78,8 +88,7 @@ def test_upgrade_runs_backfill_update():
 
 def test_downgrade_drops_column_for_all_tables():
     """downgrade() drops assignment_id from all 4 tables."""
-    with patch("alembic.op.execute") as mock_exec, \
-         patch("alembic.op.get_bind") as mock_bind:
+    with patch("alembic.op.get_bind") as mock_bind:
         conn = MagicMock()
         conn.execute.return_value.scalar.return_value = True  # column exists
         mock_bind.return_value = conn
@@ -95,8 +104,7 @@ def test_downgrade_drops_column_for_all_tables():
 
 def test_no_not_null_constraint():
     """Migration does NOT add NOT NULL (M4 concern only)."""
-    with patch("alembic.op.execute") as mock_exec, \
-         patch("alembic.op.get_bind") as mock_bind:
+    with patch("alembic.op.get_bind") as mock_bind:
         conn = MagicMock()
         conn.execute.return_value.scalar.return_value = False
         mock_bind.return_value = conn
