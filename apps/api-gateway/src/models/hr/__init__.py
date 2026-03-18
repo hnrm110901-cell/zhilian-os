@@ -16,6 +16,9 @@ from .clock_record import ClockRecord
 from .daily_attendance import DailyAttendance
 from .leave_request import LeaveRequest
 from .leave_balance import LeaveBalance
+from .payroll_batch import PayrollBatch
+from .payroll_item import PayrollItem
+from .cost_allocation import CostAllocation
 
 __all__ = [
     "Person",
@@ -35,4 +38,7 @@ __all__ = [
     "DailyAttendance",
     "LeaveRequest",
     "LeaveBalance",
+    "PayrollBatch",
+    "PayrollItem",
+    "CostAllocation",
 ]
