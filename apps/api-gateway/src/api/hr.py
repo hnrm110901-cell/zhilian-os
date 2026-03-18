@@ -18,6 +18,10 @@ from ..services.hr.transfer_service import TransferService
 from ..services.hr.approval_workflow_service import HRApprovalWorkflowService
 from ..services.hr.attendance_service import AttendanceService
 from ..services.hr.leave_service import LeaveService
+from ..services.hr.growth_guidance_service import GrowthGuidanceService
+from ..services.hr.career_path_service import CareerPathService
+from ..services.hr.compensation_fairness_service import CompensationFairnessService
+from ..services.hr.talent_health_service import TalentHealthService
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -1413,6 +1417,194 @@ async def simulate_leave(
         leave_type=leave_type,
         days=days,
         year=year,
+        session=session,
+    )
+    return result
+
+
+# ── AI Growth Schemas ──────────────────────────────────────────────
+
+class GrowthPlanRequest(BaseModel):
+    assignment_id: str
+    job_title: str
+    start_date: Optional[date] = None
+
+
+class CareerRecommendRequest(BaseModel):
+    current_role: str
+    current_skills: List[str]
+
+
+class SkillGapRequest(BaseModel):
+    current_skills: List[str]
+    target_role: str
+
+
+class PeerCompareRequest(BaseModel):
+    current_role: str
+    current_skills: List[str]
+    tenure_months: int
+
+
+class StoreCompensationRequest(BaseModel):
+    employees: List[dict]
+
+
+class TalentHealthRequest(BaseModel):
+    stores_data: List[dict]
+
+
+# ── AI Growth & Analytics Endpoints ────────────────────────────────
+
+@router.post("/ai/growth-plan")
+async def generate_growth_plan(
+    req: GrowthPlanRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """WF-6: 生成90天成长计划"""
+    svc = GrowthGuidanceService()
+    plan = await svc.generate_plan(
+        assignment_id=uuid.UUID(req.assignment_id),
+        job_title=req.job_title,
+        session=session,
+        start_date=req.start_date,
+    )
+    return plan
+
+
+@router.get("/ai/growth-checkin")
+async def weekly_growth_checkin(
+    assignment_id: str = Query(...),
+    week: int = Query(...),
+    job_title: str = Query(...),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """WF-6: 每周成长进度检查"""
+    svc = GrowthGuidanceService()
+    result = await svc.weekly_checkin(
+        assignment_id=uuid.UUID(assignment_id),
+        week_num=week,
+        job_title=job_title,
+        session=session,
+    )
+    return result
+
+
+@router.get("/ai/growth-milestone")
+async def milestone_review(
+    assignment_id: str = Query(...),
+    day: int = Query(...),
+    job_title: str = Query(...),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """WF-6: 30/60/90天里程碑评估"""
+    svc = GrowthGuidanceService()
+    try:
+        result = await svc.milestone_review(
+            assignment_id=uuid.UUID(assignment_id),
+            day=day,
+            job_title=job_title,
+            session=session,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return result
+
+
+@router.post("/ai/career-recommend")
+async def recommend_career_path(
+    req: CareerRecommendRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """WF-7: 晋升路径推荐"""
+    svc = CareerPathService()
+    result = await svc.recommend_next_role(
+        current_role=req.current_role,
+        current_skills=req.current_skills,
+        session=session,
+    )
+    return result
+
+
+@router.post("/ai/skill-gap")
+async def analyze_skill_gap(
+    req: SkillGapRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """WF-7: 技能差距分析"""
+    svc = CareerPathService()
+    result = await svc.analyze_skill_gap_to_target(
+        current_skills=req.current_skills,
+        target_role=req.target_role,
+        session=session,
+    )
+    return result
+
+
+@router.post("/ai/peer-compare")
+async def compare_with_peers(
+    req: PeerCompareRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """WF-7: 同岗位同期对比"""
+    svc = CareerPathService()
+    result = await svc.compare_with_peers(
+        current_role=req.current_role,
+        current_skills=req.current_skills,
+        tenure_months=req.tenure_months,
+        session=session,
+    )
+    return result
+
+
+@router.post("/ai/compensation-analysis")
+async def analyze_compensation(
+    req: StoreCompensationRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """WF-8: 门店薪资公平性分析"""
+    svc = CompensationFairnessService()
+    result = await svc.analyze_store(
+        employees=req.employees,
+        session=session,
+    )
+    return result
+
+
+@router.get("/ai/market-benchmark")
+async def get_market_benchmark(
+    job_title: str = Query(...),
+    city: str = Query("长沙"),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """WF-8: 市场薪资对标"""
+    svc = CompensationFairnessService()
+    result = await svc.market_benchmark(
+        job_title=job_title,
+        city=city,
+        session=session,
+    )
+    return result
+
+
+@router.post("/ai/talent-health")
+async def get_talent_health_dashboard(
+    req: TalentHealthRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """WF-9: 人才健康度大盘"""
+    svc = TalentHealthService()
+    result = await svc.hq_dashboard(
+        stores_data=req.stores_data,
         session=session,
     )
     return result
