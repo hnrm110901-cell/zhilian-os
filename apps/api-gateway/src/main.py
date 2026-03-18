@@ -967,6 +967,11 @@ from src.api import bff_member
 
 app.include_router(bff_member.router, tags=["BFF-会员"])
 
+# BFF 会员画像（P1 到店识客：多源聚合 + AI话术 + Redis缓存）
+from src.api import bff_member_profile
+
+app.include_router(bff_member_profile.router, tags=["BFF-会员画像"])
+
 # v2.0 MVP — 决策中枢（Top3 + 手动推送 + 场景识别）
 from src.api import decision_hub, monthly_report
 
