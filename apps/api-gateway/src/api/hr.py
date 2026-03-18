@@ -12,6 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..core.database import get_db
 from ..core.dependencies import get_current_active_user
 from ..models.user import User
+from ..services.hr.onboarding_service import OnboardingService
+from ..services.hr.offboarding_service import OffboardingService
+from ..services.hr.transfer_service import TransferService
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -71,6 +74,68 @@ class KnowledgeCaptureSubmitRequest(BaseModel):
     person_id: str
     trigger_type: str
     raw_dialogue: str
+
+
+# ── Onboarding Schemas ─────────────────────────────────────────────
+
+class OnboardingCreateRequest(BaseModel):
+    person_id: str
+    org_node_id: str
+    planned_start_date: date
+    created_by: str
+    offer_date: Optional[date] = None
+    extra_data: Optional[dict] = None
+
+
+class ChecklistGenerateRequest(BaseModel):
+    job_title: str
+
+
+class ChecklistItemCompleteRequest(BaseModel):
+    completed_by: str
+    file_url: Optional[str] = None
+
+
+class OnboardingApproveRequest(BaseModel):
+    approved_by: str
+    employment_type: str  # full_time/hourly/outsourced/dispatched/partner
+
+
+# ── Offboarding Schemas ─────────────────────────────────────────────
+
+class OffboardingApplyRequest(BaseModel):
+    assignment_id: str
+    reason: str  # resignation/termination/contract_end/retirement/mutual
+    planned_last_day: date
+    created_by: str
+    notes: Optional[str] = None
+    apply_date: Optional[date] = None
+
+
+class OffboardingApproveRequest(BaseModel):
+    approved_by: str
+
+
+class OffboardingCompleteRequest(BaseModel):
+    actual_last_day: Optional[date] = None
+
+
+# ── Transfer Schemas ─────────────────────────────────────────────────
+
+class TransferApplyRequest(BaseModel):
+    person_id: str
+    from_assignment_id: str
+    to_org_node_id: str
+    transfer_type: str  # internal_transfer/promotion/demotion/secondment
+    effective_date: date
+    reason: str
+    created_by: str
+    to_employment_type: str
+    new_pay_scheme: Optional[dict] = None
+
+
+class TransferApproveRequest(BaseModel):
+    approved_by: str
 
 
 # ── Endpoints ────────────────────────────────────────────────────────
@@ -743,3 +808,243 @@ async def analyze_talent_pipeline(
         headcount_plan=req.headcount_plan,
     )
     return result
+
+
+# ── Onboarding Endpoints ──────────────────────────────────────────────
+
+@router.post("/onboarding", status_code=201)
+async def create_onboarding_process(
+    req: OnboardingCreateRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """创建入职流程（draft状态）"""
+    svc = OnboardingService()
+    try:
+        process = await svc.create_process(
+            person_id=uuid.UUID(req.person_id),
+            org_node_id=req.org_node_id,
+            planned_start_date=req.planned_start_date,
+            created_by=req.created_by,
+            session=session,
+            offer_date=req.offer_date,
+            extra_data=req.extra_data,
+        )
+        await session.commit()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"id": str(process.id), "status": process.status}
+
+
+@router.post("/onboarding/{process_id}/checklist")
+async def generate_onboarding_checklist(
+    process_id: str,
+    req: ChecklistGenerateRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """生成入职清单（status → pending_review）"""
+    svc = OnboardingService()
+    try:
+        items = await svc.generate_checklist(
+            process_id=uuid.UUID(process_id),
+            job_title=req.job_title,
+            session=session,
+        )
+        await session.commit()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"process_id": process_id, "item_count": len(items)}
+
+
+@router.post("/onboarding/items/{item_id}/complete")
+async def complete_onboarding_item(
+    item_id: str,
+    req: ChecklistItemCompleteRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """完成清单项"""
+    svc = OnboardingService()
+    try:
+        item = await svc.complete_item(
+            item_id=uuid.UUID(item_id),
+            completed_by=req.completed_by,
+            session=session,
+            file_url=req.file_url,
+        )
+        await session.commit()
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"id": str(item.id), "completed_at": item.completed_at.isoformat() if item.completed_at else None}
+
+
+@router.post("/onboarding/{process_id}/approve", status_code=200)
+async def approve_onboarding_process(
+    process_id: str,
+    req: OnboardingApproveRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """审批通过入职，创建EmploymentAssignment"""
+    svc = OnboardingService()
+    try:
+        assignment = await svc.approve(
+            process_id=uuid.UUID(process_id),
+            approved_by=req.approved_by,
+            employment_type=req.employment_type,
+            session=session,
+        )
+        await session.commit()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+        "process_id": process_id,
+        "assignment_id": str(assignment.id),
+        "status": "active",
+    }
+
+
+# ── Offboarding Endpoints ──────────────────────────────────────────────
+
+@router.post("/offboarding", status_code=201)
+async def apply_offboarding(
+    req: OffboardingApplyRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """提交离职申请"""
+    svc = OffboardingService()
+    try:
+        process = await svc.apply(
+            assignment_id=uuid.UUID(req.assignment_id),
+            reason=req.reason,
+            planned_last_day=req.planned_last_day,
+            created_by=req.created_by,
+            session=session,
+            notes=req.notes,
+            apply_date=req.apply_date,
+        )
+        await session.commit()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"id": str(process.id), "status": process.status}
+
+
+@router.post("/offboarding/{process_id}/approve")
+async def approve_offboarding(
+    process_id: str,
+    req: OffboardingApproveRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """审批通过离职申请"""
+    svc = OffboardingService()
+    try:
+        process = await svc.approve(
+            process_id=uuid.UUID(process_id),
+            approved_by=req.approved_by,
+            session=session,
+        )
+        await session.commit()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"process_id": process_id, "status": "approved"}
+
+
+@router.post("/offboarding/{process_id}/complete")
+async def complete_offboarding(
+    process_id: str,
+    req: OffboardingCompleteRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """完成离职：结算 + 知识采集 + 关闭在岗关系"""
+    svc = OffboardingService()
+    try:
+        result = await svc.complete(
+            process_id=uuid.UUID(process_id),
+            session=session,
+            actual_last_day=req.actual_last_day,
+        )
+        await session.commit()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return result
+
+
+# ── Transfer Endpoints ──────────────────────────────────────────────
+
+@router.post("/transfers", status_code=201)
+async def apply_transfer(
+    req: TransferApplyRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """提交调岗申请"""
+    svc = TransferService()
+    try:
+        process = await svc.apply(
+            person_id=uuid.UUID(req.person_id),
+            from_assignment_id=uuid.UUID(req.from_assignment_id),
+            to_org_node_id=req.to_org_node_id,
+            transfer_type=req.transfer_type,
+            effective_date=req.effective_date,
+            reason=req.reason,
+            created_by=req.created_by,
+            to_employment_type=req.to_employment_type,
+            session=session,
+            new_pay_scheme=req.new_pay_scheme,
+        )
+        await session.commit()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+        "id": str(process.id),
+        "status": process.status,
+        "revenue_impact_yuan": float(process.revenue_impact_yuan) if process.revenue_impact_yuan else None,
+    }
+
+
+@router.post("/transfers/{process_id}/approve")
+async def approve_transfer(
+    process_id: str,
+    req: TransferApproveRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """审批通过调岗申请"""
+    svc = TransferService()
+    try:
+        process = await svc.approve(
+            process_id=uuid.UUID(process_id),
+            approved_by=req.approved_by,
+            session=session,
+        )
+        await session.commit()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"process_id": process_id, "status": "approved"}
+
+
+@router.post("/transfers/{process_id}/execute")
+async def execute_transfer(
+    process_id: str,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """执行调岗：创建新在岗关系，关闭旧关系"""
+    svc = TransferService()
+    try:
+        new_assignment = await svc.execute(
+            process_id=uuid.UUID(process_id),
+            session=session,
+        )
+        await session.commit()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+        "process_id": process_id,
+        "new_assignment_id": str(new_assignment.id),
+        "status": "active",
+    }
