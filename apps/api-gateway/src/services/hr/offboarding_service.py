@@ -6,7 +6,6 @@ pending → (approve) → approved → (complete) → completed
 """
 import uuid
 from datetime import date, datetime, timezone
-from decimal import Decimal
 from typing import Optional
 import structlog
 from sqlalchemy import select, update
@@ -19,9 +18,7 @@ logger = structlog.get_logger()
 
 # 技能损失评估：各岗位的基准月薪（元）用于估算技能损失
 _BASE_MONTHLY_SALARY_YUAN: dict[str, float] = {
-    "manager": 8000.0,
-    "chef": 6000.0,
-    "server": 4000.0,
+    "outsourced_dispatched": 4000.0,
     "default": 4500.0,
 }
 
@@ -39,6 +36,7 @@ class OffboardingService:
         created_by: str,
         session: AsyncSession,
         notes: Optional[str] = None,
+        apply_date: Optional[date] = None,
     ) -> OffboardingProcess:
         """提交离职申请"""
         if reason not in ("resignation", "termination", "contract_end", "retirement", "mutual"):
@@ -47,22 +45,14 @@ class OffboardingService:
         process = OffboardingProcess(
             assignment_id=assignment_id,
             reason=reason,
-            apply_date=date.today(),
+            apply_date=apply_date or date.today(),
             planned_last_day=planned_last_day,
             created_by=created_by,
             notes=notes,
             status="pending",
         )
         session.add(process)
-
-        # 更新在岗关系，关联离职流程（软引用）
-        await session.execute(
-            update(EmploymentAssignment)
-            .where(EmploymentAssignment.id == assignment_id)
-            .values(offboarding_process_id=None)  # 先置None，flush后再更新
-        )
         await session.flush()
-
         # 用flush后的process.id更新软引用
         await session.execute(
             update(EmploymentAssignment)
@@ -168,7 +158,7 @@ class OffboardingService:
         emp_type = getattr(assignment, "employment_type", "full_time")
         # 简单用岗位类型做基准映射
         if emp_type in ("outsourced", "dispatched"):
-            base = _BASE_MONTHLY_SALARY_YUAN["server"]
+            base = _BASE_MONTHLY_SALARY_YUAN["outsourced_dispatched"]
         else:
             base = _BASE_MONTHLY_SALARY_YUAN["default"]
 

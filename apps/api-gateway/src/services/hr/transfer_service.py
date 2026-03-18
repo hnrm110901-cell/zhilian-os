@@ -16,6 +16,9 @@ from ...models.hr.employment_assignment import EmploymentAssignment
 
 logger = structlog.get_logger()
 
+# 基准月薪占位值（元）— WF-6 实装前使用固定值
+_STUB_BASE_MONTHLY_YUAN = 5000.0
+
 # 晋升/调岗的预期¥影响系数（相对当前岗位月薪的比例）
 _REVENUE_IMPACT_RATIO: dict[str, float] = {
     "promotion": 0.20,     # 晋升：+20% 预期产能提升
@@ -138,6 +141,7 @@ class TransferService:
             "transfer.executed",
             process_id=str(process_id),
             new_assignment_id=str(new_assignment.id),
+            from_assignment_id=str(process.from_assignment_id),
         )
         return new_assignment
 
@@ -148,7 +152,6 @@ class TransferService:
         transfer_type: str,
         session: AsyncSession,
     ) -> float:
-        """AI预测¥影响（元）= 岗位基准月薪 × 影响系数"""
-        base_monthly = 5000.0  # 默认基准月薪（元）
+        """估算调岗¥影响（元）= 基准月薪 × 影响系数（WF-6实装前为固定值）"""
         ratio = _REVENUE_IMPACT_RATIO.get(transfer_type, 0.0)
-        return round(base_monthly * ratio, 2)
+        return round(_STUB_BASE_MONTHLY_YUAN * ratio, 2)

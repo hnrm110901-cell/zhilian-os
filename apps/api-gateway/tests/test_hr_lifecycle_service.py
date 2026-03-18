@@ -9,6 +9,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from src.services.hr.onboarding_service import OnboardingService
+from src.services.hr.offboarding_service import OffboardingService
+from src.services.hr.transfer_service import TransferService
+
 pytestmark = pytest.mark.asyncio
 
 
@@ -26,19 +30,16 @@ def mock_session():
 
 @pytest.fixture
 def onboarding_svc():
-    from src.services.hr.onboarding_service import OnboardingService
     return OnboardingService()
 
 
 @pytest.fixture
 def offboarding_svc():
-    from src.services.hr.offboarding_service import OffboardingService
     return OffboardingService()
 
 
 @pytest.fixture
 def transfer_svc():
-    from src.services.hr.transfer_service import TransferService
     return TransferService()
 
 
@@ -54,7 +55,6 @@ def _make_scalar_result(value):
 # ---------------------------------------------------------------------------
 
 async def test_create_onboarding_returns_process(mock_session):
-    from src.services.hr.onboarding_service import OnboardingService
     svc = OnboardingService()
     person_id = uuid.uuid4()
     start_date = date(2026, 4, 1)
@@ -77,7 +77,6 @@ async def test_create_onboarding_returns_process(mock_session):
 
 
 async def test_create_onboarding_sets_draft_status(mock_session):
-    from src.services.hr.onboarding_service import OnboardingService
     svc = OnboardingService()
 
     result = await svc.create_process(
@@ -92,7 +91,6 @@ async def test_create_onboarding_sets_draft_status(mock_session):
 
 
 async def test_generate_checklist_manager_gets_6_items(mock_session):
-    from src.services.hr.onboarding_service import OnboardingService
     svc = OnboardingService()
     process_id = uuid.uuid4()
 
@@ -107,7 +105,6 @@ async def test_generate_checklist_manager_gets_6_items(mock_session):
 
 
 async def test_generate_checklist_chef_gets_5_items(mock_session):
-    from src.services.hr.onboarding_service import OnboardingService
     svc = OnboardingService()
 
     items = await svc.generate_checklist(
@@ -120,7 +117,6 @@ async def test_generate_checklist_chef_gets_5_items(mock_session):
 
 
 async def test_generate_checklist_unknown_gets_default_items(mock_session):
-    from src.services.hr.onboarding_service import OnboardingService
     svc = OnboardingService()
 
     items = await svc.generate_checklist(
@@ -133,7 +129,6 @@ async def test_generate_checklist_unknown_gets_default_items(mock_session):
 
 
 async def test_generate_checklist_advances_status_to_pending_review(mock_session):
-    from src.services.hr.onboarding_service import OnboardingService
     svc = OnboardingService()
 
     await svc.generate_checklist(
@@ -142,12 +137,15 @@ async def test_generate_checklist_advances_status_to_pending_review(mock_session
         session=mock_session,
     )
 
-    # session.execute should have been called (for the status update)
-    mock_session.execute.assert_called()
+    # Check that execute was called for the status update to pending_review
+    call_args_list = mock_session.execute.call_args_list
+    # At least one execute call should be made (the UPDATE for status=pending_review)
+    assert mock_session.execute.call_count >= 1
+    # The service called flush after the update
+    mock_session.flush.assert_called()
 
 
 async def test_complete_item_sets_completed_at(mock_session):
-    from src.services.hr.onboarding_service import OnboardingService
     from src.models.hr.onboarding_checklist_item import OnboardingChecklistItem
     svc = OnboardingService()
 
@@ -174,7 +172,6 @@ async def test_complete_item_sets_completed_at(mock_session):
 
 
 async def test_complete_item_raises_if_not_found(mock_session):
-    from src.services.hr.onboarding_service import OnboardingService
     svc = OnboardingService()
 
     mock_session.execute.return_value = _make_scalar_result(None)
@@ -188,7 +185,6 @@ async def test_complete_item_raises_if_not_found(mock_session):
 
 
 async def test_approve_onboarding_creates_assignment(mock_session):
-    from src.services.hr.onboarding_service import OnboardingService
     from src.models.hr.onboarding_process import OnboardingProcess
     svc = OnboardingService()
 
@@ -222,7 +218,6 @@ async def test_approve_onboarding_creates_assignment(mock_session):
 
 
 async def test_approve_onboarding_raises_on_wrong_status(mock_session):
-    from src.services.hr.onboarding_service import OnboardingService
     from src.models.hr.onboarding_process import OnboardingProcess
     svc = OnboardingService()
 
@@ -250,12 +245,11 @@ async def test_approve_onboarding_raises_on_wrong_status(mock_session):
 # ---------------------------------------------------------------------------
 
 async def test_offboarding_apply_creates_process(mock_session):
-    from src.services.hr.offboarding_service import OffboardingService
     svc = OffboardingService()
 
     assignment_id = uuid.uuid4()
-    # Two execute calls in apply: first update (clear ref), second update (set ref)
-    mock_session.execute.side_effect = [AsyncMock(), AsyncMock()]
+    # apply: session.add(process) + flush + execute(update) + flush
+    mock_session.execute.side_effect = [AsyncMock()]
 
     result = await svc.apply(
         assignment_id=assignment_id,
@@ -273,7 +267,6 @@ async def test_offboarding_apply_creates_process(mock_session):
 
 
 async def test_offboarding_apply_raises_on_invalid_reason(mock_session):
-    from src.services.hr.offboarding_service import OffboardingService
     svc = OffboardingService()
 
     with pytest.raises(ValueError, match="Invalid reason"):
@@ -287,7 +280,6 @@ async def test_offboarding_apply_raises_on_invalid_reason(mock_session):
 
 
 async def test_offboarding_approve_raises_on_wrong_status(mock_session):
-    from src.services.hr.offboarding_service import OffboardingService
     from src.models.hr.offboarding_process import OffboardingProcess
     svc = OffboardingService()
 
@@ -311,7 +303,6 @@ async def test_offboarding_approve_raises_on_wrong_status(mock_session):
 
 
 async def test_offboarding_complete_returns_summary_dict(mock_session):
-    from src.services.hr.offboarding_service import OffboardingService
     from src.models.hr.offboarding_process import OffboardingProcess
     from src.models.hr.employment_assignment import EmploymentAssignment
     svc = OffboardingService()
@@ -362,7 +353,6 @@ async def test_offboarding_complete_returns_summary_dict(mock_session):
 
 
 async def test_offboarding_calculates_skill_loss_yuan_positive(mock_session):
-    from src.services.hr.offboarding_service import OffboardingService
     from src.models.hr.employment_assignment import EmploymentAssignment
     svc = OffboardingService()
 
@@ -384,7 +374,6 @@ async def test_offboarding_calculates_skill_loss_yuan_positive(mock_session):
 
 
 async def test_offboarding_triggers_knowledge_capture(mock_session):
-    from src.services.hr.offboarding_service import OffboardingService
     from src.models.hr.offboarding_process import OffboardingProcess
     from src.models.hr.employment_assignment import EmploymentAssignment
     svc = OffboardingService()
@@ -428,7 +417,6 @@ async def test_offboarding_triggers_knowledge_capture(mock_session):
 # ---------------------------------------------------------------------------
 
 async def test_transfer_apply_creates_process_with_revenue_impact(mock_session):
-    from src.services.hr.transfer_service import TransferService
     svc = TransferService()
 
     person_id = uuid.uuid4()
@@ -456,7 +444,6 @@ async def test_transfer_apply_creates_process_with_revenue_impact(mock_session):
 
 
 async def test_transfer_apply_raises_on_invalid_type(mock_session):
-    from src.services.hr.transfer_service import TransferService
     svc = TransferService()
 
     with pytest.raises(ValueError, match="Invalid transfer_type"):
@@ -474,7 +461,6 @@ async def test_transfer_apply_raises_on_invalid_type(mock_session):
 
 
 async def test_transfer_approve_raises_on_wrong_status(mock_session):
-    from src.services.hr.transfer_service import TransferService
     from src.models.hr.transfer_process import TransferProcess
     svc = TransferService()
 
@@ -501,7 +487,6 @@ async def test_transfer_approve_raises_on_wrong_status(mock_session):
 
 
 async def test_transfer_execute_creates_new_assignment_ends_old(mock_session):
-    from src.services.hr.transfer_service import TransferService
     from src.models.hr.transfer_process import TransferProcess
     svc = TransferService()
 
@@ -539,10 +524,12 @@ async def test_transfer_execute_creates_new_assignment_ends_old(mock_session):
     assert new_assignment.status == "active"
     # session.add called with the new assignment
     mock_session.add.assert_called_once_with(new_assignment)
+    # Verify old assignment was ended (UPDATE call should have been made)
+    # execute was called 3 times: select, update_old_assignment, update_transfer_process
+    assert mock_session.execute.call_count == 3
 
 
 async def test_transfer_execute_raises_on_wrong_status(mock_session):
-    from src.services.hr.transfer_service import TransferService
     from src.models.hr.transfer_process import TransferProcess
     svc = TransferService()
 

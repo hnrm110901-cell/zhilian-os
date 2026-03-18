@@ -152,7 +152,7 @@ class OnboardingService:
         process = result.scalar_one_or_none()
         if process is None:
             raise ValueError(f"OnboardingProcess {process_id} not found")
-        if process.status not in ("pending_review", "draft"):
+        if process.status != "pending_review":
             raise ValueError(f"Cannot approve process in status {process.status!r}")
 
         # 创建在岗关系
@@ -184,17 +184,3 @@ class OnboardingService:
             approved_by=approved_by,
         )
         return assignment
-
-    async def _generate_ai_growth_plan(
-        self,
-        person_id: uuid.UUID,
-        job_title: str,
-        session: AsyncSession,
-    ) -> dict:
-        """生成AI成长计划（占位实现，WF-6实现后替换）"""
-        return {
-            "job_title": job_title,
-            "recommended_skills": [],
-            "estimated_growth_months": 6,
-            "note": "AI成长计划生成功能待WF-6实现",
-        }
