@@ -5851,3 +5851,63 @@ def trigger_exit_knowledge_capture(person_id: str):
             )
 
     asyncio.run(_run())
+
+
+@celery_app.task(name="hr.notify_pending_approvals")
+def notify_pending_approvals():
+    """每天09:00推送超过24h未处理的审批提醒"""
+    async def _run():
+        from src.core.database import AsyncSessionLocal
+        from src.models.hr.approval_instance import ApprovalInstance
+        from src.models.hr.approval_step_record import ApprovalStepRecord
+        import sqlalchemy as sa
+        from datetime import datetime, timezone, timedelta
+
+        async with AsyncSessionLocal() as session:
+            cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+            result = await session.execute(
+                sa.select(ApprovalStepRecord)
+                .join(ApprovalInstance, ApprovalStepRecord.instance_id == ApprovalInstance.id)
+                .where(
+                    ApprovalStepRecord.action == "pending",
+                    ApprovalInstance.status == "pending",
+                    ApprovalStepRecord.created_at < cutoff,
+                )
+            )
+            overdue_records = list(result.scalars().all())
+            logger.info(
+                "celery.notify_pending_approvals",
+                overdue_count=len(overdue_records),
+            )
+            # 企微推送占位：遍历overdue_records发送提醒
+            for record in overdue_records:
+                record.notified_at = datetime.now(timezone.utc)
+            await session.commit()
+
+    asyncio.run(_run())
+
+
+@celery_app.task(name="hr.check_approval_deadline")
+def check_approval_deadline(instance_id: str):
+    """48h超时自动升级到上级审批（占位实现）"""
+    async def _run():
+        from src.core.database import AsyncSessionLocal
+        from src.models.hr.approval_instance import ApprovalInstance
+        import sqlalchemy as sa
+
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                sa.select(ApprovalInstance).where(
+                    ApprovalInstance.id == sa.text(f"'{instance_id}'::uuid")
+                )
+            )
+            instance = result.scalar_one_or_none()
+            if instance and instance.status == "pending":
+                logger.warning(
+                    "celery.approval_deadline_exceeded",
+                    instance_id=instance_id,
+                    current_step=instance.current_step,
+                )
+                # 超时升级占位：实际实现时查找上级审批人并创建新step record
+
+    asyncio.run(_run())

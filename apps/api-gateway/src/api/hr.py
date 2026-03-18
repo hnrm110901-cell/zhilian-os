@@ -15,6 +15,7 @@ from ..models.user import User
 from ..services.hr.onboarding_service import OnboardingService
 from ..services.hr.offboarding_service import OffboardingService
 from ..services.hr.transfer_service import TransferService
+from ..services.hr.approval_workflow_service import HRApprovalWorkflowService
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -1048,3 +1049,188 @@ async def execute_transfer(
         "new_assignment_id": str(new_assignment.id),
         "status": "active",
     }
+
+
+# ── Approval Schemas ──────────────────────────────────────────────
+
+class ApprovalActionRequest(BaseModel):
+    approver_id: str
+    action: str  # approved/rejected
+    comment: Optional[str] = None
+
+
+class ApprovalDelegateRequest(BaseModel):
+    from_approver: str
+    to_approver_id: str
+    to_approver_name: str
+
+
+class ApprovalTemplateCreateRequest(BaseModel):
+    name: str
+    resource_type: str  # onboarding/offboarding/transfer
+    org_node_id: Optional[str] = None
+    steps: list  # [{level:1, approver_type:"position", role:"store_manager"}]
+
+
+# ── Approval Endpoints ──────────────────────────────────────────────
+
+@router.get("/approvals/pending")
+async def list_pending_approvals(
+    approver_id: str = Query(..., description="审批人ID"),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """当前用户待审批列表"""
+    svc = HRApprovalWorkflowService()
+    instances = await svc.get_pending_for(approver_id=approver_id, session=session)
+    return {
+        "total": len(instances),
+        "items": [
+            {
+                "id": str(inst.id),
+                "resource_type": inst.resource_type,
+                "resource_id": str(inst.resource_id),
+                "status": inst.status,
+                "current_step": inst.current_step,
+                "created_by": inst.created_by,
+                "created_at": inst.created_at.isoformat() if inst.created_at else None,
+            }
+            for inst in instances
+        ],
+    }
+
+
+@router.get("/approvals/{instance_id}")
+async def get_approval_detail(
+    instance_id: str,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """审批详情+步骤记录"""
+    svc = HRApprovalWorkflowService()
+    try:
+        detail = await svc.get_instance_detail(
+            instance_id=uuid.UUID(instance_id), session=session
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return detail
+
+
+@router.post("/approvals/{instance_id}/approve")
+async def approve_instance(
+    instance_id: str,
+    req: ApprovalActionRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """审批通过"""
+    svc = HRApprovalWorkflowService()
+    try:
+        instance = await svc.action(
+            instance_id=uuid.UUID(instance_id),
+            approver_id=req.approver_id,
+            action_type="approved",
+            session=session,
+            comment=req.comment,
+        )
+        await session.commit()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"instance_id": instance_id, "status": "approved"}
+
+
+@router.post("/approvals/{instance_id}/reject")
+async def reject_instance(
+    instance_id: str,
+    req: ApprovalActionRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """审批驳回"""
+    svc = HRApprovalWorkflowService()
+    try:
+        instance = await svc.action(
+            instance_id=uuid.UUID(instance_id),
+            approver_id=req.approver_id,
+            action_type="rejected",
+            session=session,
+            comment=req.comment,
+        )
+        await session.commit()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"instance_id": instance_id, "status": "rejected"}
+
+
+@router.post("/approvals/{instance_id}/delegate")
+async def delegate_approval(
+    instance_id: str,
+    req: ApprovalDelegateRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """委托他人审批"""
+    svc = HRApprovalWorkflowService()
+    try:
+        record = await svc.delegate(
+            instance_id=uuid.UUID(instance_id),
+            from_approver=req.from_approver,
+            to_approver_id=req.to_approver_id,
+            to_approver_name=req.to_approver_name,
+            session=session,
+        )
+        await session.commit()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"instance_id": instance_id, "delegated_to": req.to_approver_id}
+
+
+@router.get("/approval-templates")
+async def list_approval_templates(
+    resource_type: Optional[str] = Query(None, description="按资源类型筛选"),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """审批模板列表"""
+    import sqlalchemy as sa_local
+    from ..models.hr.approval_template import ApprovalTemplate
+    query = sa_local.select(ApprovalTemplate).where(ApprovalTemplate.is_active == True)
+    if resource_type:
+        query = query.where(ApprovalTemplate.resource_type == resource_type)
+    result = await session.execute(query)
+    templates = list(result.scalars().all())
+    return {
+        "total": len(templates),
+        "items": [
+            {
+                "id": str(t.id),
+                "name": t.name,
+                "resource_type": t.resource_type,
+                "org_node_id": t.org_node_id,
+                "steps": t.steps,
+                "is_active": t.is_active,
+            }
+            for t in templates
+        ],
+    }
+
+
+@router.post("/approval-templates", status_code=201)
+async def create_approval_template(
+    req: ApprovalTemplateCreateRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """创建审批模板"""
+    from ..models.hr.approval_template import ApprovalTemplate
+    template = ApprovalTemplate(
+        name=req.name,
+        resource_type=req.resource_type,
+        org_node_id=req.org_node_id,
+        steps=req.steps,
+        is_active=True,
+    )
+    session.add(template)
+    await session.commit()
+    return {"id": str(template.id), "name": template.name}
