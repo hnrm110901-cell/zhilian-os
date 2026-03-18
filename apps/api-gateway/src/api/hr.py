@@ -6,6 +6,7 @@ from typing import List, Optional
 import sqlalchemy as sa
 import structlog
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -1722,3 +1723,25 @@ async def import_employees(
     )
     await session.commit()
     return result
+
+
+# ── Payroll Export ──────────────────────────────────────────────────
+
+@router.get("/payroll/{batch_id}/export")
+async def export_payroll(
+    batch_id: str,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """导出薪资Excel（3个sheet：月度汇总/个人工资条/部门成本）"""
+    from ..services.hr.hr_export_service import HRExportService
+    svc = HRExportService()
+    try:
+        buf = await svc.export_payroll_batch(uuid.UUID(batch_id), session)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=payroll_{batch_id[:8]}.xlsx"},
+    )
