@@ -4,6 +4,7 @@
 
 from typing import List
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -135,10 +136,24 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str
     CELERY_RESULT_BACKEND: str
 
-    # 安全配置
-    SECRET_KEY: str
-    JWT_SECRET: str
+    # 安全配置（兼容 compose 传入 JWT_SECRET_KEY / SECRET_KEY）
+    SECRET_KEY: str = ""
+    JWT_SECRET: str = ""
+    JWT_SECRET_KEY: str = ""  # compose 传入的别名
     JWT_ALGORITHM: str = "HS256"
+
+    @model_validator(mode="after")
+    def _resolve_jwt_secret(self) -> "Settings":
+        """JWT_SECRET 和 JWT_SECRET_KEY 互为别名，取先有值的那个"""
+        if not self.JWT_SECRET and self.JWT_SECRET_KEY:
+            self.JWT_SECRET = self.JWT_SECRET_KEY
+        elif not self.JWT_SECRET_KEY and self.JWT_SECRET:
+            self.JWT_SECRET_KEY = self.JWT_SECRET
+        if not self.JWT_SECRET:
+            raise ValueError("JWT_SECRET 或 JWT_SECRET_KEY 必须配置")
+        if not self.SECRET_KEY:
+            self.SECRET_KEY = self.JWT_SECRET
+        return self
     JWT_EXPIRATION: int = 3600
     EDGE_BOOTSTRAP_TOKEN: str = ""
     EDGE_SHOKZ_CALLBACK_URL: str = ""
