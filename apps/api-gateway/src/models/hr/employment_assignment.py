@@ -24,6 +24,9 @@ class EmploymentAssignment(Base):
     status = Column(String(20), nullable=False, default="active",
                     server_default="'active'",
                     comment="active/ended/suspended")
+    # 软引用：入职/离职流程创建 assignment，不反向强FK以避免循环依赖
+    onboarding_process_id = Column(UUID(as_uuid=True), nullable=True)
+    offboarding_process_id = Column(UUID(as_uuid=True), nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=text("NOW()"),
                         nullable=False)
 

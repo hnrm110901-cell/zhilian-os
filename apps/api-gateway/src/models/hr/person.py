@@ -19,6 +19,8 @@ class Person(Base):
     photo_url = Column(String(500), nullable=True)
     preferences = Column(JSONB, nullable=True, default=dict)
     emergency_contact = Column(JSONB, nullable=True, default=dict)
+    career_stage = Column(String(20), nullable=True, default="probation",
+                          comment="probation/regular/senior/lead/manager")
     created_at = Column(TIMESTAMP(timezone=True), server_default=text("NOW()"),
                         nullable=False)
     updated_at = Column(TIMESTAMP(timezone=True), server_default=text("NOW()"),
