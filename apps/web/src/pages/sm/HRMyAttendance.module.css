@@ -1,0 +1,18 @@
+.page { padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
+.monthNav { display: flex; align-items: center; justify-content: center; gap: var(--space-4); }
+.navBtn { background: none; border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--space-1) var(--space-3); cursor: pointer; font-size: 1rem; color: var(--text-primary); }
+.monthLabel { font-size: 1.1rem; font-weight: 600; }
+.calGrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; }
+.dayHeader { font-size: 0.75rem; color: var(--text-muted); padding: var(--space-1) 0; font-weight: 500; }
+.dayEmpty { }
+.dayCell { padding: var(--space-2) 0; font-size: 0.85rem; border-radius: var(--radius-sm); color: var(--text-secondary); }
+.past { color: var(--text-primary); }
+.today { background: var(--accent); color: #fff; font-weight: 700; border-radius: 50%; }
+.legend { display: flex; gap: var(--space-3); justify-content: center; margin-top: var(--space-3); font-size: 0.75rem; color: var(--text-muted); }
+.legendItem { display: flex; align-items: center; gap: 4px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.dotNormal { background: #52c41a; }
+.dotLate { background: #faad14; }
+.dotAbsent { background: #ff4d4f; }
+.dotLeave { background: #1890ff; }
+.summaryGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); text-align: center; }

@@ -302,6 +302,10 @@ const HQHrApprovals       = lazy(() => import('./pages/hq/HRApprovals'));
 const HQHrAttendance      = lazy(() => import('./pages/hq/HRAttendance'));
 const SmHRTeam            = lazy(() => import('./pages/sm/HRTeam'));
 const SmHRPerson          = lazy(() => import('./pages/sm/HRPerson'));
+const SmHRSelf            = lazy(() => import('./pages/sm/HRSelf'));
+const SmHRMyAttendance    = lazy(() => import('./pages/sm/HRMyAttendance'));
+const SmHRLeave           = lazy(() => import('./pages/sm/HRLeave'));
+const SmHRGrowth          = lazy(() => import('./pages/sm/HRGrowth'));
 const SmBanquet       = lazy(() => import('./pages/sm/Banquet'));
 const SmBanquetLeads       = lazy(() => import('./pages/sm/BanquetLeads'));
 const SmBanquetLeadDetail  = lazy(() => import('./pages/sm/BanquetLeadDetail'));
@@ -1060,6 +1064,10 @@ const AppContent: React.FC = () => {
                   <Route path="hr"             element={<SmHRQuick />} />
                   <Route path="hr/team"        element={<SmHRTeam />} />
                   <Route path="hr/person/:id"  element={<SmHRPerson />} />
+                  <Route path="hr/self"          element={<SmHRSelf />} />
+                  <Route path="hr/my-attendance" element={<SmHRMyAttendance />} />
+                  <Route path="hr/leave"         element={<SmHRLeave />} />
+                  <Route path="hr/growth"        element={<SmHRGrowth />} />
                   <Route path="patrol"   element={<SmPatrol />} />
                   <Route path="profile"  element={<SmProfile />} />
                   {/* 日清日结 + 周复盘 */}

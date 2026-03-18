@@ -1,0 +1,13 @@
+.page { padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
+.greeting { display: flex; align-items: center; justify-content: space-between; }
+.hi { font-size: 1.25rem; font-weight: 600; }
+.scheduleRow { display: flex; align-items: center; justify-content: space-between; }
+.scheduleTime { font-size: 1.1rem; font-weight: 500; }
+.kpiRow { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); text-align: center; }
+.actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-2); }
+.actionBtn { display: flex; flex-direction: column; align-items: center; gap: var(--space-1); padding: var(--space-3) var(--space-2); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); cursor: pointer; font-size: 0.8rem; color: var(--text-primary); transition: background 0.15s; }
+.actionBtn:hover { background: var(--surface-hover); }
+.actionIcon { font-size: 1.5rem; }
+.growthBar { height: 8px; border-radius: 4px; background: var(--surface-hover); overflow: hidden; }
+.growthFill { height: 100%; background: var(--accent); border-radius: 4px; transition: width 0.3s; }
+.growthLabel { font-size: 0.75rem; color: var(--text-muted); margin-top: var(--space-1); }
