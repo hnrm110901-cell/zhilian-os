@@ -15,6 +15,10 @@ from .career_path_service import CareerPathService
 from .compensation_fairness_service import CompensationFairnessService
 from .talent_health_service import TalentHealthService
 from .payroll_service import PayrollService
+from .social_insurance_service import SocialInsuranceService
+from .tax_service import TaxService
+from .hr_import_service import HRImportService
+from .hr_export_service import HRExportService
 
 __all__ = [
     "HrSeedService",
@@ -33,4 +37,8 @@ __all__ = [
     "CompensationFairnessService",
     "TalentHealthService",
     "PayrollService",
+    "SocialInsuranceService",
+    "TaxService",
+    "HRImportService",
+    "HRExportService",
 ]
