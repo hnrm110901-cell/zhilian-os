@@ -59,6 +59,8 @@ class ConsumerIdentity(Base, TimestampMixin):
 
     # 标签（JSON数组，如 ["高频","家庭聚餐","宴会客户"]）
     tags = Column(JSON, default=list)
+    dietary_restrictions = Column(JSON, default=list)  # ["不吃香菜", "海鲜过敏"]
+    anniversary = Column(Date, nullable=True)
 
     # merge 支持 — 被合并的记录标记 merged_into，不物理删除
     is_merged = Column(Boolean, default=False, index=True)

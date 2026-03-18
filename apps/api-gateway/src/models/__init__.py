@@ -415,6 +415,9 @@ __all__ = [
     "PayslipRecord",
     # HR — 操作审计日志
     "OperationAuditLog",
+    # P1 — 识客 + 菜品偏好
+    "MemberCheckIn",
+    "MemberDishPreference",
     # HR架构重构 M1
     "Person",
     "Assignment",
@@ -469,6 +472,10 @@ from .consumer_id_mapping import ConsumerIdMapping, IdType
 
 # Sprint 1 — CDP 地基层
 from .consumer_identity import ConsumerIdentity
+
+# P1 — 识客 + 菜品偏好
+from .member_check_in import MemberCheckIn
+from .member_dish_preference import MemberDishPreference
 from .cost_truth import CostTruthDaily, CostTruthDishDetail, CostVarianceAttribution
 from .customer_ownership import CustomerOwnership, CustomerRiskAlert, RiskLevel, RiskType, TransferReason
 from .daily_summary import DailyPnlSummary, DailyRevenueSummary, DailyWasteSummary
