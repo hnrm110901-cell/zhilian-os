@@ -120,3 +120,8 @@ def test_downgrade_restores_old_columns():
             for s in sqls
         )
         assert found, f"downgrade() did not restore {old_col} on {table}"
+
+    # Verify assignment_id NOT NULL constraint is removed on all 4 tables
+    for table, _ in TARGET_TABLES:
+        found = any(table in s and "DROP NOT NULL" in s for s in sqls)
+        assert found, f"downgrade() did not DROP NOT NULL on assignment_id for {table}"
