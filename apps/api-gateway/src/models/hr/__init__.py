@@ -9,6 +9,9 @@ from .onboarding_process import OnboardingProcess
 from .onboarding_checklist_item import OnboardingChecklistItem
 from .offboarding_process import OffboardingProcess
 from .transfer_process import TransferProcess
+from .approval_template import ApprovalTemplate
+from .approval_instance import ApprovalInstance
+from .approval_step_record import ApprovalStepRecord
 
 __all__ = [
     "Person",
@@ -21,4 +24,7 @@ __all__ = [
     "OnboardingChecklistItem",
     "OffboardingProcess",
     "TransferProcess",
+    "ApprovalTemplate",
+    "ApprovalInstance",
+    "ApprovalStepRecord",
 ]
