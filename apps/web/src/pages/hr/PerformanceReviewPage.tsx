@@ -24,7 +24,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const PerformanceReviewPage: React.FC = () => {
-  const [storeId] = useState('STORE_001');
+  const [storeId] = useState(localStorage.getItem('store_id') || '');
   const [period, setPeriod] = useState('2026-Q1');
   const [items, setItems] = useState<ReviewItem[]>([]);
   const [loading, setLoading] = useState(true);

@@ -51,7 +51,7 @@ const DetailRow: React.FC<{ label: string; value: React.ReactNode }> = ({ label,
 );
 
 const EmployeeRosterPage: React.FC = () => {
-  const [storeId] = useState('STORE_001');
+  const [storeId] = useState(localStorage.getItem('store_id') || '');
   const [employees, setEmployees] = useState<EmployeeItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);

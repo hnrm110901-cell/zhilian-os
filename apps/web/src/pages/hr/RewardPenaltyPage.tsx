@@ -8,7 +8,7 @@ import { hrService } from '../../services/hrService';
 import type { RewardPenaltyItem } from '../../services/hrService';
 import styles from './RewardPenaltyPage.module.css';
 
-const STORE_ID = localStorage.getItem('store_id') || 'STORE_001';
+const STORE_ID = localStorage.getItem('store_id') || '';
 
 const CATEGORY_LABELS: Record<string, string> = {
   service_excellence: '服务之星', sales_champion: '销售冠军',

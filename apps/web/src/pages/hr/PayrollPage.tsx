@@ -38,7 +38,7 @@ const STATUS_MAP: Record<string, { label: string; color: string }> = {
 };
 
 const PayrollPage: React.FC = () => {
-  const [storeId] = useState('STORE_001');
+  const [storeId] = useState(localStorage.getItem('store_id') || '');
   const [payMonth, setPayMonth] = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;

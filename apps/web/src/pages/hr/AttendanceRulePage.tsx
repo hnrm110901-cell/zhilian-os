@@ -18,7 +18,7 @@ import type { AttendanceRuleItem } from '../../services/hrService';
 
 const { Title, Text } = Typography;
 
-const BRAND_ID = localStorage.getItem('brand_id') || 'BRAND_001';
+const BRAND_ID = localStorage.getItem('brand_id') || '';
 
 const WORK_HOUR_LABELS: Record<string, string> = {
   standard: '标准工时', flexible: '弹性工时', comprehensive: '综合工时',

@@ -17,7 +17,7 @@ import dayjs from 'dayjs';
 
 const { Title, Text } = Typography;
 
-const BRAND_ID = localStorage.getItem('brand_id') || 'BRAND_001';
+const BRAND_ID = localStorage.getItem('brand_id') || '';
 
 const ShiftTemplatePage: React.FC = () => {
   const [items, setItems] = useState<ShiftTemplateItem[]>([]);

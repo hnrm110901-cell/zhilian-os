@@ -16,7 +16,7 @@ import apiClient from '../../services/api';
 import { handleApiError } from '../../utils/message';
 import styles from './Business.module.css';
 
-const STORE_ID = localStorage.getItem('store_id') || 'S001';
+const STORE_ID = localStorage.getItem('store_id') || '';
 
 interface ChefData {
   store_id:           string;

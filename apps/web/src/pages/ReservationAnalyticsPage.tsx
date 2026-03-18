@@ -79,6 +79,13 @@ const ReservationAnalyticsPage: React.FC = () => {
   const [days, setDays] = useState(30);
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
   const [loading, setLoading] = useState(false);
+  const [stores, setStores] = useState<any[]>([]);
+
+  useEffect(() => {
+    apiClient.get('/api/v1/stores').then((res: any) => {
+      setStores(res.stores || res || []);
+    }).catch(() => {});
+  }, []);
 
   // Data states
   const [overview, setOverview] = useState<Overview | null>(null);
@@ -222,11 +229,7 @@ const ReservationAnalyticsPage: React.FC = () => {
           <span className={styles.title}>预订数据分析</span>
           <div className={styles.controls}>
             <Select value={storeId} onChange={setStoreId} style={{ width: 140 }}
-              options={[
-                { value: 'S001', label: '尝在一起' },
-                { value: 'S002', label: '尚宫厨' },
-                { value: 'S003', label: '最黔线' },
-              ]}
+              options={stores.map((s: any) => ({ value: s.store_id || s.id, label: s.name || s.store_id || s.id }))}
             />
             <Select value={days} onChange={setDays} style={{ width: 100 }}
               options={[

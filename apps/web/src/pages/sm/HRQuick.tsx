@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../../services/api';
 import styles from './HRQuick.module.css';
 
-const STORE_ID = localStorage.getItem('store_id') || 'STORE_001';
+const STORE_ID = localStorage.getItem('store_id') || '';
 
 interface PendingLeave {
   id: string;

@@ -10,7 +10,7 @@ import {
 import apiClient from '../../services/api';
 import styles from './Inventory.module.css';
 
-const STORE_ID = localStorage.getItem('store_id') || 'S001';
+const STORE_ID = localStorage.getItem('store_id') || '';
 
 interface InventoryAlert {
   ingredient_name:  string;

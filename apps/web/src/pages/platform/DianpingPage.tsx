@@ -68,13 +68,7 @@ interface KeywordItem {
 
 // ── 常量 ─────────────────────────────────────────────────────────
 
-const BRAND_ID = 'brand_default';
-const STORE_OPTIONS = [
-  { label: '全部门店', value: '' },
-  { label: '长沙万达店', value: 'S001' },
-  { label: '长沙梅溪湖店', value: 'S002' },
-  { label: '株洲天元店', value: 'S003' },
-];
+const BRAND_ID = localStorage.getItem('brand_id') || '';
 
 const SENTIMENT_OPTIONS = [
   { label: '全部情感', value: '' },
@@ -139,6 +133,18 @@ const DianpingPage: React.FC = () => {
   const [filterRating, setFilterRating] = useState(0);
   const [filterIsRead, setFilterIsRead] = useState<boolean | undefined>(undefined);
   const [searchKeyword, setSearchKeyword] = useState('');
+
+  // 门店选项
+  const [storeOptions, setStoreOptions] = useState<{ label: string; value: string }[]>([{ label: '全部门店', value: '' }]);
+  useEffect(() => {
+    apiClient.get('/api/v1/stores').then((res: any) => {
+      const list: any[] = res.stores || res || [];
+      setStoreOptions([
+        { label: '全部门店', value: '' },
+        ...list.map((s: any) => ({ label: s.name || s.store_id || s.id, value: s.store_id || s.id })),
+      ]);
+    }).catch(() => {});
+  }, []);
 
   // 统计
   const [stats, setStats] = useState<DianpingStats | null>(null);
@@ -335,7 +341,7 @@ const DianpingPage: React.FC = () => {
         <Select
           value={filterStore}
           onChange={(v) => { setFilterStore(v); setPage(1); }}
-          options={STORE_OPTIONS}
+          options={storeOptions}
           style={{ width: 140 }}
           size="small"
         />

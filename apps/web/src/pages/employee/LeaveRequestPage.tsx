@@ -8,7 +8,7 @@ import { apiClient } from '../../services/api';
 import styles from './LeaveRequestPage.module.css';
 
 const EMP_ID = localStorage.getItem('employee_id') || 'EMP_001';
-const STORE_ID = localStorage.getItem('store_id') || 'STORE_001';
+const STORE_ID = localStorage.getItem('store_id') || '';
 
 interface LeaveBalance {
   leave_category: string;

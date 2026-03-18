@@ -8,7 +8,7 @@ import { hrService } from '../../services/hrService';
 import type { CommissionRuleItem, CommissionRecordItem } from '../../services/hrService';
 import styles from './CommissionPage.module.css';
 
-const STORE_ID = localStorage.getItem('store_id') || 'STORE_001';
+const STORE_ID = localStorage.getItem('store_id') || '';
 
 const TYPE_LABELS: Record<string, string> = {
   sales_amount: '按营业额', dish_count: '按菜品销量',

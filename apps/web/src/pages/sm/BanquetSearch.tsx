@@ -10,7 +10,7 @@ import { ZBadge, ZSkeleton, ZEmpty } from '../../design-system/components';
 import apiClient from '../../services/api';
 import styles from './BanquetSearch.module.css';
 
-const STORE_ID = localStorage.getItem('store_id') || 'S001';
+const STORE_ID = localStorage.getItem('store_id') || '';
 
 const TYPE_CHIPS = [
   { value: 'all',   label: '全部' },

@@ -15,7 +15,7 @@ import apiClient from '../../services/api';
 import { handleApiError } from '../../utils/message';
 import styles from './BanquetLeads.module.css';
 
-const STORE_ID = localStorage.getItem('store_id') || 'S001';
+const STORE_ID = localStorage.getItem('store_id') || '';
 
 const STAGE_FILTERS = [
   { value: '',                label: '全部' },

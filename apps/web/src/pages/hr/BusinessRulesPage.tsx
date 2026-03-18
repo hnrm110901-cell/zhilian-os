@@ -18,7 +18,7 @@ import type { BusinessRuleItem } from '../../services/hrService';
 const { Title, Text } = Typography;
 const { TextArea } = Input;
 
-const BRAND_ID = localStorage.getItem('brand_id') || 'BRAND_001';
+const BRAND_ID = localStorage.getItem('brand_id') || '';
 
 const CATEGORY_LABELS: Record<string, string> = {
   attendance_penalty: '迟到扣款',
@@ -134,7 +134,7 @@ const BusinessRulesPage: React.FC = () => {
     try {
       const res = await hrService.previewPayrollImpact(
         BRAND_ID,
-        item.store_id || 'STORE_001',
+        item.store_id || '',
         item.category,
         item.rules_json,
       );

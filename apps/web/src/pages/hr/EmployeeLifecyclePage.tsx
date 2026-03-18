@@ -41,7 +41,7 @@ const CHANGE_TYPE_COLORS: Record<string, string> = {
 };
 
 const EmployeeLifecyclePage: React.FC = () => {
-  const [storeId] = useState('STORE_001');
+  const [storeId] = useState(localStorage.getItem('store_id') || '');
   const [changes, setChanges] = useState<ChangeItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState('');

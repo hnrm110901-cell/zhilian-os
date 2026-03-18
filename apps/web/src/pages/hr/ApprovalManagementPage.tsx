@@ -18,7 +18,7 @@ import type { ApprovalInstanceItem, ApprovalTemplateItem } from '../../services/
 const { Title } = Typography;
 const { TextArea } = Input;
 
-const BRAND_ID = localStorage.getItem('brand_id') || 'BRAND_001';
+const BRAND_ID = localStorage.getItem('brand_id') || '';
 const CURRENT_USER_ID = localStorage.getItem('user_id') || 'current_user';
 const CURRENT_USER_NAME = localStorage.getItem('user_name') || '当前用户';
 

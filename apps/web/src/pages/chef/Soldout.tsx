@@ -10,7 +10,7 @@ import {
 import { apiClient } from '../../services/api';
 import styles from './Soldout.module.css';
 
-const STORE_ID = localStorage.getItem('store_id') || 'S001';
+const STORE_ID = localStorage.getItem('store_id') || '';
 
 interface DishItem {
   dish_id: string;

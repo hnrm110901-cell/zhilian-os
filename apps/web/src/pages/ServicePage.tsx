@@ -49,7 +49,7 @@ const ServicePage: React.FC = () => {
       const res = await apiClient.get('/api/v1/stores');
       setStores(res?.stores || res || []);
     } catch {
-      // ignore and keep fallback STORE001
+      // ignore
     }
   }, []);
 

@@ -25,7 +25,7 @@ interface Funnel {
 }
 
 const RecruitmentPage: React.FC = () => {
-  const [storeId] = useState('STORE_001');
+  const [storeId] = useState(localStorage.getItem('store_id') || '');
   const [jobs, setJobs] = useState<JobItem[]>([]);
   const [funnel, setFunnel] = useState<Funnel | null>(null);
   const [activeJobs, setActiveJobs] = useState(0);

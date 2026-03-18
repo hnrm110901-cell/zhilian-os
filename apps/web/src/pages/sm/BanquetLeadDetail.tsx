@@ -14,7 +14,7 @@ import {
 import apiClient from '../../services/api';
 import { handleApiError } from '../../utils/message';
 import styles from './BanquetLeadDetail.module.css';
-const STORE_ID = localStorage.getItem('store_id') || 'S001';
+const STORE_ID = localStorage.getItem('store_id') || '';
 
 const STAGE_BADGE_TYPE: Record<string, 'info' | 'warning' | 'success' | 'default'> = {
   new:              'info',

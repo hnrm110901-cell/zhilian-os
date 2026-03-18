@@ -14,7 +14,7 @@ import apiClient from '../../services/api';
 import { handleApiError, showSuccess, showError } from '../../utils/message';
 import styles from './Workforce.module.css';
 
-const STORE_ID = localStorage.getItem('store_id') || 'S001';
+const STORE_ID = localStorage.getItem('store_id') || '';
 const TOMORROW  = dayjs().add(1, 'day').format('YYYY-MM-DD');
 
 type ActionType = 'confirmed' | 'modified' | 'rejected';

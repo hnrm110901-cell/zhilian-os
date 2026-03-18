@@ -184,6 +184,13 @@ const OmniChannelPage: React.FC = () => {
 
   // 加载状态
   const [loading, setLoading] = useState(false);
+  const [storeOptions, setStoreOptions] = useState<{ label: string; value: any }[]>([]);
+  useEffect(() => {
+    apiClient.get('/api/v1/stores').then((res: any) => {
+      const list: any[] = res.stores || res || [];
+      setStoreOptions(list.map((s: any) => ({ label: s.name || s.store_id || s.id, value: s.store_id || s.id })));
+    }).catch(() => {});
+  }, []);
 
   // ── 数据拉取 ───────────────────────────────────────────────────
 
@@ -396,8 +403,7 @@ const OmniChannelPage: React.FC = () => {
           placeholder="全部门店"
           options={[
             { label: '全部门店', value: undefined as any },
-            { label: '旗舰店', value: 'S001' },
-            { label: '分店A', value: 'S002' },
+            ...storeOptions,
           ]}
         />
         <RangePicker

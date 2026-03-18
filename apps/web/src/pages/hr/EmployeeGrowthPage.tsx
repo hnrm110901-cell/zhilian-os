@@ -14,7 +14,7 @@ import type {
 } from '../../services/hrService';
 import styles from './EmployeeGrowthPage.module.css';
 
-const STORE_ID = localStorage.getItem('store_id') || 'STORE_001';
+const STORE_ID = localStorage.getItem('store_id') || '';
 
 type TabKey = 'plans' | 'skills' | 'milestones' | 'wellbeing' | 'journey';
 

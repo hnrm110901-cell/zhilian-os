@@ -60,7 +60,7 @@ const FloorPlanPage: React.FC = () => {
   const [selectedTable, setSelectedTable] = useState<TableData | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
   const [activeFloor, setActiveFloor] = useState(1);
-  const [storeId, setStoreId] = useState('STORE_001'); // default
+  const [storeId, setStoreId] = useState(localStorage.getItem('store_id') || ''); // default
   const svgRef = useRef<SVGSVGElement>(null);
   const [dragTable, setDragTable] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });

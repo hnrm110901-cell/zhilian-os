@@ -17,7 +17,7 @@ import apiClient from '../../services/api';
 import { handleApiError } from '../../utils/message';
 import styles from './BanquetOrderDetail.module.css';
 
-const STORE_ID = localStorage.getItem('store_id') || 'S001';
+const STORE_ID = localStorage.getItem('store_id') || '';
 
 const STATUS_BADGE: Record<string, { text: string; type: 'success' | 'info' | 'warning' | 'default' }> = {
   draft:       { text: '待确认', type: 'warning' },

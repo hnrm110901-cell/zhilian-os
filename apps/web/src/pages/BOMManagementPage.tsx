@@ -384,11 +384,7 @@ const BOMManagementPage: React.FC = () => {
 
   const storeOptions = stores.length > 0
     ? stores.map((s: any) => ({ value: s.store_id || s.id, label: s.name || s.store_id || s.id }))
-    : [
-        { value: 'STORE001', label: '北京旗舰店' },
-        { value: 'STORE002', label: '上海直营店' },
-        { value: 'STORE003', label: '广州加盟店' },
-      ];
+    : [];
 
   // ── BOM 列表列定义 ──────────────────────────────────────────────────────────
 

@@ -8,7 +8,7 @@ import { hrService } from '../../services/hrService';
 import type { SocialInsuranceConfigItem, EmployeeInsuranceItem } from '../../services/hrService';
 import styles from './SocialInsurancePage.module.css';
 
-const STORE_ID = localStorage.getItem('store_id') || 'STORE_001';
+const STORE_ID = localStorage.getItem('store_id') || '';
 const CURRENT_YEAR = new Date().getFullYear();
 
 const SocialInsurancePage: React.FC = () => {

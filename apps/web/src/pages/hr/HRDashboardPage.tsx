@@ -24,9 +24,9 @@ import styles from './HRPages.module.css';
 
 // ── 常量 ──────────────────────────────────────────────────────
 
-const STORE_ID = () => localStorage.getItem('current_store_id') || 'STORE_001';
-const BRAND_ID = () => localStorage.getItem('current_brand_id') || 'BRAND_001';
-const OPERATOR_ID = () => localStorage.getItem('user_id') || 'USER_001';
+const STORE_ID = () => localStorage.getItem('store_id') || localStorage.getItem('current_store_id') || '';
+const BRAND_ID = () => localStorage.getItem('brand_id') || localStorage.getItem('current_brand_id') || '';
+const OPERATOR_ID = () => localStorage.getItem('user_id') || '';
 const OPERATOR_NAME = () => localStorage.getItem('user_name') || '管理员';
 const REFRESH_INTERVAL = 60_000;
 

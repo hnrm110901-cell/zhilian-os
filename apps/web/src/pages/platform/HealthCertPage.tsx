@@ -102,6 +102,12 @@ const HealthCertPage: React.FC = () => {
   const [filterStore, setFilterStore] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [searchText, setSearchText] = useState('');
+  const [storeList, setStoreList] = useState<any[]>([]);
+  useEffect(() => {
+    apiClient.get('/api/v1/stores').then((res: any) => {
+      setStoreList(res.stores || res || []);
+    }).catch(() => {});
+  }, []);
 
   // 创建/编辑 Modal
   const [showModal, setShowModal] = useState(false);
@@ -417,9 +423,9 @@ const HealthCertPage: React.FC = () => {
           onChange={e => { setFilterStore(e.target.value); setPage(1); }}
         >
           <option value="">全部门店</option>
-          <option value="S001">S001</option>
-          <option value="S002">S002</option>
-          <option value="S003">S003</option>
+          {storeList.map((s: any) => (
+            <option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</option>
+          ))}
         </select>
         <select
           className={styles.filterSelect}
@@ -502,8 +508,13 @@ const HealthCertPage: React.FC = () => {
               <label className={styles.fieldLabel}>
                 门店ID{!editingId && <span className={styles.fieldRequired}>*</span>}
               </label>
-              <input className={styles.fieldInput} value={formStoreId}
-                onChange={e => setFormStoreId(e.target.value)} placeholder="如 S001" />
+              <select className={styles.fieldInput} value={formStoreId}
+                onChange={e => setFormStoreId(e.target.value)}>
+                <option value="">选择门店</option>
+                {storeList.map((s: any) => (
+                  <option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</option>
+                ))}
+              </select>
             </div>
             <div className={styles.fieldRow}>
               <label className={styles.fieldLabel}>证件编号</label>

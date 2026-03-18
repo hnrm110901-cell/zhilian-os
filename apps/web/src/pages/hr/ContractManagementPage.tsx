@@ -36,7 +36,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const ContractManagementPage: React.FC = () => {
-  const [storeId] = useState('STORE_001');
+  const [storeId] = useState(localStorage.getItem('store_id') || '');
   const [contracts, setContracts] = useState<ContractItem[]>([]);
   const [expiring, setExpiring] = useState<ExpiringItem[]>([]);
   const [loading, setLoading] = useState(true);

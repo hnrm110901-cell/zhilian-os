@@ -19,7 +19,7 @@ import dayjs from 'dayjs';
 
 const { Title } = Typography;
 
-const STORE_ID = localStorage.getItem('store_id') || 'STORE_001';
+const STORE_ID = localStorage.getItem('store_id') || '';
 
 const PUSH_STATUS_MAP: Record<string, { label: string; color: string }> = {
   not_pushed: { label: '未推送', color: 'default' },

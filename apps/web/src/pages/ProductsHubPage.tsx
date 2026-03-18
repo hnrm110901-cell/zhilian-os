@@ -100,7 +100,7 @@ const ProductsHubPage: React.FC = () => {
   const navigate = useNavigate();
 
   const [stores,        setStores]        = useState<any[]>([]);
-  const [selectedStore, setSelectedStore] = useState(localStorage.getItem('store_id') || 'S001');
+  const [selectedStore, setSelectedStore] = useState(localStorage.getItem('store_id') || '');
 
   const [bffLoading,   setBffLoading]   = useState(true);
   const [foodCost,     setFoodCost]     = useState<FoodCost | null>(null);

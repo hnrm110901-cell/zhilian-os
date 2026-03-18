@@ -28,7 +28,7 @@ interface AttendanceSummary {
 }
 
 const AttendanceReportPage: React.FC = () => {
-  const [storeId] = useState('STORE_001');
+  const [storeId] = useState(localStorage.getItem('store_id') || '');
   const [items, setItems] = useState<AttendanceItem[]>([]);
   const [summary, setSummary] = useState<AttendanceSummary | null>(null);
   const [loading, setLoading] = useState(true);

@@ -30,7 +30,7 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
 };
 
 const LeaveManagementPage: React.FC = () => {
-  const [storeId] = useState('STORE_001');
+  const [storeId] = useState(localStorage.getItem('store_id') || '');
   const [tab, setTab] = useState<'all' | 'pending'>('all');
   const [items, setItems] = useState<LeaveItem[]>([]);
   const [loading, setLoading] = useState(true);

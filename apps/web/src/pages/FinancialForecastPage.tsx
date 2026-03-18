@@ -194,6 +194,13 @@ const FinancialForecastPage: React.FC = () => {
   const [loading, setLoading]   = useState(false);
   const [computing, setComp]    = useState(false);
   const [error, setError]       = useState<string | null>(null);
+  const [stores, setStores]     = useState<any[]>([]);
+
+  useEffect(() => {
+    apiClient.get('/api/v1/stores').then((res: any) => {
+      setStores(res.stores || res || []);
+    }).catch(() => {});
+  }, []);
 
   const loadAccuracy = useCallback(async () => {
     try {
@@ -305,11 +312,7 @@ const FinancialForecastPage: React.FC = () => {
             value={storeId}
             onChange={setStoreId}
             style={{ width: 140 }}
-            options={[
-              { value: 'STORE001', label: '门店001' },
-              { value: 'STORE002', label: '门店002' },
-              { value: 'STORE003', label: '门店003' },
-            ]}
+            options={stores.map((s: any) => ({ value: s.store_id || s.id, label: s.name || s.store_id || s.id }))}
           />
           <Select
             value={targetPeriod}

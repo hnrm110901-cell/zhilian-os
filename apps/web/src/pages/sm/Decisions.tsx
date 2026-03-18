@@ -12,7 +12,7 @@ import {
 import apiClient from '../../services/api';
 import styles from './Decisions.module.css';
 
-const STORE_ID = localStorage.getItem('store_id') || 'S001';
+const STORE_ID = localStorage.getItem('store_id') || '';
 
 interface DecisionItem {
   id:                    string;

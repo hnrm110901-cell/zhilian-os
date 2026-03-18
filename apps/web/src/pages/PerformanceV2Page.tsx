@@ -108,7 +108,7 @@ interface SkillItem {
 // ════════════════════════════════════════════════════════════════
 
 export default function PerformanceV2Page() {
-  const storeId  = localStorage.getItem('store_id')  || 'S001';
+  const storeId  = localStorage.getItem('store_id')  || '';
   const brandId  = localStorage.getItem('brand_id')  || 'B001';
   const [period, setPeriod] = useState(currentPeriod());
 
@@ -812,7 +812,7 @@ function AlertsTab({ storeId, brandId, period }: { storeId: string; brandId: str
 // ════════════════════════════════════════════════════════════════
 
 function SkillTreeTab() {
-  const storeId = localStorage.getItem('store_id') || 'S001';
+  const storeId = localStorage.getItem('store_id') || '';
   const [employeeId, setEmployeeId] = useState('');
   const [skills, setSkills]         = useState<SkillItem[]>([]);
   const [skillDefs, setSkillDefs]   = useState<any[]>([]);

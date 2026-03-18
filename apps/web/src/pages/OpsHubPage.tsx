@@ -134,7 +134,7 @@ const OpsHubPage: React.FC = () => {
   const navigate = useNavigate();
 
   const [stores,        setStores]        = useState<any[]>([]);
-  const [selectedStore, setSelectedStore] = useState(localStorage.getItem('store_id') || 'S001');
+  const [selectedStore, setSelectedStore] = useState(localStorage.getItem('store_id') || '');
 
   const [bffLoading,  setBffLoading]  = useState(true);
   const [kpi,         setKpi]         = useState<KpiState | null>(null);

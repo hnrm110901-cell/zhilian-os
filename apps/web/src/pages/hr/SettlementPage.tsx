@@ -17,8 +17,8 @@ import type { SettlementRecordItem } from '../../services/hrService';
 
 const { Title } = Typography;
 
-const STORE_ID = localStorage.getItem('store_id') || 'STORE_001';
-const BRAND_ID = localStorage.getItem('brand_id') || 'BRAND_001';
+const STORE_ID = localStorage.getItem('store_id') || '';
+const BRAND_ID = localStorage.getItem('brand_id') || '';
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
   draft: { label: '草稿', color: 'default' },
