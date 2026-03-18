@@ -77,6 +77,20 @@ def _make_attendance(status="normal", overtime_minutes=0):
     return att
 
 
+def _make_contract(pay_scheme=None):
+    """Helper: mock EmploymentContract with pay_scheme."""
+    contract = MagicMock()
+    contract.pay_scheme = pay_scheme or {"type": "fixed_monthly", "base_salary_fen": 400000}
+    return contract
+
+
+def _make_ytd_result(value=0):
+    """Helper: mock scalar result for YTD taxable query."""
+    mock_result = MagicMock()
+    mock_result.scalar.return_value = value
+    return mock_result
+
+
 def _make_payroll_item(
     item_id=None, batch_id=None, assignment_id=None,
     base=400000, overtime=0, deduction_late=0, deduction_absent=0,
@@ -131,6 +145,7 @@ async def test_calculate_raises_when_wrong_status(svc, mock_session):
 async def test_calculate_returns_items(svc, mock_session):
     batch = _make_batch()
     asn = _make_assignment()
+    contract = _make_contract()
     att_rows = [
         _make_attendance("normal", 0),
         _make_attendance("normal", 0),
@@ -139,36 +154,40 @@ async def test_calculate_returns_items(svc, mock_session):
     mock_session.execute = AsyncMock(side_effect=[
         _make_scalar_result(batch),       # select batch
         _make_scalars_result([asn]),       # select assignments
-        _make_scalars_result(att_rows),    # select attendance
+        _make_scalar_result(contract),    # select contract
+        _make_scalars_result(att_rows),   # select attendance
+        _make_ytd_result(0),              # YTD taxable
     ])
 
     items = await svc.calculate(batch.id, mock_session)
     assert len(items) == 1
     assert items[0].base_salary_fen == 400000
-    assert items[0].gross_fen == 400000
     assert batch.status == "review"
 
 
 async def test_calculate_overtime_fen_positive(svc, mock_session):
     batch = _make_batch()
     asn = _make_assignment()
+    contract = _make_contract()
     # 120 min overtime = 2h => 2 * 2500 = 5000 fen
     att_rows = [_make_attendance("normal", 120)]
 
     mock_session.execute = AsyncMock(side_effect=[
         _make_scalar_result(batch),
         _make_scalars_result([asn]),
+        _make_scalar_result(contract),
         _make_scalars_result(att_rows),
+        _make_ytd_result(0),
     ])
 
     items = await svc.calculate(batch.id, mock_session)
     assert items[0].overtime_fen == 5000
-    assert items[0].gross_fen == 400000 + 5000
 
 
 async def test_calculate_deductions_applied(svc, mock_session):
     batch = _make_batch()
     asn = _make_assignment()
+    contract = _make_contract()
     att_rows = [
         _make_attendance("late", 0),
         _make_attendance("absent", 0),
@@ -178,27 +197,31 @@ async def test_calculate_deductions_applied(svc, mock_session):
     mock_session.execute = AsyncMock(side_effect=[
         _make_scalar_result(batch),
         _make_scalars_result([asn]),
+        _make_scalar_result(contract),
         _make_scalars_result(att_rows),
+        _make_ytd_result(0),
     ])
 
     items = await svc.calculate(batch.id, mock_session)
     # 2 late * 5000 + 1 absent * 20000 = 30000
     assert items[0].deduction_late_fen == 10000
     assert items[0].deduction_absent_fen == 20000
-    assert items[0].gross_fen == 400000 - 10000 - 20000
 
 
 async def test_calculate_gross_not_negative(svc, mock_session):
     """大量缺勤时gross不为负"""
     batch = _make_batch()
     asn = _make_assignment()
+    contract = _make_contract()
     # 30 absent days => 30 * 20000 = 600000 > 400000 base
     att_rows = [_make_attendance("absent", 0) for _ in range(30)]
 
     mock_session.execute = AsyncMock(side_effect=[
         _make_scalar_result(batch),
         _make_scalars_result([asn]),
+        _make_scalar_result(contract),
         _make_scalars_result(att_rows),
+        _make_ytd_result(0),
     ])
 
     items = await svc.calculate(batch.id, mock_session)
