@@ -188,14 +188,13 @@ class HRAgentV1(BaseAgent):
         self, store_id: str, session, person_id: str
     ) -> HRDiagnosis:
         """C级 ML预测 — 有 person_id 时走 ML路径，失败回退 B级扫描。"""
-        import os
         redis_client = None
         try:
             import redis as redis_lib
-            redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
-            redis_client = redis_lib.from_url(redis_url, decode_responses=False)
+            from src.core.config import settings
+            redis_client = redis_lib.from_url(settings.REDIS_URL, decode_responses=False)
         except Exception:
-            pass
+            logger.warning("hr_agent.redis_connect_failed", store_id=store_id)
 
         MLSvc = _get_retention_ml_cls()
         if MLSvc is None:

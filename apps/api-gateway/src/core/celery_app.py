@@ -697,7 +697,8 @@ celery_app.conf.update(
         "hr-retrain-retention-model-weekly": {
             "task": "hr.retrain_retention_model_weekly",
             "schedule": crontab(hour=2, minute=0, day_of_week=0),  # Sunday 02:00 UTC
-            "options": {"priority": 3},
+            "args": (),
+            "options": {"queue": "low_priority", "priority": 3},
         },
     },
 )

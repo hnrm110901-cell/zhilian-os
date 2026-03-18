@@ -5776,16 +5776,19 @@ def retrain_retention_model_weekly():
         from src.services.hr.retention_ml_service import RetentionMLService
 
         r = redis_lib.from_url(settings.REDIS_URL, decode_responses=False)
-        async with AsyncSessionLocal() as session:
-            result = await session.execute(
-                sa.text("SELECT id FROM stores WHERE is_active = TRUE")
-            )
-            store_ids = [str(row[0]) for row in result.fetchall()]
-
-        for store_id in store_ids:
+        try:
             async with AsyncSessionLocal() as session:
-                svc = RetentionMLService(session=session, redis_client=r)
-                outcome = await svc.train_for_store(store_id)
-                logger.info("celery.hr_ml_retrain", store_id=store_id, outcome=outcome)
+                result = await session.execute(
+                    sa.text("SELECT id FROM stores WHERE is_active = TRUE")
+                )
+                store_ids = [str(row[0]) for row in result.fetchall()]
+
+            for store_id in store_ids:
+                async with AsyncSessionLocal() as session:
+                    svc = RetentionMLService(session=session, redis_client=r)
+                    outcome = await svc.train_for_store(store_id)
+                    logger.info("celery.hr_ml_retrain", store_id=store_id, outcome=outcome)
+        finally:
+            r.close()
 
     asyncio.run(_run())
