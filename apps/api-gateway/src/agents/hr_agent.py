@@ -24,6 +24,21 @@ from src.services.hr.skill_gap_service import SkillGapService
 
 logger = structlog.get_logger()
 
+# Lazy import — 避免 sklearn 未安装时崩溃
+_retention_ml_cls = None
+
+
+def _get_retention_ml_cls():
+    global _retention_ml_cls
+    if _retention_ml_cls is None:
+        try:
+            from src.services.hr.retention_ml_service import RetentionMLService
+            _retention_ml_cls = RetentionMLService
+        except ImportError:
+            logger.warning("hr_agent.retention_ml_import_failed")
+    return _retention_ml_cls
+
+
 _SUPPORTED_INTENTS = [
     "retention_risk",
     "skill_gaps",
@@ -100,6 +115,8 @@ class HRAgentV1(BaseAgent):
     ) -> HRDiagnosis:
         """Main entry point. Routes to appropriate diagnosis method."""
         if intent == "retention_risk":
+            if person_id:
+                return await self._predict_retention_risk(store_id, session, person_id)
             return await self._diagnose_retention(store_id, session)
         elif intent == "skill_gaps":
             return await self._diagnose_skill_gaps(store_id, session, person_id)
@@ -165,6 +182,41 @@ class HRAgentV1(BaseAgent):
             summary=summary,
             recommendations=recommendations,
             high_risk_persons=high_risk,
+        )
+
+    async def _predict_retention_risk(
+        self, store_id: str, session, person_id: str
+    ) -> HRDiagnosis:
+        """C级 ML预测 — 有 person_id 时走 ML路径，失败回退 B级扫描。"""
+        import os
+        redis_client = None
+        try:
+            import redis as redis_lib
+            redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+            redis_client = redis_lib.from_url(redis_url, decode_responses=False)
+        except Exception:
+            pass
+
+        MLSvc = _get_retention_ml_cls()
+        if MLSvc is None:
+            return await self._diagnose_retention(store_id, session)
+
+        svc = MLSvc(session=session, redis_client=redis_client)
+        prediction = await svc.predict(
+            person_id=uuid_mod.UUID(person_id), store_id=store_id
+        )
+
+        level = prediction["risk_level"]
+        score = prediction["risk_score"]
+        source = prediction["prediction_source"]
+        summary = f"ML预测 [{source}]: 离职风险 {level} (score={score:.2f})"
+
+        return HRDiagnosis(
+            intent="retention_risk",
+            store_id=store_id,
+            summary=summary,
+            recommendations=[prediction.get("intervention", {})],
+            high_risk_persons=[prediction] if level == "high" else [],
         )
 
     async def _diagnose_skill_gaps(

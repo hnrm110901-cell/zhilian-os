@@ -5759,3 +5759,33 @@ def enrich_members_from_aoqiwei_crm(self) -> Dict[str, Any]:
     except Exception as exc:
         logger.error("enrich_members_from_aoqiwei_crm.failed", error=str(exc))
         raise self.retry(exc=exc)
+
+
+# ── HR: 每周留任预测模型重训 ─────────────────────────────────────────────────────
+
+
+@celery_app.task(name="hr.retrain_retention_model_weekly")
+def retrain_retention_model_weekly():
+    """每周日 02:00 UTC — 遍历所有 active store，重训留任预测模型存入 Redis。"""
+    import sqlalchemy as sa
+
+    async def _run():
+        import redis as redis_lib
+        from src.core.config import settings
+        from src.core.database import AsyncSessionLocal
+        from src.services.hr.retention_ml_service import RetentionMLService
+
+        r = redis_lib.from_url(settings.REDIS_URL, decode_responses=False)
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                sa.text("SELECT id FROM stores WHERE is_active = TRUE")
+            )
+            store_ids = [str(row[0]) for row in result.fetchall()]
+
+        for store_id in store_ids:
+            async with AsyncSessionLocal() as session:
+                svc = RetentionMLService(session=session, redis_client=r)
+                outcome = await svc.train_for_store(store_id)
+                logger.info("celery.hr_ml_retrain", store_id=store_id, outcome=outcome)
+
+    asyncio.run(_run())

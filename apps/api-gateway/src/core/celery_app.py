@@ -693,6 +693,12 @@ celery_app.conf.update(
                 "priority": 8,
             },
         },
+        # HR — 每周日 02:00 UTC 重训留任预测模型
+        "hr-retrain-retention-model-weekly": {
+            "task": "hr.retrain_retention_model_weekly",
+            "schedule": crontab(hour=2, minute=0, day_of_week=0),  # Sunday 02:00 UTC
+            "options": {"priority": 3},
+        },
     },
 )
 
