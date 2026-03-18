@@ -127,6 +127,114 @@ class HrSeedService:
         )
         return result.scalar() or 0
 
+    async def load_xuji_org(self, skip_if_exists: bool = True) -> int:
+        """加载徐记海鲜组织架构种子数据"""
+        if skip_if_exists:
+            result = await self._session.execute(
+                sa.text("SELECT COUNT(*) FROM org_nodes WHERE id = :id"),
+                {"id": "xj-group"},
+            )
+            if (result.scalar() or 0) > 0:
+                logger.info("xuji org nodes already seeded, skipping.")
+                return 0
+
+        nodes = self._load_json("xuji_org_seed.json")
+        inserted = 0
+        for node in nodes:
+            await self._session.execute(
+                sa.text(
+                    "INSERT INTO org_nodes "
+                    "(id, name, node_type, parent_id, path, depth, is_active, sort_order) "
+                    "VALUES (:id, :name, :node_type, :parent_id, :path, :depth, true, 0) "
+                    "ON CONFLICT (id) DO NOTHING"
+                ),
+                {
+                    "id": node["id"],
+                    "name": node["name"],
+                    "node_type": node["node_type"],
+                    "parent_id": node.get("parent_id"),
+                    "path": node["path"],
+                    "depth": node["depth"],
+                },
+            )
+            inserted += 1
+
+        await self._session.commit()
+        logger.info("Inserted %d xuji org nodes.", inserted)
+        return inserted
+
+    async def load_xuji_employees(self, skip_if_exists: bool = True) -> int:
+        """加载徐记海鲜员工种子数据"""
+        if skip_if_exists:
+            result = await self._session.execute(
+                sa.text("SELECT COUNT(*) FROM persons WHERE phone LIKE :pattern"),
+                {"pattern": "13800138%"},
+            )
+            if (result.scalar() or 0) > 0:
+                logger.info("xuji employees already seeded, skipping.")
+                return 0
+
+        employees = self._load_json("xuji_employees_seed.json")
+        inserted = 0
+        for emp in employees:
+            person_id = str(uuid.uuid4())
+            await self._session.execute(
+                sa.text(
+                    "INSERT INTO persons "
+                    "(id, name, phone, id_number, preferences) "
+                    "VALUES (:id, :name, :phone, :id_number, :preferences::jsonb)"
+                ),
+                {
+                    "id": person_id,
+                    "name": emp["name"],
+                    "phone": emp["phone"],
+                    "id_number": emp.get("id_number"),
+                    "preferences": json.dumps({}),
+                },
+            )
+
+            assignment_id = str(uuid.uuid4())
+            await self._session.execute(
+                sa.text(
+                    "INSERT INTO employment_assignments "
+                    "(id, person_id, org_node_id, employment_type, start_date, status) "
+                    "VALUES (:id, :person_id, :org_node_id, :employment_type, "
+                    "        :start_date, :status)"
+                ),
+                {
+                    "id": assignment_id,
+                    "person_id": person_id,
+                    "org_node_id": emp["org_node_id"],
+                    "employment_type": emp.get("employment_type", "full_time"),
+                    "start_date": emp["start_date"],
+                    "status": "active",
+                },
+            )
+
+            contract_id = str(uuid.uuid4())
+            await self._session.execute(
+                sa.text(
+                    "INSERT INTO employment_contracts "
+                    "(id, assignment_id, contract_type, pay_scheme, valid_from) "
+                    "VALUES (:id, :assignment_id, :contract_type, "
+                    "        :pay_scheme::jsonb, :valid_from)"
+                ),
+                {
+                    "id": contract_id,
+                    "assignment_id": assignment_id,
+                    "contract_type": "labor",
+                    "pay_scheme": json.dumps(emp.get("pay_scheme", {})),
+                    "valid_from": emp["start_date"],
+                },
+            )
+            inserted += 1
+
+        await self._session.commit()
+        logger.info("Inserted %d xuji employees.", inserted)
+        return inserted
+
+    # ── private ───────────────────────────────────────────────────────────
+
     async def _skill_count(self) -> int:
         result = await self._session.execute(
             sa.text("SELECT COUNT(*) FROM skill_nodes")

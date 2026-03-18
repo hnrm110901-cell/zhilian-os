@@ -1,9 +1,11 @@
 """DoubleWriteService — propagate Employee writes to new HR tables.
 
 Shadow-write pattern: new HR tables are non-authoritative in M2.
-Failures are logged but NEVER fail the original Employee API call.
+Failures are logged but NEVER fail the original Employee API call,
+unless HR_AUTHORITATIVE=true (P1 flip).
 """
 import json
+import os
 import uuid
 from datetime import date
 from typing import Optional
@@ -15,6 +17,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import AsyncSessionLocal
 
 logger = structlog.get_logger()
+
+_AUTHORITATIVE = os.environ.get("HR_AUTHORITATIVE", "false").lower() == "true"
 
 
 class DoubleWriteService:
@@ -33,6 +37,8 @@ class DoubleWriteService:
                 employee_id=employee.id,
                 error=str(exc),
             )
+            if _AUTHORITATIVE:
+                raise
             return False
 
     async def on_employee_updated(self, employee) -> bool:
@@ -45,6 +51,8 @@ class DoubleWriteService:
                 employee_id=employee.id,
                 error=str(exc),
             )
+            if _AUTHORITATIVE:
+                raise
             return False
 
     # ── Internal ──────────────────────────────────────────────────────

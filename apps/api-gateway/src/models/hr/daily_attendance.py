@@ -1,7 +1,7 @@
 """DailyAttendance — 日考勤计算结果"""
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Date, Integer, Boolean, ForeignKey, TIMESTAMP, text
+from sqlalchemy import Column, String, Date, Integer, Boolean, ForeignKey, TIMESTAMP, Time, text
 from sqlalchemy.dialects.postgresql import UUID
 from ..base import Base
 
@@ -24,6 +24,8 @@ class DailyAttendance(Base):
     early_leave_minutes = Column(Integer, nullable=False, default=0, server_default="0")
     calculated_at = Column(TIMESTAMP(timezone=True), server_default=text("NOW()"),
                            nullable=False)
+    scheduled_start_time = Column(Time, nullable=True, comment="排班开始时间")
+    scheduled_end_time = Column(Time, nullable=True, comment="排班结束时间")
     locked = Column(Boolean, nullable=False, default=False, server_default="false",
                     comment="月结后锁定")
     updated_at = Column(TIMESTAMP(timezone=True), server_default=text("NOW()"),

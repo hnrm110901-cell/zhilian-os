@@ -1,0 +1,55 @@
+[
+  {"id": "xj-group", "name": "徐记海鲜集团", "node_type": "group", "parent_id": null, "path": "xj-group", "depth": 0},
+  {"id": "xj-brand", "name": "徐记海鲜", "node_type": "brand", "parent_id": "xj-group", "path": "xj-group.xj-brand", "depth": 1},
+  {"id": "xj-hunan", "name": "湖南区", "node_type": "region", "parent_id": "xj-brand", "path": "xj-group.xj-brand.xj-hunan", "depth": 2},
+
+  {"id": "xj-s01", "name": "五一广场店", "node_type": "store", "parent_id": "xj-hunan", "path": "xj-group.xj-brand.xj-hunan.xj-s01", "depth": 3},
+  {"id": "xj-s01-ft", "name": "五一广场店-前厅", "node_type": "department", "parent_id": "xj-s01", "path": "xj-group.xj-brand.xj-hunan.xj-s01.xj-s01-ft", "depth": 4},
+  {"id": "xj-s01-hc", "name": "五一广场店-后厨", "node_type": "department", "parent_id": "xj-s01", "path": "xj-group.xj-brand.xj-hunan.xj-s01.xj-s01-hc", "depth": 4},
+  {"id": "xj-s01-mg", "name": "五一广场店-管理", "node_type": "department", "parent_id": "xj-s01", "path": "xj-group.xj-brand.xj-hunan.xj-s01.xj-s01-mg", "depth": 4},
+
+  {"id": "xj-s02", "name": "IFS店", "node_type": "store", "parent_id": "xj-hunan", "path": "xj-group.xj-brand.xj-hunan.xj-s02", "depth": 3},
+  {"id": "xj-s02-ft", "name": "IFS店-前厅", "node_type": "department", "parent_id": "xj-s02", "path": "xj-group.xj-brand.xj-hunan.xj-s02.xj-s02-ft", "depth": 4},
+  {"id": "xj-s02-hc", "name": "IFS店-后厨", "node_type": "department", "parent_id": "xj-s02", "path": "xj-group.xj-brand.xj-hunan.xj-s02.xj-s02-hc", "depth": 4},
+  {"id": "xj-s02-mg", "name": "IFS店-管理", "node_type": "department", "parent_id": "xj-s02", "path": "xj-group.xj-brand.xj-hunan.xj-s02.xj-s02-mg", "depth": 4},
+
+  {"id": "xj-s03", "name": "梅溪湖店", "node_type": "store", "parent_id": "xj-hunan", "path": "xj-group.xj-brand.xj-hunan.xj-s03", "depth": 3},
+  {"id": "xj-s03-ft", "name": "梅溪湖店-前厅", "node_type": "department", "parent_id": "xj-s03", "path": "xj-group.xj-brand.xj-hunan.xj-s03.xj-s03-ft", "depth": 4},
+  {"id": "xj-s03-hc", "name": "梅溪湖店-后厨", "node_type": "department", "parent_id": "xj-s03", "path": "xj-group.xj-brand.xj-hunan.xj-s03.xj-s03-hc", "depth": 4},
+  {"id": "xj-s03-mg", "name": "梅溪湖店-管理", "node_type": "department", "parent_id": "xj-s03", "path": "xj-group.xj-brand.xj-hunan.xj-s03.xj-s03-mg", "depth": 4},
+
+  {"id": "xj-s04", "name": "星沙店", "node_type": "store", "parent_id": "xj-hunan", "path": "xj-group.xj-brand.xj-hunan.xj-s04", "depth": 3},
+  {"id": "xj-s04-ft", "name": "星沙店-前厅", "node_type": "department", "parent_id": "xj-s04", "path": "xj-group.xj-brand.xj-hunan.xj-s04.xj-s04-ft", "depth": 4},
+  {"id": "xj-s04-hc", "name": "星沙店-后厨", "node_type": "department", "parent_id": "xj-s04", "path": "xj-group.xj-brand.xj-hunan.xj-s04.xj-s04-hc", "depth": 4},
+  {"id": "xj-s04-mg", "name": "星沙店-管理", "node_type": "department", "parent_id": "xj-s04", "path": "xj-group.xj-brand.xj-hunan.xj-s04.xj-s04-mg", "depth": 4},
+
+  {"id": "xj-s05", "name": "河西万达店", "node_type": "store", "parent_id": "xj-hunan", "path": "xj-group.xj-brand.xj-hunan.xj-s05", "depth": 3},
+  {"id": "xj-s05-ft", "name": "河西万达店-前厅", "node_type": "department", "parent_id": "xj-s05", "path": "xj-group.xj-brand.xj-hunan.xj-s05.xj-s05-ft", "depth": 4},
+  {"id": "xj-s05-hc", "name": "河西万达店-后厨", "node_type": "department", "parent_id": "xj-s05", "path": "xj-group.xj-brand.xj-hunan.xj-s05.xj-s05-hc", "depth": 4},
+  {"id": "xj-s05-mg", "name": "河西万达店-管理", "node_type": "department", "parent_id": "xj-s05", "path": "xj-group.xj-brand.xj-hunan.xj-s05.xj-s05-mg", "depth": 4},
+
+  {"id": "xj-s06", "name": "株洲店", "node_type": "store", "parent_id": "xj-hunan", "path": "xj-group.xj-brand.xj-hunan.xj-s06", "depth": 3},
+  {"id": "xj-s06-ft", "name": "株洲店-前厅", "node_type": "department", "parent_id": "xj-s06", "path": "xj-group.xj-brand.xj-hunan.xj-s06.xj-s06-ft", "depth": 4},
+  {"id": "xj-s06-hc", "name": "株洲店-后厨", "node_type": "department", "parent_id": "xj-s06", "path": "xj-group.xj-brand.xj-hunan.xj-s06.xj-s06-hc", "depth": 4},
+  {"id": "xj-s06-mg", "name": "株洲店-管理", "node_type": "department", "parent_id": "xj-s06", "path": "xj-group.xj-brand.xj-hunan.xj-s06.xj-s06-mg", "depth": 4},
+
+  {"id": "xj-s07", "name": "湘潭步步高店", "node_type": "store", "parent_id": "xj-hunan", "path": "xj-group.xj-brand.xj-hunan.xj-s07", "depth": 3},
+  {"id": "xj-s07-ft", "name": "湘潭步步高店-前厅", "node_type": "department", "parent_id": "xj-s07", "path": "xj-group.xj-brand.xj-hunan.xj-s07.xj-s07-ft", "depth": 4},
+  {"id": "xj-s07-hc", "name": "湘潭步步高店-后厨", "node_type": "department", "parent_id": "xj-s07", "path": "xj-group.xj-brand.xj-hunan.xj-s07.xj-s07-hc", "depth": 4},
+  {"id": "xj-s07-mg", "name": "湘潭步步高店-管理", "node_type": "department", "parent_id": "xj-s07", "path": "xj-group.xj-brand.xj-hunan.xj-s07.xj-s07-mg", "depth": 4},
+
+  {"id": "xj-s08", "name": "衡阳店", "node_type": "store", "parent_id": "xj-hunan", "path": "xj-group.xj-brand.xj-hunan.xj-s08", "depth": 3},
+  {"id": "xj-s08-ft", "name": "衡阳店-前厅", "node_type": "department", "parent_id": "xj-s08", "path": "xj-group.xj-brand.xj-hunan.xj-s08.xj-s08-ft", "depth": 4},
+  {"id": "xj-s08-hc", "name": "衡阳店-后厨", "node_type": "department", "parent_id": "xj-s08", "path": "xj-group.xj-brand.xj-hunan.xj-s08.xj-s08-hc", "depth": 4},
+  {"id": "xj-s08-mg", "name": "衡阳店-管理", "node_type": "department", "parent_id": "xj-s08", "path": "xj-group.xj-brand.xj-hunan.xj-s08.xj-s08-mg", "depth": 4},
+
+  {"id": "xj-s09", "name": "岳阳店", "node_type": "store", "parent_id": "xj-hunan", "path": "xj-group.xj-brand.xj-hunan.xj-s09", "depth": 3},
+  {"id": "xj-s09-ft", "name": "岳阳店-前厅", "node_type": "department", "parent_id": "xj-s09", "path": "xj-group.xj-brand.xj-hunan.xj-s09.xj-s09-ft", "depth": 4},
+  {"id": "xj-s09-hc", "name": "岳阳店-后厨", "node_type": "department", "parent_id": "xj-s09", "path": "xj-group.xj-brand.xj-hunan.xj-s09.xj-s09-hc", "depth": 4},
+  {"id": "xj-s09-mg", "name": "岳阳店-管理", "node_type": "department", "parent_id": "xj-s09", "path": "xj-group.xj-brand.xj-hunan.xj-s09.xj-s09-mg", "depth": 4},
+
+  {"id": "xj-s10", "name": "常德店", "node_type": "store", "parent_id": "xj-hunan", "path": "xj-group.xj-brand.xj-hunan.xj-s10", "depth": 3},
+  {"id": "xj-s10-ft", "name": "常德店-前厅", "node_type": "department", "parent_id": "xj-s10", "path": "xj-group.xj-brand.xj-hunan.xj-s10.xj-s10-ft", "depth": 4},
+  {"id": "xj-s10-hc", "name": "常德店-后厨", "node_type": "department", "parent_id": "xj-s10", "path": "xj-group.xj-brand.xj-hunan.xj-s10.xj-s10-hc", "depth": 4},
+  {"id": "xj-s10-mg", "name": "常德店-管理", "node_type": "department", "parent_id": "xj-s10", "path": "xj-group.xj-brand.xj-hunan.xj-s10.xj-s10-mg", "depth": 4}
+]

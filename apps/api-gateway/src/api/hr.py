@@ -5,7 +5,7 @@ from typing import List, Optional
 
 import sqlalchemy as sa
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -1700,4 +1700,25 @@ async def get_cost_allocations(
     """获取薪资成本分摊"""
     svc = PayrollService()
     result = await svc.allocate_cost(uuid.UUID(batch_id), session)
+    return result
+
+
+@router.post("/import/employees", status_code=200)
+async def import_employees(
+    file: UploadFile = File(...),
+    org_node_id: str = Query(...),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """批量导入员工Excel"""
+    from ..services.hr.hr_import_service import HRImportService
+    content = await file.read()
+    svc = HRImportService()
+    result = await svc.import_employee_roster(
+        file_content=content,
+        org_node_id=org_node_id,
+        created_by=current_user.username if hasattr(current_user, "username") else "import",
+        session=session,
+    )
+    await session.commit()
     return result
