@@ -1,5 +1,6 @@
 """OffboardingProcess — 离职流程主记录"""
 import uuid
+from datetime import datetime
 from sqlalchemy import Column, String, Date, Integer, Text, Boolean, ForeignKey, TIMESTAMP, text
 from sqlalchemy.dialects.postgresql import UUID
 from ..base import Base
@@ -30,7 +31,7 @@ class OffboardingProcess(Base):
     created_at = Column(TIMESTAMP(timezone=True), server_default=text("NOW()"),
                         nullable=False)
     updated_at = Column(TIMESTAMP(timezone=True), server_default=text("NOW()"),
-                        nullable=False)
+                        onupdate=datetime.utcnow, nullable=False)
 
     def __repr__(self) -> str:
         return (f"<OffboardingProcess(id={self.id}, "

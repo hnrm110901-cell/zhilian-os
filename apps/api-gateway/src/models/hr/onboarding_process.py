@@ -1,5 +1,6 @@
 """OnboardingProcess — 入职流程主记录"""
 import uuid
+from datetime import datetime
 from sqlalchemy import Column, String, Date, ForeignKey, TIMESTAMP, text
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from ..base import Base
@@ -27,7 +28,7 @@ class OnboardingProcess(Base):
     created_at = Column(TIMESTAMP(timezone=True), server_default=text("NOW()"),
                         nullable=False)
     updated_at = Column(TIMESTAMP(timezone=True), server_default=text("NOW()"),
-                        nullable=False)
+                        onupdate=datetime.utcnow, nullable=False)
 
     def __repr__(self) -> str:
         return (f"<OnboardingProcess(id={self.id}, "

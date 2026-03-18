@@ -114,7 +114,7 @@ def upgrade() -> None:
         sa.Column("effective_date", sa.Date, nullable=False),
         sa.Column("status", sa.String(20), nullable=False, server_default="'pending'"),
         sa.Column("reason", sa.String(500), nullable=False),
-        sa.Column("revenue_impact_yuan", sa.Float(precision=2), nullable=True),
+        sa.Column("revenue_impact_yuan", sa.Numeric(12, 2), nullable=True),
         sa.Column("created_by", sa.String(100), nullable=False),
         sa.Column("created_at", sa.TIMESTAMP(timezone=True),
                   server_default=sa.text("NOW()"), nullable=False),
@@ -125,6 +125,8 @@ def upgrade() -> None:
                     "transfer_processes", ["person_id"])
     op.create_index("ix_transfer_processes_from_assignment_id",
                     "transfer_processes", ["from_assignment_id"])
+    op.create_index("ix_transfer_processes_to_org_node_id",
+                    "transfer_processes", ["to_org_node_id"])
 
     # 5. Patch persons: add career_stage
     op.add_column(
@@ -154,6 +156,7 @@ def downgrade() -> None:
     op.drop_column("persons", "career_stage")
 
     # Drop tables in reverse dependency order
+    op.drop_index("ix_transfer_processes_to_org_node_id", table_name="transfer_processes")
     op.drop_index("ix_transfer_processes_from_assignment_id", table_name="transfer_processes")
     op.drop_index("ix_transfer_processes_person_id", table_name="transfer_processes")
     op.drop_table("transfer_processes")

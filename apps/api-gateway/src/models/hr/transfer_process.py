@@ -1,6 +1,7 @@
 """TransferProcess — 调岗/晋升/外派流程"""
 import uuid
-from sqlalchemy import Column, String, Date, Float, ForeignKey, TIMESTAMP, text
+from datetime import datetime
+from sqlalchemy import Column, String, Date, Numeric, ForeignKey, TIMESTAMP, text
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from ..base import Base
 
@@ -17,7 +18,7 @@ class TransferProcess(Base):
                                 nullable=False, index=True)
     to_org_node_id = Column(String(64),
                             ForeignKey("org_nodes.id", ondelete="RESTRICT"),
-                            nullable=False)
+                            nullable=False, index=True)
     to_employment_type = Column(String(30), nullable=False,
                                 comment="full_time/hourly/outsourced/dispatched/partner")
     new_pay_scheme = Column(JSONB, nullable=True, default=dict)
@@ -28,13 +29,13 @@ class TransferProcess(Base):
                     server_default="'pending'",
                     comment="pending/approved/active/rejected")
     reason = Column(String(500), nullable=False)
-    revenue_impact_yuan = Column(Float(precision=2), nullable=True,
+    revenue_impact_yuan = Column(Numeric(12, 2), nullable=True,
                                  comment="AI预测¥影响（元）")
     created_by = Column(String(100), nullable=False)
     created_at = Column(TIMESTAMP(timezone=True), server_default=text("NOW()"),
                         nullable=False)
     updated_at = Column(TIMESTAMP(timezone=True), server_default=text("NOW()"),
-                        nullable=False)
+                        onupdate=datetime.utcnow, nullable=False)
 
     def __repr__(self) -> str:
         return (f"<TransferProcess(id={self.id}, "
