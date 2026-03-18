@@ -10,6 +10,8 @@ from .transfer_service import TransferService
 from .approval_workflow_service import HRApprovalWorkflowService
 from .attendance_service import AttendanceService
 from .leave_service import LeaveService
+from .growth_guidance_service import GrowthGuidanceService
+from .career_path_service import CareerPathService
 
 __all__ = [
     "HrSeedService",
@@ -23,4 +25,6 @@ __all__ = [
     "HRApprovalWorkflowService",
     "AttendanceService",
     "LeaveService",
+    "GrowthGuidanceService",
+    "CareerPathService",
 ]
