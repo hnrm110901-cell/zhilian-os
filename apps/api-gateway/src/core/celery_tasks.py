@@ -7060,3 +7060,54 @@ def pull_pinzhi_missed_orders(self) -> Dict[str, Any]:
     except Exception as e:
         logger.error("pull_pinzhi_missed_orders.failed", error=str(e))
         raise self.retry(exc=e)
+
+
+# ── Task 3.1: 每日 RFM 重算 + 生命周期状态同步 ─────────────────────────────────
+
+# 模块级懒加载引用，供测试 patch 使用（初始值为 None，运行时懒加载）
+cdp_rfm_service = None
+lifecycle_state_machine = None
+
+# 为测试兼容性提供 app 别名（测试用 `from src.core.celery_tasks import app`）
+app = celery_app
+
+
+@app.task(bind=True, name="recalculate_rfm_daily")
+def recalculate_rfm_daily(self):
+    """每日 02:30 UTC 全量 RFM 重算 + 生命周期状态同步"""
+    import src.core.celery_tasks as _this_module
+
+    async def _run():
+        # 懒加载服务实例（支持测试 patch 替换模块级变量）
+        if _this_module.cdp_rfm_service is None:
+            from src.services.cdp_rfm_service import CDPRFMService
+            _this_module.cdp_rfm_service = CDPRFMService()
+        svc = _this_module.cdp_rfm_service
+
+        if _this_module.lifecycle_state_machine is None:
+            from src.services.lifecycle_state_machine import LifecycleStateMachine
+            _this_module.lifecycle_state_machine = LifecycleStateMachine()
+        lsm = _this_module.lifecycle_state_machine
+
+        from src.core.database import AsyncSessionLocal
+        async with AsyncSessionLocal() as db:
+            rfm_result = await svc.recalculate_all(db)
+            transitions = 0
+            for change in rfm_result.get("level_changes", []):
+                try:
+                    await lsm.detect_and_sync(db, change["consumer_id"])
+                    transitions += 1
+                except Exception as e:
+                    logger.warning(f"lifecycle sync failed for {change['consumer_id']}: {e}")
+            try:
+                await db.commit()
+            except Exception as e:
+                logger.warning(f"recalculate_rfm_daily db.commit failed: {e}")
+            return {
+                "success": True,
+                "updated": rfm_result.get("updated", 0),
+                "lifecycle_transitions": transitions,
+                "errors": rfm_result.get("errors", []),
+            }
+
+    return asyncio.run(_run())
