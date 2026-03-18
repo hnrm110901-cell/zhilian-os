@@ -112,3 +112,11 @@ def test_downgrade_restores_old_columns():
     assert any("employee_id_map" in s and "CREATE TABLE" in s for s in sqls), (
         "downgrade() did not recreate employee_id_map"
     )
+
+    # Verify all 4 old columns are restored via ADD COLUMN
+    for table, old_col in TARGET_TABLES:
+        found = any(
+            table in s and old_col in s and "ADD COLUMN" in s
+            for s in sqls
+        )
+        assert found, f"downgrade() did not restore {old_col} on {table}"
