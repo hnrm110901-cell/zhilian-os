@@ -13,7 +13,7 @@ const riskLabel: Record<string, string> = { high: '高', medium: '中', low: '�
 const { Option } = Select;
 
 const HumanInTheLoop: React.FC = () => {
-  const [selectedStore, setSelectedStore] = useState('STORE001');
+  const [selectedStore, setSelectedStore] = useState(localStorage.getItem('store_id') || '');
   const [stores, setStores] = useState<any[]>([]);
   const [pending, setPending] = useState<any[]>([]);
   const [trustPhase, setTrustPhase] = useState<any>(null);
@@ -152,7 +152,6 @@ const HumanInTheLoop: React.FC = () => {
           <Select value={selectedStore} onChange={setSelectedStore} style={{ width: 180 }}>
             {stores.length > 0
               ? stores.map((s: any) => <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>)
-              : <Option value="STORE001">STORE001</Option>}
           </Select>
         </Space>
       </div>

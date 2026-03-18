@@ -29,7 +29,7 @@ export default function Kitchen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storeId = localStorage.getItem('store_id') || 'STORE001';
+    const storeId = localStorage.getItem('store_id') || '';
     apiClient.get<{ items: KitchenOrder[] }>(`/api/v1/bff/floor/${storeId}?section=kitchen`)
       .then((data) => setOrders(data.items || []))
       .catch(() => setOrders([]))

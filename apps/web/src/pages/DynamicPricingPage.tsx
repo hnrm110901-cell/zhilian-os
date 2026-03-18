@@ -35,7 +35,7 @@ interface PricingOffer {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const DEFAULT_STORE = 'S001';
+const DEFAULT_STORE = localStorage.getItem('store_id') || '';
 
 const MASLOW_COLORS: Record<number, string> = {
   1: '#bfbfbf',

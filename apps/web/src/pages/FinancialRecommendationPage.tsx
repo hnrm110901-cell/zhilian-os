@@ -84,8 +84,8 @@ const STATUS_COLOR: Record<string, string> = {
 // ── 主组件 ────────────────────────────────────────────────────────────────
 
 const FinancialRecommendationPage: React.FC = () => {
-  const [storeId, setStoreId] = useState('S001');
-  const [storeOptions, setStoreOptions] = useState<string[]>(['S001']);
+  const [storeId, setStoreId] = useState(localStorage.getItem('store_id') || '');
+  const [storeOptions, setStoreOptions] = useState<string[]>([]);
   const [period, setPeriod] = useState(dayjs().subtract(1, 'month').format('YYYY-MM'));
   const [statusFilter, setStatusFilter] = useState<string>('');
 

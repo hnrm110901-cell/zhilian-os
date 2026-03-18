@@ -109,7 +109,7 @@ const TIMELINE_NODES = [
 
 export default function EventOrderPage() {
   const [loading, setLoading] = useState(true);
-  const [storeId] = useState('STORE001');
+  const [storeId] = useState(localStorage.getItem('store_id') || '');
   const [activeTab, setActiveTab] = useState('eo-list');
 
   const [eoList, setEoList] = useState<EventOrder[]>([]);

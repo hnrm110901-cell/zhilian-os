@@ -39,7 +39,7 @@ interface Decision {
   ai_insight: string; status: string
 }
 
-const DEFAULT_STORE = 'store_001'
+const DEFAULT_STORE = localStorage.getItem('store_id') || ''
 const SEVERITY_LABEL: Record<string, string> = { critical: '紧急', warning: '预警', info: '提示' }
 const RISK_LABEL: Record<string, string> = { critical: '危急', high: '高风险', medium: '中风险', low: '低风险' }
 const LAYER_LABEL: Record<string, string> = { order: '订单', inventory: '库存', quality: '质检' }

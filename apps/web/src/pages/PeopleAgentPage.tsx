@@ -73,7 +73,7 @@ interface StaffingDecision {
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const DEFAULT_BRAND = 'B001';
-const DEFAULT_STORE = 'S001';
+const DEFAULT_STORE = localStorage.getItem('store_id') || '';
 
 const SEVERITY_COLOR: Record<string, string> = {
   critical: 'red', warning: 'gold', info: 'blue',

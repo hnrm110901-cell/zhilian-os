@@ -88,8 +88,8 @@ const fmtPct = (n: number) => `${n.toFixed(1)}%`;
 
 // ── 主页面 ────────────────────────────────────────────────────────────────────
 const DishProfitabilityPage: React.FC = () => {
-  const [storeId,      setStoreId]      = useState('S001');
-  const [storeOptions, setStoreOptions] = useState<string[]>(['S001']);
+  const [storeId,      setStoreId]      = useState(localStorage.getItem('store_id') || '');
+  const [storeOptions, setStoreOptions] = useState<string[]>([]);
 
   useEffect(() => {
     apiClient.get<{ items: Array<{ id: string }> }>('/api/v1/stores?limit=50')

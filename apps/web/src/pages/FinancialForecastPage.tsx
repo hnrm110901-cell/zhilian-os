@@ -182,7 +182,7 @@ const buildForecastChart = (
 // ── 组件 ──────────────────────────────────────────────────────────────────────
 
 const FinancialForecastPage: React.FC = () => {
-  const [storeId, setStoreId]   = useState(localStorage.getItem('store_id') || 'STORE001');
+  const [storeId, setStoreId]   = useState(localStorage.getItem('store_id') || '');
   const [targetPeriod, setTP]   = useState<string>(() => {
     const now = dayjs();
     const next = now.add(1, 'month');

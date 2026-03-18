@@ -182,7 +182,7 @@ const costItemColumns: ZTableColumn<CostReportItem>[] = [
 // ── 主组件 ────────────────────────────────────────────────────────────────────
 
 const BOMManagementPage: React.FC = () => {
-  const [storeId, setStoreId]       = useState(localStorage.getItem('store_id') || 'STORE001');
+  const [storeId, setStoreId]       = useState(localStorage.getItem('store_id') || '');
   const [stores, setStores]         = useState<any[]>([]);
   const [boms, setBoms]             = useState<BOMTemplate[]>([]);
   const [loading, setLoading]       = useState(false);
@@ -230,7 +230,7 @@ const BOMManagementPage: React.FC = () => {
       const list: any[] = res.stores || res || [];
       setStores(list);
       if (list.length > 0 && !list.find((s: any) => (s.store_id || s.id) === storeId)) {
-        setStoreId(list[0].store_id || list[0].id || 'STORE001');
+        setStoreId(list[0].store_id || list[0].id || '');
       }
     } catch { /* ignore */ }
   }, [storeId]);

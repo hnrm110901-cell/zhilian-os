@@ -7,7 +7,7 @@ const { Title, Paragraph } = Typography;
 const { TextArea } = Input;
 
 const OntologyGraphPage: React.FC = () => {
-  const [storeId, setStoreId] = useState('STORE001');
+  const [storeId, setStoreId] = useState(localStorage.getItem('store_id') || '');
   const [dishId, setDishId] = useState('D001');
   const [question, setQuestion] = useState('本周损耗最高的菜品是什么？');
   const [limit, setLimit] = useState(20);

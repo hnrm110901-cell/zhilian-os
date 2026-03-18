@@ -11,7 +11,7 @@ import { handleApiError, showSuccess } from '../utils/message';
 const { Option } = Select;
 
 const QualityManagementPage: React.FC = () => {
-  const [selectedStore, setSelectedStore] = useState('STORE001');
+  const [selectedStore, setSelectedStore] = useState(localStorage.getItem('store_id') || '');
   const [stores, setStores] = useState<any[]>([]);
   const [inspections, setInspections] = useState<any[]>([]);
   const [summary, setSummary] = useState<any>(null);
@@ -117,7 +117,7 @@ const QualityManagementPage: React.FC = () => {
         <Select value={selectedStore} onChange={setSelectedStore} style={{ width: 160 }}>
           {stores.length > 0 ? stores.map((s: any) => (
             <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
-          )) : <Option value="STORE001">STORE001</Option>}
+          ))}
         </Select>
         <Button icon={<ReloadOutlined />} onClick={loadData}>刷新</Button>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setInspectModal(true)}>发起质检</Button>

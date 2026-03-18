@@ -15,7 +15,7 @@ interface TranscriptEntry {
 }
 
 const VoiceWebSocketPage: React.FC = () => {
-  const [storeId, setStoreId] = useState('STORE001');
+  const [storeId, setStoreId] = useState(localStorage.getItem('store_id') || '');
   const [stores, setStores] = useState<Array<{ store_id: string; name: string }>>([]);
   const [mode, setMode] = useState<'stt' | 'tts' | 'dialog'>('dialog');
   const [connected, setConnected] = useState(false);
@@ -140,7 +140,6 @@ const VoiceWebSocketPage: React.FC = () => {
               <Form.Item label="门店">
                 <Select value={storeId} onChange={setStoreId} disabled={connected} style={{ width: '100%' }}>
                   {stores.map(s => <Option key={s.store_id} value={s.store_id}>{s.name || s.store_id}</Option>)}
-                  {!stores.length && <Option value="STORE001">STORE001</Option>}
                 </Select>
               </Form.Item>
               <Form.Item label="模式">

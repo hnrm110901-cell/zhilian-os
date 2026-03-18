@@ -52,7 +52,7 @@ const STAGE_LABELS: Record<string, string> = {
 
 export default function ReservationAIPage() {
   const [loading, setLoading] = useState(true);
-  const [storeId] = useState('STORE001');
+  const [storeId] = useState(localStorage.getItem('store_id') || '');
   const [activeTab, setActiveTab] = useState('report');
 
   const [dailyReport, setDailyReport] = useState<DailyReport | null>(null);

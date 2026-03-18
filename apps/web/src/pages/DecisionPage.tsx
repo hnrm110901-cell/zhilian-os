@@ -45,7 +45,7 @@ const DecisionPage: React.FC = () => {
   const [performanceData, setPerformanceData] = useState<PerformanceData[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<string>('month');
   const [loading, setLoading] = useState(false);
-  const [storeId, setStoreId] = useState('STORE001');
+  const [storeId, setStoreId] = useState(localStorage.getItem('store_id') || '');
   const [stores, setStores] = useState<any[]>([]);
 
   const loadData = useCallback(async () => {
@@ -78,7 +78,7 @@ const DecisionPage: React.FC = () => {
         const res = await apiClient.get('/api/v1/stores');
         const list: any[] = res.stores || res || [];
         setStores(list);
-        if (list.length > 0) setStoreId(list[0].store_id || list[0].id || 'STORE001');
+        if (list.length > 0) setStoreId(list[0].store_id || list[0].id || '');
       } catch { /* ignore */ }
     };
     loadStores();
@@ -258,7 +258,6 @@ const DecisionPage: React.FC = () => {
                   {s.name || s.store_id || s.id}
                 </Option>
               ))
-            : <Option value="STORE001">STORE001</Option>}
         </Select>
         <Select value={selectedPeriod} onChange={setSelectedPeriod} style={{ width: 120 }}>
           <Option value="week">本周</Option>

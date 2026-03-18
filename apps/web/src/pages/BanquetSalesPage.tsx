@@ -64,7 +64,7 @@ const STAGE_COLORS: Record<string, string> = {
 
 export default function BanquetSalesPage() {
   const [loading, setLoading] = useState(true);
-  const [storeId] = useState('STORE001');
+  const [storeId] = useState(localStorage.getItem('store_id') || '');
   const [activeTab, setActiveTab] = useState('funnel');
 
   const [funnelStats, setFunnelStats] = useState<{ stages: FunnelStage[] } | null>(null);

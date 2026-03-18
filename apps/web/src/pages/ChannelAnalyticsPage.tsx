@@ -68,7 +68,7 @@ const CHANNEL_COLORS: Record<string, string> = {
 export default function ChannelAnalyticsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [storeId] = useState('STORE001');
+  const [storeId] = useState(localStorage.getItem('store_id') || '');
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>([
     dayjs().subtract(30, 'day'),
     dayjs(),

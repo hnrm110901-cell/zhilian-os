@@ -17,7 +17,7 @@ const statusColor: Record<string, string> = {
 };
 
 const POSPage: React.FC = () => {
-  const [selectedStore, setSelectedStore] = useState('STORE001');
+  const [selectedStore, setSelectedStore] = useState(localStorage.getItem('store_id') || '');
   const [stores, setStores] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [inventory, setInventory] = useState<any[]>([]);
@@ -202,7 +202,7 @@ const POSPage: React.FC = () => {
         <Select value={selectedStore} onChange={setSelectedStore} style={{ width: 160 }}>
           {stores.length > 0 ? stores.map((s: any) => (
             <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
-          )) : <Option value="STORE001">STORE001</Option>}
+          ))}
         </Select>
         <RangePicker
           defaultValue={[dayjs().subtract(7, 'day'), dayjs()]}

@@ -221,7 +221,7 @@ const DianpingPage: React.FC = () => {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      const storeId = filterStore || 'S001';
+      const storeId = filterStore || '';
       await apiClient.post('/api/v1/dianping/sync', {
         brand_id: BRAND_ID,
         store_id: storeId,

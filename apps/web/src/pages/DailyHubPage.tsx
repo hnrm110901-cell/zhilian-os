@@ -66,7 +66,7 @@ async function loadKpiData(storeId: string) {
 const DailyHubPage: React.FC = () => {
   const [loading, setLoading]   = useState(false);
   const [approving, setApproving] = useState(false);
-  const [selectedStore, setSelectedStore] = useState('STORE001');
+  const [selectedStore, setSelectedStore] = useState(localStorage.getItem('store_id') || '');
   const [board, setBoard]       = useState<any>(null);
   const [kpi, setKpi]           = useState<any>(null);
   const phaseIdx = currentPhaseIndex();
@@ -144,7 +144,6 @@ const DailyHubPage: React.FC = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <Space>
           <Select value={selectedStore} onChange={setSelectedStore} style={{ width: 160 }}>
-            <Option value="STORE001">STORE001</Option>
           </Select>
           <Button icon={<ReloadOutlined />} onClick={loadAll} loading={loading}>刷新</Button>
         </Space>

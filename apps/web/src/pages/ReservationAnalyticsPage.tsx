@@ -75,7 +75,7 @@ const CHANNEL_NAMES: Record<string, string> = {
 };
 
 const ReservationAnalyticsPage: React.FC = () => {
-  const [storeId, setStoreId] = useState('S001');
+  const [storeId, setStoreId] = useState(localStorage.getItem('store_id') || '');
   const [days, setDays] = useState(30);
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
   const [loading, setLoading] = useState(false);

@@ -38,7 +38,7 @@ const TXN_CONFIG: Record<string, { color: string; text: string }> = {
 };
 
 const InventoryPage: React.FC = () => {
-  const [storeId, setStoreId] = useState(localStorage.getItem('store_id') || 'STORE001');
+  const [storeId, setStoreId] = useState(localStorage.getItem('store_id') || '');
   const [stores, setStores] = useState<any[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [stats, setStats] = useState<InventoryStats | null>(null);
@@ -278,7 +278,7 @@ const InventoryPage: React.FC = () => {
           >
             {stores.length > 0 ? stores.map((s: any) => (
               <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
-            )) : <Option value="STORE001">STORE001</Option>}
+            ))}
           </Select>
           <Button icon={<ReloadOutlined />} onClick={() => { loadInventory(); loadStats(); }} loading={loading}>刷新</Button>
         </Space>

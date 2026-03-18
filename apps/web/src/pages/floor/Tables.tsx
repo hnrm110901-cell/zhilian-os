@@ -35,7 +35,7 @@ export default function Tables() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storeId = localStorage.getItem('store_id') || 'STORE001';
+    const storeId = localStorage.getItem('store_id') || '';
     apiClient.get<{ tables: TableInfo[] }>(`/api/v1/bff/floor/${storeId}?section=tables`)
       .then((data) => setTables(data.tables || []))
       .catch(() => setTables([]))

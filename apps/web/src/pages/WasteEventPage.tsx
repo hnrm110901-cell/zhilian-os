@@ -87,7 +87,7 @@ const ROOT_CAUSE_LABELS: Record<string, string> = {
 // ── 主组件 ────────────────────────────────────────────────────────────────────
 
 const WasteEventPage: React.FC = () => {
-  const [storeId, setStoreId] = useState('STORE001');
+  const [storeId, setStoreId] = useState(localStorage.getItem('store_id') || '');
   const [stores, setStores] = useState<any[]>([]);
   const [events, setEvents] = useState<WasteEvent[]>([]);
   const [loading, setLoading] = useState(false);
@@ -148,7 +148,7 @@ const WasteEventPage: React.FC = () => {
       const res = await apiClient.get('/api/v1/stores');
       const list: any[] = res.stores || res || [];
       setStores(list);
-      if (list.length > 0) setStoreId(list[0].store_id || list[0].id || 'STORE001');
+      if (list.length > 0) setStoreId(list[0].store_id || list[0].id || '');
     } catch { /* ignore */ }
   }, []);
 
@@ -386,9 +386,6 @@ const WasteEventPage: React.FC = () => {
                     </Option>
                   ))
                 : <>
-                    <Option value="STORE001">北京旗舰店</Option>
-                    <Option value="STORE002">上海直营店</Option>
-                    <Option value="STORE003">广州加盟店</Option>
                   </>}
             </Select>
             <Button icon={<ReloadOutlined />} onClick={() => { loadEvents(); loadSummary(); }} loading={loading} />

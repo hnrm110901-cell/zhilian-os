@@ -247,7 +247,7 @@ const bomColumns: ZTableColumn<BomDeviationItem>[] = [
 const WasteReasoningPage: React.FC = () => {
   const [loading, setLoading]     = useState(false);
   const [stores, setStores]       = useState<any[]>([]);
-  const [storeId, setStoreId]     = useState(localStorage.getItem('store_id') || 'STORE001');
+  const [storeId, setStoreId]     = useState(localStorage.getItem('store_id') || '');
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>([
     dayjs().subtract(6, 'day'),
     dayjs(),
@@ -261,7 +261,7 @@ const WasteReasoningPage: React.FC = () => {
       const list = res.data?.stores || res.data || [];
       setStores(list);
       if (list.length > 0 && !list.find((s: any) => s.id === storeId)) {
-        setStoreId(list[0].id || list[0].store_id || 'STORE001');
+        setStoreId(list[0].id || list[0].store_id || '');
       }
     } catch {
       // 静默降级，使用默认门店ID
@@ -294,7 +294,7 @@ const WasteReasoningPage: React.FC = () => {
 
   const storeOptions = stores.length > 0
     ? stores.map((s: any) => ({ value: s.id || s.store_id, label: s.name || s.store_name || s.id }))
-    : [{ value: 'STORE001', label: '默认门店' }];
+    : [];
 
   const change = report?.waste_change_yuan ?? 0;
   const changeColor = change > 0 ? '#cf1322' : change < 0 ? '#3f8600' : 'var(--text-secondary)';

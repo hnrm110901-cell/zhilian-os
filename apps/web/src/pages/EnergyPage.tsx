@@ -36,7 +36,7 @@ const { Title, Text } = Typography;
 const API = '/api/v1/energy';
 
 // 演示用默认值
-const DEFAULT_STORE_ID  = 'store_001';
+const DEFAULT_STORE_ID = localStorage.getItem('store_id') || '';
 const DEFAULT_BRAND_ID  = 'brand_001';
 
 const DEVICE_TYPE_LABELS: Record<string, string> = {

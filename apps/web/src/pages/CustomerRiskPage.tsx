@@ -63,7 +63,7 @@ const RISK_TYPE_LABELS: Record<string, string> = {
 export default function CustomerRiskPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [storeId] = useState('STORE001');
+  const [storeId] = useState(localStorage.getItem('store_id') || '');
   const [activeTab, setActiveTab] = useState('alerts');
 
   // 数据

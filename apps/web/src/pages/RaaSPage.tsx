@@ -9,7 +9,7 @@ const tierColor: Record<string, string> = { basic: 'default', growth: 'blue', pr
 const tierLabel: Record<string, string> = { basic: '基础版', growth: '成长版', premium: '高级版', enterprise: '企业版' };
 
 const RaaSPage: React.FC = () => {
-  const [storeId, setStoreId] = useState('STORE001');
+  const [storeId, setStoreId] = useState(localStorage.getItem('store_id') || '');
   const [stores, setStores] = useState<any[]>([]);
   const [tier, setTier] = useState<any>(null);
   const [baseline, setBaseline] = useState<any>(null);
@@ -112,7 +112,7 @@ const RaaSPage: React.FC = () => {
         <Select value={storeId} onChange={setStoreId} style={{ width: 160 }}>
           {stores.length > 0 ? stores.map((s: any) => (
             <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
-          )) : <Option value="STORE001">门店001</Option>}
+          ))}
         </Select>
       </div>
       <Tabs items={tabItems} />

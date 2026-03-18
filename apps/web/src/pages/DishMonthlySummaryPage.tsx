@@ -24,7 +24,7 @@ import styles from './DishMonthlySummaryPage.module.css';
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 
-const DEFAULT_STORE  = 'S001';
+const DEFAULT_STORE = localStorage.getItem('store_id') || '';
 const DEFAULT_PERIOD = dayjs().subtract(1, 'month').format('YYYY-MM');
 
 // ── 工具函数 ──────────────────────────────────────────────────────────────────

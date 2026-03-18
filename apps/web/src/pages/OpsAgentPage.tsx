@@ -17,7 +17,7 @@ interface QARecord {
 }
 
 const OpsAgentPage: React.FC = () => {
-  const [selectedStore, setSelectedStore] = useState('STORE001');
+  const [selectedStore, setSelectedStore] = useState(localStorage.getItem('store_id') || '');
   const [stores, setStores] = useState<any[]>([]);
   const [healthResult, setHealthResult] = useState('');
   const [healthLoading, setHealthLoading] = useState(false);
@@ -58,7 +58,7 @@ const OpsAgentPage: React.FC = () => {
         const res = await apiClient.get('/api/v1/stores');
         const list: any[] = res.stores || res || [];
         setStores(list);
-        if (list.length > 0) setSelectedStore(list[0].store_id || list[0].id || 'STORE001');
+        if (list.length > 0) setSelectedStore(list[0].store_id || list[0].id || '');
       } catch { /* ignore */ }
     };
     loadStores();
@@ -241,9 +241,6 @@ const OpsAgentPage: React.FC = () => {
                 </Option>
               ))
             : <>
-                <Option value="STORE001">STORE001</Option>
-                <Option value="STORE002">STORE002</Option>
-                <Option value="STORE003">STORE003</Option>
               </>}
         </Select>
       </Space>

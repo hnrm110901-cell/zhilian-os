@@ -28,7 +28,7 @@ const { Option } = Select;
 
 const TrainingPage: React.FC = () => {
   const [stores, setStores] = useState<any[]>([]);
-  const [storeId, setStoreId] = useState('STORE001');
+  const [storeId, setStoreId] = useState(localStorage.getItem('store_id') || '');
   const [range, setRange] = useState<[Dayjs, Dayjs]>([dayjs().subtract(29, 'day'), dayjs()]);
   const [loading, setLoading] = useState(false);
   const [recording, setRecording] = useState(false);
@@ -150,7 +150,6 @@ const TrainingPage: React.FC = () => {
                     {s.name || s.id || s.store_id}
                   </Option>
                 ))
-              : <Option value="STORE001">STORE001</Option>}
           </Select>
           <RangePicker
             value={range}

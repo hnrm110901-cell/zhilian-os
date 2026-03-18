@@ -191,7 +191,7 @@ const MenuRecommendationPage: React.FC = () => {
                       value: s.store_id || s.id,
                       label: s.name || s.store_id || s.id,
                     }))
-                  : [{ value: 'STORE001', label: '屯象餐厅-朝阳店' }]}
+                  : []}
                 allowClear
               />
             </Space>

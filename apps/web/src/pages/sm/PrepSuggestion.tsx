@@ -3,7 +3,7 @@ import { apiClient } from '../../services/api';
 import { ZCard, ZButton, ZEmpty, ZSkeleton, ZBadge } from '../../design-system/components';
 import styles from './PrepSuggestion.module.css';
 
-const STORE_ID = localStorage.getItem('store_id') || 'STORE001';
+const STORE_ID = localStorage.getItem('store_id') || '';
 
 interface SuggestionItem {
   ingredient_id: string;

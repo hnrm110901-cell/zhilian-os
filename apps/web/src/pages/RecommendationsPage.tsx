@@ -9,7 +9,7 @@ const { RangePicker } = DatePicker;
 
 const RecommendationsPage: React.FC = () => {
   const [stores, setStores] = useState<any[]>([]);
-  const [selectedStore, setSelectedStore] = useState('STORE001');
+  const [selectedStore, setSelectedStore] = useState(localStorage.getItem('store_id') || '');
   const [dishResult, setDishResult] = useState<any[]>([]);
   const [pricingResult, setPricingResult] = useState<any>(null);
   const [campaignResult, setCampaignResult] = useState<any>(null);
@@ -173,7 +173,7 @@ const RecommendationsPage: React.FC = () => {
         <Select value={selectedStore} onChange={setSelectedStore} style={{ width: 160 }}>
           {stores.length > 0 ? stores.map((s: any) => (
             <Option key={s.store_id || s.id} value={s.store_id || s.id}>{s.name || s.store_id || s.id}</Option>
-          )) : <Option value="STORE001">STORE001</Option>}
+          ))}
         </Select>
       </Space>
       <Card><Tabs items={tabItems} /></Card>

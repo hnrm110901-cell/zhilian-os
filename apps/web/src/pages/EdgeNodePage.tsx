@@ -25,7 +25,7 @@ const modeLabel: Record<string, string> = {
 
 const EdgeNodePage: React.FC = () => {
   const [loading, setLoading]         = useState(false);
-  const [storeId, setStoreId]         = useState('STORE001');
+  const [storeId, setStoreId]         = useState(localStorage.getItem('store_id') || '');
   const [stores, setStores]           = useState<any[]>([]);
   const [edgeMode, setEdgeMode]       = useState<EdgeMode | null>(null);
   const [networkStatus, setNetworkStatus] = useState<NetworkStatus | null>(null);
@@ -96,7 +96,7 @@ const EdgeNodePage: React.FC = () => {
 
   const storeOptions = stores.length > 0
     ? stores.map((s: any) => ({ value: s.store_id || s.id, label: s.name || s.store_id || s.id }))
-    : [{ value: 'STORE001', label: '门店 001' }];
+    : [];
 
   return (
     <div className={styles.page}>

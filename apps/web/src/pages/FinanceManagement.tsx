@@ -28,7 +28,7 @@ const FinanceManagement: React.FC = () => {
   const [budgetModalVisible, setBudgetModalVisible] = useState(false);
   const [form] = Form.useForm();
   const [budgetForm] = Form.useForm();
-  const [storeId, setStoreId] = useState('STORE001');
+  const [storeId, setStoreId] = useState(localStorage.getItem('store_id') || '');
   const [stores, setStores] = useState<any[]>([]);
   const [dateRange, setDateRange] = useState<any>([
     dayjs().startOf('month'),

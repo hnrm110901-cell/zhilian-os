@@ -151,7 +151,7 @@ function WelcomeStep({ onNext }: { onNext: (storeId: string) => void }) {
         <span />
         <ZButton
           variant="primary"
-          onClick={() => onNext(storeId || 'S001')}
+          onClick={() => onNext(storeId || '')}
         >
           开始诊断 →
         </ZButton>
