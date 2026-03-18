@@ -36,6 +36,9 @@ router = APIRouter(prefix="/api/v1/pos-webhook", tags=["pos_webhook"])
 
 WEBHOOK_SECRET = os.getenv("WEBHOOK_POS_SECRET", "")
 
+# 延迟初始化（lazy），避免模块导入时产生循环依赖；测试可通过 patch 此名称替换
+identity_resolution_service = None
+
 
 # ── Pydantic 入参模型 ──────────────────────────────────────────
 
@@ -222,6 +225,53 @@ NORMALIZERS = {
 }
 
 
+# ── 识客 ───────────────────────────────────────────────────────
+
+
+async def _handle_member_check_in(
+    store_id: str,
+    customer_phone: Optional[str],
+) -> Optional["uuid.UUID"]:
+    """POS开单时自动识客：resolve phone → 创建 MemberCheckIn 记录。
+    自行管理 DB session（与 _upsert_order 模式一致，使用 get_db_session）。
+    """
+    if not customer_phone:
+        return None
+    try:
+        # 延迟导入，避免循环依赖；同时允许测试通过模块属性 patch
+        global identity_resolution_service
+        if identity_resolution_service is None:
+            from src.services.identity_resolution_service import (
+                identity_resolution_service as _irs,
+            )
+            identity_resolution_service = _irs
+        from src.models.member_check_in import MemberCheckIn
+        from src.models.store import Store
+
+        async with get_db_session() as session:
+            store = await session.get(Store, store_id)
+            brand_id = store.brand_id if store else ""
+
+            consumer_id = await identity_resolution_service.resolve(
+                session, customer_phone.strip(),
+                store_id=store_id,
+                source="pos_webhook",
+            )
+            check_in = MemberCheckIn(
+                store_id=store_id,
+                brand_id=brand_id,
+                consumer_id=consumer_id,
+                trigger_type="pos_webhook",
+            )
+            session.add(check_in)
+            await session.commit()
+            logger.info("POS识客事件已创建", store_id=store_id, consumer_id=str(consumer_id))
+            return consumer_id
+    except Exception as exc:
+        logger.warning("POS识客失败，不影响订单处理", error=str(exc))
+        return None
+
+
 # ── 写库 ───────────────────────────────────────────────────────
 
 
@@ -276,7 +326,12 @@ async def _upsert_order(store_id: str, payload: WebhookOrderPayload) -> str:
 
         await session.commit()
         logger.info("POS 订单写入成功", order_id=order_id, store_id=store_id)
-        return order_id
+
+    # 识客：如果订单含手机号，自动创建识客事件（独立session，不影响订单事务）
+    if payload.customer_phone:
+        await _handle_member_check_in(store_id=store_id, customer_phone=payload.customer_phone)
+
+    return order_id
 
 
 # ── API 端点 ───────────────────────────────────────────────────
