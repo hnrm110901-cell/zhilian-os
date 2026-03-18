@@ -12,6 +12,10 @@ from .transfer_process import TransferProcess
 from .approval_template import ApprovalTemplate
 from .approval_instance import ApprovalInstance
 from .approval_step_record import ApprovalStepRecord
+from .clock_record import ClockRecord
+from .daily_attendance import DailyAttendance
+from .leave_request import LeaveRequest
+from .leave_balance import LeaveBalance
 
 __all__ = [
     "Person",
@@ -27,4 +31,8 @@ __all__ = [
     "ApprovalTemplate",
     "ApprovalInstance",
     "ApprovalStepRecord",
+    "ClockRecord",
+    "DailyAttendance",
+    "LeaveRequest",
+    "LeaveBalance",
 ]
