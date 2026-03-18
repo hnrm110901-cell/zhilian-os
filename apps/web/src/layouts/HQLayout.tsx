@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { to: '/hq/workforce',   label: '人力成本', icon: '👥' },
   { to: '/hq/hr',                  label: 'HR智能',  icon: '🧠' },
   { to: '/hq/hr/talent-pipeline',  label: '人才梯队', icon: '🌱' },
+  { to: '/hq/hr/lifecycle',  label: '生命周期', icon: '🔄' },
   { to: '/hq/banquet',     label: '宴会',    icon: '🎊' },
 ];
 

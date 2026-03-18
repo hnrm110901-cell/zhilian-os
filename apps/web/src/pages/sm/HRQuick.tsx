@@ -165,6 +165,21 @@ export default function HRQuick() {
               </div>
             )}
           </ZCard>
+
+          {/* 快捷操作 */}
+          <ZCard title="快捷操作">
+            <div className={styles.actionRow}>
+              <ZButton variant="primary" size="sm" onClick={() => navigate('/sm/hr/onboarding/new')}>
+                发起入职
+              </ZButton>
+              <ZButton variant="ghost" size="sm" onClick={() => navigate('/sm/hr/offboarding/new')}>
+                提交离职
+              </ZButton>
+              <ZButton variant="ghost" size="sm" onClick={() => navigate('/sm/hr/transfer/new')}>
+                申请调岗
+              </ZButton>
+            </div>
+          </ZCard>
         </div>
       )}
     </div>

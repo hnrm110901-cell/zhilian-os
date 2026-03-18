@@ -123,3 +123,9 @@
   color: var(--color-success, #52c41a);
   white-space: nowrap;
 }
+
+.actionRow {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
