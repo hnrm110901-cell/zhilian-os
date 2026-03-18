@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { to: '/hq/hr/lifecycle',  label: '生命周期', icon: '🔄' },
   { to: '/hq/hr/approvals',  label: '审批中心', icon: '✅' },
   { to: '/hq/hr/attendance',  label: '考勤', icon: '⏰' },
+  { to: '/hq/hr/payroll',    label: '薪资', icon: '💳' },
   { to: '/hq/banquet',     label: '宴会',    icon: '🎊' },
 ];
 

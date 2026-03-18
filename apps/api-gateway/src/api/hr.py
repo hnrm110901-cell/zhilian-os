@@ -22,6 +22,7 @@ from ..services.hr.growth_guidance_service import GrowthGuidanceService
 from ..services.hr.career_path_service import CareerPathService
 from ..services.hr.compensation_fairness_service import CompensationFairnessService
 from ..services.hr.talent_health_service import TalentHealthService
+from ..services.hr.payroll_service import PayrollService
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -1607,4 +1608,96 @@ async def get_talent_health_dashboard(
         stores_data=req.stores_data,
         session=session,
     )
+    return result
+
+
+# ── Payroll Schemas ──────────────────────────────────────────────────
+
+class PayrollBatchCreateRequest(BaseModel):
+    org_node_id: str
+    year: int
+    month: int
+    created_by: str
+
+
+class PayrollApproveRequest(BaseModel):
+    approved_by: str
+
+
+# ── Payroll Endpoints ────────────────────────────────────────────────
+
+@router.post("/payroll/batch", status_code=201)
+async def create_payroll_batch(
+    req: PayrollBatchCreateRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """创建薪资核算批次"""
+    svc = PayrollService()
+    batch = await svc.create_batch(
+        req.org_node_id, req.year, req.month, req.created_by, session,
+    )
+    await session.commit()
+    return {"id": str(batch.id), "status": batch.status}
+
+
+@router.post("/payroll/batch/{batch_id}/calculate")
+async def calculate_payroll(
+    batch_id: str,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """计算薪资批次"""
+    svc = PayrollService()
+    try:
+        items = await svc.calculate(uuid.UUID(batch_id), session)
+        await session.commit()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"batch_id": batch_id, "item_count": len(items)}
+
+
+@router.post("/payroll/batch/{batch_id}/approve")
+async def approve_payroll(
+    batch_id: str,
+    req: PayrollApproveRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """审批薪资批次"""
+    svc = PayrollService()
+    try:
+        batch = await svc.approve(uuid.UUID(batch_id), req.approved_by, session)
+        await session.commit()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"batch_id": batch_id, "status": batch.status}
+
+
+@router.get("/payroll/payslip/{item_id}")
+async def get_payslip(
+    item_id: str,
+    viewer_id: str = Query(...),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """获取工资条（阅后即焚）"""
+    svc = PayrollService()
+    try:
+        result = await svc.get_payslip(uuid.UUID(item_id), viewer_id, session)
+        await session.commit()
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return result
+
+
+@router.get("/payroll/batch/{batch_id}/allocations")
+async def get_cost_allocations(
+    batch_id: str,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """获取薪资成本分摊"""
+    svc = PayrollService()
+    result = await svc.allocate_cost(uuid.UUID(batch_id), session)
     return result
