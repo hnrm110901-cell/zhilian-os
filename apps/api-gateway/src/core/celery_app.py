@@ -700,6 +700,13 @@ celery_app.conf.update(
             "args": (),
             "options": {"queue": "low_priority", "priority": 3},
         },
+        # HR — 每周一 06:00 UTC 生成排班诊断
+        "hr-staffing-analysis-weekly": {
+            "task": "hr.trigger_staffing_analysis_weekly",
+            "schedule": crontab(hour=6, minute=0, day_of_week=1),  # Monday 06:00 UTC
+            "args": (),
+            "options": {"queue": "low_priority", "priority": 3},
+        },
     },
 )
 

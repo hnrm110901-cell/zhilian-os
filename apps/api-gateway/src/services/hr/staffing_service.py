@@ -193,7 +193,9 @@ class StaffingService:
     ) -> Dict[int, float]:
         """近30天同星期均值 (60% weight — 历史基准)."""
         since = analysis_date - timedelta(days=30)
-        weekday = analysis_date.weekday()
+        # Python weekday(): Mon=0, Tue=1, ..., Sun=6
+        # PostgreSQL DOW: Sun=0, Mon=1, ..., Sat=6
+        _weekday = (analysis_date.weekday() + 1) % 7
         result = await self._session.execute(
             sa.text("""
                 SELECT EXTRACT(HOUR FROM created_at)::int AS hour,
@@ -208,7 +210,7 @@ class StaffingService:
                 ) sub
                 GROUP BY hour ORDER BY hour
             """),
-            {"store_id": store_id, "since": str(since), "weekday": weekday},
+            {"store_id": store_id, "since": str(since), "weekday": _weekday},
         )
         return {r.hour: float(r.avg_count) for r in result.fetchall()}
 

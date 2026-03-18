@@ -121,7 +121,7 @@ class HRAgentV1(BaseAgent):
         elif intent == "skill_gaps":
             return await self._diagnose_skill_gaps(store_id, session, person_id)
         elif intent == "staffing":
-            return self._diagnose_staffing_placeholder(store_id)
+            return await self._diagnose_staffing(store_id, session)
         else:
             return HRDiagnosis(
                 intent=intent,
@@ -269,10 +269,48 @@ class HRAgentV1(BaseAgent):
             recommendations=recommendations,
         )
 
-    def _diagnose_staffing_placeholder(self, store_id: str) -> HRDiagnosis:
-        """Staffing diagnosis placeholder — M3 implementation."""
+    async def _diagnose_staffing(self, store_id: str, session) -> HRDiagnosis:
+        """WF-2: 排班健康度诊断 — 调用 StaffingService."""
+        from datetime import date as date_cls
+        redis_client = None
+        try:
+            import redis as redis_lib
+            from src.core.config import settings
+            redis_client = redis_lib.from_url(settings.REDIS_URL, decode_responses=False)
+        except Exception:
+            logger.warning("hr_agent.staffing_redis_failed", store_id=store_id)
+
+        from src.services.hr.staffing_service import StaffingService
+        svc = StaffingService(session=session, redis_client=redis_client)
+        d = await svc.diagnose_staffing(store_id, date_cls.today())
+
+        peak = d.get("peak_hours", [])
+        savings = d.get("estimated_savings_yuan", 0.0)
+        understaffed = d.get("understaffed_hours", [])
+        overstaffed = d.get("overstaffed_hours", [])
+        confidence = d.get("confidence", 0.0)
+
+        summary = (
+            f"排班诊断 (置信度{confidence:.0%})："
+            f"峰值 {peak}，缺编 {understaffed}，超编 {overstaffed}，可节省 ¥{savings:.2f}"
+        )
+        recommendations = []
+        if understaffed:
+            recommendations.append({
+                "action": f"在 {understaffed} 时段增加排班",
+                "expected_yuan": 0.0,
+                "confidence": confidence,
+                "source": "staffing_service",
+            })
+        if savings > 0:
+            recommendations.append({
+                "action": f"减少 {overstaffed} 超编，可节省 ¥{savings:.2f}",
+                "expected_yuan": savings,
+                "confidence": confidence,
+                "source": "staffing_service",
+            })
+
         return HRDiagnosis(
-            intent="staffing",
-            store_id=store_id,
-            summary="人力配置诊断将在 M3 实现（需要排班数据接入）",
+            intent="staffing", store_id=store_id,
+            summary=summary, recommendations=recommendations,
         )

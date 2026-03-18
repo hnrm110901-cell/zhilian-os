@@ -5792,3 +5792,40 @@ def retrain_retention_model_weekly():
             r.close()
 
     asyncio.run(_run())
+
+
+@celery_app.task(name="hr.trigger_staffing_analysis_weekly")
+def trigger_staffing_analysis_weekly():
+    """每周一 06:00 UTC — 遍历所有 active store，生成排班诊断存入 Redis。"""
+    import sqlalchemy as sa
+
+    async def _run():
+        import redis as redis_lib
+        from src.core.config import settings
+        from src.core.database import AsyncSessionLocal
+        from src.services.hr.staffing_service import StaffingService
+        from datetime import date as date_cls
+
+        r = redis_lib.from_url(settings.REDIS_URL, decode_responses=False)
+        today = date_cls.today()
+        try:
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(
+                    sa.text("SELECT id FROM stores WHERE is_active = TRUE")
+                )
+                store_ids = [str(row[0]) for row in result.fetchall()]
+
+            for store_id in store_ids:
+                async with AsyncSessionLocal() as session:
+                    svc = StaffingService(session=session, redis_client=r)
+                    d = await svc.diagnose_staffing(store_id, today)
+                    logger.info(
+                        "celery.hr_staffing_weekly",
+                        store_id=store_id,
+                        peak_hours=d.get("peak_hours"),
+                        savings_yuan=d.get("estimated_savings_yuan"),
+                    )
+        finally:
+            r.close()
+
+    asyncio.run(_run())
