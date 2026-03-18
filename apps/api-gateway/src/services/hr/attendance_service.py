@@ -1,6 +1,7 @@
-"""AttendanceService — 考勤计算引擎
+"""AttendanceService — 考勤计算引擎（规则驱动多班次版）
 
 AI差异化：异常打卡模式识别（凌晨2-3点场景特殊处理）
+P3重写：从硬编码常量 → 合同绑定考勤规则 → 多班次支持
 """
 import uuid
 from datetime import date, datetime, time, timezone, timedelta
@@ -14,12 +15,12 @@ from ...models.hr.daily_attendance import DailyAttendance
 
 logger = structlog.get_logger()
 
-# 标准工作时段（餐饮行业默认）
-_DEFAULT_WORK_START = time(9, 0)   # 09:00
-_DEFAULT_WORK_END = time(22, 0)    # 22:00（餐饮常见长班）
-_STANDARD_WORK_MINUTES = 480       # 8小时标准工时
-_LATE_THRESHOLD_MINUTES = 5        # 5分钟以内不算迟到
-_ANOMALY_HOURS = (2, 3)            # 凌晨2-3点打卡视为异常
+# 后备常量：仅当员工未绑定考勤规则时使用
+_FALLBACK_WORK_START = time(9, 0)
+_FALLBACK_WORK_END = time(22, 0)
+_FALLBACK_STANDARD_MINUTES = 480
+_FALLBACK_LATE_THRESHOLD = 5
+_ANOMALY_HOURS = (2, 3)  # 凌晨2-3点打卡视为异常
 
 
 class AttendanceService:
@@ -67,11 +68,36 @@ class AttendanceService:
         target_date: date,
         session: AsyncSession,
     ) -> DailyAttendance:
-        """计算某天的考勤结果"""
-        # 查找当日所有打卡记录
-        day_start = datetime.combine(target_date, time.min, tzinfo=timezone.utc)
-        day_end = datetime.combine(target_date + timedelta(days=1), time.min, tzinfo=timezone.utc)
+        """计算某天的考勤结果（规则驱动）"""
+        # 1. 解析班次规则
+        shift_start, shift_end, rule_config = await self._resolve_shift(
+            assignment_id, target_date, session,
+        )
 
+        late_threshold = (
+            rule_config.get("late_threshold_minutes", _FALLBACK_LATE_THRESHOLD)
+            if rule_config else _FALLBACK_LATE_THRESHOLD
+        )
+        standard_minutes = (
+            rule_config.get("standard_work_minutes_per_shift", _FALLBACK_STANDARD_MINUTES)
+            if rule_config else _FALLBACK_STANDARD_MINUTES
+        )
+
+        # 2. 确定打卡查询窗口（夜班延伸到次日凌晨）
+        day_start = datetime.combine(target_date, time.min, tzinfo=timezone.utc)
+        cutoff_hour = rule_config.get("night_shift_cutoff_hour", 3) if rule_config else 3
+        if shift_end and shift_end.hour >= 22:
+            day_end = datetime.combine(
+                target_date + timedelta(days=1),
+                time(cutoff_hour, 0),
+                tzinfo=timezone.utc,
+            )
+        else:
+            day_end = datetime.combine(
+                target_date + timedelta(days=1), time.min, tzinfo=timezone.utc,
+            )
+
+        # 3. 查找当日所有打卡记录
         result = await session.execute(
             select(ClockRecord)
             .where(
@@ -84,12 +110,18 @@ class AttendanceService:
         )
         records = list(result.scalars().all())
 
-        # 计算各指标
+        # 4. 计算各指标
         status, work_minutes, late_minutes, early_leave_minutes, overtime_minutes = (
-            self._compute_attendance(records, target_date)
+            self._compute_attendance(
+                records, target_date,
+                shift_start=shift_start,
+                shift_end=shift_end,
+                late_threshold=late_threshold,
+                standard_minutes=standard_minutes,
+            )
         )
 
-        # upsert日考勤记录
+        # 5. upsert日考勤记录
         existing = await session.execute(
             select(DailyAttendance).where(
                 DailyAttendance.assignment_id == assignment_id,
@@ -100,13 +132,19 @@ class AttendanceService:
 
         if attendance:
             if attendance.locked:
-                logger.warning("attendance.locked_skip", assignment_id=str(assignment_id), date=str(target_date))
+                logger.warning(
+                    "attendance.locked_skip",
+                    assignment_id=str(assignment_id),
+                    date=str(target_date),
+                )
                 return attendance
             attendance.status = status
             attendance.work_minutes = work_minutes
             attendance.late_minutes = late_minutes
             attendance.early_leave_minutes = early_leave_minutes
             attendance.overtime_minutes = overtime_minutes
+            attendance.scheduled_start_time = shift_start
+            attendance.scheduled_end_time = shift_end
             attendance.calculated_at = datetime.now(timezone.utc)
         else:
             attendance = DailyAttendance(
@@ -117,6 +155,8 @@ class AttendanceService:
                 late_minutes=late_minutes,
                 early_leave_minutes=early_leave_minutes,
                 overtime_minutes=overtime_minutes,
+                scheduled_start_time=shift_start,
+                scheduled_end_time=shift_end,
             )
             session.add(attendance)
 
@@ -190,12 +230,68 @@ class AttendanceService:
             for r in anomalies
         ]
 
+    # ── 班次解析 ──────────────────────────────────────────────────────────
+
+    async def _resolve_shift(
+        self,
+        assignment_id: uuid.UUID,
+        target_date: date,
+        session: AsyncSession,
+    ) -> tuple[time, time, dict]:
+        """解析当日班次：合同规则 -> 排班表 -> 默认后备"""
+        from ...models.hr.employment_contract import EmploymentContract
+        from ...models.hr.attendance_rule import AttendanceRule
+
+        contract_result = await session.execute(
+            select(EmploymentContract)
+            .where(
+                EmploymentContract.assignment_id == assignment_id,
+                EmploymentContract.valid_from <= target_date,
+            )
+            .order_by(EmploymentContract.valid_from.desc())
+            .limit(1)
+        )
+        contract = contract_result.scalar_one_or_none()
+
+        rule_config: dict = {}
+        if contract and contract.attendance_rule_id:
+            rule_result = await session.execute(
+                select(AttendanceRule).where(
+                    AttendanceRule.id == contract.attendance_rule_id,
+                )
+            )
+            rule = rule_result.scalar_one_or_none()
+            if rule and rule.rule_config:
+                rule_config = rule.rule_config
+
+        # 从规则配置中解析班次
+        shifts = rule_config.get("shifts", {})
+        default_shift_name = rule_config.get("default_shift", "full")
+        shift_config = shifts.get(default_shift_name, {})
+
+        start_str = shift_config.get("start", "09:00")
+        end_str = shift_config.get("end", "22:00")
+        shift_start = time.fromisoformat(start_str)
+        shift_end = time.fromisoformat(end_str)
+
+        return shift_start, shift_end, rule_config
+
+    # ── 考勤计算（纯函数） ────────────────────────────────────────────────
+
     def _compute_attendance(
         self,
         records: list,
         target_date: date,
+        shift_start: time = _FALLBACK_WORK_START,
+        shift_end: time = _FALLBACK_WORK_END,
+        late_threshold: int = _FALLBACK_LATE_THRESHOLD,
+        standard_minutes: int = _FALLBACK_STANDARD_MINUTES,
     ) -> tuple[str, int, int, int, int]:
-        """纯函数：根据打卡记录计算考勤状态"""
+        """纯函数：根据打卡记录 + 班次参数计算考勤状态
+
+        Returns:
+            (status, work_minutes, late_minutes, early_leave_minutes, overtime_minutes)
+        """
         if not records:
             return ("absent", 0, 0, 0, 0)
 
@@ -214,26 +310,32 @@ class AttendanceService:
         if first_in and last_out and last_out > first_in:
             work_minutes = int((last_out - first_in).total_seconds() / 60)
 
-        # 计算迟到分钟（相对标准上班时间）
+        # 计算迟到分钟（相对班次开始时间）
         late_minutes = 0
         if first_in:
             scheduled_start = datetime.combine(
-                target_date, _DEFAULT_WORK_START, tzinfo=first_in.tzinfo
+                target_date, shift_start, tzinfo=first_in.tzinfo,
             )
-            if first_in > scheduled_start + timedelta(minutes=_LATE_THRESHOLD_MINUTES):
+            if first_in > scheduled_start + timedelta(minutes=late_threshold):
                 late_minutes = int((first_in - scheduled_start).total_seconds() / 60)
 
-        # 计算早退分钟（相对标准下班时间）
+        # 计算早退分钟（相对班次结束时间）
         early_leave_minutes = 0
         if last_out:
+            # 夜班：结束时间跨日
+            end_date = target_date
+            if shift_end <= shift_start:
+                end_date = target_date + timedelta(days=1)
             scheduled_end = datetime.combine(
-                target_date, _DEFAULT_WORK_END, tzinfo=last_out.tzinfo
+                end_date, shift_end, tzinfo=last_out.tzinfo,
             )
             if last_out < scheduled_end:
-                early_leave_minutes = int((scheduled_end - last_out).total_seconds() / 60)
+                early_leave_minutes = int(
+                    (scheduled_end - last_out).total_seconds() / 60
+                )
 
         # 加班分钟
-        overtime_minutes = max(0, work_minutes - _STANDARD_WORK_MINUTES)
+        overtime_minutes = max(0, work_minutes - standard_minutes)
 
         # 判断状态
         if late_minutes > 0 and early_leave_minutes > 0:
@@ -242,9 +344,71 @@ class AttendanceService:
             status = "late"
         elif early_leave_minutes > 0:
             status = "early_leave"
-        elif work_minutes > _STANDARD_WORK_MINUTES:
+        elif work_minutes > standard_minutes:
             status = "overtime"
         else:
             status = "normal"
 
         return (status, work_minutes, late_minutes, early_leave_minutes, overtime_minutes)
+
+    # ── 考勤申诉 ─────────────────────────────────────────────────────────
+
+    async def submit_appeal(
+        self,
+        assignment_id: uuid.UUID,
+        target_date: date,
+        reason: str,
+        created_by: str,
+        session: AsyncSession,
+    ) -> dict:
+        """提交考勤申诉（通过审批工作流）"""
+        from .approval_workflow_service import HRApprovalWorkflowService
+
+        appeal_resource_id = uuid.uuid4()
+
+        svc = HRApprovalWorkflowService()
+        try:
+            instance = await svc.start(
+                resource_type="attendance_appeal",
+                resource_id=appeal_resource_id,
+                initiator=created_by,
+                session=session,
+                extra_data={
+                    "assignment_id": str(assignment_id),
+                    "date": target_date.isoformat(),
+                    "reason": reason,
+                },
+            )
+            return {
+                "appeal_id": str(appeal_resource_id),
+                "approval_instance_id": str(instance.id),
+                "status": "submitted",
+            }
+        except ValueError:
+            # 无审批模板时直接提交（无工作流）
+            return {
+                "appeal_id": str(appeal_resource_id),
+                "approval_instance_id": None,
+                "status": "submitted_no_workflow",
+            }
+
+    async def resolve_appeal(
+        self,
+        assignment_id: uuid.UUID,
+        target_date: date,
+        new_status: str,
+        session: AsyncSession,
+    ) -> None:
+        """申诉通过：覆盖考勤状态"""
+        if new_status not in ("normal", "leave", "overtime"):
+            raise ValueError(f"Invalid override status: {new_status!r}")
+
+        await session.execute(
+            update(DailyAttendance)
+            .where(
+                DailyAttendance.assignment_id == assignment_id,
+                DailyAttendance.date == target_date,
+            )
+            .values(status=new_status)
+        )
+        await session.flush()

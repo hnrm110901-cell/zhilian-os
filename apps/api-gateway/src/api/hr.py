@@ -1253,6 +1253,19 @@ class ClockRecordRequest(BaseModel):
     source: str  # wechat_work/dingtalk/manual/face_recognition
 
 
+class AttendanceAppealRequest(BaseModel):
+    assignment_id: str
+    date: str  # YYYY-MM-DD
+    reason: str
+    created_by: str
+
+
+class AttendanceAppealResolveRequest(BaseModel):
+    assignment_id: str
+    date: str  # YYYY-MM-DD
+    new_status: str  # normal/leave/overtime
+
+
 class LeaveApplyRequest(BaseModel):
     assignment_id: str
     leave_type: str
@@ -1325,6 +1338,72 @@ async def get_attendance_anomalies(
         session=session,
     )
     return {"anomalies": anomalies, "count": len(anomalies)}
+
+
+@router.post("/attendance/appeal", status_code=201)
+async def submit_attendance_appeal(
+    req: AttendanceAppealRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """提交考勤申诉"""
+    svc = AttendanceService()
+    try:
+        result = await svc.submit_appeal(
+            assignment_id=uuid.UUID(req.assignment_id),
+            target_date=date.fromisoformat(req.date),
+            reason=req.reason,
+            created_by=req.created_by,
+            session=session,
+        )
+        await session.commit()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return result
+
+
+@router.post("/attendance/appeal/resolve")
+async def resolve_attendance_appeal(
+    req: AttendanceAppealResolveRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """审批考勤申诉：覆盖状态"""
+    svc = AttendanceService()
+    try:
+        await svc.resolve_appeal(
+            assignment_id=uuid.UUID(req.assignment_id),
+            target_date=date.fromisoformat(req.date),
+            new_status=req.new_status,
+            session=session,
+        )
+        await session.commit()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"status": "resolved", "new_status": req.new_status}
+
+
+@router.get("/attendance/export")
+async def export_attendance(
+    org_node_id: str = Query(...),
+    year: int = Query(...),
+    month: int = Query(...),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """导出月度考勤Excel"""
+    from ..services.hr.hr_export_service import HRExportService
+    svc = HRExportService()
+    buf = await svc.export_attendance_monthly(org_node_id, year, month, session)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": (
+                f"attachment; filename=attendance_{org_node_id}_{year}{month:02d}.xlsx"
+            ),
+        },
+    )
 
 
 # ── Leave Endpoints ──────────────────────────────────────────────

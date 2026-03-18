@@ -1,4 +1,5 @@
 """HRExportService — HR数据Excel导出"""
+from datetime import date
 from io import BytesIO
 import uuid
 import structlog
@@ -68,6 +69,72 @@ class HRExportService:
         ws_cost = wb.create_sheet("部门成本")
         ws_cost.append(["部门", "总成本（元）"])
         ws_cost.append([batch.org_node_id, batch.total_gross_fen / 100])
+
+        buf = BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        return buf
+
+    async def export_attendance_monthly(
+        self,
+        org_node_id: str,
+        year: int,
+        month: int,
+        session: AsyncSession,
+    ) -> BytesIO:
+        """导出月度考勤报表Excel"""
+        from ...models.hr.daily_attendance import DailyAttendance
+        from ...models.hr.employment_assignment import EmploymentAssignment
+        from ...models.hr.person import Person
+
+        first_day = date(year, month, 1)
+        last_day = (
+            date(year, month + 1, 1) if month < 12 else date(year + 1, 1, 1)
+        )
+
+        # 获取该组织节点下所有在岗员工
+        result = await session.execute(
+            select(EmploymentAssignment, Person)
+            .join(Person, Person.id == EmploymentAssignment.person_id)
+            .where(
+                EmploymentAssignment.org_node_id == org_node_id,
+                EmploymentAssignment.status == "active",
+            )
+        )
+        rows = result.all()
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = f"考勤报表{year}年{month}月"
+        ws.append([
+            "姓名", "部门", "出勤天数", "正常天数", "迟到次数",
+            "早退次数", "缺勤天数", "加班小时", "总工时",
+        ])
+
+        for assignment, person in rows:
+            att_result = await session.execute(
+                select(DailyAttendance).where(
+                    DailyAttendance.assignment_id == assignment.id,
+                    DailyAttendance.date >= first_day,
+                    DailyAttendance.date < last_day,
+                )
+            )
+            att = list(att_result.scalars().all())
+
+            total_days = len(att)
+            normal = sum(1 for a in att if a.status == "normal")
+            late = sum(1 for a in att if a.status == "late")
+            early = sum(1 for a in att if a.status == "early_leave")
+            absent = sum(1 for a in att if a.status == "absent")
+            overtime_h = round(
+                sum(a.overtime_minutes for a in att) / 60, 1,
+            )
+            work_h = round(sum(a.work_minutes for a in att) / 60, 1)
+
+            ws.append([
+                person.name, org_node_id, total_days, normal,
+                late, early, absent, overtime_h, work_h,
+            ])
 
         buf = BytesIO()
         wb.save(buf)

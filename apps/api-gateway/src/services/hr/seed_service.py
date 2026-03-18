@@ -233,6 +233,43 @@ class HrSeedService:
         logger.info("Inserted %d xuji employees.", inserted)
         return inserted
 
+    async def load_xuji_attendance_rules(self, skip_if_exists: bool = True) -> int:
+        """加载徐记海鲜考勤规则种子数据到 attendance_rules 表"""
+        if skip_if_exists:
+            result = await self._session.execute(
+                sa.text(
+                    "SELECT COUNT(*) FROM attendance_rules "
+                    "WHERE org_node_id = :org"
+                ),
+                {"org": "xj-brand"},
+            )
+            if (result.scalar() or 0) > 0:
+                logger.info("xuji attendance rules already seeded, skipping.")
+                return 0
+
+        rules = self._load_json("xuji_attendance_rules.json")
+        inserted = 0
+        for rule in rules:
+            await self._session.execute(
+                sa.text(
+                    "INSERT INTO attendance_rules "
+                    "(id, name, rule_config, org_node_id) "
+                    "VALUES (:id, :name, :rule_config::jsonb, :org_node_id) "
+                    "ON CONFLICT DO NOTHING"
+                ),
+                {
+                    "id": str(uuid.uuid4()),
+                    "name": rule["name"],
+                    "rule_config": json.dumps(rule["rule_config"]),
+                    "org_node_id": rule.get("org_node_id"),
+                },
+            )
+            inserted += 1
+
+        await self._session.commit()
+        logger.info("Inserted %d xuji attendance rules.", inserted)
+        return inserted
+
     # ── private ───────────────────────────────────────────────────────────
 
     async def _skill_count(self) -> int:

@@ -1,0 +1,20 @@
+[
+  {
+    "name": "徐记海鲜标准考勤规则",
+    "org_node_id": "xj-brand",
+    "rule_config": {
+      "shifts": {
+        "morning": {"start": "07:00", "end": "15:00", "break_minutes": 30},
+        "middle": {"start": "10:00", "end": "18:00", "break_minutes": 30},
+        "evening": {"start": "15:00", "end": "23:00", "break_minutes": 30},
+        "full": {"start": "10:00", "end": "22:00", "break_minutes": 60}
+      },
+      "default_shift": "full",
+      "late_threshold_minutes": 5,
+      "early_leave_threshold_minutes": 10,
+      "overtime_start_after_minutes": 480,
+      "night_shift_cutoff_hour": 3,
+      "standard_work_minutes_per_shift": 480
+    }
+  }
+]
