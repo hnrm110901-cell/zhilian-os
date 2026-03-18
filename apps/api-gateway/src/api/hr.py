@@ -505,3 +505,241 @@ async def submit_knowledge_capture(
     svc = KnowledgeCaptureService(session=session)
     capture = await svc.submit_capture(req.person_id, req.trigger_type, req.raw_dialogue)
     return capture
+
+
+# ── Person CRUD ───────────────────────────────────────────────────────
+
+@router.get("/persons")
+async def list_persons(
+    store_id: str = Query(..., description="门店ID"),
+    search: Optional[str] = Query(None, description="姓名搜索"),
+    limit: int = Query(50, ge=1, le=200),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """列出门店员工，含风险分和技能达标数."""
+    if search:
+        result = await session.execute(
+            sa.text(
+                "SELECT p.id, p.name, p.phone, "
+                "       ea.id AS assignment_id, ea.employment_type, ea.start_date, "
+                "       js.title AS job_title, "
+                "       (SELECT rs.risk_score FROM retention_signals rs "
+                "        WHERE rs.assignment_id = ea.id "
+                "        ORDER BY rs.computed_at DESC LIMIT 1) AS risk_score, "
+                "       (SELECT COUNT(*) FROM person_achievements pa "
+                "        WHERE pa.person_id = p.id) AS achieved_count "
+                "FROM persons p "
+                "JOIN employment_assignments ea ON ea.person_id = p.id "
+                "JOIN stores s ON s.org_node_id = ea.org_node_id "
+                "LEFT JOIN job_standards js ON js.id = ea.job_standard_id "
+                "WHERE s.id = :store_id "
+                "  AND ea.status = 'active' "
+                "  AND p.name ILIKE :search "
+                "ORDER BY COALESCE("
+                "  (SELECT rs2.risk_score FROM retention_signals rs2 "
+                "   WHERE rs2.assignment_id = ea.id "
+                "   ORDER BY rs2.computed_at DESC LIMIT 1), 0) DESC "
+                "LIMIT :limit"
+            ),
+            {"store_id": store_id, "search": f"%{search}%", "limit": limit},
+        )
+    else:
+        result = await session.execute(
+            sa.text(
+                "SELECT p.id, p.name, p.phone, "
+                "       ea.id AS assignment_id, ea.employment_type, ea.start_date, "
+                "       js.title AS job_title, "
+                "       (SELECT rs.risk_score FROM retention_signals rs "
+                "        WHERE rs.assignment_id = ea.id "
+                "        ORDER BY rs.computed_at DESC LIMIT 1) AS risk_score, "
+                "       (SELECT COUNT(*) FROM person_achievements pa "
+                "        WHERE pa.person_id = p.id) AS achieved_count "
+                "FROM persons p "
+                "JOIN employment_assignments ea ON ea.person_id = p.id "
+                "JOIN stores s ON s.org_node_id = ea.org_node_id "
+                "LEFT JOIN job_standards js ON js.id = ea.job_standard_id "
+                "WHERE s.id = :store_id "
+                "  AND ea.status = 'active' "
+                "ORDER BY COALESCE("
+                "  (SELECT rs2.risk_score FROM retention_signals rs2 "
+                "   WHERE rs2.assignment_id = ea.id "
+                "   ORDER BY rs2.computed_at DESC LIMIT 1), 0) DESC "
+                "LIMIT :limit"
+            ),
+            {"store_id": store_id, "limit": limit},
+        )
+
+    rows = result.fetchall()
+    return {
+        "store_id": store_id,
+        "total": len(rows),
+        "items": [
+            {
+                "id": str(row.id),
+                "name": row.name,
+                "phone": row.phone,
+                "assignment_id": str(row.assignment_id),
+                "employment_type": row.employment_type,
+                "start_date": row.start_date.isoformat() if row.start_date else None,
+                "job_title": row.job_title,
+                "risk_score": float(row.risk_score) if row.risk_score is not None else None,
+                "achieved_count": int(row.achieved_count or 0),
+            }
+            for row in rows
+        ],
+    }
+
+
+@router.get("/persons/{person_id}")
+async def get_person(
+    person_id: str,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """员工详情：基本信息 + 当前在岗关系 + 技能认证 + 最新风险信号 + 近期知识采集."""
+    # 基本信息
+    person_result = await session.execute(
+        sa.text(
+            "SELECT id, name, phone, email, photo_url, preferences, created_at "
+            "FROM persons WHERE id = :person_id"
+        ),
+        {"person_id": person_id},
+    )
+    person_row = person_result.fetchone()
+    if not person_row:
+        raise HTTPException(status_code=404, detail="员工不存在")
+
+    # 在岗关系（全部，含历史）
+    assign_result = await session.execute(
+        sa.text(
+            "SELECT ea.id, ea.employment_type, ea.start_date, ea.end_date, ea.status, "
+            "       s.name AS store_name, s.id AS store_id, "
+            "       js.title AS job_title "
+            "FROM employment_assignments ea "
+            "LEFT JOIN stores s ON s.org_node_id = ea.org_node_id "
+            "LEFT JOIN job_standards js ON js.id = ea.job_standard_id "
+            "WHERE ea.person_id = :person_id "
+            "ORDER BY ea.start_date DESC"
+        ),
+        {"person_id": person_id},
+    )
+    assignments = [
+        {
+            "id": str(r.id),
+            "employment_type": r.employment_type,
+            "start_date": r.start_date.isoformat() if r.start_date else None,
+            "end_date": r.end_date.isoformat() if r.end_date else None,
+            "status": r.status,
+            "store_name": r.store_name,
+            "store_id": str(r.store_id) if r.store_id else None,
+            "job_title": r.job_title,
+        }
+        for r in assign_result.fetchall()
+    ]
+
+    # 技能认证
+    ach_result = await session.execute(
+        sa.text(
+            "SELECT pa.id, pa.achieved_at, pa.evidence, "
+            "       sn.skill_name, sn.category, sn.estimated_revenue_lift "
+            "FROM person_achievements pa "
+            "JOIN skill_nodes sn ON sn.id = pa.skill_node_id "
+            "WHERE pa.person_id = :person_id "
+            "ORDER BY pa.achieved_at DESC"
+        ),
+        {"person_id": person_id},
+    )
+    achievements = [
+        {
+            "id": str(r.id),
+            "skill_name": r.skill_name,
+            "category": r.category,
+            "achieved_at": r.achieved_at.isoformat() if r.achieved_at else None,
+            "evidence": r.evidence,
+            "estimated_revenue_lift": float(r.estimated_revenue_lift) if r.estimated_revenue_lift else None,
+        }
+        for r in ach_result.fetchall()
+    ]
+
+    # 最新留任风险信号
+    risk_result = await session.execute(
+        sa.text(
+            "SELECT rs.risk_score, rs.risk_factors, rs.intervention_status, rs.computed_at "
+            "FROM retention_signals rs "
+            "JOIN employment_assignments ea ON ea.id = rs.assignment_id "
+            "WHERE ea.person_id = :person_id "
+            "ORDER BY rs.computed_at DESC LIMIT 1"
+        ),
+        {"person_id": person_id},
+    )
+    risk_row = risk_result.fetchone()
+    latest_risk = {
+        "risk_score": float(risk_row.risk_score) if risk_row else None,
+        "risk_factors": risk_row.risk_factors if risk_row else {},
+        "intervention_status": risk_row.intervention_status if risk_row else None,
+        "computed_at": risk_row.computed_at.isoformat() if risk_row and risk_row.computed_at else None,
+    } if risk_row else None
+
+    # 近期知识采集（最近5条）
+    kc_result = await session.execute(
+        sa.text(
+            "SELECT id, trigger_type, context, quality_score, created_at "
+            "FROM knowledge_captures "
+            "WHERE person_id = :person_id "
+            "ORDER BY created_at DESC LIMIT 5"
+        ),
+        {"person_id": person_id},
+    )
+    captures = [
+        {
+            "id": str(r.id),
+            "trigger_type": r.trigger_type,
+            "context": (r.context or "")[:100] if r.context else None,
+            "quality_score": float(r.quality_score) if r.quality_score is not None else None,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in kc_result.fetchall()
+    ]
+
+    return {
+        "id": str(person_row.id),
+        "name": person_row.name,
+        "phone": person_row.phone,
+        "email": person_row.email,
+        "photo_url": person_row.photo_url,
+        "created_at": person_row.created_at.isoformat() if person_row.created_at else None,
+        "assignments": assignments,
+        "achievements": achievements,
+        "latest_risk": latest_risk,
+        "recent_captures": captures,
+    }
+
+
+# ── WF-5 新店人才梯队 ─────────────────────────────────────────────────
+
+class TalentPipelineRequest(BaseModel):
+    new_store_org_node_id: str
+    open_date: Optional[str] = None    # ISO date string，如 "2026-06-01"
+    headcount_plan: Optional[dict] = None  # {"kitchen": 5, "service": 8, ...}
+
+
+@router.post("/talent-pipeline/analyze")
+async def analyze_talent_pipeline(
+    req: TalentPipelineRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """WF-5: 新店人才梯队分析.
+
+    输入：新店OrgNode + 预计开业日期 + 岗位需求（可选）
+    输出：人才就绪率 + 内部候选人清单 + 技能缺口 + 补招建议（含¥预算）
+    """
+    from src.services.hr.talent_pipeline_service import TalentPipelineService
+    svc = TalentPipelineService(session=session)
+    result = await svc.analyze(
+        new_store_org_node_id=req.new_store_org_node_id,
+        open_date=req.open_date,
+        headcount_plan=req.headcount_plan,
+    )
+    return result

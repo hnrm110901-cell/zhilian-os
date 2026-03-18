@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ZCard, ZKpi, ZBadge, ZButton, ZSkeleton, ZEmpty } from '../../design-system/components';
 import apiClient from '../../services/api';
 import styles from './HRQuick.module.css';
@@ -45,6 +46,7 @@ export default function HRQuick() {
   const [data, setData] = useState<BffData | null>(null);
   const [loading, setLoading] = useState(true);
   const storeId = localStorage.getItem('store_id') || 'STORE001';
+  const navigate = useNavigate();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -70,7 +72,10 @@ export default function HRQuick() {
     <div className={styles.page}>
       <div className={styles.header}>
         <span className={styles.title}>人力智能</span>
-        <ZButton variant="ghost" size="sm" onClick={load}>刷新</ZButton>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <ZButton variant="ghost" size="sm" onClick={() => navigate('/sm/hr/team')}>团队成员</ZButton>
+          <ZButton variant="ghost" size="sm" onClick={load}>刷新</ZButton>
+        </div>
       </div>
 
       {loading ? (

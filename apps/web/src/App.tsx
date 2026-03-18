@@ -294,8 +294,11 @@ const HQDecisions     = lazy(() => import('./pages/hq/Decisions'));
 const HQFinance       = lazy(() => import('./pages/hq/Finance'));
 const HQWorkforce     = lazy(() => import('./pages/hq/Workforce'));
 const HQBanquet       = lazy(() => import('./pages/hq/Banquet'));
-const HQHr            = lazy(() => import('./pages/hq/HR'));
-const HQHrKnowledge   = lazy(() => import('./pages/hq/HRKnowledge'));
+const HQHr                = lazy(() => import('./pages/hq/HR'));
+const HQHrKnowledge       = lazy(() => import('./pages/hq/HRKnowledge'));
+const HQHrTalentPipeline  = lazy(() => import('./pages/hq/HRTalentPipeline'));
+const SmHRTeam            = lazy(() => import('./pages/sm/HRTeam'));
+const SmHRPerson          = lazy(() => import('./pages/sm/HRPerson'));
 const SmBanquet       = lazy(() => import('./pages/sm/Banquet'));
 const SmBanquetLeads       = lazy(() => import('./pages/sm/BanquetLeads'));
 const SmBanquetLeadDetail  = lazy(() => import('./pages/sm/BanquetLeadDetail'));
@@ -1051,7 +1054,9 @@ const AppContent: React.FC = () => {
                   <Route path="banquet-search"       element={<SmBanquetSearch />} />
                   <Route path="private-domain-health" element={<SmPrivateDomainHealth />} />
                   <Route path="prep" element={<SmPrepSuggestion />} />
-                  <Route path="hr"       element={<SmHRQuick />} />
+                  <Route path="hr"             element={<SmHRQuick />} />
+                  <Route path="hr/team"        element={<SmHRTeam />} />
+                  <Route path="hr/person/:id"  element={<SmHRPerson />} />
                   <Route path="patrol"   element={<SmPatrol />} />
                   <Route path="profile"  element={<SmProfile />} />
                   {/* 日清日结 + 周复盘 */}
@@ -1099,8 +1104,9 @@ const AppContent: React.FC = () => {
                   <Route path="finance"   element={<HQFinance />} />
                   <Route path="workforce"       element={<HQWorkforce />} />
                   <Route path="banquet"         element={<HQBanquet />} />
-                  <Route path="hr"              element={<HQHr />} />
-                  <Route path="hr/knowledge"    element={<HQHrKnowledge />} />
+                  <Route path="hr"                       element={<HQHr />} />
+                  <Route path="hr/knowledge"             element={<HQHrKnowledge />} />
+                  <Route path="hr/talent-pipeline"       element={<HQHrTalentPipeline />} />
                 </Route>
 
                 {/* Role-based views — Employee H5 Self-Service (手机) */}

@@ -1,0 +1,211 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  background: var(--bg-page, #f5f5f5);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--bg-surface, #fff);
+}
+
+.body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 基本信息 */
+.profileRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--accent, #ff6b2c);
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.profileInfo {
+  flex: 1;
+}
+
+.personName {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.personMeta {
+  font-size: 13px;
+  color: var(--text-secondary, #666);
+  margin-top: 2px;
+}
+
+/* KPI 行 */
+.kpiRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+/* 技能认证 */
+.achievementList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.achievementItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-muted, #f0f0f0);
+}
+
+.achievementItem:last-child {
+  border-bottom: none;
+}
+
+.achievementTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.skillName {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.liftAmount {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-success, #52c41a);
+}
+
+.achievementMeta {
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+  display: flex;
+  gap: 8px;
+}
+
+.evidence {
+  font-style: italic;
+}
+
+/* 风险详情 */
+.riskDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.riskFactor {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.riskKey {
+  color: var(--text-secondary, #666);
+}
+
+.riskVal {
+  color: var(--text-primary, #1a1a1a);
+  font-weight: 500;
+}
+
+.riskMeta {
+  font-size: 12px;
+  color: var(--text-muted, #999);
+  margin-top: 4px;
+}
+
+/* 知识采集 */
+.captureList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.captureItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.captureTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.captureDate {
+  font-size: 12px;
+  color: var(--text-muted, #999);
+  margin-left: auto;
+}
+
+.captureContext {
+  font-size: 13px;
+  color: var(--text-secondary, #666);
+  background: var(--bg-muted, #f8f8f8);
+  border-radius: 4px;
+  padding: 4px 8px;
+}
+
+/* 在岗历史 */
+.assignmentList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.assignmentItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-muted, #f0f0f0);
+}
+
+.assignmentItem:last-child {
+  border-bottom: none;
+}
+
+.assignmentTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.assignmentStore {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.assignmentMeta {
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+}
