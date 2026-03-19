@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from src.core.database import get_db_session
 from src.core.dependencies import get_current_user
-from src.models.employee import Employee  # 保留双写
+from src.models.employee import Employee  # 影子写入（向后兼容，待M4删除）
 from src.models.hr.person import Person
 from src.models.inventory import InventoryItem, InventoryStatus
 from src.models.order import Order, OrderItem, OrderStatus
@@ -77,13 +77,38 @@ async def import_employees(
 
                 from sqlalchemy import select
 
-                existing = await session.execute(select(Employee).where(Employee.id == emp_id))
-                emp = existing.scalar_one_or_none()
+                phone = row.get("手机", "").strip() or None
+                email = row.get("邮箱", "").strip() or None
 
+                # ── 主写入：Person 表 ──
+                existing_person = await session.execute(
+                    select(Person).where(Person.legacy_employee_id == emp_id)
+                )
+                person = existing_person.scalar_one_or_none()
+                if person:
+                    person.name = name
+                    person.phone = phone or person.phone
+                    person.email = email or person.email
+                    person.is_active = is_active
+                    person.store_id = store_id
+                else:
+                    person = Person(
+                        legacy_employee_id=emp_id,
+                        store_id=store_id,
+                        name=name,
+                        phone=phone,
+                        email=email,
+                        is_active=is_active,
+                    )
+                    session.add(person)
+
+                # ── 影子写入：Employee 表（向后兼容，待 M4 删除） ──
+                existing_emp = await session.execute(select(Employee).where(Employee.id == emp_id))
+                emp = existing_emp.scalar_one_or_none()
                 if emp:
                     emp.name = name
-                    emp.phone = row.get("手机", "").strip() or emp.phone
-                    emp.email = row.get("邮箱", "").strip() or emp.email
+                    emp.phone = phone or emp.phone
+                    emp.email = email or emp.email
                     emp.position = position
                     emp.hire_date = hire_date or emp.hire_date
                     emp.is_active = is_active
@@ -93,33 +118,10 @@ async def import_employees(
                             id=emp_id,
                             store_id=store_id,
                             name=name,
-                            phone=row.get("手机", "").strip() or None,
-                            email=row.get("邮箱", "").strip() or None,
+                            phone=phone,
+                            email=email,
                             position=position,
                             hire_date=hire_date,
-                            is_active=is_active,
-                        )
-                    )
-
-                # 双写 Person 表
-                existing_person = await session.execute(
-                    select(Person).where(Person.legacy_employee_id == emp_id)
-                )
-                person = existing_person.scalar_one_or_none()
-                if person:
-                    person.name = name
-                    person.phone = row.get("手机", "").strip() or person.phone
-                    person.email = row.get("邮箱", "").strip() or person.email
-                    person.is_active = is_active
-                    person.store_id = store_id
-                else:
-                    session.add(
-                        Person(
-                            legacy_employee_id=emp_id,
-                            store_id=store_id,
-                            name=name,
-                            phone=row.get("手机", "").strip() or None,
-                            email=row.get("邮箱", "").strip() or None,
                             is_active=is_active,
                         )
                     )

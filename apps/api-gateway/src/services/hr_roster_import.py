@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import structlog
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.models.employee import Employee
+from src.models.employee import Employee  # 影子写入（向后兼容，待M4删除）
 from src.models.hr.person import Person
 from src.models.organization import Organization
 
@@ -190,7 +190,10 @@ class HRRosterImportService:
                 emp_id = str(data["id"]).strip()
                 data["store_id"] = data.get("store_id") or store_id
 
-                # upsert Employee（保留全字段，向后兼容）
+                # ── 主写入：Person 表 ──
+                await self._upsert_person(db, emp_id, data)
+
+                # ── 影子写入：Employee 表（向后兼容，待 M4 删除） ──
                 existing = await db.execute(select(Employee).where(Employee.id == emp_id))
                 emp = existing.scalar_one_or_none()
 
@@ -203,9 +206,6 @@ class HRRosterImportService:
                     emp = Employee(**data)
                     db.add(emp)
                     stats["created"] += 1
-
-                # 同步写入 Person（三层模型过渡，核心身份字段）
-                await self._upsert_person(db, emp_id, data)
 
                 # 自动创建组织节点（如果有部门/区域信息）
                 dept = None
@@ -295,19 +295,49 @@ class HRRosterImportService:
         )
         person = person_result.scalar_one_or_none()
 
+        # 需要直接写入 Person 的字段映射（data key → Person attr）
+        _DIRECT_FIELDS = {
+            "name": "name", "phone": "phone", "email": "email",
+            "store_id": "store_id", "gender": "gender",
+            "birth_date": "birth_date", "id_card_no": "id_number",
+            "health_cert_expiry": "health_cert_expiry",
+            "health_cert_attachment": "health_cert_attachment",
+            "id_card_expiry": "id_card_expiry",
+            "bank_name": "bank_name", "bank_account": "bank_account",
+            "bank_branch": "bank_branch", "background_check": "background_check",
+            "accommodation": "accommodation", "union_member": "union_member",
+        }
+        # profile_ext JSONB 字段
+        _PROFILE_EXT_FIELDS = [
+            "education", "graduation_school", "major", "professional_cert",
+            "marital_status", "ethnicity", "hukou_type", "hukou_location",
+            "political_status", "height_cm", "weight_kg", "regular_date",
+            "emergency_contact", "emergency_phone", "emergency_relation",
+        ]
+
         if person:
             # 更新核心字段（仅覆盖非空值）
-            if data.get("name"):
-                person.name = data["name"]
-            if data.get("phone"):
-                person.phone = data["phone"]
-            if data.get("email"):
-                person.email = data["email"]
-            if data.get("store_id"):
-                person.store_id = data["store_id"]
+            for data_key, attr in _DIRECT_FIELDS.items():
+                val = data.get(data_key)
+                if val is not None:
+                    setattr(person, attr, val)
             person.is_active = is_active
             person.career_stage = career_stage
+            # 更新 profile_ext
+            ext = dict(person.profile_ext or {})
+            for field in _PROFILE_EXT_FIELDS:
+                val = data.get(field)
+                if val is not None:
+                    ext[field] = str(val) if isinstance(val, (date, datetime)) else val
+            person.profile_ext = ext
         else:
+            # 构建 profile_ext
+            ext = {}
+            for field in _PROFILE_EXT_FIELDS:
+                val = data.get(field)
+                if val is not None:
+                    ext[field] = str(val) if isinstance(val, (date, datetime)) else val
+
             person = Person(
                 legacy_employee_id=emp_id,
                 name=data.get("name", ""),
@@ -316,6 +346,18 @@ class HRRosterImportService:
                 store_id=data.get("store_id") or self.store_id,
                 is_active=is_active,
                 career_stage=career_stage,
+                gender=data.get("gender"),
+                birth_date=data.get("birth_date"),
+                id_number=data.get("id_card_no"),
+                health_cert_expiry=data.get("health_cert_expiry"),
+                id_card_expiry=data.get("id_card_expiry"),
+                bank_name=data.get("bank_name"),
+                bank_account=data.get("bank_account"),
+                bank_branch=data.get("bank_branch"),
+                background_check=data.get("background_check"),
+                accommodation=data.get("accommodation"),
+                union_member=data.get("union_member"),
+                profile_ext=ext if ext else {},
             )
             db.add(person)
 
