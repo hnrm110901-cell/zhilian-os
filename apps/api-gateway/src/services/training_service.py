@@ -12,7 +12,8 @@ import structlog
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import selectinload
 from src.core.database import get_db_session
-from src.models.employee import Employee
+from src.models.hr.person import Person
+from src.models.hr.employment_assignment import EmploymentAssignment
 from src.models.kpi import KPI, KPIRecord
 
 logger = structlog.get_logger()
@@ -76,23 +77,34 @@ class TrainingService:
             培训需求列表
         """
         async with get_db_session() as session:
-            # 查询员工
-            stmt = select(Employee).where(Employee.store_id == self.store_id)
-
+            # 查询员工（Person JOIN EmploymentAssignment）
+            stmt = (
+                select(Person, EmploymentAssignment)
+                .join(EmploymentAssignment, EmploymentAssignment.person_id == Person.id)
+                .where(
+                    and_(
+                        Person.store_id == self.store_id,
+                        Person.is_active.is_(True),
+                        EmploymentAssignment.status == "active",
+                    )
+                )
+            )
             if staff_id:
-                stmt = stmt.where(Employee.id == staff_id)
-
+                stmt = stmt.where(Person.legacy_employee_id == str(staff_id))
             if position:
-                stmt = stmt.where(Employee.position == position)
+                stmt = stmt.where(EmploymentAssignment.position == position)
 
             result = await session.execute(stmt)
-            employees = result.scalars().all()
+            rows = result.all()
 
             # 生成培训需求（基于员工岗位和技能）
             training_needs = []
-            for employee in employees:
-                # 根据岗位确定培训需求
-                needs = self._identify_training_needs(employee)
+            for person, assignment in rows:
+                needs = self._identify_training_needs(
+                    employee_id=person.legacy_employee_id or str(person.id),
+                    name=person.name,
+                    position=assignment.position,
+                )
                 training_needs.extend(needs)
 
             return training_needs
@@ -346,13 +358,24 @@ class TrainingService:
             培训历史
         """
         async with get_db_session() as session:
-            # 获取员工信息
-            emp_stmt = select(Employee).where(Employee.id == staff_id)
-            emp_result = await session.execute(emp_stmt)
-            employee = emp_result.scalar_one_or_none()
+            # 通过 legacy_employee_id 查 Person
+            person_result = await session.execute(
+                select(Person).where(Person.legacy_employee_id == str(staff_id))
+            )
+            person = person_result.scalar_one_or_none()
 
-            if not employee:
+            if not person:
                 raise ValueError(f"员工不存在: {staff_id}")
+
+            # 查当前岗位
+            assign_result = await session.execute(
+                select(EmploymentAssignment)
+                .where(and_(EmploymentAssignment.person_id == person.id, EmploymentAssignment.status == "active"))
+                .order_by(EmploymentAssignment.start_date.desc())
+                .limit(1)
+            )
+            assignment = assign_result.scalar_one_or_none()
+            current_position = assignment.position if assignment else None
 
             # 获取培训记录
             progress = await self.get_training_progress(staff_id=staff_id)
@@ -364,8 +387,8 @@ class TrainingService:
 
             return {
                 "staff_id": staff_id,
-                "staff_name": employee.name,
-                "position": employee.position,
+                "staff_name": person.name,
+                "position": current_position,
                 "training_summary": {
                     "total_trainings": total_trainings,
                     "passed_trainings": passed_trainings,
@@ -375,7 +398,12 @@ class TrainingService:
                 "training_history": progress,
             }
 
-    def _identify_training_needs(self, employee: Employee) -> List[Dict[str, Any]]:
+    def _identify_training_needs(
+        self,
+        employee_id: str,
+        name: str,
+        position: Optional[str],
+    ) -> List[Dict[str, Any]]:
         """识别员工培训需求"""
         needs = []
 
@@ -387,27 +415,27 @@ class TrainingService:
             "manager": ["management", "leadership"],
         }
 
-        position = employee.position.lower() if employee.position else ""
+        pos_lower = position.lower() if position else ""
         required_trainings = []
 
         for key, trainings in position_training_map.items():
-            if key in position:
+            if key in pos_lower:
                 required_trainings = trainings
                 break
 
         for training in required_trainings:
             needs.append(
                 {
-                    "need_id": f"NEED_{employee.id}_{training.upper()}",
-                    "staff_id": employee.id,
-                    "staff_name": employee.name,
-                    "position": employee.position,
+                    "need_id": f"NEED_{employee_id}_{training.upper()}",
+                    "staff_id": employee_id,
+                    "staff_name": name,
+                    "position": position,
                     "skill_gap": training,
                     "current_level": "beginner",
                     "target_level": "intermediate",
                     "priority": "medium",
                     "recommended_courses": [training],
-                    "reason": f"Required for {employee.position} position",
+                    "reason": f"Required for {position} position",
                     "identified_at": datetime.now().isoformat(),
                 }
             )

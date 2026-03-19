@@ -20,7 +20,8 @@ import structlog
 from sqlalchemy import and_, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.attendance import AttendanceLog
-from src.models.employee import Employee
+from src.models.hr.person import Person
+from src.models.hr.employment_assignment import EmploymentAssignment
 from src.models.employee_growth import (
     CareerPath,
     EmployeeGrowthPlan,
@@ -91,18 +92,30 @@ async def analyze_skill_gaps(db: AsyncSession, store_id: str, employee_id: str) 
     技能差距分析：对比员工当前技能等级与岗位要求。
     返回差距列表 + AI成长建议。
     """
-    # 获取员工信息
-    emp_result = await db.execute(select(Employee).where(Employee.id == employee_id))
-    employee = emp_result.scalar_one_or_none()
-    if not employee:
+    # 获取员工信息（三层模型：Person）
+    person_result = await db.execute(
+        select(Person).where(Person.legacy_employee_id == str(employee_id))
+    )
+    person = person_result.scalar_one_or_none()
+    if not person:
         return {"error": "员工不存在"}
+
+    # 查当前岗位（EmploymentAssignment）
+    assign_result = await db.execute(
+        select(EmploymentAssignment)
+        .where(and_(EmploymentAssignment.person_id == person.id, EmploymentAssignment.status == "active"))
+        .order_by(EmploymentAssignment.start_date.desc())
+        .limit(1)
+    )
+    assignment = assign_result.scalar_one_or_none()
+    position = assignment.position if assignment else None
 
     # 获取岗位要求的技能
     skill_defs = await db.execute(
         select(SkillDefinition).where(
             and_(
                 SkillDefinition.is_active.is_(True),
-                SkillDefinition.applicable_positions.op("@>")(f'["{employee.position}"]') if employee.position else True,
+                SkillDefinition.applicable_positions.op("@>")(f'["{position}"]') if position else True,
             )
         )
     )
@@ -160,8 +173,8 @@ async def analyze_skill_gaps(db: AsyncSession, store_id: str, employee_id: str) 
 
     return {
         "employee_id": employee_id,
-        "employee_name": employee.name,
-        "position": employee.position,
+        "employee_name": person.name,
+        "position": position,
         "readiness_pct": readiness_pct,
         "gap_count": len(gaps),
         "strength_count": len(strengths),
@@ -175,17 +188,30 @@ async def assess_promotion_readiness(db: AsyncSession, store_id: str, employee_i
     """
     晋升就绪度评估：综合技能、绩效、工龄判断是否可以晋升。
     """
-    emp_result = await db.execute(select(Employee).where(Employee.id == employee_id))
-    employee = emp_result.scalar_one_or_none()
-    if not employee:
+    person_result = await db.execute(
+        select(Person).where(Person.legacy_employee_id == str(employee_id))
+    )
+    person = person_result.scalar_one_or_none()
+    if not person:
         return {"error": "员工不存在"}
+
+    # 查当前岗位和最早入职日期
+    assign_result = await db.execute(
+        select(EmploymentAssignment)
+        .where(and_(EmploymentAssignment.person_id == person.id, EmploymentAssignment.status == "active"))
+        .order_by(EmploymentAssignment.start_date.asc())
+        .limit(1)
+    )
+    assignment = assign_result.scalar_one_or_none()
+    position = assignment.position if assignment else None
+    hire_date = assignment.start_date if assignment else None
 
     # 查找可用的晋升路径
     paths = await db.execute(
         select(CareerPath)
         .where(
             and_(
-                CareerPath.from_position == employee.position,
+                CareerPath.from_position == position,
                 CareerPath.is_active.is_(True),
             )
         )
@@ -196,16 +222,16 @@ async def assess_promotion_readiness(db: AsyncSession, store_id: str, employee_i
     if not available_paths:
         return {
             "employee_id": employee_id,
-            "employee_name": employee.name,
-            "current_position": employee.position,
+            "employee_name": person.name,
+            "current_position": position,
             "paths": [],
             "message": "暂无可用晋升路径配置",
         }
 
     # 计算在岗月数
     tenure_months = 0
-    if employee.hire_date:
-        delta = date.today() - employee.hire_date
+    if hire_date:
+        delta = date.today() - hire_date
         tenure_months = delta.days // 30
 
     # 获取最近绩效
@@ -279,8 +305,8 @@ async def assess_promotion_readiness(db: AsyncSession, store_id: str, employee_i
 
     return {
         "employee_id": employee_id,
-        "employee_name": employee.name,
-        "current_position": employee.position,
+        "employee_name": person.name,
+        "current_position": position,
         "tenure_months": tenure_months,
         "performance_score": perf_score,
         "paths": results,
@@ -299,11 +325,21 @@ async def generate_growth_plan(db: AsyncSession, store_id: str, employee_id: str
     promotion = await assess_promotion_readiness(db, store_id, employee_id)
 
     # 获取员工详情（用于 LLM 上下文）
-    emp_result = await db.execute(select(Employee).where(Employee.id == employee_id))
-    employee = emp_result.scalar_one_or_none()
+    person_result = await db.execute(
+        select(Person).where(Person.legacy_employee_id == str(employee_id))
+    )
+    person = person_result.scalar_one_or_none()
     tenure_months = 0
-    if employee and employee.hire_date:
-        tenure_months = (date.today() - employee.hire_date).days // 30
+    if person:
+        assign_result = await db.execute(
+            select(EmploymentAssignment)
+            .where(and_(EmploymentAssignment.person_id == person.id, EmploymentAssignment.status == "active"))
+            .order_by(EmploymentAssignment.start_date.asc())
+            .limit(1)
+        )
+        asgn = assign_result.scalar_one_or_none()
+        if asgn and asgn.start_date:
+            tenure_months = (date.today() - asgn.start_date).days // 30
 
     # 获取最近绩效分数
     perf_scores = []
@@ -534,19 +570,33 @@ async def check_and_trigger_milestones(db: AsyncSession, store_id: str) -> List[
     today = date.today()
     triggered = []
 
-    # 获取在职员工
-    emp_result = await db.execute(select(Employee).where(and_(Employee.store_id == store_id, Employee.is_active.is_(True))))
-    employees = emp_result.scalars().all()
+    # 获取在职员工（Person）
+    person_result = await db.execute(
+        select(Person).where(and_(Person.store_id == store_id, Person.is_active.is_(True)))
+    )
+    persons = person_result.scalars().all()
 
-    for emp in employees:
+    for person in persons:
+        legacy_id = person.legacy_employee_id or str(person.id)
+
+        # 查最早入职日期（EmploymentAssignment.start_date）
+        hire_assign = await db.execute(
+            select(EmploymentAssignment)
+            .where(EmploymentAssignment.person_id == person.id)
+            .order_by(EmploymentAssignment.start_date.asc())
+            .limit(1)
+        )
+        hire_assignment = hire_assign.scalar_one_or_none()
+        hire_date = hire_assignment.start_date if hire_assignment else None
+
         # 1. 周年纪念（入职满N年）
-        if emp.hire_date:
-            years = (today - emp.hire_date).days // 365
+        if hire_date:
+            years = (today - hire_date).days // 365
             if years > 0:
                 existing = await db.execute(
                     select(func.count(EmployeeMilestone.id)).where(
                         and_(
-                            EmployeeMilestone.employee_id == emp.id,
+                            EmployeeMilestone.employee_id == legacy_id,
                             EmployeeMilestone.milestone_type == MilestoneType.ANNIVERSARY,
                             EmployeeMilestone.title.ilike(f"%{years}周年%"),
                         )
@@ -556,18 +606,18 @@ async def check_and_trigger_milestones(db: AsyncSession, store_id: str) -> List[
                     ms = EmployeeMilestone(
                         id=uuid_mod.uuid4(),
                         store_id=store_id,
-                        employee_id=emp.id,
+                        employee_id=legacy_id,
                         milestone_type=MilestoneType.ANNIVERSARY,
                         title=f"入职{years}周年",
-                        description=f"{emp.name}入职已满{years}年，感谢一路同行",
+                        description=f"{person.name}入职已满{years}年，感谢一路同行",
                         achieved_at=today,
                         badge_icon="anniversary",
                     )
                     db.add(ms)
                     triggered.append(
                         {
-                            "employee_id": emp.id,
-                            "employee_name": emp.name,
+                            "employee_id": legacy_id,
+                            "employee_name": person.name,
                             "milestone": f"入职{years}周年",
                             "type": "anniversary",
                         }
@@ -579,7 +629,7 @@ async def check_and_trigger_milestones(db: AsyncSession, store_id: str) -> List[
         att_result = await db.execute(
             select(func.count(AttendanceLog.id)).where(
                 and_(
-                    AttendanceLog.employee_id == emp.id,
+                    AttendanceLog.employee_id == legacy_id,
                     AttendanceLog.work_date >= lm_start,
                     AttendanceLog.work_date <= last_month,
                     AttendanceLog.status.in_(["absent", "late"]),
@@ -592,7 +642,7 @@ async def check_and_trigger_milestones(db: AsyncSession, store_id: str) -> List[
             total_att = await db.execute(
                 select(func.count(AttendanceLog.id)).where(
                     and_(
-                        AttendanceLog.employee_id == emp.id,
+                        AttendanceLog.employee_id == legacy_id,
                         AttendanceLog.work_date >= lm_start,
                         AttendanceLog.work_date <= last_month,
                     )
@@ -603,7 +653,7 @@ async def check_and_trigger_milestones(db: AsyncSession, store_id: str) -> List[
                 existing_pa = await db.execute(
                     select(func.count(EmployeeMilestone.id)).where(
                         and_(
-                            EmployeeMilestone.employee_id == emp.id,
+                            EmployeeMilestone.employee_id == legacy_id,
                             EmployeeMilestone.milestone_type == MilestoneType.PERFECT_ATTENDANCE,
                             EmployeeMilestone.title.ilike(f"%{period}%"),
                         )
@@ -613,18 +663,18 @@ async def check_and_trigger_milestones(db: AsyncSession, store_id: str) -> List[
                     ms = EmployeeMilestone(
                         id=uuid_mod.uuid4(),
                         store_id=store_id,
-                        employee_id=emp.id,
+                        employee_id=legacy_id,
                         milestone_type=MilestoneType.PERFECT_ATTENDANCE,
                         title=f"{period}全勤之星",
-                        description=f"{emp.name}在{period}保持全勤，表现优秀",
+                        description=f"{person.name}在{period}保持全勤，表现优秀",
                         achieved_at=today,
                         badge_icon="perfect_attendance",
                     )
                     db.add(ms)
                     triggered.append(
                         {
-                            "employee_id": emp.id,
-                            "employee_name": emp.name,
+                            "employee_id": legacy_id,
+                            "employee_name": person.name,
                             "milestone": f"{period}全勤之星",
                             "type": "perfect_attendance",
                         }
@@ -703,8 +753,8 @@ async def compute_wellbeing_insights(db: AsyncSession, store_id: str) -> Dict[st
 
     # 找出需要关怀的员工（幸福指数<5分）
     concern_result = await db.execute(
-        select(EmployeeWellbeing, Employee.name)
-        .join(Employee, EmployeeWellbeing.employee_id == Employee.id)
+        select(EmployeeWellbeing, Person.name)
+        .join(Person, Person.legacy_employee_id == EmployeeWellbeing.employee_id)
         .where(
             and_(
                 EmployeeWellbeing.store_id == store_id,
@@ -772,10 +822,23 @@ async def get_employee_journey(db: AsyncSession, employee_id: str) -> Dict[str, 
     """
     获取员工全旅程视图：时间线 + 技能 + 里程碑 + 成长计划 + 幸福指数。
     """
-    emp_result = await db.execute(select(Employee).where(Employee.id == employee_id))
-    employee = emp_result.scalar_one_or_none()
-    if not employee:
+    person_result = await db.execute(
+        select(Person).where(Person.legacy_employee_id == str(employee_id))
+    )
+    person = person_result.scalar_one_or_none()
+    if not person:
         return {"error": "员工不存在"}
+
+    # 查当前岗位和入职日期（EmploymentAssignment）
+    assign_result = await db.execute(
+        select(EmploymentAssignment)
+        .where(and_(EmploymentAssignment.person_id == person.id, EmploymentAssignment.status == "active"))
+        .order_by(EmploymentAssignment.start_date.asc())
+        .limit(1)
+    )
+    assignment = assign_result.scalar_one_or_none()
+    position = assignment.position if assignment else None
+    hire_date = assignment.start_date if assignment else None
 
     # 1. 变动时间线
     changes = await db.execute(
@@ -873,17 +936,17 @@ async def get_employee_journey(db: AsyncSession, employee_id: str) -> Dict[str, 
     ]
 
     # 6. 计算在岗天数和价值贡献
-    tenure_days = (date.today() - employee.hire_date).days if employee.hire_date else 0
+    tenure_days = (date.today() - hire_date).days if hire_date else 0
 
     return {
         "employee": {
-            "id": employee.id,
-            "name": employee.name,
-            "position": employee.position,
-            "hire_date": str(employee.hire_date) if employee.hire_date else None,
-            "employment_status": employee.employment_status or "regular",
+            "id": person.legacy_employee_id or str(person.id),
+            "name": person.name,
+            "position": position,
+            "hire_date": str(hire_date) if hire_date else None,
+            "employment_status": person.career_stage or "regular",
             "tenure_days": tenure_days,
-            "is_active": employee.is_active,
+            "is_active": person.is_active,
         },
         "timeline": timeline,
         "milestones": milestone_list,
