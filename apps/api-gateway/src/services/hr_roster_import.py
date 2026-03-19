@@ -10,6 +10,7 @@ import structlog
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.employee import Employee
+from src.models.hr.person import Person
 from src.models.organization import Organization
 
 logger = structlog.get_logger()
@@ -189,7 +190,7 @@ class HRRosterImportService:
                 emp_id = str(data["id"]).strip()
                 data["store_id"] = data.get("store_id") or store_id
 
-                # upsert
+                # upsert Employee（保留全字段，向后兼容）
                 existing = await db.execute(select(Employee).where(Employee.id == emp_id))
                 emp = existing.scalar_one_or_none()
 
@@ -202,6 +203,9 @@ class HRRosterImportService:
                     emp = Employee(**data)
                     db.add(emp)
                     stats["created"] += 1
+
+                # 同步写入 Person（三层模型过渡，核心身份字段）
+                await self._upsert_person(db, emp_id, data)
 
                 # 自动创建组织节点（如果有部门/区域信息）
                 dept = None
@@ -262,6 +266,58 @@ class HRRosterImportService:
                 return None
 
         return str(val).strip() if val else None
+
+    async def _upsert_person(self, db: AsyncSession, emp_id: str, data: Dict) -> None:
+        """同步写入 Person 核心身份字段（三层模型过渡）。不创建 EmploymentAssignment，
+        避免 org_node FK 约束在批量导入时因 store→org_node 映射未就绪而失败。"""
+        emp_status = str(data.get("employment_status") or "").strip().lower()
+        is_active = emp_status not in ("resigned", "terminated", "离职", "已离职")
+
+        # 简单映射 employment_status → career_stage
+        career_stage_map = {
+            "trial": "probation",
+            "probation": "probation",
+            "regular": "regular",
+            "resigned": "regular",
+            "terminated": "regular",
+            "在职": "regular",
+            "试岗": "probation",
+            "试用": "probation",
+            "正式": "regular",
+            "离职": "regular",
+        }
+        career_stage = career_stage_map.get(emp_status) or career_stage_map.get(
+            data.get("employment_status", ""), "regular"
+        )
+
+        person_result = await db.execute(
+            select(Person).where(Person.legacy_employee_id == emp_id)
+        )
+        person = person_result.scalar_one_or_none()
+
+        if person:
+            # 更新核心字段（仅覆盖非空值）
+            if data.get("name"):
+                person.name = data["name"]
+            if data.get("phone"):
+                person.phone = data["phone"]
+            if data.get("email"):
+                person.email = data["email"]
+            if data.get("store_id"):
+                person.store_id = data["store_id"]
+            person.is_active = is_active
+            person.career_stage = career_stage
+        else:
+            person = Person(
+                legacy_employee_id=emp_id,
+                name=data.get("name", ""),
+                phone=data.get("phone"),
+                email=data.get("email"),
+                store_id=data.get("store_id") or self.store_id,
+                is_active=is_active,
+                career_stage=career_stage,
+            )
+            db.add(person)
 
     async def _ensure_org_node(self, db: AsyncSession, dept_name: str, store_id: Optional[str]) -> None:
         """确保组织节点存在，不存在则创建"""
